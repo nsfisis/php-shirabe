@@ -1,5 +1,5 @@
 use crate::{
-    ChildPipe, PhpMixed, PhpResource, StreamBacking, StreamState, bconcat, fopen,
+    ChildPipe, PhpMixed, PhpResource, StreamBacking, StreamState, bformat, fopen,
     os_str_from_bytes, path_from_bytes,
 };
 use bstr::{BString, ByteSlice};
@@ -202,7 +202,7 @@ pub fn proc_open(
                                 !child_reads,
                                 child_reads,
                                 mode.clone(),
-                                bconcat!("pipe:fd", fd),
+                                bformat!("pipe:fd{fd}"),
                             ),
                         ))),
                     );
@@ -297,7 +297,7 @@ pub fn proc_open(
                 readable,
                 writable,
                 mode,
-                bconcat!("pipe:fd", fd),
+                bformat!("pipe:fd{fd}"),
             ))));
         pipes.insert(fd, resource);
     }
@@ -487,7 +487,7 @@ fn pipe_cloexec() -> std::io::Result<(std::os::fd::OwnedFd, std::os::fd::OwnedFd
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{bconcat, fclose, fwrite, path_to_bytes, stream_get_contents};
+    use crate::{bformat, fclose, fwrite, path_to_bytes, stream_get_contents};
 
     #[test]
     fn proc_open_reads_stdout_and_reports_status() {
@@ -640,10 +640,9 @@ mod tests {
 
     #[test]
     fn proc_open_redirects_stdout_to_file() {
-        let path = std::env::temp_dir().join(path_from_bytes(&bconcat!(
-            "shirabe_proc_open_",
-            std::process::id(),
-            ".txt"
+        let path = std::env::temp_dir().join(path_from_bytes(&bformat!(
+            "shirabe_proc_open_{}.txt",
+            std::process::id()
         )));
         let path_str = path_to_bytes(&path);
 
@@ -652,7 +651,7 @@ mod tests {
             "echo filetest",
             &[
                 Descriptor::Inherit,
-                Descriptor::File(bconcat!(path_str), BString::from("w")),
+                Descriptor::File(bformat!("{path_str}"), BString::from("w")),
                 Descriptor::Inherit,
             ],
             &mut pipes,

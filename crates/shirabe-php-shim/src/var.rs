@@ -1,4 +1,4 @@
-use crate::{PhpDisplay, PhpMixed, ToPhpString, bconcat, utf8_text};
+use crate::{PhpDisplay, PhpMixed, ToPhpString, bformat, bwrite, utf8_text};
 use bstr::{BStr, BString, ByteSlice, ByteVec};
 use indexmap::IndexMap;
 
@@ -23,7 +23,7 @@ pub fn serialize(value: &PhpMixed) -> BString {
 
 fn serialize_string(out: &mut BString, s: &[u8]) {
     // PHP measures the string length in bytes.
-    out.push_str(bconcat!("s:", s.len(), ":\""));
+    bwrite!(out, "s:{}:\"", s.len());
     out.extend_from_slice(s);
     out.push_str("\";");
 }
@@ -32,7 +32,7 @@ fn serialize_into(out: &mut BString, value: &PhpMixed) {
     match value {
         PhpMixed::Null => out.push_str("N;"),
         PhpMixed::Bool(b) => out.push_str(if *b { "b:1;" } else { "b:0;" }),
-        PhpMixed::Int(i) => out.push_str(bconcat!("i:", i, ";")),
+        PhpMixed::Int(i) => bwrite!(out, "i:{i};"),
         PhpMixed::Float(f) => {
             out.push_str("d:");
             out.extend_from_slice(&serialize_float(*f));
@@ -40,19 +40,19 @@ fn serialize_into(out: &mut BString, value: &PhpMixed) {
         }
         PhpMixed::String(s) => serialize_string(out, s),
         PhpMixed::List(items) => {
-            out.push_str(bconcat!("a:", items.len(), ":{"));
+            bwrite!(out, "a:{}:{{", items.len());
             for (i, item) in items.iter().enumerate() {
-                out.push_str(bconcat!("i:", i, ";"));
+                bwrite!(out, "i:{i};");
                 serialize_into(out, item);
             }
             out.push(b'}');
         }
         PhpMixed::Array(entries) => {
-            out.push_str(bconcat!("a:", entries.len(), ":{"));
+            bwrite!(out, "a:{}:{{", entries.len());
             for (k, v) in entries {
                 // PHP normalizes canonical integer string keys to integer keys.
                 match canonical_int_key(k) {
-                    Some(i) => out.push_str(bconcat!("i:", i, ";")),
+                    Some(i) => bwrite!(out, "i:{i};"),
                     None => serialize_string(out, k),
                 }
                 serialize_into(out, v);
@@ -341,7 +341,7 @@ pub fn to_array(value: PhpMixed) -> IndexMap<BString, PhpMixed> {
         PhpMixed::List(items) => items
             .into_iter()
             .enumerate()
-            .map(|(i, v)| (bconcat!(i), v))
+            .map(|(i, v)| (bformat!("{i}"), v))
             .collect(),
         scalar => {
             let mut m = IndexMap::new();
@@ -407,14 +407,14 @@ fn var_export_into(out: &mut BString, value: &PhpMixed, level: usize) {
     match value {
         PhpMixed::Null => out.push_str("NULL"),
         PhpMixed::Bool(b) => out.push_str(if *b { "true" } else { "false" }),
-        PhpMixed::Int(i) => out.push_str(bconcat!(i)),
+        PhpMixed::Int(i) => bwrite!(out, "{i}"),
         PhpMixed::Float(f) => out.extend_from_slice(&var_export_float(*f)),
         PhpMixed::String(s) => var_export_string(out, s),
         PhpMixed::List(items) => {
             out.push_str("array (\n");
             for (i, item) in items.iter().enumerate() {
                 var_export_indent(out, level + 1);
-                out.push_str(bconcat!(i, " => "));
+                bwrite!(out, "{i} => ");
                 if matches!(
                     item,
                     PhpMixed::List(_) | PhpMixed::Array(_) | PhpMixed::Object(_)
@@ -433,7 +433,7 @@ fn var_export_into(out: &mut BString, value: &PhpMixed, level: usize) {
             for (k, v) in entries {
                 var_export_indent(out, level + 1);
                 match canonical_int_key(k) {
-                    Some(i) => out.push_str(bconcat!(i)),
+                    Some(i) => bwrite!(out, "{i}"),
                     None => var_export_string(out, k),
                 }
                 out.push_str(" => ");

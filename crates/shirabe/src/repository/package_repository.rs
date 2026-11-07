@@ -12,7 +12,7 @@ use crate::repository::{
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpMixed, RuntimeException, bconcat, error_message, json_encode, php_regex, preg_replace,
+    PhpMixed, RuntimeException, bformat, error_message, json_encode, php_regex, preg_replace,
     var_export,
 };
 use shirabe_semver::constraint::AnyConstraint;
@@ -65,10 +65,9 @@ impl PackageRepository {
             ) {
                 Ok(p) => p,
                 Err(e) => {
-                    let msg = bconcat!(
-                        "A repository of type \"package\" contains an invalid package definition: ",
+                    let msg = bformat!(
+                        "A repository of type \"package\" contains an invalid package definition: {}\n\nInvalid package definition:\n{}",
                         error_message(&e),
-                        "\n\nInvalid package definition:\n",
                         json_encode(package).unwrap_or_default()
                     );
                     return Ok(Err(InvalidRepositoryException::new(msg)));
@@ -235,14 +234,7 @@ impl AdvisoryProviderInterface for PackageRepository {
                 };
                 if !allow_partial_advisories && matches!(advisory, AnySecurityAdvisory::Partial(_))
                 {
-                    return Err(RuntimeException::new(bconcat!(
-                        "Advisory for ",
-                        package_name,
-                        " could not be loaded as a full advisory from ",
-                        self.get_repo_name()?,
-                        "\n",
-                        var_export(data, true)
-                    ))
+                    return Err(RuntimeException::new(bformat!("Advisory for {package_name} could not be loaded as a full advisory from {}\n{}", self.get_repo_name()?, var_export(data, true)))
                     .into());
                 }
 

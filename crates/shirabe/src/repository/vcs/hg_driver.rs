@@ -10,7 +10,7 @@ use bstr::{BStr, BString, ByteSlice};
 use chrono::{DateTime, FixedOffset, Utc};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    Catch as _, PhpMixed, RuntimeException, bconcat, date_create, dirname, is_dir, is_writable,
+    Catch as _, PhpMixed, RuntimeException, bformat, date_create, dirname, is_dir, is_writable,
     path_from_bytes, path_to_bytes, php_regex, preg_is_match, preg_match, preg_replace, trim,
 };
 
@@ -62,19 +62,13 @@ impl HgDriver {
                 "-",
                 Url::sanitize(BString::from(&self.inner.url.clone()[..])),
             );
-            self.repo_dir = bconcat!(cache_vcs_dir, "/", sanitized, "/");
+            self.repo_dir = bformat!("{cache_vcs_dir}/{sanitized}/");
 
             let mut fs = Filesystem::new(None);
             fs.ensure_directory_exists(path_from_bytes(&cache_vcs_dir))?;
 
             if !is_writable(path_from_bytes(&dirname(&self.repo_dir))) {
-                return Err(RuntimeException::new(bconcat!(
-                    "Can not clone ",
-                    self.inner.url,
-                    " to access package information. The \"",
-                    cache_vcs_dir,
-                    "\" directory is not writable by the current user."
-                ))
+                return Err(RuntimeException::new(bformat!("Can not clone {} to access package information. The \"{cache_vcs_dir}\" directory is not writable by the current user.", self.inner.url))
                 .into());
             }
 
@@ -92,24 +86,18 @@ impl HgDriver {
 
             if is_dir(path_from_bytes(&self.repo_dir))
                 && self.inner.process.borrow_mut().execute(
-                    ["hg", "summary"].map(|s| bconcat!(s)).as_ref(),
+                    ["hg", "summary"].map(|s| bformat!("{s}")).as_ref(),
                     &mut BString::default(),
                     Some(path_from_bytes(&self.repo_dir)),
                 )? == 0
             {
                 if self.inner.process.borrow_mut().execute(
-                    ["hg", "pull"].map(|s| bconcat!(s)).as_ref(),
+                    ["hg", "pull"].map(|s| bformat!("{s}")).as_ref(),
                     &mut BString::default(),
                     Some(path_from_bytes(&self.repo_dir)),
                 )? != 0
                 {
-                    self.inner.io.write_error(bconcat!(
-                        "<error>Failed to update ",
-                        self.inner.url,
-                        ", package information from this repository may be outdated (",
-                        self.inner.process.borrow().get_error_output(),
-                        ")</error>"
-                    ));
+                    self.inner.io.write_error(bformat!("<error>Failed to update {}, package information from this repository may be outdated ({})</error>", self.inner.url, self.inner.process.borrow().get_error_output()));
                 }
             } else {
                 let mut fs2 = Filesystem::new(None);
@@ -142,7 +130,7 @@ impl HgDriver {
             let mut output = BString::default();
             self.inner.process.borrow_mut().execute(
                 ["hg", "tip", "--template", "{node}"]
-                    .map(|s| bconcat!(s))
+                    .map(|s| bformat!("{s}"))
                     .as_ref(),
                 &mut output,
                 Some(path_from_bytes(&self.repo_dir)),
@@ -176,10 +164,7 @@ impl HgDriver {
         identifier: &BStr,
     ) -> anyhow::Result<Option<BString>> {
         if identifier.starts_with(b"-") {
-            return Err(RuntimeException::new(bconcat!(
-                "Invalid hg identifier detected. Identifier must not start with a -, given: ",
-                identifier
-            ))
+            return Err(RuntimeException::new(bformat!("Invalid hg identifier detected. Identifier must not start with a -, given: {identifier}"))
             .into());
         }
 
@@ -210,10 +195,7 @@ impl HgDriver {
         identifier: &BStr,
     ) -> anyhow::Result<Option<DateTime<FixedOffset>>> {
         if identifier.starts_with(b"-") {
-            return Err(RuntimeException::new(bconcat!(
-                "Invalid hg identifier detected. Identifier must not start with a -, given: ",
-                identifier
-            ))
+            return Err(RuntimeException::new(bformat!("Invalid hg identifier detected. Identifier must not start with a -, given: {identifier}"))
             .into());
         }
 
@@ -240,7 +222,7 @@ impl HgDriver {
             let mut tags: IndexMap<BString, BString> = IndexMap::new();
             let mut output = BString::default();
             self.inner.process.borrow_mut().execute(
-                ["hg", "tags"].map(|s| bconcat!(s)).as_ref(),
+                ["hg", "tags"].map(|s| bformat!("{s}")).as_ref(),
                 &mut output,
                 Some(path_from_bytes(&self.repo_dir)),
             )?;
@@ -269,7 +251,7 @@ impl HgDriver {
 
             let mut output = BString::default();
             self.inner.process.borrow_mut().execute(
-                ["hg", "branches"].map(|s| bconcat!(s)).as_ref(),
+                ["hg", "branches"].map(|s| bformat!("{s}")).as_ref(),
                 &mut output,
                 Some(path_from_bytes(&self.repo_dir)),
             )?;
@@ -287,7 +269,7 @@ impl HgDriver {
 
             output.clear();
             self.inner.process.borrow_mut().execute(
-                ["hg", "bookmarks"].map(|s| bconcat!(s)).as_ref(),
+                ["hg", "bookmarks"].map(|s| bformat!("{s}")).as_ref(),
                 &mut output,
                 Some(path_from_bytes(&self.repo_dir)),
             )?;
@@ -335,7 +317,7 @@ impl HgDriver {
             let process = ProcessExecutor::new(Some(io.clone()));
             let mut output = BString::default();
             if process.execute(
-                ["hg", "summary"].map(|s| bconcat!(s)).as_ref(),
+                ["hg", "summary"].map(|s| bformat!("{s}")).as_ref(),
                 &mut output,
                 Some(path_from_bytes(&url)),
             )? == 0

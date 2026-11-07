@@ -1,5 +1,5 @@
 use crate::{
-    PhpMixed, ToPhpString, TypeError, bconcat, display_to_bytes, get_debug_type, intval, utf8_text,
+    PhpMixed, ToPhpString, TypeError, bformat, display_to_bytes, get_debug_type, intval, utf8_text,
 };
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
@@ -374,10 +374,9 @@ pub fn implode_mixed(glue: impl AsRef<[u8]>, pieces: &PhpMixed) -> anyhow::Resul
         PhpMixed::List(list) => list.iter().map(ToPhpString::to_php_string).collect(),
         PhpMixed::Array(map) => map.values().map(ToPhpString::to_php_string).collect(),
         other => {
-            return Err(TypeError::new(bconcat!(
-                "implode(): Argument #2 ($array) must be of type ?array, ",
-                get_debug_type(other),
-                " given"
+            return Err(TypeError::new(bformat!(
+                "implode(): Argument #2 ($array) must be of type ?array, {} given",
+                get_debug_type(other)
             ))
             .into());
         }
@@ -857,7 +856,7 @@ pub fn sprintf(format: impl AsRef<[u8]>, args: &[PhpMixed]) -> BString {
 
         let (core, numeric): (BString, bool) = match spec {
             b'd' => (sprintf_signed_int(intval(&arg), plus, space), true),
-            b'u' => (bconcat!(intval(&arg) as u64), true),
+            b'u' => (bformat!("{}", intval(&arg) as u64), true),
             b'b' => (
                 display_to_bytes(format_args!("{:b}", intval(&arg) as u64)),
                 true,
@@ -900,13 +899,13 @@ pub fn sprintf(format: impl AsRef<[u8]>, args: &[PhpMixed]) -> BString {
 
 fn sprintf_signed_int(n: i64, plus: bool, space: bool) -> BString {
     if n < 0 {
-        bconcat!(n)
+        bformat!("{n}")
     } else if plus {
-        bconcat!("+", n)
+        bformat!("+{n}")
     } else if space {
-        bconcat!(" ", n)
+        bformat!(" {n}")
     } else {
-        bconcat!(n)
+        bformat!("{n}")
     }
 }
 
@@ -914,11 +913,11 @@ fn sprintf_float(v: f64, precision: usize, plus: bool, space: bool) -> BString {
     let negative = v.is_sign_negative() && !v.is_nan();
     let magnitude = display_to_bytes(format_args!("{:.*}", precision, v.abs()));
     if negative {
-        bconcat!("-", magnitude)
+        bformat!("-{magnitude}")
     } else if plus {
-        bconcat!("+", magnitude)
+        bformat!("+{magnitude}")
     } else if space {
-        bconcat!(" ", magnitude)
+        bformat!(" {magnitude}")
     } else {
         magnitude
     }

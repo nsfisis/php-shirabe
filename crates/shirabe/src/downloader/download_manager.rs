@@ -9,7 +9,7 @@ use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, LogicException, PhpMixed, RuntimeException, ToPhpString,
-    array_keys, array_reverse, array_shift, bconcat, dirname, implode, in_array_strict,
+    array_keys, array_reverse, array_shift, bformat, dirname, implode, in_array_strict,
     path_from_bytes, path_to_bytes, preg_is_match, preg_quote, rtrim_chars, str_replace,
     strtolower, usort,
 };
@@ -77,12 +77,10 @@ impl DownloadManager {
     ) -> anyhow::Result<std::rc::Rc<std::cell::RefCell<dyn DownloaderInterface>>> {
         let r#type = strtolower(r#type);
         if !self.downloaders.contains_key(r#type.as_bstr()) {
-            return Err(InvalidArgumentException::new(bconcat!(
-                "Unknown downloader type: ",
+            return Err(InvalidArgumentException::new(bformat!(
+                "Unknown downloader type: {}. Available types: {}.",
                 r#type,
-                ". Available types: ",
-                implode(", ", &array_keys(&self.downloaders)),
-                "."
+                implode(", ", &array_keys(&self.downloaders))
             ))
             .into());
         }
@@ -106,10 +104,9 @@ impl DownloadManager {
         } else if installation_source.as_ref().is_some_and(|s| s == "source") {
             self.get_downloader(package.get_source_type().unwrap_or_default())?
         } else {
-            return Err(InvalidArgumentException::new(bconcat!(
-                "Package ",
-                package.to_php_string(),
-                " does not have an installation source set"
+            return Err(InvalidArgumentException::new(bformat!(
+                "Package {} does not have an installation source set",
+                package.to_php_string()
             ))
             .into());
         };
@@ -119,16 +116,7 @@ impl DownloadManager {
             .as_ref()
             .is_none_or(|s| *s != downloader_installation_source)
         {
-            return Err(LogicException::new(bconcat!(
-                "Downloader \"",
-                downloader.borrow().php_class_name(),
-                "\" is a ",
-                downloader_installation_source,
-                " type downloader and can not be used to download ",
-                installation_source.unwrap_or_default(),
-                " for package ",
-                package.to_php_string()
-            ))
+            return Err(LogicException::new(bformat!("Downloader \"{}\" is a {downloader_installation_source} type downloader and can not be used to download {} for package {}", downloader.borrow().php_class_name(), installation_source.unwrap_or_default(), package.to_php_string()))
             .into());
         }
 
@@ -171,10 +159,8 @@ impl DownloadManager {
                 }
             };
             if retry {
-                self.io.write_error(bconcat!(
-                    "    <warning>Now trying to download from ",
-                    source,
-                    "</warning>"
+                self.io.write_error(bformat!(
+                    "    <warning>Now trying to download from {source}</warning>"
                 ));
             }
             package.set_installation_source(Some(source.clone()));
@@ -202,14 +188,9 @@ impl DownloadManager {
                             .unwrap()
                             .get_message()
                             .to_owned();
-                        self.io.write_error(bconcat!(
-                            "    <warning>Failed to download ",
-                            package.get_pretty_name(),
-                            " from ",
-                            source,
-                            ": ",
-                            message,
-                            "</warning>"
+                        self.io.write_error(bformat!(
+                            "    <warning>Failed to download {} from {source}: {message}</warning>",
+                            package.get_pretty_name()
                         ));
 
                         retry = true;
@@ -307,11 +288,8 @@ impl DownloadManager {
                         .unwrap()
                         .get_message()
                         .to_owned();
-                    self.io.write_error(bconcat!(
-                        "<error>    Update failed (",
-                        message,
-                        ")</error>"
-                    ));
+                    self.io
+                        .write_error(bformat!("<error>    Update failed ({message})</error>"));
                     if !self.io.ask_confirmation(
                         "    Would you like to try reinstalling the package instead [<comment>yes</comment>]? ",
                         true,
@@ -370,10 +348,9 @@ impl DownloadManager {
     /// Determines the install preference of a package
     fn resolve_package_install_preference(&self, package: PackageInterfaceHandle) -> &'static BStr {
         for (pattern, preference) in &self.package_preferences {
-            let pattern_regex = bconcat!(
-                "{^",
-                str_replace("\\*", ".*", preg_quote(pattern, None)),
-                "$}i",
+            let pattern_regex = bformat!(
+                "{{^{}$}}i",
+                str_replace("\\*", ".*", preg_quote(pattern, None))
             );
             if preg_is_match(&pattern_regex, package.get_name()) {
                 if "dist" == preference || (!package.is_dev() && "auto" == preference) {
@@ -409,10 +386,9 @@ impl DownloadManager {
         }
 
         if sources.is_empty() {
-            return Err(InvalidArgumentException::new(bconcat!(
-                "Package ",
-                package.to_php_string(),
-                " must have a source or dist specified"
+            return Err(InvalidArgumentException::new(bformat!(
+                "Package {} must have a source or dist specified",
+                package.to_php_string()
             ))
             .into());
         }

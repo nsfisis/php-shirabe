@@ -11,7 +11,7 @@ use crate::event_dispatcher::{Callable, EventFlags};
 use crate::io::IOInterfaceWrite;
 use bstr::BString;
 use shirabe_php_shim::{
-    RuntimeException, basename, bconcat, canonical_int_key, chdir, getcwd, glob, impl_php_class,
+    RuntimeException, basename, bformat, canonical_int_key, chdir, getcwd, glob, impl_php_class,
 };
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::{InputInterface, InputInterfaceByName, InputValue};
@@ -45,12 +45,12 @@ impl ExecCommand {
         let composer = self.require_composer(None, None)?;
         let composer_ref = composer_full(&composer);
         let bin_dir = composer_ref.get_config().borrow().get_path("bin-dir")?;
-        let bins = glob(bconcat!(bin_dir, "/*"));
+        let bins = glob(bformat!("{bin_dir}/*"));
         let local_bins_raw = composer_ref.get_package().get_binaries();
         let local_bins: Vec<BString> = if for_display {
             local_bins_raw
                 .into_iter()
-                .map(|e| bconcat!(e, " (local)"))
+                .map(|e| bformat!("{e} (local)"))
                 .collect()
         } else {
             local_bins_raw
@@ -60,7 +60,7 @@ impl ExecCommand {
         let mut previous_bin: Option<&BString> = None;
         for bin in bins.iter().chain(local_bins.iter()) {
             if let Some(prev) = previous_bin
-                && *bin == bconcat!(prev, ".bat")
+                && *bin == bformat!("{prev}.bat")
             {
                 continue;
             }
@@ -132,7 +132,7 @@ impl Command for ExecCommand {
                 binaries
                     .iter()
                     .enumerate()
-                    .map(|(index, binary)| (bconcat!(index), binary.clone()))
+                    .map(|(index, binary)| (bformat!("{index}"), binary.clone()))
                     .collect(),
                 InputValue::from(""),
                 Some(1),
@@ -174,10 +174,8 @@ impl Command for ExecCommand {
                     .get_config()
                     .borrow()
                     .get_path("bin-dir")?;
-                return Err(RuntimeException::new(bconcat!(
-                    "No binaries found in composer.json or in bin-dir (",
-                    bin_dir,
-                    ")"
+                return Err(RuntimeException::new(bformat!(
+                    "No binaries found in composer.json or in bin-dir ({bin_dir})"
                 ))
                 .into());
             }
@@ -185,7 +183,7 @@ impl Command for ExecCommand {
             self.get_io()
                 .write("<comment>Available binaries:</comment>");
             for bin in &bins {
-                self.get_io().write(bconcat!("<info>- ", bin, "</info>"));
+                self.get_io().write(bformat!("<info>- {bin}</info>"));
             }
 
             return Ok(0);
@@ -218,7 +216,7 @@ impl Command for ExecCommand {
         {
             chdir(iwd).map_err(|e| {
                 RuntimeException::with_code_and_previous(
-                    bconcat!("Could not switch back to working directory \"", iwd, "\""),
+                    bformat!("Could not switch back to working directory \"{iwd}\""),
                     0,
                     Some(std::sync::Arc::new(e)),
                 )

@@ -14,7 +14,7 @@ use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, RuntimeException, ToPhpString, array_is_list,
-    array_key_first, array_merge, array_values_mixed, bconcat, chmod, escapeshellcmd, exec,
+    array_key_first, array_merge, array_values_mixed, bformat, chmod, escapeshellcmd, exec,
     explode, file_exists, impl_php_class, implode, in_array_loose, in_array_strict, intval,
     is_array, is_bool, is_dir, is_numeric, is_object, is_string, json_encode, path_from_bytes,
     path_to_bytes, php_regex, php_str, preg_is_match, preg_match, preg_replace, str_replace,
@@ -89,15 +89,13 @@ impl ConfigCommand {
         let validation = validator(&PhpMixed::string(values[0].clone()));
         if validation.as_bool() != Some(true) {
             let suffix = if !validation.is_null() && validation.as_bool() != Some(false) {
-                bconcat!(" (", validation.as_string().unwrap_or_default(), ")")
+                bformat!(" ({})", validation.as_string().unwrap_or_default())
             } else {
                 BString::default()
             };
-            return Err(RuntimeException::new(bconcat!(
-                "\"",
-                values[0],
-                "\" is an invalid value",
-                suffix
+            return Err(RuntimeException::new(bformat!(
+                "\"{}\" is an invalid value{suffix}",
+                values[0]
             ))
             .into());
         }
@@ -144,14 +142,13 @@ impl ConfigCommand {
         let validation = validator(&values_mixed);
         if validation.as_bool() != Some(true) {
             let suffix = if !validation.is_null() && validation.as_bool() != Some(false) {
-                bconcat!(" (", validation.as_string().unwrap_or_default(), ")")
+                bformat!(" ({})", validation.as_string().unwrap_or_default())
             } else {
                 BString::default()
             };
-            return Err(RuntimeException::new(bconcat!(
-                json_encode(&values_mixed).ok().unwrap_or_default(),
-                " is an invalid value",
-                suffix
+            return Err(RuntimeException::new(bformat!(
+                "{} is an invalid value{suffix}",
+                json_encode(&values_mixed).ok().unwrap_or_default()
             ))
             .into());
         }
@@ -203,7 +200,7 @@ impl ConfigCommand {
                 new_k.extend_from_slice(&preg_replace(
                     php_regex!("{^config\\.}"),
                     "",
-                    bconcat!(key, "."),
+                    bformat!("{key}."),
                 ));
                 k = Some(new_k);
                 self.list_configuration(
@@ -229,7 +226,7 @@ impl ConfigCommand {
                         }
                     })
                     .collect();
-                value_inner = PhpMixed::string(bconcat!("[", implode(", ", &arr_strs), "]"));
+                value_inner = PhpMixed::string(bformat!("[{}]", implode(", ", &arr_strs)));
             }
 
             if is_bool(&value_inner) {
@@ -237,15 +234,14 @@ impl ConfigCommand {
             }
 
             let source = if show_source {
-                bconcat!(
-                    " (",
+                bformat!(
+                    " ({})",
                     self.config
                         .borrow()
                         .as_ref()
                         .unwrap()
                         .borrow()
-                        .get_source_of_value(bconcat!(k.clone().unwrap_or_default(), key))?,
-                    ")"
+                        .get_source_of_value(bformat!("{}{key}", k.clone().unwrap_or_default()))?
                 )
             } else {
                 BString::default()
@@ -267,37 +263,24 @@ impl ConfigCommand {
                         strtolower(trim_chars(&id, " \t\n\r\0\u{0B}")),
                     );
                     let id = preg_replace(php_regex!("{-+}"), "-", &id);
-                    bconcat!("https://getcomposer.org/doc/06-config.md#", id)
+                    bformat!("https://getcomposer.org/doc/06-config.md#{id}")
                 };
             if is_string(&raw_val) && raw_val.as_string() != value_inner.as_string() {
                 self.get_io().write_with_verbosity(
-                    bconcat!(
-                        "[<fg=yellow;href=",
-                        link,
-                        ">",
+                    bformat!(
+                        "[<fg=yellow;href={link}>{}{key}</>] <info>{} ({})</info>{source}",
                         k.clone().unwrap_or_default(),
-                        key,
-                        "</>] <info>",
                         raw_val.as_string().unwrap_or_default(),
-                        " (",
-                        value_inner.to_php_string(),
-                        ")</info>",
-                        source
+                        value_inner.to_php_string()
                     ),
                     io_interface::QUIET,
                 );
             } else {
                 self.get_io().write_with_verbosity(
-                    bconcat!(
-                        "[<fg=yellow;href=",
-                        link,
-                        ">",
+                    bformat!(
+                        "[<fg=yellow;href={link}>{}{key}</>] <info>{}</info>{source}",
                         k.clone().unwrap_or_default(),
-                        key,
-                        "</>] <info>",
-                        value_inner.to_php_string(),
-                        "</info>",
-                        source
+                        value_inner.to_php_string()
                     ),
                     io_interface::QUIET,
                 );
@@ -533,7 +516,7 @@ impl Command for ConfigCommand {
                 "bearer",
                 "forgejo-token",
             ] {
-                empty_objs.insert(bconcat!(k), PhpMixed::Object(IndexMap::new()));
+                empty_objs.insert(bformat!("{k}"), PhpMixed::Object(IndexMap::new()));
             }
             auth_config_file
                 .borrow()
@@ -557,7 +540,7 @@ impl Command for ConfigCommand {
                     editor = Some("notepad".into());
                 } else {
                     for candidate in &["editor", "vim", "vi", "nano", "pico", "ed"] {
-                        if !exec(bconcat!("which ", candidate), None, None)
+                        if !exec(bformat!("which {candidate}"), None, None)
                             .unwrap_or_default()
                             .is_empty()
                         {
@@ -588,10 +571,9 @@ impl Command for ConfigCommand {
                     .to_path_buf()
             };
             system(
-                bconcat!(
+                bformat!(
+                    "{} {file}{}",
                     editor.unwrap_or_default(),
-                    " ",
-                    file,
                     if Platform::is_windows() {
                         ""
                     } else {
@@ -715,10 +697,8 @@ impl Command for ConfigCommand {
                     {
                         Some(v) => v.clone(),
                         None => {
-                            return Err(InvalidArgumentException::new(bconcat!(
-                                "There is no ",
-                                repo_key,
-                                " repository defined"
+                            return Err(InvalidArgumentException::new(bformat!(
+                                "There is no {repo_key} repository defined"
                             ))
                             .into());
                         }
@@ -736,7 +716,7 @@ impl Command for ConfigCommand {
                 let mut key_acc: Option<BString> = None;
                 for bit in &bits {
                     let new_key = match &key_acc {
-                        Some(k) => bconcat!(k, ".", bit),
+                        Some(k) => bformat!("{k}.{bit}"),
                         None => bit.clone(),
                     };
                     key_acc = Some(new_key.clone());
@@ -752,7 +732,7 @@ impl Command for ConfigCommand {
 
                 if !r#match {
                     return Err(
-                        RuntimeException::new(bconcat!(setting_key, " is not defined.")).into(),
+                        RuntimeException::new(bformat!("{setting_key} is not defined.")).into(),
                     );
                 }
 
@@ -824,7 +804,7 @@ impl Command for ConfigCommand {
                 value = v.clone();
                 source = "defaults".into();
             } else {
-                return Err(RuntimeException::new(bconcat!(setting_key, " is not defined")).into());
+                return Err(RuntimeException::new(bformat!("{setting_key} is not defined")).into());
             }
 
             let value_str = if is_array(&value) || is_object(&value) || is_bool(&value) {
@@ -841,11 +821,11 @@ impl Command for ConfigCommand {
 
             let mut source_of_config_value = BString::default();
             if input.borrow().get_option("source")?.as_bool() == Some(true) {
-                source_of_config_value = bconcat!(" (", source, ")");
+                source_of_config_value = bformat!(" ({source})");
             }
 
             self.get_io().write_with_verbosity(
-                bconcat!(value_str, source_of_config_value),
+                bformat!("{value_str}{source_of_config_value}"),
                 io_interface::QUIET,
             );
 
@@ -935,10 +915,8 @@ impl Command for ConfigCommand {
                 .as_bool()
                 .unwrap_or(false)
             {
-                return Err(RuntimeException::new(bconcat!(
-                    "Invalid value for ",
-                    setting_key,
-                    ". Should be one of: auto, source, or dist"
+                return Err(RuntimeException::new(bformat!(
+                    "Invalid value for {setting_key}. Should be one of: auto, source, or dist"
                 ))
                 .into());
             }
@@ -971,10 +949,9 @@ impl Command for ConfigCommand {
             }
 
             if !boolean_validator(&PhpMixed::string(values[0].clone())) {
-                return Err(RuntimeException::new(bconcat!(
-                    "\"",
-                    values[0],
-                    "\" is an invalid value"
+                return Err(RuntimeException::new(bformat!(
+                    "\"{}\" is an invalid value",
+                    values[0]
                 ))
                 .into());
             }
@@ -999,7 +976,7 @@ impl Command for ConfigCommand {
                 || multi_props.contains_key(&setting_key)
                 || strpos(&setting_key, "extra.") == Some(0))
         {
-            return Err(InvalidArgumentException::new(bconcat!("The ", setting_key, " property can not be set in the global config.json file. Use `shirabe global config` to apply changes to the global composer.json"))
+            return Err(InvalidArgumentException::new(bformat!("The {setting_key} property can not be set in the global config.json file. Use `shirabe global config` to apply changes to the global composer.json"))
             .into());
         }
         if input.borrow().get_option("unset")?.as_bool() == Some(true)
@@ -1148,7 +1125,7 @@ impl Command for ConfigCommand {
                                 PhpMixed::List(l) => l
                                     .iter()
                                     .enumerate()
-                                    .map(|(i, v)| (bconcat!(i), v.clone()))
+                                    .map(|(i, v)| (bformat!("{i}"), v.clone()))
                                     .collect(),
                                 _ => value.as_array().cloned().unwrap_or_default(),
                             };
@@ -1156,7 +1133,7 @@ impl Command for ConfigCommand {
                                 PhpMixed::List(l) => l
                                     .iter()
                                     .enumerate()
-                                    .map(|(i, v)| (bconcat!(i), v.clone()))
+                                    .map(|(i, v)| (bformat!("{i}"), v.clone()))
                                     .collect(),
                                 _ => current_value.as_array().cloned().unwrap_or_default(),
                             };
@@ -1275,9 +1252,8 @@ impl Command for ConfigCommand {
                 value =
                     JsonFile::parse_json(Some(&values[0]), Some(bstr::BStr::new("composer.json")))?;
                 if !is_array(&value) {
-                    return Err(RuntimeException::new(bconcat!(
-                        "Expected an array or object for ",
-                        setting_key
+                    return Err(RuntimeException::new(bformat!(
+                        "Expected an array or object for {setting_key}"
                     ))
                     .into());
                 }
@@ -1316,9 +1292,8 @@ impl Command for ConfigCommand {
                         }
                         value = PhpMixed::Array(merged);
                     } else {
-                        return Err(RuntimeException::new(bconcat!(
-                            "Cannot merge array and object for ",
-                            setting_key
+                        return Err(RuntimeException::new(bformat!(
+                            "Cannot merge array and object for {setting_key}"
                         ))
                         .into());
                     }
@@ -1346,29 +1321,29 @@ impl Command for ConfigCommand {
                     .borrow_mut()
                     .as_mut()
                     .unwrap()
-                    .remove_config_setting(bstr::BStr::new(&bconcat!(
+                    .remove_config_setting(bstr::BStr::new(&bformat!(
+                        "{}.{}",
                         matches.get(1).unwrap(),
-                        ".",
                         matches.get(2).unwrap()
                     )));
                 self.config_source
                     .borrow_mut()
                     .as_mut()
                     .unwrap()
-                    .remove_config_setting(bstr::BStr::new(&bconcat!(
+                    .remove_config_setting(bstr::BStr::new(&bformat!(
+                        "{}.{}",
                         matches.get(1).unwrap(),
-                        ".",
                         matches.get(2).unwrap()
                     )));
 
                 return Ok(0);
             }
 
-            let key = bconcat!(matches.get(1).unwrap(), ".", matches.get(2).unwrap());
+            let key = bformat!("{}.{}", matches.get(1).unwrap(), matches.get(2).unwrap());
             if matches.get(1).unwrap() == "bitbucket-oauth" {
                 if 2 != values.len() {
-                    return Err(RuntimeException::new(bconcat!(
-                        "Expected two arguments (consumer-key, consumer-secret), got ",
+                    return Err(RuntimeException::new(bformat!(
+                        "Expected two arguments (consumer-key, consumer-secret), got {}",
                         values.len()
                     ))
                     .into());
@@ -1425,8 +1400,8 @@ impl Command for ConfigCommand {
                     .add_config_setting(bstr::BStr::new(&key), PhpMixed::string(values[0].clone()));
             } else if matches.get(1).unwrap() == "http-basic" {
                 if 2 != values.len() {
-                    return Err(RuntimeException::new(bconcat!(
-                        "Expected two arguments (username, password), got ",
+                    return Err(RuntimeException::new(bformat!(
+                        "Expected two arguments (username, password), got {}",
                         values.len()
                     ))
                     .into());
@@ -1464,10 +1439,8 @@ impl Command for ConfigCommand {
 
                     // Check if the header is in correct "Name: Value" format
                     if !preg_is_match(php_regex!("/^[^:]+:\\s*.+$/"), header) {
-                        return Err(RuntimeException::new(bconcat!(
-                            "Header \"",
-                            header,
-                            "\" is not in \"Header-Name: Header-Value\" format"
+                        return Err(RuntimeException::new(bformat!(
+                            "Header \"{header}\" is not in \"Header-Name: Header-Value\" format"
                         ))
                         .into());
                     }
@@ -1487,8 +1460,8 @@ impl Command for ConfigCommand {
                     .add_config_setting(bstr::BStr::new(&key), PhpMixed::List(formatted_headers));
             } else if matches.get(1).unwrap() == "forgejo-token" {
                 if 2 != values.len() {
-                    return Err(RuntimeException::new(bconcat!(
-                        "Expected two arguments (username, access token), got ",
+                    return Err(RuntimeException::new(bformat!(
+                        "Expected two arguments (username, access token), got {}",
                         values.len()
                     ))
                     .into());
@@ -1548,10 +1521,8 @@ impl Command for ConfigCommand {
             return Ok(0);
         }
 
-        Err(InvalidArgumentException::new(bconcat!(
-            "Setting ",
-            setting_key,
-            " does not exist or is not supported by this command"
+        Err(InvalidArgumentException::new(bformat!(
+            "Setting {setting_key} does not exist or is not supported by this command"
         ))
         .into())
     }
@@ -2152,13 +2123,13 @@ fn flatten_setting_keys(config: PhpMixed, prefix: impl AsRef<[u8]>) -> Vec<BStri
         None => return vec![],
     };
     for (key, value) in &arr {
-        keys.push(vec![bconcat!(prefix, key)]);
+        keys.push(vec![bformat!("{prefix}{key}")]);
         // array-lists must not be added to completion
         // sub-keys of repository-keys must not be added to completion
         if is_array(value) && !array_is_list(value) && prefix != b"repositories." {
             keys.push(flatten_setting_keys(
                 value.clone(),
-                &bconcat!(prefix, key, "."),
+                &bformat!("{prefix}{key}."),
             ));
         }
     }

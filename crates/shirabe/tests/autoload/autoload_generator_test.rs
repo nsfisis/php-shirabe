@@ -21,7 +21,7 @@ use shirabe::script::ScriptEvents;
 use shirabe::util::HttpDownloader;
 use shirabe::util::r#loop::Loop;
 use shirabe_php_shim::{
-    PhpMixed, bconcat, dirname, error_message, path_from_bytes, path_to_bytes, preg_quote,
+    PhpMixed, bformat, dirname, error_message, path_from_bytes, path_to_bytes, preg_quote,
     realpath, strtr, symlink,
 };
 use shirabe_semver::VersionParser;
@@ -142,7 +142,7 @@ impl Drop for SetUp {
 }
 
 fn null_path(s: &BStr) -> BString {
-    bconcat!(s)
+    bformat!("{s}")
 }
 
 /// Builds an InstallationManager whose single installer routes `getInstallPath` through
@@ -265,10 +265,10 @@ fn fixtures_dir() -> std::path::PathBuf {
 /// ref: AutoloadGeneratorTest::assertAutoloadFiles
 #[track_caller]
 fn assert_autoload_files(name: &BStr, dir: impl AsRef<std::path::Path>, r#type: &BStr) {
-    let a = fixtures_dir().join(path_from_bytes(&bconcat!("autoload_", name, ".php")));
+    let a = fixtures_dir().join(path_from_bytes(&bformat!("autoload_{name}.php")));
     let b = dir
         .as_ref()
-        .join(path_from_bytes(&bconcat!("autoload_", r#type, ".php")));
+        .join(path_from_bytes(&bformat!("autoload_{}.php", r#type)));
     assert_file_content_equals(a, b);
 }
 
@@ -315,7 +315,7 @@ fn match_all() -> AnyConstraint {
 }
 
 fn constraint(operator: &BStr, version: &BStr) -> AnyConstraint {
-    AnyConstraint::Simple(SimpleConstraint::new(operator, bconcat!(version), None))
+    AnyConstraint::Simple(SimpleConstraint::new(operator, bformat!("{version}"), None))
 }
 
 fn link(
@@ -325,8 +325,8 @@ fn link(
     description: Option<&bstr::BStr>,
 ) -> Link {
     Link::new(
-        bconcat!(source),
-        bconcat!(target),
+        bformat!("{source}"),
+        bformat!("{target}"),
         constraint,
         description.map(|d| d.to_owned()),
         Some(BString::default()),
@@ -334,18 +334,24 @@ fn link(
 }
 
 fn requires(links: Vec<(&BStr, Link)>) -> IndexMap<BString, Link> {
-    links.into_iter().map(|(k, v)| (bconcat!(k), v)).collect()
+    links
+        .into_iter()
+        .map(|(k, v)| (bformat!("{k}"), v))
+        .collect()
 }
 
 fn autoload(entries: Vec<(&BStr, PhpMixed)>) -> IndexMap<BString, PhpMixed> {
-    entries.into_iter().map(|(k, v)| (bconcat!(k), v)).collect()
+    entries
+        .into_iter()
+        .map(|(k, v)| (bformat!("{k}"), v))
+        .collect()
 }
 
 fn str_list(items: &[&BStr]) -> PhpMixed {
     PhpMixed::List(
         items
             .iter()
-            .map(|s| PhpMixed::string(bconcat!(s)))
+            .map(|s| PhpMixed::string(bformat!("{s}")))
             .collect(),
     )
 }
@@ -354,25 +360,29 @@ fn str_map(entries: &[(&BStr, PhpMixed)]) -> PhpMixed {
     PhpMixed::Array(
         entries
             .iter()
-            .map(|(k, v)| (bconcat!(k), v.clone()))
+            .map(|(k, v)| (bformat!("{k}"), v.clone()))
             .collect(),
     )
 }
 
 fn pstr(v: &BStr) -> PhpMixed {
-    PhpMixed::string(bconcat!(v))
+    PhpMixed::string(bformat!("{v}"))
 }
 
 fn new_root_pkg(name: &BStr) -> RootPackageHandle {
     RootPackageHandle::new(
-        bconcat!(name),
+        bformat!("{name}"),
         null_path(BStr::new("1.0")),
         BString::from("1.0"),
     )
 }
 
 fn new_pkg(name: &BStr) -> PackageHandle {
-    PackageHandle::new(bconcat!(name), BString::from("1.0"), BString::from("1.0"))
+    PackageHandle::new(
+        bformat!("{name}"),
+        BString::from("1.0"),
+        BString::from("1.0"),
+    )
 }
 
 fn dump(
@@ -395,7 +405,7 @@ fn dump(
         im.clone(),
         BStr::new("composer"),
         scan_psr_packages,
-        Some(bconcat!(suffix)),
+        Some(bformat!("{suffix}")),
         None,
         false,
     )
@@ -1136,8 +1146,8 @@ fn test_non_dev_autoload_replaces_nested_requirements() {
             s.vendor_dir
                 .join(name)
                 .join("src")
-                .join(path_from_bytes(&bconcat!(file, ".php"))),
-            bconcat!("<?php class ", class, " {}").as_bstr(),
+                .join(path_from_bytes(&bformat!("{file}.php"))),
+            bformat!("<?php class {class} {{}}").as_bstr(),
         );
     }
 
@@ -2742,10 +2752,9 @@ fn test_autoload_rules_in_package_that_does_not_exist_on_disk() {
         BStr::new("classmap"),
         str_list(&[BStr::new("classmap")]),
     )]));
-    let expected_message = bconcat!(
-        "Could not scan for classes inside \"",
-        s.vendor_dir,
-        "/dep/a/classmap\" which does not appear to be a file nor a folder"
+    let expected_message = bformat!(
+        "Could not scan for classes inside \"{}/dep/a/classmap\" which does not appear to be a file nor a folder",
+        s.vendor_dir
     );
     if let Err(e) = dump(&mut s, package.clone().into(), true, BStr::new("_19")) {
         assert_eq!(expected_message, error_message(&e));
@@ -2780,7 +2789,8 @@ fn test_autoload_rules_in_package_that_does_not_exist_on_disk() {
     let parsed = s
         .generator
         .parse_autoloads(map, package.into(), PhpMixed::Bool(false));
-    let excluded_root = bconcat!(
+    let excluded_root = bformat!(
+        "{}/excludedroot($|/)",
         preg_quote(
             strtr(
                 realpath(path_from_bytes(&dirname(path_to_bytes(&s.working_dir))))
@@ -2790,10 +2800,10 @@ fn test_autoload_rules_in_package_that_does_not_exist_on_disk() {
                 "/"
             ),
             None
-        ),
-        "/excludedroot($|/)"
+        )
     );
-    let root_excl = bconcat!(
+    let root_excl = bformat!(
+        "{}/root/excl($|/)",
         preg_quote(
             strtr(
                 realpath(&s.working_dir)
@@ -2803,8 +2813,7 @@ fn test_autoload_rules_in_package_that_does_not_exist_on_disk() {
                 "/"
             ),
             None
-        ),
-        "/root/excl($|/)"
+        )
     );
     assert_eq!(
         str_map(&[
@@ -3091,7 +3100,7 @@ fn test_generates_platform_check() {
                 assert_file_content_equals(
                     fixtures_dir()
                         .join("platform")
-                        .join(path_from_bytes(&bconcat!(fixture, ".php"))),
+                        .join(path_from_bytes(&bformat!("{fixture}.php"))),
                     &platform_check,
                 );
                 assert!(

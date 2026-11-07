@@ -4,10 +4,15 @@ use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe::advisory::{AuditConfig, Auditor};
 use shirabe::config::Config;
-use shirabe_php_shim::{PhpMixed, bconcat};
+use shirabe_php_shim::{PhpMixed, bformat};
 
 fn arr(pairs: Vec<(&BStr, PhpMixed)>) -> PhpMixed {
-    PhpMixed::Array(pairs.into_iter().map(|(k, v)| (bconcat!(k), v)).collect())
+    PhpMixed::Array(
+        pairs
+            .into_iter()
+            .map(|(k, v)| (bformat!("{k}"), v))
+            .collect(),
+    )
 }
 
 fn list(items: Vec<PhpMixed>) -> PhpMixed {
@@ -15,7 +20,7 @@ fn list(items: Vec<PhpMixed>) -> PhpMixed {
 }
 
 fn s(v: &BStr) -> PhpMixed {
-    PhpMixed::string(bconcat!(v))
+    PhpMixed::string(bformat!("{v}"))
 }
 
 fn ignore_list(pairs: Vec<(&BStr, Option<&BStr>)>) -> IndexMap<BString, Option<BString>> {

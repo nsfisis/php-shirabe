@@ -2,7 +2,7 @@
 
 use bstr::{BStr, BString};
 use shirabe::package::{Package, PackageInterface};
-use shirabe_php_shim::{ToPhpString, bconcat};
+use shirabe_php_shim::{ToPhpString, bformat};
 use shirabe_semver::VersionParser;
 
 /// Memory package naming, versioning, and marshalling semantics provider
@@ -22,7 +22,7 @@ fn test_package_has_expected_naming_semantics() {
     for (name, version) in provider_versioning_schemes() {
         let version_parser = VersionParser;
         let norm_version = version_parser.normalize(version, None).unwrap();
-        let package = Package::new(bconcat!(name), norm_version, bconcat!(version));
+        let package = Package::new(bformat!("{name}"), norm_version, bformat!("{version}"));
         assert_eq!(name.to_ascii_lowercase(), package.get_name());
     }
 }
@@ -32,7 +32,11 @@ fn test_package_has_expected_versioning_semantics() {
     for (name, version) in provider_versioning_schemes() {
         let version_parser = VersionParser;
         let norm_version = version_parser.normalize(version, None).unwrap();
-        let package = Package::new(bconcat!(name), norm_version.clone(), bconcat!(version));
+        let package = Package::new(
+            bformat!("{name}"),
+            norm_version.clone(),
+            bformat!("{version}"),
+        );
         assert_eq!(version, package.get_pretty_version());
         assert_eq!(norm_version, package.get_version());
     }
@@ -43,9 +47,13 @@ fn test_package_has_expected_marshalling_semantics() {
     for (name, version) in provider_versioning_schemes() {
         let version_parser = VersionParser;
         let norm_version = version_parser.normalize(version, None).unwrap();
-        let package = Package::new(bconcat!(name), norm_version.clone(), bconcat!(version));
+        let package = Package::new(
+            bformat!("{name}"),
+            norm_version.clone(),
+            bformat!("{version}"),
+        );
         assert_eq!(
-            bconcat!(name.to_ascii_lowercase(), "-", norm_version),
+            bformat!("{}-{norm_version}", name.to_ascii_lowercase()),
             package.to_php_string()
         );
     }

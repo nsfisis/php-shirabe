@@ -8,7 +8,7 @@ use shirabe::repository::{
     FindPackageConstraint, PlatformRepository, RepositoryInterface, SEARCH_NAME,
 };
 use shirabe_php_rpc::PlatformInfo;
-use shirabe_php_shim::{PhpMixed, bconcat};
+use shirabe_php_shim::{PhpMixed, bformat};
 use shirabe_semver::constraint::SimpleConstraint;
 
 #[expect(
@@ -161,7 +161,7 @@ fn php_flavor_test_cases() -> Vec<(
     Vec<(PhpMixed, Vec<PhpMixed>, PhpMixed)>,
 )> {
     let ubuntu = BStr::new("7.2.31-1+ubuntu16.04.1+deb.sury.org+1");
-    let s = |v: &BStr| PhpMixed::string(bconcat!(v));
+    let s = |v: &BStr| PhpMixed::string(bformat!("{v}"));
 
     vec![
         (
@@ -357,7 +357,7 @@ struct LibCase {
 // PhpMixed::Object holding the version they would expose); their runtime read paths are
 // still `TODO(plugin)` stubs, but the data is ported faithfully.
 fn library_test_cases() -> Vec<LibCase> {
-    let s = |v: &BStr| PhpMixed::string(bconcat!(v));
+    let s = |v: &BStr| PhpMixed::string(bformat!("{v}"));
     let curl = |v: &BStr| -> (PhpMixed, Vec<PhpMixed>, PhpMixed) {
         (
             s(BStr::new("curl_version")),
@@ -1684,12 +1684,12 @@ fn test_library_information() {
     let extension_version = BStr::new("100.200.300");
 
     for case in library_test_cases() {
-        let extensions: Vec<BString> = case.extensions.iter().map(|e| bconcat!(e)).collect();
+        let extensions: Vec<BString> = case.extensions.iter().map(|e| bformat!("{e}")).collect();
 
         let mut constants: Vec<(BString, Option<BString>, PhpMixed)> = case
             .constants
             .iter()
-            .map(|(n, c, v)| (bconcat!(n), c.map(|s| bconcat!(s)), v.clone()))
+            .map(|(n, c, v)| (bformat!("{n}"), c.map(|s| bformat!("{s}")), v.clone()))
             .collect();
         constants.push((
             BString::from("PHP_VERSION"),
@@ -1733,11 +1733,11 @@ fn test_library_information() {
         let mut all_expectations: Vec<(BString, (Option<&BStr>, &[&BStr], &[&BStr]))> = case
             .expectations
             .iter()
-            .map(|(name, exp)| (bconcat!(name), exp.parts()))
+            .map(|(name, exp)| (bformat!("{name}"), exp.parts()))
             .collect();
         for extension in &extensions {
             all_expectations.push((
-                bconcat!("ext-", extension),
+                bformat!("ext-{extension}"),
                 (Some(extension_version), &[], &[]),
             ));
         }
@@ -1819,7 +1819,7 @@ fn test_composer_platform_version() {
     let package = platform_repository
         .find_package(
             bstr::BStr::new("composer"),
-            FindPackageConstraint::String(bconcat!("=", shirabe::composer::get_version())),
+            FindPackageConstraint::String(bformat!("={}", shirabe::composer::get_version())),
         )
         .unwrap();
     assert!(package.is_some(), "Composer package exists");

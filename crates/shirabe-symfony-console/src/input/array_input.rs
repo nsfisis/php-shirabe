@@ -6,7 +6,7 @@ use crate::input::{
 };
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpDisplay, PhpResource, ToPhpString, bconcat, implode};
+use shirabe_php_shim::{PhpDisplay, PhpResource, ToPhpString, bformat, implode};
 
 /// ArrayInput represents an input provided as an array.
 ///
@@ -151,10 +151,8 @@ impl ArrayInput {
     /// Adds a short option value.
     fn add_short_option(&mut self, shortcut: &BStr, value: InputValue) -> anyhow::Result<()> {
         if !self.inner.definition.has_shortcut(shortcut) {
-            return Err(InvalidOptionException::new(bconcat!(
-                "The \"-",
-                shortcut,
-                "\" option does not exist."
+            return Err(InvalidOptionException::new(bformat!(
+                "The \"-{shortcut}\" option does not exist."
             ))
             .into());
         }
@@ -172,10 +170,8 @@ impl ArrayInput {
     fn add_long_option(&mut self, name: &BStr, mut value: InputValue) -> anyhow::Result<()> {
         if !self.inner.definition.has_option(name) {
             if !self.inner.definition.has_negation(name) {
-                return Err(InvalidOptionException::new(bconcat!(
-                    "The \"--",
-                    name,
-                    "\" option does not exist."
+                return Err(InvalidOptionException::new(bformat!(
+                    "The \"--{name}\" option does not exist."
                 ))
                 .into());
             }
@@ -192,10 +188,8 @@ impl ArrayInput {
 
         if value.is_null() {
             if option.is_value_required() {
-                return Err(InvalidOptionException::new(bconcat!(
-                    "The \"--",
-                    name,
-                    "\" option requires a value."
+                return Err(InvalidOptionException::new(bformat!(
+                    "The \"--{name}\" option requires a value."
                 ))
                 .into());
             }
@@ -214,10 +208,8 @@ impl ArrayInput {
     fn add_argument(&mut self, name: &ParameterName, value: InputValue) -> anyhow::Result<()> {
         let key = name.to_key();
         if !self.inner.definition.has_argument(&name.to_argument_name()) {
-            return Err(InvalidArgumentException::new(bconcat!(
-                "The \"",
-                key,
-                "\" argument does not exist."
+            return Err(InvalidArgumentException::new(bformat!(
+                "The \"{key}\" argument does not exist."
             ))
             .into());
         }
@@ -244,10 +236,10 @@ impl PhpDisplay for ArrayInput {
                 };
                 if let InputValue::Array(list) = val {
                     for v in list {
-                        params.push(bconcat!(
-                            param,
+                        params.push(bformat!(
+                            "{param}{}",
                             if !v.is_empty() {
-                                bconcat!(glue, self.inner.escape_token(v.as_ref()))
+                                bformat!("{glue}{}", self.inner.escape_token(v.as_ref()))
                             } else {
                                 BString::default()
                             }
@@ -255,10 +247,10 @@ impl PhpDisplay for ArrayInput {
                     }
                 } else {
                     let val = val.to_php_string();
-                    params.push(bconcat!(
-                        param,
+                    params.push(bformat!(
+                        "{param}{}",
                         if !val.is_empty() {
-                            bconcat!(glue, self.inner.escape_token(val.as_ref()))
+                            bformat!("{glue}{}", self.inner.escape_token(val.as_ref()))
                         } else {
                             BString::default()
                         }
@@ -381,7 +373,7 @@ impl ParameterName {
     fn to_key(&self) -> BString {
         match self {
             Self::Name(name) => name.clone(),
-            Self::Index(index) => bconcat!(*index),
+            Self::Index(index) => bformat!("{}", *index),
         }
     }
 

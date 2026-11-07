@@ -31,7 +31,7 @@ use crate::util::{
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PHP_EOL, PhpMixed, RuntimeException, ToPhpString, TypeError, bconcat, display_to_bytes,
+    PHP_EOL, PhpMixed, RuntimeException, ToPhpString, TypeError, bformat, display_to_bytes,
     get_debug_type, in_array_loose, in_array_strict, intval, json_decode_assoc, parse_url,
     path_from_bytes, path_to_bytes, php_regex, preg_is_match, preg_quote, preg_replace, rename,
     stripos, strlen, strpos, strtolower, substr, trim, unlink_silent, utf8_text,
@@ -197,10 +197,9 @@ impl NativeHttpDownloader {
         if let Some(header) = options.http().and_then(HttpOptions::header)
             && !matches!(header, PhpMixed::List(_) | PhpMixed::Array(_))
         {
-            return Err(TypeError::new(bconcat!(
-                "array_diff(): Argument #1 ($array) must be of type array, ",
-                get_debug_type(header),
-                " given"
+            return Err(TypeError::new(bformat!(
+                "array_diff(): Argument #1 ($array) must be of type array, {} given",
+                get_debug_type(header)
             ))
             .into());
         }
@@ -224,7 +223,10 @@ impl NativeHttpDownloader {
         // `attributes.redirects == 0 && attributes.retries == 0` in PHP is always true here since
         // this runs exactly once, before the retry loop below has a chance to advance either.
         self.io.write_error_with_verbosity(
-            bconcat!("Downloading ", Url::sanitize(url), using_proxy, if_modified),
+            bformat!(
+                "Downloading {}{using_proxy}{if_modified}",
+                Url::sanitize(url)
+            ),
             DEBUG,
         );
 
@@ -314,12 +316,10 @@ impl NativeHttpDownloader {
                         attributes.insert("ipResolve".into(), PhpMixed::Int(4));
                     }
                     self.io.write_error_with_verbosity(
-                        bconcat!(
-                            "Retrying (",
+                        bformat!(
+                            "Retrying ({}) {} due to connection error",
                             retries + 1,
-                            ") ",
-                            Url::sanitize(url),
-                            " due to connection error"
+                            Url::sanitize(url)
                         ),
                         DEBUG,
                     );
@@ -344,10 +344,9 @@ impl NativeHttpDownloader {
                 }
                 return Ok(Decision::Failed(
                     TransportException::new(
-                        bconcat!(
-                            "curl error while downloading ",
+                        bformat!(
+                            "curl error while downloading {}: {}",
                             Url::sanitize(url),
-                            ": ",
                             transport_err.message
                         ),
                         0,
@@ -360,10 +359,8 @@ impl NativeHttpDownloader {
         let status_code = response.status;
         let native_response = response.into_native_http_response(url);
 
-        self.io.write_error_with_verbosity(
-            bconcat!("[", status_code, "] ", Url::sanitize(url)),
-            DEBUG,
-        );
+        self.io
+            .write_error_with_verbosity(bformat!("[{status_code}] {}", Url::sanitize(url)), DEBUG);
 
         // Output JSON warnings (PHP HttpDownloader::outputWarnings) for >= 300 JSON bodies.
         if native_response.inner.get_status_code() >= 300
@@ -454,13 +451,10 @@ impl NativeHttpDownloader {
                 && retries < self.max_retries
             {
                 self.io.write_error_with_verbosity(
-                    bconcat!(
-                        "Retrying (",
+                    bformat!(
+                        "Retrying ({}) {} due to status code {status_code}",
                         retries + 1,
-                        ") ",
-                        Url::sanitize(url),
-                        " due to status code ",
-                        status_code
+                        Url::sanitize(url)
                     ),
                     DEBUG,
                 );
@@ -570,8 +564,8 @@ impl NativeHttpDownloader {
         })?;
 
         let status = resp.status().as_u16() as i64;
-        let status_line = bconcat!(
-            "HTTP/",
+        let status_line = bformat!(
+            "HTTP/{} {}",
             match resp.version() {
                 reqwest::Version::HTTP_09 => "0.9",
                 reqwest::Version::HTTP_10 => "1.0",
@@ -580,7 +574,6 @@ impl NativeHttpDownloader {
                 reqwest::Version::HTTP_3 => "3",
                 _ => "1.1",
             },
-            " ",
             display_to_bytes(resp.status())
         );
         // Header lines start with the status line so Response::get_status_message can find it.
@@ -588,7 +581,7 @@ impl NativeHttpDownloader {
         // while curl reports the headers as received.
         let mut headers_out: Vec<BString> = vec![status_line];
         for (k, v) in resp.headers().iter() {
-            headers_out.push(bconcat!(k.as_str(), ": ", v.as_bytes()));
+            headers_out.push(bformat!("{}: {}", k.as_str(), v.as_bytes()));
         }
 
         let body = Self::read_body_with_limit(resp, max_file_size, filename)
@@ -642,12 +635,8 @@ impl NativeHttpDownloader {
                 && written > max
             {
                 return Err((
-                    bconcat!(
-                        "Maximum allowed download size reached. Downloaded ",
-                        written,
-                        " of allowed ",
-                        max,
-                        " bytes"
+                    bformat!(
+                        "Maximum allowed download size reached. Downloaded {written} of allowed {max} bytes"
                     ),
                     true,
                 ));
@@ -697,31 +686,29 @@ impl NativeHttpDownloader {
                 .is_some_and(|host| !host.is_empty() && host != "0")
             {
                 // Scheme relative; e.g. //example.com/foo
-                target_url = bconcat!(
+                target_url = bformat!(
+                    "{}:{location_header}",
                     parse_url(url)
                         .and_then(|parsed| parsed.scheme)
-                        .unwrap_or_default(),
-                    ":",
-                    location_header
+                        .unwrap_or_default()
                 );
             } else if location_header.starts_with(b"/") {
                 // Absolute path; e.g. /foo
                 let url_host = parse_url(url).and_then(|parsed| parsed.host);
                 let url_host_str = url_host.unwrap_or_default();
                 target_url = preg_replace(
-                    bconcat!(
-                        r"{^(.+(?://|@)",
-                        preg_quote(url_host_str, None),
-                        r"(?::\d+)?)(?:[/\?].*)?$}"
+                    bformat!(
+                        "{{^(.+(?://|@){}(?::\\d+)?)(?:[/\\?].*)?$}}",
+                        preg_quote(url_host_str, None)
                     ),
-                    bconcat!("\\1", location_header),
+                    bformat!("\\1{location_header}"),
                     url,
                 );
             } else {
                 // Relative path; e.g. foo
                 target_url = preg_replace(
                     php_regex!(r"{^(.+/)[^/?]*(?:\?.*)?$}"),
-                    bconcat!("\\1", location_header),
+                    bformat!("\\1{location_header}"),
                     url,
                 );
             }
@@ -729,14 +716,13 @@ impl NativeHttpDownloader {
 
         if !target_url.is_empty() {
             self.io.write_error_with_verbosity(
-                bconcat!(
-                    "Following redirect (",
+                bformat!(
+                    "Following redirect ({}) {}",
                     attributes
                         .get(B("redirects"))
                         .and_then(|v| v.as_int())
                         .unwrap_or(0)
                         + 1,
-                    ") ",
                     Url::sanitize(target_url.clone())
                 ),
                 DEBUG,
@@ -746,12 +732,9 @@ impl NativeHttpDownloader {
         }
 
         Ok(Err(Box::new(TransportException::new(
-            bconcat!(
-                "The \"",
-                url,
-                "\" file could not be downloaded, got redirect without Location (",
-                response.inner.get_status_message().unwrap_or_default(),
-                ")"
+            bformat!(
+                "The \"{url}\" file could not be downloaded, got redirect without Location ({})",
+                response.inner.get_status_message().unwrap_or_default()
             ),
             0,
         ))))
@@ -896,22 +879,17 @@ impl NativeHttpDownloader {
             b"application/json" | b"application/json; charset=utf-8"
         ) {
             let body = response.inner.get_body().unwrap_or_default();
-            details = bconcat!(
-                ":",
-                PHP_EOL,
+            details = bformat!(
+                ":{PHP_EOL}{}{}",
                 substr(body, 0, Some(200)),
                 if strlen(body) > 200 { "..." } else { "" }
             );
         }
 
         Box::new(TransportException::new(
-            bconcat!(
-                "The \"",
-                url,
-                "\" file could not be downloaded (",
-                error_message.as_bstr(),
-                ")",
-                details
+            bformat!(
+                "The \"{url}\" file could not be downloaded ({}){details}",
+                error_message.as_bstr()
             ),
             response.inner.get_status_code(),
         ))
@@ -964,7 +942,7 @@ impl NativeHttpDownloader {
 
     /// The `~` file a download is written to before it is renamed to `filename`.
     fn temp_file(filename: &std::path::Path) -> std::path::PathBuf {
-        path_from_bytes(&bconcat!(path_to_bytes(filename), "~")).to_owned()
+        path_from_bytes(&bformat!("{}~", path_to_bytes(filename))).to_owned()
     }
 }
 

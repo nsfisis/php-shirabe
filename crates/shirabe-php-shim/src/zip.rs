@@ -1,7 +1,7 @@
 // TODO(php-semantics): this differs from PHP's `ZipArchive` in details. Its compatibility needs to
 // be investigated against the C sources of PHP's `ext/zip`.
 
-use crate::{ErrorException, PhpResource, StreamBacking, StreamState, bconcat};
+use crate::{ErrorException, PhpResource, StreamBacking, StreamState, bformat};
 use bstr::{BStr, BString};
 use zip::read::{ExtractOptions, SymlinkExtractAction};
 use zip::result::ZipResult;
@@ -220,7 +220,7 @@ impl ZipArchive {
                 true,
                 false,
                 BString::from("r"),
-                bconcat!("zip://", name),
+                bformat!("zip://{name}"),
             )),
         )))
     }

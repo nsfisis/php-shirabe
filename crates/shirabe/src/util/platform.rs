@@ -3,7 +3,7 @@
 use crate::util::ProcessExecutor;
 use bstr::{BStr, BString, ByteSlice};
 use shirabe_php_shim::{
-    PHP_ENV, PHP_SERVER, PhpMixed, PhpResource, PregMatches, RuntimeException, STDOUT, bconcat,
+    PHP_ENV, PHP_SERVER, PhpMixed, PhpResource, PregMatches, RuntimeException, STDOUT, bformat,
     defined, file_exists, file_get_contents, function_exists, getcwd, getenv, ini_get, is_readable,
     mb_strlen, os_str_from_bytes, path_to_bytes, php_os_family, php_regex, posix_geteuid,
     posix_getpwuid, posix_getuid, preg_is_match, preg_replace_callback, putenv, realpath,
@@ -67,9 +67,9 @@ impl Platform {
     /// putenv() equivalent but updates the runtime global variables too
     pub fn put_env(name: impl AsRef<[u8]>, value: impl AsRef<[u8]>) -> anyhow::Result<()> {
         unsafe {
-            putenv(os_str_from_bytes(&bconcat!(
+            putenv(os_str_from_bytes(&bformat!(
+                "{}={}",
                 name.as_ref(),
-                "=",
                 value.as_ref()
             )))
         }?;
@@ -93,7 +93,11 @@ impl Platform {
     pub fn expand_path(path: impl AsRef<[u8]>) -> BString {
         let path = path.as_ref();
         if preg_is_match(php_regex!(r"#^~[\\/]#"), path) {
-            return bconcat!(Self::get_user_directory().unwrap(), substr(path, 1, None));
+            return bformat!(
+                "{}{}",
+                Self::get_user_directory().unwrap(),
+                substr(path, 1, None)
+            );
         }
 
         // Regex pattern compatibility:
@@ -113,18 +117,18 @@ impl Platform {
                     let home =
                         Platform::get_env("HOME").filter(|v| PhpMixed::string(v.clone()).to_bool());
                     if let Some(home) = home {
-                        return Ok(bconcat!(home, path_part));
+                        return Ok(bformat!("{home}{path_part}"));
                     }
 
-                    return Ok(bconcat!(
-                        Platform::get_env("USERPROFILE").unwrap_or_default(),
-                        path_part,
+                    return Ok(bformat!(
+                        "{}{path_part}",
+                        Platform::get_env("USERPROFILE").unwrap_or_default()
                     ));
                 }
 
-                Ok(bconcat!(
-                    Platform::get_env(var).unwrap_or_default(),
-                    path_part,
+                Ok(bformat!(
+                    "{}{path_part}",
+                    Platform::get_env(var).unwrap_or_default()
                 ))
             },
             path,

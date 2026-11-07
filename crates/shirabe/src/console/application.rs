@@ -40,7 +40,7 @@ use indexmap::IndexMap;
 use shirabe_php_shim::{
     AnyThrowable, AsAny, Catch as _, Error, ExitException, InvalidArgumentException,
     LogicException as ShimLogicException, PHP_ENV, PHP_SERVER, PhpMixed, PregMatches,
-    RuntimeException, STDIN, STR_PAD_RIGHT, ToPhpString, basename, bconcat, bin2hex, chdir,
+    RuntimeException, STDIN, STR_PAD_RIGHT, ToPhpString, basename, bformat, bin2hex, chdir,
     defined, dirname, disk_free_space, display_to_bytes, error_message, exec, explode,
     explode_limit, extension_loaded, file_exists, file_get_contents, file_put_contents,
     function_exists, get_debug_type_obj, getcwd, getenv, getmypid, glob, implode, ini_set, intval,
@@ -196,10 +196,8 @@ impl Application {
         if let Some(ref wd) = working_dir
             && !is_dir(wd)
         {
-            return Err(RuntimeException::new(bconcat!(
-                "Invalid working directory specified, ",
-                wd,
-                " does not exist."
+            return Err(RuntimeException::new(bformat!(
+                "Invalid working directory specified, {wd} does not exist."
             ))
             .into());
         }
@@ -246,7 +244,7 @@ impl Application {
                     hit = df.map(|d| d < min_space_free).unwrap_or(false);
                 }
                 if hit {
-                    return Ok(Some(bconcat!("<error>The disk hosting ", dir, " has less than 100MiB of free space, this may be the cause of the following exception</error>")));
+                    return Ok(Some(bformat!("<error>The disk hosting {dir} has less than 100MiB of free space, this may be the cause of the following exception</error>")));
                 }
             }
             Ok(None)
@@ -400,7 +398,7 @@ impl Application {
     }
 
     pub fn get_help(&self) -> BString {
-        bconcat!(Self::LOGO, self.base_get_help())
+        bformat!("{}{}", Self::LOGO, self.base_get_help())
     }
 
     /// Initializes all the composer commands.
@@ -469,19 +467,15 @@ impl Application {
     pub fn get_long_version(&self) -> BString {
         let mut branch_alias_string = BString::default();
         if !composer::SHIRABE_BRANCH_ALIAS_VERSION.is_empty() {
-            branch_alias_string = bconcat!(" (", composer::SHIRABE_BRANCH_ALIAS_VERSION, ")");
+            branch_alias_string = bformat!(" ({})", composer::SHIRABE_BRANCH_ALIAS_VERSION);
         }
 
-        bconcat!(
-            "<info>",
+        bformat!(
+            "<info>{}</info> version <comment>{}{branch_alias_string}</comment> (based on Composer {}) {}",
             self.get_name(),
-            "</info> version <comment>",
             self.get_version(),
-            branch_alias_string,
-            "</comment> (based on Composer ",
             composer::VERSION,
-            ") ",
-            composer::SHIRABE_RELEASE_DATE,
+            composer::SHIRABE_RELEASE_DATE
         )
     }
 
@@ -792,7 +786,7 @@ impl Application {
     ) -> anyhow::Result<std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>> {
         if !self.has(name) {
             return Err(CommandNotFoundException::new(
-                bconcat!("The command \"", name, "\" does not exist."),
+                bformat!("The command \"{name}\" does not exist."),
                 Vec::new(),
                 0,
             )
@@ -802,7 +796,7 @@ impl Application {
         // When the command has a different name than the one used at the command loader level
         if !self.commands.contains_key(name) {
             return Err(CommandNotFoundException::new(
-                bconcat!("The \"", name, "\" command cannot be found because it is registered under multiple names. Make sure you don't set a different name via constructor or \"setName()\"."),
+                bformat!("The \"{name}\" command cannot be found because it is registered under multiple names. Make sure you don't set a different name via constructor or \"setName()\"."),
                 Vec::new(),
                 0,
             )
@@ -893,16 +887,13 @@ impl Application {
             .into_iter()
             .map(|p| preg_quote(&p, None))
             .collect();
-        let expr = bconcat!(implode("[^:]*:", &parts), "[^:]*");
+        let expr = bformat!("{}[^:]*", implode("[^:]*:", &parts));
         let namespaces: Vec<BString> =
-            preg_grep(bconcat!("{^", expr, "}"), all_namespaces.iter().cloned()).collect();
+            preg_grep(bformat!("{{^{expr}}}"), all_namespaces.iter().cloned()).collect();
 
         if namespaces.is_empty() {
-            let mut message = bconcat!(
-                "There are no commands defined in the \"",
-                namespace,
-                "\" namespace."
-            );
+            let mut message =
+                bformat!("There are no commands defined in the \"{namespace}\" namespace.");
 
             let alternatives = self.find_alternatives(namespace, &all_namespaces);
             if !alternatives.is_empty() {
@@ -921,12 +912,9 @@ impl Application {
         let exact = namespaces.iter().any(|n| n.as_bstr() == namespace);
         if namespaces.len() > 1 && !exact {
             return Err(NamespaceNotFoundException::new(
-                bconcat!(
-                    "The namespace \"",
-                    namespace,
-                    "\" is ambiguous.\nDid you mean one of these?\n",
-                    self.get_abbreviation_suggestions(&namespaces),
-                    "."
+                bformat!(
+                    "The namespace \"{namespace}\" is ambiguous.\nDid you mean one of these?\n{}.",
+                    self.get_abbreviation_suggestions(&namespaces)
                 ),
                 namespaces,
                 0,
@@ -983,18 +971,17 @@ impl Application {
             .into_iter()
             .map(|p| preg_quote(&p, None))
             .collect();
-        let expr = bconcat!(implode("[^:]*:", &parts), "[^:]*");
+        let expr = bformat!("{}[^:]*", implode("[^:]*:", &parts));
         let mut commands: Vec<BString> =
-            preg_grep(bconcat!("{^", expr, "}"), all_commands.iter().cloned()).collect();
+            preg_grep(bformat!("{{^{expr}}}"), all_commands.iter().cloned()).collect();
 
         if commands.is_empty() {
-            commands =
-                preg_grep(bconcat!("{^", expr, "}i"), all_commands.iter().cloned()).collect();
+            commands = preg_grep(bformat!("{{^{expr}}}i"), all_commands.iter().cloned()).collect();
         }
 
         // if no commands matched or we just matched namespaces
         if commands.is_empty()
-            || preg_grep(bconcat!("{^", expr, "$}i"), commands.iter())
+            || preg_grep(bformat!("{{^{expr}$}}i"), commands.iter())
                 .next()
                 .is_none()
         {
@@ -1003,7 +990,7 @@ impl Application {
                 self.find_namespace(&name[..pos])?;
             }
 
-            let mut message = bconcat!("Command \"", name, "\" is not defined.");
+            let mut message = bformat!("Command \"{name}\" is not defined.");
 
             let mut alternatives = self.find_alternatives(name, &all_commands);
             if !alternatives.is_empty() {
@@ -1079,16 +1066,16 @@ impl Application {
                         continue;
                     }
 
-                    let abbrev = bconcat!(
+                    let abbrev = bformat!(
+                        "{} {}",
                         str_pad(&cmd, max_len as usize, " ", STR_PAD_RIGHT),
-                        " ",
                         command_list[&cmd].borrow().get_description()
                     );
 
                     if Helper::width(&abbrev) > usable_width {
-                        formatted_abbrevs.push(PhpMixed::from(bconcat!(
-                            Helper::substr(&abbrev, 0, Some(usable_width - 3)),
-                            "..."
+                        formatted_abbrevs.push(PhpMixed::from(bformat!(
+                            "{}...",
+                            Helper::substr(&abbrev, 0, Some(usable_width - 3))
                         )));
                     } else {
                         formatted_abbrevs.push(PhpMixed::from(abbrev));
@@ -1104,13 +1091,7 @@ impl Application {
                     let suggestions = self.get_abbreviation_suggestions(&filtered);
 
                     return Err(CommandNotFoundException::new(
-                        bconcat!(
-                            "Command \"",
-                            name,
-                            "\" is ambiguous.\nDid you mean one of these?\n",
-                            suggestions,
-                            "."
-                        ),
+                        bformat!("Command \"{name}\" is ambiguous.\nDid you mean one of these?\n{suggestions}."),
                         commands.clone(),
                         0,
                     )
@@ -1124,7 +1105,7 @@ impl Application {
 
         if command.borrow().is_hidden() {
             return Err(CommandNotFoundException::new(
-                bconcat!("The command \"", name, "\" does not exist."),
+                bformat!("The command \"{name}\" does not exist."),
                 Vec::new(),
                 0,
             )
@@ -1225,10 +1206,9 @@ impl Application {
             // identity over the synopsis and the application-name argument is never substituted.
             let synopsis = running_command.borrow().get_synopsis(false);
             output.borrow().writeln(
-                &[bconcat!(
-                    "<info>",
-                    OutputFormatter::escape(&synopsis).unwrap(),
-                    "</info>"
+                &[bformat!(
+                    "<info>{}</info>",
+                    OutputFormatter::escape(&synopsis).unwrap()
                 )],
                 output_interface::VERBOSITY_QUIET,
             );
@@ -1257,15 +1237,13 @@ impl Application {
                 let class =
                     exception.map_or_else(|| BStr::new("Exception"), AnyThrowable::get_debug_type);
                 let code = exception.map_or(0, AnyThrowable::get_code);
-                title = bconcat!(
-                    "  [",
-                    class,
+                title = bformat!(
+                    "  [{class}{}]  ",
                     if code != 0 {
-                        bconcat!(" (", code, ")")
+                        bformat!(" ({code})")
                     } else {
                         BString::default()
-                    },
-                    "]  "
+                    }
                 );
                 len = Helper::width(&title);
             } else {
@@ -1316,30 +1294,25 @@ impl Application {
                 let line = exception
                     .map(AnyThrowable::get_line)
                     .filter(|line| *line != 0)
-                    .map_or_else(|| BString::from("n/a"), |line| bconcat!(line));
-                messages.push(bconcat!(
-                    "<comment>",
-                    OutputFormatter::escape(bconcat!("In ", file, " line ", line, ":")).unwrap(),
-                    "</comment>"
+                    .map_or_else(|| BString::from("n/a"), |line| bformat!("{line}"));
+                messages.push(bformat!(
+                    "<comment>{}</comment>",
+                    OutputFormatter::escape(bformat!("In {file} line {line}:")).unwrap()
                 ));
             }
-            let empty_line = bconcat!("<error>", str_repeat(" ", len as usize), "</error>");
+            let empty_line = bformat!("<error>{}</error>", str_repeat(" ", len as usize));
             messages.push(empty_line.clone());
             if message.is_empty() || output_interface::VERBOSITY_VERBOSE <= verbosity {
-                messages.push(bconcat!(
-                    "<error>",
-                    title,
-                    str_repeat(" ", (len - Helper::width(&title)).max(0) as usize),
-                    "</error>"
+                messages.push(bformat!(
+                    "<error>{title}{}</error>",
+                    str_repeat(" ", (len - Helper::width(&title)).max(0) as usize)
                 ));
             }
             for (line, line_length) in &lines {
-                messages.push(bconcat!(
-                    "<error>  ",
+                messages.push(bformat!(
+                    "<error>  {}  {}</error>",
                     OutputFormatter::escape(line).unwrap(),
-                    "  ",
-                    str_repeat(" ", (len - line_length) as usize),
-                    "</error>"
+                    str_repeat(" ", (len - line_length) as usize)
                 ));
             }
             messages.push(empty_line);
@@ -1454,12 +1427,11 @@ impl Application {
             input.borrow_mut().set_interactive(false);
         }
 
-        let shell_verbosity_value = bconcat!(shell_verbosity);
+        let shell_verbosity_value = bformat!("{shell_verbosity}");
         let shell_verbosity_value = os_str_from_bytes(&shell_verbosity_value);
         unsafe {
-            putenv(os_str_from_bytes(&bconcat!(
-                "SHELL_VERBOSITY=",
-                shell_verbosity
+            putenv(os_str_from_bytes(&bformat!(
+                "SHELL_VERBOSITY={shell_verbosity}"
             )))
         }
         .expect("a NAME=value assignment has a valid syntax");
@@ -1504,11 +1476,7 @@ impl Application {
                     "--help",
                     Some("-h".into()),
                     Some(InputOption::VALUE_NONE),
-                    bconcat!(
-                        "Display help for the given command. When no command is given display help for the <info>",
-                        self.default_command,
-                        "</info> command"
-                    ),
+                    bformat!("Display help for the given command. When no command is given display help for the <info>{}</info> command", self.default_command),
                     InputValue::Null,
                 )
                 .unwrap(),
@@ -1612,7 +1580,7 @@ impl Application {
 
     /// Returns abbreviated suggestions in string format.
     fn get_abbreviation_suggestions(&self, abbrevs: &[BString]) -> BString {
-        bconcat!("    ", implode("\n    ", abbrevs))
+        bformat!("    {}", implode("\n    ", abbrevs))
     }
 
     /// Returns the namespace part of the command name.
@@ -1733,7 +1701,7 @@ impl Application {
             for (start, end, _) in m0.char_indices() {
                 let char = &m0[start..end];
                 // test if $char could be appended to current line
-                if mb_strwidth(bconcat!(line, char), Some(bstr::BStr::new("utf8"))) <= width {
+                if mb_strwidth(bformat!("{line}{char}"), Some(bstr::BStr::new("utf8"))) <= width {
                     line.extend_from_slice(char);
                     continue;
                 }
@@ -1763,7 +1731,7 @@ impl Application {
         for part in parts {
             if !namespaces.is_empty() {
                 let last = namespaces.last().unwrap().clone();
-                namespaces.push(bconcat!(last, ":", part));
+                namespaces.push(bformat!("{last}:{part}"));
             } else {
                 namespaces.push(part);
             }
@@ -1827,10 +1795,9 @@ impl ApplicationHandle {
         command.borrow().get_definition();
 
         if command.borrow().get_name().is_none() {
-            return Err(ConsoleLogicException::new(bconcat!(
-                "The command defined in \"",
-                get_debug_type_obj(&command),
-                "\" cannot have an empty name."
+            return Err(ConsoleLogicException::new(bformat!(
+                "The command defined in \"{}\" cannot have an empty name.",
+                get_debug_type_obj(&command)
             ))
             .into());
         }
@@ -1935,8 +1902,8 @@ impl ApplicationHandle {
             application.borrow_mut().initial_working_directory = getcwd();
             let cwd = Platform::get_cwd(true).unwrap_or_default();
             io.write_error_with_verbosity(
-                bconcat!(
-                    "Changed CWD to ",
+                bformat!(
+                    "Changed CWD to {}",
                     if !cwd.as_os_str().is_empty() {
                         cwd
                     } else {
@@ -2007,26 +1974,21 @@ impl ApplicationHandle {
 
             // abort when we reach the home dir or top of the filesystem
             while dirname(&dir) != dir && dir != home {
-                if file_exists(path_from_bytes(&bconcat!(
-                    dir,
-                    "/",
+                if file_exists(path_from_bytes(&bformat!(
+                    "{dir}/{}",
                     Factory::get_composer_file().unwrap_or_default()
                 ))) {
                     if use_parent_dir_if_no_json_available != UseParentDir::Bool(true)
                         && !io.is_interactive()
                     {
-                        io.write_error(bconcat!(
-                            "<info>No composer.json in current directory, to use the one at ",
-                            dir,
-                            " run interactively or set config.use-parent-dir to true</info>"
-                        ));
+                        io.write_error(bformat!("<info>No composer.json in current directory, to use the one at {dir} run interactively or set config.use-parent-dir to true</info>"));
                         break;
                     }
                     if use_parent_dir_if_no_json_available == UseParentDir::Bool(true)
-                        || io.ask_confirmation(bconcat!("<info>No composer.json in current directory, do you want to use the one at ", dir, "?</info> [<comment>y,n</comment>]? "), true)?
+                        || io.ask_confirmation(bformat!("<info>No composer.json in current directory, do you want to use the one at {dir}?</info> [<comment>y,n</comment>]? "), true)?
                     {
                         if use_parent_dir_if_no_json_available == UseParentDir::Bool(true) {
-                            io.write_error(bconcat!("<info>No composer.json in current directory, changing working directory to ", dir, "</info>"));
+                            io.write_error(bformat!("<info>No composer.json in current directory, changing working directory to {dir}</info>"));
                         } else {
                             io.write_error("<info>Always want to use the parent dir? Use \"shirabe config --global use-parent-dir true\" to change the default.</info>");
                         }
@@ -2057,7 +2019,7 @@ impl ApplicationHandle {
                     // Silently clobber any sudo credentials on the invoking user to avoid privilege escalations later on
                     // ref. https://github.com/composer/composer/issues/5119
                     let _ = exec(
-                        bconcat!("sudo -u \\#", uid, " sudo -K > /dev/null 2>&1"),
+                        bformat!("sudo -u \\#{uid} sudo -K > /dev/null 2>&1"),
                         None,
                         None,
                     );
@@ -2121,13 +2083,7 @@ impl ApplicationHandle {
                     let cmd_name = command.borrow().get_name().unwrap_or_default();
                     if application.borrow_mut().has(cmd_name.as_bstr()) {
                         let cls = command.borrow().php_class_name().to_owned();
-                        io.write_error(bconcat!(
-                            "<warning>Plugin command ",
-                            cmd_name,
-                            " (",
-                            cls,
-                            ") would override a Shirabe command and has been skipped</warning>"
-                        ));
+                        io.write_error(bformat!("<warning>Plugin command {cmd_name} ({cls}) would override a Shirabe command and has been skipped</warning>"));
                     } else {
                         self.add(command)?;
                     }
@@ -2189,25 +2145,20 @@ impl ApplicationHandle {
 
         if !is_proxy_command {
             io.write_error_with_verbosity(
-                bconcat!(
-                    "Running Shirabe ",
+                bformat!(
+                    "Running Shirabe {} ({}, based on Composer {}) with PHP {} on {} / {}",
                     composer::SHIRABE_VERSION,
-                    " (",
                     composer::SHIRABE_RELEASE_DATE,
-                    ", based on Composer ",
                     composer::VERSION,
-                    ") with PHP ",
                     shirabe_php_rpc::get_php_version()?.version,
-                    " on ",
                     php_uname("s"),
-                    " / ",
                     php_uname("r")
                 ),
                 io_interface::DEBUG,
             );
 
             if shirabe_php_rpc::get_php_version()?.version_id < 70205 {
-                io.write_error(bconcat!("<warning>Shirabe supports PHP 7.2.5 and above, you will most likely encounter problems with your PHP ", shirabe_php_rpc::get_php_version()?.version, ". Upgrading is strongly recommended but you can use Composer 2.2.x LTS as a fallback.</warning>"));
+                io.write_error(bformat!("<warning>Shirabe supports PHP 7.2.5 and above, you will most likely encounter problems with your PHP {}. Upgrading is strongly recommended but you can use Composer 2.2.x LTS as a fallback.</warning>", shirabe_php_rpc::get_php_version()?.version));
             }
 
             if shirabe_php_rpc::xdebug::is_xdebug_active()?
@@ -2226,13 +2177,13 @@ impl ApplicationHandle {
                     .is_none_or(|name| name != "selfupdate")
                 && time() > dev_warning_time
             {
-                io.write_error(bconcat!("<warning>Warning: This development build of Shirabe is over 60 days old. It is recommended to update it by running \"", std::path::Path::new(
+                io.write_error(bformat!("<warning>Warning: This development build of Shirabe is over 60 days old. It is recommended to update it by running \"{} self-update\" to get the latest version.</warning>", std::path::Path::new(
                         &PHP_SERVER
                             .lock()
                             .unwrap()
                             .get("PHP_SELF")
                             .unwrap_or_default()
-                    ), " self-update\" to get the latest version.</warning>"));
+                    )));
             }
 
             if is_non_allowed_root
@@ -2257,10 +2208,9 @@ impl ApplicationHandle {
             }
 
             // Check system temp folder for usability as it can cause weird runtime issues otherwise
-            let pid = bconcat!(getmypid(), "-");
-            let tempfile = sys_get_temp_dir().join(path_from_bytes(&bconcat!(
-                "temp-",
-                pid,
+            let pid = bformat!("{}-", getmypid());
+            let tempfile = sys_get_temp_dir().join(path_from_bytes(&bformat!(
+                "temp-{pid}{}",
                 bin2hex(random_bytes(5))
             )));
             if !(file_put_contents(&tempfile, file!().as_bytes()).is_some_and(|n| n > 0)
@@ -2268,7 +2218,7 @@ impl ApplicationHandle {
                 && unlink(&tempfile).is_ok()
                 && !file_exists(&tempfile))
             {
-                io.write_error(bconcat!("<error>PHP temp directory (", sys_get_temp_dir(), ") does not exist or is not writable to Shirabe. Set sys_temp_dir in your php.ini</error>"));
+                io.write_error(bformat!("<error>PHP temp directory ({}) does not exist or is not writable to Shirabe. Set sys_temp_dir in your php.ini</error>", sys_get_temp_dir()));
             }
 
             // add non-standard scripts as own commands
@@ -2281,18 +2231,16 @@ impl ApplicationHandle {
                     && let Some(scripts) = arr.get(B("scripts")).and_then(|v| v.as_array())
                 {
                     for (script, dummy) in scripts {
-                        let script_event_const = bconcat!(
-                            "Composer\\Script\\ScriptEvents::",
+                        let script_event_const = bformat!(
+                            "Composer\\Script\\ScriptEvents::{}",
                             str_replace("-", "_", strtoupper(script))
                         );
                         if !defined(&script_event_const) {
                             if application.borrow_mut().has(script.as_ref()) {
-                                io.write_error(bconcat!("<warning>A script named ", script, " would override a Shirabe command and has been skipped</warning>"));
+                                io.write_error(bformat!("<warning>A script named {script} would override a Shirabe command and has been skipped</warning>"));
                             } else {
-                                let mut description: BString = bconcat!(
-                                    "Runs the ",
-                                    script,
-                                    " script as defined in composer.json"
+                                let mut description: BString = bformat!(
+                                    "Runs the {script} script as defined in composer.json"
                                 );
 
                                 if let Some(desc) = arr
@@ -2404,7 +2352,7 @@ impl ApplicationHandle {
                                                 shirabe_php_rpc::PluginValue::Bool(true),
                                             ],
                                         )? {
-                                            io.write_error(bconcat!("<warning>The script named ", script, " extends SingleCommandApplication which is not compatible with Composer 2.9+, make sure you extend Symfony\\Component\\Console\\Command instead.</warning>"));
+                                            io.write_error(bformat!("<warning>The script named {script} extends SingleCommandApplication which is not compatible with Composer 2.9+, make sure you extend Symfony\\Component\\Console\\Command instead.</warning>"));
                                         }
 
                                         let handle = new_php_object(
@@ -2422,7 +2370,7 @@ impl ApplicationHandle {
                                             && !bytes.is_empty()
                                             && bytes != script
                                         {
-                                            io.write_error(bconcat!("<warning>The script named ", script, " in composer.json has a mismatched name in its class definition. For consistency, either use the same name, or do not define one inside the class.</warning>"));
+                                            io.write_error(bformat!("<warning>The script named {script} in composer.json has a mismatched name in its class definition. For consistency, either use the same name, or do not define one inside the class.</warning>"));
                                             // override it with the defined script name
                                             PhpCall::Method(&handle, BStr::new("setName"))
                                                 .run::<shirabe_php_rpc::PluginValue>(vec![
@@ -2490,12 +2438,10 @@ impl ApplicationHandle {
                 .borrow()
                 .has_parameter_option(&["--version", "-V"], true)
             {
-                io.write_error(bconcat!(
-                    "<info>PHP</info> version <comment>",
+                io.write_error(bformat!(
+                    "<info>PHP</info> version <comment>{}</comment> ({})",
                     shirabe_php_rpc::get_php_version()?.version,
-                    "</comment> (",
-                    shirabe_php_rpc::get_php_binary()?,
-                    ")"
+                    shirabe_php_rpc::get_php_binary()?
                 ));
                 io.write_error(
                     "Run the \"diagnose\" command to get more detailed diagnostics output.",
@@ -2511,20 +2457,17 @@ impl ApplicationHandle {
 
             if let Some(st) = start_time {
                 let mib = |memory: anyhow::Result<i64>| match memory {
-                    Ok(memory) => bconcat!(
-                        display_to_bytes(round((memory as f64) / 1024.0 / 1024.0, 2)),
-                        "MiB"
+                    Ok(memory) => bformat!(
+                        "{}MiB",
+                        display_to_bytes(round((memory as f64) / 1024.0 / 1024.0, 2))
                     ),
                     Err(_) => BString::from("<unknown>"),
                 };
-                io.write_error(bconcat!(
-                    "<info>Memory usage: ",
+                io.write_error(bformat!(
+                    "<info>Memory usage: {} (peak: {}), time: {}s</info>",
                     mib(shirabe_php_rpc::memory_get_usage(false)),
-                    " (peak: ",
                     mib(shirabe_php_rpc::memory_get_peak_usage(false)),
-                    "), time: ",
-                    display_to_bytes(round(microtime() - st, 2)),
-                    "s</info>"
+                    display_to_bytes(round(microtime() - st, 2))
                 ));
             }
 
@@ -2617,9 +2560,9 @@ impl ApplicationHandle {
             let app = application.borrow();
             (app.terminal.get_height(), app.terminal.get_width())
         };
-        unsafe { putenv(os_str_from_bytes(&bconcat!("LINES=", height))) }
+        unsafe { putenv(os_str_from_bytes(&bformat!("LINES={height}"))) }
             .expect("a NAME=value assignment has a valid syntax");
-        unsafe { putenv(os_str_from_bytes(&bconcat!("COLUMNS=", width))) }
+        unsafe { putenv(os_str_from_bytes(&bformat!("COLUMNS={width}"))) }
             .expect("a NAME=value assignment has a valid syntax");
 
         let input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>> = match input {
@@ -2682,7 +2625,7 @@ impl ApplicationHandle {
                 // $exitCode = $e->getCode();
                 // is_numeric($exitCode) ? max(1, (int) $exitCode) : 1
                 let exit_code = AnyThrowable::of(&e).map_or(0, AnyThrowable::get_code) as i32;
-                if is_numeric_string(bconcat!(exit_code)) {
+                if is_numeric_string(bformat!("{exit_code}")) {
                     if exit_code <= 0 { 1 } else { exit_code }
                 } else {
                     1
@@ -2814,7 +2757,7 @@ impl ApplicationHandle {
                     .borrow()
                     .writeln(&[BString::from("")], output_interface::OUTPUT_NORMAL);
                 let formatted_block = FormatterHelper::default().format_block(
-                    FormatBlockMessages::String(bconcat!("Command \"", name, "\" is not defined.")),
+                    FormatBlockMessages::String(bformat!("Command \"{name}\" is not defined.")),
                     "error".into(),
                     true,
                 );
@@ -2822,7 +2765,7 @@ impl ApplicationHandle {
                     .borrow()
                     .writeln(&[formatted_block], output_interface::OUTPUT_NORMAL);
                 if !style.borrow().confirm(
-                    bconcat!("Do you want to run \"", alternative, "\" instead? ").as_ref(),
+                    bformat!("Do you want to run \"{alternative}\" instead? ").as_ref(),
                     false,
                 ) {
                     return Ok(1);
@@ -2988,7 +2931,7 @@ fn anonymous_class_display_name(class: &BStr) -> anyhow::Result<BString> {
             .next()
             .unwrap_or_else(|| BString::from("class")),
     };
-    Ok(bconcat!(name, "@anonymous"))
+    Ok(bformat!("{name}@anonymous"))
 }
 
 thread_local! {
@@ -3026,10 +2969,8 @@ pub(crate) fn run_worker_reverse_command(name: &BStr, input_line: &BStr) -> anyh
     let application = WORKER_REVERSE_APPLICATION
         .with(|slot| slot.borrow().as_ref().and_then(std::rc::Weak::upgrade))
         .ok_or_else(|| -> anyhow::Error {
-            RuntimeException::new(bconcat!(
-                "cannot run command ",
-                name,
-                ": no application is registered for worker callbacks"
+            RuntimeException::new(bformat!(
+                "cannot run command {name}: no application is registered for worker callbacks"
             ))
             .into()
         })?;
@@ -3058,7 +2999,7 @@ pub(crate) fn run_worker_reverse_command(name: &BStr, input_line: &BStr) -> anyh
     } else if trimmed.is_empty() {
         BString::from(name)
     } else {
-        bconcat!(name, " ", trimmed)
+        bformat!("{name} {trimmed}")
     };
     let input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>> = std::rc::Rc::new(
         std::cell::RefCell::new(shirabe_symfony_console::input::StringInput::new(&line)?),

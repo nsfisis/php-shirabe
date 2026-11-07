@@ -9,7 +9,7 @@ use crate::util::{HttpDownloader, Perforce, PerforceInterface, ProcessExecutor};
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    BadMethodCallException, PhpMixed, RuntimeException, bconcat, path_from_bytes, php_regex,
+    BadMethodCallException, PhpMixed, RuntimeException, bformat, path_from_bytes, php_regex,
     preg_is_match,
 };
 
@@ -82,7 +82,7 @@ impl PerforceDriver {
             return Err(RuntimeException::new(BString::from("PerforceDriver requires a usable cache directory, and it looks like you set it to be disabled")).into());
         }
 
-        let repo_dir = path_from_bytes(&bconcat!(cache_vcs_dir, "/", self.depot)).to_path_buf();
+        let repo_dir = path_from_bytes(&bformat!("{cache_vcs_dir}/{}", self.depot)).to_path_buf();
         self.perforce = Some(Box::new(Perforce::create(
             repo_config.clone(),
             self.inner.url.clone(),
@@ -168,7 +168,7 @@ impl PerforceDriver {
     }
 
     pub fn has_composer_file(&mut self, identifier: &BStr) -> bool {
-        let path = bconcat!("//", self.depot, "/", identifier);
+        let path = bformat!("//{}/{identifier}", self.depot);
         self.perforce
             .as_mut()
             .unwrap()

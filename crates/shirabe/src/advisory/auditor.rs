@@ -10,7 +10,7 @@ use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     DATE_ATOM, InvalidArgumentException, PhpMixed, array_all, array_any, array_key_exists,
-    array_keys, array_reduce, bconcat, display_to_bytes, get_class, json_bytes, php_str,
+    array_keys, array_reduce, bformat, display_to_bytes, get_class, json_bytes, php_str,
     preg_is_match,
 };
 use shirabe_symfony_console::formatter::OutputFormatter;
@@ -194,24 +194,7 @@ impl Auditor {
                     };
                     let pkg_plurality = if pkg_count == 1 { "" } else { "s" };
                     let punctuation = if format == "summary" { "." } else { ":" };
-                    io.write_error(bconcat!(
-                        "<",
-                        tag,
-                        ">Found ",
-                        total_advisory_count,
-                        " ",
-                        ignored,
-                        "security vulnerability advisor",
-                        plurality,
-                        " affecting ",
-                        pkg_count,
-                        " package",
-                        pkg_plurality,
-                        punctuation,
-                        "</",
-                        tag,
-                        ">"
-                    ));
+                    io.write_error(bformat!("<{tag}>Found {total_advisory_count} {ignored}security vulnerability advisor{plurality} affecting {pkg_count} package{pkg_plurality}{punctuation}</{tag}>"));
                     self.output_advisories(io, advisories_to_output, format)?;
                 }
             }
@@ -226,7 +209,7 @@ impl Auditor {
         if !unreachable_repos.is_empty() {
             io.write_error("<warning>The following repositories were unreachable:</warning>");
             for repo in &unreachable_repos {
-                io.write_error(bconcat!("  - ", repo));
+                io.write_error(bformat!("  - {repo}"));
             }
         }
 
@@ -339,7 +322,7 @@ impl Auditor {
                             .get(severity)
                             .cloned()
                             .flatten()
-                            .or_else(|| Some(bconcat!(severity, " severity is ignored")));
+                            .or_else(|| Some(bformat!("{severity} severity is ignored")));
                     }
 
                     if let Some(cve) = &full.cve
@@ -421,8 +404,8 @@ impl Auditor {
                         .map(|buffer_io| &buffer_io.inner)
                 });
                 if io_as_console.is_none() {
-                    return Err(InvalidArgumentException::new(bconcat!(
-                        "Cannot use table format with ",
+                    return Err(InvalidArgumentException::new(bformat!(
+                        "Cannot use table format with {}",
                         get_class(&PhpMixed::Null)
                     ))
                     .into());
@@ -437,9 +420,9 @@ impl Auditor {
                 Ok(())
             }
             _ if format == Self::FORMAT_SUMMARY => Ok(()),
-            _ => Err(
-                InvalidArgumentException::new(bconcat!("Invalid format \"", format, "\".")).into(),
-            ),
+            _ => {
+                Err(InvalidArgumentException::new(bformat!("Invalid format \"{format}\".")).into())
+            }
         }
     }
 
@@ -517,23 +500,23 @@ impl Auditor {
                 let sa = advisory
                     .as_security_advisory()
                     .expect("output_advisories_plain only receives full advisories");
-                error.push(bconcat!("Package: ", sa.package_name()));
-                error.push(bconcat!("Severity: ", self.get_severity(sa)));
-                error.push(bconcat!("Advisory ID: ", self.get_advisory_id(sa)));
-                error.push(bconcat!("CVE: ", self.get_cve(sa)));
-                error.push(bconcat!("Title: ", OutputFormatter::escape(&sa.title)?));
-                error.push(bconcat!("URL: ", self.get_url(sa)));
-                error.push(bconcat!(
-                    "Affected versions: ",
+                error.push(bformat!("Package: {}", sa.package_name()));
+                error.push(bformat!("Severity: {}", self.get_severity(sa)));
+                error.push(bformat!("Advisory ID: {}", self.get_advisory_id(sa)));
+                error.push(bformat!("CVE: {}", self.get_cve(sa)));
+                error.push(bformat!("Title: {}", OutputFormatter::escape(&sa.title)?));
+                error.push(bformat!("URL: {}", self.get_url(sa)));
+                error.push(bformat!(
+                    "Affected versions: {}",
                     OutputFormatter::escape(sa.affected_versions().get_pretty_string())?
                 ));
-                error.push(bconcat!(
-                    "Reported at: ",
+                error.push(bformat!(
+                    "Reported at: {}",
                     display_to_bytes(sa.reported_at.format(DATE_ATOM))
                 ));
                 if let Some(ignored) = advisory.as_ignored() {
-                    error.push(bconcat!(
-                        "Ignore reason: ",
+                    error.push(bformat!(
+                        "Ignore reason: {}",
                         ignored
                             .ignore_reason
                             .clone()
@@ -556,26 +539,22 @@ impl Auditor {
         packages: &[CompletePackageInterfaceHandle],
         format: &BStr,
     ) -> anyhow::Result<()> {
-        io.write_error(bconcat!(
-            "<error>Found ",
+        io.write_error(bformat!(
+            "<error>Found {} abandoned package{}:</error>",
             packages.len() as i64,
-            " abandoned package",
-            if packages.len() > 1 { "s" } else { "" },
-            ":</error>"
+            if packages.len() > 1 { "s" } else { "" }
         ));
 
         if format == Self::FORMAT_PLAIN {
             for pkg in packages {
                 let replacement = if pkg.get_replacement_package().is_some() {
-                    bconcat!("Use ", pkg.get_replacement_package().unwrap(), " instead")
+                    bformat!("Use {} instead", pkg.get_replacement_package().unwrap())
                 } else {
                     BString::from("No replacement was suggested")
                 };
-                io.write_error(bconcat!(
-                    self.get_package_name_with_link(pkg.clone().into()),
-                    " is abandoned. ",
-                    replacement,
-                    "."
+                io.write_error(bformat!(
+                    "{} is abandoned. {replacement}.",
+                    self.get_package_name_with_link(pkg.clone().into())
                 ));
             }
 
@@ -592,8 +571,8 @@ impl Auditor {
                 .map(|buffer_io| &buffer_io.inner)
         });
         if io_as_console.is_none() {
-            return Err(InvalidArgumentException::new(bconcat!(
-                "Cannot use table format with ",
+            return Err(InvalidArgumentException::new(bformat!(
+                "Cannot use table format with {}",
                 get_class(&PhpMixed::Null)
             ))
             .into());
@@ -629,13 +608,11 @@ impl Auditor {
         let package_url = PackageInfo::get_view_source_or_homepage_url(package.clone());
 
         if let Some(package_url) = package_url {
-            bconcat!(
-                "<href=",
+            bformat!(
+                "<href={}>{}</>",
                 OutputFormatter::escape(&package_url)
                     .expect("OutputFormatter::escape does not fail"),
-                ">",
-                package.get_pretty_name(),
-                "</>"
+                package.get_pretty_name()
             )
         } else {
             package.get_pretty_name()
@@ -653,12 +630,8 @@ impl Auditor {
     fn get_advisory_id(&self, advisory: &SecurityAdvisory) -> BString {
         let advisory_id = advisory.advisory_id();
         if advisory_id.starts_with(b"PKSA-") {
-            return bconcat!(
-                "<href=https://packagist.org/security-advisories/",
-                advisory_id,
-                ">",
-                advisory_id,
-                "</>"
+            return bformat!(
+                "<href=https://packagist.org/security-advisories/{advisory_id}>{advisory_id}</>"
             );
         }
 
@@ -670,13 +643,7 @@ impl Auditor {
             return BString::from("NO CVE");
         };
 
-        bconcat!(
-            "<href=https://cve.mitre.org/cgi-bin/cvename.cgi?name=",
-            cve,
-            ">",
-            cve,
-            "</>"
-        )
+        bformat!("<href=https://cve.mitre.org/cgi-bin/cvename.cgi?name={cve}>{cve}</>")
     }
 
     fn get_url(&self, advisory: &SecurityAdvisory) -> BString {
@@ -685,7 +652,7 @@ impl Auditor {
         };
 
         let link = OutputFormatter::escape(link).expect("OutputFormatter::escape does not fail");
-        bconcat!("<href=", link, ">", link, "</>")
+        bformat!("<href={link}>{link}</>")
     }
 
     fn calculate_bitmask(

@@ -7,7 +7,7 @@ use crate::test_case::{
 use bstr::{BString, ByteSlice};
 use serial_test::serial;
 use shirabe::util::Platform;
-use shirabe_php_shim::{bconcat, error_message, path_to_bytes};
+use shirabe_php_shim::{bformat, error_message, path_to_bytes};
 use shirabe_symfony_console::input::{InputValue, ParameterName};
 use std::path::PathBuf;
 
@@ -66,11 +66,7 @@ fn test_global() {
     let display = app_tester.get_display();
 
     assert_eq!(
-        bconcat!(
-            "Changed current directory to ",
-            composer_home_str,
-            "\nCOMPOSER SCRIPT OUTPUT: \n"
-        ),
+        bformat!("Changed current directory to {composer_home_str}\nCOMPOSER SCRIPT OUTPUT: \n"),
         display
     );
 
@@ -108,7 +104,7 @@ fn test_cannot_create_home() {
         .expect_err("expected RuntimeException for a non-directory COMPOSER_HOME");
 
     assert!(
-        error_message(&err).contains_str(bconcat!(filename_str, " exists and is not a directory.")),
+        error_message(&err).contains_str(bformat!("{filename_str} exists and is not a directory.")),
         "got: {}",
         err
     );
@@ -360,7 +356,7 @@ fn test_global_changes_directory() {
 
     let output = app_tester.get_display();
     assert!(
-        output.contains_str(bconcat!("Changed current directory to ", composer_home_str)),
+        output.contains_str(bformat!("Changed current directory to {composer_home_str}")),
         "got: {}",
         output.display_lossy()
     );

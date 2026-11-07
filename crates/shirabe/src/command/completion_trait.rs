@@ -10,7 +10,7 @@ use crate::repository::{
 };
 use bstr::BString;
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpMixed, bconcat, php_regex, preg_is_match, preg_quote, substr};
+use shirabe_php_shim::{PhpMixed, bformat, php_regex, preg_is_match, preg_quote, substr};
 
 /// Adds completion to arguments and options.
 ///
@@ -107,7 +107,8 @@ pub trait CompletionTrait: BaseCommand {
                                         name.len() as i64 - 3,
                                         hint_prefix.len() as i64 + 1,
                                     );
-                                    platform_hint.push(bconcat!(substr(name, 0, Some(end)), "..."));
+                                    platform_hint
+                                        .push(bformat!("{}...", substr(name, 0, Some(end))));
                                 }
                                 continue 'pkgs;
                             }
@@ -189,7 +190,7 @@ pub trait CompletionTrait: BaseCommand {
             let mut show_vendors = false;
             if !input.get_completion_value().contains(&b'/') {
                 results = repos.search(
-                    bconcat!("^", preg_quote(input.get_completion_value(), None)),
+                    bformat!("^{}", preg_quote(input.get_completion_value(), None)),
                     SEARCH_VENDOR,
                     None,
                 )?;
@@ -199,7 +200,7 @@ pub trait CompletionTrait: BaseCommand {
             // if we get a single vendor, we expand it into its contents already
             if results.len() <= 1 {
                 results = repos.search(
-                    bconcat!("^", preg_quote(input.get_completion_value(), None)),
+                    bformat!("^{}", preg_quote(input.get_completion_value(), None)),
                     SEARCH_NAME,
                     None,
                 )?;
@@ -212,7 +213,7 @@ pub trait CompletionTrait: BaseCommand {
             if show_vendors {
                 let mut results: Vec<BString> = results
                     .into_iter()
-                    .map(|name| bconcat!(name, "/"))
+                    .map(|name| bformat!("{name}/"))
                     .collect();
 
                 // sort shorter results first to avoid auto-expanding the completion to a longer string than needed
@@ -228,7 +229,7 @@ pub trait CompletionTrait: BaseCommand {
                 let mut pinned: Vec<BString> = vec![];
 
                 // ensure if the input is an exact match that it is always in the result set
-                let completion_input = bconcat!(input.get_completion_value(), "/");
+                let completion_input = bformat!("{}/", input.get_completion_value());
                 // PHP: array_search(..., true) + array_splice($results, $exactIndex, 1)
                 if let Some(exact_index) = results.iter().position(|r| *r == completion_input) {
                     pinned.push(completion_input);
@@ -276,7 +277,7 @@ pub trait CompletionTrait: BaseCommand {
             let mut repos = PlatformRepository::new(vec![], overrides, None, None)?;
 
             let pattern =
-                base_package::package_name_to_regexp(bconcat!(input.get_completion_value(), "*"));
+                base_package::package_name_to_regexp(bformat!("{}*", input.get_completion_value()));
 
             // array_filter(array_map(getName, ...), isMatch)
             let mut names: Vec<BString> = vec![];

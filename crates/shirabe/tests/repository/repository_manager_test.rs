@@ -13,7 +13,7 @@ use shirabe::repository::{
     ArrayRepository, FilterRepository, PathRepository, RepositoryInterfaceHandle, RepositoryManager,
 };
 use shirabe::util::{Filesystem, HttpDownloader};
-use shirabe_php_shim::{PhpMixed, bconcat, path_to_bytes};
+use shirabe_php_shim::{PhpMixed, bformat, path_to_bytes};
 use tempfile::TempDir;
 
 struct SetUp {
@@ -70,7 +70,7 @@ fn http_downloader(
 fn str_config(pairs: &[(&BStr, PhpMixed)]) -> IndexMap<BString, PhpMixed> {
     let mut c: IndexMap<BString, PhpMixed> = IndexMap::new();
     for (k, v) in pairs {
-        c.insert(bconcat!(k), v.clone());
+        c.insert(bformat!("{k}"), v.clone());
     }
     c
 }

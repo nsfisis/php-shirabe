@@ -8,7 +8,7 @@ use crate::util::Platform;
 use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpMixed, RuntimeException, bconcat, chmod, dirname, path_from_bytes, path_to_bytes, touch,
+    PhpMixed, RuntimeException, bformat, chmod, dirname, path_from_bytes, path_to_bytes, touch,
 };
 use shirabe_symfony_console::input::{InputInterface, InputInterfaceByName};
 use shirabe_symfony_console::output::OutputInterface;
@@ -107,10 +107,8 @@ pub trait BaseConfigCommand: BaseCommand {
         }
 
         if !self.config_file().unwrap().borrow().exists() {
-            return Err(RuntimeException::new(bconcat!(
-                "File \"",
-                config_file,
-                "\" cannot be found in the current directory"
+            return Err(RuntimeException::new(bformat!(
+                "File \"{config_file}\" cannot be found in the current directory"
             ))
             .into());
         }
@@ -160,9 +158,9 @@ pub trait BaseConfigCommand: BaseCommand {
             Ok(path_from_bytes(&config.get_home()?).join("auth.json"))
         } else {
             let composer_config = self.get_composer_config_file(input, config)?;
-            Ok(path_from_bytes(&bconcat!(
-                dirname(path_to_bytes(&composer_config)),
-                "/auth.json"
+            Ok(path_from_bytes(&bformat!(
+                "{}/auth.json",
+                dirname(path_to_bytes(&composer_config))
             ))
             .to_path_buf())
         }

@@ -1,5 +1,5 @@
 use crate::{
-    PhpResource, RuntimeException, StreamBacking, StreamState, UnexpectedValueException, bconcat,
+    PhpResource, RuntimeException, StreamBacking, StreamState, UnexpectedValueException, bformat,
     path_from_bytes, path_to_bytes, php_str, utf8_text,
 };
 use bstr::{BStr, BString, ByteSlice};
@@ -62,10 +62,8 @@ pub fn filesystem_iterator(
     );
     let base = path.as_ref();
     let rd = std::fs::read_dir(base).map_err(|_| {
-        UnexpectedValueException::new(bconcat!(
-            "FilesystemIterator::__construct(",
-            base,
-            "): Failed to open directory"
+        UnexpectedValueException::new(bformat!(
+            "FilesystemIterator::__construct({base}): Failed to open directory"
         ))
     })?;
     Ok(rd.flatten().map(|entry| entry.path()).collect())
@@ -206,8 +204,8 @@ impl RecursiveIteratorFileInfo {
     pub fn get_size(&self) -> anyhow::Result<i64> {
         match filesize(&self.path) {
             Some(size) => Ok(size),
-            None => Err(RuntimeException::new(bconcat!(
-                "SplFileInfo::getSize(): stat failed for ",
+            None => Err(RuntimeException::new(bformat!(
+                "SplFileInfo::getSize(): stat failed for {}",
                 self.path
             ))
             .into()),
@@ -228,10 +226,8 @@ pub fn recursive_directory_iterator(
 ) -> Result<RecursiveDirectoryIterator, UnexpectedValueException> {
     let root = path.as_ref().to_path_buf();
     if !root.is_dir() {
-        return Err(UnexpectedValueException::new(bconcat!(
-            "RecursiveDirectoryIterator::__construct(",
-            root,
-            "): Failed to open directory"
+        return Err(UnexpectedValueException::new(bformat!(
+            "RecursiveDirectoryIterator::__construct({root}): Failed to open directory"
         )));
     }
     Ok(RecursiveDirectoryIterator { root, flags })
@@ -295,10 +291,8 @@ pub fn directory_iterator(
 ) -> Result<Vec<DirectoryIteratorEntry>, UnexpectedValueException> {
     let base = path.as_ref();
     let rd = std::fs::read_dir(base).map_err(|_| {
-        UnexpectedValueException::new(bconcat!(
-            "DirectoryIterator::__construct(",
-            base,
-            "): Failed to open directory"
+        UnexpectedValueException::new(bformat!(
+            "DirectoryIterator::__construct({base}): Failed to open directory"
         ))
     })?;
     // PHP's DirectoryIterator yields the "." and ".." entries before the real ones.
@@ -1219,9 +1213,9 @@ fn glob_join(base: &[u8], seg: &[u8]) -> BString {
     if base.is_empty() {
         BString::from(seg)
     } else if base == b"/" {
-        bconcat!("/", seg)
+        bformat!("/{seg}")
     } else {
-        bconcat!(base, "/", seg)
+        bformat!("{base}/{seg}")
     }
 }
 
@@ -1353,7 +1347,7 @@ fn glob_expand_braces(pattern: &[u8]) -> Vec<BString> {
     let inner = &pattern[open + 1..close];
     let mut result = Vec::new();
     for alt in glob_split_top_commas(inner) {
-        let combined = bconcat!(prefix, alt, suffix);
+        let combined = bformat!("{prefix}{alt}{suffix}");
         result.extend(glob_expand_braces(&combined));
     }
     result

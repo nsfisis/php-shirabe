@@ -7,7 +7,7 @@ use crate::test_case::{
 use bstr::{BString, ByteSlice};
 use serial_test::serial;
 use shirabe::package::PackageInterfaceHandle;
-use shirabe_php_shim::{bconcat, error_message, trim, utf8_text};
+use shirabe_php_shim::{bformat, error_message, trim, utf8_text};
 use shirabe_symfony_console::input::{InputValue, ParameterName};
 
 /// ref: LicensesCommandTest::setUp
@@ -205,9 +205,9 @@ fn test_format_summary() {
     let display = app_tester.get_display();
     let lines: Vec<&[u8]> = display.split_str("\n").collect();
     for (i, (key, value)) in expected.iter().enumerate() {
-        let pattern = bconcat!(
+        let pattern = bformat!(
+            "{}\\s+{}",
             BString::from(regex::escape(utf8_text(key).unwrap())),
-            r"\s+",
             BString::from(regex::escape(utf8_text(value).unwrap()))
         );
         let re = regex::bytes::Regex::new(utf8_text(&pattern).unwrap()).unwrap();

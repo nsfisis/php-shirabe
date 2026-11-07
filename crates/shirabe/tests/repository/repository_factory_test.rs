@@ -6,7 +6,7 @@ use shirabe::config::Config;
 use shirabe::io::{IOInterface, NullIO};
 use shirabe::repository::RepositoryFactory;
 use shirabe::util::HttpDownloader;
-use shirabe_php_shim::{PhpMixed, bconcat};
+use shirabe_php_shim::{PhpMixed, bformat};
 
 #[test]
 fn test_manager_with_all_repository_types() {
@@ -109,11 +109,11 @@ fn test_generate_repository_name() {
     for (index, repo_pairs, existing_keys, expected) in generate_repository_name_provider() {
         let repo: IndexMap<BString, PhpMixed> = repo_pairs
             .into_iter()
-            .map(|(k, v)| (bconcat!(k), v))
+            .map(|(k, v)| (bformat!("{k}"), v))
             .collect();
         let existing_repos: IndexMap<BString, ()> = existing_keys
             .into_iter()
-            .map(|k| (bconcat!(k), ()))
+            .map(|k| (bformat!("{k}"), ()))
             .collect();
 
         assert_eq!(

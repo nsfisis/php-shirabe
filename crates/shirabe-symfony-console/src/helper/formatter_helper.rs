@@ -3,7 +3,7 @@
 use crate::formatter::OutputFormatter;
 use crate::helper::{Helper, HelperInterface, HelperSet};
 use bstr::{BStr, BString};
-use shirabe_php_shim::{bconcat, implode, str_repeat};
+use shirabe_php_shim::{bformat, implode, str_repeat};
 
 /// The Formatter class provides helpers to format messages.
 #[derive(Debug, Default)]
@@ -14,7 +14,7 @@ pub struct FormatterHelper {
 impl FormatterHelper {
     /// Formats a message within a section.
     pub fn format_section(&self, section: &BStr, message: &BStr, style: &BStr) -> BString {
-        bconcat!("<", style, ">[", section, "]</", style, "> ", message)
+        bformat!("<{style}>[{section}]</{style}> {message}")
     }
 
     /// Formats a message as a block of text.
@@ -34,9 +34,9 @@ impl FormatterHelper {
         for message in &messages {
             let message = OutputFormatter::escape(message).unwrap();
             lines.push(if large {
-                bconcat!("  ", message, "  ")
+                bformat!("  {message}  ")
             } else {
-                bconcat!(" ", message, " ")
+                bformat!(" {message} ")
             });
             len = std::cmp::max(Helper::width(&message) + (if large { 4 } else { 2 }), len);
         }
@@ -48,7 +48,8 @@ impl FormatterHelper {
         };
         let mut i = 0;
         while i < lines.len() {
-            messages.push(bconcat!(
+            messages.push(bformat!(
+                "{}{}",
                 lines[i],
                 str_repeat(" ", (len - Helper::width(&lines[i])) as usize)
             ));
@@ -60,7 +61,7 @@ impl FormatterHelper {
 
         let mut i = 0;
         while i < messages.len() {
-            messages[i] = bconcat!("<", style, ">", messages[i], "</", style, ">");
+            messages[i] = bformat!("<{style}>{}</{style}>", messages[i]);
             i += 1;
         }
 
@@ -75,7 +76,7 @@ impl FormatterHelper {
             return message.into();
         }
 
-        bconcat!(Helper::substr(message, 0, Some(length)), suffix)
+        bformat!("{}{suffix}", Helper::substr(message, 0, Some(length)))
     }
 }
 

@@ -2,7 +2,7 @@
 
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe_php_shim::{OutOfBoundsException, bconcat, preg_is_match, rtrim_chars, strpos, strtr};
+use shirabe_php_shim::{OutOfBoundsException, bformat, preg_is_match, rtrim_chars, strpos, strtr};
 
 #[derive(Debug, Clone)]
 pub struct PsrViolationEntry {
@@ -95,10 +95,8 @@ impl ClassMap {
         let class_name = class_name.as_ref().as_bstr();
         match self.map.get(class_name) {
             Some(path) => Ok(path.as_bstr()),
-            None => Err(OutOfBoundsException::new(bconcat!(
-                "Class ",
-                class_name,
-                " is not present in the map"
+            None => Err(OutOfBoundsException::new(bformat!(
+                "Class {class_name} is not present in the map"
             ))
             .into()),
         }
@@ -129,7 +127,7 @@ impl ClassMap {
         let path_prefix = rtrim_chars(strtr(path_prefix, "\\", "/"), "/");
 
         self.psr_violations.retain(|path, _| {
-            path != &path_prefix && strpos(path, bconcat!(path_prefix, "/")) != Some(0)
+            path != &path_prefix && strpos(path, bformat!("{path_prefix}/")) != Some(0)
         });
     }
 

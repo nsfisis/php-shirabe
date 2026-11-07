@@ -11,7 +11,7 @@ use crate::util::{
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpMixed, RuntimeException, array_map, bconcat, empty, implode, is_string, json_encode,
+    PhpMixed, RuntimeException, array_map, bformat, empty, implode, is_string, json_encode,
     path_to_bytes, php_regex, preg_is_match, preg_match, preg_quote, preg_replace, str_replace,
     strlen, strnatcasecmp, strpos, substr, trim, usort,
 };
@@ -235,13 +235,13 @@ impl VersionGuesser {
                         || strpos(g1, "(detached ") == Some(0)
                         || strpos(g1, "(HEAD detached at") == Some(0)
                     {
-                        version = Some(bconcat!("dev-", g2));
+                        version = Some(bformat!("dev-{g2}"));
                         pretty_version = version.clone();
                         is_feature_branch = true;
                         is_detached = true;
                     } else {
                         version = Some(self.version_parser.normalize_branch(g1)?);
-                        pretty_version = Some(bconcat!("dev-", g1));
+                        pretty_version = Some(bformat!("dev-{g1}"));
                         is_feature_branch = self.is_feature_branch(package_config, Some(g1));
                     }
 
@@ -368,7 +368,7 @@ impl VersionGuesser {
                 return Ok(Some(VersionData {
                     version: Some(version),
                     commit: None,
-                    pretty_version: Some(bconcat!("dev-", branch)),
+                    pretty_version: Some(bformat!("dev-{branch}")),
                     feature_version: None,
                     feature_pretty_version: None,
                 }));
@@ -541,7 +541,7 @@ impl VersionGuesser {
                         last_index = index;
                         length = strlen(&output);
                         version = Some(self.version_parser.normalize_branch(&candidate_version)?);
-                        pretty_version = Some(bconcat!("dev-", candidate_version));
+                        pretty_version = Some(bformat!("dev-{candidate_version}"));
                         if length == 0 {
                             break;
                         }
@@ -580,10 +580,8 @@ impl VersionGuesser {
         }
 
         !preg_is_match(
-            bconcat!(
-                "{^(",
-                non_feature_branches,
-                r"|master|main|latest|next|current|support|tip|trunk|default|develop|\d+\..+)$}",
+            bformat!(
+                "{{^({non_feature_branches}|master|main|latest|next|current|support|tip|trunk|default|develop|\\d+\\..+)$}}"
             ),
             branch_name.unwrap_or_default(),
         )
@@ -602,7 +600,7 @@ impl VersionGuesser {
         )? {
             let branch = trim(&output);
             version = Some(self.version_parser.normalize_branch(&branch)?);
-            pretty_version = Some(bconcat!("dev-", branch));
+            pretty_version = Some(bformat!("dev-{branch}"));
         }
 
         // try to fetch current version from fossil tags
@@ -660,15 +658,8 @@ impl VersionGuesser {
                 .map(|s| preg_quote(s, Some(b'#')))
                 .unwrap_or_else(|| BString::from("tags"));
 
-            let url_pattern = bconcat!(
-                "#<url>.*/(",
-                trunk_path,
-                "|(",
-                branches_path,
-                "|",
-                tags_path,
-                ")/(.*))</url>#"
-            );
+            let url_pattern =
+                bformat!("#<url>.*/({trunk_path}|({branches_path}|{tags_path})/(.*))</url>#");
 
             if let Some(matches) = preg_match(&url_pattern, &output) {
                 let m1 = matches.get(1).unwrap_or_default();
@@ -681,7 +672,7 @@ impl VersionGuesser {
                 {
                     // we are in a branches path
                     let version = self.version_parser.normalize_branch(m3)?;
-                    let pretty_version = bconcat!("dev-", m3);
+                    let pretty_version = bformat!("dev-{m3}");
 
                     return Ok(Some(VersionData {
                         version: Some(version),
@@ -725,7 +716,7 @@ impl VersionGuesser {
             }
         };
         if let Some(m) = preg_match(php_regex!(r"{^(\d+(?:\.\d+)*)-dev$}i"), &version) {
-            return Ok(bconcat!(m.get(1).unwrap_or_default(), ".x-dev"));
+            return Ok(bformat!("{}.x-dev", m.get(1).unwrap_or_default()));
         }
 
         Ok(version)

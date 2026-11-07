@@ -10,7 +10,7 @@ use shirabe::repository::{
     ComposerRepository, ProviderListingEntry, RepositoryInterface, SEARCH_FULLTEXT,
 };
 use shirabe::util::HttpDownloaderMockHandler;
-use shirabe_php_shim::{PhpMixed, bconcat, hash, path_to_bytes, uniqid};
+use shirabe_php_shim::{PhpMixed, bformat, hash, path_to_bytes, uniqid};
 use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
 use tempfile::TempDir;
 
@@ -55,7 +55,7 @@ fn null_io() -> std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
 
 fn repo_config(url: &BStr) -> IndexMap<BString, PhpMixed> {
     let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
-    repo_config.insert("url".into(), PhpMixed::string(bconcat!(url)));
+    repo_config.insert("url".into(), PhpMixed::string(bformat!("{url}")));
     repo_config
 }
 
@@ -68,7 +68,7 @@ fn json_encode(value: &PhpMixed) -> BString {
 fn str_kv(pairs: &[(&BStr, PhpMixed)]) -> PhpMixed {
     let mut m: IndexMap<BString, PhpMixed> = IndexMap::new();
     for (k, v) in pairs {
-        m.insert(bconcat!(k), v.clone());
+        m.insert(bformat!("{k}"), v.clone());
     }
     PhpMixed::Array(m)
 }
@@ -212,10 +212,10 @@ fn test_load_data() {
         assert_eq!(expected.len(), packages.len());
         for (index, (name, version)) in expected.iter().enumerate() {
             assert_eq!(
-                bconcat!(name, " ", version),
-                bconcat!(
+                bformat!("{name} {version}"),
+                bformat!(
+                    "{} {}",
                     packages[index].get_name(),
-                    " ",
                     packages[index].get_pretty_version()
                 )
             );
@@ -711,7 +711,7 @@ fn generate_security_advisory(
         ),
         (
             BStr::new("packageName"),
-            PhpMixed::string(bconcat!(package_name)),
+            PhpMixed::string(bformat!("{package_name}")),
         ),
         (
             BStr::new("remoteId"),
@@ -725,13 +725,13 @@ fn generate_security_advisory(
         (
             BStr::new("cve"),
             match cve {
-                Some(c) => PhpMixed::string(bconcat!(c)),
+                Some(c) => PhpMixed::string(bformat!("{c}")),
                 None => PhpMixed::Null,
             },
         ),
         (
             BStr::new("affectedVersions"),
-            PhpMixed::string(bconcat!(affected_versions)),
+            PhpMixed::string(bformat!("{affected_versions}")),
         ),
         (
             BStr::new("source"),
@@ -807,14 +807,14 @@ fn test_get_security_advisories_assert_repository_advisories_is_zero_indexed_arr
                                     BStr::new("dev-branch"),
                                     str_kv(&[(
                                         BStr::new("name"),
-                                        PhpMixed::string(bconcat!(package_name)),
+                                        PhpMixed::string(bformat!("{package_name}")),
                                     )]),
                                 ),
                                 (
                                     BStr::new("v1.0.0"),
                                     str_kv(&[(
                                         BStr::new("name"),
-                                        PhpMixed::string(bconcat!(package_name)),
+                                        PhpMixed::string(bformat!("{package_name}")),
                                     )]),
                                 ),
                             ]),

@@ -8,7 +8,7 @@ use crate::plugin::rpc::jobs::{poll_once, resolved_promise};
 use crate::util::Filesystem;
 use bstr::{BStr, BString, ByteSlice};
 use shirabe_php_rpc::{PhpThrow, PluginValue, ToWire};
-use shirabe_php_shim::{bconcat, path_from_bytes};
+use shirabe_php_shim::{bformat, path_from_bytes};
 
 pub(crate) fn dispatch_filesystem_method(
     fs: &std::rc::Rc<std::cell::RefCell<Filesystem>>,
@@ -19,7 +19,7 @@ pub(crate) fn dispatch_filesystem_method(
         arg::<BString>(method_name, args, position)
             .map(|path| std::path::PathBuf::from(path_from_bytes(&path)))
     };
-    let failed = |error: anyhow::Error| error_throw(bconcat!(method_name, " failed"), &error);
+    let failed = |error: anyhow::Error| error_throw(bformat!("{method_name} failed"), &error);
     match method_name.as_bytes() {
         b"remove" => Ok(fs
             .borrow_mut()

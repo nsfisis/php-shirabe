@@ -15,7 +15,7 @@ use crate::script::ScriptEvents;
 use crate::util::ProcessExecutor;
 use bstr::{B, BStr, BString};
 use indexmap::IndexMap;
-use shirabe_php_shim::{bconcat, explode, impl_php_class, implode, ltrim, path_to_bytes};
+use shirabe_php_shim::{bformat, explode, impl_php_class, implode, ltrim, path_to_bytes};
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::{InputInterface, InputInterfaceByName};
 use shirabe_symfony_console::output::OutputInterface;
@@ -51,7 +51,7 @@ impl StatusCommand {
     fn indent_changes(changes: &BStr) -> BString {
         let lines: Vec<BString> = explode("\n", changes)
             .iter()
-            .map(|line| bconcat!("    ", ltrim(line)))
+            .map(|line| bformat!("    {}", ltrim(line)))
             .collect();
         implode("\n", &lines)
     }
@@ -116,7 +116,7 @@ impl StatusCommand {
                 if target_path.is_symlink() {
                     errors.insert(
                         target_dir.clone(),
-                        bconcat!(target_dir, " is a symbolic link."),
+                        bformat!("{target_dir} is a symbolic link."),
                     );
                 }
 
@@ -196,7 +196,7 @@ impl StatusCommand {
                     .unwrap_or(false)
                 {
                     let indented_changes = Self::indent_changes(BStr::new(changes));
-                    io.write(bconcat!("<info>", path, "</info>:"));
+                    io.write(bformat!("<info>{path}</info>:"));
                     io.write(&indented_changes);
                 } else {
                     io.write(path);
@@ -215,7 +215,7 @@ impl StatusCommand {
                     .unwrap_or(false)
                 {
                     let indented_changes = Self::indent_changes(BStr::new(changes));
-                    io.write(bconcat!("<info>", path, "</info>:"));
+                    io.write(bformat!("<info>{path}</info>:"));
                     io.write(&indented_changes);
                 } else {
                     io.write(path);
@@ -248,26 +248,15 @@ impl StatusCommand {
 
                     let (current_display, previous_display) = if io.is_very_verbose() {
                         (
-                            bconcat!(current_version, " (", changes[B("current")][B("ref")], ")"),
-                            bconcat!(
-                                previous_version,
-                                " (",
-                                changes[B("previous")][B("ref")],
-                                ")"
-                            ),
+                            bformat!("{current_version} ({})", changes[B("current")][B("ref")]),
+                            bformat!("{previous_version} ({})", changes[B("previous")][B("ref")]),
                         )
                     } else {
                         (current_version, previous_version)
                     };
 
-                    io.write(bconcat!("<info>", path, "</info>:"));
-                    io.write(bconcat!(
-                        "    From <comment>",
-                        previous_display,
-                        "</comment> to <comment>",
-                        current_display,
-                        "</comment>"
-                    ));
+                    io.write(bformat!("<info>{path}</info>:"));
+                    io.write(bformat!("    From <comment>{previous_display}</comment> to <comment>{current_display}</comment>"));
                 } else {
                     io.write(path);
                 }

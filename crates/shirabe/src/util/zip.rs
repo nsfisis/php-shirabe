@@ -3,7 +3,7 @@
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    RuntimeException, ZipArchive, bconcat, dirname, extension_loaded, implode, stream_get_contents,
+    RuntimeException, ZipArchive, bformat, dirname, extension_loaded, implode, stream_get_contents,
 };
 
 pub struct Zip;
@@ -64,7 +64,7 @@ impl Zip {
             if dir_name == "." {
                 top_level_paths.insert(name, true);
                 if top_level_paths.len() > 1 {
-                    return Err(RuntimeException::new(bconcat!("Archive has more than one top level directories, and no composer.json was found on the top level, so it's an invalid archive. Top level paths found were: ", implode(",", &top_level_paths.keys().cloned().collect::<Vec<_>>())))
+                    return Err(RuntimeException::new(bformat!("Archive has more than one top level directories, and no composer.json was found on the top level, so it's an invalid archive. Top level paths found were: {}", implode(",", &top_level_paths.keys().cloned().collect::<Vec<_>>())))
                     .into());
                 }
                 continue;
@@ -72,9 +72,9 @@ impl Zip {
 
             // handle archives which do not have a TOC record for the directory itself
             if !dir_name.contains_str("\\") && !dir_name.contains_str("/") {
-                top_level_paths.insert(bconcat!(&dir_name, "/"), true);
+                top_level_paths.insert(bformat!("{dir_name}/"), true);
                 if top_level_paths.len() > 1 {
-                    return Err(RuntimeException::new(bconcat!("Archive has more than one top level directories, and no composer.json was found on the top level, so it's an invalid archive. Top level paths found were: ", implode(",", &top_level_paths.keys().cloned().collect::<Vec<_>>())))
+                    return Err(RuntimeException::new(bformat!("Archive has more than one top level directories, and no composer.json was found on the top level, so it's an invalid archive. Top level paths found were: {}", implode(",", &top_level_paths.keys().cloned().collect::<Vec<_>>())))
                     .into());
                 }
             }
@@ -82,7 +82,7 @@ impl Zip {
 
         if !top_level_paths.is_empty() {
             let first_key = top_level_paths.keys().next().unwrap().clone();
-            if let Some(index) = zip.locate_name(bconcat!(&first_key, filename))
+            if let Some(index) = zip.locate_name(bformat!("{first_key}{filename}"))
                 && zip.get_from_index(index).is_some()
             {
                 return Ok(index);

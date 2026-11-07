@@ -13,7 +13,7 @@ use chrono::{DateTime, FixedOffset};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, LogicException, PhpMixed, RuntimeException,
-    array_key_exists, array_search_mixed, bconcat, date_create, empty, extension_loaded,
+    array_key_exists, array_search_mixed, bformat, date_create, empty, extension_loaded,
     http_build_query, implode, is_array, path_from_bytes, php_regex, preg_is_match, preg_match,
     preg_replace, strpos,
 };
@@ -69,11 +69,7 @@ impl GitBitbucketDriver {
             php_regex!(r"#^https?://bitbucket\.org/([^/]+)/([^/]+?)(?:\.git|/?)?$#i"),
             &self.inner.url,
         ) else {
-            return Err(InvalidArgumentException::new(bconcat!(
-                "The Bitbucket repository URL ",
-                self.inner.url.clone(),
-                " is invalid. It must be the HTTPS URL of a Bitbucket repository."
-            ))
+            return Err(InvalidArgumentException::new(bformat!("The Bitbucket repository URL {} is invalid. It must be the HTTPS URL of a Bitbucket repository.", self.inner.url.clone()))
             .into());
         };
 
@@ -121,13 +117,11 @@ impl GitBitbucketDriver {
     /// Attempts to fetch the repository data via the BitBucket API and
     /// sets some parameters which are used in other methods
     fn get_repo_data(&mut self) -> anyhow::Result<bool> {
-        let resource = bconcat!(
-            "https://api.bitbucket.org/2.0/repositories/",
+        let resource = bformat!(
+            "https://api.bitbucket.org/2.0/repositories/{}/{}?{}",
             self.owner,
-            "/",
             self.repository,
-            "?",
-            http_build_query(&[("fields", "-project,-owner")]),
+            http_build_query(&[("fields", "-project,-owner")])
         );
 
         let repo_data = self
@@ -313,14 +307,11 @@ impl GitBitbucketDriver {
                             if let PhpMixed::Array(support_map) = support_entry {
                                 support_map.insert(
                                     "source".into(),
-                                    PhpMixed::string(bconcat!(
-                                        "https://",
+                                    PhpMixed::string(bformat!(
+                                        "https://{}/{}/{}/src",
                                         self.inner.origin_url.clone(),
-                                        "/",
                                         self.owner.clone(),
-                                        "/",
-                                        self.repository.clone(),
-                                        "/src"
+                                        self.repository.clone()
                                     )),
                                 );
                             }
@@ -329,17 +320,11 @@ impl GitBitbucketDriver {
                             if let PhpMixed::Array(support_map) = support_entry {
                                 support_map.insert(
                                     "source".into(),
-                                    PhpMixed::string(bconcat!(
-                                        "https://",
+                                    PhpMixed::string(bformat!(
+                                        "https://{}/{}/{}/src/{hash}/?at={label}",
                                         self.inner.origin_url.clone(),
-                                        "/",
                                         self.owner.clone(),
-                                        "/",
-                                        self.repository.clone(),
-                                        "/src/",
-                                        hash,
-                                        "/?at=",
-                                        label
+                                        self.repository.clone()
                                     )),
                                 );
                             }
@@ -360,14 +345,11 @@ impl GitBitbucketDriver {
                     if let PhpMixed::Array(support_map) = support_entry {
                         support_map.insert(
                             "issues".into(),
-                            PhpMixed::string(bconcat!(
-                                "https://",
+                            PhpMixed::string(bformat!(
+                                "https://{}/{}/{}/issues",
                                 self.inner.origin_url.clone(),
-                                "/",
                                 self.owner.clone(),
-                                "/",
-                                self.repository.clone(),
-                                "/issues"
+                                self.repository.clone()
                             )),
                         );
                     }
@@ -410,15 +392,10 @@ impl GitBitbucketDriver {
             }
         }
 
-        let resource = bconcat!(
-            "https://api.bitbucket.org/2.0/repositories/",
+        let resource = bformat!(
+            "https://api.bitbucket.org/2.0/repositories/{}/{}/src/{identifier}/{file}",
             self.owner.clone(),
-            "/",
-            self.repository.clone(),
-            "/src/",
-            identifier,
-            "/",
-            file
+            self.repository.clone()
         );
 
         Ok(self
@@ -443,14 +420,10 @@ impl GitBitbucketDriver {
             }
         }
 
-        let resource = bconcat!(
-            "https://api.bitbucket.org/2.0/repositories/",
+        let resource = bformat!(
+            "https://api.bitbucket.org/2.0/repositories/{}/{}/commit/{identifier}?fields=date",
             self.owner.clone(),
-            "/",
-            self.repository.clone(),
-            "/commit/",
-            identifier,
-            "?fields=date"
+            self.repository.clone()
         );
         let commit = self
             .fetch_with_oauth_credentials(resource.as_bstr(), false)?
@@ -484,14 +457,10 @@ impl GitBitbucketDriver {
             return fallback.get_dist(identifier);
         }
 
-        let url = bconcat!(
-            "https://bitbucket.org/",
+        let url = bformat!(
+            "https://bitbucket.org/{}/{}/get/{identifier}.zip",
             self.owner.clone(),
-            "/",
-            self.repository.clone(),
-            "/get/",
-            identifier,
-            ".zip"
+            self.repository.clone()
         );
 
         let mut m: IndexMap<BString, BString> = IndexMap::new();
@@ -509,14 +478,14 @@ impl GitBitbucketDriver {
 
         if self.tags.is_none() {
             let mut tags: IndexMap<BString, BString> = IndexMap::new();
-            let mut resource = bconcat!(
+            let mut resource = bformat!(
+                "{}?{}",
                 self.tags_url,
-                "?",
                 http_build_query(&[
                     ("pagelen", "100"),
                     ("fields", "values.name,values.target.hash,next"),
                     ("sort", "-target.date"),
-                ]),
+                ])
             );
             let mut has_next = true;
             while has_next {
@@ -576,14 +545,14 @@ impl GitBitbucketDriver {
 
         if self.branches.is_none() {
             let mut branches: IndexMap<BString, BString> = IndexMap::new();
-            let mut resource = bconcat!(
+            let mut resource = bformat!(
+                "{}?{}",
                 self.branches_url,
-                "?",
                 http_build_query(&[
                     ("pagelen", "100"),
                     ("fields", "values.name,values.target.hash,values.heads,next"),
                     ("sort", "-target.date"),
-                ]),
+                ])
             );
             let mut has_next = true;
             while has_next {
@@ -686,14 +655,11 @@ impl GitBitbucketDriver {
 
     /// Generate an SSH URL
     fn generate_ssh_url(&self) -> BString {
-        bconcat!(
-            "git@",
+        bformat!(
+            "git@{}:{}/{}.git",
             self.inner.origin_url,
-            ":",
             self.owner,
-            "/",
-            self.repository,
-            ".git"
+            self.repository
         )
     }
 
@@ -704,7 +670,7 @@ impl GitBitbucketDriver {
                 if e.is_instanceof::<RuntimeException>() {
                     self.fallback_driver = None;
 
-                    self.inner.io.write_error(bconcat!("<error>Failed to clone the ", self.generate_ssh_url(), " repository, try running in interactive mode so that you can enter your Bitbucket OAuth consumer credentials</error>"));
+                    self.inner.io.write_error(bformat!("<error>Failed to clone the {} repository, try running in interactive mode so that you can enter your Bitbucket OAuth consumer credentials</error>", self.generate_ssh_url()));
                 }
                 Err(e)
             }
@@ -768,7 +734,7 @@ impl GitBitbucketDriver {
             }
 
             if self.vcs_type.as_ref().is_none_or(|t| t != "git") {
-                return Err(RuntimeException::new(bconcat!(self.inner.url, " does not appear to be a git repository, use ", self.clone_https_url, " but remember that Bitbucket no longer supports the mercurial repositories. https://bitbucket.org/blog/sunsetting-mercurial-support-in-bitbucket"))
+                return Err(RuntimeException::new(bformat!("{} does not appear to be a git repository, use {} but remember that Bitbucket no longer supports the mercurial repositories. https://bitbucket.org/blog/sunsetting-mercurial-support-in-bitbucket", self.inner.url, self.clone_https_url))
                 .into());
             }
 
@@ -802,11 +768,7 @@ impl GitBitbucketDriver {
 
         if !extension_loaded("openssl") {
             io.write_error_with_verbosity(
-                bconcat!(
-                    "Skipping Bitbucket git driver for ",
-                    url,
-                    " because the OpenSSL PHP extension is missing."
-                ),
+                bformat!("Skipping Bitbucket git driver for {url} because the OpenSSL PHP extension is missing."),
                 io_interface::VERBOSE,
             );
 

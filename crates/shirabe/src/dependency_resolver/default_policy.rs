@@ -5,7 +5,7 @@ use crate::package::{BasePackageHandle, stability_priority};
 use crate::util::Platform;
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe_php_shim::{CmpOp, PhpMixed, bconcat, implode};
+use shirabe_php_shim::{CmpOp, PhpMixed, bformat, implode};
 use shirabe_semver::CompilingMatcher;
 use shirabe_semver::constraint::SimpleConstraint;
 
@@ -212,10 +212,11 @@ impl PolicyInterface for DefaultPolicy {
         required_package: Option<BString>,
     ) -> Vec<i64> {
         literals.sort();
-        let result_cache_key = bconcat!(
+        let result_cache_key = bformat!(
+            "{}{}",
             implode(
                 ",",
-                &literals.iter().map(|l| bconcat!(l)).collect::<Vec<_>>()
+                &literals.iter().map(|l| bformat!("{l}")).collect::<Vec<_>>()
             ),
             required_package.clone().unwrap_or_default()
         );
@@ -235,7 +236,7 @@ impl PolicyInterface for DefaultPolicy {
         for name_literals in packages.values_mut() {
             name_literals.sort_by(|&a, &b| {
                 let cache_key =
-                    bconcat!("i", a, ".", b, required_package.clone().unwrap_or_default());
+                    bformat!("i{a}.{b}{}", required_package.clone().unwrap_or_default());
                 {
                     let cache = self.sorting_cache_per_pool.borrow();
                     if let Some(pool_cache) = cache.get(&pool_id)
@@ -268,7 +269,7 @@ impl PolicyInterface for DefaultPolicy {
         let mut selected: Vec<i64> = packages.into_values().flatten().collect();
 
         selected.sort_by(|&a, &b| {
-            let cache_key = bconcat!(a, ".", b, required_package.clone().unwrap_or_default());
+            let cache_key = bformat!("{a}.{b}{}", required_package.clone().unwrap_or_default());
             {
                 let cache = self.sorting_cache_per_pool.borrow();
                 if let Some(pool_cache) = cache.get(&pool_id)

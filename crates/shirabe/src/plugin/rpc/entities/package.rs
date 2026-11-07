@@ -11,7 +11,7 @@ use crate::repository::{PlatformRepository, RepositoryInterfaceHandle};
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_rpc::{PhpThrow, PluginValue, ToWire};
-use shirabe_php_shim::{PhpMixed, bconcat};
+use shirabe_php_shim::{PhpMixed, bformat};
 
 /// The read half of the `CompletePackage` / `RootPackage` surface, which `PackageInterface`
 /// does not carry. `None` means the method belongs to the base surface below.
@@ -52,12 +52,8 @@ fn dispatch_complete_package_getter(
 }
 
 fn package_method_unavailable(method_name: &BStr, receiver: &[u8]) -> PhpThrow {
-    PhpThrow::runtime(bconcat!(
-        "`",
-        method_name,
-        "` is not available on ",
-        receiver,
-        " over RPC"
+    PhpThrow::runtime(bformat!(
+        "`{method_name}` is not available on {receiver} over RPC"
     ))
 }
 
@@ -117,7 +113,7 @@ fn set_on_root_or_base_package<T>(
                 .expect("a root package exposes RootPackageInterface"),
             value,
         )
-        .map_err(|error| error_throw(bconcat!(method_name, " failed"), &error))?;
+        .map_err(|error| error_throw(bformat!("{method_name} failed"), &error))?;
     } else {
         base(base_package_mut(package, method_name)?, value);
     }

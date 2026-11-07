@@ -12,7 +12,7 @@ use indexmap::IndexMap;
 use shirabe::installer::InstallerInterface;
 use shirabe::package::loader::{ArrayLoader, JsonLoader, JsonLoaderInput};
 use shirabe::package::{Link, PackageInterfaceHandle};
-use shirabe_php_shim::{Catch, UnexpectedValueException, bconcat, implode, path_to_bytes};
+use shirabe_php_shim::{Catch, UnexpectedValueException, bformat, implode, path_to_bytes};
 use shirabe_semver::constraint::{
     AnyConstraint, MatchAllConstraint, MatchNoneConstraint, MultiConstraint, SimpleConstraint,
 };
@@ -31,7 +31,7 @@ fn values_fixture_package() -> PackageInterfaceHandle {
 fn simple(operator: &BStr, version: &BStr, pretty_string: Option<&BStr>) -> AnyConstraint {
     AnyConstraint::Simple(SimpleConstraint::new(
         operator,
-        bconcat!(version),
+        bformat!("{version}"),
         pretty_string.map(|s| s.to_owned()),
     ))
 }
@@ -39,10 +39,10 @@ fn simple(operator: &BStr, version: &BStr, pretty_string: Option<&BStr>) -> AnyC
 fn link(target: &BStr, constraint: AnyConstraint, pretty_constraint: &BStr) -> Link {
     Link::new(
         BString::from("dummy/root"),
-        bconcat!(target),
+        bformat!("{target}"),
         constraint,
         Some(Link::TYPE_REQUIRE.to_owned()),
-        Some(bconcat!(pretty_constraint)),
+        Some(bformat!("{pretty_constraint}")),
     )
 }
 
@@ -99,45 +99,36 @@ fn seeded_requires() -> IndexMap<BString, Link> {
 fn describe(constraint: &AnyConstraint) -> BString {
     let shape = match constraint {
         AnyConstraint::Simple(c) => {
-            bconcat!(
-                "Constraint(",
+            bformat!(
+                "Constraint({} {})",
                 c.get_operator().as_str(),
-                " ",
-                c.get_version(),
-                ")"
+                c.get_version()
             )
         }
-        AnyConstraint::Multi(c) => bconcat!(
-            "MultiConstraint(",
+        AnyConstraint::Multi(c) => bformat!(
+            "MultiConstraint({}: {})",
             if c.is_conjunctive() { "and" } else { "or" },
-            ": ",
             implode(
                 ", ",
                 &c.get_constraints().iter().map(describe).collect::<Vec<_>>()
-            ),
-            ")"
+            )
         ),
         AnyConstraint::MatchAll(_) => BString::from("MatchAllConstraint()"),
         AnyConstraint::MatchNone(_) => BString::from("MatchNoneConstraint()"),
     };
-    bconcat!(shape, " pretty=", constraint.get_pretty_string())
+    bformat!("{shape} pretty={}", constraint.get_pretty_string())
 }
 
 fn describe_links(links: &IndexMap<BString, Link>) -> Vec<BString> {
     links
         .iter()
         .map(|(name, link)| {
-            bconcat!(
-                name,
-                " | ",
+            bformat!(
+                "{name} | {} | {} | {} | {} | {}",
                 link.get_source(),
-                " | ",
                 link.get_target(),
-                " | ",
                 link.get_description(),
-                " | ",
                 link.get_pretty_constraint().unwrap(),
-                " | ",
                 describe(link.get_constraint())
             )
         })

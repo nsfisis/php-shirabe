@@ -4,7 +4,7 @@ use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite};
 use bstr::{BString, ByteSlice, ByteVec};
 use shirabe_php_shim::{
     E_ALL, E_DEPRECATED, E_USER_DEPRECATED, E_USER_WARNING, E_WARNING, ErrorException, PHP_EOL,
-    STDERR, bconcat, debug_backtrace, error_reporting, filter_var_boolean, fwrite, ini_get,
+    STDERR, bformat, debug_backtrace, error_reporting, filter_var_boolean, fwrite, ini_get,
     set_error_handler,
 };
 use std::cell::Cell;
@@ -48,14 +48,7 @@ impl ErrorHandler {
                 )
             {
                 Self::output_warning(
-                    bconcat!(
-                        "Ignored new PHP warning but it should be reported and fixed: ",
-                        message,
-                        " in ",
-                        file,
-                        ":",
-                        line
-                    )
+                    bformat!("Ignored new PHP warning but it should be reported and fixed: {message} in {file}:{line}")
                     .as_bstr(),
                     true,
                 );
@@ -77,7 +70,7 @@ impl ErrorHandler {
             }
             HAS_SHOWN_DEPRECATION_NOTICE.with(|c| c.set(1));
             Self::output_warning(
-                bconcat!("Deprecation Notice: ", message, " in ", file, ":", line).as_bstr(),
+                bformat!("Deprecation Notice: {message} in {file}:{line}").as_bstr(),
                 false,
             );
         }
@@ -96,7 +89,7 @@ impl ErrorHandler {
     fn output_warning(message: &bstr::BStr, output_even_without_io: bool) {
         let io = IO.with(|cell| cell.borrow().clone());
         if let Some(io) = io {
-            io.write_error(bconcat!("<warning>", message, "</warning>"));
+            io.write_error(bformat!("<warning>{message}</warning>"));
             if io.is_verbose() {
                 io.write_error("<warning>Stack trace:</warning>");
                 let frames: Vec<BString> = debug_backtrace()
@@ -104,7 +97,7 @@ impl ErrorHandler {
                     .skip(2)
                     .filter_map(|frame| {
                         if let (Some(line), Some(file)) = (frame.line, frame.file) {
-                            Some(bconcat!("<warning> ", file, ":", line, "</warning>"))
+                            Some(bformat!("<warning> {file}:{line}</warning>"))
                         } else {
                             None
                         }
@@ -118,7 +111,7 @@ impl ErrorHandler {
         }
 
         if output_even_without_io {
-            fwrite(&STDERR, bconcat!("Warning: ", message, PHP_EOL), None);
+            fwrite(&STDERR, bformat!("Warning: {message}{PHP_EOL}"), None);
         }
     }
 }

@@ -19,7 +19,7 @@ use php_worker::{load_composer_php_runtime, lock_php_worker, php_call_static, ph
 use shirabe::plugin::php_call::PhpCall;
 use shirabe_php_rpc::{PluginValue, ToWire};
 use shirabe_php_shim::{
-    PhpMixed, bconcat, path_from_bytes, path_to_bytes, php_str, realpath, var_export_str,
+    PhpMixed, bformat, path_from_bytes, path_to_bytes, php_str, realpath, var_export_str,
 };
 use tempfile::TempDir;
 
@@ -61,12 +61,10 @@ fn set_up() -> SetUp {
 /// `require __DIR__.'/Repository/Fixtures/installed_relative.php'` with `$dir` bound, evaluated in
 /// the worker so the upstream fixture file is used as-is.
 fn fixture_data(dir: &std::path::Path) -> PluginValue {
-    php_eval(bconcat!(
-        "$dir = ",
+    php_eval(bformat!(
+        "$dir = {};\nreturn require {};",
         var_export_str(path_to_bytes(dir), true),
-        ";\nreturn require ",
-        var_export_str(path_to_bytes(&fixture_path("installed_relative.php")), true),
-        ";",
+        var_export_str(path_to_bytes(&fixture_path("installed_relative.php")), true)
     ))
 }
 
@@ -342,7 +340,7 @@ fn test_get_root_package() {
         ("type".into(), PhpMixed::string(BString::from("library"))),
         (
             "install_path".into(),
-            PhpMixed::string(bconcat!(set_up.root(), "/./")),
+            PhpMixed::string(bformat!("{}/./", set_up.root())),
         ),
         (
             "aliases".into(),

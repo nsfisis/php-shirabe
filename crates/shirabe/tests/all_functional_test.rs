@@ -16,7 +16,7 @@ use indexmap::IndexMap;
 use serial_test::serial;
 use shirabe::util::Filesystem;
 use shirabe_php_shim::{
-    PhpMixed, bconcat, intval, os_str_from_bytes, path_from_bytes, php_regex, preg_match,
+    PhpMixed, bformat, intval, os_str_from_bytes, path_from_bytes, php_regex, preg_match,
     preg_split_delim_capture, trim, utf8_text,
 };
 use std::path::{Path, PathBuf};
@@ -84,7 +84,7 @@ fn parse_test_file(file: &Path) -> IndexMap<BString, BString> {
 
         // Allow sections to validate, or modify their section data.
         let section_data = match sec.as_bytes() {
-            b"EXPECT-EXIT-CODE" => bconcat!(intval(&PhpMixed::from(token))),
+            b"EXPECT-EXIT-CODE" => bformat!("{}", intval(&PhpMixed::from(token))),
             b"RUN" | b"EXPECT" | b"EXPECT-REGEX" | b"EXPECT-REGEXES" => trim(&token),
             b"TEST" => token,
             _ => panic!(
@@ -158,7 +158,7 @@ fn expect_matches(expected: &[u8], output: &[u8]) {
             };
             let regex = m.get(1).unwrap().to_owned();
 
-            let pattern = bconcat!("{", regex, "}");
+            let pattern = bformat!("{{{regex}}}");
             if let Some(m) = preg_match(&pattern, &output[j..]) {
                 let full = m.get(0).unwrap().to_owned();
                 i += regex.len() + 2;
@@ -209,8 +209,8 @@ fn run_integration(test_filename: &BStr) {
             .unwrap();
     }
 
-    let composer_home = bconcat!(test_dir, "home");
-    let composer_cache_dir = bconcat!(test_dir, "cache");
+    let composer_home = bformat!("{test_dir}home");
+    let composer_cache_dir = bformat!("{test_dir}cache");
 
     // PHP runs `escapeshellcmd(PHP_BINARY) . ' ' . escapeshellarg($pharPath) . ' --no-ansi ' . RUN`
     // via Process::fromShellCommandline; here the shirabe binary takes the place of php+phar. The
@@ -218,7 +218,7 @@ fn run_integration(test_filename: &BStr) {
     // callback performs.
     let bin = env!("CARGO_BIN_EXE_shirabe");
     let run = &test_data[B("RUN")];
-    let command_line = bconcat!("'", bin, "' --no-ansi ", run, " 2>&1");
+    let command_line = bformat!("'{bin}' --no-ansi {run} 2>&1");
 
     let proc = std::process::Command::new("sh")
         .arg("-c")

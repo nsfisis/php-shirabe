@@ -65,7 +65,7 @@ use crate::util::Platform;
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    Catch as _, PhpMixed, RuntimeException, ToPhpString, array_map, array_unique, bconcat, implode,
+    Catch as _, PhpMixed, RuntimeException, ToPhpString, array_map, array_unique, bformat, implode,
     intval, is_dir, is_numeric, path_from_bytes, strcmp, strpos, strtolower, touch, usort,
 };
 use shirabe_seld_json_lint::ParsingException;
@@ -335,18 +335,12 @@ impl Installer {
             };
 
             let replacement = if let Some(repl) = complete.get_replacement_package() {
-                bconcat!("Use ", repl, " instead")
+                bformat!("Use {repl} instead")
             } else {
                 BString::from("No replacement was suggested")
             };
 
-            self.io.write_error(bconcat!(
-                "<warning>Package ",
-                complete.get_pretty_name(),
-                " is abandoned, you should avoid using it. ",
-                replacement,
-                ".</warning>"
-            ));
+            self.io.write_error(bformat!("<warning>Package {} is abandoned, you should avoid using it. {replacement}.</warning>", complete.get_pretty_name()));
         }
 
         if self.dump_autoloader {
@@ -418,14 +412,10 @@ impl Installer {
                 }
             }
             if funding_count > 0 {
-                self.io.write_error(bconcat!(
-                    "<info>",
-                    funding_count,
-                    " package",
+                self.io.write_error(bformat!(
+                    "<info>{funding_count} package{} you are using {} looking for funding.</info>",
                     (if 1 == funding_count { "" } else { "s" }),
-                    " you are using ",
-                    (if 1 == funding_count { "is" } else { "are" }),
-                    " looking for funding.</info>"
+                    (if 1 == funding_count { "is" } else { "are" })
                 ));
                 self.io
                     .write_error("<info>Use the `shirabe fund` command to find out more!</info>");
@@ -503,10 +493,10 @@ impl Installer {
                     Err(e) => {
                         if let Some(te) = e.catch::<TransportException>() {
                             self.io
-                                .error(bconcat!("Failed to audit ", target, " packages."), &[]);
+                                .error(bformat!("Failed to audit {target} packages."), &[]);
                             if self.io.is_verbose() {
                                 self.io.error(
-                                    bconcat!("[", "TransportException", "] ", te.get_message()),
+                                    bformat!("[TransportException] {}", te.get_message()),
                                     &[],
                                 );
                             }
@@ -517,7 +507,7 @@ impl Installer {
                 }
             } else {
                 self.io
-                    .write_error(bconcat!("No ", target, " packages - skipping audit."));
+                    .write_error(bformat!("No {target} packages - skipping audit."));
             }
         }
 
@@ -562,11 +552,11 @@ impl Installer {
 
         if (self.update_allow_list.is_some() || self.update_mirrors) && locked_repository.is_none()
         {
-            self.io.write_error_with_verbosity(bconcat!("<error>Cannot update ", if self.update_mirrors {
+            self.io.write_error_with_verbosity(bformat!("<error>Cannot update {} without a lock file present. Run `shirabe update` to generate a lock file.</error>", if self.update_mirrors {
                         "lock file information"
                     } else {
                         "only a partial set of packages"
-                    }, " without a lock file present. Run `shirabe update` to generate a lock file.</error>"), io_interface::QUIET);
+                    }), io_interface::QUIET);
 
             return Ok(Self::ERROR_NO_LOCK_FILE_FOR_PARTIAL_UPDATE);
         }
@@ -643,7 +633,7 @@ impl Installer {
                 )?;
 
                 self.io.write_error_with_verbosity(
-                    bconcat!("<error>", err, "</error>"),
+                    bformat!("<error>{err}</error>"),
                     io_interface::QUIET,
                 );
                 self.io.write_error(&pretty_problem);
@@ -652,7 +642,7 @@ impl Installer {
                 }
 
                 let mut ghe = GithubActionError::new(self.io.clone());
-                ghe.emit(bconcat!(err, "\n", pretty_problem).as_bstr(), None, None);
+                ghe.emit(bformat!("{err}\n{pretty_problem}").as_bstr(), None, None);
 
                 return Ok(std::cmp::max(Self::ERROR_GENERIC_FAILURE, e.get_code()));
             }
@@ -660,15 +650,14 @@ impl Installer {
         let _ = solver;
 
         self.io.write_error_with_verbosity(
-            bconcat!(
-                "Analyzed ",
-                pool.borrow().get_packages().len(),
-                " packages to resolve dependencies"
+            bformat!(
+                "Analyzed {} packages to resolve dependencies",
+                pool.borrow().get_packages().len()
             ),
             io_interface::VERBOSE,
         );
         self.io.write_error_with_verbosity(
-            bconcat!("Analyzed ", rule_set_size, " rules to resolve dependencies"),
+            bformat!("Analyzed {rule_set_size} rules to resolve dependencies"),
             io_interface::VERBOSE,
         );
 
@@ -712,9 +701,9 @@ impl Installer {
             for operation in lock_transaction.get_operations() {
                 if let AnyOperation::Install(io) = &**operation {
                     installs_updates.push(operation.clone());
-                    install_names.push(bconcat!(
+                    install_names.push(bformat!(
+                        "{}:{}",
                         io.get_package().get_pretty_name(),
-                        ":",
                         io.get_package()
                             .get_full_pretty_version(true, DisplayMode::SourceRefIfDev)
                     ));
@@ -730,9 +719,9 @@ impl Installer {
                     }
 
                     installs_updates.push(operation.clone());
-                    update_names.push(bconcat!(
+                    update_names.push(bformat!(
+                        "{}:{}",
                         uo.get_target_package().get_pretty_name(),
-                        ":",
                         uo.get_target_package()
                             .get_full_pretty_version(true, DisplayMode::SourceRefIfDev)
                     ));
@@ -743,36 +732,30 @@ impl Installer {
             }
 
             if self.config.borrow().get_bool("lock") {
-                self.io.write_error(bconcat!(
-                    "<info>Lock file operations: ",
+                self.io.write_error(bformat!(
+                    "<info>Lock file operations: {} install{}, {} update{}, {} removal{}</info>",
                     (install_names.len() as i64),
-                    " install",
                     (if 1 == install_names.len() { "" } else { "s" }),
-                    ", ",
                     (update_names.len() as i64),
-                    " update",
                     (if 1 == update_names.len() { "" } else { "s" }),
-                    ", ",
                     (uninstalls.len() as i64),
-                    " removal",
-                    (if 1 == uninstalls.len() { "" } else { "s" }),
-                    "</info>"
+                    (if 1 == uninstalls.len() { "" } else { "s" })
                 ));
                 if !install_names.is_empty() {
                     self.io.write_error_with_verbosity(
-                        bconcat!("Installs: ", implode(", ", &install_names)),
+                        bformat!("Installs: {}", implode(", ", &install_names)),
                         io_interface::VERBOSE,
                     );
                 }
                 if !update_names.is_empty() {
                     self.io.write_error_with_verbosity(
-                        bconcat!("Updates: ", implode(", ", &update_names)),
+                        bformat!("Updates: {}", implode(", ", &update_names)),
                         io_interface::VERBOSE,
                     );
                 }
                 if !uninstalls.is_empty() {
                     self.io.write_error_with_verbosity(
-                        bconcat!("Removals: ", implode(", ", &uninstall_names)),
+                        bformat!("Removals: {}", implode(", ", &uninstall_names)),
                         io_interface::VERBOSE,
                     );
                 }
@@ -808,11 +791,11 @@ impl Installer {
                 {
                     let operation_pkg = operation.get_target_package();
                     if let Some(repo) = operation_pkg.get_repository() {
-                        source_repo = bconcat!(" from ", repo.get_repo_name()?);
+                        source_repo = bformat!(" from {}", repo.get_repo_name()?);
                     }
                 }
                 self.io
-                    .write_error(bconcat!("  - ", operation.show(true), source_repo));
+                    .write_error(bformat!("  - {}{source_repo}", operation.show(true)));
             }
         }
 
@@ -915,7 +898,7 @@ impl Installer {
                 )?;
 
                 self.io.write_error_with_verbosity(
-                    bconcat!("<error>", err, "</error>"),
+                    bformat!("<error>{err}</error>"),
                     io_interface::QUIET,
                 );
                 self.io.write_error(
@@ -927,7 +910,7 @@ impl Installer {
                 self.io.write_error(&pretty_problem);
 
                 let mut ghe = GithubActionError::new(self.io.clone());
-                ghe.emit(bconcat!(err, "\n", pretty_problem).as_bstr(), None, None);
+                ghe.emit(bformat!("{err}\n{pretty_problem}").as_bstr(), None, None);
 
                 return Ok(e.get_code());
             }
@@ -946,14 +929,13 @@ impl Installer {
         already_solved: bool,
     ) -> anyhow::Result<i64> {
         if self.config.borrow().get_bool("lock") {
-            self.io.write_error(bconcat!(
-                "<info>Installing dependencies from lock file",
+            self.io.write_error(bformat!(
+                "<info>Installing dependencies from lock file{}</info>",
                 if self.dev_mode {
                     " (including require-dev)"
                 } else {
                     ""
-                },
-                "</info>"
+                }
             ));
         }
 
@@ -1084,13 +1066,13 @@ impl Installer {
                     )?;
 
                     self.io.write_error_with_verbosity(
-                        bconcat!("<error>", err, "</error>"),
+                        bformat!("<error>{err}</error>"),
                         io_interface::QUIET,
                     );
                     self.io.write_error(&pretty_problem);
 
                     let mut ghe = GithubActionError::new(self.io.clone());
-                    ghe.emit(bconcat!(err, "\n", pretty_problem).as_bstr(), None, None);
+                    ghe.emit(bformat!("{err}\n{pretty_problem}").as_bstr(), None, None);
 
                     return Ok(std::cmp::max(Self::ERROR_GENERIC_FAILURE, e.get_code()));
                 }
@@ -1125,16 +1107,16 @@ impl Installer {
         let mut uninstalls: Vec<BString> = vec![];
         for operation in local_repo_transaction.get_operations() {
             if let AnyOperation::Install(io) = &**operation {
-                installs.push(bconcat!(
+                installs.push(bformat!(
+                    "{}:{}",
                     io.get_package().get_pretty_name(),
-                    ":",
                     io.get_package()
                         .get_full_pretty_version(true, DisplayMode::SourceRefIfDev)
                 ));
             } else if let AnyOperation::Update(uo) = &**operation {
-                updates.push(bconcat!(
+                updates.push(bformat!(
+                    "{}:{}",
                     uo.get_target_package().get_pretty_name(),
-                    ":",
                     uo.get_target_package()
                         .get_full_pretty_version(true, DisplayMode::SourceRefIfDev)
                 ));
@@ -1146,36 +1128,30 @@ impl Installer {
         if installs.is_empty() && updates.is_empty() && uninstalls.is_empty() {
             self.io.write_error("Nothing to install, update or remove");
         } else {
-            self.io.write_error(bconcat!(
-                "<info>Package operations: ",
+            self.io.write_error(bformat!(
+                "<info>Package operations: {} install{}, {} update{}, {} removal{}</info>",
                 (installs.len() as i64),
-                " install",
                 (if 1 == installs.len() { "" } else { "s" }),
-                ", ",
                 (updates.len() as i64),
-                " update",
                 (if 1 == updates.len() { "" } else { "s" }),
-                ", ",
                 (uninstalls.len() as i64),
-                " removal",
-                (if 1 == uninstalls.len() { "" } else { "s" }),
-                "</info>"
+                (if 1 == uninstalls.len() { "" } else { "s" })
             ));
             if !installs.is_empty() {
                 self.io.write_error_with_verbosity(
-                    bconcat!("Installs: ", implode(", ", &installs)),
+                    bformat!("Installs: {}", implode(", ", &installs)),
                     io_interface::VERBOSE,
                 );
             }
             if !updates.is_empty() {
                 self.io.write_error_with_verbosity(
-                    bconcat!("Updates: ", implode(", ", &updates)),
+                    bformat!("Updates: {}", implode(", ", &updates)),
                     io_interface::VERBOSE,
                 );
             }
             if !uninstalls.is_empty() {
                 self.io.write_error_with_verbosity(
-                    bconcat!("Removals: ", implode(", ", &uninstalls)),
+                    bformat!("Removals: {}", implode(", ", &uninstalls)),
                     io_interface::VERBOSE,
                 );
             }
@@ -1209,7 +1185,8 @@ impl Installer {
             for operation in local_repo_transaction.get_operations() {
                 // output op, but alias op only in debug verbosity
                 if strpos(operation.get_operation_type(), "Alias").is_none() || self.io.is_debug() {
-                    self.io.write_error(bconcat!("  - ", operation.show(false)));
+                    self.io
+                        .write_error(bformat!("  - {}", operation.show(false)));
                 }
             }
         }

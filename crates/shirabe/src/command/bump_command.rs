@@ -15,7 +15,7 @@ use crate::repository::{FindPackageConstraint, PlatformRepository, RepositoryInt
 use crate::util::Filesystem;
 use bstr::{B, BStr, BString};
 use shirabe_php_shim::{
-    PhpMixed, RuntimeException, bconcat, file_get_contents, file_put_contents, impl_php_class,
+    PhpMixed, RuntimeException, bformat, file_get_contents, file_put_contents, impl_php_class,
     is_writable, php_regex, preg_is_match, preg_replace, strtolower,
 };
 use shirabe_symfony_console::command::Command;
@@ -61,10 +61,8 @@ impl BumpCommand {
         let composer_json_path = Factory::get_composer_file()?;
 
         if !Filesystem::is_readable(&composer_json_path) {
-            io.write_error(bconcat!(
-                "<error>",
-                composer_json_path,
-                " is not readable.</error>"
+            io.write_error(bformat!(
+                "<error>{composer_json_path} is not readable.</error>"
             ));
             return Ok(Self::ERROR_GENERIC);
         }
@@ -73,10 +71,8 @@ impl BumpCommand {
         let contents = match file_get_contents(composer_json.get_path()) {
             Ok(c) => c,
             Err(_) => {
-                io.write_error(bconcat!(
-                    "<error>",
-                    composer_json_path,
-                    " is not readable.</error>"
+                io.write_error(bformat!(
+                    "<error>{composer_json_path} is not readable.</error>"
                 ));
                 return Ok(Self::ERROR_GENERIC);
             }
@@ -85,10 +81,8 @@ impl BumpCommand {
         if !is_writable(&composer_json_path)
             && file_put_contents(&composer_json_path, &contents).is_none()
         {
-            io.write_error(bconcat!(
-                "<error>",
-                composer_json_path,
-                " is not writable.</error>"
+            io.write_error(bformat!(
+                "<error>{composer_json_path} is not writable.</error>"
             ));
             return Ok(Self::ERROR_GENERIC);
         }
@@ -129,11 +123,7 @@ impl BumpCommand {
                 .is_some_and(|m| m.contains_key(B("type")))
             {
                 io.write_error("<warning>If your package is not a library, you can explicitly specify the \"type\" by using \"shirabe config type project\".</warning>");
-                io.write_error(bconcat!(
-                    "<warning>Alternatively you can use ",
-                    dev_only_flag_hint,
-                    " to only bump dependencies within \"require-dev\".</warning>"
-                ));
+                io.write_error(bformat!("<warning>Alternatively you can use {dev_only_flag_hint} to only bump dependencies within \"require-dev\".</warning>"));
             }
         }
 
@@ -212,7 +202,7 @@ impl BumpCommand {
             for (key, packages) in &updates {
                 for (package, version) in packages {
                     let section = composer_definition
-                        .entry(bconcat!(key))
+                        .entry(bformat!("{key}"))
                         .or_insert_with(|| PhpMixed::Array(indexmap::IndexMap::new()));
                     if let PhpMixed::Array(map) = section {
                         map.insert(package.clone(), PhpMixed::string(version.clone()));
@@ -225,38 +215,25 @@ impl BumpCommand {
         let change_count: usize = updates.values().map(|m| m.len()).sum();
         if change_count > 0 {
             if dry_run {
-                io.write(bconcat!(
-                    "<info>",
-                    composer_json_path,
-                    " would be updated with:</info>"
+                io.write(bformat!(
+                    "<info>{composer_json_path} would be updated with:</info>"
                 ));
                 for (require_type, packages) in &updates {
                     for (package, version) in packages {
-                        io.write(bconcat!(
-                            "<info> - ",
-                            *require_type,
-                            ".",
-                            package,
-                            ": ",
-                            version,
-                            "</info>"
+                        io.write(bformat!(
+                            "<info> - {}.{package}: {version}</info>",
+                            *require_type
                         ));
                     }
                 }
             } else {
-                io.write(bconcat!(
-                    "<info>",
-                    composer_json_path,
-                    " has been updated (",
-                    change_count,
-                    " changes).</info>"
+                io.write(bformat!(
+                    "<info>{composer_json_path} has been updated ({change_count} changes).</info>"
                 ));
             }
         } else {
-            io.write(bconcat!(
-                "<info>No requirements to update in ",
-                composer_json_path,
-                ".</info>"
+            io.write(bformat!(
+                "<info>No requirements to update in {composer_json_path}.</info>"
             ));
         }
 
@@ -286,10 +263,9 @@ impl BumpCommand {
         let contents = match file_get_contents(json.get_path()) {
             Ok(c) => c,
             Err(_) => {
-                return Err(RuntimeException::new(bconcat!(
-                    "Unable to read ",
-                    json.get_path(),
-                    " contents."
+                return Err(RuntimeException::new(bformat!(
+                    "Unable to read {} contents.",
+                    json.get_path()
                 ))
                 .into());
             }
@@ -307,10 +283,9 @@ impl BumpCommand {
 
         match file_put_contents(json.get_path(), manipulator.get_contents()) {
             Some(_) => Ok(true),
-            None => Err(RuntimeException::new(bconcat!(
-                "Unable to write new ",
-                json.get_path(),
-                " contents."
+            None => Err(RuntimeException::new(bformat!(
+                "Unable to write new {} contents.",
+                json.get_path()
             ))
             .into()),
         }

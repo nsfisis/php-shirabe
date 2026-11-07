@@ -15,7 +15,7 @@ use crate::util::{Filesystem, Git as GitUtil, HttpDownloader, Platform, ProcessE
 use bstr::{B, BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    GLOB_BRACE, GLOB_MARK, GLOB_ONLYDIR, PhpMixed, RuntimeException, bconcat, dirname, file_exists,
+    GLOB_BRACE, GLOB_MARK, GLOB_ONLYDIR, PhpMixed, RuntimeException, bformat, dirname, file_exists,
     file_get_contents, glob_with_flags, hash, is_dir, path_from_bytes, path_to_bytes, php_regex,
     preg_is_match, realpath, rtrim_chars, serialize, str_replace, trim,
 };
@@ -95,15 +95,14 @@ impl PathRepository {
     }
 
     pub fn get_repo_name(&self) -> BString {
-        bconcat!(
-            "path repo (",
+        bformat!(
+            "path repo ({})",
             Url::sanitize(
                 self.repo_config
                     .get(B("url"))
                     .and_then(|v| v.as_string())
                     .unwrap_or_default()
-            ),
-            ")"
+            )
         )
     }
 
@@ -155,18 +154,17 @@ impl PathRepository {
                 }
             }
 
-            return Err(RuntimeException::new(bconcat!(
-                "The `url` supplied for the path (",
-                self.url,
-                ") repository does not exist"
+            return Err(RuntimeException::new(bformat!(
+                "The `url` supplied for the path ({}) repository does not exist",
+                self.url
             ))
             .into());
         }
 
         for url in url_matches {
-            let path = bconcat!(realpath(path_from_bytes(&url)).unwrap_or_default(), "/");
+            let path = bformat!("{}/", realpath(path_from_bytes(&url)).unwrap_or_default());
             let composer_file_path =
-                path_from_bytes(&bconcat!(path, "composer.json")).to_path_buf();
+                path_from_bytes(&bformat!("{path}composer.json")).to_path_buf();
 
             if !file_exists(&composer_file_path) {
                 continue;
@@ -279,7 +277,10 @@ impl PathRepository {
                 args
             })?;
             if reference == "auto"
-                && is_dir(path_from_bytes(&bconcat!(rtrim_chars(&path, "/"), "/.git")))
+                && is_dir(path_from_bytes(&bformat!(
+                    "{}/.git",
+                    rtrim_chars(&path, "/")
+                )))
                 && self
                     .process
                     .borrow_mut()
@@ -339,7 +340,7 @@ impl PathRepository {
             self.inner
                 .add_package(self.loader.load(package.clone(), None).map_err(|e| {
                     RuntimeException::with_code_and_previous(
-                        bconcat!("Failed loading the package in ", composer_file_path),
+                        bformat!("Failed loading the package in {composer_file_path}"),
                         0,
                         Some(std::sync::Arc::new(e)),
                     )

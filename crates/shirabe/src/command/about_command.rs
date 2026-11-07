@@ -5,7 +5,7 @@ use crate::command::{
 };
 use crate::io::IOInterfaceWrite;
 use crate::{composer, delegate_base_command_trait_impls_to_inner};
-use shirabe_php_shim::{bconcat, impl_php_class};
+use shirabe_php_shim::{bformat, impl_php_class};
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::InputInterface;
 use shirabe_symfony_console::output::OutputInterface;
@@ -53,9 +53,7 @@ impl Command for AboutCommand {
         let composer_version = composer::VERSION;
         let _ = (input, output);
 
-        self.get_io().borrow().write(bconcat!("<info>Shirabe - Dependency Manager for PHP - version ", shirabe_version, " (based on Composer ", composer_version, ")</info>\n\
-            <comment>Shirabe is a dependency manager tracking local dependencies of your projects and libraries.\n\
-            See https://getcomposer.org/ for more information.</comment>"));
+        self.get_io().borrow().write(bformat!("<info>Shirabe - Dependency Manager for PHP - version {shirabe_version} (based on Composer {composer_version})</info>\n<comment>Shirabe is a dependency manager tracking local dependencies of your projects and libraries.\nSee https://getcomposer.org/ for more information.</comment>"));
 
         Ok(0)
     }

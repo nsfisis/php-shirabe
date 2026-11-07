@@ -16,7 +16,7 @@ use bstr::{B, BString};
 use indexmap::IndexMap;
 use shirabe_php_rpc::{FromWire, PhpThrow, PluginValue, ToWire};
 use shirabe_php_shim::{
-    PhpMixed, ToPhpString, TypeError, array_replace_recursive, bconcat, error_message,
+    PhpMixed, ToPhpString, TypeError, array_replace_recursive, bformat, error_message,
     get_debug_type, implode_mixed,
 };
 
@@ -65,13 +65,12 @@ impl StreamContextOptions {
             PhpMixed::List(list) => Self::from_array(
                 list.into_iter()
                     .enumerate()
-                    .map(|(i, value)| (bconcat!(i), value))
+                    .map(|(i, value)| (bformat!("{i}"), value))
                     .collect(),
             ),
-            other => Err(TypeError::new(bconcat!(
-                "Stream context options must be of type array, ",
-                get_debug_type(&other),
-                " given"
+            other => Err(TypeError::new(bformat!(
+                "Stream context options must be of type array, {} given",
+                get_debug_type(&other)
             ))
             .into()),
         }
@@ -198,10 +197,9 @@ impl StreamContextOptions {
         match self.get("max_file_size") {
             None | Some(PhpMixed::Null) => Ok(None),
             Some(PhpMixed::Int(max_file_size)) => Ok(Some(max_file_size)),
-            Some(other) => Err(TypeError::new(bconcat!(
-                "The \"max_file_size\" option must be of type ?int, ",
-                get_debug_type(&other),
-                " given"
+            Some(other) => Err(TypeError::new(bformat!(
+                "The \"max_file_size\" option must be of type ?int, {} given",
+                get_debug_type(&other)
             ))
             .into()),
         }
@@ -250,15 +248,12 @@ impl StreamContextOption {
             PhpMixed::List(list) => list
                 .into_iter()
                 .enumerate()
-                .map(|(i, value)| (bconcat!(i), value))
+                .map(|(i, value)| (bformat!("{i}"), value))
                 .collect(),
             other => {
-                return Err(TypeError::new(bconcat!(
-                    "The \"",
-                    key,
-                    "\" stream context option must be of type array, ",
-                    get_debug_type(&other),
-                    " given"
+                return Err(TypeError::new(bformat!(
+                    "The \"{key}\" stream context option must be of type array, {} given",
+                    get_debug_type(&other)
                 ))
                 .into());
             }
@@ -356,10 +351,9 @@ impl HttpOptions {
             Some(PhpMixed::Array(map)) => {
                 Ok(map.values().map(ToPhpString::to_php_string).collect())
             }
-            other => Err(TypeError::new(bconcat!(
-                "curl_setopt(): The CURLOPT_HTTPHEADER option must have an array value, ",
-                get_debug_type(other.unwrap_or(&PhpMixed::Null)),
-                " given"
+            other => Err(TypeError::new(bformat!(
+                "curl_setopt(): The CURLOPT_HTTPHEADER option must have an array value, {} given",
+                get_debug_type(other.unwrap_or(&PhpMixed::Null))
             ))
             .into()),
         }

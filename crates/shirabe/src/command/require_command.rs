@@ -28,7 +28,7 @@ use bstr::{B, BStr, BString, ByteSlice, ByteVec};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     PhpMixed, RuntimeException, array_fill_keys, array_intersect, array_keys, array_merge,
-    array_unique, bconcat, empty, file_exists, file_get_contents, file_put_contents, filesize,
+    array_unique, bformat, empty, file_exists, file_get_contents, file_put_contents, filesize,
     impl_php_class, implode, is_writable, strtolower, unlink,
 };
 use shirabe_symfony_console::command::Command;
@@ -318,11 +318,9 @@ impl RequireCommand {
             flags.push_str(" --with-dependencies");
         }
 
-        io.write_error(bconcat!(
-            "<info>Running shirabe update ",
-            implode(" ", &array_keys(requirements)),
-            flags,
-            "</info>"
+        io.write_error(bformat!(
+            "<info>Running shirabe update {}{flags}</info>",
+            implode(" ", &array_keys(requirements))
         ));
 
         let command_event =
@@ -424,7 +422,7 @@ impl RequireCommand {
                         .unwrap_or_default(),
                 )? {
                     if !req.contains_key(B("version")) {
-                        io.write_error(bconcat!("You can also try re-running shirabe require with an explicit version constraint, e.g. \"shirabe require ", req.get(B("name")).cloned().unwrap_or_default(), ":*\" to figure out if any version is installable, or \"shirabe require ", req.get(B("name")).cloned().unwrap_or_default(), ":^2.1\" if you know which you need."));
+                        io.write_error(bformat!("You can also try re-running shirabe require with an explicit version constraint, e.g. \"shirabe require {}:*\" to figure out if any version is installable, or \"shirabe require {}:^2.1\" if you know which you need.", req.get(B("name")).cloned().unwrap_or_default(), req.get(B("name")).cloned().unwrap_or_default()));
                         break;
                     }
                 }
@@ -493,12 +491,9 @@ impl RequireCommand {
                     version_selector.find_recommended_require_version(package.clone())?,
                 );
             }
-            self.get_io().write_error(bconcat!(
-                "Using version <info>",
-                requirements.get(package_name).cloned().unwrap_or_default(),
-                "</info> for <info>",
-                package_name,
-                "</info>"
+            self.get_io().write_error(bformat!(
+                "Using version <info>{}</info> for <info>{package_name}</info>",
+                requirements.get(package_name).cloned().unwrap_or_default()
             ));
 
             // Regex pattern compatibility:
@@ -512,7 +507,7 @@ impl RequireCommand {
                 )
             {
                 self.get_io().warning(
-                    bconcat!("Version ", requirement_str, " looks like it may be a feature branch which is unlikely to keep working in the long run and may be in an unstable state"),
+                    bformat!("Version {requirement_str} looks like it may be a feature branch which is unlikely to keep working in the long run and may be in an unstable state"),
                     &[],
                 );
                 if self.get_io().is_interactive()
@@ -643,10 +638,9 @@ impl RequireCommand {
         let json = self.json.borrow().as_ref().unwrap().clone();
         let lock = self.lock.borrow().clone();
         if self.newly_created.get() {
-            let msg = bconcat!(
-                "\n<error>Installation failed, deleting ",
-                &*self.file.borrow(),
-                ".</error>"
+            let msg = bformat!(
+                "\n<error>Installation failed, deleting {}.</error>",
+                &*self.file.borrow()
             );
             self.get_io().write_error(&msg);
             unlink(json.borrow().get_path());
@@ -655,15 +649,13 @@ impl RequireCommand {
             }
         } else {
             let extra = if self.lock_backup.borrow().is_some() {
-                bconcat!(" and ", lock, " to their ")
+                bformat!(" and {lock} to their ")
             } else {
                 BString::from(" to its ")
             };
-            let msg = bconcat!(
-                "\n<error>Installation failed, reverting ",
-                &*self.file.borrow(),
-                extra,
-                "original content.</error>"
+            let msg = bformat!(
+                "\n<error>Installation failed, reverting {}{extra}original content.</error>",
+                &*self.file.borrow()
             );
             self.get_io().write_error(&msg);
             file_put_contents(json.borrow().get_path(), &*self.composer_backup.borrow());
@@ -762,13 +754,13 @@ impl Command for RequireCommand {
         let write_failed =
             self.newly_created.get() && file_put_contents(&file, b"{\n}\n").is_none();
         if write_failed {
-            let msg = bconcat!("<error>", file, " could not be created.</error>");
+            let msg = bformat!("<error>{file} could not be created.</error>");
             self.get_io().write_error(&msg);
 
             return Ok(1);
         }
         if !Filesystem::is_readable(&file) {
-            let msg = bconcat!("<error>", file, " is not readable.</error>");
+            let msg = bformat!("<error>{file} is not readable.</error>");
             self.get_io().write_error(&msg);
 
             return Ok(1);
@@ -796,7 +788,7 @@ impl Command for RequireCommand {
         let signals = SignalSubscription::new();
         let abort_on_signal = |signals: &SignalSubscription| {
             self.get_io().write_error_with_verbosity(
-                bconcat!("Received ", signals.last_signal().as_str(), ", aborting"),
+                bformat!("Received {}, aborting", signals.last_signal().as_str()),
                 io_interface::DEBUG,
             );
             self.revert_composer_file();
@@ -807,7 +799,7 @@ impl Command for RequireCommand {
         // see https://github.com/composer/composer/issues/8231 and https://bugs.php.net/bug.php?id=68926
         let backup_contents = self.composer_backup.borrow().clone();
         if !is_writable(&file) && file_put_contents(&file, &backup_contents).is_none() {
-            let msg = bconcat!("<error>", file, " is not writable.</error>");
+            let msg = bformat!("<error>{file} is not writable.</error>");
             self.get_io().write_error(&msg);
 
             return Ok(1);
@@ -907,11 +899,7 @@ impl Command for RequireCommand {
                     self.revert_composer_file();
 
                     return Err(RuntimeException::with_code_and_previous(
-                        bconcat!(
-                            "No composer.json present in the current directory (",
-                            &*self.file.borrow(),
-                            "), this may be the cause of the following exception."
-                        ),
+                        bformat!("No composer.json present in the current directory ({}), this may be the cause of the following exception.", &*self.file.borrow()),
                         0,
                         Some(std::sync::Arc::new(e)),
                     )
@@ -979,16 +967,9 @@ impl Command for RequireCommand {
                 };
                 let merged: Vec<BString> = dev_packages.iter().flatten().cloned().collect();
                 let pkg_dev_tags: Vec<BString> = array_unique(&merged);
-                let warn_msg = bconcat!(
-                    "The package",
-                    plural,
-                    " you required ",
-                    plural2,
-                    " recommended to be placed in require-dev (because ",
-                    plural3,
-                    " tagged as \"",
-                    implode("\", \"", &pkg_dev_tags),
-                    "\") but you did not use --dev."
+                let warn_msg = bformat!(
+                    "The package{plural} you required {plural2} recommended to be placed in require-dev (because {plural3} tagged as \"{}\") but you did not use --dev.",
+                    implode("\", \"", &pkg_dev_tags)
                 );
                 self.get_io().warning(&warn_msg, &[]);
                 if self.get_io().ask_confirmation(
@@ -1028,10 +1009,8 @@ impl Command for RequireCommand {
         let version_parser = VersionParser::new();
         for (package, constraint) in &requirements {
             if strtolower(package) == composer.get_package().get_name() {
-                let msg = bconcat!(
-                    "<error>Root package '",
-                    package,
-                    "' cannot require itself in its composer.json</error>"
+                let msg = bformat!(
+                    "<error>Root package '{package}' cannot require itself in its composer.json</error>"
                 );
                 self.get_io().write_error(&msg);
 
@@ -1047,42 +1026,34 @@ impl Command for RequireCommand {
             self.get_inconsistent_require_keys(&requirements, BStr::new(require_key));
         if (inconsistent_require_keys.len() as i64) > 0 {
             for package in &inconsistent_require_keys {
-                let warn_msg = bconcat!(
-                    package,
-                    " is currently present in the ",
-                    remove_key,
-                    " key and you ran the command ",
+                let warn_msg = bformat!(
+                    "{package} is currently present in the {remove_key} key and you ran the command {} the --dev flag, which will move it to the {require_key} key.",
                     if input.borrow().get_option("dev")?.as_bool().unwrap_or(false) {
                         "with"
                     } else {
                         "without"
-                    },
-                    " the --dev flag, which will move it to the ",
-                    require_key,
-                    " key."
+                    }
                 );
                 self.get_io().warning(&warn_msg, &[]);
             }
 
             if self.get_io().is_interactive() {
-                let q1 = bconcat!(
-                    "<info>Do you want to move ",
+                let q1 = bformat!(
+                    "<info>Do you want to move {}?</info> [<comment>no</comment>]? ",
                     if (inconsistent_require_keys.len() as i64) > 1 {
                         "these requirements"
                     } else {
                         "this requirement"
-                    },
-                    "?</info> [<comment>no</comment>]? "
+                    }
                 );
                 if !self.get_io().ask_confirmation(q1, false)? {
-                    let q2 = bconcat!(
-                        "<info>Do you want to re-run the command ",
+                    let q2 = bformat!(
+                        "<info>Do you want to re-run the command {} --dev?</info> [<comment>yes</comment>]? ",
                         if input.borrow().get_option("dev")?.as_bool().unwrap_or(false) {
                             "without"
                         } else {
                             "with"
-                        },
-                        " --dev?</info> [<comment>yes</comment>]? "
+                        }
                     );
                     if !self.get_io().ask_confirmation(q2, true)? {
                         return Ok(0);
@@ -1134,16 +1105,13 @@ impl Command for RequireCommand {
             abort_on_signal(&signals);
         }
 
-        let updated_msg = bconcat!(
-            "<info>",
-            file,
-            " has been ",
+        let updated_msg = bformat!(
+            "<info>{file} has been {}</info>",
             if self.newly_created.get() {
                 "created"
             } else {
                 "updated"
-            },
-            "</info>"
+            }
         );
         self.get_io().write_error(&updated_msg);
 

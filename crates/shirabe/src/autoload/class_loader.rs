@@ -4,7 +4,7 @@ use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_rpc::stream_resolve_include_path;
 use shirabe_php_shim::{
-    InvalidArgumentException, PhpMixed, bconcat, file_exists, path_from_bytes, path_to_bytes,
+    InvalidArgumentException, PhpMixed, bformat, file_exists, path_from_bytes, path_to_bytes,
     strlen, strpos, strrpos, strtr, substr,
 };
 
@@ -351,21 +351,23 @@ impl ClassLoader {
         ext: &BStr,
     ) -> anyhow::Result<Option<BString>> {
         // PSR-4 lookup
-        let logical_path_psr4 = bconcat!(strtr(class, "\\", std::path::MAIN_SEPARATOR_STR), ext);
+        let logical_path_psr4 =
+            bformat!("{}{ext}", strtr(class, "\\", std::path::MAIN_SEPARATOR_STR));
 
         let first = BString::from(&class[..1.min(class.len())]);
         if self.prefix_lengths_psr4.contains_key(&first) {
             let mut sub_path = class.to_owned();
             while let Some(last_pos) = strrpos(&sub_path, "\\") {
                 sub_path = substr(&sub_path, 0, Some(last_pos as i64));
-                let search = bconcat!(sub_path, "\\");
+                let search = bformat!("{sub_path}\\");
                 if let Some(dirs) = self.prefix_dirs_psr4.get(&search) {
-                    let path_end = bconcat!(
+                    let path_end = bformat!(
+                        "{}{}",
                         std::path::MAIN_SEPARATOR_STR,
                         substr(&logical_path_psr4, (last_pos + 1) as i64, None)
                     );
                     for dir in dirs {
-                        let file = bconcat!(dir, path_end);
+                        let file = bformat!("{dir}{path_end}");
                         if file_exists(path_from_bytes(&file)) {
                             return Ok(Some(file));
                         }
@@ -376,7 +378,7 @@ impl ClassLoader {
 
         // PSR-4 fallback dirs
         for dir in &self.fallback_dirs_psr4 {
-            let file = bconcat!(dir, std::path::MAIN_SEPARATOR_STR, logical_path_psr4);
+            let file = bformat!("{dir}{}{logical_path_psr4}", std::path::MAIN_SEPARATOR_STR);
             if file_exists(path_from_bytes(&file)) {
                 return Ok(Some(file));
             }
@@ -385,7 +387,8 @@ impl ClassLoader {
         // PSR-0 lookup
         let logical_path_psr0 = if let Some(pos) = strrpos(class, "\\") {
             // namespaced class name
-            bconcat!(
+            bformat!(
+                "{}{}",
                 substr(&logical_path_psr4, 0, Some((pos + 1) as i64)),
                 strtr(
                     substr(&logical_path_psr4, (pos + 1) as i64, None),
@@ -395,14 +398,15 @@ impl ClassLoader {
             )
         } else {
             // PEAR-like class name
-            bconcat!(strtr(class, "_", std::path::MAIN_SEPARATOR_STR), ext)
+            bformat!("{}{ext}", strtr(class, "_", std::path::MAIN_SEPARATOR_STR))
         };
 
         if let Some(prefixes) = self.prefixes_psr0.get(&first) {
             for (prefix, dirs) in prefixes {
                 if Some(0) == strpos(class, prefix) {
                     for dir in dirs {
-                        let file = bconcat!(dir, std::path::MAIN_SEPARATOR_STR, logical_path_psr0);
+                        let file =
+                            bformat!("{dir}{}{logical_path_psr0}", std::path::MAIN_SEPARATOR_STR);
                         if file_exists(path_from_bytes(&file)) {
                             return Ok(Some(file));
                         }
@@ -413,7 +417,7 @@ impl ClassLoader {
 
         // PSR-0 fallback dirs
         for dir in &self.fallback_dirs_psr0 {
-            let file = bconcat!(dir, std::path::MAIN_SEPARATOR_STR, logical_path_psr0);
+            let file = bformat!("{dir}{}{logical_path_psr0}", std::path::MAIN_SEPARATOR_STR);
             if file_exists(path_from_bytes(&file)) {
                 return Ok(Some(file));
             }
@@ -433,7 +437,7 @@ impl ClassLoader {
     /// `"\0Composer\Autoload\ClassLoader\0<propertyName>"` using the original camelCase names, in
     /// declaration order.
     pub fn as_array_iter(&self) -> Vec<(BString, PhpMixed)> {
-        let key = |name: &BStr| bconcat!("\0Composer\\Autoload\\ClassLoader\0", name);
+        let key = |name: &BStr| bformat!("\0Composer\\Autoload\\ClassLoader\0{name}");
         let str_list = |v: &Vec<BString>| {
             PhpMixed::List(v.iter().map(|s| PhpMixed::string(s.clone())).collect())
         };

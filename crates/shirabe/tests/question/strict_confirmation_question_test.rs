@@ -3,7 +3,7 @@
 use bstr::{BStr, BString, ByteSlice};
 use shirabe::question::StrictConfirmationQuestion;
 use shirabe_php_shim::{
-    PhpResource, bconcat, error_message, fwrite_resource, php_fopen_resource, php_str, rewind,
+    PhpResource, bformat, error_message, fwrite_resource, php_fopen_resource, php_str, rewind,
 };
 use shirabe_symfony_console::helper::{QuestionHelper, QuestionHelperInterface};
 use shirabe_symfony_console::input::{
@@ -26,13 +26,13 @@ fn get_ask_confirmation_bad_data() -> Vec<&'static BStr> {
 #[test]
 fn test_ask_confirmation_bad_answer() {
     for answer in get_ask_confirmation_bad_data() {
-        let (mut input, mut dialog) = create_input(bconcat!(answer, "\n").as_bstr());
+        let (mut input, mut dialog) = create_input(bformat!("{answer}\n").as_bstr());
 
         let mut question = StrictConfirmationQuestion::new(
             BString::from("Do you like French fries?"),
             true,
-            bconcat!(TRUE_ANSWER_REGEX),
-            bconcat!(FALSE_ANSWER_REGEX),
+            bformat!("{TRUE_ANSWER_REGEX}"),
+            bformat!("{FALSE_ANSWER_REGEX}"),
         );
         question.inner_mut().set_max_attempts(Some(1)).unwrap();
 
@@ -46,13 +46,13 @@ fn test_ask_confirmation_bad_answer() {
 #[test]
 fn test_ask_confirmation() {
     for (question, expected, default) in get_ask_confirmation_data() {
-        let (mut input, mut dialog) = create_input(bconcat!(question, "\n").as_bstr());
+        let (mut input, mut dialog) = create_input(bformat!("{question}\n").as_bstr());
 
         let question = StrictConfirmationQuestion::new(
             BString::from("Do you like French fries?"),
             default,
-            bconcat!(TRUE_ANSWER_REGEX),
-            bconcat!(FALSE_ANSWER_REGEX),
+            bformat!("{TRUE_ANSWER_REGEX}"),
+            bformat!("{FALSE_ANSWER_REGEX}"),
         );
         assert_eq!(
             dialog

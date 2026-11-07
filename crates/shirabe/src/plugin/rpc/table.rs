@@ -21,7 +21,7 @@ use crate::util::{Filesystem, HttpDownloader, ProcessExecutor};
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_rpc::{FromWire, PhpThrow, PluginValue, RustObjHandle, ToWire, wire};
-use shirabe_php_shim::{bconcat, php_str};
+use shirabe_php_shim::{bformat, php_str};
 
 /// A Rust-side entity a PHP proxy stub points back to.
 #[derive(Debug, Clone)]
@@ -315,10 +315,9 @@ fn rust_entity_from_wire<T: FromRustEntity>(value: &PluginValue) -> Result<T, Ph
         .with(|table| table.borrow().get(&handle.rhandle).cloned())
         .and_then(T::from_entity)
         .ok_or_else(|| {
-            PhpThrow::runtime(bconcat!(
-                "expected ",
+            PhpThrow::runtime(bformat!(
+                "expected {}, got Rust handle {}",
                 T::EXPECTED,
-                ", got Rust handle ",
                 handle.rhandle
             ))
         })

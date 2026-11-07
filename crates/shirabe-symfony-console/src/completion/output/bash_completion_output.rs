@@ -4,7 +4,7 @@ use crate::completion::CompletionSuggestions;
 use crate::completion::output::CompletionOutputInterface;
 use crate::output::OutputInterface;
 use bstr::BString;
-use shirabe_php_shim::{bconcat, implode};
+use shirabe_php_shim::{bformat, implode};
 
 #[derive(Debug)]
 pub struct BashCompletionOutput;
@@ -17,9 +17,9 @@ impl CompletionOutputInterface for BashCompletionOutput {
             .map(|suggestion| suggestion.get_value())
             .collect();
         for option in suggestions.get_option_suggestions() {
-            values.push(bconcat!("--", option.get_name()));
+            values.push(bformat!("--{}", option.get_name()));
             if option.is_negatable() {
-                values.push(bconcat!("--no-", option.get_name()));
+                values.push(bformat!("--no-{}", option.get_name()));
             }
         }
         output.writeln(&[implode("\n", &values)], 0);

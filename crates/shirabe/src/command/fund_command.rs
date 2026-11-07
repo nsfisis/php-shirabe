@@ -12,7 +12,7 @@ use crate::package::{CompletePackageInterfaceHandle, base_package};
 use crate::repository::{CompositeRepository, RepositoryInterface};
 use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe_php_shim::{bconcat, impl_php_class, implode, json_bytes, php_regex, preg_match};
+use shirabe_php_shim::{bformat, impl_php_class, implode, json_bytes, php_regex, preg_match};
 use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint};
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::formatter::OutputFormatter;
@@ -85,7 +85,7 @@ impl FundCommand {
                     preg_match(php_regex!(r"{^https://github.com/([^/]+)$}"), &url)
                 && let Some(sponsor) = matches.get(1)
             {
-                url = bconcat!("https://github.com/sponsors/", sponsor);
+                url = bformat!("https://github.com/sponsors/{sponsor}");
             }
             fundings
                 .entry(BString::from(vendor))
@@ -192,10 +192,8 @@ impl Command for FundCommand {
                 .unwrap_or(bstr::BStr::new("text")),
         );
         if !matches!(format.as_slice(), b"text" | b"json") {
-            io.write_error(bconcat!(
-                "Unsupported format \"",
-                format,
-                "\". See help for supported formats."
+            io.write_error(bformat!(
+                "Unsupported format \"{format}\". See help for supported formats."
             ));
             return Ok(1);
         }
@@ -207,19 +205,16 @@ impl Command for FundCommand {
 
             for (vendor, links) in &fundings {
                 io.write("");
-                io.write(bconcat!("<comment>", vendor, "</comment>"));
+                io.write(bformat!("<comment>{vendor}</comment>"));
                 for (url, packages) in links {
-                    let line = bconcat!("  <info>", implode(", ", packages), "</info>");
+                    let line = bformat!("  <info>{}</info>", implode(", ", packages));
                     if prev.as_ref() != Some(&line) {
                         io.write(&line);
                         prev = Some(line);
                     }
-                    io.write(bconcat!(
-                        "    <href=",
-                        OutputFormatter::escape(url)?,
-                        ">",
-                        url,
-                        "</>"
+                    io.write(bformat!(
+                        "    <href={}>{url}</>",
+                        OutputFormatter::escape(url)?
                     ));
                 }
             }

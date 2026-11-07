@@ -1,6 +1,6 @@
 //! Minimal, PHP-compatible subset of the DOM classes.
 
-use crate::bconcat;
+use crate::bformat;
 use bstr::{BStr, BString};
 use std::rc::Weak;
 
@@ -127,12 +127,10 @@ impl DOMDocument {
 
     pub fn save_xml<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
         let doc = self.0.borrow();
-        writer.write_all(&bconcat!(
-            "<?xml version=\"",
+        writer.write_all(&bformat!(
+            "<?xml version=\"{}\" encoding=\"{}\"?>\n",
             doc.version,
-            "\" encoding=\"",
-            doc.encoding,
-            "\"?>\n"
+            doc.encoding
         ))?;
         for child in &doc.children {
             serialize_node(child, 0, doc.format_output, writer)?;

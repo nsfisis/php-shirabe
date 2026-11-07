@@ -5,7 +5,7 @@ use crate::util::{Filesystem, Platform};
 use bstr::{BStr, BString};
 use chrono::{DateTime, Utc};
 use shirabe_php_shim::{
-    bconcat, bin2hex, clearstatcache, dirname, disk_free_space, display_to_bytes, file_exists,
+    bformat, bin2hex, clearstatcache, dirname, disk_free_space, display_to_bytes, file_exists,
     file_get_contents, file_put_contents, filemtime, hash_file, is_dir, is_writable, mkdir,
     path_from_bytes, path_to_bytes, php_regex, preg_is_match, preg_match, preg_replace,
     random_bytes, random_int, rename, rtrim_chars, time, touch, touch_with_mtime_and_atime, unlink,
@@ -60,8 +60,11 @@ impl Cache {
     ) -> Self {
         let cache_dir = cache_dir.as_ref();
         let allowlist = allowlist.unwrap_or(BStr::new("a-z0-9._")).to_owned();
-        let root = path_from_bytes(&bconcat!(rtrim_chars(path_to_bytes(cache_dir), "/\\"), "/"))
-            .to_path_buf();
+        let root = path_from_bytes(&bformat!(
+            "{}/",
+            rtrim_chars(path_to_bytes(cache_dir), "/\\")
+        ))
+        .to_path_buf();
         let filesystem = filesystem
             .unwrap_or_else(|| std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(None))));
         let mut this = Self {
@@ -104,7 +107,7 @@ impl Cache {
                 && ((!is_dir(&self.root) && mkdir(&self.root, 0o777, true).is_err())
                     || !is_writable(&self.root))
             {
-                self.io.write_error(bconcat!("<warning>Cannot create cache directory ", self.root, ", or directory is not writable. Proceeding without cache. See also cache-read-only config if your filesystem is read-only.</warning>"));
+                self.io.write_error(bformat!("<warning>Cannot create cache directory {}, or directory is not writable. Proceeding without cache. See also cache-read-only config if your filesystem is read-only.</warning>", self.root));
                 self.enabled = Some(false);
             }
         }
@@ -118,18 +121,16 @@ impl Cache {
 
     /// `$this->root . Preg::replace('{[^'.$this->allowlist.']}i', '-', $file)`
     fn full_path(&self, file: impl AsRef<[u8]>) -> PathBuf {
-        let file = preg_replace(bconcat!("{[^", self.allowlist, "]}i"), "-", file);
-        path_from_bytes(&bconcat!(path_to_bytes(&self.root), file)).to_path_buf()
+        let file = preg_replace(bformat!("{{[^{}]}}i", self.allowlist), "-", file);
+        path_from_bytes(&bformat!("{}{file}", path_to_bytes(&self.root))).to_path_buf()
     }
 
     pub fn read(&mut self, file: impl AsRef<[u8]>) -> Option<BString> {
         if self.is_enabled() {
             let full_path = self.full_path(file);
             if file_exists(&full_path) {
-                self.io.write_error_with_verbosity(
-                    bconcat!("Reading ", full_path, " from cache"),
-                    DEBUG,
-                );
+                self.io
+                    .write_error_with_verbosity(bformat!("Reading {full_path} from cache"), DEBUG);
 
                 return file_get_contents(&full_path).map(BString::from).ok();
             }
@@ -151,12 +152,12 @@ impl Cache {
             let dest = self.full_path(file);
 
             self.io
-                .write_error_with_verbosity(bconcat!("Writing ", dest, " into cache"), DEBUG);
+                .write_error_with_verbosity(bformat!("Writing {dest} into cache"), DEBUG);
 
-            let temp_file_name = path_from_bytes(&bconcat!(
+            let temp_file_name = path_from_bytes(&bformat!(
+                "{}{}.tmp",
                 path_to_bytes(&dest),
-                bin2hex(random_bytes(5)),
-                ".tmp"
+                bin2hex(random_bytes(5))
             ))
             .to_path_buf();
             // TODO(php-semantics): the shim's file_put_contents() discards the io::Error, so a failed
@@ -180,10 +181,9 @@ impl Cache {
                     }
 
                     self.io.write_error_with_verbosity(
-                        bconcat!(
-                            "<warning>Failed to write into cache: ",
-                            display_to_bytes(&e),
-                            "</warning>"
+                        bformat!(
+                            "<warning>Failed to write into cache: {}</warning>",
+                            display_to_bytes(&e)
                         ),
                         DEBUG,
                     );
@@ -202,16 +202,10 @@ impl Cache {
                         ))))
                         .map(display_to_bytes)
                         .unwrap_or_default();
-                        let message = bconcat!(
-                            "<warning>Writing ",
-                            temp_file_name,
-                            " into cache failed after ",
+                        let message = bformat!(
+                            "<warning>Writing {temp_file_name} into cache failed after {} of {} bytes written, only {free_space} bytes of free space available</warning>",
                             m.get(1).unwrap_or_default(),
-                            " of ",
-                            m.get(2).unwrap_or_default(),
-                            " bytes written, only ",
-                            free_space,
-                            " bytes of free space available</warning>"
+                            m.get(2).unwrap_or_default()
                         );
 
                         self.io.write_error(&message);
@@ -238,14 +232,12 @@ impl Cache {
                 .ensure_directory_exists(path_from_bytes(&dirname(path_to_bytes(&full_path))));
 
             if !file_exists(source) {
-                self.io.write_error(bconcat!(
-                    "<error>",
-                    source,
-                    " does not exist, can not write into cache</error>"
+                self.io.write_error(bformat!(
+                    "<error>{source} does not exist, can not write into cache</error>"
                 ));
             } else if self.io.is_debug() {
                 self.io
-                    .write_error(bconcat!("Writing ", full_path, " into cache from ", source));
+                    .write_error(bformat!("Writing {full_path} into cache from {source}"));
             }
 
             return self
@@ -277,10 +269,8 @@ impl Cache {
                     touch(&full_path);
                 }
 
-                self.io.write_error_with_verbosity(
-                    bconcat!("Reading ", full_path, " from cache"),
-                    DEBUG,
-                );
+                self.io
+                    .write_error_with_verbosity(bformat!("Reading {full_path} from cache"), DEBUG);
 
                 return self
                     .filesystem

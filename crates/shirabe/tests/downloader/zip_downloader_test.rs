@@ -17,7 +17,7 @@ use shirabe::package::{CompletePackageHandle, PackageInterfaceHandle};
 use shirabe::util::r#loop::Loop;
 use shirabe::util::{Filesystem, HttpDownloader, MockHandler, ProcessExecutor};
 use shirabe_php_shim::{
-    PhpMixed, ZipArchive, ZipArchiveMock, bconcat, error_message, path_to_bytes,
+    PhpMixed, ZipArchive, ZipArchiveMock, bformat, error_message, path_to_bytes,
 };
 use shirabe_semver::VersionParser;
 use tempfile::TempDir;
@@ -151,7 +151,7 @@ fn test_error_messages() {
     ));
 
     // $distUrl = 'file://'.__FILE__: an existing, non-zip file referenced by a file:// URL.
-    let dist_url = bconcat!("file://", env!("CARGO_MANIFEST_DIR"), "/Cargo.toml");
+    let dist_url = bformat!("file://{}/Cargo.toml", env!("CARGO_MANIFEST_DIR"));
     let norm_version = VersionParser.normalize("1.0.0", None).unwrap();
     let package: PackageInterfaceHandle = CompletePackageHandle::new(
         BString::from("test/pkg"),

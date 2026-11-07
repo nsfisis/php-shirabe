@@ -14,7 +14,7 @@ use shirabe::repository::{
     InstalledArrayRepository, RepositoryInterfaceHandle, RepositoryManagerInterface,
 };
 use shirabe::util::Platform;
-use shirabe_php_shim::{PhpMixed, bconcat, path_to_bytes};
+use shirabe_php_shim::{PhpMixed, bformat, path_to_bytes};
 use shirabe_semver::VersionParser;
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::{ArrayInput, InputInterface, InputValue, ParameterName};
@@ -135,7 +135,7 @@ fn noop_event_dispatcher() -> MockEventDispatcher {
 
 fn root_package(name: &BStr, version: &BStr) -> RootPackageHandle {
     let normalized = VersionParser.normalize(version, None).unwrap();
-    RootPackageHandle::new(bconcat!(name), normalized, bconcat!(version))
+    RootPackageHandle::new(bformat!("{name}"), normalized, bformat!("{version}"))
 }
 
 fn full_composer(composer: Composer) -> PartialComposerHandle {

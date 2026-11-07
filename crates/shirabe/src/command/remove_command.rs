@@ -19,7 +19,7 @@ use crate::repository::RepositoryInterface;
 use bstr::{B, BStr, BString, ByteSlice, ByteVec};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpMixed, UnexpectedValueException, bconcat, impl_php_class, implode, preg_grep, strtolower,
+    PhpMixed, UnexpectedValueException, bformat, impl_php_class, implode, preg_grep, strtolower,
 };
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::exception::InvalidArgumentException;
@@ -356,35 +356,25 @@ impl Command for RemoveCommand {
             if let Some(canonical_name) = in_type {
                 if dry_run {
                     to_remove
-                        .entry(bconcat!(r#type))
+                        .entry(bformat!("{}", r#type))
                         .or_default()
                         .push(canonical_name.clone());
                 } else {
                     json.remove_link(bstr::BStr::new(r#type), bstr::BStr::new(&canonical_name));
                 }
             } else if let Some(canonical_name) = in_alt_type {
-                io.write_error(bconcat!(
-                    "<warning>",
-                    canonical_name,
-                    " could not be found in ",
-                    r#type,
-                    " but it is present in ",
-                    alt_type,
-                    "</warning>"
-                ));
+                io.write_error(bformat!("<warning>{canonical_name} could not be found in {} but it is present in {alt_type}</warning>", r#type));
                 if io.is_interactive()
                     && io.ask_confirmation(
-                        bconcat!(
-                            "Do you want to remove it from ",
-                            alt_type,
-                            " [<comment>yes</comment>]? "
+                        bformat!(
+                            "Do you want to remove it from {alt_type} [<comment>yes</comment>]? "
                         ),
                         true,
                     )?
                 {
                     if dry_run {
                         to_remove
-                            .entry(bconcat!(alt_type))
+                            .entry(bformat!("{alt_type}"))
                             .or_default()
                             .push(canonical_name.clone());
                     } else {
@@ -423,7 +413,7 @@ impl Command for RemoveCommand {
                     for matched_package in matches_in_type {
                         if dry_run {
                             to_remove
-                                .entry(bconcat!(r#type))
+                                .entry(bformat!("{}", r#type))
                                 .or_default()
                                 .push(matched_package.clone());
                         } else {
@@ -435,28 +425,16 @@ impl Command for RemoveCommand {
                     }
                 } else if !alt_type_keys.is_empty() && !matches_in_alt_type.is_empty() {
                     for matched_package in matches_in_alt_type {
-                        io.write_error(bconcat!(
-                            "<warning>",
-                            matched_package,
-                            " could not be found in ",
-                            r#type,
-                            " but it is present in ",
-                            alt_type,
-                            "</warning>"
-                        ));
+                        io.write_error(bformat!("<warning>{matched_package} could not be found in {} but it is present in {alt_type}</warning>", r#type));
                         if io.is_interactive()
                             && io.ask_confirmation(
-                                bconcat!(
-                                    "Do you want to remove it from ",
-                                    alt_type,
-                                    " [<comment>yes</comment>]? "
-                                ),
+                                bformat!("Do you want to remove it from {alt_type} [<comment>yes</comment>]? "),
                                 true,
                             )?
                         {
                             if dry_run {
                                 to_remove
-                                    .entry(bconcat!(alt_type))
+                                    .entry(bformat!("{alt_type}"))
                                     .or_default()
                                     .push(matched_package.clone());
                             } else {
@@ -468,16 +446,12 @@ impl Command for RemoveCommand {
                         }
                     }
                 } else {
-                    io.write_error(bconcat!(
-                        "<warning>",
-                        package,
-                        " is not required in your composer.json and has not been removed</warning>"
-                    ));
+                    io.write_error(bformat!("<warning>{package} is not required in your composer.json and has not been removed</warning>"));
                 }
             }
         }
 
-        io.write_error(bconcat!("<info>", file, " has been updated</info>"));
+        io.write_error(bformat!("<info>{file} has been updated</info>"));
 
         if input
             .borrow()
@@ -557,9 +531,8 @@ impl Command for RemoveCommand {
                 json.remove_config_setting(bstr::BStr::new("allow-plugins"));
             } else {
                 for plugin in &removed_plugins {
-                    json.remove_config_setting(bstr::BStr::new(&bconcat!(
-                        "allow-plugins.",
-                        plugin
+                    json.remove_config_setting(bstr::BStr::new(&bformat!(
+                        "allow-plugins.{plugin}"
                     )));
                 }
             }
@@ -653,11 +626,9 @@ impl Command for RemoveCommand {
             flags.push_str(" --with-dependencies");
         }
 
-        io.write_error(bconcat!(
-            "<info>Running shirabe update ",
-            implode(" ", &packages),
-            flags,
-            "</info>"
+        io.write_error(bformat!(
+            "<info>Running shirabe update {}{flags}</info>",
+            implode(" ", &packages)
         ));
 
         install.set_verbose(
@@ -696,10 +667,8 @@ impl Command for RemoveCommand {
 
         let status = install.run().await?;
         if status != 0 {
-            io.write_error(bconcat!(
-                "\n<error>Removal failed, reverting ",
-                file,
-                " to its original content.</error>"
+            io.write_error(bformat!(
+                "\n<error>Removal failed, reverting {file} to its original content.</error>"
             ));
             std::fs::write(json_file.get_path(), &composer_backup)?;
         }
@@ -713,7 +682,7 @@ impl Command for RemoveCommand {
                     .find_packages(bstr::BStr::new(package), None)?
                     .is_empty()
                 {
-                    io.write_error(bconcat!("<error>Removal failed, ", package, " is still present, it may be required by another package. See `shirabe why ", package, "`.</error>"));
+                    io.write_error(bformat!("<error>Removal failed, {package} is still present, it may be required by another package. See `shirabe why {package}`.</error>"));
                     return Ok(2);
                 }
             }

@@ -4,7 +4,7 @@ use crate::config::Config;
 use crate::io::{IOInterface, IOInterfaceImmutable};
 use crate::util::{ProcessExecutor, Url};
 use bstr::{BStr, BString, ByteSlice};
-use shirabe_php_shim::{RuntimeException, bconcat, php_regex, preg_match, rawurlencode};
+use shirabe_php_shim::{RuntimeException, bformat, php_regex, preg_match, rawurlencode};
 use std::path::Path;
 use std::sync::Mutex;
 
@@ -69,38 +69,35 @@ impl Hg {
         {
             let authenticated_url = if matches.name("proto") == Some(BStr::new("ssh")) {
                 let user = if let Some(u) = matches.name("user") {
-                    bconcat!(rawurlencode(u), "@")
+                    bformat!("{}@", rawurlencode(u))
                 } else {
                     BString::default()
                 };
-                bconcat!(
+                bformat!(
+                    "{}://{user}{}{}",
                     matches.name("proto").unwrap_or_default(),
-                    "://",
-                    user,
                     matches.name("host").unwrap_or_default(),
-                    matches.name("path").unwrap_or_default(),
+                    matches.name("path").unwrap_or_default()
                 )
             } else {
                 let auth = self
                     .io
                     .get_authentication(matches.name("host").unwrap_or_default());
-                bconcat!(
+                bformat!(
+                    "{}://{}:{}@{}{}",
                     matches.name("proto").unwrap_or_default(),
-                    "://",
                     rawurlencode(
                         auth.get(bstr::B("username"))
                             .and_then(|s| s.as_ref().map(|s| s.as_slice()))
                             .unwrap_or_default()
                     ),
-                    ":",
                     rawurlencode(
                         auth.get(bstr::B("password"))
                             .and_then(|s| s.as_ref().map(|s| s.as_slice()))
                             .unwrap_or_default()
                     ),
-                    "@",
                     matches.name("host").unwrap_or_default(),
-                    matches.name("path").unwrap_or_default(),
+                    matches.name("path").unwrap_or_default()
                 )
             };
 
@@ -117,30 +114,23 @@ impl Hg {
 
             let error = self.process.borrow().get_error_output();
             return self.throw_exception(
-                bconcat!("Failed to clone ", url, ", \n\n", error).as_bstr(),
+                bformat!("Failed to clone {url}, \n\n{error}").as_bstr(),
                 url,
             );
         }
 
-        let error = bconcat!(
-            "The given URL (",
-            url,
-            ") does not match the required format (ssh|http(s)://(username:password@)example.com/path-to-repository)"
+        let error = bformat!(
+            "The given URL ({url}) does not match the required format (ssh|http(s)://(username:password@)example.com/path-to-repository)"
         );
         self.throw_exception(
-            bconcat!("Failed to clone ", url, ", \n\n", error).as_bstr(),
+            bformat!("Failed to clone {url}, \n\n{error}").as_bstr(),
             url,
         )
     }
 
     fn throw_exception(&self, message: &BStr, url: &BStr) -> anyhow::Result<()> {
         if Self::get_version(&self.process)?.is_none() {
-            return Err(RuntimeException::new(Url::sanitize(bconcat!(
-                "Failed to clone ",
-                url,
-                ", hg was not found, check that it is installed and in your PATH env.\n\n",
-                self.process.borrow().get_error_output()
-            )))
+            return Err(RuntimeException::new(Url::sanitize(bformat!("Failed to clone {url}, hg was not found, check that it is installed and in your PATH env.\n\n{}", self.process.borrow().get_error_output())))
             .into());
         }
 

@@ -9,7 +9,7 @@ use shirabe::package::loader::{ArrayLoader, LoaderInterface};
 use shirabe::package::version::VersionParser;
 use shirabe::repository::{LockArrayRepository, LockArrayRepositoryHandle};
 use shirabe_php_shim::{
-    PhpMixed, bconcat, file_get_contents, path_to_bytes, php_regex, preg_is_match,
+    PhpMixed, bformat, file_get_contents, path_to_bytes, php_regex, preg_is_match,
     preg_split_delim_capture, str_replace,
 };
 use std::path::PathBuf;
@@ -40,15 +40,14 @@ fn reduce_packages_info_for_comparison(packages: &[BasePackageHandle]) -> Vec<BS
 
     for package in packages {
         let suffix = if let Some(alias) = package.as_alias() {
-            bconcat!(" (alias of ", alias.get_alias_of().get_version(), ")")
+            bformat!(" (alias of {})", alias.get_alias_of().get_version())
         } else {
             BString::default()
         };
-        packages_info.push(bconcat!(
+        packages_info.push(bformat!(
+            "{}@{}{suffix}",
             package.get_name(),
-            "@",
-            package.get_version(),
-            suffix
+            package.get_version()
         ));
     }
 
@@ -82,7 +81,7 @@ fn read_test_file(
             if !section_info.iter().any(|name| *name == token) {
                 panic!(
                     "The test file \"{}\" must not contain a section named \"{}\".",
-                    str_replace(bconcat!(fixtures_dir, "/"), "", path_to_bytes(file))
+                    str_replace(bformat!("{fixtures_dir}/"), "", path_to_bytes(file))
                         .display_lossy(),
                     token.display_lossy()
                 );
@@ -98,7 +97,7 @@ fn read_test_file(
         if !data.contains_key(B(required_section)) {
             panic!(
                 "The test file \"{}\" must have a section named \"{}\".",
-                str_replace(bconcat!(fixtures_dir, "/"), "", path_to_bytes(file)).display_lossy(),
+                str_replace(bformat!("{fixtures_dir}/"), "", path_to_bytes(file)).display_lossy(),
                 required_section.display_lossy()
             );
         }

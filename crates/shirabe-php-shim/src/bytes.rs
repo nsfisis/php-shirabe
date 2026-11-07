@@ -147,38 +147,13 @@ impl<T: PhpDisplay + ?Sized> PhpDisplay for &T {
     }
 }
 
-#[doc(hidden)]
-pub fn __bconcat_buffer() -> BString {
-    BString::default()
-}
-
-/// PHP's string concatenation: `bconcat!("Package ", $name, " not found")` is
-/// `"Package " . $name . " not found"`, and evaluates to a `BString` holding the bytes of every
-/// operand as they are.
-#[macro_export]
-macro_rules! bconcat {
-    ($($operand:expr),* $(,)?) => {{
-        let mut out = $crate::__bconcat_buffer();
-        $($crate::PhpDisplay::fmt(&$operand, &mut out);)*
-        out
-    }};
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn bconcat_keeps_invalid_utf8() {
-        let name = BString::from(b"\xffvendor".to_vec());
-        let path = path_from_bytes(b"/tmp/\xfe");
-        let out = bconcat!("a ", name, b" ".as_slice(), path, " ", 42i64);
-        assert_eq!(out, BString::from(b"a \xffvendor /tmp/\xfe 42".to_vec()));
-    }
-
-    #[test]
-    fn bconcat_writes_integers_in_decimal() {
-        let out = bconcat!(-1i8, " ", 2u16, " ", 3u32, " ", 4usize);
+    fn bformat_writes_integers_in_decimal() {
+        let out = bformat!("{} {} {} {}", -1i8, 2u16, 3u32, 4usize);
         assert_eq!(out, BString::from("-1 2 3 4"));
     }
 

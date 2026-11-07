@@ -18,7 +18,7 @@ use crate::util::{HttpOptions, Platform, StreamContextOptions};
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    InvalidArgumentException, PhpMixed, array_splice, array_unshift, bconcat, http_build_query,
+    InvalidArgumentException, PhpMixed, array_splice, array_unshift, bformat, http_build_query,
     json_encode, path_from_bytes, str_replace, strip_tags, strpos, strtolower, ucfirst,
 };
 use std::path::PathBuf;
@@ -176,7 +176,7 @@ impl InstallationManager {
             }
         }
 
-        Err(InvalidArgumentException::new(bconcat!("Unknown installer type: ", r#type)).into())
+        Err(InvalidArgumentException::new(bformat!("Unknown installer type: {}", r#type)).into())
     }
 
     /// Checks whether provided package is installed in one of the registered installers.
@@ -582,7 +582,8 @@ impl InstallationManager {
             {
                 // output alias ops in debug verbosity as they have no output otherwise
                 if self.io.is_debug() {
-                    self.io.write_error(bconcat!("  - ", operation.show(false)));
+                    self.io
+                        .write_error(bformat!("  - {}", operation.show(false)));
                 }
                 match &*operation {
                     AnyOperation::MarkAliasInstalled(op) => {
@@ -663,12 +664,10 @@ impl InstallationManager {
 
                 // PHP rejects the promise with an "<op> of <name> failed" message before rethrowing.
                 if let Err(e) = chain_result {
-                    self.io.write_error(bconcat!(
-                        "    <error>",
+                    self.io.write_error(bformat!(
+                        "    <error>{} of {} failed</error>",
                         ucfirst(op_type),
-                        " of ",
-                        package.get_pretty_name(),
-                        " failed</error>"
+                        package.get_pretty_name()
                     ));
                     return Err(e);
                 }
@@ -815,8 +814,8 @@ impl InstallationManager {
     pub fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<PathBuf> {
         // For testing only (ref InstallationManagerMock::getInstallPath).
         if self.mock.is_some() {
-            return Some(PathBuf::from(path_from_bytes(&bconcat!(
-                "vendor/",
+            return Some(PathBuf::from(path_from_bytes(&bformat!(
+                "vendor/{}",
                 package.get_name()
             ))));
         }
@@ -1025,7 +1024,7 @@ impl InstallationManager {
         >,
     ) {
         self.io.write_error_with_verbosity(
-            bconcat!("Received ", signals.last_signal().as_str(), ", aborting"),
+            bformat!("Received {}, aborting", signals.last_signal().as_str()),
             io_interface::DEBUG,
         );
         self.run_cleanup(cleanup_promises).await;

@@ -8,7 +8,7 @@ use shirabe::package::CompletePackageHandle;
 use shirabe::package::archiver::{ArchiverInterface, ZipArchiver};
 use shirabe::util::Platform;
 use shirabe_php_shim::{
-    ZipArchive, bconcat, dirname, file_exists, file_put_contents, mkdir, path_from_bytes,
+    ZipArchive, bformat, dirname, file_exists, file_put_contents, mkdir, path_from_bytes,
     path_to_bytes, realpath, sys_get_temp_dir, unlink,
 };
 use tempfile::TempDir;
@@ -140,7 +140,7 @@ fn test_simple_files() {
 
     if !Platform::is_windows() {
         files.insert(
-            bconcat!("zfoo", Platform::get_cwd(false).unwrap(), "/file.txt"),
+            bformat!("zfoo{}/file.txt", Platform::get_cwd(false).unwrap()),
             None,
         );
     }
@@ -157,7 +157,7 @@ fn test_gitignore_exclude_negation() {
         let mut files: IndexMap<BString, Option<BString>> = IndexMap::new();
         files.insert(
             BString::from(".gitignore"),
-            Some(bconcat!("/*\n.*\n!.git*\n", include)),
+            Some(bformat!("/*\n.*\n!.git*\n{include}")),
         );
         files.insert(
             BString::from("docs/README.md"),

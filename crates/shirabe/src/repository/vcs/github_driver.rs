@@ -13,7 +13,7 @@ use chrono::{DateTime, FixedOffset};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, PhpMixed, RuntimeException, ToPhpString, array_diff,
-    array_map, array_search_mixed, base64_decode, basename, bconcat, date_create, empty, explode,
+    array_map, array_search_mixed, base64_decode, basename, bformat, date_create, empty, explode,
     extension_loaded, in_array_loose, parse_url, path_from_bytes, php_regex, preg_is_match,
     preg_match, preg_replace, preg_split, strpos, strtolower, substr, trim, trim_chars, urlencode,
 };
@@ -68,10 +68,9 @@ impl GitHubDriver {
             ),
             &self.inner.url,
         ) else {
-            return Err(InvalidArgumentException::new(bconcat!(
-                "The GitHub repository URL ",
-                self.inner.url.clone(),
-                " is invalid."
+            return Err(InvalidArgumentException::new(bformat!(
+                "The GitHub repository URL {} is invalid.",
+                self.inner.url.clone()
             ))
             .into());
         };
@@ -92,17 +91,15 @@ impl GitHubDriver {
         }
         self.inner.cache = Some(Cache::new(
             self.inner.io.clone(),
-            path_from_bytes(&bconcat!(
+            path_from_bytes(&bformat!(
+                "{}/{}/{}/{}",
                 self.inner
                     .config
                     .borrow()
                     .get_path("cache-repo-dir")?
                     .as_bstr(),
-                "/",
                 self.inner.origin_url,
-                "/",
                 self.owner,
-                "/",
                 self.repository
             )),
             None,
@@ -139,12 +136,10 @@ impl GitHubDriver {
     }
 
     pub fn get_repository_url(&self) -> BString {
-        bconcat!(
-            "https://",
+        bformat!(
+            "https://{}/{}/{}",
             self.inner.origin_url,
-            "/",
             self.owner,
-            "/",
             self.repository
         )
     }
@@ -162,14 +157,11 @@ impl GitHubDriver {
             return git_driver.get_url();
         }
 
-        bconcat!(
-            "https://",
+        bformat!(
+            "https://{}/{}/{}.git",
             self.inner.origin_url,
-            "/",
             self.owner,
-            "/",
-            self.repository,
-            ".git"
+            self.repository
         )
     }
 
@@ -177,10 +169,10 @@ impl GitHubDriver {
         let api_url = if self.inner.origin_url == "github.com" {
             BString::from("api.github.com")
         } else {
-            bconcat!(self.inner.origin_url, "/api/v3")
+            bformat!("{}/api/v3", self.inner.origin_url)
         };
 
-        bconcat!("https://", api_url)
+        bformat!("https://{api_url}")
     }
 
     pub fn get_source(&self, identifier: &BStr) -> IndexMap<BString, PhpMixed> {
@@ -210,14 +202,11 @@ impl GitHubDriver {
     }
 
     pub fn get_dist(&self, identifier: &BStr) -> Option<IndexMap<BString, PhpMixed>> {
-        let url = bconcat!(
+        let url = bformat!(
+            "{}/repos/{}/{}/zipball/{identifier}",
             self.get_api_url(),
-            "/repos/",
             self.owner,
-            "/",
-            self.repository,
-            "/zipball/",
-            identifier
+            self.repository
         );
 
         let mut result = IndexMap::new();
@@ -341,15 +330,11 @@ impl GitHubDriver {
                     }) {
                         support.insert(
                             "source".into(),
-                            PhpMixed::string(bconcat!(
-                                "https://",
+                            PhpMixed::string(bformat!(
+                                "https://{}/{}/{}/tree/{label_str}",
                                 self.inner.origin_url.clone(),
-                                "/",
                                 self.owner.clone(),
-                                "/",
-                                self.repository.clone(),
-                                "/tree/",
-                                label_str
+                                self.repository.clone()
                             )),
                         );
                     }
@@ -368,14 +353,11 @@ impl GitHubDriver {
                 {
                     support.insert(
                         "issues".into(),
-                        PhpMixed::string(bconcat!(
-                            "https://",
+                        PhpMixed::string(bformat!(
+                            "https://{}/{}/{}/issues",
                             self.inner.origin_url.clone(),
-                            "/",
                             self.owner.clone(),
-                            "/",
-                            self.repository.clone(),
-                            "/issues"
+                            self.repository.clone()
                         )),
                     );
                 }
@@ -415,19 +397,16 @@ impl GitHubDriver {
 
         let mut funding: Option<bstr::BString> = None;
         for file_url in &[
-            bconcat!(
+            bformat!(
+                "{}/repos/{}/{}/contents/.github/FUNDING.yml",
                 self.get_api_url(),
-                "/repos/",
                 self.owner,
-                "/",
-                self.repository,
-                "/contents/.github/FUNDING.yml"
+                self.repository
             ),
-            bconcat!(
+            bformat!(
+                "{}/repos/{}/.github/contents/FUNDING.yml",
                 self.get_api_url(),
-                "/repos/",
-                self.owner,
-                "/.github/contents/FUNDING.yml"
+                self.owner
             ),
         ] {
             let mut options = StreamContextOptions::new();
@@ -553,8 +532,8 @@ impl GitHubDriver {
                 b"community_bridge" => {
                     result[key_idx].insert(
                         "url".into(),
-                        PhpMixed::string(bconcat!(
-                            "https://funding.communitybridge.org/projects/",
+                        PhpMixed::string(bformat!(
+                            "https://funding.communitybridge.org/projects/{}",
                             basename(&item_url)
                         )),
                     );
@@ -562,32 +541,32 @@ impl GitHubDriver {
                 b"github" => {
                     result[key_idx].insert(
                         "url".into(),
-                        PhpMixed::string(bconcat!("https://github.com/", basename(&item_url))),
+                        PhpMixed::string(bformat!("https://github.com/{}", basename(&item_url))),
                     );
                 }
                 b"issuehunt" => {
                     result[key_idx].insert(
                         "url".into(),
-                        PhpMixed::string(bconcat!("https://issuehunt.io/r/", item_url)),
+                        PhpMixed::string(bformat!("https://issuehunt.io/r/{item_url}")),
                     );
                 }
                 b"ko_fi" => {
                     result[key_idx].insert(
                         "url".into(),
-                        PhpMixed::string(bconcat!("https://ko-fi.com/", basename(&item_url))),
+                        PhpMixed::string(bformat!("https://ko-fi.com/{}", basename(&item_url))),
                     );
                 }
                 b"liberapay" => {
                     result[key_idx].insert(
                         "url".into(),
-                        PhpMixed::string(bconcat!("https://liberapay.com/", basename(&item_url))),
+                        PhpMixed::string(bformat!("https://liberapay.com/{}", basename(&item_url))),
                     );
                 }
                 b"open_collective" => {
                     result[key_idx].insert(
                         "url".into(),
-                        PhpMixed::string(bconcat!(
-                            "https://opencollective.com/",
+                        PhpMixed::string(bformat!(
+                            "https://opencollective.com/{}",
                             basename(&item_url)
                         )),
                     );
@@ -595,29 +574,31 @@ impl GitHubDriver {
                 b"patreon" => {
                     result[key_idx].insert(
                         "url".into(),
-                        PhpMixed::string(bconcat!("https://www.patreon.com/", basename(&item_url))),
+                        PhpMixed::string(bformat!(
+                            "https://www.patreon.com/{}",
+                            basename(&item_url)
+                        )),
                     );
                 }
                 b"tidelift" => {
                     result[key_idx].insert(
                         "url".into(),
-                        PhpMixed::string(bconcat!(
-                            "https://tidelift.com/funding/github/",
-                            item_url
+                        PhpMixed::string(bformat!(
+                            "https://tidelift.com/funding/github/{item_url}"
                         )),
                     );
                 }
                 b"polar" => {
                     result[key_idx].insert(
                         "url".into(),
-                        PhpMixed::string(bconcat!("https://polar.sh/", basename(&item_url))),
+                        PhpMixed::string(bformat!("https://polar.sh/{}", basename(&item_url))),
                     );
                 }
                 b"buy_me_a_coffee" => {
                     result[key_idx].insert(
                         "url".into(),
-                        PhpMixed::string(bconcat!(
-                            "https://www.buymeacoffee.com/",
+                        PhpMixed::string(bformat!(
+                            "https://www.buymeacoffee.com/{}",
                             basename(&item_url)
                         )),
                     );
@@ -625,13 +606,13 @@ impl GitHubDriver {
                 b"thanks_dev" => {
                     result[key_idx].insert(
                         "url".into(),
-                        PhpMixed::string(bconcat!("https://thanks.dev/", item_url)),
+                        PhpMixed::string(bformat!("https://thanks.dev/{item_url}")),
                     );
                 }
                 b"otechie" => {
                     result[key_idx].insert(
                         "url".into(),
-                        PhpMixed::string(bconcat!("https://otechie.com/", basename(&item_url))),
+                        PhpMixed::string(bformat!("https://otechie.com/{}", basename(&item_url))),
                     );
                 }
                 b"custom" => {
@@ -644,15 +625,13 @@ impl GitHubDriver {
                         if preg_is_match(php_regex!(r"{^[a-z0-9-]++\.[a-z]{2,3}$}"), &item_url) {
                             result[key_idx].insert(
                                 "url".into(),
-                                PhpMixed::string(bconcat!("https://", item_url)),
+                                PhpMixed::string(bformat!("https://{item_url}")),
                             );
                             continue;
                         }
 
-                        self.inner.io.write_error(bconcat!(
-                            "<warning>Funding URL ",
-                            item_url,
-                            " not in a supported format.</warning>"
+                        self.inner.io.write_error(bformat!(
+                            "<warning>Funding URL {item_url} not in a supported format.</warning>"
                         ));
                         keys_to_remove.push(key_idx);
                     }
@@ -684,15 +663,11 @@ impl GitHubDriver {
             return git_driver.get_file_content(file, identifier);
         }
 
-        let resource_url = bconcat!(
+        let resource_url = bformat!(
+            "{}/repos/{}/{}/contents/{file}?ref={}",
             self.get_api_url(),
-            "/repos/",
             self.owner,
-            "/",
             self.repository,
-            "/contents/",
-            file,
-            "?ref=",
             urlencode(identifier)
         );
         let mut resource = self
@@ -748,11 +723,8 @@ impl GitHubDriver {
         let content = match content {
             Some(c) => c,
             None => {
-                return Err(RuntimeException::new(bconcat!(
-                    "Could not retrieve ",
-                    file,
-                    " for ",
-                    identifier
+                return Err(RuntimeException::new(bformat!(
+                    "Could not retrieve {file} for {identifier}"
                 ))
                 .into());
             }
@@ -769,13 +741,11 @@ impl GitHubDriver {
             return git_driver.get_change_date(identifier);
         }
 
-        let resource = bconcat!(
+        let resource = bformat!(
+            "{}/repos/{}/{}/commits/{}",
             self.get_api_url(),
-            "/repos/",
             self.owner,
-            "/",
             self.repository,
-            "/commits/",
             urlencode(identifier)
         );
         let commit = self
@@ -805,13 +775,11 @@ impl GitHubDriver {
         }
         if self.tags.is_none() {
             let mut tags: IndexMap<BString, BString> = IndexMap::new();
-            let mut resource: Option<BString> = Some(bconcat!(
+            let mut resource: Option<BString> = Some(bformat!(
+                "{}/repos/{}/{}/tags?per_page=100",
                 self.get_api_url(),
-                "/repos/",
                 self.owner,
-                "/",
-                self.repository,
-                "/tags?per_page=100"
+                self.repository
             ));
 
             loop {
@@ -860,13 +828,11 @@ impl GitHubDriver {
         }
         if self.branches.is_none() {
             let mut branches: IndexMap<BString, BString> = IndexMap::new();
-            let mut resource: Option<BString> = Some(bconcat!(
+            let mut resource: Option<BString> = Some(bformat!(
+                "{}/repos/{}/{}/git/refs/heads?per_page=100",
                 self.get_api_url(),
-                "/repos/",
                 self.owner,
-                "/",
-                self.repository,
-                "/git/refs/heads?per_page=100"
+                self.repository
             ));
 
             loop {
@@ -939,10 +905,8 @@ impl GitHubDriver {
 
         if !extension_loaded("openssl") {
             io.write_error_with_verbosity(
-                bconcat!(
-                    "Skipping GitHub driver for ",
-                    url,
-                    " because the OpenSSL PHP extension is missing."
+                bformat!(
+                    "Skipping GitHub driver for {url} because the OpenSSL PHP extension is missing."
                 ),
                 io_interface::VERBOSE,
             );
@@ -963,25 +927,19 @@ impl GitHubDriver {
     /// Generate an SSH URL
     fn generate_ssh_url(&self) -> BString {
         if strpos(&self.inner.origin_url, ":").is_some() {
-            return bconcat!(
-                "ssh://git@",
+            return bformat!(
+                "ssh://git@{}/{}/{}.git",
                 self.inner.origin_url,
-                "/",
                 self.owner,
-                "/",
-                self.repository,
-                ".git"
+                self.repository
             );
         }
 
-        bconcat!(
-            "git@",
+        bformat!(
+            "git@{}:{}/{}.git",
             self.inner.origin_url,
-            ":",
             self.owner,
-            "/",
-            self.repository,
-            ".git"
+            self.repository
         )
     }
 
@@ -1048,7 +1006,7 @@ impl GitHubDriver {
                         {
                             git_hub_util.authorize_oauth_interactively(
                                 self.inner.origin_url.as_bstr(),
-                                Some(bconcat!("Your GitHub credentials are required to fetch private repository metadata (<info>", self.inner.url, "</info>)").as_bstr()),
+                                Some(bformat!("Your GitHub credentials are required to fetch private repository metadata (<info>{}</info>)", self.inner.url).as_bstr()),
                             )?;
                         }
 
@@ -1084,13 +1042,13 @@ impl GitHubDriver {
                             .has_authentication(self.inner.origin_url.as_bstr())
                         {
                             if !self.inner.io.is_interactive() {
-                                self.inner.io.write_error(bconcat!("<error>GitHub API limit exhausted. Failed to get metadata for the ", self.inner.url, " repository, try running in interactive mode so that you can enter your GitHub credentials to increase the API limit</error>"));
+                                self.inner.io.write_error(bformat!("<error>GitHub API limit exhausted. Failed to get metadata for the {} repository, try running in interactive mode so that you can enter your GitHub credentials to increase the API limit</error>", self.inner.url));
                                 return Ok(Err(e));
                             }
 
                             git_hub_util.authorize_oauth_interactively(
                                 self.inner.origin_url.as_bstr(),
-                                Some(bconcat!("API limit exhausted. Enter your GitHub credentials to get a larger API limit (<info>", self.inner.url, "</info>)").as_bstr()),
+                                Some(bformat!("API limit exhausted. Enter your GitHub credentials to get a larger API limit (<info>{}</info>)", self.inner.url).as_bstr()),
                             )?;
 
                             return self.inner.get_contents(url);
@@ -1098,7 +1056,7 @@ impl GitHubDriver {
 
                         if rate_limited {
                             let rate_limit = git_hub_util.get_rate_limit(&headers);
-                            self.inner.io.write_error(bconcat!("<error>GitHub API limit (", rate_limit.get(B("limit")).map(ToPhpString::to_php_string).unwrap_or_default(), " calls/hr) is exhausted. You are already authorized so you have to wait until ", rate_limit.get(B("reset")).map(ToPhpString::to_php_string).unwrap_or_default(), " before doing more requests</error>"));
+                            self.inner.io.write_error(bformat!("<error>GitHub API limit ({} calls/hr) is exhausted. You are already authorized so you have to wait until {} before doing more requests</error>", rate_limit.get(B("limit")).map(ToPhpString::to_php_string).unwrap_or_default(), rate_limit.get(B("reset")).map(ToPhpString::to_php_string).unwrap_or_default()));
                         }
 
                         Ok(Err(e))
@@ -1115,11 +1073,10 @@ impl GitHubDriver {
             return Ok(());
         }
 
-        let repo_data_url = bconcat!(
+        let repo_data_url = bformat!(
+            "{}/repos/{}/{}",
             self.get_api_url(),
-            "/repos/",
             self.owner,
-            "/",
             self.repository
         );
 
@@ -1220,7 +1177,7 @@ impl GitHubDriver {
             Err(setup_err) => {
                 self.git_driver = None;
 
-                self.inner.io.write_error(bconcat!("<error>Failed to clone the ", self.generate_ssh_url(), " repository, try running in interactive mode so that you can enter your GitHub credentials</error>"));
+                self.inner.io.write_error(bformat!("<error>Failed to clone the {} repository, try running in interactive mode so that you can enter your GitHub credentials</error>", self.generate_ssh_url()));
                 Err(setup_err)
             }
         }

@@ -2,7 +2,7 @@
 
 use bstr::{BStr, BString};
 use shirabe_php_shim::{
-    PATHINFO_EXTENSION, PHP_EOL, basename, bconcat, escapeshellarg, exec, getenv, is_dir,
+    PATHINFO_EXTENSION, PHP_EOL, basename, bformat, escapeshellarg, exec, getenv, is_dir,
     is_executable, is_file, path_from_bytes, path_to_bytes, pathinfo, php_str, strcspn, strpos,
     strtolower, substr,
 };
@@ -120,7 +120,7 @@ impl ExecutableFinder {
                 } else {
                     dir.as_path()
                 };
-                let file_name = bconcat!(name, suffix);
+                let file_name = bformat!("{name}{suffix}");
                 let file = dir.join(path_from_bytes(&file_name));
                 if is_file(&file) && (cfg!(windows) || is_executable(&file)) {
                     return Some(path_to_bytes(&file).into());
@@ -133,13 +133,17 @@ impl ExecutableFinder {
         }
 
         if cfg!(windows)
-            || name.len() != strcspn(name, bconcat!("/", std::path::MAIN_SEPARATOR_STR))
+            || name.len() != strcspn(name, bformat!("/{}", std::path::MAIN_SEPARATOR_STR))
         {
             return default.map(BString::from);
         }
 
-        let exec_result =
-            exec(bconcat!("command -v -- ", escapeshellarg(name)), None, None).unwrap_or_default();
+        let exec_result = exec(
+            bformat!("command -v -- {}", escapeshellarg(name)),
+            None,
+            None,
+        )
+        .unwrap_or_default();
 
         let executable_path = substr(
             &exec_result,

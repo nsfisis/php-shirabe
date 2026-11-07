@@ -12,7 +12,7 @@ use crate::package::loader::ValidatingArrayLoader;
 use crate::plugin::{CommandEvent, PluginEvents};
 use crate::util::{ConfigValidator, Filesystem};
 use bstr::{BStr, BString, ByteSlice};
-use shirabe_php_shim::{bconcat, impl_php_class, path_from_bytes, path_to_bytes};
+use shirabe_php_shim::{bformat, impl_php_class, path_from_bytes, path_to_bytes};
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::{InputInterface, InputInterfaceByName};
 use shirabe_symfony_console::output::OutputInterface;
@@ -57,38 +57,29 @@ impl ValidateCommand {
         let mut do_print_schema_url = false;
 
         if !errors.is_empty() {
-            io.write_error(bconcat!(
-                "<error>",
-                name,
-                " is invalid, the following errors/warnings were found:</error>"
+            io.write_error(bformat!(
+                "<error>{name} is invalid, the following errors/warnings were found:</error>"
             ));
         } else if !publish_errors.is_empty() && check_publish {
-            io.write_error(bconcat!(
-                "<info>",
-                name,
-                " is valid for simple usage with Composer but has</info>"
+            io.write_error(bformat!(
+                "<info>{name} is valid for simple usage with Composer but has</info>"
             ));
             io.write_error(
                 "<info>strict errors that make it unable to be published as a package</info>",
             );
             do_print_schema_url = print_schema_url;
         } else if !warnings.is_empty() {
-            io.write_error(bconcat!(
-                "<info>",
-                name,
-                " is valid, but with a few warnings</info>"
+            io.write_error(bformat!(
+                "<info>{name} is valid, but with a few warnings</info>"
             ));
             do_print_schema_url = print_schema_url;
         } else if !lock_errors.is_empty() {
-            io.write(bconcat!(
-                "<info>",
-                name,
-                " is valid but your composer.lock has some ",
-                if check_lock { "errors" } else { "warnings" },
-                "</info>"
+            io.write(bformat!(
+                "<info>{name} is valid but your composer.lock has some {}</info>",
+                if check_lock { "errors" } else { "warnings" }
             ));
         } else {
-            io.write(bconcat!("<info>", name, " is valid</info>"));
+            io.write(bformat!("<info>{name} is valid</info>"));
         }
 
         if do_print_schema_url {
@@ -96,18 +87,18 @@ impl ValidateCommand {
         }
 
         if !errors.is_empty() {
-            *errors = errors.iter().map(|e| bconcat!("- ", e)).collect();
+            *errors = errors.iter().map(|e| bformat!("- {e}")).collect();
             errors.insert(0, BString::from("# General errors"));
         }
         if !warnings.is_empty() {
-            *warnings = warnings.iter().map(|w| bconcat!("- ", w)).collect();
+            *warnings = warnings.iter().map(|w| bformat!("- {w}")).collect();
             warnings.insert(0, BString::from("# General warnings"));
         }
 
         let mut extra_warnings: Vec<BString> = vec![];
 
         if !publish_errors.is_empty() && check_publish {
-            *publish_errors = publish_errors.iter().map(|e| bconcat!("- ", e)).collect();
+            *publish_errors = publish_errors.iter().map(|e| bformat!("- {e}")).collect();
             publish_errors.insert(0, BString::from("# Publish errors"));
             errors.append(publish_errors);
         }
@@ -126,14 +117,14 @@ impl ValidateCommand {
 
         for msg in errors.iter() {
             if msg.starts_with(b"#") {
-                io.write_error(bconcat!("<error>", msg, "</error>"));
+                io.write_error(bformat!("<error>{msg}</error>"));
             } else {
                 io.write_error(msg);
             }
         }
         for msg in &all_warnings {
             if msg.starts_with(b"#") {
-                io.write_error(bconcat!("<warning>", msg, "</warning>"));
+                io.write_error(bformat!("<warning>{msg}</warning>"));
             } else {
                 io.write_error(msg);
             }
@@ -245,11 +236,11 @@ impl Command for ValidateCommand {
         let io = self.get_io().clone();
 
         if !file.exists() {
-            io.write_error(bconcat!("<error>", file, " not found.</error>"));
+            io.write_error(bformat!("<error>{file} not found.</error>"));
             return Ok(3);
         }
         if !Filesystem::is_readable(&file) {
-            io.write_error(bconcat!("<error>", file, " is not readable.</error>"));
+            io.write_error(bformat!("<error>{file} is not readable.</error>"));
             return Ok(3);
         }
 

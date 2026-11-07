@@ -12,7 +12,7 @@ use bstr::{BStr, BString, ByteSlice};
 use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpMixed, bconcat, display_to_bytes, path_from_bytes, path_to_bytes, php_str, utf8_text,
+    PhpMixed, bformat, display_to_bytes, path_from_bytes, path_to_bytes, php_str, utf8_text,
 };
 
 /// Encodes a Rust value as the PHP value the receiving side declares.
@@ -28,10 +28,9 @@ pub trait FromWire: Sized {
 
 /// The failure of a value that does not have the shape `expected` names.
 pub fn unexpected(expected: impl AsRef<[u8]>, value: &PluginValue) -> PhpThrow {
-    PhpThrow::runtime(bconcat!(
-        "expected ",
+    PhpThrow::runtime(bformat!(
+        "expected {}, got {}",
         expected.as_ref(),
-        ", got ",
         display_to_bytes(format_args!("{value:?}"))
     ))
 }
@@ -281,7 +280,7 @@ impl<T: FromWire> FromWire for IndexMap<BString, T> {
             PluginValue::List(items) => items
                 .iter()
                 .enumerate()
-                .map(|(index, item)| Ok((bconcat!(index), T::from_wire(item)?)))
+                .map(|(index, item)| Ok((bformat!("{index}"), T::from_wire(item)?)))
                 .collect(),
             other => Err(unexpected("an array", other)),
         }
@@ -353,7 +352,7 @@ pub fn record_entries<'a>(
 ) -> Result<&'a IndexMap<BString, PluginValue>, PhpThrow> {
     match value {
         PluginValue::Array(entries) => Ok(entries),
-        other => Err(unexpected(bconcat!("a ", record, " record"), other)),
+        other => Err(unexpected(bformat!("a {record} record"), other)),
     }
 }
 
@@ -363,22 +362,12 @@ pub fn record_field<T: FromWire>(
     record: &[u8],
     field: &[u8],
 ) -> Result<T, PhpThrow> {
-    let value = entries.get(field).ok_or_else(|| {
-        PhpThrow::runtime(bconcat!(
-            "the ",
-            record,
-            " record has no `",
-            field,
-            "` entry"
-        ))
-    })?;
+    let value = entries
+        .get(field)
+        .ok_or_else(|| PhpThrow::runtime(bformat!("the {record} record has no `{field}` entry")))?;
     T::from_wire(value).map_err(|throw| PhpThrow {
-        message: bconcat!(
-            "the `",
-            field,
-            "` entry of the ",
-            record,
-            " record: ",
+        message: bformat!(
+            "the `{field}` entry of the {record} record: {}",
             throw.message
         ),
         ..throw
@@ -421,36 +410,30 @@ impl FromWire for DateTime<Utc> {
             return Err(unexpected("a date", value));
         };
         if object.class != DATE_TIME_IMMUTABLE_CLASS && object.class != DATE_TIME_CLASS {
-            return Err(PhpThrow::runtime(bconcat!(
-                "the class `",
-                object.class,
-                "` cannot cross the plugin boundary as a date"
+            return Err(PhpThrow::runtime(bformat!(
+                "the class `{}` cannot cross the plugin boundary as a date",
+                object.class
             )));
         }
         let zone = Option::<BString>::from_wire(object.public("timezone").unwrap_or(&NULL))?;
         if object.public("timezone_type") != Some(&PluginValue::Int(TIMEZONE_TYPE_IDENTIFIER))
             || zone.as_ref().is_none_or(|zone| zone != TIMEZONE_UTC)
         {
-            return Err(PhpThrow::runtime(bconcat!(
-                "a date crosses the plugin boundary rebased on ",
-                TIMEZONE_UTC,
-                ", got the zone ",
+            return Err(PhpThrow::runtime(bformat!(
+                "a date crosses the plugin boundary rebased on {TIMEZONE_UTC}, got the zone {}",
                 display_to_bytes(format_args!("{zone:?}"))
             )));
         }
         let rendered = BString::from_wire(object.public("date").unwrap_or(&NULL))?;
         let rendered = utf8_text(&rendered).ok_or_else(|| {
-            PhpThrow::runtime(bconcat!(
-                "the date ",
-                display_to_bytes(format_args!("{rendered:?}")),
-                " from the plugin is not text"
+            PhpThrow::runtime(bformat!(
+                "the date {} from the plugin is not text",
+                display_to_bytes(format_args!("{rendered:?}"))
             ))
         })?;
         let parsed = NaiveDateTime::parse_from_str(rendered, DATE_FORMAT).map_err(|e| {
-            PhpThrow::runtime(bconcat!(
-                "the date `",
-                rendered,
-                "` from the plugin is not in the expected format: ",
+            PhpThrow::runtime(bformat!(
+                "the date `{rendered}` from the plugin is not in the expected format: {}",
                 display_to_bytes(e)
             ))
         })?;

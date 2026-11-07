@@ -4,7 +4,7 @@ use crate::package::archiver::{BaseExcludeFilter, ComposerExcludeFilter, GitExcl
 use crate::util::Filesystem;
 use bstr::{BStr, BString};
 use shirabe_php_shim::{
-    RuntimeException, bconcat, path_to_bytes, preg_quote, preg_replace, realpath,
+    RuntimeException, bformat, path_to_bytes, preg_quote, preg_replace, realpath,
 };
 use shirabe_symfony_finder::Finder;
 use std::path::{Path, PathBuf};
@@ -33,10 +33,8 @@ impl ArchivableFilesFinder {
 
         let sources_real_path = realpath(sources);
         if sources_real_path.is_none() {
-            return Err(RuntimeException::new(bconcat!(
-                "Could not realpath() the source directory \"",
-                sources,
-                "\""
+            return Err(RuntimeException::new(bformat!(
+                "Could not realpath() the source directory \"{sources}\""
             ))
             .into());
         }
@@ -65,10 +63,9 @@ impl ArchivableFilesFinder {
             }
 
             let relative_path = preg_replace(
-                bconcat!(
-                    "#^",
-                    preg_quote(path_to_bytes(&sources_clone), Some(b'#')),
-                    "#"
+                bformat!(
+                    "#^{}#",
+                    preg_quote(path_to_bytes(&sources_clone), Some(b'#'))
                 ),
                 "",
                 path_to_bytes(&fs.normalize_path(&realpath)),

@@ -12,7 +12,7 @@ use crate::util::{Platform, Tar, Zip};
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PATHINFO_EXTENSION, PhpMixed, RuntimeException, UnexpectedValueException, basename, bconcat,
+    PATHINFO_EXTENSION, PhpMixed, RuntimeException, UnexpectedValueException, basename, bformat,
     error_message, extension_loaded, hash_file, path_from_bytes, path_to_bytes, pathinfo,
     php_regex, preg_is_match, realpath, strtr,
 };
@@ -59,7 +59,7 @@ impl ArtifactRepository {
     }
 
     pub fn get_repo_name(&self) -> BString {
-        bconcat!("artifact repo (", self.lookup, ")")
+        bformat!("artifact repo ({})", self.lookup)
     }
 
     /// For testing only: drives `initialize` (scanning the lookup directory) and returns the
@@ -121,25 +121,15 @@ impl ArtifactRepository {
             match package {
                 None => {
                     self.io.write_error_with_verbosity(
-                        bconcat!(
-                            "File <comment>",
-                            basename,
-                            "</comment> doesn't seem to hold a package"
+                        bformat!(
+                            "File <comment>{basename}</comment> doesn't seem to hold a package"
                         ),
                         io_interface::VERBOSE,
                     );
                 }
                 Some(package) => {
                     self.io.write_error_with_verbosity(
-                        bconcat!(
-                            "Found package <info>",
-                            package.get_name(),
-                            "</info> (<comment>",
-                            package.get_pretty_version(),
-                            "</comment>) in file <info>",
-                            basename,
-                            "</info>"
-                        ),
+                        bformat!("Found package <info>{}</info> (<comment>{}</comment>) in file <info>{basename}</info>", package.get_name(), package.get_pretty_version()),
                         io_interface::VERBOSE,
                     );
                     self.inner.add_package(package);
@@ -163,7 +153,7 @@ impl ArtifactRepository {
         } else if file_extension == "zip" {
             file_type = BStr::new("zip");
         } else {
-            return Err(RuntimeException::new(bconcat!("Files with \"", file_extension, "\" extensions aren't supported. Only ZIP and TAR/TAR.GZ/TGZ archives are supported."))
+            return Err(RuntimeException::new(bformat!("Files with \"{file_extension}\" extensions aren't supported. Only ZIP and TAR/TAR.GZ/TGZ archives are supported."))
             .into());
         }
 
@@ -176,10 +166,8 @@ impl ArtifactRepository {
             Ok(j) => json = j,
             Err(exception) => {
                 self.io.write_no_newline_with_verbosity(
-                    bconcat!(
-                        "Failed loading package ",
-                        pathname,
-                        ": ",
+                    bformat!(
+                        "Failed loading package {pathname}: {}",
                         error_message(&exception)
                     ),
                     io_interface::VERBOSE,
@@ -192,14 +180,14 @@ impl ArtifactRepository {
         }
 
         let json_str = json.unwrap();
-        let pathname_label = bconcat!(pathname, "#composer.json");
+        let pathname_label = bformat!("{pathname}#composer.json");
         let mut package = JsonFile::parse_json(Some(&json_str), Some(pathname_label.as_bstr()))?;
         let url_normalized = strtr(pathname, "\\", "/");
         let real_path = realpath(file).unwrap_or_default();
         let shasum = hash_file("sha1", &real_path).unwrap_or_default();
 
         let mut dist = IndexMap::new();
-        dist.insert("type".into(), PhpMixed::string(bconcat!(file_type)));
+        dist.insert("type".into(), PhpMixed::string(bformat!("{file_type}")));
         dist.insert("url".into(), PhpMixed::string(url_normalized));
         dist.insert("shasum".into(), PhpMixed::string(shasum));
         if let Some(arr) = package.as_array_mut() {
@@ -214,10 +202,8 @@ impl ArtifactRepository {
         match self.loader.load(cfg, None) {
             Ok(package) => Ok(Some(package)),
             Err(exception) => {
-                let message = bconcat!(
-                    "Failed loading package in ",
-                    pathname,
-                    ": ",
+                let message = bformat!(
+                    "Failed loading package in {pathname}: {}",
                     error_message(&exception)
                 );
                 Err(UnexpectedValueException::with_code_and_previous(

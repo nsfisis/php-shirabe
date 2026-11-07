@@ -11,7 +11,7 @@ use crate::output::OutputInterface;
 use bstr::BString;
 use indexmap::IndexMap;
 use serde::Serialize;
-use shirabe_php_shim::{bconcat, json_bytes, json_encode_ex, php_regex, preg_replace, str_replace};
+use shirabe_php_shim::{bformat, json_bytes, json_encode_ex, php_regex, preg_replace, str_replace};
 
 /// JSON descriptor.
 #[derive(Debug, Default)]
@@ -225,19 +225,19 @@ impl JsonDescriptor {
     fn get_input_option_data(&self, option: &InputOption, negated: bool) -> InputOptionData {
         if negated {
             InputOptionData {
-                name: bconcat!("--no-", option.get_name()),
+                name: bformat!("--no-{}", option.get_name()),
                 shortcut: BString::default(),
                 accept_value: false,
                 is_value_required: false,
                 is_multiple: false,
-                description: bconcat!("Negate the \"--", option.get_name(), "\" option"),
+                description: bformat!("Negate the \"--{}\" option", option.get_name()),
                 default: InputValue::Bool(false),
             }
         } else {
             InputOptionData {
-                name: bconcat!("--", option.get_name()),
+                name: bformat!("--{}", option.get_name()),
                 shortcut: if let Some(shortcut) = option.get_shortcut() {
-                    bconcat!("-", str_replace("|", "|-", shortcut))
+                    bformat!("-{}", str_replace("|", "|-", shortcut))
                 } else {
                     BString::default()
                 },
@@ -267,7 +267,7 @@ impl JsonDescriptor {
             input_options.insert(name.clone(), self.get_input_option_data(option, false));
             if option.is_negatable() {
                 input_options.insert(
-                    bconcat!("no-", name),
+                    bformat!("no-{name}"),
                     self.get_input_option_data(option, true),
                 );
             }

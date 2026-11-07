@@ -11,7 +11,7 @@ use crate::package::{CompletePackageInterfaceHandle, RootPackageInterfaceHandle}
 use crate::repository::{RepositoryFactory, RepositoryInterfaceHandle, RootPackageRepository};
 use crate::util::{Platform, ProcessExecutor};
 use bstr::{BStr, BString};
-use shirabe_php_shim::{bconcat, filter_var_url, impl_php_class};
+use shirabe_php_shim::{bformat, filter_var_url, impl_php_class};
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::{InputInterface, InputInterfaceByName};
 use shirabe_symfony_console::output::OutputInterface;
@@ -66,7 +66,7 @@ impl HomeCommand {
         }
 
         if show_only {
-            self.get_io().write(bconcat!("<info>", url, "</info>"));
+            self.get_io().write(bformat!("<info>{url}</info>"));
         } else {
             self.open_browser(BStr::new(&url));
         }
@@ -101,9 +101,8 @@ impl HomeCommand {
         } else if osx == 0 {
             let _ = process.execute(&[BString::from("open"), url_arg], (), None);
         } else {
-            self.get_io().write_error(bconcat!(
-                "No suitable browser opening command found, open yourself: ",
-                url
+            self.get_io().write_error(bformat!(
+                "No suitable browser opening command found, open yourself: {url}"
             ));
         }
     }
@@ -233,10 +232,8 @@ impl Command for HomeCommand {
 
             if !package_exists {
                 return_code = 1;
-                io.write_error(bconcat!(
-                    "<warning>Package ",
-                    package_name,
-                    " not found</warning>"
+                io.write_error(bformat!(
+                    "<warning>Package {package_name} not found</warning>"
                 ));
             }
 
@@ -247,13 +244,7 @@ impl Command for HomeCommand {
                 } else {
                     "Invalid or missing repository URL"
                 };
-                io.write_error(bconcat!(
-                    "<warning>",
-                    msg,
-                    " for ",
-                    package_name,
-                    "</warning>"
-                ));
+                io.write_error(bformat!("<warning>{msg} for {package_name}</warning>"));
             }
         }
 

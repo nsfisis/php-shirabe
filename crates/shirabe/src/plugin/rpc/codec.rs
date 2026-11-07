@@ -5,7 +5,7 @@ use crate::plugin::php_plugin_value::{link_from_wire, link_to_wire};
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_rpc::{FromWire, PhpThrow, PluginValue, ToWire, wire};
-use shirabe_php_shim::bconcat;
+use shirabe_php_shim::bformat;
 
 /// Decodes the argument at `position`. A missing argument decodes the same way PHP's `null`
 /// does; a parameter's own default belongs to `arg_or`.
@@ -35,7 +35,7 @@ pub(crate) fn arg_or<T: FromWire>(
 /// Names the argument a decoding failure is about.
 pub(crate) fn arg_throw(method: &BStr, position: usize, throw: PhpThrow) -> PhpThrow {
     PhpThrow {
-        message: bconcat!(method, " argument ", position, ": ", throw.message),
+        message: bformat!("{method} argument {position}: {}", throw.message),
         ..throw
     }
 }

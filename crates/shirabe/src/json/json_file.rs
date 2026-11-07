@@ -7,7 +7,7 @@ use crate::util::{Filesystem, HttpDownloader, StreamContextOptions};
 use bstr::{BStr, BString, ByteSlice, ByteVec};
 use shirabe_php_shim::{
     Catch as _, Error, InvalidArgumentException, JSON_PRETTY_PRINT, JSON_UNESCAPED_SLASHES,
-    JSON_UNESCAPED_UNICODE, PhpJson, PhpMixed, RuntimeException, UnexpectedValueException, bconcat,
+    JSON_UNESCAPED_UNICODE, PhpJson, PhpMixed, RuntimeException, UnexpectedValueException, bformat,
     dirname, display_to_bytes, error_message, file_exists, file_get_contents, file_put_contents,
     is_dir, is_file, json_decode_assoc, json_decode_obj, json_encode_ex, ltrim_chars, mkdir,
     path_from_bytes, path_to_bytes, php_regex, php_str, preg_is_match, preg_match,
@@ -134,10 +134,9 @@ impl JsonFile {
                     .map(<[u8]>::to_vec))
             } else {
                 if !Filesystem::is_readable(&self.path) {
-                    return Err(RuntimeException::new(bconcat!(
-                        "The file \"",
-                        self.path,
-                        "\" is not readable."
+                    return Err(RuntimeException::new(bformat!(
+                        "The file \"{}\" is not readable.",
+                        self.path
                     ))
                     .into());
                 }
@@ -148,9 +147,9 @@ impl JsonFile {
                     if let Some(realpath) = realpath(&self.path)
                         && realpath.as_os_str() != self.path.as_os_str()
                     {
-                        realpath_info = bconcat!(" (", realpath, ")");
+                        realpath_info = bformat!(" ({realpath})");
                     }
-                    io.write_error(bconcat!("Reading ", self.path, realpath_info));
+                    io.write_error(bformat!("Reading {}{realpath_info}", self.path));
                 }
                 Ok(file_get_contents(&self.path).ok())
             }
@@ -170,10 +169,9 @@ impl JsonFile {
                 if e.is_instanceof::<Error>() {
                     return Err(e);
                 }
-                return Err(RuntimeException::new(bconcat!(
-                    "Could not read ",
+                return Err(RuntimeException::new(bformat!(
+                    "Could not read {}\n\n{}",
                     self.path,
-                    "\n\n",
                     error_message(&e)
                 ))
                 .into());
@@ -183,7 +181,7 @@ impl JsonFile {
         let json = match json {
             Some(j) => j,
             None => {
-                return Err(RuntimeException::new(bconcat!("Could not read ", self.path)).into());
+                return Err(RuntimeException::new(bformat!("Could not read {}", self.path)).into());
             }
         };
 
@@ -218,16 +216,15 @@ impl JsonFile {
         let dir = dirname(path_to_bytes(&self.path));
         if !is_dir(path_from_bytes(&dir)) {
             if file_exists(path_from_bytes(&dir)) {
-                return Err(UnexpectedValueException::new(bconcat!(
-                    realpath(path_from_bytes(&dir)).unwrap_or_default(),
-                    " exists and is not a directory."
+                return Err(UnexpectedValueException::new(bformat!(
+                    "{} exists and is not a directory.",
+                    realpath(path_from_bytes(&dir)).unwrap_or_default()
                 ))
                 .into());
             }
             if mkdir(path_from_bytes(&dir), 0o777, true).is_err() {
-                return Err(UnexpectedValueException::new(bconcat!(
-                    dir,
-                    " does not exist and could not be created."
+                return Err(UnexpectedValueException::new(bformat!(
+                    "{dir} does not exist and could not be created."
                 ))
                 .into());
             }
@@ -239,7 +236,8 @@ impl JsonFile {
             let attempt: anyhow::Result<()> = (|| -> anyhow::Result<()> {
                 self.file_put_contents_if_modified(
                     &self.path,
-                    bconcat!(
+                    bformat!(
+                        "{}{}",
                         Self::encode_with_options(&hash, options.clone())?,
                         if options.pretty_print { "\n" } else { "" }
                     )
@@ -280,10 +278,9 @@ impl JsonFile {
     /// Validates the schema of the current json file according to composer-schema.json rules
     pub fn validate_schema(&self, schema: i64, schema_file: Option<&BStr>) -> anyhow::Result<bool> {
         if !Filesystem::is_readable(&self.path) {
-            return Err(RuntimeException::new(bconcat!(
-                "The file \"",
-                self.path,
-                "\" is not readable."
+            return Err(RuntimeException::new(bformat!(
+                "The file \"{}\" is not readable.",
+                self.path
             ))
             .into());
         }
@@ -324,7 +321,7 @@ impl JsonFile {
 
         // Prepend with file:// only when not using a special schema already (e.g. in the phar)
         if strpos(&schema_file, "://").is_none() {
-            schema_file = bconcat!("file://", schema_file);
+            schema_file = bformat!("file://{schema_file}");
         }
         schema_file = encode_file_schema_reference(schema_file.as_bstr());
 
@@ -356,7 +353,7 @@ impl JsonFile {
             let mut m = indexmap::IndexMap::new();
             m.insert(
                 "$ref".into(),
-                PhpMixed::string(bconcat!(schema_file, "#/properties/config")),
+                PhpMixed::string(bformat!("{schema_file}#/properties/config")),
             );
             m.insert(
                 "$schema".into(),
@@ -389,20 +386,20 @@ impl JsonFile {
                     if property.is_empty() {
                         property = BString::from(name);
                     } else {
-                        property = bconcat!(property, ".", name);
+                        property = bformat!("{property}.{name}");
                     }
                 }
                 if property.is_empty() {
                     display_to_bytes(&error)
                 } else {
-                    bconcat!(property, " : ", display_to_bytes(&error))
+                    bformat!("{property} : {}", display_to_bytes(&error))
                 }
             })
             .collect();
 
         if !errors.is_empty() {
             return Err(JsonValidationException::new(
-                bconcat!("\"", source, "\" does not match the expected JSON schema"),
+                bformat!("\"{source}\" does not match the expected JSON schema"),
                 errors,
             )
             .into());
@@ -420,7 +417,7 @@ impl JsonFile {
         options: JsonEncodeOptions,
     ) -> anyhow::Result<BString> {
         let json = json_encode_ex(data, options.to_flags()).map_err(|err| {
-            RuntimeException::new(bconcat!("JSON encoding failed: ", error_message(&err)))
+            RuntimeException::new(bformat!("JSON encoding failed: {}", error_message(&err)))
         })?;
 
         if options.pretty_print && options.indent != Self::INDENT_DEFAULT {
@@ -507,7 +504,7 @@ impl JsonFile {
                     return Err(UnexpectedValueException::new(match file {
                         None => BString::from("The input is not UTF-8, could not parse as JSON"),
                         Some(file) => {
-                            bconcat!("\"", file, "\" is not UTF-8, could not parse as JSON")
+                            bformat!("\"{file}\" is not UTF-8, could not parse as JSON")
                         }
                     })
                     .into());
@@ -524,17 +521,15 @@ impl JsonFile {
         };
         Err(match file {
             None => ParsingException::new(
-                bconcat!(
-                    "The input does not contain valid JSON\n",
+                bformat!(
+                    "The input does not contain valid JSON\n{}",
                     display_to_bytes(&error)
                 ),
                 details,
             ),
             Some(file) => ParsingException::new(
-                bconcat!(
-                    "\"",
-                    file,
-                    "\" does not contain valid JSON\n",
+                bformat!(
+                    "\"{file}\" does not contain valid JSON\n{}",
                     display_to_bytes(&error)
                 ),
                 details,

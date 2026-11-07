@@ -11,7 +11,7 @@ use bstr::{B, BStr, BString, ByteSlice};
 use config_stub::ConfigStubBuilder;
 use serial_test::serial;
 use shirabe_php_shim::{
-    PHP_EOL, PhpJson, PhpMixed, bconcat, error_message, implode, path_to_bytes, php_fopen_resource,
+    PHP_EOL, PhpJson, PhpMixed, bformat, error_message, implode, path_to_bytes, php_fopen_resource,
     php_regex, preg_is_match, preg_match, preg_replace, preg_split_delim_capture, rewind, rtrim,
     str_replace, stream_get_contents, trim, utf8_text,
 };
@@ -259,15 +259,15 @@ impl AutoloadGeneratorInterface for StubAutoloadGenerator {
 /// ref: TestCase::getPackage with class `Composer\Package\RootPackage`.
 fn root_package(name: &BStr, version: &BStr) -> RootPackageHandle {
     let normalized = VersionParser.normalize(version, None).unwrap();
-    RootPackageHandle::new(bconcat!(name), normalized, bconcat!(version))
+    RootPackageHandle::new(bformat!("{name}"), normalized, bformat!("{version}"))
 }
 
 /// ref: `new Link($source, $target, $constraint, $type, $constraint->getPrettyString())`.
 fn link(source: &BStr, target: &BStr, constraint: AnyConstraint, r#type: &bstr::BStr) -> Link {
     let pretty = constraint.get_pretty_string();
     Link::new(
-        bconcat!(source),
-        bconcat!(target),
+        bformat!("{source}"),
+        bformat!("{target}"),
         constraint,
         Some(r#type.to_owned()),
         Some(pretty),
@@ -721,7 +721,7 @@ fn load_integration_tests(path: impl AsRef<std::path::Path>) -> Vec<IntegrationC
                 if let Some(url) = repo.get("url").and_then(|u| u.as_str())
                     && preg_is_match(php_regex!(r"{^file://[^/]}"), url)
                 {
-                    let new_url = bconcat!("file://", fixtures_str, "/", &url[7..]);
+                    let new_url = bformat!("file://{fixtures_str}/{}", &url[7..]);
                     repo["url"] = serde_json::Value::from(utf8_text(&new_url).unwrap());
                 }
             };
@@ -1183,7 +1183,7 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&BString>) 
     let app_output = StreamOutput::new(app_output_stream.clone(), None, None, None)
         .unwrap()
         .expect("php://memory is a valid stream");
-    let mut string_input = StringInput::new(bconcat!(case.run, " -vvv")).unwrap();
+    let mut string_input = StringInput::new(bformat!("{} -vvv", case.run)).unwrap();
     string_input.set_interactive(false);
     let input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(string_input));

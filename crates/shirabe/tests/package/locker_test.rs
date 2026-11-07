@@ -9,7 +9,7 @@ use shirabe::package::{CompletePackageHandle, Locker, PackageInterfaceHandle};
 use shirabe::plugin::plugin_interface;
 use shirabe::repository::{FindPackageConstraint, RepositoryInterfaceHandle};
 use shirabe::util::ProcessExecutor;
-use shirabe_php_shim::{Catch as _, LogicException, PhpMixed, bconcat, hash, trim, utf8_text};
+use shirabe_php_shim::{Catch as _, LogicException, PhpMixed, bformat, hash, trim, utf8_text};
 use tempfile::TempDir;
 
 fn null_io() -> std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
@@ -25,7 +25,7 @@ fn get_json_content(custom_data: &[(&BStr, &BStr)]) -> BString {
     );
     data.insert("name".into(), PhpMixed::string(BString::from("test")));
     for (k, v) in custom_data {
-        data.insert(bconcat!(k), PhpMixed::string(bconcat!(v)));
+        data.insert(bformat!("{k}"), PhpMixed::string(bformat!("{v}")));
     }
     data.sort_keys();
 
@@ -125,7 +125,7 @@ fn test_get_locked_packages() {
 
 #[test]
 fn test_set_lock_data() {
-    let json_content = bconcat!(get_json_content(&[]), "  ");
+    let json_content = bformat!("{}  ", get_json_content(&[]));
     let (mut locker, temp_dir, _io) = make_locker(json_content.as_bstr(), None);
 
     let package1: PackageInterfaceHandle = CompletePackageHandle::new(
@@ -244,7 +244,7 @@ fn test_lock_bad_packages() {
 #[test]
 fn test_is_fresh() {
     let json_content = get_json_content(&[]);
-    let lock = bconcat!(r#"{"hash": ""#, hash("md5", &json_content), r#""}"#);
+    let lock = bformat!("{{\"hash\": \"{}\"}}", hash("md5", &json_content));
     let (mut locker, _temp_dir, _io) = make_locker(json_content.as_bstr(), Some(lock.as_bstr()));
 
     assert!(locker.is_fresh().unwrap());
@@ -274,12 +274,10 @@ fn test_is_fresh_false() {
 #[test]
 fn test_is_fresh_with_content_hash() {
     let json_content = get_json_content(&[]);
-    let lock = bconcat!(
-        r#"{"hash": ""#,
-        hash("md5", bconcat!(json_content, "  ")),
-        r#"", "content-hash": ""#,
-        hash("md5", &json_content),
-        r#""}"#
+    let lock = bformat!(
+        "{{\"hash\": \"{}\", \"content-hash\": \"{}\"}}",
+        hash("md5", bformat!("{json_content}  ")),
+        hash("md5", &json_content)
     );
     let (mut locker, _temp_dir, _io) = make_locker(json_content.as_bstr(), Some(lock.as_bstr()));
 
@@ -289,7 +287,7 @@ fn test_is_fresh_with_content_hash() {
 #[test]
 fn test_is_fresh_with_content_hash_and_no_hash() {
     let json_content = get_json_content(&[]);
-    let lock = bconcat!(r#"{"content-hash": ""#, hash("md5", &json_content), r#""}"#);
+    let lock = bformat!("{{\"content-hash\": \"{}\"}}", hash("md5", &json_content));
     let (mut locker, _temp_dir, _io) = make_locker(json_content.as_bstr(), Some(lock.as_bstr()));
 
     assert!(locker.is_fresh().unwrap());
@@ -302,13 +300,8 @@ fn test_is_fresh_false_with_content_hash() {
         "md5",
         get_json_content(&[(BStr::new("name"), BStr::new("test2"))]),
     );
-    let lock = bconcat!(
-        r#"{"hash": ""#,
-        different_hash,
-        r#"", "content-hash": ""#,
-        different_hash,
-        r#""}"#
-    );
+    let lock =
+        bformat!("{{\"hash\": \"{different_hash}\", \"content-hash\": \"{different_hash}\"}}");
     let (mut locker, _temp_dir, _io) = make_locker(json_content.as_bstr(), Some(lock.as_bstr()));
 
     assert!(!locker.is_fresh().unwrap());

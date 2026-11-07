@@ -13,7 +13,7 @@ use crate::question::{ConfirmationQuestion, QuestionInterface};
 use crate::style::{OutputStyle, StyleInterface};
 use bstr::{BStr, BString, ByteSlice};
 use shirabe_php_shim::{
-    AsAny, PHP_EOL, array_unshift, bconcat, explode, str_repeat, str_replace, strlen, substr,
+    AsAny, PHP_EOL, array_unshift, bformat, explode, str_repeat, str_replace, strlen, substr,
     substr_count, wordwrap,
 };
 
@@ -174,7 +174,7 @@ impl SymfonyStyle {
         let mut r#type = r#type.map(BString::from);
         let mut line_indentation = BString::default();
         if let Some(t) = &r#type {
-            let formatted = bconcat!("[", t, "] ");
+            let formatted = bformat!("[{t}] ");
             indent_length = strlen(&formatted);
             line_indentation = str_repeat(" ", indent_length as usize);
             r#type = Some(formatted);
@@ -222,13 +222,13 @@ impl SymfonyStyle {
             let i = i as i64;
             if let Some(t) = &r#type {
                 *line = if first_line_index == i {
-                    bconcat!(t, &*line)
+                    bformat!("{t}{}", &*line)
                 } else {
-                    bconcat!(line_indentation, &*line)
+                    bformat!("{line_indentation}{}", &*line)
                 };
             }
 
-            *line = bconcat!(prefix, &*line);
+            *line = bformat!("{prefix}{}", &*line);
             let padding = str_repeat(
                 " ",
                 (self.line_length
@@ -241,7 +241,7 @@ impl SymfonyStyle {
             line.extend_from_slice(&padding);
 
             if let Some(style) = style {
-                *line = bconcat!("<", style, ">", &*line, "</>");
+                *line = bformat!("<{style}>{}</>", &*line);
             }
         }
 

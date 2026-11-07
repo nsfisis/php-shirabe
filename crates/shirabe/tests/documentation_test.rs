@@ -2,14 +2,14 @@
 
 use bstr::{BString, ByteSlice};
 use shirabe::console::ApplicationHandle;
-use shirabe_php_shim::bconcat;
+use shirabe_php_shim::bformat;
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::descriptor::ApplicationDescription;
 
 fn get_command_name(command: &std::rc::Rc<std::cell::RefCell<dyn Command>>) -> BString {
     let mut name = command.borrow().get_name().unwrap_or_default();
     for alias in command.borrow().get_aliases() {
-        name = bconcat!(name, " / ", alias);
+        name = bformat!("{name} / {alias}");
     }
 
     name
@@ -47,11 +47,9 @@ fn test_command() {
         assert!(
             // TODO: test description
             // TODO: test options
-            doc_content.as_bytes().contains_str(bconcat!(
-                "\n## ",
-                get_command_name(&command),
-                "\n\n"
-            )),
+            doc_content
+                .as_bytes()
+                .contains_str(bformat!("\n## {}\n\n", get_command_name(&command))),
             "doc/03-cli.md does not contain a section for command \"{}\"",
             get_command_name(&command).display_lossy(),
         );

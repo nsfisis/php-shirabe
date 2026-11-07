@@ -3,7 +3,7 @@
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    RuntimeException, bconcat, explode, filter_var_int_with_range, filter_var_ip, inet_pton,
+    RuntimeException, bformat, explode, filter_var_int_with_range, filter_var_ip, inet_pton,
     ltrim_chars, parse_url, php_regex, preg_split, stripos, strlen, strpbrk, strpos, substr,
     substr_count, utf8_text,
 };
@@ -93,7 +93,7 @@ impl NoProxyPattern {
 
         let port_int = port.unwrap_or(0);
         let host_name = if port_int != 0 {
-            bconcat!(host_str, ":", port_int)
+            bformat!("{host_str}:{port_int}")
         } else {
             host_str
         };
@@ -149,22 +149,22 @@ impl NoProxyPattern {
         let mask = network.netmask.as_deref().unwrap_or_default();
         let ip = target.ip.as_slice();
         if net.is_empty() {
-            return Err(RuntimeException::new(bconcat!(
-                "Could not parse network IP ",
+            return Err(RuntimeException::new(bformat!(
+                "Could not parse network IP {}",
                 net.as_bstr()
             ))
             .into());
         }
         if mask.is_empty() {
-            return Err(RuntimeException::new(bconcat!(
-                "Could not parse netmask ",
+            return Err(RuntimeException::new(bformat!(
+                "Could not parse netmask {}",
                 mask.as_bstr()
             ))
             .into());
         }
         if ip.is_empty() {
-            return Err(RuntimeException::new(bconcat!(
-                "Could not parse target IP ",
+            return Err(RuntimeException::new(bformat!(
+                "Could not parse target IP {}",
                 ip.as_bstr()
             ))
             .into());
@@ -300,15 +300,15 @@ impl NoProxyPattern {
 
         // Get the network from the address and mask
         if netmask.is_empty() {
-            return Err(RuntimeException::new(bconcat!(
-                "Could not parse netmask ",
+            return Err(RuntimeException::new(bformat!(
+                "Could not parse netmask {}",
                 netmask.as_bstr()
             ))
             .into());
         }
         if range_ip.is_empty() {
-            return Err(RuntimeException::new(bconcat!(
-                "Could not parse range IP ",
+            return Err(RuntimeException::new(bformat!(
+                "Could not parse range IP {}",
                 range_ip.as_bstr()
             ))
             .into());
@@ -340,7 +340,7 @@ impl NoProxyPattern {
     fn make_data(&self, host: &BStr, port: i64, ipdata: Option<IpData>) -> UrlData {
         UrlData {
             host: host.into(),
-            name: bconcat!(".", ltrim_chars(host, ".")),
+            name: bformat!(".{}", ltrim_chars(host, ".")),
             port,
             ipdata,
         }
@@ -398,7 +398,7 @@ impl NoProxyPattern {
                 .unwrap_or(0);
         }
 
-        let host = bconcat!(ip6, host_name);
+        let host = bformat!("{ip6}{host_name}");
 
         Ok((host, port, false))
     }

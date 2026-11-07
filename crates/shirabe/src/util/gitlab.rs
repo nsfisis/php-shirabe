@@ -8,7 +8,7 @@ use crate::util::{HttpDownloader, HttpOptions, ProcessExecutor, StreamContextOpt
 use bstr::{B, BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    Catch as _, PhpMixed, RuntimeException, bconcat, http_build_query, in_array_strict,
+    Catch as _, PhpMixed, RuntimeException, bformat, http_build_query, in_array_strict,
     json_decode_assoc, php_regex, preg_replace, time, trim,
 };
 use shirabe_symfony_console::input::InputValue;
@@ -187,21 +187,16 @@ impl GitLab {
             .get_local_auth_config_source()
             .map(|c| c.get_name());
         let has_local_auth_config = local_auth_config_name.is_some();
-        let personal_access_token_link = bconcat!(
-            scheme,
-            "://",
-            origin_url,
-            "/-/user_settings/personal_access_tokens"
-        );
-        let revoke_link = bconcat!(scheme, "://", origin_url, "/-/user_settings/applications");
-        self.io.write_error(bconcat!(
-            "A token will be created and stored in \"",
+        let personal_access_token_link =
+            bformat!("{scheme}://{origin_url}/-/user_settings/personal_access_tokens");
+        let revoke_link = bformat!("{scheme}://{origin_url}/-/user_settings/applications");
+        self.io.write_error(bformat!(
+            "A token will be created and stored in \"{}{}\", your password will never be stored",
             local_auth_config_name
                 .as_ref()
-                .map(|name| bconcat!(name, " OR "))
+                .map(|name| bformat!("{name} OR "))
                 .unwrap_or_default(),
-            self.config.borrow().get_auth_config_source().get_name(),
-            "\", your password will never be stored"
+            self.config.borrow().get_auth_config_source().get_name()
         ));
         self.io
             .write_error("To revoke access to this token you can visit:");
@@ -252,11 +247,7 @@ impl GitLab {
 
                             self.io.write_error("You can also manually create a personal access token enabling the \"read_api\" scope at:");
                             self.io.write_error(&personal_access_token_link);
-                            self.io.write_error(bconcat!(
-                                "Add it using \"shirabe config --global --auth gitlab-token.",
-                                origin_url,
-                                " <token>\""
-                            ));
+                            self.io.write_error(bformat!("Add it using \"shirabe config --global --auth gitlab-token.{origin_url} <token>\""));
 
                             continue;
                         }
@@ -291,12 +282,12 @@ impl GitLab {
                 let auth_config_source = config.get_local_auth_config_source_mut().unwrap();
                 if has_expires_in {
                     auth_config_source.add_config_setting(
-                        bstr::BStr::new(&bconcat!("gitlab-oauth.", origin_url)),
+                        bstr::BStr::new(&bformat!("gitlab-oauth.{origin_url}")),
                         Self::build_oauth_config(&response, access_token.as_ref()),
                     )?;
                 } else {
                     auth_config_source.add_config_setting(
-                        bstr::BStr::new(&bconcat!("gitlab-oauth.", origin_url)),
+                        bstr::BStr::new(&bformat!("gitlab-oauth.{origin_url}")),
                         PhpMixed::string(access_token),
                     )?;
                 }
@@ -305,12 +296,12 @@ impl GitLab {
                 let auth_config_source = config.get_auth_config_source_mut();
                 if has_expires_in {
                     auth_config_source.add_config_setting(
-                        bstr::BStr::new(&bconcat!("gitlab-oauth.", origin_url)),
+                        bstr::BStr::new(&bformat!("gitlab-oauth.{origin_url}")),
                         Self::build_oauth_config(&response, access_token.as_ref()),
                     )?;
                 } else {
                     auth_config_source.add_config_setting(
-                        bstr::BStr::new(&bconcat!("gitlab-oauth.", origin_url)),
+                        bstr::BStr::new(&bformat!("gitlab-oauth.{origin_url}")),
                         PhpMixed::string(access_token),
                     )?;
                 }
@@ -336,7 +327,7 @@ impl GitLab {
                 Some(te) => {
                     let message = te.get_message().to_owned();
                     self.io
-                        .write_error(bconcat!("Couldn't refresh access token: ", message));
+                        .write_error(bformat!("Couldn't refresh access token: {message}"));
                     return Ok(false);
                 }
                 None => return Err(e),
@@ -362,7 +353,7 @@ impl GitLab {
             .borrow_mut()
             .get_auth_config_source_mut()
             .add_config_setting(
-                bstr::BStr::new(&bconcat!("gitlab-oauth.", origin_url)),
+                bstr::BStr::new(&bformat!("gitlab-oauth.{origin_url}")),
                 Self::build_oauth_config(&response, access_token.as_ref()),
             )?;
 
@@ -400,7 +391,7 @@ impl GitLab {
         let token = self
             .http_downloader
             .borrow_mut()
-            .get(bconcat!(scheme, "://", api_url, "/oauth/token"), options)?
+            .get(bformat!("{scheme}://{api_url}/oauth/token"), options)?
             .decode_json()?;
 
         self.io.write_error("Token successfully created");
@@ -436,10 +427,8 @@ impl GitLab {
         let refresh_token = match refresh_token {
             Some(t) => t,
             None => {
-                return Err(RuntimeException::new(bconcat!(
-                    "No GitLab refresh token present for ",
-                    origin_url,
-                    "."
+                return Err(RuntimeException::new(bformat!(
+                    "No GitLab refresh token present for {origin_url}."
                 ))
                 .into());
             }
@@ -464,7 +453,7 @@ impl GitLab {
         let token = self
             .http_downloader
             .borrow_mut()
-            .get(bconcat!(scheme, "://", origin_url, "/oauth/token"), options)?
+            .get(bformat!("{scheme}://{origin_url}/oauth/token"), options)?
             .decode_json()?;
 
         self.io.write_error_with_verbosity(
@@ -472,13 +461,7 @@ impl GitLab {
             io_interface::VERY_VERBOSE,
         );
         self.io.write_error_with_verbosity(
-            bconcat!(
-                "To revoke access to this token you can visit ",
-                scheme,
-                "://",
-                origin_url,
-                "/-/user_settings/applications"
-            ),
+            bformat!("To revoke access to this token you can visit {scheme}://{origin_url}/-/user_settings/applications"),
             io_interface::VERY_VERBOSE,
         );
 

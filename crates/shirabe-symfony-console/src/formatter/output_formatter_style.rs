@@ -3,7 +3,7 @@
 use crate::Color;
 use crate::formatter::OutputFormatterStyleInterface;
 use bstr::{BStr, BString, ByteSlice};
-use shirabe_php_shim::{PHP_SERVER, PhpMixed, array_search_in_vec, bconcat, getenv, intval};
+use shirabe_php_shim::{PHP_SERVER, PhpMixed, array_search_in_vec, bformat, getenv, intval};
 
 /// Formatter style class for defining styles.
 #[derive(Debug, Clone)]
@@ -103,7 +103,7 @@ impl OutputFormatterStyleInterface for OutputFormatterStyle {
         if let Some(href) = &self.href
             && self.handles_href_gracefully == Some(true)
         {
-            text = bconcat!("\x1b]8;;", href, "\x1b\\", text, "\x1b]8;;\x1b\\");
+            text = bformat!("\u{1b}]8;;{href}\u{1b}\\{text}\u{1b}]8;;\u{1b}\\");
         }
 
         self.color.apply(text.as_bstr())

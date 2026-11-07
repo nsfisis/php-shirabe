@@ -3,7 +3,7 @@
 use crate::helper::{Helper, HelperInterface, HelperSet};
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
-use shirabe_php_shim::{bconcat, php_str, str_replace};
+use shirabe_php_shim::{bformat, bwrite, php_str, str_replace};
 
 const COLORS: [&BStr; 9] = [
     php_str(b"black"),
@@ -59,13 +59,9 @@ impl DebugFormatterHelper {
             },
         );
 
-        bconcat!(
-            self.get_border(id),
-            "<bg=blue;fg=white> ",
-            prefix,
-            " </> <fg=blue>",
-            message,
-            "</>\n"
+        bformat!(
+            "{}<bg=blue;fg=white> {prefix} </> <fg=blue>{message}</>\n",
+            self.get_border(id)
         )
     }
 
@@ -86,23 +82,19 @@ impl DebugFormatterHelper {
                 self.started.get_mut(id).unwrap().out = false;
             }
             if !self.started[id].err {
-                message.extend_from_slice(&bconcat!(
-                    self.get_border(id),
-                    "<bg=red;fg=white> ",
-                    error_prefix,
-                    " </> "
-                ));
+                bwrite!(
+                    message,
+                    "{}<bg=red;fg=white> {error_prefix} </> ",
+                    self.get_border(id)
+                );
                 self.started.get_mut(id).unwrap().err = true;
             }
 
             message.extend_from_slice(&str_replace(
                 "\n",
-                bconcat!(
-                    "\n",
-                    self.get_border(id),
-                    "<bg=red;fg=white> ",
-                    error_prefix,
-                    " </> "
+                bformat!(
+                    "\n{}<bg=red;fg=white> {error_prefix} </> ",
+                    self.get_border(id)
                 ),
                 buffer,
             ));
@@ -112,24 +104,17 @@ impl DebugFormatterHelper {
                 self.started.get_mut(id).unwrap().err = false;
             }
             if !self.started[id].out {
-                message.extend_from_slice(&bconcat!(
-                    self.get_border(id),
-                    "<bg=green;fg=white> ",
-                    prefix,
-                    " </> "
-                ));
+                bwrite!(
+                    message,
+                    "{}<bg=green;fg=white> {prefix} </> ",
+                    self.get_border(id)
+                );
                 self.started.get_mut(id).unwrap().out = true;
             }
 
             message.extend_from_slice(&str_replace(
                 "\n",
-                bconcat!(
-                    "\n",
-                    self.get_border(id),
-                    "<bg=green;fg=white> ",
-                    prefix,
-                    " </> "
-                ),
+                bformat!("\n{}<bg=green;fg=white> {prefix} </> ", self.get_border(id)),
                 buffer,
             ));
         }
@@ -146,25 +131,15 @@ impl DebugFormatterHelper {
         };
 
         if successful {
-            return bconcat!(
-                trailing_eol,
-                self.get_border(id),
-                "<bg=green;fg=white> ",
-                prefix,
-                " </> <fg=green>",
-                message,
-                "</>\n"
+            return bformat!(
+                "{trailing_eol}{}<bg=green;fg=white> {prefix} </> <fg=green>{message}</>\n",
+                self.get_border(id)
             );
         }
 
-        let message = bconcat!(
-            trailing_eol,
-            self.get_border(id),
-            "<bg=red;fg=white> ",
-            prefix,
-            " </> <fg=red>",
-            message,
-            "</>\n"
+        let message = bformat!(
+            "{trailing_eol}{}<bg=red;fg=white> {prefix} </> <fg=red>{message}</>\n",
+            self.get_border(id)
         );
 
         if let Some(session) = self.started.get_mut(id) {
@@ -176,7 +151,7 @@ impl DebugFormatterHelper {
     }
 
     fn get_border(&self, id: &BStr) -> BString {
-        bconcat!("<bg=", COLORS[self.started[id].border as usize], "> </>")
+        bformat!("<bg={}> </>", COLORS[self.started[id].border as usize])
     }
 }
 

@@ -8,7 +8,7 @@ use shirabe::repository::{
     AdvisoryProviderInterface, ArrayRepository, FilterRepository, RepositoryInterface,
     RepositoryInterfaceHandle,
 };
-use shirabe_php_shim::{PhpMixed, bconcat};
+use shirabe_php_shim::{PhpMixed, bformat};
 use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint};
 
 fn set_up() -> RepositoryInterfaceHandle {
@@ -27,7 +27,11 @@ fn config(only: Option<&[&BStr]>, exclude: Option<&[&BStr]>) -> IndexMap<BString
     if let Some(only) = only {
         c.insert(
             "only".into(),
-            PhpMixed::List(only.iter().map(|s| PhpMixed::string(bconcat!(s))).collect()),
+            PhpMixed::List(
+                only.iter()
+                    .map(|s| PhpMixed::string(bformat!("{s}")))
+                    .collect(),
+            ),
         );
     }
     if let Some(exclude) = exclude {
@@ -36,7 +40,7 @@ fn config(only: Option<&[&BStr]>, exclude: Option<&[&BStr]>) -> IndexMap<BString
             PhpMixed::List(
                 exclude
                     .iter()
-                    .map(|s| PhpMixed::string(bconcat!(s)))
+                    .map(|s| PhpMixed::string(bformat!("{s}")))
                     .collect(),
             ),
         );
@@ -102,7 +106,7 @@ fn test_repo_matching() {
             .map(|p| bstr::BString::from(&p.get_name()[..]))
             .collect();
 
-        let expected: Vec<BString> = expected.iter().map(|s| bconcat!(s)).collect();
+        let expected: Vec<BString> = expected.iter().map(|s| bformat!("{s}")).collect();
         assert_eq!(expected, names);
     }
 }

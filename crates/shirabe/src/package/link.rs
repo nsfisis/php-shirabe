@@ -3,7 +3,7 @@
 use crate::package::PackageInterfaceHandle;
 use bstr::{BStr, BString, ByteSlice};
 use shirabe_php_shim::{
-    PhpDisplay, ToPhpString, UnexpectedValueException, bconcat, php_str, strtolower,
+    PhpDisplay, ToPhpString, UnexpectedValueException, bformat, bwrite, php_str, strtolower,
 };
 use shirabe_semver::constraint::AnyConstraint;
 
@@ -79,10 +79,9 @@ impl Link {
     pub fn get_pretty_constraint(&self) -> anyhow::Result<&BStr> {
         match &self.pretty_constraint {
             Some(pretty_constraint) => Ok(pretty_constraint.as_bstr()),
-            None => Err(UnexpectedValueException::new(bconcat!(
-                "Link ",
-                self.to_php_string(),
-                " has been misconfigured and had no prettyConstraint given."
+            None => Err(UnexpectedValueException::new(bformat!(
+                "Link {} has been misconfigured and had no prettyConstraint given.",
+                self.to_php_string()
             ))
             .into()),
         }
@@ -93,13 +92,11 @@ impl Link {
     }
 
     pub fn get_pretty_string(&self, source_package: PackageInterfaceHandle) -> BString {
-        bconcat!(
+        bformat!(
+            "{} {} {} {}",
             source_package.get_pretty_string(),
-            " ",
             self.description,
-            " ",
             self.target,
-            " ",
             self.constraint.get_pretty_string()
         )
     }
@@ -107,16 +104,14 @@ impl Link {
 
 impl PhpDisplay for Link {
     fn fmt(&self, out: &mut BString) {
-        out.extend_from_slice(&bconcat!(
+        bwrite!(
+            out,
+            "{} {} {} ({})",
             self.source,
-            " ",
             self.description,
-            " ",
             self.target,
-            " (",
-            self.constraint,
-            ")"
-        ));
+            self.constraint
+        );
     }
 }
 

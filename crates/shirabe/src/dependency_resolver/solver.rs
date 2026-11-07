@@ -14,7 +14,7 @@ use crate::package::BasePackageHandle;
 use bstr::{BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpMixed, ToPhpString, array_shift, array_unshift, bconcat, microtime, spl_object_hash, sprintf,
+    PhpMixed, ToPhpString, array_shift, array_unshift, bformat, microtime, spl_object_hash, sprintf,
 };
 use shirabe_semver::constraint::AnyConstraint;
 
@@ -371,12 +371,8 @@ impl Solver {
             let (learn_literal, new_level, new_rule, why) = self.analyze(level, rule)?;
 
             if new_level <= 0 || new_level >= level {
-                return Err(SolverBugException::new(bconcat!(
-                    "Trying to revert to invalid level ",
-                    new_level,
-                    " from level ",
-                    level,
-                    "."
+                return Err(SolverBugException::new(bformat!(
+                    "Trying to revert to invalid level {new_level} from level {level}."
                 ))
                 .into());
             }
@@ -499,15 +495,7 @@ impl Solver {
 
                 let inner_literal = loop {
                     if decision_id <= 0 {
-                        return Err(SolverBugException::new(bconcat!(
-                            "Reached invalid decision id ",
-                            decision_id,
-                            " while looking through ",
-                            rule.borrow().to_php_string(),
-                            " for a literal present in the analyzed rule ",
-                            analyzed_rule.borrow().to_php_string(),
-                            "."
-                        ))
+                        return Err(SolverBugException::new(bformat!("Reached invalid decision id {decision_id} while looking through {} for a literal present in the analyzed rule {}.", rule.borrow().to_php_string(), analyzed_rule.borrow().to_php_string()))
                         .into());
                     }
 
@@ -585,10 +573,9 @@ impl Solver {
         let learned_literal = match learned_literal {
             Some(l) => l,
             None => {
-                return Err(SolverBugException::new(bconcat!(
-                    "Did not find a learnable literal in analyzed rule ",
-                    analyzed_rule.borrow().to_php_string(),
-                    "."
+                return Err(SolverBugException::new(bformat!(
+                    "Did not find a learnable literal in analyzed rule {}.",
+                    analyzed_rule.borrow().to_php_string()
                 ))
                 .into());
             }
@@ -774,19 +761,15 @@ impl Solver {
                 if i == rules_count {
                     if 1 == pass {
                         self.io.write_error_no_newline_with_verbosity(
-                            bconcat!(
-                                "Something's changed, looking at all rules again (pass #",
-                                pass,
-                                ")"
+                            bformat!(
+                                "Something's changed, looking at all rules again (pass #{pass})"
                             ),
                             DEBUG,
                         );
                     } else {
                         self.io.overwrite_error_no_newline_with_verbosity(
-                            bconcat!(
-                                "Something's changed, looking at all rules again (pass #",
-                                pass,
-                                ")"
+                            bformat!(
+                                "Something's changed, looking at all rules again (pass #{pass})"
                             ),
                             DEBUG,
                         );

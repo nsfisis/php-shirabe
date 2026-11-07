@@ -2,7 +2,7 @@
 
 use bstr::{B, BStr, BString};
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpMixed, TypeError, bconcat};
+use shirabe_php_shim::{PhpMixed, TypeError, bformat};
 
 #[derive(Debug)]
 pub struct ForgejoRepositoryData {
@@ -42,17 +42,15 @@ impl ForgejoRepositoryData {
                 .and_then(|v| v.as_string())
                 .map(BStr::to_owned)
                 .ok_or_else(|| {
-                    anyhow::Error::from(TypeError::new(bconcat!(
-                        "missing or invalid string field: ",
-                        key
+                    anyhow::Error::from(TypeError::new(bformat!(
+                        "missing or invalid string field: {key}"
                     )))
                 })
         };
         let get_bool = |key: &BStr| {
             data.get(B(key)).and_then(|v| v.as_bool()).ok_or_else(|| {
-                anyhow::Error::from(TypeError::new(bconcat!(
-                    "missing or invalid bool field: ",
-                    key
+                anyhow::Error::from(TypeError::new(bformat!(
+                    "missing or invalid bool field: {key}"
                 )))
             })
         };

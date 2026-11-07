@@ -13,13 +13,13 @@ use shirabe::downloader::FileDownloader;
 use shirabe::io::{IOInterface, NullIO};
 use shirabe::package::{CompletePackageHandle, PackageInterfaceHandle};
 use shirabe::util::HttpDownloader;
-use shirabe_php_shim::{PhpMixed, bconcat, path_to_bytes};
+use shirabe_php_shim::{PhpMixed, bformat, path_to_bytes};
 use shirabe_semver::VersionParser;
 
 /// ref: TestCase::getPackage (default class CompletePackage)
 fn get_package(name: &BStr, version: &BStr) -> PackageInterfaceHandle {
     let norm_version = VersionParser.normalize(version, None).unwrap();
-    CompletePackageHandle::new(bconcat!(name), norm_version, bconcat!(version)).into()
+    CompletePackageHandle::new(bformat!("{name}"), norm_version, bformat!("{version}")).into()
 }
 
 /// ref: ArchiveDownloaderTest::getArchiveDownloaderMock (the inherited getFileName/processUrl
@@ -31,7 +31,10 @@ fn get_archive_downloader(vendor_dir: Option<&BStr>) -> FileDownloader {
     let mut config = Config::new(false, None);
     if let Some(vendor_dir) = vendor_dir {
         let mut config_options: IndexMap<BString, PhpMixed> = IndexMap::new();
-        config_options.insert("vendor-dir".into(), PhpMixed::string(bconcat!(vendor_dir)));
+        config_options.insert(
+            "vendor-dir".into(),
+            PhpMixed::string(bformat!("{vendor_dir}")),
+        );
         let mut merged: IndexMap<BString, PhpMixed> = IndexMap::new();
         merged.insert("config".into(), PhpMixed::Array(config_options));
         config.merge(&merged, "test");
@@ -126,10 +129,9 @@ fn test_process_url_rewrite_dist() {
         } else {
             "zip"
         };
-        let expected = bconcat!(
-            "https://api.github.com/repos/composer/composer/",
-            r#type,
-            "ball/ref"
+        let expected = bformat!(
+            "https://api.github.com/repos/composer/composer/{}ball/ref",
+            r#type
         );
 
         let package = get_package(BStr::new("dummy/pkg"), BStr::new("1.0.0"));
@@ -165,11 +167,9 @@ fn test_process_url_rewrite_bitbucket_dist() {
     let downloader = get_archive_downloader(None);
 
     for (url, extension) in provide_bitbucket_urls() {
-        let url = bconcat!(url, ".", extension);
-        let expected = bconcat!(
-            "https://bitbucket.org/davereid/drush-virtualhost/get/ref.",
-            extension
-        );
+        let url = bformat!("{url}.{extension}");
+        let expected =
+            bformat!("https://bitbucket.org/davereid/drush-virtualhost/get/ref.{extension}");
 
         let package = get_package(BStr::new("dummy/pkg"), BStr::new("1.0.0"));
         package.set_dist_reference(Some(BString::from("ref")));

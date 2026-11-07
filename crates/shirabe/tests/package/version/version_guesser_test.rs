@@ -7,7 +7,7 @@ use serial_test::serial;
 use shirabe::config::Config;
 use shirabe::package::version::{VersionGuesser, VersionParser};
 use shirabe::util::{Git as GitUtil, MockExpectation, MockHandler, Platform, ProcessExecutor};
-use shirabe_php_shim::{PhpMixed, bconcat};
+use shirabe_php_shim::{PhpMixed, bformat};
 
 // Mirrors VersionGuesserTest::setUp/tearDown: reset GitUtil's cached `version`
 // static so each test re-runs `git --version` against its own mock.
@@ -45,7 +45,7 @@ fn make_guesser(
 fn package_config(entries: &[(&BStr, PhpMixed)]) -> IndexMap<BString, PhpMixed> {
     let mut map: IndexMap<BString, PhpMixed> = IndexMap::new();
     for (k, v) in entries {
-        map.insert(bconcat!(k), v.clone());
+        map.insert(bformat!("{k}"), v.clone());
     }
     map
 }
@@ -54,7 +54,7 @@ fn string_list(items: &[&BStr]) -> PhpMixed {
     PhpMixed::List(
         items
             .iter()
-            .map(|s| PhpMixed::string(bconcat!(s)))
+            .map(|s| PhpMixed::string(bformat!("{s}")))
             .collect(),
     )
 }
@@ -102,9 +102,9 @@ fn test_hg_guess_version_returns_data() {
         .unwrap()
         .expect("expected version data");
 
-    assert_eq!(bconcat!("dev-", branch), version_data.version.unwrap());
+    assert_eq!(bformat!("dev-{branch}"), version_data.version.unwrap());
     assert_eq!(
-        bconcat!("dev-", branch),
+        bformat!("dev-{branch}"),
         version_data.pretty_version.unwrap()
     );
     assert!(
@@ -128,12 +128,8 @@ fn test_guess_version_returns_data() {
         cmd_full(
             ["git", "branch", "-a", "--no-color", "--no-abbrev", "-v"],
             0,
-            bconcat!(
-                "* master ",
-                commit_hash,
-                " Commit message\n(no branch) ",
-                another_commit_hash,
-                " Commit message\n"
+            bformat!(
+                "* master {commit_hash} Commit message\n(no branch) {another_commit_hash} Commit message\n"
             ),
             "",
         ),
@@ -168,12 +164,8 @@ fn test_guess_version_does_not_see_custom_default_branch_as_non_feature_branch()
             ["git", "branch", "-a", "--no-color", "--no-abbrev", "-v"],
             0,
             // Assumption here is that arbitrary would be the default branch
-            bconcat!(
-                "  arbitrary ",
-                commit_hash,
-                " Commit message\n* current ",
-                another_commit_hash,
-                " Another message\n"
+            bformat!(
+                "  arbitrary {commit_hash} Commit message\n* current {another_commit_hash} Another message\n"
             ),
             "",
         ),
@@ -210,19 +202,15 @@ fn test_guess_version_reads_and_respects_non_feature_branches_configuration_for_
         cmd_full(
             ["git", "branch", "-a", "--no-color", "--no-abbrev", "-v"],
             0,
-            bconcat!(
-                "  arbitrary ",
-                commit_hash,
-                " Commit message\n* feature ",
-                another_commit_hash,
-                " Another message\n"
+            bformat!(
+                "  arbitrary {commit_hash} Commit message\n* feature {another_commit_hash} Another message\n"
             ),
             "",
         ),
         cmd_full(
             ["git", "rev-list", "arbitrary..feature"],
             0,
-            bconcat!(another_commit_hash, "\n"),
+            bformat!("{another_commit_hash}\n"),
             "",
         ),
     ];
@@ -277,19 +265,15 @@ fn test_guess_version_reads_and_respects_non_feature_branches_configuration_for_
         cmd_full(
             ["git", "branch", "-a", "--no-color", "--no-abbrev", "-v"],
             0,
-            bconcat!(
-                "  latest-testing ",
-                commit_hash,
-                " Commit message\n* feature ",
-                another_commit_hash,
-                " Another message\n"
+            bformat!(
+                "  latest-testing {commit_hash} Commit message\n* feature {another_commit_hash} Another message\n"
             ),
             "",
         ),
         cmd_full(
             ["git", "rev-list", "latest-testing..feature"],
             0,
-            bconcat!(another_commit_hash, "\n"),
+            bformat!("{another_commit_hash}\n"),
             "",
         ),
     ];
@@ -344,14 +328,8 @@ fn test_guess_version_reads_and_respects_non_feature_branches_configuration_for_
         cmd_full(
             ["git", "branch", "-a", "--no-color", "--no-abbrev", "-v"],
             0,
-            bconcat!(
-                "* latest-testing ",
-                commit_hash,
-                " Commit message\n  current ",
-                another_commit_hash,
-                " Another message\n  master ",
-                another_commit_hash,
-                " Another message\n"
+            bformat!(
+                "* latest-testing {commit_hash} Commit message\n  current {another_commit_hash} Another message\n  master {another_commit_hash} Another message\n"
             ),
             "",
         ),
@@ -395,7 +373,7 @@ fn test_detached_head_becomes_dev_hash() {
         cmd_full(
             ["git", "branch", "-a", "--no-color", "--no-abbrev", "-v"],
             0,
-            bconcat!("* (no branch) ", commit_hash, " Commit message\n"),
+            bformat!("* (no branch) {commit_hash} Commit message\n"),
             "",
         ),
         cmd(["git", "describe", "--exact-match", "--tags"]),
@@ -409,7 +387,7 @@ fn test_detached_head_becomes_dev_hash() {
         .unwrap()
         .expect("expected version data");
 
-    assert_eq!(bconcat!("dev-", commit_hash), version_data.version.unwrap());
+    assert_eq!(bformat!("dev-{commit_hash}"), version_data.version.unwrap());
 }
 
 #[test]
@@ -424,11 +402,7 @@ fn test_detached_fetch_head_becomes_dev_hash_git2() {
         cmd_full(
             ["git", "branch", "-a", "--no-color", "--no-abbrev", "-v"],
             0,
-            bconcat!(
-                "* (HEAD detached at FETCH_HEAD) ",
-                commit_hash,
-                " Commit message\n"
-            ),
+            bformat!("* (HEAD detached at FETCH_HEAD) {commit_hash} Commit message\n"),
             "",
         ),
         cmd(["git", "describe", "--exact-match", "--tags"]),
@@ -442,7 +416,7 @@ fn test_detached_fetch_head_becomes_dev_hash_git2() {
         .unwrap()
         .expect("expected version data");
 
-    assert_eq!(bconcat!("dev-", commit_hash), version_data.version.unwrap());
+    assert_eq!(bformat!("dev-{commit_hash}"), version_data.version.unwrap());
 }
 
 #[test]
@@ -457,11 +431,7 @@ fn test_detached_commit_head_becomes_dev_hash_git2() {
         cmd_full(
             ["git", "branch", "-a", "--no-color", "--no-abbrev", "-v"],
             0,
-            bconcat!(
-                "* (HEAD detached at 03a15d220) ",
-                commit_hash,
-                " Commit message\n"
-            ),
+            bformat!("* (HEAD detached at 03a15d220) {commit_hash} Commit message\n"),
             "",
         ),
         cmd(["git", "describe", "--exact-match", "--tags"]),
@@ -475,7 +445,7 @@ fn test_detached_commit_head_becomes_dev_hash_git2() {
         .unwrap()
         .expect("expected version data");
 
-    assert_eq!(bconcat!("dev-", commit_hash), version_data.version.unwrap());
+    assert_eq!(bformat!("dev-{commit_hash}"), version_data.version.unwrap());
 }
 
 #[test]

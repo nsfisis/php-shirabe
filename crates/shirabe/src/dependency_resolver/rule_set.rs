@@ -5,7 +5,7 @@ use crate::repository::RepositorySet;
 use bstr::{BStr, BString, ByteVec};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    OutOfBoundsException, PhpDisplay, STR_PAD_RIGHT, ToPhpString, bconcat, str_pad,
+    OutOfBoundsException, PhpDisplay, STR_PAD_RIGHT, ToPhpString, bformat, bwrite, str_pad,
 };
 
 #[derive(Debug)]
@@ -59,7 +59,9 @@ impl RuleSet {
     ) -> anyhow::Result<()> {
         let types = Self::types();
         if !types.contains_key(&r#type) {
-            return Err(OutOfBoundsException::new(bconcat!("Unknown rule type: ", r#type)).into());
+            return Err(
+                OutOfBoundsException::new(bformat!("Unknown rule type: {}", r#type)).into(),
+            );
         }
 
         let hash = rule.borrow().get_hash()?.to_php_string();
@@ -139,15 +141,16 @@ impl RuleSet {
         let dummy_installed_map = IndexMap::new();
         let dummy_learned_pool = Vec::new();
         for (r#type, rules) in &self.rules {
-            string.push_str(bconcat!(
+            bwrite!(
+                string,
+                "{}: ",
                 str_pad(
                     types.get(r#type).expect("unknown type"),
                     8,
                     " ",
                     STR_PAD_RIGHT
-                ),
-                ": "
-            ));
+                )
+            );
             for rule in rules {
                 if let Some(repository_set) = repository_set
                     && let Some(request) = request

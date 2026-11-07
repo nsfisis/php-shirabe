@@ -1,7 +1,7 @@
 //! ref: composer/vendor/symfony/console/Cursor.php sha1:66ee50b1358c7e580c858d4e1754674e58561f9b
 
 use crate::output::{OutputInterface, output_interface};
-use shirabe_php_shim::{PhpResource, STDIN, bconcat};
+use shirabe_php_shim::{PhpResource, STDIN, bformat};
 
 #[derive(Debug)]
 pub struct Cursor {
@@ -21,7 +21,7 @@ impl Cursor {
 
     pub fn move_up(&self, lines: i64) -> &Self {
         self.output.borrow().write(
-            &[bconcat!("\x1b[", lines, "A")],
+            &[bformat!("\u{1b}[{lines}A")],
             false,
             output_interface::OUTPUT_NORMAL,
         );
@@ -31,7 +31,7 @@ impl Cursor {
 
     pub fn move_left(&self, columns: i64) -> &Self {
         self.output.borrow().write(
-            &[bconcat!("\x1b[", columns, "D")],
+            &[bformat!("\u{1b}[{columns}D")],
             false,
             output_interface::OUTPUT_NORMAL,
         );
@@ -41,7 +41,7 @@ impl Cursor {
 
     pub fn move_to_column(&self, column: i64) -> &Self {
         self.output.borrow().write(
-            &[bconcat!("\x1b[", column, "G")],
+            &[bformat!("\u{1b}[{column}G")],
             false,
             output_interface::OUTPUT_NORMAL,
         );

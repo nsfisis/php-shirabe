@@ -9,7 +9,7 @@ use crate::output::OutputInterface;
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    FILE_APPEND, PHP_EOL, PHP_SERVER, PhpMixed, RuntimeException, ToPhpString, basename, bconcat,
+    FILE_APPEND, PHP_EOL, PHP_SERVER, PhpMixed, RuntimeException, ToPhpString, basename, bformat,
     ctype_digit, date_utc, error_message, file_put_contents_with_flags, filter_var_boolean, getenv,
     impl_php_class, implode, intval, path_from_bytes, php_str, sys_get_temp_dir,
 };
@@ -132,8 +132,8 @@ impl CompleteCommand {
         );
         let tmp_dir = sys_get_temp_dir();
         file_put_contents_with_flags(
-            path_from_bytes(&bconcat!(tmp_dir, "/sf_", command_name, ".log")),
-            &bconcat!(implode(PHP_EOL, &messages), PHP_EOL),
+            path_from_bytes(&bformat!("{tmp_dir}/sf_{command_name}.log")),
+            &bformat!("{}{PHP_EOL}", implode(PHP_EOL, &messages)),
             FILE_APPEND,
         );
     }
@@ -187,7 +187,7 @@ impl Command for CompleteCommand {
                 "shell",
                 Some("s".into()),
                 Some(InputOption::VALUE_REQUIRED),
-                bconcat!("The shell type (\"", shells, "\")"),
+                bformat!("The shell type (\"{shells}\")"),
                 InputValue::Null,
             )?
             .add_option(
@@ -257,10 +257,9 @@ impl Command for CompleteCommand {
                 .cloned()
                 .unwrap_or(PhpMixed::Bool(false));
             if !completion_output.to_bool() {
-                anyhow::bail!(RuntimeException::new(bconcat!(
-                    "Shell completion is not supported for your shell: \"",
+                anyhow::bail!(RuntimeException::new(bformat!(
+                    "Shell completion is not supported for your shell: \"{}\" (supported: \"{}\").",
                     shell.as_string().unwrap_or_default(),
-                    "\" (supported: \"",
                     implode(
                         "\", \"",
                         &self
@@ -268,8 +267,7 @@ impl Command for CompleteCommand {
                             .keys()
                             .map(|shell| shell.to_owned())
                             .collect::<Vec<_>>()
-                    ),
-                    "\")."
+                    )
                 )));
             }
 
@@ -278,12 +276,12 @@ impl Command for CompleteCommand {
 
             self.log_many(vec![
                 BString::default(),
-                bconcat!("<comment>", date_utc("Y-m-d H:i:s", None), "</>"),
+                bformat!("<comment>{}</>", date_utc("Y-m-d H:i:s", None)),
                 BString::from("<info>Input:</> <comment>(\"|\" indicates the cursor position)</>"),
-                bconcat!("  ", completion_input.to_php_string()),
+                bformat!("  {}", completion_input.to_php_string()),
                 BString::from("<info>Command:</>"),
-                bconcat!(
-                    "  ",
+                bformat!(
+                    "  {}",
                     implode(
                         " ",
                         &PHP_SERVER
@@ -342,10 +340,9 @@ impl Command for CompleteCommand {
 
                     if CompletionInput::TYPE_OPTION_NAME == completion_input.get_completion_type() {
                         self.log(
-                            bconcat!(
-                                "  Completing option names for the <comment>",
-                                get_class_of_command(&command),
-                                "</> command."
+                            bformat!(
+                                "  Completing option names for the <comment>{}</> command.",
+                                get_class_of_command(&command)
                             )
                             .as_bstr(),
                         );
@@ -353,24 +350,19 @@ impl Command for CompleteCommand {
                         suggestions.suggest_options(get_definition_options(&command));
                     } else {
                         self.log_many(vec![
-                            bconcat!(
-                                "  Completing using the <comment>",
-                                get_class_of_command(&command),
-                                "</> class."
+                            bformat!(
+                                "  Completing using the <comment>{}</> class.",
+                                get_class_of_command(&command)
                             ),
-                            bconcat!(
-                                "  Completing <comment>",
+                            bformat!(
+                                "  Completing <comment>{}</> for <comment>{}</>",
                                 completion_input.get_completion_type(),
-                                "</> for <comment>",
-                                completion_input.get_completion_name().unwrap_or_default(),
-                                "</>"
+                                completion_input.get_completion_name().unwrap_or_default()
                             ),
                         ]);
                         let compval = completion_input.get_completion_value();
                         if !compval.is_empty() {
-                            self.log(
-                                bconcat!("  Current value: <comment>", compval, "</>").as_bstr(),
-                            );
+                            self.log(bformat!("  Current value: <comment>{compval}</>").as_bstr());
                         }
 
                         command
@@ -388,8 +380,8 @@ impl Command for CompleteCommand {
             let option_suggestions = suggestions.get_option_suggestions();
             if !option_suggestions.is_empty() {
                 self.log(
-                    bconcat!(
-                        "  --",
+                    bformat!(
+                        "  --{}",
                         implode(
                             " --",
                             &option_suggestions
@@ -407,7 +399,7 @@ impl Command for CompleteCommand {
                     .map(|s| s.get_value().to_owned())
                     .collect();
                 if !value_suggestions.is_empty() {
-                    self.log(bconcat!("  ", implode(" ", &value_suggestions)).as_bstr());
+                    self.log(bformat!("  {}", implode(" ", &value_suggestions)).as_bstr());
                 } else {
                     self.log(BStr::new("  <comment>No suggestions were provided</>"));
                 }

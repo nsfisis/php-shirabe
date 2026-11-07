@@ -7,7 +7,7 @@ use crate::config_stub::ConfigStubBuilder;
 use crate::io_stub::IOStub;
 use shirabe::io::IOInterface;
 use shirabe::util::{GetResult, LocalFilesystem};
-use shirabe_php_shim::{PhpMixed, bconcat, file_get_contents, strpos, unlink};
+use shirabe_php_shim::{PhpMixed, bformat, file_get_contents, strpos, unlink};
 
 // Mirrors RemoteFilesystemTest::getConfigMock: get('github-domains') and
 // get('gitlab-domains') return [], everything else returns null.
@@ -41,7 +41,7 @@ fn test_get_contents() {
     let res = fs
         .get_contents(
             "http://example.org",
-            bconcat!("file://", this_file()),
+            bformat!("file://{}", this_file()),
             false,
             shirabe::util::StreamContextOptions::new(),
         )
@@ -60,7 +60,7 @@ fn test_copy() {
     assert!(matches!(
         fs.copy(
             "http://example.org",
-            bconcat!("file://", this_file()),
+            bformat!("file://{}", this_file()),
             &file,
             false,
             shirabe::util::StreamContextOptions::new()

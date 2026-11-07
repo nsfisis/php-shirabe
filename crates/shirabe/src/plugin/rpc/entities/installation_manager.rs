@@ -7,7 +7,7 @@ use crate::plugin::rpc::codec::arg;
 use crate::plugin::rpc::dispatch::unavailable_method;
 use bstr::{BStr, ByteSlice};
 use shirabe_php_rpc::{PhpObjHandle, PhpThrow, PluginValue, ToWire};
-use shirabe_php_shim::{bconcat, error_chain_message};
+use shirabe_php_shim::{bformat, error_chain_message};
 
 pub(crate) fn dispatch_installation_manager_method(
     im: &std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>,
@@ -26,15 +26,13 @@ pub(crate) fn dispatch_installation_manager_method(
                 BStr::new("Composer\\Installer\\InstallerInterface"),
             )
             .map_err(|error| {
-                PhpThrow::runtime(bconcat!(
-                    method_name,
-                    " could not type-check its argument: ",
+                PhpThrow::runtime(bformat!(
+                    "{method_name} could not type-check its argument: {}",
                     error_chain_message(&error)
                 ))
             })? {
-                return Err(PhpThrow::runtime(bconcat!(
-                    method_name,
-                    " expects a Composer\\Installer\\InstallerInterface, got ",
+                return Err(PhpThrow::runtime(bformat!(
+                    "{method_name} expects a Composer\\Installer\\InstallerInterface, got {}",
                     handle.class()
                 )));
             }

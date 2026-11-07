@@ -16,7 +16,7 @@ use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     AnyThrowable, InvalidArgumentException, PhpClass as _, PhpMixed, RuntimeException, array_map,
-    array_shift, bconcat, error_message, explode, implode, path_from_bytes, path_to_bytes,
+    array_shift, bformat, error_message, explode, implode, path_from_bytes, path_to_bytes,
     rawurldecode, realpath, str_replace, strlen, strpos, substr, trim,
 };
 use std::path::Path;
@@ -132,10 +132,9 @@ pub trait VcsDownloader:
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         if package.get_source_reference().is_none() {
-            return Err(InvalidArgumentException::new(bconcat!(
-                "Package ",
-                package.get_pretty_name(),
-                " is missing reference information"
+            return Err(InvalidArgumentException::new(bformat!(
+                "Package {} is missing reference information",
+                package.get_pretty_name()
             ))
             .into());
         }
@@ -157,12 +156,11 @@ pub trait VcsDownloader:
                         return Err(e);
                     }
                     if self.io().is_debug() {
-                        self.io().write_error(bconcat!(
-                            "Failed: [",
+                        self.io().write_error(bformat!(
+                            "Failed: [{}] {}",
                             AnyThrowable::of(&e)
                                 .expect("PHP reaches this only with a caught \\Throwable")
                                 .php_class_name(),
-                            "] ",
                             error_message(&e)
                         ));
                     } else if !urls.is_empty() {
@@ -232,18 +230,16 @@ pub trait VcsDownloader:
         path: &Path,
     ) -> anyhow::Result<Option<PhpMixed>> {
         if package.get_source_reference().is_none() {
-            return Err(InvalidArgumentException::new(bconcat!(
-                "Package ",
-                package.get_pretty_name(),
-                " is missing reference information"
+            return Err(InvalidArgumentException::new(bformat!(
+                "Package {} is missing reference information",
+                package.get_pretty_name()
             ))
             .into());
         }
 
-        self.io().write_error_no_newline(bconcat!(
-            "  - ",
-            InstallOperation::format(package.clone(), false),
-            ": "
+        self.io().write_error_no_newline(bformat!(
+            "  - {}: ",
+            InstallOperation::format(package.clone(), false)
         ));
 
         let mut urls = self.prepare_urls(package.get_source_urls());
@@ -261,12 +257,11 @@ pub trait VcsDownloader:
                         return Err(e);
                     }
                     if self.io().is_debug() {
-                        self.io().write_error(bconcat!(
-                            "Failed: [",
+                        self.io().write_error(bformat!(
+                            "Failed: [{}] {}",
                             AnyThrowable::of(&e)
                                 .expect("PHP reaches this only with a caught \\Throwable")
                                 .php_class_name(),
-                            "] ",
                             error_message(&e)
                         ));
                     } else if !urls.is_empty() {
@@ -289,18 +284,16 @@ pub trait VcsDownloader:
         path: &Path,
     ) -> anyhow::Result<Option<PhpMixed>> {
         if target.get_source_reference().is_none() {
-            return Err(InvalidArgumentException::new(bconcat!(
-                "Package ",
-                target.get_pretty_name(),
-                " is missing reference information"
+            return Err(InvalidArgumentException::new(bformat!(
+                "Package {} is missing reference information",
+                target.get_pretty_name()
             ))
             .into());
         }
 
-        self.io().write_error_no_newline(bconcat!(
-            "  - ",
-            UpdateOperation::format(initial.clone(), target.clone(), false),
-            ": "
+        self.io().write_error_no_newline(bformat!(
+            "  - {}: ",
+            UpdateOperation::format(initial.clone(), target.clone(), false)
         ));
 
         let mut urls = self.prepare_urls(target.get_source_urls());
@@ -324,12 +317,11 @@ pub trait VcsDownloader:
                         return Err(e);
                     }
                     if self.io().is_debug() {
-                        self.io().write_error(bconcat!(
-                            "Failed: [",
+                        self.io().write_error(bformat!(
+                            "Failed: [{}] {}",
                             AnyThrowable::of(&e)
                                 .expect("PHP reaches this only with a caught \\Throwable")
                                 .php_class_name(),
-                            "] ",
                             error_message(&e)
                         ));
                     } else if !urls.is_empty() {
@@ -356,7 +348,7 @@ pub trait VcsDownloader:
 
             if !trim(&logs).is_empty() {
                 let prefixed: Vec<BString> = array_map(
-                    |line: &BString| bconcat!("      ", line),
+                    |line: &BString| bformat!("      {line}"),
                     &explode("\n", &logs),
                 );
                 logs = implode("\n", &prefixed);
@@ -364,7 +356,7 @@ pub trait VcsDownloader:
                 // escape angle brackets for proper output in the console
                 logs = str_replace("<", "\\<", &logs);
 
-                self.io().write_error(bconcat!("    ", message));
+                self.io().write_error(bformat!("    {message}"));
                 self.io().write_error(&logs);
             }
         }
@@ -383,15 +375,15 @@ pub trait VcsDownloader:
         package: PackageInterfaceHandle,
         path: &Path,
     ) -> anyhow::Result<Option<PhpMixed>> {
-        self.io()
-            .write_error(bconcat!("  - ", UninstallOperation::format(package, false)));
+        self.io().write_error(bformat!(
+            "  - {}",
+            UninstallOperation::format(package, false)
+        ));
 
         let result = Filesystem::remove_directory_async_via(self.filesystem(), path).await?;
         if !result {
-            return Err(RuntimeException::new(bconcat!(
-                "Could not completely delete ",
-                path,
-                ", aborting."
+            return Err(RuntimeException::new(bformat!(
+                "Could not completely delete {path}, aborting."
             ))
             .into());
         }
@@ -431,10 +423,8 @@ pub trait VcsDownloader:
     ) -> anyhow::Result<Option<PhpMixed>> {
         // the default implementation just fails if there are any changes, override in child classes to provide stash-ability
         if self.get_local_changes(package, path).await?.is_some() {
-            return Err(RuntimeException::new(bconcat!(
-                "Source directory ",
-                path,
-                " has uncommitted changes."
+            return Err(RuntimeException::new(bformat!(
+                "Source directory {path} has uncommitted changes."
             ))
             .into());
         }
@@ -470,7 +460,7 @@ pub trait VcsDownloader:
                     .unwrap_or_default();
 
                 if is_file_protocol {
-                    *url_entry = bconcat!(file_protocol, &*url_entry);
+                    *url_entry = bformat!("{file_protocol}{}", &*url_entry);
                 }
             }
         }

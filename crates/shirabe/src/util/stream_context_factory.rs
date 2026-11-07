@@ -9,7 +9,7 @@ use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_ca_bundle::CaBundle;
 use shirabe_php_shim::{
-    PhpMixed, TypeError, array_replace_recursive, bconcat, explode, extension_loaded,
+    PhpMixed, TypeError, array_replace_recursive, bformat, explode, extension_loaded,
     get_debug_type, is_dir, path_from_bytes, path_to_bytes, php_uname, stream_context_create,
     stripos,
 };
@@ -124,7 +124,7 @@ impl StreamContextFactory {
         }
 
         let php = shirabe_php_rpc::get_php_version()?;
-        let php_version = bconcat!("PHP ", php.major, ".", php.minor, ".", php.release);
+        let php_version = bformat!("PHP {}.{}.{}", php.major, php.minor, php.release);
 
         let http_version = if for_curl {
             // PHP reports `cURL <version>` here. Shirabe's "curl" transport is backed by reqwest,
@@ -143,26 +143,19 @@ impl StreamContextFactory {
 
         if !has_user_agent {
             let platform_php_version = PlatformRepository::get_platform_php_version();
-            let user_agent = bconcat!(
-                "User-Agent: Composer/",
+            let user_agent = bformat!(
+                "User-Agent: Composer/{} ({}; {}; {php_version}; {http_version}{}{})",
                 composer::get_version(),
-                " (",
                 php_uname("s"),
-                "; ",
                 php_uname("r"),
-                "; ",
-                php_version,
-                "; ",
-                http_version,
                 platform_php_version
-                    .map(|v| bconcat!("; Platform-PHP ", v))
+                    .map(|v| bformat!("; Platform-PHP {v}"))
                     .unwrap_or_default(),
                 if Platform::get_env("CI").is_some_and(|v| !v.is_empty() && v != "0") {
                     "; CI"
                 } else {
                     ""
-                },
-                ")"
+                }
             );
             options
                 .http_mut()
@@ -251,11 +244,7 @@ impl StreamContextFactory {
 
         if let Some(cafile) = isset(&ssl, b"cafile") {
             let PhpMixed::String(cafile) = cafile else {
-                return Err(TypeError::new(bconcat!(
-                    "Composer\\Util\\Filesystem::isReadable(): Argument #1 ($path) must be of type string, ",
-                    get_debug_type(&cafile),
-                    " given"
-                ))
+                return Err(TypeError::new(bformat!("Composer\\Util\\Filesystem::isReadable(): Argument #1 ($path) must be of type string, {} given", get_debug_type(&cafile)))
                 .into());
             };
             let cafile = path_from_bytes(&cafile);
@@ -270,10 +259,9 @@ impl StreamContextFactory {
 
         if let Some(capath) = isset(&ssl, b"capath") {
             let PhpMixed::String(capath) = capath else {
-                return Err(TypeError::new(bconcat!(
-                    "is_dir(): Argument #1 ($filename) must be of type string, ",
-                    get_debug_type(&capath),
-                    " given"
+                return Err(TypeError::new(bformat!(
+                    "is_dir(): Argument #1 ($filename) must be of type string, {} given",
+                    get_debug_type(&capath)
                 ))
                 .into());
             };
@@ -309,10 +297,9 @@ impl StreamContextFactory {
             ),
             header @ (PhpMixed::List(_) | PhpMixed::Array(_)) => header,
             other => {
-                return Err(TypeError::new(bconcat!(
-                    "explode(): Argument #2 ($string) must be of type string, ",
-                    get_debug_type(&other),
-                    " given"
+                return Err(TypeError::new(bformat!(
+                    "explode(): Argument #2 ($string) must be of type string, {} given",
+                    get_debug_type(&other)
                 ))
                 .into());
             }
@@ -325,10 +312,9 @@ impl StreamContextFactory {
                 .into_iter()
                 .find(|value| !matches!(value, PhpMixed::String(_)))
         {
-            return Err(TypeError::new(bconcat!(
-                "stripos(): Argument #1 ($haystack) must be of type string, ",
-                get_debug_type(other),
-                " given"
+            return Err(TypeError::new(bformat!(
+                "stripos(): Argument #1 ($haystack) must be of type string, {} given",
+                get_debug_type(other)
             ))
             .into());
         }

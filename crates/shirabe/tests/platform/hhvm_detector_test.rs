@@ -2,7 +2,7 @@
 
 use shirabe::platform::{HhvmDetector, HhvmDetectorInterface};
 use shirabe::util::{Platform, ProcessExecutor};
-use shirabe_php_shim::{PhpMixed, bconcat};
+use shirabe_php_shim::{PhpMixed, bformat};
 use shirabe_semver::VersionParser;
 use shirabe_symfony_process::ExecutableFinder;
 
@@ -40,9 +40,9 @@ fn test_hhvm_version_when_executing_in_php() {
 
     let process = ProcessExecutor::new(None);
     let mut version = PhpMixed::Null;
-    let cmd = bconcat!(
-        ProcessExecutor::escape(&hhvm),
-        " --php -d hhvm.jit=0 -r \"echo HHVM_VERSION;\" 2>/dev/null"
+    let cmd = bformat!(
+        "{} --php -d hhvm.jit=0 -r \"echo HHVM_VERSION;\" 2>/dev/null",
+        ProcessExecutor::escape(&hhvm)
     );
     let exit_code = process.execute(&cmd, &mut version, None).unwrap();
     assert_eq!(0, exit_code);

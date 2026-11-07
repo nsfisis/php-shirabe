@@ -3,7 +3,7 @@
 use crate::dependency_resolver::operation::SolverOperation;
 use crate::package::{DisplayMode, PackageInterfaceHandle};
 use bstr::{BStr, BString};
-use shirabe_php_shim::{PhpDisplay, bconcat, php_str};
+use shirabe_php_shim::{PhpDisplay, bformat, php_str};
 
 #[derive(Debug, Clone)]
 pub struct UninstallOperation {
@@ -24,12 +24,10 @@ impl UninstallOperation {
     }
 
     pub fn format(package: PackageInterfaceHandle, _lock: bool) -> bstr::BString {
-        bconcat!(
-            "Removing <info>",
+        bformat!(
+            "Removing <info>{}</info> (<comment>{}</comment>)",
             package.get_pretty_name(),
-            "</info> (<comment>",
-            package.get_full_pretty_version(true, DisplayMode::SourceRefIfDev),
-            "</comment>)"
+            package.get_full_pretty_version(true, DisplayMode::SourceRefIfDev)
         )
     }
 }

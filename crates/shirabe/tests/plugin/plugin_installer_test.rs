@@ -32,7 +32,7 @@ use shirabe::util::r#loop::Loop;
 use shirabe::util::{HttpDownloader, Platform, ProcessExecutor};
 use shirabe_php_rpc::PluginValue;
 use shirabe_php_shim::{
-    Catch as _, PhpMixed, RuntimeException, UnexpectedValueException, bconcat, path_from_bytes,
+    Catch as _, PhpMixed, RuntimeException, UnexpectedValueException, bformat, path_from_bytes,
     path_to_bytes,
 };
 use shirabe_semver::VersionParser;
@@ -247,17 +247,16 @@ pub(crate) fn set_up() -> SetUp {
     let directory_path = directory.path();
     for i in 1..=8 {
         std::fs::create_dir_all(
-            directory_path.join(path_from_bytes(&bconcat!("Fixtures/plugin-v", i))),
+            directory_path.join(path_from_bytes(&bformat!("Fixtures/plugin-v{i}"))),
         )
         .unwrap();
         packages.push(
             loader
                 .load(JsonLoaderInput::String(
-                    path_to_bytes(&fixtures_dir().join(path_from_bytes(&bconcat!(
-                        "plugin-v",
-                        i,
-                        "/composer.json"
-                    ))))
+                    path_to_bytes(
+                        &fixtures_dir()
+                            .join(path_from_bytes(&bformat!("plugin-v{i}/composer.json"))),
+                    )
                     .into(),
                 ))
                 .unwrap(),
@@ -652,7 +651,7 @@ fn set_plugin_api_version_with_plugins(
         VersionParser
             .normalize(new_plugin_api_version, None)
             .unwrap(),
-        bconcat!(new_plugin_api_version),
+        bformat!("{new_plugin_api_version}"),
     )
     .into();
     let repository =
@@ -886,7 +885,7 @@ fn test_capability_implements_composer_plugin_api_class_and_is_constructed_with_
         std::rc::Rc::new(std::cell::RefCell::new(CapablePlugin {
             capabilities: IndexMap::from([(
                 capability_api.into(),
-                PhpMixed::string(bconcat!(capability_implementation)),
+                PhpMixed::string(bformat!("{capability_implementation}")),
             )]),
             get_capabilities_calls: get_capabilities_calls.clone(),
         }));
@@ -1088,7 +1087,7 @@ fn test_querying_with_non_existing_or_wrong_capability_class_types_throws() {
     load_composer_php_runtime();
     for wrong_implementation_class_type in non_existing_or_invalid_implementation_class_types() {
         assert_querying_with_invalid_capability_class_name_throws(
-            &PhpMixed::string(bconcat!(wrong_implementation_class_type)),
+            &PhpMixed::string(bformat!("{wrong_implementation_class_type}")),
             |err| err.is_instanceof::<RuntimeException>(),
             BStr::new("RuntimeException"),
         );

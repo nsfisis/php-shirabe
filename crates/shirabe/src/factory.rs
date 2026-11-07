@@ -36,7 +36,7 @@ use bstr::{B, BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, PATHINFO_EXTENSION, PHP_EOL, PHP_OS, PHP_SERVER,
-    PhpMixed, RuntimeException, UnexpectedValueException, bconcat, dirname, error_message,
+    PhpMixed, RuntimeException, UnexpectedValueException, bformat, dirname, error_message,
     extension_loaded, file_exists, file_get_contents, file_put_contents, implode, is_dir, is_file,
     json_decode_assoc, json_decode_obj, mkdir, path_from_bytes, path_to_bytes, pathinfo, realpath,
     rename, rtrim_chars, strpos, strtr, substr, trim_chars,
@@ -94,9 +94,9 @@ impl Factory {
             }
 
             let appdata = Platform::get_env("APPDATA").unwrap_or_default();
-            return Ok(bconcat!(
-                rtrim_chars(strtr(&appdata, "\\", "/"), "/"),
-                "/Shirabe"
+            return Ok(bformat!(
+                "{}/Shirabe",
+                rtrim_chars(strtr(&appdata, "\\", "/"), "/")
             ));
         }
 
@@ -107,13 +107,13 @@ impl Factory {
             // XDG Base Directory Specifications
             let mut xdg_config = Platform::get_env("XDG_CONFIG_HOME").unwrap_or_default();
             if xdg_config.is_empty() {
-                xdg_config = bconcat!(user_dir, "/.config");
+                xdg_config = bformat!("{user_dir}/.config");
             }
 
-            dirs.push(bconcat!(xdg_config, "/shirabe"));
+            dirs.push(bformat!("{xdg_config}/shirabe"));
         }
 
-        dirs.push(bconcat!(user_dir, "/.shirabe"));
+        dirs.push(bformat!("{user_dir}/.shirabe"));
 
         // select first dir which exists of: $XDG_CONFIG_HOME/shirabe or ~/.shirabe
         for dir in &dirs {
@@ -134,15 +134,15 @@ impl Factory {
 
         let home_env = Platform::get_env("COMPOSER_HOME").unwrap_or_default();
         if !home_env.is_empty() {
-            return Ok(bconcat!(home_env, "/cache"));
+            return Ok(bformat!("{home_env}/cache"));
         }
 
         if Platform::is_windows() {
             let mut cache_dir = Platform::get_env("LOCALAPPDATA").unwrap_or_default();
             if !cache_dir.is_empty() {
-                cache_dir = bconcat!(cache_dir, "/Shirabe");
+                cache_dir = bformat!("{cache_dir}/Shirabe");
             } else {
-                cache_dir = bconcat!(home, "/cache");
+                cache_dir = bformat!("{home}/cache");
             }
 
             return Ok(rtrim_chars(strtr(&cache_dir, "\\", "/"), "/"));
@@ -151,38 +151,37 @@ impl Factory {
         let user_dir = Self::get_user_dir()?;
         if PHP_OS == "Darwin" {
             // Migrate existing cache dir in old location if present
-            if is_dir(path_from_bytes(&bconcat!(home, "/cache")))
-                && !is_dir(path_from_bytes(&bconcat!(
-                    user_dir,
-                    "/Library/Caches/shirabe"
+            if is_dir(path_from_bytes(&bformat!("{home}/cache")))
+                && !is_dir(path_from_bytes(&bformat!(
+                    "{user_dir}/Library/Caches/shirabe"
                 )))
             {
-                let from = bconcat!(home, "/cache");
-                let to = bconcat!(user_dir, "/Library/Caches/shirabe");
+                let from = bformat!("{home}/cache");
+                let to = bformat!("{user_dir}/Library/Caches/shirabe");
                 let _ = rename(path_from_bytes(&from), path_from_bytes(&to));
             }
 
-            return Ok(bconcat!(user_dir, "/Library/Caches/shirabe"));
+            return Ok(bformat!("{user_dir}/Library/Caches/shirabe"));
         }
 
-        if home == bconcat!(user_dir, "/.shirabe")
-            && is_dir(path_from_bytes(&bconcat!(home, "/cache")))
+        if home == bformat!("{user_dir}/.shirabe")
+            && is_dir(path_from_bytes(&bformat!("{home}/cache")))
         {
-            return Ok(bconcat!(home, "/cache"));
+            return Ok(bformat!("{home}/cache"));
         }
 
         if Self::use_xdg() {
             let xdg_cache = Platform::get_env("XDG_CACHE_HOME").unwrap_or_default();
             let xdg_cache = if xdg_cache.is_empty() {
-                bconcat!(user_dir, "/.cache")
+                bformat!("{user_dir}/.cache")
             } else {
                 xdg_cache
             };
 
-            return Ok(bconcat!(xdg_cache, "/shirabe"));
+            return Ok(bformat!("{xdg_cache}/shirabe"));
         }
 
-        Ok(bconcat!(home, "/cache"))
+        Ok(bformat!("{home}/cache"))
     }
 
     fn get_data_dir(home: &BStr) -> anyhow::Result<BString> {
@@ -196,15 +195,15 @@ impl Factory {
         }
 
         let user_dir = Self::get_user_dir()?;
-        if home != bconcat!(user_dir, "/.shirabe") && Self::use_xdg() {
+        if home != bformat!("{user_dir}/.shirabe") && Self::use_xdg() {
             let xdg_data = Platform::get_env("XDG_DATA_HOME").unwrap_or_default();
             let xdg_data = if xdg_data.is_empty() {
-                bconcat!(user_dir, "/.local/share")
+                bformat!("{user_dir}/.local/share")
             } else {
                 xdg_data
             };
 
-            return Ok(bconcat!(xdg_data, "/shirabe"));
+            return Ok(bformat!("{xdg_data}/shirabe"));
         }
 
         Ok(BString::from(home))
@@ -246,7 +245,7 @@ impl Factory {
         if file.exists() {
             if let Some(io_ref) = &io {
                 io_ref.write_error_with_verbosity(
-                    bconcat!("Loading config file ", file.get_path()),
+                    bformat!("Loading config file {}", file.get_path()),
                     DEBUG,
                 );
             }
@@ -295,7 +294,7 @@ impl Factory {
         if auth_file.exists() {
             if let Some(io_ref) = &io {
                 io_ref.write_error_with_verbosity(
-                    bconcat!("Loading config file ", auth_file.get_path()),
+                    bformat!("Loading config file {}", auth_file.get_path()),
                     DEBUG,
                 );
             }
@@ -333,7 +332,7 @@ impl Factory {
             if !env_trimmed.is_empty() {
                 let env_trimmed = path_from_bytes(&env_trimmed);
                 if is_dir(env_trimmed) {
-                    return Err(RuntimeException::new(bconcat!("The COMPOSER environment variable is set to ", env_trimmed, " which is a directory, this variable should point to a composer.json or be left unset.")).into());
+                    return Err(RuntimeException::new(bformat!("The COMPOSER environment variable is set to {env_trimmed} which is a directory, this variable should point to a composer.json or be left unset.")).into());
                 }
 
                 return Ok(env_trimmed.to_path_buf());
@@ -347,12 +346,12 @@ impl Factory {
         let composer_file = path_to_bytes(composer_file);
         let ext = pathinfo(composer_file, PATHINFO_EXTENSION);
         let lock_file = if ext == "json" {
-            bconcat!(
-                substr(composer_file, 0, Some(composer_file.len() as i64 - 4)),
-                "lock"
+            bformat!(
+                "{}lock",
+                substr(composer_file, 0, Some(composer_file.len() as i64 - 4))
             )
         } else {
-            bconcat!(composer_file, ".lock")
+            bformat!("{composer_file}.lock")
         };
         path_from_bytes(&lock_file).to_path_buf()
     }
@@ -431,19 +430,17 @@ impl Factory {
                 let message = if path.as_os_str() == "./composer.json"
                     || path.as_os_str() == "composer.json"
                 {
-                    bconcat!("Shirabe could not find a composer.json file in ", cwd)
+                    bformat!("Shirabe could not find a composer.json file in {cwd}")
                 } else {
-                    bconcat!("Shirabe could not find the config file: ", path)
+                    bformat!("Shirabe could not find the config file: {path}")
                 };
                 let instructions = if full_load {
                     "To initialize a project, please create a composer.json file. See https://getcomposer.org/basic-usage"
                 } else {
                     ""
                 };
-                return Err(InvalidArgumentException::new(bconcat!(
-                    message,
-                    PHP_EOL,
-                    instructions
+                return Err(InvalidArgumentException::new(bformat!(
+                    "{message}{PHP_EOL}{instructions}"
                 ))
                 .into());
             }
@@ -452,9 +449,11 @@ impl Factory {
                 && let Err(e) = file.validate_schema(JsonFile::LAX_SCHEMA, None)
             {
                 if let Some(jve) = e.catch::<JsonValidationException>() {
-                    let errors =
-                        bconcat!(" - ", (implode(bconcat!(PHP_EOL, " - "), jve.get_errors())));
-                    let message = bconcat!(jve.get_message(), ":", PHP_EOL, errors);
+                    let errors = bformat!(
+                        " - {}",
+                        (implode(bformat!("{PHP_EOL} - "), jve.get_errors()))
+                    );
+                    let message = bformat!("{}:{PHP_EOL}{errors}", jve.get_message());
                     return Err(
                         JsonValidationException::new(message, jve.get_errors().clone()).into(),
                     );
@@ -486,12 +485,9 @@ impl Factory {
 
         if let Some(ref composer_file_path) = composer_file {
             io.write_error_with_verbosity(
-                bconcat!(
-                    "Loading config file ",
-                    composer_file_path,
-                    " (",
-                    realpath(composer_file_path).unwrap_or_default(),
-                    ")"
+                bformat!(
+                    "Loading config file {composer_file_path} ({})",
+                    realpath(composer_file_path).unwrap_or_default()
                 ),
                 DEBUG,
             );
@@ -514,7 +510,7 @@ impl Factory {
             )?;
             if local_auth_file.exists() {
                 io.write_error_with_verbosity(
-                    bconcat!("Loading config file ", local_auth_file.get_path()),
+                    bformat!("Loading config file {}", local_auth_file.get_path()),
                     DEBUG,
                 );
                 Self::validate_json_schema(
@@ -721,7 +717,7 @@ impl Factory {
                             let lock_file = Self::get_lock_file(composer_file_path);
                             let lock_enabled = config.borrow().get_bool("lock");
                             if !lock_enabled && file_exists(&lock_file) {
-                                io.write_error(bconcat!("<warning>", lock_file, " is present but ignored as the \"lock\" config option is disabled.</warning>"));
+                                io.write_error(bformat!("<warning>{lock_file} is present but ignored as the \"lock\" config option is disabled.</warning>"));
                             }
 
                             let locker = Locker::new(
@@ -843,7 +839,7 @@ impl Factory {
         if full_load {
             // The back-reference is now upgradeable, so dispatching the INIT event (which may read
             // the Composer through the dispatcher) is safe only after the Rc has been constructed.
-            let init_event = Event::from_name(bconcat!(PluginEvents::INIT));
+            let init_event = Event::from_name(bformat!("{}", PluginEvents::INIT));
             let init_event_name = init_event.get_name().to_owned();
             let dispatcher = composer.borrow().get_event_dispatcher();
             dispatcher.borrow_mut().dispatch(
@@ -943,7 +939,10 @@ impl Factory {
             Ok(c) => Some(c),
             Err(e) => {
                 io.write_error_with_verbosity(
-                    bconcat!("Failed to initialize global composer: ", error_message(&e)),
+                    bformat!(
+                        "Failed to initialize global composer: {}",
+                        error_message(&e)
+                    ),
                     DEBUG,
                 );
                 None
@@ -1350,10 +1349,9 @@ impl Factory {
 
         let mut config = Config::new(true, cwd.map(|cwd| path_to_bytes(cwd).into()));
 
-        let home = std::env::temp_dir().join(path_from_bytes(&bconcat!(
-            "shirabe-test-",
+        let home = std::env::temp_dir().join(path_from_bytes(&bformat!(
+            "shirabe-test-{}-{}",
             std::process::id(),
-            "-",
             NEXT.fetch_add(1, Ordering::Relaxed)
         )));
         let _ = std::fs::create_dir_all(&home);
@@ -1520,15 +1518,13 @@ impl Factory {
 
         if let Err(e) = result {
             if let Some(jve) = e.catch::<JsonValidationException>() {
-                let msg = bconcat!(
+                let msg = bformat!(
+                    "{}, this may result in errors and should be resolved:{PHP_EOL} - {}",
                     jve.get_message(),
-                    ", this may result in errors and should be resolved:",
-                    PHP_EOL,
-                    " - ",
-                    (implode(bconcat!(PHP_EOL, " - "), jve.get_errors()))
+                    (implode(bformat!("{PHP_EOL} - "), jve.get_errors()))
                 );
                 if let Some(io_ref) = io {
-                    io_ref.write_error(bconcat!("<warning>", msg, "</>"));
+                    io_ref.write_error(bformat!("<warning>{msg}</>"));
                 } else {
                     return Err(UnexpectedValueException::new(msg).into());
                 }

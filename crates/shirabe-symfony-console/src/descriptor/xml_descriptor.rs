@@ -9,7 +9,7 @@ use crate::input::{InputArgument, InputDefinition, InputOption};
 use crate::output::OutputInterface;
 use bstr::BString;
 use shirabe_php_shim::{
-    DOMDocument, DOMNode, PhpMixed, ToPhpString, bconcat, php_truthy, str_replace, strpos, substr,
+    DOMDocument, DOMNode, PhpMixed, ToPhpString, bformat, php_truthy, str_replace, strpos, substr,
     var_export,
 };
 
@@ -245,25 +245,28 @@ impl XmlDescriptor {
         let dom = DOMDocument::new("1.0", "UTF-8");
 
         let object_xml = dom.append_child(dom.create_element("option"));
-        object_xml.set_attribute("name", bconcat!("--", option.get_name()));
+        object_xml.set_attribute("name", bformat!("--{}", option.get_name()));
         let pos = strpos(option.get_shortcut().unwrap_or_default(), "|");
         if let Some(pos) = pos {
             object_xml.set_attribute(
                 "shortcut",
-                bconcat!(
-                    "-",
+                bformat!(
+                    "-{}",
                     substr(option.get_shortcut().unwrap(), 0, Some(pos as i64))
                 ),
             );
             object_xml.set_attribute(
                 "shortcuts",
-                bconcat!("-", str_replace("|", "|-", option.get_shortcut().unwrap())),
+                bformat!(
+                    "-{}",
+                    str_replace("|", "|-", option.get_shortcut().unwrap())
+                ),
             );
         } else {
             object_xml.set_attribute(
                 "shortcut",
                 &match option.get_shortcut() {
-                    Some(s) => bconcat!("-", s),
+                    Some(s) => bformat!("-{s}"),
                     None => BString::default(),
                 },
             );
@@ -306,17 +309,15 @@ impl XmlDescriptor {
 
         if option.is_negatable() {
             let object_xml = dom.append_child(dom.create_element("option"));
-            object_xml.set_attribute("name", bconcat!("--no-", option.get_name()));
+            object_xml.set_attribute("name", bformat!("--no-{}", option.get_name()));
             object_xml.set_attribute("shortcut", "");
             object_xml.set_attribute("accept_value", "0");
             object_xml.set_attribute("is_value_required", "0");
             object_xml.set_attribute("is_multiple", "0");
             let description_xml = object_xml.append_child(dom.create_element("description"));
-            description_xml.append_child(dom.create_text_node(bconcat!(
-                "Negate the \"--",
-                option.get_name(),
-                "\" option"
-            )));
+            description_xml.append_child(
+                dom.create_text_node(bformat!("Negate the \"--{}\" option", option.get_name())),
+            );
         }
 
         dom

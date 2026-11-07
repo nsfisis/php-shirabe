@@ -4,7 +4,7 @@ use crate::dependency_resolver::operation::SolverOperation;
 use crate::package::version::VersionParser;
 use crate::package::{DisplayMode, PackageInterfaceHandle};
 use bstr::{BStr, BString};
-use shirabe_php_shim::{PhpDisplay, bconcat, php_str};
+use shirabe_php_shim::{PhpDisplay, bformat, php_str};
 
 #[derive(Debug, Clone)]
 pub struct UpdateOperation {
@@ -69,15 +69,9 @@ impl UpdateOperation {
             "Downgrading"
         };
 
-        bconcat!(
-            action_name,
-            " <info>",
-            initial_package.get_pretty_name(),
-            "</info> (<comment>",
-            from_version,
-            "</comment> => <comment>",
-            to_version,
-            "</comment>)"
+        bformat!(
+            "{action_name} <info>{}</info> (<comment>{from_version}</comment> => <comment>{to_version}</comment>)",
+            initial_package.get_pretty_name()
         )
     }
 }

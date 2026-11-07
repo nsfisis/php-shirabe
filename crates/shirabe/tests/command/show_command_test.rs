@@ -9,7 +9,7 @@ use serial_test::serial;
 use shirabe::package::{Link, PackageInterfaceHandle};
 use shirabe::repository::PlatformRepository;
 use shirabe_php_shim::{
-    STR_PAD_RIGHT, bconcat, date_local, error_message, implode, rtrim, str_pad, trim, utf8_text,
+    STR_PAD_RIGHT, bformat, date_local, error_message, implode, rtrim, str_pad, trim, utf8_text,
 };
 
 /// Build a `Vec<(ParameterName, InputValue)>` command input from `(key, value)` pairs.
@@ -1084,7 +1084,7 @@ fn test_self() {
         (BStr::new("descrip."), BString::from("")),
         (BStr::new("keywords"), BString::from("")),
         (BStr::new("versions"), BString::from("* 1.2.3")),
-        (BStr::new("released"), bconcat!(today, ", today").to_owned()),
+        (BStr::new("released"), bformat!("{today}, today").to_owned()),
         (BStr::new("type"), BString::from("library")),
         (BStr::new("homepage"), BString::from("")),
         (BStr::new("source"), BString::from("[]  ")),
@@ -1094,9 +1094,9 @@ fn test_self() {
     ];
     let lines: Vec<BString> = expected
         .iter()
-        .map(|(k, v)| bconcat!(str_pad(k, 8, " ", STR_PAD_RIGHT), " : ", v))
+        .map(|(k, v)| bformat!("{} : {v}", str_pad(k, 8, " ", STR_PAD_RIGHT)))
         .collect();
-    let expected_string = bconcat!(implode("\n", &lines), "\n");
+    let expected_string = bformat!("{}\n", implode("\n", &lines));
 
     assert_eq!(expected_string, app_tester.get_display());
 }
@@ -1333,10 +1333,8 @@ fn test_not_existing_package_with_working_dir() {
     let dir = tear_down.working_dir();
     create_installed_json(&[get_package("vendor/package", "1.0.0")], &[], true);
 
-    let expected = bconcat!(
-        "Package \"not/existing\" not found in ",
-        dir,
-        "/composer.json, try using --available (-a) to show all available packages."
+    let expected = bformat!(
+        "Package \"not/existing\" not found in {dir}/composer.json, try using --available (-a) to show all available packages."
     );
 
     let mut app_tester = get_application_tester();
@@ -1347,7 +1345,7 @@ fn test_not_existing_package_with_working_dir() {
                 (BStr::new("package"), InputValue::from("not/existing")),
                 (
                     BStr::new("--working-dir"),
-                    InputValue::from(bconcat!(dir).as_bstr()),
+                    InputValue::from(bformat!("{dir}").as_bstr()),
                 ),
             ]),
             RunOptions::default(),
@@ -1549,13 +1547,13 @@ fn package_with_every_link_type() -> PackageInterfaceHandle {
     let link =
         |target: &BStr, operator: &BStr, version: &BStr, pretty: &BStr, r#type: &bstr::BStr| {
             indexmap::IndexMap::from([(
-                bconcat!(target),
+                bformat!("{target}"),
                 Link::new(
                     BString::from("vendor/package"),
-                    bconcat!(target),
+                    bformat!("{target}"),
                     get_version_constraint(operator, version),
                     Some(r#type.to_owned()),
-                    Some(bconcat!(pretty)),
+                    Some(bformat!("{pretty}")),
                 ),
             )])
         };

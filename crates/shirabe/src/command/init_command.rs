@@ -19,7 +19,7 @@ use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, FILE_IGNORE_NEW_LINES, InvalidArgumentException, PHP_EOL, PHP_SERVER, PhpMixed,
-    array_filter_map, array_intersect_key, array_map, basename, bconcat, empty, explode, file,
+    array_filter_map, array_intersect_key, array_map, basename, bformat, empty, explode, file,
     file_exists, file_get_contents, file_put_contents, filter_var_email, get_current_user,
     impl_php_class, implode, is_dir, is_string, path_from_bytes, path_to_bytes,
     pcre_check_utf8_subject, php_regex, preg_is_match, preg_match, preg_match_all, preg_quote,
@@ -96,12 +96,9 @@ impl InitCommand {
             if let Some(ref email) = email
                 && !self.is_valid_email(email.as_bstr())
             {
-                return Err(InvalidArgumentException::new(bconcat!(
-                    "Invalid email \"",
-                    email,
-                    "\""
-                ))
-                .into());
+                return Err(
+                    InvalidArgumentException::new(bformat!("Invalid email \"{email}\"")).into(),
+                );
             }
 
             let mut result: IndexMap<BString, Option<BString>> = IndexMap::new();
@@ -208,7 +205,7 @@ impl InitCommand {
             return false;
         }
 
-        let pattern = bconcat!("{^/?", preg_quote(vendor, None), "(/\\*?)?$}");
+        let pattern = bformat!("{{^/?{}(/\\*?)?$}}", preg_quote(vendor, None));
 
         let lines = file(ignore_file, FILE_IGNORE_NEW_LINES).unwrap_or_default();
         for line in &lines {
@@ -231,7 +228,7 @@ impl InitCommand {
             }
         }
 
-        file_put_contents(ignore_file, bconcat!(contents, vendor, "\n"));
+        file_put_contents(ignore_file, bformat!("{contents}{vendor}\n"));
     }
 
     /// For testing only: invoke the private `parse_author_string`.
@@ -402,7 +399,7 @@ impl InitCommand {
 
         let vendor = self.sanitize_package_name_component(vendor.as_bstr())?;
 
-        Ok(bconcat!(vendor, "/", name))
+        Ok(bformat!("{vendor}/{name}"))
     }
 
     fn get_default_author(&self) -> anyhow::Result<Option<BString>> {
@@ -443,7 +440,7 @@ impl InitCommand {
         }
 
         if let (Some(name), Some(email)) = (author_name, author_email) {
-            return Ok(Some(bconcat!(name, " <", email, ">")));
+            return Ok(Some(bformat!("{name} <{email}>")));
         }
 
         Ok(None)
@@ -463,7 +460,7 @@ impl Command for InitCommand {
         InputOption::new("homepage", None, Some(InputOption::VALUE_REQUIRED), "Homepage of package", None).unwrap().into(),
         InputOption::with_suggested_values("require", None, Some(InputOption::VALUE_IS_ARRAY | InputOption::VALUE_REQUIRED), "Package to require with a version constraint, e.g. foo/bar:1.0.0 or foo/bar=1.0.0 or \"foo/bar 1.0.0\"", None, self.suggest_available_package_incl_platform()).unwrap().into(),
         InputOption::with_suggested_values("require-dev", None, Some(InputOption::VALUE_IS_ARRAY | InputOption::VALUE_REQUIRED), "Package to require for development with a version constraint, e.g. foo/bar:1.0.0 or foo/bar=1.0.0 or \"foo/bar 1.0.0\"", None, self.suggest_available_package_incl_platform()).unwrap().into(),
-        InputOption::new("stability", Some("s".into()), Some(InputOption::VALUE_REQUIRED), bconcat!("Minimum stability (empty or one of: ", implode(", ", &base_package::STABILITIES.keys().copied().collect::<Vec<_>>()), ")"), None).unwrap().into(),
+        InputOption::new("stability", Some("s".into()), Some(InputOption::VALUE_REQUIRED), bformat!("Minimum stability (empty or one of: {})", implode(", ", &base_package::STABILITIES.keys().copied().collect::<Vec<_>>())), None).unwrap().into(),
         InputOption::new("license", Some("l".into()), Some(InputOption::VALUE_REQUIRED), "License of package", None).unwrap().into(),
         InputOption::new("repository", None, Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY), "Add custom repositories, either by URL or using JSON arrays", None).unwrap().into(),
         InputOption::new("autoload", Some("a".into()), Some(InputOption::VALUE_REQUIRED), "Add PSR-4 autoload mapping. Maps your package's namespace to the provided directory. (Expects a relative path, e.g. src/)", None).unwrap().into(),
@@ -528,7 +525,7 @@ impl Command for InitCommand {
                     .unwrap_or_default(),
             )
         {
-            return Err(InvalidArgumentException::new(bconcat!("The package name ", options.get(B("name")).and_then(|v| v.as_string()).unwrap_or_default(), " is invalid, it should be lowercase and have a vendor name, a forward slash, and a package name, matching: [a-z0-9_.-]+/[a-z0-9_.-]+"))
+            return Err(InvalidArgumentException::new(bformat!("The package name {} is invalid, it should be lowercase and have a vendor name, a forward slash, and a package name, matching: [a-z0-9_.-]+/[a-z0-9_.-]+", options.get(B("name")).and_then(|v| v.as_string()).unwrap_or_default()))
             .into());
         }
 
@@ -648,7 +645,7 @@ impl Command for InitCommand {
                 .namespace_from_package_name(name.as_string().unwrap_or_default())
                 .unwrap_or_default();
             let mut psr4 = IndexMap::new();
-            psr4.insert(bconcat!(namespace, "\\"), PhpMixed::string(ap));
+            psr4.insert(bformat!("{namespace}\\"), PhpMixed::string(ap));
             let mut autoload_obj = IndexMap::new();
             autoload_obj.insert("psr-4".into(), PhpMixed::Array(psr4));
             options.insert("autoload".into(), PhpMixed::Array(autoload_obj));
@@ -659,14 +656,14 @@ impl Command for InitCommand {
         let json = JsonFile::encode(&PhpMixed::Array(options_for_encode.clone()))?;
 
         if input.borrow().is_interactive() {
-            io.write_error(bconcat!("\n", json, "\n"));
+            io.write_error(bformat!("\n{json}\n"));
             if !io.ask_confirmation("Do you confirm generation [<comment>yes</comment>]? ", true)? {
                 io.write_error("<error>Command aborted</error>");
 
                 return Ok(1);
             }
         } else {
-            io.write_error(bconcat!("Writing ", file_obj.get_path()));
+            io.write_error(bformat!("Writing {}", file_obj.get_path()));
         }
 
         file_obj.write(PhpMixed::Array(options_for_encode))?;
@@ -675,11 +672,11 @@ impl Command for InitCommand {
             // try to downcast to JsonValidationException
             if let Some(json_err) = e.catch::<JsonValidationException>() {
                 io.write_error("<error>Schema validation error, aborting</error>");
-                let errors = bconcat!(
-                    " - ",
-                    (implode(bconcat!(PHP_EOL, " - "), json_err.get_errors()))
+                let errors = bformat!(
+                    " - {}",
+                    (implode(bformat!("{PHP_EOL} - "), json_err.get_errors()))
                 );
-                io.write_error(bconcat!(json_err.get_message(), ":", PHP_EOL, errors));
+                io.write_error(bformat!("{}:{PHP_EOL}{errors}", json_err.get_message()));
                 let _ = unlink(file_obj.get_path());
 
                 return Ok(1);
@@ -700,8 +697,11 @@ impl Command for InitCommand {
 
         if input.borrow().is_interactive() && is_dir(".git") {
             let ignore_file = realpath(".gitignore").unwrap_or_else(|| {
-                path_from_bytes(&bconcat!(realpath(".").unwrap_or_default(), "/.gitignore"))
-                    .to_path_buf()
+                path_from_bytes(&bformat!(
+                    "{}/.gitignore",
+                    realpath(".").unwrap_or_default()
+                ))
+                .to_path_buf()
             });
 
             if !self.has_vendor_ignore(&ignore_file, BStr::new("vendor")) {
@@ -731,12 +731,7 @@ impl Command for InitCommand {
                 .namespace_from_package_name(name.as_string().unwrap_or_default())
                 .unwrap_or_default();
 
-            io.write_error(bconcat!(
-                "PSR-4 autoloading configured. Use \"<comment>namespace ",
-                namespace,
-                ";</comment>\" in ",
-                autoload_path.clone().unwrap_or_default()
-            ));
+            io.write_error(bformat!("PSR-4 autoloading configured. Use \"<comment>namespace {namespace};</comment>\" in {}", autoload_path.clone().unwrap_or_default()));
             io.write_error("Include the Composer autoloader with: <comment>require 'vendor/autoload.php';</comment>");
         }
 
@@ -857,14 +852,13 @@ impl Command for InitCommand {
                 // unset($repos, $config, $repositories);
             }
 
-            io.write_error(bconcat!(
-                "\n",
+            io.write_error(bformat!(
+                "\n{}\n",
                 formatter.borrow().format_block(
                     FormatBlockMessages::String("Welcome to the Shirabe config generator".into()),
                     "bg=blue;fg=white".into(),
                     true,
-                ),
-                "\n"
+                )
             ));
 
             // namespace
@@ -886,7 +880,7 @@ impl Command for InitCommand {
             let name_for_validate = name.clone();
             name = BString::from(io
             .ask_and_validate(
-                bconcat!("Package name (<vendor>/<name>) [<comment>", name_default, "</comment>]: "),
+                bformat!("Package name (<vendor>/<name>) [<comment>{name_default}</comment>]: "),
                 Box::new(move |value: InputValue| -> anyhow::Result<InputValue> {
                     if value.is_null() {
                         return Ok(InputValue::String(name_for_validate.clone()));
@@ -898,7 +892,7 @@ impl Command for InitCommand {
                         ),
                         value.as_string().unwrap_or_default(),
                     ) {
-                        return Err(InvalidArgumentException::new(bconcat!("The package name ", value.as_string().unwrap_or_default(), " is invalid, it should be lowercase and have a vendor name, a forward slash, and a package name, matching: [a-z0-9_.-]+/[a-z0-9_.-]+"))
+                        return Err(InvalidArgumentException::new(bformat!("The package name {} is invalid, it should be lowercase and have a vendor name, a forward slash, and a package name, matching: [a-z0-9_.-]+/[a-z0-9_.-]+", value.as_string().unwrap_or_default()))
                         .into());
                     }
 
@@ -920,10 +914,9 @@ impl Command for InitCommand {
                 .map(BString::from);
             let description_default = description.clone();
             let description = io.ask(
-                bconcat!(
-                    "Description [<comment>",
-                    description.unwrap_or_default(),
-                    "</comment>]: "
+                bformat!(
+                    "Description [<comment>{}</comment>]: ",
+                    description.unwrap_or_default()
                 ),
                 InputValue::from(description_default),
             )?;
@@ -943,14 +936,13 @@ impl Command for InitCommand {
             let author_default = author.clone();
             // PHP: $this->parseAuthorString is called inside a closure. We approximate by binding.
             let author_value = io.ask_and_validate(
-                bconcat!(
-                    "Author [",
+                bformat!(
+                    "Author [{} n to skip]: ",
                     if is_string(&PhpMixed::string(author.clone())) {
-                        bconcat!("<comment>", author, "</comment>, ")
+                        bformat!("<comment>{author}</comment>, ")
                     } else {
                         BString::default()
-                    },
-                    " n to skip]: "
+                    }
                 ),
                 // PHP: function ($value) use ($self, $author) { ... $author = $self->parseAuthorString($value); ... }
                 // The validator is a `'static` closure and cannot borrow `&self`, but
@@ -974,7 +966,7 @@ impl Command for InitCommand {
                         .unwrap_or_default();
                     match parsed.get(bstr::B("email")).cloned().flatten() {
                         None => Ok(InputValue::String(name)),
-                        Some(email) => Ok(InputValue::String(bconcat!(name, " <", email, ">"))),
+                        Some(email) => Ok(InputValue::String(bformat!("{name} <{email}>"))),
                     }
                 }),
                 None,
@@ -990,10 +982,9 @@ impl Command for InitCommand {
             let minimum_stability_default = minimum_stability.clone();
             let minimum_stability_for_validate = minimum_stability.clone();
             let minimum_stability_value = io.ask_and_validate(
-                bconcat!(
-                    "Minimum Stability [<comment>",
-                    minimum_stability.unwrap_or_default(),
-                    "</comment>]: "
+                bformat!(
+                    "Minimum Stability [<comment>{}</comment>]: ",
+                    minimum_stability.unwrap_or_default()
                 ),
                 Box::new(move |value: InputValue| -> anyhow::Result<InputValue> {
                     if value.is_null() {
@@ -1003,10 +994,9 @@ impl Command for InitCommand {
                     if base_package::stability_priority(value.as_string().unwrap_or_default())
                         .is_none()
                     {
-                        return Err(InvalidArgumentException::new(bconcat!(
-                            "Invalid minimum stability \"",
+                        return Err(InvalidArgumentException::new(bformat!(
+                            "Invalid minimum stability \"{}\". Must be empty or one of: {}",
                             value.as_string().unwrap_or_default(),
-                            "\". Must be empty or one of: ",
                             implode(
                                 ", ",
                                 &base_package::STABILITIES
@@ -1030,11 +1020,7 @@ impl Command for InitCommand {
             let type_val = input.borrow().get_option("type")?;
             let type_str = BString::from(type_val.as_string().unwrap_or_default());
             let mut type_value = io.ask(
-                bconcat!(
-                    "Package Type (e.g. library, project, metapackage, composer-plugin) [<comment>",
-                    type_str,
-                    "</comment>]: "
-                ),
+                bformat!("Package Type (e.g. library, project, metapackage, composer-plugin) [<comment>{type_str}</comment>]: "),
                 type_val,
             )?;
             if type_value.as_string() == Some("".into())
@@ -1066,10 +1052,9 @@ impl Command for InitCommand {
             }
 
             let license = io.ask(
-                bconcat!(
-                    "License [<comment>",
-                    license.clone().unwrap_or_default(),
-                    "</comment>]: "
+                bformat!(
+                    "License [<comment>{}</comment>]: ",
+                    license.clone().unwrap_or_default()
                 ),
                 InputValue::from(license),
             )?;
@@ -1078,7 +1063,7 @@ impl Command for InitCommand {
                 && !spdx.validate(license.as_string().unwrap_or_default())
                 && license.as_string() != Some("proprietary".into())
             {
-                return Err(InvalidArgumentException::new(bconcat!("Invalid license provided: ", license.as_string().unwrap_or_default(), ". Only SPDX license identifiers (https://spdx.org/licenses/) or \"proprietary\" are accepted."))
+                return Err(InvalidArgumentException::new(bformat!("Invalid license provided: {}. Only SPDX license identifiers (https://spdx.org/licenses/) or \"proprietary\" are accepted.", license.as_string().unwrap_or_default()))
             .into());
             }
             input.borrow_mut().set_option("license", license);
@@ -1178,7 +1163,7 @@ impl Command for InitCommand {
             let autoload_for_validate = autoload.clone();
             let autoload_default = autoload.clone();
             let autoload_value = io.ask_and_validate(
-            bconcat!("Add PSR-4 autoload mapping? Maps namespace \"", namespace, "\" to the entered relative path. [<comment>", autoload, "</comment>, n to skip]: "),
+            bformat!("Add PSR-4 autoload mapping? Maps namespace \"{namespace}\" to the entered relative path. [<comment>{autoload}</comment>, n to skip]: "),
             Box::new(move |value: InputValue| -> anyhow::Result<InputValue> {
                 if value.is_null() {
                     return Ok(InputValue::String(autoload_for_validate.clone()));
@@ -1197,7 +1182,7 @@ impl Command for InitCommand {
 
                 if !preg_is_match(php_regex!(r"{^[^/][A-Za-z0-9\-_/]+/$}"), &value_or_default)
                 {
-                    return Err(InvalidArgumentException::new(bconcat!("The src folder name \"", value_or_default, "\" is invalid. Please add a relative path with tailing forward slash. [A-Za-z0-9_-/]+/"))
+                    return Err(InvalidArgumentException::new(bformat!("The src folder name \"{value_or_default}\" is invalid. Please add a relative path with tailing forward slash. [A-Za-z0-9_-/]+/"))
                     .into());
                 }
 

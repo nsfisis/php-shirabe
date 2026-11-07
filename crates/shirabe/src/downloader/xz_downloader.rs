@@ -12,7 +12,7 @@ use crate::util::{Filesystem, HttpDownloader, ProcessExecutor};
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpMixed, RuntimeException, bconcat, impl_php_class, implode, path_to_bytes,
+    PhpMixed, RuntimeException, bformat, impl_php_class, implode, path_to_bytes,
 };
 
 #[derive(Debug)]
@@ -82,10 +82,9 @@ impl ArchiveDownloader for XzDownloader {
             return Ok(None);
         }
 
-        let process_error = bconcat!(
-            "Failed to execute ",
+        let process_error = bformat!(
+            "Failed to execute {}\n\n{}",
             implode(" ", &command),
-            "\n\n",
             self.inner.process.borrow().get_error_output()
         );
 

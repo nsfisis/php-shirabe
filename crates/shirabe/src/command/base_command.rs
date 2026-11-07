@@ -18,7 +18,7 @@ use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpClass, PhpMixed, RuntimeException,
-    UnexpectedValueException, bconcat, count, explode, implode, in_array_strict,
+    UnexpectedValueException, bformat, count, explode, implode, in_array_strict,
 };
 use shirabe_symfony_console::Terminal;
 use shirabe_symfony_console::command::{Command, CommandData, SetDefinitionArg};
@@ -480,8 +480,8 @@ impl BaseCommand for BaseCommandData {
                     prefer_source = false;
                 }
                 other => {
-                    return Err(UnexpectedValueException::new(bconcat!(
-                        "--prefer-install accepts one of \"dist\", \"source\" or \"auto\", got ",
+                    return Err(UnexpectedValueException::new(bformat!(
+                        "--prefer-install accepts one of \"dist\", \"source\" or \"auto\", got {}",
                         bstr::BStr::new(other)
                     ))
                     .into());
@@ -565,12 +565,10 @@ impl BaseCommand for BaseCommandData {
         let requirements = self.normalize_requirements(requirements)?;
         for requirement in requirements {
             if !requirement.contains_key(B("version")) {
-                return Err(UnexpectedValueException::new(bconcat!(
-                    "Option ",
+                return Err(UnexpectedValueException::new(bformat!(
+                    "Option {} is missing a version constraint, use e.g. {}:^1.0",
                     requirement.get(B("name")).cloned().unwrap_or_default(),
-                    " is missing a version constraint, use e.g. ",
-                    requirement.get(B("name")).cloned().unwrap_or_default(),
-                    ":^1.0"
+                    requirement.get(B("name")).cloned().unwrap_or_default()
                 ))
                 .into());
             }
@@ -634,10 +632,8 @@ impl BaseCommand for BaseCommandData {
         opt_name: &BStr,
     ) -> anyhow::Result<BString> {
         if !input.borrow().has_option(opt_name) {
-            return Err(LogicException::new(bconcat!(
-                "This should not be called on a Command which has no ",
-                opt_name,
-                " option defined."
+            return Err(LogicException::new(bformat!(
+                "This should not be called on a Command which has no {opt_name} option defined."
             ))
             .into());
         }
@@ -648,12 +644,9 @@ impl BaseCommand for BaseCommandData {
             .map(|s| PhpMixed::string(*s))
             .collect();
         if !in_array_strict(val.clone(), &formats) {
-            return Err(InvalidArgumentException::new(bconcat!(
-                "--",
-                opt_name,
-                " must be one of ",
-                implode(", ", &Auditor::FORMATS),
-                "."
+            return Err(InvalidArgumentException::new(bformat!(
+                "--{opt_name} must be one of {}.",
+                implode(", ", &Auditor::FORMATS)
             ))
             .into());
         }
@@ -826,7 +819,7 @@ pub fn base_command_initialize(
     if let Some(composer) = composer.as_ref() {
         let command_name = cmd.get_name().unwrap_or_default();
         let pre_command_run_event = PreCommandRunEvent::new(
-            bconcat!(PluginEvents::PRE_COMMAND_RUN),
+            bformat!("{}", PluginEvents::PRE_COMMAND_RUN),
             input.clone(),
             command_name,
         );
@@ -934,11 +927,7 @@ pub fn base_command_initialize(
                 InputValue::Array(explode(",", &ignore_str)),
             );
 
-            io.write_error(bconcat!(
-                "<warning>COMPOSER_IGNORE_PLATFORM_REQ is set to ignore ",
-                ignore_str,
-                ". You may experience unexpected errors.</warning>"
-            ));
+            io.write_error(bformat!("<warning>COMPOSER_IGNORE_PLATFORM_REQ is set to ignore {ignore_str}. You may experience unexpected errors.</warning>"));
         }
     }
 

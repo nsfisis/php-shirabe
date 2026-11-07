@@ -7,7 +7,7 @@ use indexmap::IndexMap;
 use shirabe::config::ConfigSourceInterface;
 use shirabe::io::{IOInterface, io_interface};
 use shirabe::util::{AuthHelper, Bitbucket, StoreAuth};
-use shirabe_php_shim::{Catch as _, PhpMixed, base64_encode, bconcat, json_encode, time};
+use shirabe_php_shim::{Catch as _, PhpMixed, base64_encode, bformat, json_encode, time};
 use shirabe_symfony_console::input::InputValue;
 
 // Mirrors AuthHelperTest::setUp: a DEBUG-verbosity IOMock plus a real Config, both
@@ -388,10 +388,8 @@ fn add_authentication_header_with_basic_http_authentication(
     let mut f = set_up();
     f.io.borrow_mut()
         .expects(
-            vec![Expectation::text(bconcat!(
-                "Using HTTP basic authentication with username \"",
-                username,
-                "\""
+            vec![Expectation::text(bformat!(
+                "Using HTTP basic authentication with username \"{username}\""
             ))],
             false,
         )
@@ -399,9 +397,9 @@ fn add_authentication_header_with_basic_http_authentication(
     let options = http_options_with_headers();
     expects_authentication(&f.io, origin, username, password);
 
-    let expected = bconcat!(
-        "Authorization: Basic ",
-        base64_encode(bconcat!(username, ":", password))
+    let expected = bformat!(
+        "Authorization: Basic {}",
+        base64_encode(bformat!("{username}:{password}"))
     );
 
     let options = f
@@ -499,8 +497,8 @@ use mock_config_source::MockConfigSource;
 
 fn expected_auth_setting(username: &BStr, password: &BStr) -> PhpMixed {
     let mut auth = IndexMap::new();
-    auth.insert("username".into(), PhpMixed::string(bconcat!(username)));
-    auth.insert("password".into(), PhpMixed::string(bconcat!(password)));
+    auth.insert("username".into(), PhpMixed::string(bformat!("{username}")));
+    auth.insert("password".into(), PhpMixed::string(bformat!("{password}")));
     PhpMixed::Array(auth)
 }
 
@@ -549,12 +547,8 @@ fn test_store_auth_with_prompt_yes_answer() {
     f.io.borrow_mut()
         .expects(
             vec![Expectation::ask(
-                bconcat!(
-                    "Do you want to store credentials for ",
-                    origin,
-                    " in ",
-                    config_source_name,
-                    " ? [Yn] "
+                bformat!(
+                    "Do you want to store credentials for {origin} in {config_source_name} ? [Yn] "
                 ),
                 "y",
             )],
@@ -591,12 +585,8 @@ fn test_store_auth_with_prompt_no_answer() {
     f.io.borrow_mut()
         .expects(
             vec![Expectation::ask(
-                bconcat!(
-                    "Do you want to store credentials for ",
-                    origin,
-                    " in ",
-                    config_source_name,
-                    " ? [Yn] "
+                bformat!(
+                    "Do you want to store credentials for {origin} in {config_source_name} ? [Yn] "
                 ),
                 "n",
             )],
@@ -657,12 +647,8 @@ fn test_store_auth_with_prompt_invalid_answer() {
     // $configSourceName.' ? [Yn] ', $this->anything(), null, 'y')` verification on askAndValidate.
     assert_eq!(
         vec![(
-            bconcat!(
-                "Do you want to store credentials for ",
-                origin,
-                " in ",
-                config_source_name,
-                " ? [Yn] "
+            bformat!(
+                "Do you want to store credentials for {origin} in {config_source_name} ? [Yn] "
             ),
             None,
             InputValue::String(BString::from("y")),

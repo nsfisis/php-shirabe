@@ -5,7 +5,7 @@ use crate::downloader::TransportException;
 use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::util::{HttpDownloader, StreamContextOptions};
 use bstr::{BStr, BString};
-use shirabe_php_shim::{Catch as _, PhpMixed, bconcat, trim};
+use shirabe_php_shim::{Catch as _, PhpMixed, bformat, trim};
 use shirabe_symfony_console::input::InputValue;
 
 #[derive(Debug)]
@@ -38,7 +38,7 @@ impl Forgejo {
             self.io.write_error(message);
         }
 
-        let url = bconcat!("https://", origin_url, "/user/settings/applications");
+        let url = bformat!("https://{origin_url}/user/settings/applications");
         self.io
             .write_error("Setup a personal access token with repository:read permissions on:");
         self.io.write_error(&url);
@@ -49,16 +49,11 @@ impl Forgejo {
             (local.clone().unwrap_or_default(), local.is_some(), auth)
         };
         let local_prefix = if has_local_auth {
-            bconcat!(local_auth_name, " OR ")
+            bformat!("{local_auth_name} OR ")
         } else {
             BString::default()
         };
-        self.io.write_error(bconcat!(
-            "Tokens will be stored in plain text in \"",
-            local_prefix,
-            auth_name,
-            "\" for future use by Composer."
-        ));
+        self.io.write_error(bformat!("Tokens will be stored in plain text in \"{local_prefix}{auth_name}\" for future use by Composer."));
         self.io.write_error("For additional information, check https://getcomposer.org/doc/articles/authentication-for-private-packages.md#forgejo-token");
 
         let mut store_in_local_auth_config = false;
@@ -81,10 +76,8 @@ impl Forgejo {
             .map(trim)
             .unwrap_or_default();
 
-        let add_token_manually = bconcat!(
-            "You can also add it manually later by using \"shirabe config --global --auth forgejo-token.",
-            origin_url,
-            " <username> <token>\""
+        let add_token_manually = bformat!(
+            "You can also add it manually later by using \"shirabe config --global --auth forgejo-token.{origin_url} <username> <token>\""
         );
         if token.is_empty() || username.is_empty() {
             self.io
@@ -101,7 +94,7 @@ impl Forgejo {
         );
 
         match self.http_downloader.borrow_mut().get(
-            bconcat!("https://", origin_url, "/api/v1/version"),
+            bformat!("https://{origin_url}/api/v1/version"),
             {
                 let mut options = StreamContextOptions::new();
                 options.set_retry_auth_failure(false);
@@ -127,7 +120,7 @@ impl Forgejo {
         }
 
         // store value in local/user config
-        let setting_key = bconcat!("forgejo-token.", origin_url);
+        let setting_key = bformat!("forgejo-token.{origin_url}");
         {
             let mut cfg = self.config.borrow_mut();
             cfg.get_config_source_mut()

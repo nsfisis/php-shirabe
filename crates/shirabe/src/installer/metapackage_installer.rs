@@ -8,7 +8,7 @@ use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::package::PackageInterfaceHandle;
 use crate::repository::InstalledRepositoryInterfaceHandle;
 use bstr::BStr;
-use shirabe_php_shim::{InvalidArgumentException, PhpMixed, ToPhpString, bconcat};
+use shirabe_php_shim::{InvalidArgumentException, PhpMixed, ToPhpString, bformat};
 
 #[derive(Debug)]
 pub struct MetapackageInstaller {
@@ -66,8 +66,8 @@ impl InstallerInterface for MetapackageInstaller {
         repo: &InstalledRepositoryInterfaceHandle,
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
-        self.io.write_error(bconcat!(
-            "  - ",
+        self.io.write_error(bformat!(
+            "  - {}",
             InstallOperation::format(package.clone(), false)
         ));
 
@@ -84,15 +84,15 @@ impl InstallerInterface for MetapackageInstaller {
         target: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
         if !repo.borrow_mut().has_package(initial.clone())? {
-            return Err(InvalidArgumentException::new(bconcat!(
-                "Package is not installed: ",
+            return Err(InvalidArgumentException::new(bformat!(
+                "Package is not installed: {}",
                 initial.to_php_string()
             ))
             .into());
         }
 
-        self.io.write_error(bconcat!(
-            "  - ",
+        self.io.write_error(bformat!(
+            "  - {}",
             UpdateOperation::format(initial.clone(), target.clone(), false)
         ));
 
@@ -109,15 +109,15 @@ impl InstallerInterface for MetapackageInstaller {
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
         if !repo.borrow_mut().has_package(package.clone())? {
-            return Err(InvalidArgumentException::new(bconcat!(
-                "Package is not installed: ",
+            return Err(InvalidArgumentException::new(bformat!(
+                "Package is not installed: {}",
                 package.to_php_string()
             ))
             .into());
         }
 
-        self.io.write_error(bconcat!(
-            "  - ",
+        self.io.write_error(bformat!(
+            "  - {}",
             UninstallOperation::format(package.clone(), false)
         ));
 

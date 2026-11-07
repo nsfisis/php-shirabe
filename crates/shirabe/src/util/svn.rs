@@ -5,7 +5,7 @@ use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite};
 use crate::util::{Platform, ProcessExecutor};
 use bstr::{B, BStr, BString, ByteSlice, ByteVec};
 use shirabe_php_shim::{
-    LogicException, RuntimeException, bconcat, implode, parse_url, path_to_bytes, php_regex,
+    LogicException, RuntimeException, bformat, implode, parse_url, path_to_bytes, php_regex,
     preg_match, stripos, strpos, trim,
 };
 use shirabe_symfony_console::input::InputValue;
@@ -163,10 +163,7 @@ impl Svn {
             return self.execute_with_auth_retry(svn_command, cwd, url, path, verbose);
         }
 
-        Err(
-            RuntimeException::new(bconcat!("wrong credentials provided (", full_output, ")"))
-                .into(),
-        )
+        Err(RuntimeException::new(bformat!("wrong credentials provided ({full_output})")).into())
     }
 
     pub fn set_cache_credentials(&mut self, cache_credentials: bool) {
@@ -183,10 +180,9 @@ impl Svn {
             .into());
         }
 
-        self.io.write_error(bconcat!(
-            "The Subversion server (",
-            self.url,
-            ") requested credentials:"
+        self.io.write_error(bformat!(
+            "The Subversion server ({}) requested credentials:",
+            self.url
         ));
 
         self.has_auth = Some(true);

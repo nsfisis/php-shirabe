@@ -4,7 +4,7 @@ use crate::config::Config;
 use crate::util::GitHub;
 use bstr::BString;
 use shirabe_php_shim::{
-    PhpMixed, TypeError, bconcat, get_debug_type, in_array_strict, parse_url, php_regex,
+    PhpMixed, TypeError, bformat, get_debug_type, in_array_strict, parse_url, php_regex,
     preg_is_match, preg_match, preg_replace, preg_replace_callback,
 };
 
@@ -29,15 +29,12 @@ impl Url {
                 ),
                 &url,
             ) {
-                url = bconcat!(
-                    "https://api.github.com/repos/",
+                url = bformat!(
+                    "https://api.github.com/repos/{}/{}/{}ball/{}",
                     m.get(1).unwrap_or_default(),
-                    "/",
                     m.get(2).unwrap_or_default(),
-                    "/",
                     m.get(3).unwrap_or_default(),
-                    "ball/",
-                    r#ref,
+                    r#ref
                 );
             } else if let Some(m) = preg_match(
                 php_regex!(
@@ -45,15 +42,12 @@ impl Url {
                 ),
                 &url,
             ) {
-                url = bconcat!(
-                    "https://api.github.com/repos/",
+                url = bformat!(
+                    "https://api.github.com/repos/{}/{}/{}ball/{}",
                     m.get(1).unwrap_or_default(),
-                    "/",
                     m.get(2).unwrap_or_default(),
-                    "/",
                     m.get(3).unwrap_or_default(),
-                    "ball/",
-                    r#ref,
+                    r#ref
                 );
             } else if let Some(m) = preg_match(
                 php_regex!(
@@ -61,15 +55,12 @@ impl Url {
                 ),
                 &url,
             ) {
-                url = bconcat!(
-                    "https://api.github.com/repos/",
+                url = bformat!(
+                    "https://api.github.com/repos/{}/{}/{}ball/{}",
                     m.get(1).unwrap_or_default(),
-                    "/",
                     m.get(2).unwrap_or_default(),
-                    "/",
                     m.get(3).unwrap_or_default(),
-                    "ball/",
-                    r#ref,
+                    r#ref
                 );
             }
         } else if host == "bitbucket.org" || host == "www.bitbucket.org" {
@@ -79,15 +70,12 @@ impl Url {
                 ),
                 &url,
             ) {
-                url = bconcat!(
-                    "https://bitbucket.org/",
+                url = bformat!(
+                    "https://bitbucket.org/{}/{}/get/{}.{}",
                     m.get(1).unwrap_or_default(),
-                    "/",
                     m.get(2).unwrap_or_default(),
-                    "/get/",
                     r#ref,
-                    ".",
-                    m.get(4).unwrap_or_default(),
+                    m.get(4).unwrap_or_default()
                 );
             }
         } else if host == "gitlab.com" || host == "www.gitlab.com" {
@@ -97,13 +85,11 @@ impl Url {
                 ),
                 &url,
             ) {
-                url = bconcat!(
-                    "https://gitlab.com/api/v4/projects/",
+                url = bformat!(
+                    "https://gitlab.com/api/v4/projects/{}/repository/archive.{}?sha={}",
                     m.get(1).unwrap_or_default(),
-                    "/repository/archive.",
                     m.get(2).unwrap_or_default(),
-                    "?sha=",
-                    r#ref,
+                    r#ref
                 );
             }
         } else if in_array_strict(
@@ -112,7 +98,7 @@ impl Url {
         ) {
             url = preg_replace(
                 php_regex!(r"{(/repos/[^/]+/[^/]+/(zip|tar)ball)(?:/.+)?$}i"),
-                bconcat!("$1/", r#ref),
+                bformat!("$1/{}", r#ref),
                 &url,
             );
         } else if in_array_strict(
@@ -123,7 +109,7 @@ impl Url {
                 php_regex!(
                     r"{(/api/v[34]/projects/[^/]+/repository/archive\.(?:zip|tar\.gz|tar\.bz2|tar)\?sha=).+$}i"
                 ),
-                bconcat!("${1}", r#ref),
+                bformat!("${{1}}{}", r#ref),
                 &url,
             );
         }
@@ -148,7 +134,7 @@ impl Url {
             .and_then(|parsed| parsed.port)
             .filter(|port| *port != 0)
         {
-            origin = bconcat!(origin, ":", port);
+            origin = bformat!("{origin}:{port}");
         }
 
         if origin.ends_with(b".github.com") && origin != "codeload.github.com" {
@@ -173,11 +159,7 @@ impl Url {
         {
             for gitlab_domain in config.get_list("gitlab-domains")? {
                 let PhpMixed::String(gitlab_domain) = gitlab_domain else {
-                    return Err(TypeError::new(bconcat!(
-                        "str_starts_with(): Argument #1 ($haystack) must be of type string, ",
-                        get_debug_type(&gitlab_domain),
-                        " given"
-                    ))
+                    return Err(TypeError::new(bformat!("str_starts_with(): Argument #1 ($haystack) must be of type string, {} given", get_debug_type(&gitlab_domain)))
                     .into());
                 };
                 if !gitlab_domain.is_empty() && gitlab_domain.starts_with(&origin) {
@@ -201,9 +183,9 @@ impl Url {
                 let prefix = m.name("prefix").unwrap_or_default();
                 // if the username looks like a long (12char+) hex string, or a modern github token (e.g. ghp_xxx, github_pat_xxx) we obfuscate that
                 Ok(if preg_is_match(GitHub::GITHUB_TOKEN_REGEX, user) {
-                    bconcat!(prefix, "***:***@")
+                    bformat!("{prefix}***:***@")
                 } else {
-                    bconcat!(prefix, user, ":***@")
+                    bformat!("{prefix}{user}:***@")
                 })
             },
             &url,

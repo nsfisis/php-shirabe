@@ -11,7 +11,7 @@ use bstr::{BStr, BString, ByteSlice};
 use chrono::{DateTime, TimeZone};
 use indexmap::IndexSet;
 use shirabe_php_shim::{
-    GLOB_BRACE, GLOB_ONLYDIR, bconcat, file_exists, fileatime, filemtime, glob_with_flags, implode,
+    GLOB_BRACE, GLOB_ONLYDIR, bformat, file_exists, fileatime, filemtime, glob_with_flags, implode,
     is_dir, loosely_compare, path_from_bytes, path_to_bytes, php_regex, php_str, preg_is_match,
     preg_match, preg_quote, realpath, rtrim_chars, str_replace,
 };
@@ -492,7 +492,7 @@ impl Finder {
             let relative_pathname = if relative_dir.is_empty() {
                 filename.clone()
             } else {
-                bconcat!(relative_dir, "/", filename)
+                bformat!("{relative_dir}/{filename}")
             };
 
             let file_type = entry.file_type().ok();
@@ -605,11 +605,7 @@ fn build_exclude(directories: &[BString]) -> (IndexSet<BString>, Option<BString>
     let excluded_pattern = if patterns.is_empty() {
         None
     } else {
-        Some(bconcat!(
-            "#(?:^|/)(?:",
-            implode("|", &patterns),
-            ")(?:/|$)#"
-        ))
+        Some(bformat!("#(?:^|/)(?:{})(?:/|$)#", implode("|", &patterns)))
     };
 
     (excluded_dirs, excluded_pattern)
@@ -657,7 +653,7 @@ fn to_regex_path(pattern: &BStr) -> BString {
     if is_regex(pattern) {
         pattern.to_owned()
     } else {
-        bconcat!("/", preg_quote(pattern, Some(b'/')), "/")
+        bformat!("/{}/", preg_quote(pattern, Some(b'/')))
     }
 }
 
@@ -687,7 +683,7 @@ fn is_regex(str: &BStr) -> bool {
     // PHP 8.2+ available modifiers.
     let available_modifiers = "imsxuADUn";
 
-    let pattern = bconcat!("/^(.{3,}?)[", available_modifiers, "]*$/");
+    let pattern = bformat!("/^(.{{3,}}?)[{available_modifiers}]*$/");
     if let Some(matches) = preg_match(&pattern, str) {
         let bytes = matches.get(1).unwrap_or_default();
         let start = &bytes[..bytes.len().min(1)];

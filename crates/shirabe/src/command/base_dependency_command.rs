@@ -17,7 +17,7 @@ use crate::util::PackageInfo;
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    InvalidArgumentException, PhpMixed, ToPhpString, UnexpectedValueException, bconcat, php_str,
+    InvalidArgumentException, PhpMixed, ToPhpString, UnexpectedValueException, bformat, php_str,
     rtrim,
 };
 use shirabe_semver::constraint::{AnyConstraint, Bound};
@@ -150,10 +150,8 @@ pub trait BaseDependencyCommand: BaseCommand {
         let packages =
             installed_repo.find_packages_with_replacers_and_providers(BStr::new(&needle), None)?;
         if packages.is_empty() {
-            return Err(InvalidArgumentException::new(bconcat!(
-                "Could not find package \"",
-                needle,
-                "\" in your project"
+            return Err(InvalidArgumentException::new(bformat!(
+                "Could not find package \"{needle}\" in your project"
             ))
             .into());
         }
@@ -198,13 +196,7 @@ pub trait BaseDependencyCommand: BaseCommand {
                         ));
                     }
                 } else {
-                    self.get_io().write_error(bconcat!(
-                        "<error>Package \"",
-                        needle,
-                        "\" could not be found with constraint \"",
-                        text_constraint,
-                        "\", results below will most likely be incomplete.</error>"
-                    ));
+                    self.get_io().write_error(bformat!("<error>Package \"{needle}\" could not be found with constraint \"{text_constraint}\", results below will most likely be incomplete.</error>"));
                 }
             }
             Some(matched) if PlatformRepository::is_platform_package(&needle) => {
@@ -218,28 +210,10 @@ pub trait BaseDependencyCommand: BaseCommand {
                 } else {
                     ""
                 };
-                self.get_io().write_error(bconcat!(
-                    "<info>Package \"",
-                    needle,
-                    " ",
-                    text_constraint,
-                    "\" found in version \"",
-                    matched.get_pretty_version(),
-                    "\"",
-                    extra_notice,
-                    ".</info>"
-                ));
+                self.get_io().write_error(bformat!("<info>Package \"{needle} {text_constraint}\" found in version \"{}\"{extra_notice}.</info>", matched.get_pretty_version()));
             }
             Some(matched) if inverted => {
-                self.get_io().write(bconcat!(
-                    "<comment>Package \"",
-                    needle,
-                    "\" ",
-                    matched.get_pretty_version(),
-                    " is already installed! To find out why, run `shirabe why ",
-                    needle,
-                    "`</comment>"
-                ));
+                self.get_io().write(bformat!("<comment>Package \"{needle}\" {} is already installed! To find out why, run `shirabe why {needle}`</comment>", matched.get_pretty_version()));
 
                 return Ok(0);
             }
@@ -289,20 +263,15 @@ pub trait BaseDependencyCommand: BaseCommand {
         )?;
         if results.is_empty() {
             let extra = if has_constraint {
-                bconcat!(
-                    " in versions ",
-                    if inverted { "not " } else { "" },
-                    "matching ",
-                    text_constraint
+                bformat!(
+                    " in versions {}matching {text_constraint}",
+                    if inverted { "not " } else { "" }
                 )
             } else {
                 BString::default()
             };
-            self.get_io().write_error(bconcat!(
-                "<info>There is no installed package depending on \"",
-                needle,
-                "\"",
-                extra
+            self.get_io().write_error(bformat!(
+                "<info>There is no installed package depending on \"{needle}\"{extra}"
             ));
             r#return = if inverted { 0 } else { 1 };
         } else if render_tree {
@@ -312,13 +281,10 @@ pub trait BaseDependencyCommand: BaseCommand {
                 .as_complete()
                 .and_then(|c| c.get_description())
                 .unwrap_or_default();
-            self.get_io().write(bconcat!(
-                "<info>",
+            self.get_io().write(bformat!(
+                "<info>{}</info> {} {description}",
                 root.get_pretty_name(),
-                "</info> ",
-                root.get_pretty_version(),
-                " ",
-                description
+                root.get_pretty_version()
             ));
             self.print_tree(&results, BStr::new(""), 1)?;
         } else {
@@ -345,15 +311,7 @@ pub trait BaseDependencyCommand: BaseCommand {
                 }
             }
 
-            self.get_io().write_error(bconcat!(
-                "Not finding what you were looking for? Try calling `shirabe ",
-                composer_command,
-                " \"",
-                needle,
-                ":",
-                text_constraint,
-                "\" --dry-run` to get another view on the problem."
-            ));
+            self.get_io().write_error(bformat!("Not finding what you were looking for? Try calling `shirabe {composer_command} \"{needle}:{text_constraint}\" --dry-run` to get another view on the problem."));
         }
 
         Ok(r#return)
@@ -387,12 +345,10 @@ pub trait BaseDependencyCommand: BaseCommand {
                 };
                 let package_url = PackageInfo::get_view_source_or_homepage_url(package.clone());
                 let name_with_link = match &package_url {
-                    Some(url) => bconcat!(
-                        "<href=",
+                    Some(url) => bformat!(
+                        "<href={}>{}</>",
                         OutputFormatter::escape(url).expect("OutputFormatter::escape never fails"),
-                        ">",
-                        package.get_pretty_name(),
-                        "</>"
+                        package.get_pretty_name()
                     ),
                     None => package.get_pretty_name(),
                 };
@@ -400,7 +356,7 @@ pub trait BaseDependencyCommand: BaseCommand {
                     name_with_link,
                     version,
                     BString::from(link.get_description()),
-                    bconcat!(link.get_target(), " (", link.get_pretty_constraint()?, ")"),
+                    bformat!("{} ({})", link.get_target(), link.get_pretty_constraint()?),
                 ]);
                 if let Some(children_vec) = children {
                     queue.extend(children_vec);
@@ -456,34 +412,20 @@ pub trait BaseDependencyCommand: BaseCommand {
                 };
             let package_url = PackageInfo::get_view_source_or_homepage_url(package.clone());
             let name_with_link = match &package_url {
-                Some(url) => bconcat!(
-                    "<href=",
+                Some(url) => bformat!(
+                    "<href={}>{}</>",
                     OutputFormatter::escape(url).expect("OutputFormatter::escape never fails"),
-                    ">",
-                    package.get_pretty_name(),
-                    "</>"
+                    package.get_pretty_name()
                 ),
                 None => package.get_pretty_name(),
             };
-            let package_text = rtrim(bconcat!(
-                "<",
-                color,
-                ">",
-                name_with_link,
-                "</",
-                color,
-                "> ",
-                version_text
+            let package_text = rtrim(bformat!(
+                "<{color}>{name_with_link}</{color}> {version_text}"
             ));
-            let link_text = bconcat!(
+            let link_text = bformat!(
+                "{} <{prev_color}>{}</{prev_color}> {}",
                 link.get_description(),
-                " <",
-                prev_color,
-                ">",
                 link.get_target(),
-                "</",
-                prev_color,
-                "> ",
                 link.get_pretty_constraint()?
             );
             let circular_warn = if children.is_none() {
@@ -491,19 +433,14 @@ pub trait BaseDependencyCommand: BaseCommand {
             } else {
                 ""
             };
-            self.write_tree_line(BStr::new(&rtrim(bconcat!(
-                prefix,
-                if is_last { "└──" } else { "├──" },
-                package_text,
-                " (",
-                link_text,
-                ") ",
-                circular_warn
+            self.write_tree_line(BStr::new(&rtrim(bformat!(
+                "{prefix}{}{package_text} ({link_text}) {circular_warn}",
+                if is_last { "└──" } else { "├──" }
             ))));
             if let Some(children_vec) = children {
                 self.print_tree(
                     children_vec,
-                    bconcat!(prefix, if is_last { "   " } else { "│  " }).as_bstr(),
+                    bformat!("{prefix}{}", if is_last { "   " } else { "│  " }).as_bstr(),
                     level + 1,
                 )?;
             }

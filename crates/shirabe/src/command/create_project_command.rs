@@ -31,7 +31,7 @@ use crate::util::{Filesystem, Platform, ProcessExecutor};
 use bstr::{B, BStr, BString, ByteSlice};
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, PhpMixed, RuntimeException, UnexpectedValueException,
-    array_pop, bconcat, chdir, error_message, explode_with_limit, file_exists, getcwd,
+    array_pop, bformat, chdir, error_message, explode_with_limit, file_exists, getcwd,
     impl_php_class, implode, is_dir, is_file, mkdir, path_from_bytes, path_to_bytes, preg_match,
     realpath, rtrim_chars, strtolower, unlink,
 };
@@ -298,7 +298,7 @@ impl CreateProjectCommand {
                 Err(e) => {
                     if e.is_instanceof::<PluginBlockedException>() {
                         io.write_error("<error>Hint: To allow running the config command recommended below before dependencies are installed, run create-project with --no-install.</error>");
-                        io.write_error(bconcat!("<error>You can then cd into ", getcwd().unwrap_or_default(), ", configure allow-plugins, and finally run a shirabe install to complete the process.</error>"));
+                        io.write_error(bformat!("<error>You can then cd into {}, configure allow-plugins, and finally run a shirabe install to complete the process.</error>", getcwd().unwrap_or_default()));
                     }
                     return Err(e);
                 }
@@ -347,15 +347,14 @@ impl CreateProjectCommand {
             for dir in &dirs {
                 if !fs.remove_directory(dir)? {
                     had_error =
-                        Some(RuntimeException::new(bconcat!("Could not remove ", dir)).into());
+                        Some(RuntimeException::new(bformat!("Could not remove {dir}")).into());
                     break;
                 }
             }
             if let Some(e) = had_error {
-                io.write_error(bconcat!(
-                    "<error>An error occurred while removing the VCS metadata: ",
-                    error_message(&e),
-                    "</error>"
+                io.write_error(bformat!(
+                    "<error>An error occurred while removing the VCS metadata: {}</error>",
+                    error_message(&e)
                 ));
             }
 
@@ -473,29 +472,22 @@ impl CreateProjectCommand {
                 .merge(&merge_map, Config::SOURCE_COMMAND);
         }
 
-        io.write_error(bconcat!(
-            "<info>Creating a \"",
-            package_name,
-            "\" project at \"",
+        io.write_error(bformat!(
+            "<info>Creating a \"{package_name}\" project at \"{}\"</info>",
             fs.borrow()
-                .find_shortest_path(&Platform::get_cwd(false)?, &directory, true, false)?,
-            "\"</info>"
+                .find_shortest_path(&Platform::get_cwd(false)?, &directory, true, false)?
         ));
 
         if file_exists(&directory) {
             if !is_dir(&directory) {
-                return Err(InvalidArgumentException::new(bconcat!(
-                    "Cannot create project directory at \"",
-                    directory,
-                    "\", it exists as a file."
+                return Err(InvalidArgumentException::new(bformat!(
+                    "Cannot create project directory at \"{directory}\", it exists as a file."
                 ))
                 .into());
             }
             if !fs.borrow().is_dir_empty(&directory) {
-                return Err(InvalidArgumentException::new(bconcat!(
-                    "Project directory \"",
-                    directory,
-                    "\" is not empty."
+                return Err(InvalidArgumentException::new(bformat!(
+                    "Project directory \"{directory}\" is not empty."
                 ))
                 .into());
             }
@@ -506,10 +498,9 @@ impl CreateProjectCommand {
                 stability = Some("stable".into());
             } else {
                 let matched = preg_match(
-                    bconcat!(
-                        "{^[^,\\s]*?@(",
-                        implode("|", &STABILITIES.keys().copied().collect::<Vec<_>>()),
-                        ")$}i"
+                    bformat!(
+                        "{{^[^,\\s]*?@({})$}}i",
+                        implode("|", &STABILITIES.keys().copied().collect::<Vec<_>>())
                     ),
                     package_version
                         .as_ref()
@@ -530,10 +521,8 @@ impl CreateProjectCommand {
             VersionParser::normalize_stability(stability.unwrap_or_default()).unwrap_or_default();
 
         if stability_priority(&stability).is_none() {
-            return Err(InvalidArgumentException::new(bconcat!(
-                "Invalid stability provided (",
-                stability,
-                "), must be one of: ",
+            return Err(InvalidArgumentException::new(bformat!(
+                "Invalid stability provided ({stability}), must be one of: {}",
                 implode(", ", &STABILITIES.keys().copied().collect::<Vec<_>>())
             ))
             .into());
@@ -639,14 +628,12 @@ impl CreateProjectCommand {
         )?;
 
         if package.is_none() {
-            let error_message = bconcat!(
-                "Could not find package ",
-                name,
-                " with ",
+            let error_message = bformat!(
+                "Could not find package {name} with {}",
                 if let Some(v) = package_version.as_ref() {
-                    bconcat!("version ", v)
+                    bformat!("version {v}")
                 } else {
-                    bconcat!("stability ", stability)
+                    bformat!("stability {stability}")
                 }
             );
             let is_ignore_all = platform_requirement_filter
@@ -666,11 +653,11 @@ impl CreateProjectCommand {
                     )?
                     .is_some()
             {
-                return Err(InvalidArgumentException::new(bconcat!(error_message, " in a version installable using your PHP version, PHP extensions and Composer version."))
+                return Err(InvalidArgumentException::new(bformat!("{error_message} in a version installable using your PHP version, PHP extensions and Composer version."))
                 .into());
             }
 
-            return Err(InvalidArgumentException::new(bconcat!(error_message, ".")).into());
+            return Err(InvalidArgumentException::new(bformat!("{error_message}.")).into());
         }
         let mut package = package.unwrap();
 
@@ -680,7 +667,7 @@ impl CreateProjectCommand {
         let signals = real_dir.as_ref().map(|_| SignalSubscription::new());
         let abort_on_signal = |signals: &SignalSubscription| {
             io.write_error_with_verbosity(
-                bconcat!("Received ", signals.last_signal().as_str(), ", aborting"),
+                bformat!("Received {}, aborting", signals.last_signal().as_str()),
                 DEBUG,
             );
             let mut fs = Filesystem::new(None);
@@ -700,12 +687,10 @@ impl CreateProjectCommand {
             package = alias.get_alias_of().into();
         }
 
-        io.write_error(bconcat!(
-            "<info>Installing ",
+        io.write_error(bformat!(
+            "<info>Installing {} ({})</info>",
             package.get_name(),
-            " (",
-            package.get_full_pretty_version(false, DisplayMode::SourceRefIfDev),
-            ")</info>"
+            package.get_full_pretty_version(false, DisplayMode::SourceRefIfDev)
         ));
 
         if disable_plugins {
@@ -764,13 +749,13 @@ impl CreateProjectCommand {
             .get_installation_source()
             .is_some_and(|s| s == "source");
 
-        io.write_error(bconcat!("<info>Created project in ", directory, "</info>"));
+        io.write_error(bformat!("<info>Created project in {directory}</info>"));
         chdir(&directory);
 
         // ensure that the env var being set does not interfere with create-project
         // as it is probably not meant to be used here, so we do not use it if a composer.json can be found
         // in the project
-        if file_exists(path_from_bytes(&bconcat!(directory, "/composer.json")))
+        if file_exists(path_from_bytes(&bformat!("{directory}/composer.json")))
             && Platform::get_env("COMPOSER").is_some()
         {
             Platform::clear_env("COMPOSER")?;
@@ -881,10 +866,9 @@ impl Command for CreateProjectCommand {
             }
             let mut parts =
                 explode_with_limit("/", strtolower(package.as_string().unwrap_or_default()), 2);
-            let prompt = bconcat!(
-                "New project directory [<comment>",
-                array_pop(&mut parts).unwrap_or_default(),
-                "</comment>]: "
+            let prompt = bformat!(
+                "New project directory [<comment>{}</comment>]: ",
+                array_pop(&mut parts).unwrap_or_default()
             );
             input
                 .borrow_mut()

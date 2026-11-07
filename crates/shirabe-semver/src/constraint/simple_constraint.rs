@@ -3,7 +3,7 @@
 use crate::constraint::Bound;
 use bstr::{BStr, BString, ByteSlice};
 use shirabe_php_shim::{
-    CmpOp, PhpDisplay, ToPhpString, bconcat, implode, str_replace, var_export_str, version_compare,
+    CmpOp, PhpDisplay, ToPhpString, bformat, implode, str_replace, var_export_str, version_compare,
 };
 
 /// Corresponds to PHP's `Constraint`.
@@ -121,17 +121,17 @@ impl SimpleConstraint {
         if self.version.starts_with(b"dev-") {
             if CmpOp::Eq == self.operator {
                 if CmpOp::Eq == other_operator {
-                    return bconcat!("$b && $v === ", version);
+                    return bformat!("$b && $v === {version}");
                 }
                 if CmpOp::Ne == other_operator {
-                    return bconcat!("!$b || $v !== ", version);
+                    return bformat!("!$b || $v !== {version}");
                 }
                 return "false".into();
             }
 
             if CmpOp::Ne == self.operator {
                 if CmpOp::Eq == other_operator {
-                    return bconcat!("!$b || $v !== ", version);
+                    return bformat!("!$b || $v !== {version}");
                 }
                 if CmpOp::Ne == other_operator {
                     return "true".into();
@@ -144,23 +144,20 @@ impl SimpleConstraint {
 
         if CmpOp::Eq == self.operator {
             if CmpOp::Eq == other_operator {
-                return bconcat!("\\version_compare($v, ", version, ", '==')");
+                return bformat!("\\version_compare($v, {version}, '==')");
             }
             if CmpOp::Ne == other_operator {
-                return bconcat!("$b || \\version_compare($v, ", version, ", '!=')");
+                return bformat!("$b || \\version_compare($v, {version}, '!=')");
             }
-            return bconcat!(
-                "!$b && \\version_compare(",
-                version,
-                ", $v, '",
-                other_operator.as_str(),
-                "')"
+            return bformat!(
+                "!$b && \\version_compare({version}, $v, '{}')",
+                other_operator.as_str()
             );
         }
 
         if CmpOp::Ne == self.operator {
             if CmpOp::Eq == other_operator {
-                return bconcat!("$b || (!$b && \\version_compare($v, ", version, ", '!='))");
+                return bformat!("$b || (!$b && \\version_compare($v, {version}, '!='))");
             }
             if CmpOp::Ne == other_operator {
                 return "true".into();
@@ -180,33 +177,20 @@ impl SimpleConstraint {
             return "true".into();
         }
 
-        let code_comparison = bconcat!(
-            "\\version_compare($v, ",
-            version,
-            ", '",
-            self.operator.as_str(),
-            "')"
+        let code_comparison = bformat!(
+            "\\version_compare($v, {version}, '{}')",
+            self.operator.as_str()
         );
 
         if self.operator == CmpOp::Le && other_operator == CmpOp::Gt {
-            return bconcat!(
-                "!$b && \\version_compare($v, ",
-                version,
-                ", '!=') && ",
-                code_comparison
-            );
+            return bformat!("!$b && \\version_compare($v, {version}, '!=') && {code_comparison}");
         }
 
         if self.operator == CmpOp::Ge && other_operator == CmpOp::Lt {
-            return bconcat!(
-                "!$b && \\version_compare($v, ",
-                version,
-                ", '!=') && ",
-                code_comparison
-            );
+            return bformat!("!$b && \\version_compare($v, {version}, '!=') && {code_comparison}");
         }
 
-        bconcat!("!$b && ", code_comparison)
+        bformat!("!$b && {code_comparison}")
     }
 
     pub fn match_specific(&self, provider: &SimpleConstraint, compare_branches: bool) -> bool {

@@ -7,7 +7,7 @@ use bstr::BStr;
 use shirabe::config::{Config, ConfigSourceInterface};
 use shirabe::io::{IOInterface, io_interface};
 use shirabe::util::{GitHub, HttpDownloader, HttpDownloaderMockHandler};
-use shirabe_php_shim::{PhpMixed, bconcat, php_str};
+use shirabe_php_shim::{PhpMixed, bformat, php_str};
 
 const PASSWORD: &BStr = php_str(b"password");
 const MESSAGE: &BStr = php_str(b"mymessage");
@@ -57,7 +57,7 @@ fn get_auth_json_mock() -> Box<MockConfigSource> {
 // getConfJsonMock: removeConfigSetting atLeastOnce with('github-oauth.<origin>').
 fn get_conf_json_mock(origin: &BStr) -> Box<MockConfigSource> {
     let mut mock = MockConfigSource::new();
-    let expected = bconcat!("github-oauth.", origin);
+    let expected = bformat!("github-oauth.{origin}");
     mock.expect_remove_config_setting()
         .times(1..)
         .withf(move |name| name == expected)
@@ -101,7 +101,7 @@ fn test_username_password_authentication_flow() {
 
     let (http_downloader, _http_guard) = get_http_downloader_mock(
         vec![expect_full(
-            bconcat!("https://api.", ORIGIN, "/"),
+            bformat!("https://api.{ORIGIN}/"),
             None,
             200,
             "{}",
@@ -139,7 +139,7 @@ fn test_username_password_failure() {
 
     let (http_downloader, _http_guard) = get_http_downloader_mock(
         vec![expect_full(
-            bconcat!("https://api.", ORIGIN, "/"),
+            bformat!("https://api.{ORIGIN}/"),
             None,
             401,
             "",

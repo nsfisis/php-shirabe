@@ -12,7 +12,7 @@
 use anyhow::bail;
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe_php_shim::{bconcat, canonical_int_key, utf8_text};
+use shirabe_php_shim::{bformat, canonical_int_key, utf8_text};
 use std::sync::{Arc, LazyLock, Mutex, MutexGuard, Weak};
 
 /// A handle to an object whose entity lives on the Rust side. PHP holds a thin proxy stub.
@@ -245,7 +245,7 @@ fn serialize_into(value: &PluginValue, out: &mut Vec<u8>) {
         }
         PluginValue::Int(n) => {
             out.extend_from_slice(b"i:");
-            out.extend_from_slice(&bconcat!(n));
+            out.extend_from_slice(&bformat!("{n}"));
             out.push(b';');
         }
         PluginValue::Float(f) => {
@@ -260,11 +260,11 @@ fn serialize_into(value: &PluginValue, out: &mut Vec<u8>) {
         PluginValue::String(bytes) => serialize_bytes(bytes, out),
         PluginValue::List(items) => {
             out.extend_from_slice(b"a:");
-            out.extend_from_slice(&bconcat!(items.len()));
+            out.extend_from_slice(&bformat!("{}", items.len()));
             out.extend_from_slice(b":{");
             for (index, item) in items.iter().enumerate() {
                 out.extend_from_slice(b"i:");
-                out.extend_from_slice(&bconcat!(index));
+                out.extend_from_slice(&bformat!("{index}"));
                 out.push(b';');
                 serialize_into(item, out);
             }
@@ -313,11 +313,11 @@ fn serialize_into(value: &PluginValue, out: &mut Vec<u8>) {
 
 fn serialize_object(object: &PhpObject, out: &mut Vec<u8>) {
     out.extend_from_slice(b"O:");
-    out.extend_from_slice(&bconcat!(object.class.len()));
+    out.extend_from_slice(&bformat!("{}", object.class.len()));
     out.extend_from_slice(b":\"");
     out.extend_from_slice(&object.class);
     out.extend_from_slice(b"\":");
-    out.extend_from_slice(&bconcat!(object.props.len()));
+    out.extend_from_slice(&bformat!("{}", object.props.len()));
     out.extend_from_slice(b":{");
     for (name, value) in &object.props {
         // A property name is always written as a string, even a numeric one, and never as the
@@ -330,7 +330,7 @@ fn serialize_object(object: &PhpObject, out: &mut Vec<u8>) {
 
 fn serialize_bytes(bytes: &[u8], out: &mut Vec<u8>) {
     out.extend_from_slice(b"s:");
-    out.extend_from_slice(&bconcat!(bytes.len()));
+    out.extend_from_slice(&bformat!("{}", bytes.len()));
     out.extend_from_slice(b":\"");
     out.extend_from_slice(bytes);
     out.extend_from_slice(b"\";");
@@ -338,13 +338,13 @@ fn serialize_bytes(bytes: &[u8], out: &mut Vec<u8>) {
 
 fn serialize_map(map: &IndexMap<BString, PluginValue>, out: &mut Vec<u8>) {
     out.extend_from_slice(b"a:");
-    out.extend_from_slice(&bconcat!(map.len()));
+    out.extend_from_slice(&bformat!("{}", map.len()));
     out.extend_from_slice(b":{");
     for (key, value) in map {
         match canonical_int_key(key) {
             Some(n) => {
                 out.extend_from_slice(b"i:");
-                out.extend_from_slice(&bconcat!(n));
+                out.extend_from_slice(&bformat!("{n}"));
                 out.push(b';');
             }
             None => serialize_bytes(key, out),
@@ -443,7 +443,7 @@ fn parse_value(payload: &[u8], pos: &mut usize) -> anyhow::Result<PluginValue> {
             match lex(payload, pos)? {
                 Lex::Value(PluginValue::Int(n)) => {
                     frame.is_list &= n == index;
-                    frame.pending_key = Some(bconcat!(n));
+                    frame.pending_key = Some(bformat!("{n}"));
                 }
                 Lex::Value(PluginValue::String(bytes)) => {
                     frame.is_list = false;

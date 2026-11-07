@@ -17,9 +17,9 @@ use indexmap::IndexMap;
 use shirabe_php_rpc::ToWire;
 use shirabe_php_shim::{
     AnyThrowable, InvalidArgumentException, LogicException, PhpClass as _, PhpMixed,
-    UnexpectedValueException, array_flip, bconcat, canonical_int_key, dirname, error_message,
-    get_debug_type, in_array_strict, is_array, is_null, is_string, ksort, path_from_bytes,
-    path_to_bytes, realpath, str_repeat, strcmp, strnatcmp, usort, var_export,
+    UnexpectedValueException, array_flip, bformat, bwrite, canonical_int_key, dirname,
+    error_message, get_debug_type, in_array_strict, is_array, is_null, is_string, ksort,
+    path_from_bytes, path_to_bytes, realpath, str_repeat, strcmp, strnatcmp, usort, var_export,
 };
 use shirabe_semver::constraint::AnyConstraint;
 use std::path::Path;
@@ -136,14 +136,12 @@ impl FilesystemRepository {
         })() {
             Ok(p) => p,
             Err(e) => {
-                return Err(InvalidRepositoryException::new(bconcat!(
-                    "Invalid repository data in ",
+                return Err(InvalidRepositoryException::new(bformat!(
+                    "Invalid repository data in {}, packages could not be loaded: [{}] {}",
                     self.file.get_path(),
-                    ", packages could not be loaded: [",
                     AnyThrowable::of(&e)
                         .expect("PHP reaches this only with a caught \\Throwable")
                         .php_class_name(),
-                    "] ",
                     error_message(&e)
                 ))
                 .into());
@@ -247,10 +245,9 @@ impl FilesystemRepository {
                 let path_to_normalize = if self.filesystem.borrow().is_absolute_path(path_str) {
                     path_str.clone()
                 } else {
-                    std::path::PathBuf::from(path_from_bytes(&bconcat!(
-                        Platform::get_cwd(false).unwrap_or_default(),
-                        "/",
-                        path_str
+                    std::path::PathBuf::from(path_from_bytes(&bformat!(
+                        "{}/{path_str}",
+                        Platform::get_cwd(false).unwrap_or_default()
                     )))
                 };
                 let normalized_path = self
@@ -336,14 +333,13 @@ impl FilesystemRepository {
                 &repo_dir,
             )?;
 
-            let installed_php =
-                bconcat!("<?php return ", self.dump_to_php_code(&versions, 0), ";\n");
+            let installed_php = bformat!("<?php return {};\n", self.dump_to_php_code(&versions, 0));
             self.filesystem.borrow_mut().file_put_contents_if_modified(
-                path_from_bytes(&bconcat!(repo_dir, "/installed.php")),
+                path_from_bytes(&bformat!("{repo_dir}/installed.php")),
                 &installed_php,
             );
             self.filesystem.borrow_mut().file_put_contents_if_modified(
-                path_from_bytes(&bconcat!(repo_dir, "/InstalledVersions.php")),
+                path_from_bytes(&bformat!("{repo_dir}/InstalledVersions.php")),
                 include_str!("../../../../composer/src/Composer/InstalledVersions.php"),
             );
 
@@ -404,9 +400,9 @@ impl FilesystemRepository {
         for (key, value) in array {
             lines.extend_from_slice(&str_repeat("    ", level as usize));
             lines.extend_from_slice(&if canonical_int_key(key).is_some() {
-                bconcat!(key, " => ")
+                bformat!("{key} => ")
             } else {
-                bconcat!(var_export(&PhpMixed::String(key.clone()), true), " => ")
+                bformat!("{} => ", var_export(&PhpMixed::String(key.clone()), true))
             });
 
             if is_array(value) {
@@ -425,7 +421,7 @@ impl FilesystemRepository {
                         let inner_map: IndexMap<BString, PhpMixed> = list
                             .iter()
                             .enumerate()
-                            .map(|(i, v)| (bconcat!(i), v.clone()))
+                            .map(|(i, v)| (bformat!("{i}"), v.clone()))
                             .collect();
                         lines.extend_from_slice(&self.dump_to_php_code(&inner_map, level));
                     } else {
@@ -439,19 +435,16 @@ impl FilesystemRepository {
                     .borrow_mut()
                     .is_absolute_path(path_from_bytes(&s))
                 {
-                    lines.extend_from_slice(&bconcat!(
-                        var_export(&PhpMixed::string(s), true),
-                        ",\n"
-                    ));
+                    bwrite!(lines, "{},\n", var_export(&PhpMixed::string(s), true));
                 } else {
-                    lines.extend_from_slice(&bconcat!(
-                        "__DIR__ . ",
-                        var_export(&PhpMixed::string(bconcat!("/", s)), true),
-                        ",\n"
-                    ));
+                    bwrite!(
+                        lines,
+                        "__DIR__ . {},\n",
+                        var_export(&PhpMixed::string(bformat!("/{s}")), true)
+                    );
                 }
             } else if is_string(value) {
-                lines.extend_from_slice(&bconcat!(var_export(value, true), ",\n"));
+                bwrite!(lines, "{},\n", var_export(value, true));
             } else if let PhpMixed::Bool(b) = value {
                 lines.extend_from_slice(if *b {
                     b"true,\n".as_slice()
@@ -872,7 +865,7 @@ fn versions_entry<'a>(
 
 fn push_to_list(entry: &mut IndexMap<BString, PhpMixed>, key: &BStr, value: BString) {
     if let PhpMixed::List(list) = entry
-        .entry(bconcat!(key))
+        .entry(bformat!("{key}"))
         .or_insert_with(|| PhpMixed::List(vec![]))
     {
         list.push(PhpMixed::string(value));

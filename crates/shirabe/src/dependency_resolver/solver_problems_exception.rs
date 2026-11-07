@@ -5,7 +5,7 @@ use crate::repository::RepositorySet;
 use crate::util::IniHelper;
 use bstr::{BString, ByteSlice, ByteVec};
 use shirabe_php_shim::{
-    RuntimeException, array_unique, bconcat, impl_php_exception, implode, path_to_bytes,
+    RuntimeException, array_unique, bformat, bwrite, impl_php_exception, implode, path_to_bytes,
 };
 
 #[derive(Debug)]
@@ -23,10 +23,9 @@ impl SolverProblemsException {
         problems: Vec<Problem>,
         learned_pool: Vec<Vec<std::rc::Rc<std::cell::RefCell<Rule>>>>,
     ) -> Self {
-        let message = bconcat!(
-            "Failed resolving dependencies with ",
-            problems.len(),
-            " problems, call getPrettyString to get formatted details"
+        let message = bformat!(
+            "Failed resolving dependencies with {} problems, call getPrettyString to get formatted details",
+            problems.len()
         );
         Self {
             inner: RuntimeException::with_code(message, Self::ERROR_DEPENDENCY_RESOLUTION_FAILED),
@@ -49,7 +48,8 @@ impl SolverProblemsException {
 
         let mut problems: Vec<BString> = Vec::new();
         for problem in &self.problems {
-            problems.push(bconcat!(
+            problems.push(bformat!(
+                "{}\n",
                 problem.get_pretty_string(
                     repository_set,
                     request,
@@ -57,8 +57,7 @@ impl SolverProblemsException {
                     is_verbose,
                     &installed_map,
                     &self.learned_pool
-                )?,
-                "\n"
+                )?
             ));
             missing_extensions.extend(self.get_extension_problems(problem.get_reasons()));
             is_caused_by_lock =
@@ -70,7 +69,7 @@ impl SolverProblemsException {
         let mut unique_problems = problems.clone();
         unique_problems.dedup();
         for problem in &unique_problems {
-            text.push_str(bconcat!("  Problem ", i as i64, problem));
+            bwrite!(text, "  Problem {}{problem}", i as i64);
             i += 1;
         }
 
@@ -131,7 +130,7 @@ impl SolverProblemsException {
             " ",
             &unique_extensions
                 .iter()
-                .map(|ext| bconcat!("--ignore-platform-req=", ext))
+                .map(|ext| bformat!("--ignore-platform-req={ext}"))
                 .collect::<Vec<_>>(),
         );
 
@@ -143,11 +142,10 @@ impl SolverProblemsException {
             &paths.iter().map(path_to_bytes).collect::<Vec<_>>(),
         ));
         text.push_str("\nYou can also run `php --ini` in a terminal to see which files are used by PHP in CLI mode.");
-        text.push_str(bconcat!(
-            "\nAlternatively, you can run Composer with `",
-            ignore_extensions_arguments,
-            "` to temporarily ignore these required extensions."
-        ));
+        bwrite!(
+            text,
+            "\nAlternatively, you can run Composer with `{ignore_extensions_arguments}` to temporarily ignore these required extensions."
+        );
 
         Ok(text)
     }

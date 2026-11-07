@@ -30,7 +30,7 @@ use indexmap::IndexMap;
 use shirabe_metadata_minifier::{ExpandedVersion, ExpandedVersions, MetadataMinifier};
 use shirabe_php_shim::{
     AnyThrowable, Catch as _, CmpOp, InvalidArgumentException, LogicException, PHP_EOL, PhpClass,
-    PhpMixed, RuntimeException, ToPhpString, UnexpectedValueException, bconcat, error_message,
+    PhpMixed, RuntimeException, ToPhpString, UnexpectedValueException, bformat, error_message,
     explode, extension_loaded, hash, http_build_query_mixed, implode, json_decode_assoc, parse_url,
     path_from_bytes, php_regex, preg_grep, preg_is_match, preg_match, preg_replace, preg_split,
     realpath, rtrim_chars, str_replace, strpos, strtolower, strtr, urlencode, var_export,
@@ -154,7 +154,7 @@ impl VersionList {
     fn set(&mut self, index: usize, key: &BStr, val: PhpMixed) {
         match self {
             Self::Plain(versions) => {
-                versions[index].insert(bconcat!(key), val);
+                versions[index].insert(bformat!("{key}"), val);
             }
             Self::Minified(expanded) => expanded.set(index, key, val),
         }
@@ -233,11 +233,11 @@ impl ComposerRepository {
                 // it is a local path, add file scheme
                 repo_config.insert(
                     "url".into(),
-                    PhpMixed::string(bconcat!("file://", local_file_path)),
+                    PhpMixed::string(bformat!("file://{local_file_path}")),
                 );
             } else {
                 // otherwise, assume http as the default protocol
-                repo_config.insert("url".into(), PhpMixed::string(bconcat!("http://", url_str)));
+                repo_config.insert("url".into(), PhpMixed::string(bformat!("http://{url_str}")));
             }
         }
         let url_after = rtrim_chars(
@@ -261,7 +261,7 @@ impl ComposerRepository {
             } else {
                 "http"
             };
-            repo_config.insert("url".into(), PhpMixed::string(bconcat!(scheme, rest)));
+            repo_config.insert("url".into(), PhpMixed::string(bformat!("{scheme}{rest}")));
         }
 
         let current_url = BString::from(
@@ -276,9 +276,8 @@ impl ComposerRepository {
             .and_then(|url_bits| url_bits.scheme.as_deref())
             .is_some_and(|scheme| !scheme.is_empty());
         if url_bits.is_none() || !scheme_present {
-            return Err(UnexpectedValueException::new(bconcat!(
-                "Invalid url given for Composer repository: ",
-                current_url
+            return Err(UnexpectedValueException::new(bformat!(
+                "Invalid url given for Composer repository: {current_url}"
             ))
             .into());
         }
@@ -306,9 +305,9 @@ impl ComposerRepository {
             php_regex!(r"{^(?P<proto>https?)://packagist\.org/?$}i"),
             &url,
         ) {
-            url = bconcat!(
-                match_packagist.name("proto").unwrap_or_default(),
-                "://repo.packagist.org"
+            url = bformat!(
+                "{}://repo.packagist.org",
+                match_packagist.name("proto").unwrap_or_default()
             );
         }
 
@@ -317,10 +316,10 @@ impl ComposerRepository {
         let base_url = rtrim_chars(&base_url_trimmed, "/");
         assert!(!base_url.is_empty());
 
-        let cache_dir = bconcat!(
+        let cache_dir = bformat!(
+            "{}/{}",
             config.get_path("cache-repo-dir")?.as_bstr(),
-            "/",
-            preg_replace(r"{[^a-z0-9.]}i", "-", Url::sanitize(&url)),
+            preg_replace(r"{[^a-z0-9.]}i", "-", Url::sanitize(&url))
         );
         let cache_dir = path_from_bytes(&cache_dir);
         let cache = Cache::new(
@@ -382,7 +381,7 @@ impl ComposerRepository {
     }
 
     pub fn get_repo_name(&self) -> BString {
-        bconcat!("composer repo (", Url::sanitize(&self.url), ")")
+        bformat!("composer repo ({})", Url::sanitize(&self.url))
     }
 
     pub fn get_repo_config_pub(&self) -> IndexMap<BString, PhpMixed> {
@@ -571,7 +570,7 @@ impl ComposerRepository {
         if let Some(filter) = package_filter
             && !filter.is_empty()
         {
-            let url = bconcat!(url, "?filter=", urlencode(filter));
+            let url = bformat!("{url}?filter={}", urlencode(filter));
             let result = self
                 .http_downloader
                 .borrow_mut()
@@ -691,11 +690,11 @@ impl ComposerRepository {
                         }
                     };
                     if matches_constraint {
-                        let hash_c = bconcat!(candidate.ptr_id());
+                        let hash_c = bformat!("{}", candidate.ptr_id());
                         matches.insert(hash_c, candidate.clone());
                         if let Some(alias) = candidate.as_alias() {
                             let aliased = alias.get_alias_of();
-                            let aliased_hash = bconcat!(aliased.ptr_id());
+                            let aliased_hash = bformat!("{}", aliased.ptr_id());
                             if !matches.contains_key(&aliased_hash) {
                                 matches.insert(aliased_hash, aliased.into());
                             }
@@ -707,9 +706,9 @@ impl ComposerRepository {
                 for (_uid, candidate) in candidates.iter() {
                     if let Some(alias) = candidate.as_alias() {
                         let aliased = alias.get_alias_of();
-                        let aliased_hash = bconcat!(aliased.ptr_id());
+                        let aliased_hash = bformat!("{}", aliased.ptr_id());
                         if matches.contains_key(&aliased_hash) {
-                            let hash_c = bconcat!(candidate.ptr_id());
+                            let hash_c = bformat!("{}", candidate.ptr_id());
                             matches.insert(hash_c, candidate.clone());
                         }
                     }
@@ -815,7 +814,7 @@ impl ComposerRepository {
         if mode == SEARCH_VENDOR {
             let mut results: Vec<IndexMap<BString, PhpMixed>> = Vec::new();
             let parts = preg_split(php_regex!(r"{\s+}"), &query);
-            let regex = bconcat!("{(?:", implode("|", &parts), ")}i");
+            let regex = bformat!("{{(?:{})}}i", implode("|", &parts));
 
             let vendor_names = self.get_vendor_names()?;
             for name in preg_grep(&regex, vendor_names) {
@@ -837,12 +836,10 @@ impl ComposerRepository {
             {
                 let q = match_groups.name("query").unwrap_or_default();
                 let vendor = match_groups.name("vendor").unwrap_or_default();
-                let url = bconcat!(
-                    list_url,
-                    "?vendor=",
+                let url = bformat!(
+                    "{list_url}?vendor={}&filter={}",
                     urlencode(vendor),
-                    "&filter=",
-                    urlencode(bconcat!(q, "*")),
+                    urlencode(bformat!("{q}*"))
                 );
                 let result = self
                     .http_downloader
@@ -872,7 +869,7 @@ impl ComposerRepository {
 
             let mut results: Vec<IndexMap<BString, PhpMixed>> = Vec::new();
             let parts = preg_split(php_regex!(r"{\s+}"), &query);
-            let regex = bconcat!("{(?:", implode("|", &parts), ")}i");
+            let regex = bformat!("{{(?:{})}}i", implode("|", &parts));
 
             let package_names = self.get_package_names(None)?;
             for name in preg_grep(&regex, package_names) {
@@ -970,14 +967,7 @@ impl ComposerRepository {
             if !allow_partial_advisories && !is_full {
                 let data_mixed =
                     PhpMixed::Array(data.iter().map(|(k, v)| (k.clone(), v.clone())).collect());
-                return Err(RuntimeException::new(bconcat!(
-                    "Advisory for ",
-                    name,
-                    " could not be loaded as a full advisory from ",
-                    repo_name,
-                    PHP_EOL,
-                    var_export(&data_mixed, true)
-                ))
+                return Err(RuntimeException::new(bformat!("Advisory for {name} could not be loaded as a full advisory from {repo_name}{PHP_EOL}{}", var_export(&data_mixed, true)))
                 .into());
             }
             let affected_versions: &AnyConstraint = advisory.affected_versions();
@@ -1101,7 +1091,7 @@ impl ComposerRepository {
             for (name, list_box) in advisories_response.iter() {
                 if !package_constraint_map.contains_key(name) {
                     if !warned {
-                        self.io.write_error(bconcat!("<warning>", self.get_repo_name(), " returned names which were not requested in response to the security-advisories API. ", name, " was not requested but is present in the response. Requested names were: ", implode(", ", &package_constraint_map.keys().collect::<Vec<_>>()), "</warning>"));
+                        self.io.write_error(bformat!("<warning>{} returned names which were not requested in response to the security-advisories API. {name} was not requested but is present in the response. Requested names were: {}</warning>", self.get_repo_name(), implode(", ", &package_constraint_map.keys().collect::<Vec<_>>())));
                         warned = true;
                     }
                     continue;
@@ -1339,7 +1329,7 @@ impl ComposerRepository {
             {
                 hash_opt = None;
                 url = str_replace("%package%", name, lazy_providers_url);
-                cache_key = bconcat!("provider-", strtr(name, "/", "$"), ".json");
+                cache_key = bformat!("provider-{}.json", strtr(name, "/", "$"));
                 use_last_modified_check = true;
             } else if let Some(providers_url) = self.providers_url.clone() {
                 // package does not exist in this repo
@@ -1359,7 +1349,7 @@ impl ComposerRepository {
                     &entry.sha256,
                     str_replace("%package%", name, &providers_url),
                 );
-                cache_key = bconcat!("provider-", strtr(name, "/", "$"), ".json");
+                cache_key = bformat!("provider-{}.json", strtr(name, "/", "$"));
             } else {
                 return Ok(IndexMap::new());
             }
@@ -1373,12 +1363,9 @@ impl ComposerRepository {
                     && let PhpMixed::Array(map) = json_decode_assoc(&raw)?
                 {
                     packages_opt = Some(map);
-                    packages_source = Some(bconcat!(
-                        "cached file (",
-                        cache_key,
-                        " originating from ",
-                        Url::sanitize(&url),
-                        ")"
+                    packages_source = Some(bformat!(
+                        "cached file ({cache_key} originating from {})",
+                        Url::sanitize(&url)
                     ));
                 }
             } else if use_last_modified_check {
@@ -1389,12 +1376,9 @@ impl ComposerRepository {
                     // we already loaded some packages from this file, so assume it is fresh and avoid fetching it again
                     if already_loaded.contains_key(name) {
                         packages_opt = Some(contents);
-                        packages_source = Some(bconcat!(
-                            "cached file (",
-                            cache_key,
-                            " originating from ",
-                            Url::sanitize(&url),
-                            ")"
+                        packages_source = Some(bformat!(
+                            "cached file ({cache_key} originating from {})",
+                            Url::sanitize(&url)
                         ));
                     } else if let Some(last_modified) = contents
                         .get(B("last-modified"))
@@ -1409,18 +1393,15 @@ impl ComposerRepository {
                         match response {
                             FetchFileIfLastModifiedResult::NotModified => {
                                 packages_opt = Some(contents);
-                                packages_source = Some(bconcat!(
-                                    "cached file (",
-                                    cache_key,
-                                    " originating from ",
-                                    Url::sanitize(&url),
-                                    ")"
+                                packages_source = Some(bformat!(
+                                    "cached file ({cache_key} originating from {})",
+                                    Url::sanitize(&url)
                                 ));
                             }
                             FetchFileIfLastModifiedResult::Data(data) => {
                                 packages_opt = Some(data);
                                 packages_source =
-                                    Some(bconcat!("downloaded file (", Url::sanitize(&url), ")"));
+                                    Some(bformat!("downloaded file ({})", Url::sanitize(&url)));
                             }
                         }
                     }
@@ -1437,7 +1418,7 @@ impl ComposerRepository {
                     Ok(p) => {
                         packages_opt = Some(p);
                         packages_source =
-                            Some(bconcat!("downloaded file (", Url::sanitize(&url), ")"));
+                            Some(bformat!("downloaded file ({})", Url::sanitize(&url)));
                     }
                     Err(e) => {
                         // 404s are acceptable for lazy provider repos
@@ -1450,10 +1431,10 @@ impl ComposerRepository {
                                 p.insert("packages".into(), PhpMixed::Array(IndexMap::new()));
                                 packages_opt = Some(p);
                                 packages_source =
-                                    Some(bconcat!("not-found file (", Url::sanitize(&url), ")"));
+                                    Some(bformat!("not-found file ({})", Url::sanitize(&url)));
                                 if status_code == Some(499) {
                                     self.io.error(
-                                        bconcat!("<warning>", te.get_message(), "</warning>"),
+                                        bformat!("<warning>{}</warning>", te.get_message()),
                                         &[],
                                     );
                                 }
@@ -1489,10 +1470,9 @@ impl ComposerRepository {
                 PhpMixed::Array(versions_map.into_iter().collect()),
             );
             packages = packages_inner;
-            packages_source = Some(bconcat!(
-                "root file (",
-                Url::sanitize(self.get_packages_json_url()),
-                ")"
+            packages_source = Some(bformat!(
+                "root file ({})",
+                Url::sanitize(self.get_packages_json_url())
             ));
             loading_partial_package = true;
         }
@@ -1544,7 +1524,7 @@ impl ComposerRepository {
                 }
 
                 let uid_key = match version.get(B("uid")) {
-                    Some(PhpMixed::Int(i)) => bconcat!(i),
+                    Some(PhpMixed::Int(i)) => bformat!("{i}"),
                     Some(PhpMixed::String(s)) => s.clone(),
                     Some(other) => other.to_php_string(),
                     None => continue,
@@ -1623,7 +1603,7 @@ impl ComposerRepository {
                     aliased_pkg.set_repository(h.clone())?;
                 }
                 result.insert(uid.clone(), aliased.into());
-                result.insert(bconcat!(uid, "-alias"), package);
+                result.insert(bformat!("{uid}-alias"), package);
             } else {
                 result.insert(uid.clone(), package);
             }
@@ -1637,10 +1617,9 @@ impl ComposerRepository {
 
         let repo_data = self.load_data_from_server()?;
 
-        let source = bconcat!(
-            "root file (",
-            Url::sanitize(self.get_packages_json_url()),
-            ")"
+        let source = bformat!(
+            "root file ({})",
+            Url::sanitize(self.get_packages_json_url())
         );
         for package in self.create_packages(repo_data, Some(source))? {
             self.add_package(package)?;
@@ -1743,7 +1722,7 @@ impl ComposerRepository {
                     bstr::BStr::new("dev"),
                 )
             {
-                package_names.insert(bconcat!(name, "~dev"), constraint);
+                package_names.insert(bformat!("{name}~dev"), constraint);
             }
             // if only dev stability is requested, we skip loading the non dev file
             if acceptable_stabilities.is_some_and(|m| m.contains_key(B("dev")) && m.len() == 1)
@@ -1934,14 +1913,14 @@ impl ComposerRepository {
                 if let Some(h) = self_handle.as_ref() {
                     package.set_repository(h.clone())?;
                 }
-                let hash_c = bconcat!(package.ptr_id());
+                let hash_c = bformat!("{}", package.ptr_id());
                 if let Some(alias) = package.as_alias() {
                     let aliased = alias.get_alias_of();
                     if let Some(h) = self_handle.as_ref() {
                         let aliased_pkg: PackageInterfaceHandle = aliased.clone().into();
                         aliased_pkg.set_repository(h.clone())?;
                     }
-                    let aliased_hash = bconcat!(aliased.ptr_id());
+                    let aliased_hash = bformat!("{}", aliased.ptr_id());
                     if !packages.contains_key(&aliased_hash) {
                         packages.insert(aliased_hash, aliased.into());
                     }
@@ -1974,7 +1953,7 @@ impl ComposerRepository {
             &name,
             self.lazy_providers_url.as_ref().unwrap(),
         );
-        let cache_key = bconcat!("provider-", strtr(&name, "/", "~"), ".json");
+        let cache_key = bformat!("provider-{}.json", strtr(&name, "/", "~"));
 
         let mut last_modified: Option<BString> = None;
         let contents_opt: Option<IndexMap<BString, PhpMixed>>;
@@ -2001,15 +1980,12 @@ impl ComposerRepository {
             )
             .await?;
 
-        let mut packages_source = bconcat!("downloaded file (", Url::sanitize(&url), ")");
+        let mut packages_source = bformat!("downloaded file ({})", Url::sanitize(&url));
 
         let response_data = if response.as_bool() == Some(true) {
-            packages_source = bconcat!(
-                "cached file (",
-                cache_key,
-                " originating from ",
-                Url::sanitize(&url),
-                ")"
+            packages_source = bformat!(
+                "cached file ({cache_key} originating from {})",
+                Url::sanitize(&url)
             );
             contents_opt.map(PhpMixed::Array).unwrap_or(PhpMixed::Null)
         } else {
@@ -2124,7 +2100,7 @@ impl ComposerRepository {
             return self.url.clone();
         }
 
-        bconcat!(self.url, "/packages.json")
+        bformat!("{}/packages.json", self.url)
     }
 
     fn load_root_server_file(&mut self, root_max_age: Option<i64>) -> anyhow::Result<RootData> {
@@ -2133,8 +2109,8 @@ impl ComposerRepository {
         }
 
         if !extension_loaded("openssl") && self.url.starts_with(b"https") {
-            return Err(RuntimeException::new(bconcat!(
-                "You must enable the openssl extension in your php.ini to load information from ",
+            return Err(RuntimeException::new(bformat!(
+                "You must enable the openssl extension in your php.ini to load information from {}",
                 self.url
             ))
             .into());
@@ -2372,7 +2348,7 @@ impl ComposerRepository {
                     api_url: api_url.clone(),
                 });
                 if api_url.is_none() && !self.has_available_package_list {
-                    return Err(UnexpectedValueException::new(bconcat!("Invalid security advisory configuration on ", self.get_repo_name(), ": If the repository does not provide a security-advisories.api-url then available-packages or available-package-patterns are required to be provided for performance reason.")).into());
+                    return Err(UnexpectedValueException::new(bformat!("Invalid security advisory configuration on {}: If the repository does not provide a security-advisories.api-url then available-packages or available-package-patterns are required to be provided for performance reason.", self.get_repo_name())).into());
                 }
             }
         }
@@ -2444,7 +2420,7 @@ impl ComposerRepository {
 
         if url.starts_with(b"/") {
             if let Some(matches) = preg_match(php_regex!(r"{^[^:]++://[^/]*+}"), &self.url) {
-                return Ok(bconcat!(matches.get(0).unwrap_or_default(), url));
+                return Ok(bformat!("{}{url}", matches.get(0).unwrap_or_default()));
             }
 
             return Ok(self.url.clone());
@@ -2513,7 +2489,11 @@ impl ComposerRepository {
                         .and_then(|v| v.as_string())
                         .unwrap_or_default(),
                 );
-                let url = bconcat!(self.base_url, "/", str_replace("%hash%", &sha256, include));
+                let url = bformat!(
+                    "{}/{}",
+                    self.base_url,
+                    str_replace("%hash%", &sha256, include)
+                );
                 let cache_key = str_replace("$", "", str_replace("%hash%", "", include));
                 let included_data: IndexMap<BString, PhpMixed> =
                     if self.cache.borrow_mut().sha256(&cache_key).as_ref() == Some(&sha256) {
@@ -2591,15 +2571,7 @@ impl ComposerRepository {
                         && package_name != strtolower(&meta_name)
                     {
                         self.displayed_warning_about_non_matching_package_index = true;
-                        self.io.write_error(bconcat!(
-                            "<warning>Warning: the packages key '",
-                            package,
-                            "' doesn't match the name defined in the package metadata '",
-                            meta_name,
-                            "' in repository ",
-                            self.base_url,
-                            "</warning>"
-                        ));
+                        self.io.write_error(bformat!("<warning>Warning: the packages key '{package}' doesn't match the name defined in the package metadata '{meta_name}' in repository {}</warning>", self.base_url));
                     }
                 }
             }
@@ -2696,18 +2668,16 @@ impl ComposerRepository {
         })();
 
         result.map_err(|e| {
-            let message = bconcat!(
-                "Could not load packages in ",
+            let message = bformat!(
+                "Could not load packages in {}{}: [{}] {}",
                 self.get_repo_name(),
                 source
                     .as_ref()
-                    .map(|s| bconcat!(" from ", s))
+                    .map(|s| bformat!(" from {s}"))
                     .unwrap_or_default(),
-                ": [",
                 AnyThrowable::of(&e)
                     .map_or_else(|| BStr::new("Exception"), PhpClass::php_class_name),
-                "] ",
-                error_message(&e),
+                error_message(&e)
             );
             RuntimeException::with_code_and_previous(message, 0, Some(std::sync::Arc::new(e)))
                 .into()
@@ -2731,7 +2701,7 @@ impl ComposerRepository {
         let (mut filename, cache_key_owned): (BString, Option<BString>) = match cache_key {
             None => {
                 let ck = BString::from(filename);
-                let fn_full = bconcat!(self.base_url, "/", filename);
+                let fn_full = bformat!("{}/{filename}", self.base_url);
                 (fn_full, Some(ck))
             }
             Some(ck) => (BString::from(filename), Some(BString::from(ck))),
@@ -2742,7 +2712,7 @@ impl ComposerRepository {
             && pos > 0
             && preg_is_match(php_regex!(r"{^https?://}i"), &filename)
         {
-            filename = bconcat!(&filename[..pos], "%24", &filename[pos + 1..]);
+            filename = bformat!("{}%24{}", &filename[..pos], &filename[pos + 1..]);
         }
 
         let mut retries: i64 = 3;
@@ -2757,7 +2727,7 @@ impl ComposerRepository {
                 if let Some(dispatcher) = self.event_dispatcher.as_ref() {
                     let mut dispatcher = dispatcher.borrow_mut();
                     let mut pre_file_download_event = PreFileDownloadEvent::new(
-                        bconcat!(PluginEvents::PRE_FILE_DOWNLOAD),
+                        bformat!("{}", PluginEvents::PRE_FILE_DOWNLOAD),
                         self.http_downloader.clone(),
                         filename.clone(),
                         "metadata".into(),
@@ -2795,13 +2765,13 @@ impl ComposerRepository {
                     }
 
                     // TODO use scarier wording once we know for sure it doesn't do false positives anymore
-                    return Err(RepositorySecurityException::new(bconcat!("The contents of ", filename, " do not match its signature. This could indicate a man-in-the-middle attack or e.g. antivirus software corrupting files. Try running composer again and report this if you think it is a mistake.")).into());
+                    return Err(RepositorySecurityException::new(bformat!("The contents of {filename} do not match its signature. This could indicate a man-in-the-middle attack or e.g. antivirus software corrupting files. Try running composer again and report this if you think it is a mistake.")).into());
                 }
 
                 if let Some(dispatcher) = self.event_dispatcher.as_ref() {
                     let mut dispatcher = dispatcher.borrow_mut();
                     let post_file_download_event = PostFileDownloadEvent::new(
-                        bconcat!(PluginEvents::POST_FILE_DOWNLOAD),
+                        bformat!("{}", PluginEvents::POST_FILE_DOWNLOAD),
                         None,
                         sha256.map(BString::from),
                         filename.clone(),
@@ -2878,12 +2848,12 @@ impl ComposerRepository {
                         && let Some(contents) = self.cache.borrow_mut().read(ck)
                     {
                         if !self.degraded_mode.get() {
-                            self.io.write_error(bconcat!("<warning>", self.url, " could not be fully loaded (", error_message(&e), "), package information was loaded from the local cache and may be out of date</warning>"));
+                            self.io.write_error(bformat!("<warning>{} could not be fully loaded ({}), package information was loaded from the local cache and may be out of date</warning>", self.url, error_message(&e)));
                         }
                         self.degraded_mode.set(true);
                         let parsed = JsonFile::parse_json(
                             Some(&contents),
-                            Some(bconcat!(self.cache.borrow().get_root(), ck).as_ref()),
+                            Some(bformat!("{}{ck}", self.cache.borrow().get_root()).as_ref()),
                         )?;
                         let map: IndexMap<BString, PhpMixed> = parsed
                             .as_array()
@@ -2924,7 +2894,7 @@ impl ComposerRepository {
             if let Some(dispatcher) = self.event_dispatcher.as_ref() {
                 let mut dispatcher = dispatcher.borrow_mut();
                 let mut pre_file_download_event = PreFileDownloadEvent::new(
-                    bconcat!(PluginEvents::PRE_FILE_DOWNLOAD),
+                    bformat!("{}", PluginEvents::PRE_FILE_DOWNLOAD),
                     self.http_downloader.clone(),
                     filename.clone(),
                     "metadata".into(),
@@ -2946,9 +2916,8 @@ impl ComposerRepository {
             // cast http.header to array, then append
             let http = options.http_mut();
             http.cast_header_to_array();
-            http.push_header(PhpMixed::string(bconcat!(
-                "If-Modified-Since: ",
-                last_modified_time
+            http.push_header(PhpMixed::string(bformat!(
+                "If-Modified-Since: {last_modified_time}"
             )))?;
 
             let mut response = self
@@ -2963,7 +2932,7 @@ impl ComposerRepository {
             if let Some(dispatcher) = self.event_dispatcher.as_ref() {
                 let mut dispatcher = dispatcher.borrow_mut();
                 let post_file_download_event = PostFileDownloadEvent::new(
-                    bconcat!(PluginEvents::POST_FILE_DOWNLOAD),
+                    bformat!("{}", PluginEvents::POST_FILE_DOWNLOAD),
                     None,
                     None,
                     filename.clone(),
@@ -3017,7 +2986,7 @@ impl ComposerRepository {
                 }
 
                 if !self.degraded_mode.get() {
-                    self.io.write_error(bconcat!("<warning>", self.url, " could not be fully loaded (", error_message(&e), "), package information was loaded from the local cache and may be out of date</warning>"));
+                    self.io.write_error(bformat!("<warning>{} could not be fully loaded ({}), package information was loaded from the local cache and may be out of date</warning>", self.url, error_message(&e)));
                 }
                 self.degraded_mode.set(true);
 
@@ -3060,7 +3029,7 @@ impl ComposerRepository {
         if let Some(dispatcher) = self.event_dispatcher.as_ref() {
             let mut dispatcher = dispatcher.borrow_mut();
             let mut pre_file_download_event = PreFileDownloadEvent::new(
-                bconcat!(PluginEvents::PRE_FILE_DOWNLOAD),
+                bformat!("{}", PluginEvents::PRE_FILE_DOWNLOAD),
                 self.http_downloader.clone(),
                 filename.clone(),
                 "metadata".into(),
@@ -3082,9 +3051,8 @@ impl ComposerRepository {
         if let Some(last_modified_time) = last_modified_time {
             let http = options.http_mut();
             http.cast_header_to_array();
-            http.push_header(PhpMixed::string(bconcat!(
-                "If-Modified-Since: ",
-                last_modified_time
+            http.push_header(PhpMixed::string(bformat!(
+                "If-Modified-Since: {last_modified_time}"
             )))?;
         }
 
@@ -3127,7 +3095,7 @@ impl ComposerRepository {
 
         if let Some(dispatcher) = self.event_dispatcher.as_ref() {
             let post_file_download_event = PostFileDownloadEvent::new(
-                bconcat!(PluginEvents::POST_FILE_DOWNLOAD),
+                bformat!("{}", PluginEvents::POST_FILE_DOWNLOAD),
                 None,
                 None,
                 BString::from(filename),
@@ -3195,7 +3163,7 @@ impl ComposerRepository {
         }
 
         if !self.degraded_mode.get() {
-            self.io.write_error(bconcat!("<warning>", self.url, " could not be fully loaded (", error_message(&e), "), package information was loaded from the local cache and may be out of date</warning>"));
+            self.io.write_error(bformat!("<warning>{} could not be fully loaded ({}), package information was loaded from the local cache and may be out of date</warning>", self.url, error_message(&e)));
         }
         self.degraded_mode.set(true);
 
@@ -3262,15 +3230,7 @@ impl ComposerRepository {
                     if !self.displayed_warning_about_non_matching_package_index
                         && version_package_name != strtolower(package)
                     {
-                        self.io.write_error(bconcat!(
-                            "<warning>Warning: the packages key '",
-                            package,
-                            "' doesn't match the name defined in the package metadata '",
-                            name_str,
-                            "' in repository ",
-                            self.base_url,
-                            "</warning>"
-                        ));
+                        self.io.write_error(bformat!("<warning>Warning: the packages key '{package}' doesn't match the name defined in the package metadata '{name_str}' in repository {}</warning>", self.base_url));
                         self.displayed_warning_about_non_matching_package_index = true;
                     }
                 }

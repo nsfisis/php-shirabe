@@ -5,7 +5,7 @@ use crate::package::PackageInterfaceHandle;
 use crate::repository::{InstalledRepository, RepositoryInterface};
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
-use shirabe_php_shim::{bconcat, php_regex, preg_replace, str_repeat, str_replace};
+use shirabe_php_shim::{bformat, php_regex, preg_replace, str_repeat, str_replace};
 use shirabe_symfony_console::formatter::OutputFormatter;
 
 #[derive(Debug)]
@@ -82,7 +82,7 @@ impl SuggestedPackagesReporter {
         // Simple mode
         if mode & Self::MODE_LIST != 0 {
             for name in suggested.keys() {
-                self.io.write(bconcat!("<info>", name, "</info>"));
+                self.io.write(bformat!("<info>{name}</info>"));
             }
 
             return Ok(());
@@ -92,15 +92,13 @@ impl SuggestedPackagesReporter {
         if mode & Self::MODE_BY_PACKAGE != 0 {
             for (suggester, suggestions) in &suggesters {
                 self.io
-                    .write(bconcat!("<comment>", suggester, "</comment> suggests:"));
+                    .write(bformat!("<comment>{suggester}</comment> suggests:"));
 
                 for (suggestion, reason) in suggestions {
-                    self.io.write(bconcat!(
-                        " - <info>",
-                        suggestion,
-                        "</info>",
+                    self.io.write(bformat!(
+                        " - <info>{suggestion}</info>{}",
                         if !reason.is_empty() {
-                            bconcat!(": ", self.escape_output(reason.as_ref()))
+                            bformat!(": {}", self.escape_output(reason.as_ref()))
                         } else {
                             BString::default()
                         }
@@ -117,19 +115,14 @@ impl SuggestedPackagesReporter {
                 self.io.write(str_repeat("-", 78));
             }
             for (suggestion, suggesters) in &suggested {
-                self.io.write(bconcat!(
-                    "<comment>",
-                    suggestion,
-                    "</comment> is suggested by:"
-                ));
+                self.io
+                    .write(bformat!("<comment>{suggestion}</comment> is suggested by:"));
 
                 for (suggester, reason) in suggesters {
-                    self.io.write(bconcat!(
-                        " - <info>",
-                        suggester,
-                        "</info>",
+                    self.io.write(bformat!(
+                        " - <info>{suggester}</info>{}",
                         if !reason.is_empty() {
-                            bconcat!(": ", self.escape_output(reason.as_ref()))
+                            bformat!(": {}", self.escape_output(reason.as_ref()))
                         } else {
                             BString::default()
                         }
@@ -143,7 +136,7 @@ impl SuggestedPackagesReporter {
             let all_suggested_packages = self.get_filtered_suggestions(installed_repo, None)?;
             let diff = all_suggested_packages.len() as i64 - suggested_packages.len() as i64;
             if diff != 0 {
-                self.io.write(bconcat!("<info>", diff, " additional suggestions</info> by transitive dependencies can be shown with <info>--all</info>"));
+                self.io.write(bformat!("<info>{diff} additional suggestions</info> by transitive dependencies can be shown with <info>--all</info>"));
             }
         }
 
@@ -158,7 +151,7 @@ impl SuggestedPackagesReporter {
         let suggested_packages =
             self.get_filtered_suggestions(installed_repo, only_dependents_of)?;
         if !suggested_packages.is_empty() {
-            self.io.write_error(bconcat!("<info>", suggested_packages.len(), " package suggestions were added by new dependencies, use `shirabe suggest` to see details.</info>"));
+            self.io.write_error(bformat!("<info>{} package suggestions were added by new dependencies, use `shirabe suggest` to see details.</info>", suggested_packages.len()));
         }
 
         Ok(())

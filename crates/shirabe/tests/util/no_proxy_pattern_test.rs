@@ -2,7 +2,7 @@
 
 use bstr::{BStr, BString, ByteSlice};
 use shirabe::util::NoProxyPattern;
-use shirabe_php_shim::bconcat;
+use shirabe_php_shim::bformat;
 
 fn run_test(noproxy: &BStr, url: &BStr, expected: bool) {
     let mut matcher = NoProxyPattern::new(noproxy);
@@ -13,7 +13,7 @@ fn run_test(noproxy: &BStr, url: &BStr, expected: bool) {
 /// Appends a scheme to the test url if it is missing.
 fn get_url(url: &BStr) -> BString {
     if url.contains_str("://") {
-        return bconcat!(url);
+        return bformat!("{url}");
     }
 
     let mut scheme = BStr::new("http");
@@ -26,7 +26,7 @@ fn get_url(url: &BStr) -> BString {
         }
     }
 
-    bconcat!(scheme, "://", url)
+    bformat!("{scheme}://{url}")
 }
 
 #[test]

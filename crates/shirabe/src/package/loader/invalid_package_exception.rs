@@ -2,7 +2,7 @@
 
 use bstr::BString;
 use indexmap::IndexMap;
-use shirabe_php_shim::{Exception, PhpMixed, bconcat, impl_php_exception, implode};
+use shirabe_php_shim::{Exception, PhpMixed, bformat, impl_php_exception, implode};
 
 #[derive(Debug)]
 pub struct InvalidPackageException {
@@ -19,8 +19,8 @@ impl InvalidPackageException {
         warnings: Vec<BString>,
         data: IndexMap<BString, PhpMixed>,
     ) -> Self {
-        let message = bconcat!(
-            "Invalid package information: \n",
+        let message = bformat!(
+            "Invalid package information: \n{}",
             implode(
                 "\n",
                 &errors

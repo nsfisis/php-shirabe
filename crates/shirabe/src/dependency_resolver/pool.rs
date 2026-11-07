@@ -5,7 +5,7 @@ use crate::package::BasePackageHandle;
 use crate::package::version::VersionParser;
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
-use shirabe_php_shim::{CmpOp, PhpDisplay, STR_PAD_LEFT, ToPhpString, bconcat, str_pad};
+use shirabe_php_shim::{CmpOp, PhpDisplay, STR_PAD_LEFT, ToPhpString, bformat, bwrite, str_pad};
 use shirabe_semver::CompilingMatcher;
 use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
 
@@ -254,7 +254,7 @@ impl Pool {
     ) -> BString {
         let package = self.literal_to_package(literal);
 
-        let prefix = if installed_map.contains_key(bstr::B(&bconcat!(package.id()))) {
+        let prefix = if installed_map.contains_key(bstr::B(&bformat!("{}", package.id()))) {
             if literal > 0 { "keep" } else { "remove" }
         } else {
             if literal > 0 {
@@ -264,7 +264,7 @@ impl Pool {
             }
         };
 
-        bconcat!(prefix, " ", package.get_pretty_string())
+        bformat!("{prefix} {}", package.get_pretty_string())
     }
 
     /// Checks if the package matches the given constraint directly or through
@@ -346,13 +346,12 @@ impl PhpDisplay for Pool {
         out.extend_from_slice(b"Pool:\n");
 
         for package in &self.packages {
-            out.extend_from_slice(&bconcat!(
-                "- ",
-                str_pad(bconcat!(package.id()), 6, " ", STR_PAD_LEFT),
-                ": ",
-                package.get_name(),
-                "\n"
-            ));
+            bwrite!(
+                out,
+                "- {}: {}\n",
+                str_pad(bformat!("{}", package.id()), 6, " ", STR_PAD_LEFT),
+                package.get_name()
+            );
         }
     }
 }

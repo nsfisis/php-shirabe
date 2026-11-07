@@ -12,7 +12,7 @@ use crate::util::{GetResult, Platform, StreamContextOptions, Url};
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    RuntimeException, ToPhpString, bconcat, file_get_contents, file_get_contents_with_max_length,
+    RuntimeException, ToPhpString, bformat, file_get_contents, file_get_contents_with_max_length,
     file_put_contents, parse_url, path_from_bytes, php_regex, preg_is_match, strpos, strtr,
 };
 
@@ -110,7 +110,10 @@ impl LocalFilesystem {
             } else {
                 "&"
             };
-            file_url = bconcat!(file_url, separator, "access_token=", token.to_php_string());
+            file_url = bformat!(
+                "{file_url}{separator}access_token={}",
+                token.to_php_string()
+            );
         }
 
         let max_file_size = options.max_file_size()?;
@@ -126,14 +129,14 @@ impl LocalFilesystem {
                 .unwrap_or_default()
         };
         self.io.write_error_with_verbosity(
-            bconcat!(
+            bformat!(
+                "{}{}{using_proxy}",
                 if strpos(&orig_file_url, "http") == Some(0) {
                     "Downloading "
                 } else {
                     "Reading "
                 },
-                Url::sanitize(orig_file_url.clone()),
-                using_proxy
+                Url::sanitize(orig_file_url.clone())
             ),
             DEBUG,
         );
@@ -171,36 +174,27 @@ impl LocalFilesystem {
             && let Some(max) = max_file_size
             && r.len() as i64 >= max
         {
-            return Err(MaxFileSizeExceededException::new(bconcat!(
-                "Maximum allowed download size reached. Downloaded ",
-                r.len(),
-                " of allowed ",
-                max,
-                " bytes"
+            return Err(MaxFileSizeExceededException::new(bformat!(
+                "Maximum allowed download size reached. Downloaded {} of allowed {max} bytes",
+                r.len()
             ))
             .into());
         }
 
         if progress && !is_redirect {
-            self.io.overwrite_error_no_newline(bconcat!(
-                "Downloading (",
+            self.io.overwrite_error_no_newline(bformat!(
+                "Downloading ({})",
                 if result.is_none() {
                     "<error>failed</error>"
                 } else {
                     "<comment>100%</comment>"
-                },
-                ")"
+                }
             ));
         }
 
         let Some(result) = result else {
             return Err(TransportException::new(
-                bconcat!(
-                    "The \"",
-                    orig_file_url,
-                    "\" file could not be downloaded: ",
-                    error_message
-                ),
+                bformat!("The \"{orig_file_url}\" file could not be downloaded: {error_message}"),
                 0,
             )
             .into());
@@ -211,10 +205,8 @@ impl LocalFilesystem {
         {
             if result.is_empty() {
                 return Err(TransportException::new(
-                    bconcat!(
-                        "\"",
-                        orig_file_url,
-                        "\" appears broken, and returned an empty 200 response"
+                    bformat!(
+                        "\"{orig_file_url}\" appears broken, and returned an empty 200 response"
                     ),
                     0,
                 )
@@ -225,13 +217,7 @@ impl LocalFilesystem {
             // and appends it to the message below; the write failure's reason is not carried yet.
             if file_put_contents(file_name, &result).is_none() {
                 return Err(TransportException::new(
-                    bconcat!(
-                        "The \"",
-                        orig_file_url,
-                        "\" file could not be written to ",
-                        file_name,
-                        ": "
-                    ),
+                    bformat!("The \"{orig_file_url}\" file could not be written to {file_name}: "),
                     0,
                 )
                 .into());

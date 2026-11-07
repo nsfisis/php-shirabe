@@ -12,7 +12,7 @@ use bstr::{B, BStr, BString};
 use chrono::{DateTime, FixedOffset};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    Catch as _, DATE_RFC3339, PhpMixed, bconcat, display_to_bytes, extension_loaded, php_regex,
+    Catch as _, DATE_RFC3339, PhpMixed, bformat, display_to_bytes, extension_loaded, php_regex,
     preg_is_match,
 };
 
@@ -107,7 +107,7 @@ impl VcsDriverBase {
 
         let parsed = JsonFile::parse_json(
             Some(&content),
-            Some(bconcat!(identifier, ":composer.json").as_ref()),
+            Some(bformat!("{identifier}:composer.json").as_ref()),
         )?;
 
         let array = match parsed {
@@ -266,7 +266,7 @@ pub trait VcsDriver: VcsDriverInterface {
 
         let composer = JsonFile::parse_json(
             Some(&composer_file_content),
-            Some(bconcat!(identifier, ":composer.json").as_ref()),
+            Some(bformat!("{identifier}:composer.json").as_ref()),
         )?;
 
         let mut composer: IndexMap<BString, PhpMixed> = match composer {

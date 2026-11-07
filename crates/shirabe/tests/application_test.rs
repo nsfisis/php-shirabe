@@ -13,7 +13,7 @@ use test_case::init_temp_composer;
 use shirabe::command::{AboutCommand, SelfUpdateCommand};
 use shirabe::console::{Application, ApplicationHandle};
 use shirabe::util::Platform;
-use shirabe_php_shim::{PHP_EOL, PHP_SERVER, RuntimeException, bconcat, time};
+use shirabe_php_shim::{PHP_EOL, PHP_SERVER, RuntimeException, bformat, time};
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::output::{BufferedOutput, OutputInterface};
 
@@ -56,17 +56,15 @@ fn test_dev_warning() {
     let output_trait: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>> = output.clone();
     shirabe::util::sync_executor::block_on(application.do_run(input, output_trait)).unwrap();
 
-    let expected_output = bconcat!(
-        "<warning>Warning: This development build of Shirabe is over 60 days old. It is recommended to update it by running \"",
+    let expected_output = bformat!(
+        "<warning>Warning: This development build of Shirabe is over 60 days old. It is recommended to update it by running \"{} self-update\" to get the latest version.</warning>{PHP_EOL}",
         std::path::Path::new(
             &PHP_SERVER
                 .lock()
                 .unwrap()
                 .get("PHP_SELF")
                 .unwrap_or_default()
-        ),
-        " self-update\" to get the latest version.</warning>",
-        PHP_EOL
+        )
     );
     assert!(output.borrow().fetch().contains_str(&expected_output));
 }

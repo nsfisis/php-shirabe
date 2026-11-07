@@ -5,7 +5,7 @@ use crate::io::{BaseIO, ConsoleIO, IOInterface, IOInterfaceImmutable, IOInterfac
 use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PHP_EOL, PhpResource, PregMatches, RuntimeException, SEEK_SET, bconcat, fopen, fseek, fwrite,
+    PHP_EOL, PhpResource, PregMatches, RuntimeException, SEEK_SET, bformat, fopen, fseek, fwrite,
     php_regex, preg_replace_callback, rewind, rtrim, stream_get_contents, strip_tags,
 };
 use shirabe_symfony_console::formatter::OutputFormatterInterface;
@@ -87,7 +87,7 @@ impl BufferIO {
                     }
 
                     // TODO reverse parse the string, skipping span tags and \033\[([0-9;]+)m(.*?)\033\[0m style blobs
-                    Ok(bconcat!(g1, rtrim(g2), "\n"))
+                    Ok(bformat!("{g1}{}\n", rtrim(g2)))
                 },
                 &output,
             )
@@ -127,7 +127,7 @@ impl BufferIO {
         };
 
         for input in inputs {
-            fwrite(&stream, bconcat!(input.as_ref(), PHP_EOL), None);
+            fwrite(&stream, bformat!("{}{PHP_EOL}", input.as_ref()), None);
         }
 
         rewind(&stream);

@@ -7,7 +7,7 @@ use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpMixed, addcslashes, array_key_exists, array_keys,
-    array_reverse, bconcat, empty, explode, implode, in_array_loose, intval, is_array, is_int,
+    array_reverse, bformat, empty, explode, implode, in_array_loose, intval, is_array, is_int,
     is_numeric, json_decode_assoc, json_decode_obj, php_regex, php_str, php_truthy, preg_is_match,
     preg_match, preg_quote, preg_replace, preg_replace_with_limit_and_count, rtrim_chars,
     str_repeat, str_replace, strlen, strnatcmp, strpos, substr, trim_chars, uksort,
@@ -51,7 +51,7 @@ impl JsonManipulator {
         });
         let mut s = Self {
             contents: if contents == "{}" {
-                bconcat!("{", newline, "}")
+                bformat!("{{{newline}}}")
             } else {
                 contents
             },
@@ -63,7 +63,7 @@ impl JsonManipulator {
     }
 
     pub fn get_contents(&self) -> BString {
-        bconcat!(self.contents, self.newline)
+        bformat!("{}{}", self.contents, self.newline)
     }
 
     pub fn add_link(
@@ -107,17 +107,14 @@ impl JsonManipulator {
             // update existing link: re-encode the existing key, keep its separator, swap the value
             let existing_package = BString::from(&links[key_start + 1..key_end - 1]);
             let separator = BString::from(&links[key_end..value_start]);
-            links = bconcat!(
+            links = bformat!(
+                "{}{}{separator}\"{constraint}\"{}",
                 &links[..key_start],
                 JsonFile::encode(&PhpMixed::string(str_replace(
                     "\\/",
                     "/",
                     &existing_package
                 )))?,
-                separator,
-                "\"",
-                constraint,
-                "\"",
                 &links[value_end..]
             );
         } else {
@@ -127,17 +124,15 @@ impl JsonManipulator {
                 let groups_1 = BString::from(groups.get(1).unwrap_or_default());
                 // link missing but non empty links
                 links = preg_replace(
-                    bconcat!("{", preg_quote(&groups_1, None), "$}"),
+                    bformat!("{{{}$}}", preg_quote(&groups_1, None)),
                     addcslashes(
-                        bconcat!(
-                            ",",
+                        bformat!(
+                            ",{}{}{}{}: {}{groups_1}",
                             self.newline,
                             self.indent,
                             self.indent,
                             JsonFile::encode(&PhpMixed::string(package))?,
-                            ": ",
-                            JsonFile::encode(&PhpMixed::string(constraint))?,
-                            groups_1
+                            JsonFile::encode(&PhpMixed::string(constraint))?
                         ),
                         "\\$",
                     ),
@@ -145,17 +140,15 @@ impl JsonManipulator {
                 );
             } else {
                 // links empty
-                links = bconcat!(
-                    "{",
+                links = bformat!(
+                    "{{{}{}{}{}: {}{}{}}}",
                     self.newline,
                     self.indent,
                     self.indent,
                     JsonFile::encode(&PhpMixed::string(package))?,
-                    ": ",
                     JsonFile::encode(&PhpMixed::string(constraint))?,
                     self.newline,
-                    self.indent,
-                    "}"
+                    self.indent
                 );
             }
         }
@@ -166,7 +159,7 @@ impl JsonManipulator {
             links = self.format(&requirements, 0, false)?;
         }
 
-        self.contents = bconcat!(start, property, links, end);
+        self.contents = bformat!("{start}{property}{links}{end}");
 
         Ok(true)
     }
@@ -183,7 +176,7 @@ impl JsonManipulator {
                 }
                 result
             } else {
-                bconcat!("5-", requirement)
+                bformat!("5-{requirement}")
             }
         };
 
@@ -323,7 +316,7 @@ impl JsonManipulator {
             if let Some(list) = repos_value.as_ref().and_then(|v| v.as_list()) {
                 list.iter()
                     .enumerate()
-                    .map(|(i, v)| (bconcat!(i), v.clone()))
+                    .map(|(i, v)| (bformat!("{i}"), v.clone()))
                     .collect()
             } else {
                 repos_value
@@ -430,7 +423,8 @@ impl JsonManipulator {
             b"\"url\"",
             ValueKind::Json,
         ) {
-            Some(u) => bconcat!(
+            Some(u) => bformat!(
+                "{}{}{}",
                 &raw_repo[..u.value_pos],
                 JsonFile::encode(&PhpMixed::string(url))?,
                 &raw_repo[u.value_end..]
@@ -438,7 +432,7 @@ impl JsonManipulator {
             None => raw_repo,
         };
 
-        self.contents = bconcat!(start_outer, new_raw_repo, end_outer);
+        self.contents = bformat!("{start_outer}{new_raw_repo}{end_outer}");
 
         Ok(true)
     }
@@ -549,7 +543,7 @@ impl JsonManipulator {
             } else if let Some(l) = repositories_value.as_ref().and_then(|v| v.as_list()) {
                 l.iter()
                     .enumerate()
-                    .map(|(i, v)| (bconcat!(i), v.clone()))
+                    .map(|(i, v)| (bformat!("{i}"), v.clone()))
                     .collect()
             } else {
                 Vec::new()
@@ -747,7 +741,7 @@ impl JsonManipulator {
         // child exists. The child pattern looks for the raw `"name"` key token within the children
         // object and rewrites its value in place; the surrounding `"name"\s*:\s*` and optional comma
         // are preserved as-is.
-        let child_key = bconcat!("\"", name_owned, "\"");
+        let child_key = bformat!("\"{name_owned}\"");
         let child = json_grammar::find_top_level_key(
             children.as_bytes(),
             child_key.as_bytes(),
@@ -767,9 +761,9 @@ impl JsonManipulator {
                 value_local = cur_val;
             }
             let formatted = self.format(&value_local, 1, false)?;
-            children = bconcat!(
+            children = bformat!(
+                "{}{formatted}{}",
                 &children[..cm.value_pos],
-                formatted,
                 &children[cm.value_end..]
             );
         } else {
@@ -795,18 +789,15 @@ impl JsonManipulator {
                     // child missing but non empty children
                     if append {
                         children = preg_replace(
-                            bconcat!("#", whitespace, "}$#"),
+                            bformat!("#{whitespace}}}$#"),
                             addcslashes(
-                                bconcat!(
-                                    ",",
+                                bformat!(
+                                    ",{}{}{}{}: {}{whitespace}}}",
                                     self.newline,
                                     self.indent,
                                     self.indent,
                                     JsonFile::encode(&PhpMixed::String(name_owned.clone()))?,
-                                    ": ",
-                                    self.format(&value_local, 1, false)?,
-                                    whitespace,
-                                    "}"
+                                    self.format(&value_local, 1, false)?
                                 ),
                                 "\\$",
                             ),
@@ -815,15 +806,12 @@ impl JsonManipulator {
                     } else {
                         whitespace = leading_space;
                         children = preg_replace(
-                            bconcat!("#^{", whitespace, "#"),
+                            bformat!("#^{{{whitespace}#"),
                             addcslashes(
-                                bconcat!(
-                                    "{",
-                                    whitespace,
+                                bformat!(
+                                    "{{{whitespace}{}: {},{}{}{}",
                                     JsonFile::encode(&PhpMixed::String(name_owned.clone()))?,
-                                    ": ",
                                     self.format(&value_local, 1, false)?,
-                                    ",",
                                     self.newline,
                                     self.indent,
                                     self.indent
@@ -842,26 +830,23 @@ impl JsonManipulator {
                     }
 
                     // children present but empty
-                    children = bconcat!(
-                        "{",
+                    children = bformat!(
+                        "{{{}{}{}{}: {}{whitespace}}}",
                         self.newline,
                         self.indent,
                         self.indent,
                         JsonFile::encode(&PhpMixed::String(name_owned.clone()))?,
-                        ": ",
-                        self.format(&value_local, 1, false)?,
-                        whitespace,
-                        "}"
+                        self.format(&value_local, 1, false)?
                     );
                 }
             } else {
                 return Err(
-                    LogicException::new(bconcat!("Nothing matched above for: ", children)).into(),
+                    LogicException::new(bformat!("Nothing matched above for: {children}")).into(),
                 );
             }
         }
 
-        self.contents = bconcat!(node_start, children, node_end);
+        self.contents = bformat!("{node_start}{children}{node_end}");
 
         Ok(true)
     }
@@ -937,7 +922,7 @@ impl JsonManipulator {
         // try and find a match for the subkey
         let key_regex = str_replace("/", "\\\\?/", preg_quote(&name_owned, None));
         let mut children_clean: Option<BString> = None;
-        if preg_is_match(bconcat!("{\"", key_regex, "\"\\s*:}i"), &children) {
+        if preg_is_match(bformat!("{{\"{key_regex}\"\\s*:}}i"), &children) {
             // find best match for the value of "name". The PHP pattern `"name"\s*:\s*(?&json)` is
             // not anchored, so it can match the key at several nesting levels; collect every such
             // occurrence and keep the longest, reproducing PHP's behaviour.
@@ -951,7 +936,7 @@ impl JsonManipulator {
                 }
                 let mut count_out: usize = 0;
                 let cleaned = preg_replace_with_limit_and_count(
-                    bconcat!("{,\\s*", preg_quote(&best_match, None), "}i"),
+                    bformat!("{{,\\s*{}}}i", preg_quote(&best_match, None)),
                     "",
                     &children,
                     -1,
@@ -959,7 +944,7 @@ impl JsonManipulator {
                 );
                 if 1 != count_out {
                     let cleaned2 = preg_replace_with_limit_and_count(
-                        bconcat!("{", preg_quote(&best_match, None), "\\s*,?\\s*}i"),
+                        bformat!("{{{}\\s*,?\\s*}}i", preg_quote(&best_match, None)),
                         "",
                         &cleaned,
                         -1,
@@ -985,7 +970,7 @@ impl JsonManipulator {
             &children_clean,
         ) && empty_match.name("content").is_none()
         {
-            self.contents = bconcat!(node_start, "{", self.newline, self.indent, "}", node_end);
+            self.contents = bformat!("{node_start}{{{}{}}}{node_end}", self.newline, self.indent);
 
             // we have a subname, so we restore the rest of $name
             if let Some(sub) = sub_name {
@@ -1036,7 +1021,7 @@ impl JsonManipulator {
             children_final = self.format(&cur_val, 0, true)?;
         }
 
-        self.contents = bconcat!(node_start, children_final, node_end);
+        self.contents = bformat!("{node_start}{children_final}{node_end}");
 
         Ok(true)
     }
@@ -1087,7 +1072,8 @@ impl JsonManipulator {
                 BString::from(leading_match.name("leadingspace").unwrap_or_default());
             let mut whitespace =
                 BString::from(leading_match.name("trailingspace").unwrap_or_default());
-            let mut leading_item_whitespace = bconcat!(self.newline, self.indent, self.indent);
+            let mut leading_item_whitespace =
+                bformat!("{}{}{}", self.newline, self.indent, self.indent);
             let mut trailing_item_whitespace = whitespace.clone();
             let mut item_depth: i64 = 1;
 
@@ -1102,14 +1088,11 @@ impl JsonManipulator {
                 // child missing but non empty children
                 if append {
                     children = preg_replace(
-                        bconcat!("#", whitespace, "\\]$#"),
+                        bformat!("#{whitespace}\\]$#"),
                         addcslashes(
-                            bconcat!(
-                                ",",
-                                leading_item_whitespace,
-                                self.format(&value, item_depth, false)?,
-                                trailing_item_whitespace,
-                                "]"
+                            bformat!(
+                                ",{leading_item_whitespace}{}{trailing_item_whitespace}]",
+                                self.format(&value, item_depth, false)?
                             ),
                             "\\$",
                         ),
@@ -1118,14 +1101,11 @@ impl JsonManipulator {
                 } else {
                     whitespace = leading_whitespace;
                     children = preg_replace(
-                        bconcat!("#^\\[", whitespace, "#"),
+                        bformat!("#^\\[{whitespace}#"),
                         addcslashes(
-                            bconcat!(
-                                "[",
-                                whitespace,
-                                self.format(&value, item_depth, false)?,
-                                ",",
-                                leading_item_whitespace
+                            bformat!(
+                                "[{whitespace}{},{leading_item_whitespace}",
+                                self.format(&value, item_depth, false)?
                             ),
                             "\\$",
                         ),
@@ -1134,21 +1114,18 @@ impl JsonManipulator {
                 }
             } else {
                 // children present but empty
-                children = bconcat!(
-                    "[",
-                    leading_item_whitespace,
-                    self.format(&value, item_depth, false)?,
-                    trailing_item_whitespace,
-                    "]"
+                children = bformat!(
+                    "[{leading_item_whitespace}{}{trailing_item_whitespace}]",
+                    self.format(&value, item_depth, false)?
                 );
             }
         } else {
             return Err(
-                LogicException::new(bconcat!("Nothing matched above for: ", children)).into(),
+                LogicException::new(bformat!("Nothing matched above for: {children}")).into(),
             );
         }
 
-        self.contents = bconcat!(node_start, children, node_end);
+        self.contents = bformat!("{node_start}{children}{node_end}");
 
         Ok(true)
     }
@@ -1228,17 +1205,14 @@ impl JsonManipulator {
             let sbi_end = json_grammar::skip_ws(cb, i);
             let space_before_item = &children[start_end..sbi_end];
             let formatted = self.format(&value, 1, false)?;
-            bconcat!(
+            bformat!(
+                "{}{space_before_item}{formatted},{space_before_item}{}",
                 &children[..start_end],
-                space_before_item,
-                formatted,
-                ",",
-                space_before_item,
                 &children[sbi_end..]
             )
         };
 
-        self.contents = bconcat!(node_start, new_children, node_end);
+        self.contents = bformat!("{node_start}{new_children}{node_end}");
 
         Ok(true)
     }
@@ -1321,7 +1295,7 @@ impl JsonManipulator {
         })();
 
         if let Some((a, b)) = removal {
-            self.contents = bconcat!(node_start, &children[..a], &children[b..], node_end);
+            self.contents = bformat!("{node_start}{}{}{node_end}", &children[..a], &children[b..]);
 
             return Ok(true);
         }
@@ -1353,15 +1327,13 @@ impl JsonManipulator {
         if let Some(m) = key_match {
             // invalid match due to un-regexable content, abort
             let key_capture = &self.contents[m.key_pos..m.value_end];
-            if json_decode_obj(bconcat!("{", key_capture, "}"))?.is_null() {
+            if json_decode_obj(bformat!("{{{key_capture}}}"))?.is_null() {
                 return Ok(false);
             }
 
-            self.contents = bconcat!(
+            self.contents = bformat!(
+                "{}{encoded_key}: {content}{}",
                 &self.contents[..m.key_pos],
-                encoded_key,
-                ": ",
-                content,
                 &self.contents[m.value_end..]
             );
 
@@ -1372,17 +1344,14 @@ impl JsonManipulator {
         if let Some(tail_match) = preg_match(php_regex!("#[^{\\s](\\s*)\\}$#"), &self.contents) {
             let tail_match_1 = BString::from(tail_match.get(1).unwrap_or_default());
             self.contents = preg_replace(
-                bconcat!("#", tail_match_1, "\\}$#"),
+                bformat!("#{tail_match_1}\\}}$#"),
                 addcslashes(
-                    bconcat!(
-                        ",",
+                    bformat!(
+                        ",{}{}{}: {content}{}}}",
                         self.newline,
                         self.indent,
                         JsonFile::encode(&PhpMixed::string(key))?,
-                        ": ",
-                        content,
-                        self.newline,
-                        "}"
+                        self.newline
                     ),
                     "\\$",
                 ),
@@ -1396,13 +1365,11 @@ impl JsonManipulator {
         self.contents = preg_replace(
             php_regex!("#\\}$#"),
             addcslashes(
-                bconcat!(
+                bformat!(
+                    "{}{}: {content}{}}}",
                     self.indent,
                     JsonFile::encode(&PhpMixed::string(key))?,
-                    ": ",
-                    content,
-                    self.newline,
-                    "}"
+                    self.newline
                 ),
                 "\\$",
             ),
@@ -1432,7 +1399,7 @@ impl JsonManipulator {
         if let Some(m) = key_match {
             // invalid match due to un-regexable content, abort
             let removal = &self.contents[m.key_pos..m.value_end];
-            if json_decode_obj(bconcat!("{", removal, "}"))?.is_null() {
+            if json_decode_obj(bformat!("{{{removal}}}"))?.is_null() {
                 return Ok(false);
             }
 
@@ -1456,7 +1423,7 @@ impl JsonManipulator {
                 );
             }
 
-            self.contents = bconcat!(start, end);
+            self.contents = bformat!("{start}{end}");
             if preg_is_match(php_regex!("#^\\{\\s*\\}\\s*$#"), &self.contents) {
                 self.contents = BString::from("{\n}");
             }
@@ -1490,11 +1457,9 @@ impl JsonManipulator {
             }
 
             let removal_space = &self.contents[m.value_pos + 1..m.value_end - 1];
-            self.contents = bconcat!(
+            self.contents = bformat!(
+                "{}[{removal_space}]{}",
                 &self.contents[..m.value_pos],
-                "[",
-                removal_space,
-                "]",
                 &self.contents[m.value_end..]
             );
 
@@ -1542,11 +1507,10 @@ impl JsonManipulator {
                 && data.as_list().map(|l| l.len()).unwrap_or(0) == 0
             {
                 return Ok(if was_object {
-                    bconcat!(
-                        "{",
+                    bformat!(
+                        "{{{}{}}}",
                         self.newline,
-                        str_repeat(&self.indent, (depth + 1) as usize),
-                        "}"
+                        str_repeat(&self.indent, (depth + 1) as usize)
                     )
                 } else {
                     BString::from("[]")
@@ -1559,28 +1523,27 @@ impl JsonManipulator {
                     formatted.push(self.format(val, depth + 1, false)?);
                 }
 
-                return Ok(bconcat!("[", implode(", ", &formatted), "]"));
+                return Ok(bformat!("[{}]", implode(", ", &formatted)));
             }
 
-            let out = bconcat!("{", self.newline);
+            let out = bformat!("{{{}", self.newline);
             let mut elems: Vec<BString> = vec![];
             if let Some(arr) = data.as_array() {
                 for (key, val) in arr {
-                    elems.push(bconcat!(
+                    elems.push(bformat!(
+                        "{}{}: {}",
                         str_repeat(&self.indent, (depth + 2) as usize),
                         JsonFile::encode(&PhpMixed::String(key.clone()))?,
-                        ": ",
                         self.format(val, depth + 1, false)?
                     ));
                 }
             }
 
-            return Ok(bconcat!(
-                out,
-                implode(bconcat!(",", self.newline), &elems),
+            return Ok(bformat!(
+                "{out}{}{}{}}}",
+                implode(bformat!(",{}", self.newline), &elems),
                 self.newline,
-                str_repeat(&self.indent, (depth + 1) as usize),
-                "}"
+                str_repeat(&self.indent, (depth + 1) as usize)
             ));
         }
 
@@ -1722,11 +1685,10 @@ impl ManipulatorFormatter {
                 && data.as_list().map(|l| l.len()).unwrap_or(0) == 0
             {
                 return Ok(if was_object {
-                    bconcat!(
-                        "{",
+                    bformat!(
+                        "{{{}{}}}",
                         self.newline,
-                        str_repeat(&self.indent, (depth + 1) as usize),
-                        "}"
+                        str_repeat(&self.indent, (depth + 1) as usize)
                     )
                 } else {
                     BString::from("[]")
@@ -1739,28 +1701,27 @@ impl ManipulatorFormatter {
                     formatted.push(self.format(val, depth + 1, false)?);
                 }
 
-                return Ok(bconcat!("[", implode(", ", &formatted), "]"));
+                return Ok(bformat!("[{}]", implode(", ", &formatted)));
             }
 
-            let out = bconcat!("{", self.newline);
+            let out = bformat!("{{{}", self.newline);
             let mut elems: Vec<BString> = vec![];
             if let Some(arr) = data.as_array() {
                 for (key, val) in arr {
-                    elems.push(bconcat!(
+                    elems.push(bformat!(
+                        "{}{}: {}",
                         str_repeat(&self.indent, (depth + 2) as usize),
                         JsonFile::encode(&PhpMixed::String(key.clone()))?,
-                        ": ",
                         self.format(val, depth + 1, false)?
                     ));
                 }
             }
 
-            return Ok(bconcat!(
-                out,
-                implode(bconcat!(",", self.newline), &elems),
+            return Ok(bformat!(
+                "{out}{}{}{}}}",
+                implode(bformat!(",{}", self.newline), &elems),
                 self.newline,
-                str_repeat(&self.indent, (depth + 1) as usize),
-                "}"
+                str_repeat(&self.indent, (depth + 1) as usize)
             ));
         }
 

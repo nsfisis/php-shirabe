@@ -11,7 +11,7 @@ use bstr::{B, BStr, BString, ByteSlice};
 use chrono::Utc;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    AnyThrowable, E_USER_DEPRECATED, PhpMixed, TypeError, UnexpectedValueException, bconcat,
+    AnyThrowable, E_USER_DEPRECATED, PhpMixed, TypeError, UnexpectedValueException, bformat,
     date_create, empty, error_message, get_debug_type, is_scalar, is_string, json_encode,
     ltrim_chars, php_regex, preg_is_match, preg_replace, stripos, strpos, strtolower, strval,
     substr, to_array, trigger_error, trim,
@@ -83,21 +83,19 @@ impl ArrayLoader {
         class: &BStr,
     ) -> anyhow::Result<CompleteOrRootPackage> {
         if !config.contains_key(B("name")) {
-            return Err(UnexpectedValueException::new(bconcat!(
-                "Unknown package has no name defined (",
-                json_encode(&PhpMixed::Array(config.clone())).unwrap_or_default(),
-                ")."
+            return Err(UnexpectedValueException::new(bformat!(
+                "Unknown package has no name defined ({}).",
+                json_encode(&PhpMixed::Array(config.clone())).unwrap_or_default()
             ))
             .into());
         }
         if !config.contains_key(B("version")) || !is_scalar(config.get(B("version")).unwrap()) {
-            return Err(UnexpectedValueException::new(bconcat!(
-                "Package ",
+            return Err(UnexpectedValueException::new(bformat!(
+                "Package {} has no version defined.",
                 config
                     .get(B("name"))
                     .and_then(|v| v.as_string())
-                    .unwrap_or_default(),
-                " has no version defined."
+                    .unwrap_or_default()
             ))
             .into());
         }
@@ -132,13 +130,12 @@ impl ArrayLoader {
             {
                 Ok(v) => version = v,
                 Err(e) => {
-                    let message = bconcat!(
-                        "Failed to normalize version for package \"",
+                    let message = bformat!(
+                        "Failed to normalize version for package \"{}\": {}",
                         config
                             .get(B("name"))
                             .and_then(|v| v.as_string())
                             .unwrap_or_default(),
-                        "\": ",
                         error_message(&e)
                     );
                     let code = AnyThrowable::of(&e).map_or(0, AnyThrowable::get_code);
@@ -249,10 +246,10 @@ impl ArrayLoader {
                 })
                 .unwrap_or(false);
             if !has_required {
-                return Err(UnexpectedValueException::new(bconcat!("Package ", config
+                return Err(UnexpectedValueException::new(bformat!("Package {}'s source key should be specified as {{\"type\": ..., \"url\": ..., \"reference\": ...}},\n{} given.", config
                         .get(B("name"))
                         .and_then(|v| v.as_string())
-                        .unwrap_or_default(), "'s source key should be specified as {\"type\": ..., \"url\": ..., \"reference\": ...},\n", json_encode(&source).unwrap_or_default(), " given."))
+                        .unwrap_or_default(), json_encode(&source).unwrap_or_default()))
                 .into());
             }
             let source_map = source_map.unwrap();
@@ -288,10 +285,10 @@ impl ArrayLoader {
                 .map(|m| m.contains_key(B("type")) && m.contains_key(B("url")))
                 .unwrap_or(false);
             if !has_required {
-                return Err(UnexpectedValueException::new(bconcat!("Package ", config
+                return Err(UnexpectedValueException::new(bformat!("Package {}'s dist key should be specified as {{\"type\": ..., \"url\": ..., \"reference\": ..., \"shasum\": ...}},\n{} given.", config
                         .get(B("name"))
                         .and_then(|v| v.as_string())
-                        .unwrap_or_default(), "'s dist key should be specified as {\"type\": ..., \"url\": ..., \"reference\": ..., \"shasum\": ...},\n", json_encode(&dist).unwrap_or_default(), " given."))
+                        .unwrap_or_default(), json_encode(&dist).unwrap_or_default()))
                 .into());
             }
             let dist_map = dist_map.unwrap();
@@ -379,7 +376,7 @@ impl ArrayLoader {
         {
             let time_str = time_value.as_string().unwrap_or_default();
             let time = if preg_is_match(php_regex!(r"/^\d++$/D"), time_str) {
-                bconcat!("@", time_str)
+                bformat!("@{time_str}")
             } else {
                 BString::from(time_str)
             };
@@ -435,10 +432,8 @@ impl ArrayLoader {
             for reserved in ["composer", "php", "putenv"].iter() {
                 if scripts_map.contains_key(B(reserved)) {
                     trigger_error(
-                        bconcat!(
-                            "The `",
-                            reserved,
-                            "` script name is reserved for internal use, please avoid defining it"
+                        bformat!(
+                            "The `{reserved}` script name is reserved for internal use, please avoid defining it"
                         ),
                         E_USER_DEPRECATED,
                     );
@@ -705,16 +700,8 @@ impl ArrayLoader {
         let parsed_constraint = match self.version_parser.parse_constraints(constraint) {
             Ok(c) => c,
             Err(e) => {
-                let message = bconcat!(
-                    "Link constraint in ",
-                    source,
-                    " ",
-                    description,
-                    " > ",
-                    target,
-                    " should be a valid version constraint, got \"",
-                    constraint,
-                    "\""
+                let message = bformat!(
+                    "Link constraint in {source} {description} > {target} should be a valid version constraint, got \"{constraint}\""
                 );
                 let code = AnyThrowable::of(&e).map_or(0, AnyThrowable::get_code);
                 return Err(UnexpectedValueException::with_code_and_previous(
@@ -879,13 +866,11 @@ fn array_argument(
 ) -> anyhow::Result<IndexMap<BString, PhpMixed>> {
     match value {
         PhpMixed::Array(_) | PhpMixed::List(_) => Ok(to_array(value.clone())),
-        other => Err(TypeError::new(bconcat!(
+        other => Err(TypeError::new(bformat!(
+            "{}(): Argument #1 (${}) must be of type array, {} given",
             method.as_ref(),
-            "(): Argument #1 ($",
             param.as_ref(),
-            ") must be of type array, ",
-            get_debug_type(other),
-            " given"
+            get_debug_type(other)
         ))
         .into()),
     }
@@ -915,10 +900,9 @@ fn php_to_mirrors(value: &PhpMixed, method: impl AsRef<[u8]>) -> anyhow::Result<
                     url: url.clone(),
                     preferred: m.get(B("preferred")).is_some_and(|v| v.to_bool()),
                 }),
-                _ => Err(TypeError::new(bconcat!(
-                    "A mirror must be an array with a string \"url\", ",
-                    json_encode(entry).unwrap_or_default(),
-                    " given"
+                _ => Err(TypeError::new(bformat!(
+                    "A mirror must be an array with a string \"url\", {} given",
+                    json_encode(entry).unwrap_or_default()
                 ))
                 .into()),
             }

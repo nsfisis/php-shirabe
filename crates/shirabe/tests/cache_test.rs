@@ -10,7 +10,7 @@ use bstr::BStr;
 use shirabe::cache::{Cache, CacheMock, GcFinderMock};
 use shirabe::io::{IOInterface, NullIO};
 use shirabe::util::Filesystem;
-use shirabe_php_shim::{bconcat, path_from_bytes};
+use shirabe_php_shim::{bformat, path_from_bytes};
 use std::fs;
 use tempfile::TempDir;
 
@@ -28,7 +28,7 @@ fn set_up() -> SetUp {
     for i in 0..4 {
         let path = root
             .path()
-            .join(path_from_bytes(&bconcat!("cached.file", i, ".zip")));
+            .join(path_from_bytes(&bformat!("cached.file{i}.zip")));
         fs::write(&path, &zeros).unwrap();
         files.push(path);
     }

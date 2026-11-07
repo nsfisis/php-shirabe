@@ -4,7 +4,7 @@ use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe::dependency_resolver::Request;
 use shirabe::package::version::VersionParser;
-use shirabe_php_shim::{bconcat, display_to_bytes};
+use shirabe_php_shim::{bformat, display_to_bytes};
 use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint, SimpleConstraint};
 
 // AnyConstraint does not implement PartialEq (it lives in another crate), so
@@ -20,7 +20,7 @@ fn get_version_constraint(operator: &BStr, version: &BStr) -> AnyConstraint {
     AnyConstraint::Simple(SimpleConstraint::new(
         operator,
         normalized,
-        Some(bconcat!(operator, " ", version)),
+        Some(bformat!("{operator} {version}")),
     ))
 }
 

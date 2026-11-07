@@ -7,7 +7,7 @@ use crate::repository::{
 };
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
-use shirabe_php_shim::{bconcat, implode};
+use shirabe_php_shim::{bformat, implode};
 use shirabe_semver::constraint::AnyConstraint;
 
 #[derive(Debug)]
@@ -76,7 +76,7 @@ impl RepositoryInterface for CompositeRepository {
             .iter()
             .map(|r| r.get_repo_name())
             .collect::<anyhow::Result<_>>()?;
-        Ok(bconcat!("composite repo (", implode(", ", &names), ")"))
+        Ok(bformat!("composite repo ({})", implode(", ", &names)))
     }
 
     fn has_package(&mut self, package: PackageInterfaceHandle) -> anyhow::Result<bool> {

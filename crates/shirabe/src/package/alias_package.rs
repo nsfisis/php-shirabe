@@ -6,7 +6,7 @@ use crate::repository::{RepositoryInterfaceHandle, RepositoryInterfaceWeakHandle
 use bstr::{BStr, BString, ByteSlice};
 use chrono::{DateTime, Utc};
 use indexmap::{IndexMap, IndexSet};
-use shirabe_php_shim::{LogicException, PhpDisplay, PhpMixed, bconcat, strtolower};
+use shirabe_php_shim::{LogicException, PhpDisplay, PhpMixed, bformat, bwrite, strtolower};
 use shirabe_semver::constraint::SimpleConstraint;
 
 #[derive(Debug, Clone)]
@@ -133,7 +133,7 @@ impl AliasPackage {
                 }
             }
             for (index, new_link) in new_links.into_iter().enumerate() {
-                links.insert(bconcat!(index), new_link);
+                links.insert(bformat!("{index}"), new_link);
             }
         } else {
             for link in links.values_mut() {
@@ -381,11 +381,11 @@ impl PackageInterface for AliasPackage {
     }
 
     fn get_unique_name(&self) -> BString {
-        bconcat!(self.get_name(), "-", self.get_version())
+        bformat!("{}-{}", self.get_name(), self.get_version())
     }
 
     fn get_pretty_string(&self) -> BString {
-        bconcat!(self.get_pretty_name(), " ", self.get_pretty_version())
+        bformat!("{} {}", self.get_pretty_name(), self.get_pretty_version())
     }
 
     fn set_repository(&mut self, repository: RepositoryInterfaceHandle) -> anyhow::Result<()> {
@@ -411,14 +411,13 @@ impl PackageInterface for AliasPackage {
 
 impl PhpDisplay for AliasPackage {
     fn fmt(&self, out: &mut BString) {
-        out.extend_from_slice(&bconcat!(
+        bwrite!(
+            out,
+            "{} ({}alias of {})",
             self.get_unique_name(),
-            " (",
             if self.root_package_alias { "root " } else { "" },
-            "alias of ",
-            self.alias_of.get_version(),
-            ")"
-        ));
+            self.alias_of.get_version()
+        );
     }
 }
 

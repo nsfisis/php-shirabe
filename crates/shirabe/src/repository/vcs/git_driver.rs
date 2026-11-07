@@ -10,7 +10,7 @@ use bstr::{BStr, BString, ByteSlice};
 use chrono::{DateTime, FixedOffset, TimeZone, Utc};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    Catch as _, InvalidArgumentException, PhpMixed, RuntimeException, bconcat, dirname, is_dir,
+    Catch as _, InvalidArgumentException, PhpMixed, RuntimeException, bformat, dirname, is_dir,
     is_writable, path_from_bytes, path_to_bytes, php_regex, preg_is_match, preg_match,
     preg_replace, realpath, sys_get_temp_dir, trim, utf8_text,
 };
@@ -48,10 +48,9 @@ impl GitDriver {
                 &preg_replace(php_regex!(r"{[\\/]\.git/?$}"), "", &self.inner.url)[..],
             );
             if !is_dir(path_from_bytes(&self.inner.url)) {
-                return Err(RuntimeException::new(bconcat!(
-                    "Failed to read package information from ",
-                    self.inner.url,
-                    " as the path does not exist"
+                return Err(RuntimeException::new(bformat!(
+                    "Failed to read package information from {} as the path does not exist",
+                    self.inner.url
                 ))
                 .into());
             }
@@ -74,11 +73,9 @@ impl GitDriver {
                 .into());
             }
 
-            self.repo_dir = bconcat!(
-                cache_vcs_dir,
-                "/",
-                preg_replace(r"{[^a-z0-9.]}i", "-", Url::sanitize(&self.inner.url)),
-                "/"
+            self.repo_dir = bformat!(
+                "{cache_vcs_dir}/{}/",
+                preg_replace(r"{[^a-z0-9.]}i", "-", Url::sanitize(&self.inner.url))
             );
 
             GitUtil::clean_env(&self.inner.process);
@@ -87,18 +84,12 @@ impl GitDriver {
             fs.ensure_directory_exists(path_from_bytes(&dirname(&self.repo_dir)))?;
 
             if !is_writable(path_from_bytes(&dirname(&self.repo_dir))) {
-                return Err(RuntimeException::new(bconcat!(
-                    "Can not clone ",
-                    self.inner.url,
-                    " to access package information. The \"",
-                    dirname(&self.repo_dir),
-                    "\" directory is not writable by the current user."
-                ))
+                return Err(RuntimeException::new(bformat!("Can not clone {} to access package information. The \"{}\" directory is not writable by the current user.", self.inner.url, dirname(&self.repo_dir)))
                 .into());
             }
 
             if preg_is_match(php_regex!(r"{^ssh://[^@]+@[^:]+:[^0-9]+}"), &self.inner.url) {
-                return Err(InvalidArgumentException::new(bconcat!("The source URL ", self.inner.url, " is invalid, ssh URLs should have a port number after \":\".\nUse ssh://git@example.com:22/path or just git@example.com:path if you do not want to provide a password or custom port."))
+                return Err(InvalidArgumentException::new(bformat!("The source URL {} is invalid, ssh URLs should have a port number after \":\".\nUse ssh://git@example.com:22/path or just git@example.com:path if you do not want to provide a password or custom port.", self.inner.url))
                 .into());
             }
 
@@ -110,18 +101,13 @@ impl GitDriver {
             );
             if !git_util.sync_mirror(self.inner.url.as_bstr(), path_from_bytes(&self.repo_dir))? {
                 if !is_dir(path_from_bytes(&self.repo_dir)) {
-                    return Err(RuntimeException::new(bconcat!(
-                        "Failed to clone ",
-                        self.inner.url,
-                        " to read package information from it"
+                    return Err(RuntimeException::new(bformat!(
+                        "Failed to clone {} to read package information from it",
+                        self.inner.url
                     ))
                     .into());
                 }
-                self.inner.io.write_error(bconcat!(
-                    "<error>Failed to update ",
-                    self.inner.url,
-                    ", package information from this repository may be outdated</error>"
-                ));
+                self.inner.io.write_error(bformat!("<error>Failed to update {}, package information from this repository may be outdated</error>", self.inner.url));
             }
 
             cache_url = self.inner.url.clone();
@@ -139,9 +125,8 @@ impl GitDriver {
         );
         self.inner.cache = Some(Cache::new(
             self.inner.io.clone(),
-            path_from_bytes(&bconcat!(
-                cache_repo_dir,
-                "/",
+            path_from_bytes(&bformat!(
+                "{cache_repo_dir}/{}",
                 preg_replace(r"{[^a-z0-9.]}i", "-", Url::sanitize(&cache_url))
             )),
             None,
@@ -226,10 +211,7 @@ impl GitDriver {
         identifier: &BStr,
     ) -> anyhow::Result<Option<BString>> {
         if identifier.starts_with(b"-") {
-            return Err(RuntimeException::new(bconcat!(
-                "Invalid git identifier detected. Identifier must not start with a -, given: ",
-                identifier
-            ))
+            return Err(RuntimeException::new(bformat!("Invalid git identifier detected. Identifier must not start with a -, given: {identifier}"))
             .into());
         }
 
@@ -238,7 +220,7 @@ impl GitDriver {
             &[
                 BString::from("git"),
                 BString::from("show"),
-                bconcat!(identifier, ":", file),
+                bformat!("{identifier}:{file}"),
             ],
             &mut content,
             Some(path_from_bytes(&self.repo_dir)),
@@ -256,10 +238,7 @@ impl GitDriver {
         identifier: &BStr,
     ) -> anyhow::Result<Option<DateTime<FixedOffset>>> {
         if identifier.starts_with(b"-") {
-            return Err(RuntimeException::new(bconcat!(
-                "Invalid git identifier detected. Identifier must not start with a -, given: ",
-                identifier
-            ))
+            return Err(RuntimeException::new(bformat!("Invalid git identifier detected. Identifier must not start with a -, given: {identifier}"))
             .into());
         }
 

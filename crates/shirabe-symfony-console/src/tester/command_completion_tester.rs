@@ -3,7 +3,7 @@
 use crate::command::Command;
 use crate::completion::{CompletionInput, CompletionSuggestions};
 use bstr::BString;
-use shirabe_php_shim::bconcat;
+use shirabe_php_shim::bformat;
 
 /// Eases the testing of command completion.
 #[derive(Debug)]
@@ -41,7 +41,7 @@ impl CommandCompletionTester {
         let mut result: Vec<BString> = suggestions
             .get_option_suggestions()
             .iter()
-            .map(|option| bconcat!("--", option.get_name()))
+            .map(|option| bformat!("--{}", option.get_name()))
             .collect();
         // array_map('strval', ... $suggestions->getValueSuggestions())
         result.extend(

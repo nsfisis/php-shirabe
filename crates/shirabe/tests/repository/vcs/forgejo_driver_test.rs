@@ -9,7 +9,7 @@ use shirabe::config::Config;
 use shirabe::io::{IOInterface, NullIO};
 use shirabe::repository::vcs::ForgejoDriver;
 use shirabe::util::{Filesystem, HttpDownloader, HttpDownloaderMockHandler, MockHandler};
-use shirabe_php_shim::{PhpMixed, bconcat, path_to_bytes};
+use shirabe_php_shim::{PhpMixed, bformat, path_to_bytes};
 use tempfile::TempDir;
 
 struct SetUp {
@@ -73,7 +73,7 @@ fn initialize_driver(
     let (process, process_guard) = get_process_executor_mock(vec![], false, MockHandler::default());
 
     let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
-    repo_config.insert("url".into(), PhpMixed::string(bconcat!(repo_url)));
+    repo_config.insert("url".into(), PhpMixed::string(bformat!("{repo_url}")));
     let mut driver = ForgejoDriver::new(
         repo_config,
         set_up.io.clone(),

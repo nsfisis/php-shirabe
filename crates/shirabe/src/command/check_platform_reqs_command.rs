@@ -16,7 +16,7 @@ use crate::repository::{
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    ToPhpString, array_merge_map, bconcat, impl_php_class, json_bytes, rtrim, strip_tags,
+    ToPhpString, array_merge_map, bformat, impl_php_class, json_bytes, rtrim, strip_tags,
 };
 use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
 use shirabe_symfony_console::command::Command;
@@ -134,20 +134,17 @@ impl CheckPlatformReqsCommand {
                             None => BString::default(),
                         },
                         if let Some(link) = &result.link {
-                            bconcat!(
+                            bformat!(
+                                "{} {} {} ({})",
                                 link.get_source(),
-                                " ",
                                 link.get_description(),
-                                " ",
                                 link.get_target(),
-                                " (",
-                                link.get_pretty_constraint()?,
-                                ")"
+                                link.get_pretty_constraint()?
                             )
                         } else {
                             BString::default()
                         },
-                        rtrim(bconcat!(result.status, " ", result.provider)),
+                        rtrim(bformat!("{} {}", result.status, result.provider)),
                     ])
                 })
                 .collect::<anyhow::Result<_>>()?;
@@ -226,10 +223,9 @@ impl Command for CheckPlatformReqsCommand {
             .as_bool()
             .unwrap_or(false)
         {
-            io.write_error(bconcat!(
-                "<info>Checking ",
-                if no_dev { "non-dev " } else { "" },
-                "platform requirements using the lock file</info>"
+            io.write_error(bformat!(
+                "<info>Checking {}platform requirements using the lock file</info>",
+                if no_dev { "non-dev " } else { "" }
             ));
             composer
                 .get_locker()
@@ -241,11 +237,7 @@ impl Command for CheckPlatformReqsCommand {
             let repository_manager = repository_manager.borrow();
             let local_repo = repository_manager.get_local_repository();
             if local_repo.get_packages()?.is_empty() {
-                io.write_error(bconcat!(
-                    "<warning>No vendor dir present, checking ",
-                    if no_dev { "non-dev " } else { "" },
-                    "platform requirements from the lock file</warning>"
-                ));
+                io.write_error(bformat!("<warning>No vendor dir present, checking {}platform requirements from the lock file</warning>", if no_dev { "non-dev " } else { "" }));
                 composer
                     .get_locker()
                     .borrow_mut()
@@ -255,10 +247,9 @@ impl Command for CheckPlatformReqsCommand {
                 if no_dev {
                     remove_packages = local_repo.get_dev_package_names();
                 }
-                io.write_error(bconcat!(
-                    "<info>Checking ",
-                    if no_dev { "non-dev " } else { "" },
-                    "platform requirements for packages in the vendor dir</info>"
+                io.write_error(bformat!(
+                    "<info>Checking {}platform requirements for packages in the vendor dir</info>",
+                    if no_dev { "non-dev " } else { "" }
                 ));
                 local_repo
             }
@@ -355,10 +346,9 @@ impl Command for CheckPlatformReqsCommand {
                                     provider: if candidate.get_name() == *require {
                                         BString::default()
                                     } else {
-                                        bconcat!(
-                                            "<comment>provided by ",
-                                            candidate.get_pretty_name(),
-                                            "</comment>"
+                                        bformat!(
+                                            "<comment>provided by {}</comment>",
+                                            candidate.get_pretty_name()
                                         )
                                     },
                                 });
@@ -378,10 +368,9 @@ impl Command for CheckPlatformReqsCommand {
                             provider: if candidate.get_name() == *require {
                                 BString::default()
                             } else {
-                                bconcat!(
-                                    "<comment>provided by ",
-                                    candidate.get_pretty_name(),
-                                    "</comment>"
+                                bformat!(
+                                    "<comment>provided by {}</comment>",
+                                    candidate.get_pretty_name()
                                 )
                             },
                         });

@@ -7,7 +7,7 @@ use crate::input::{InputArgument, InputInterface, InputInterfaceByName, InputOpt
 use crate::output::{OutputInterface, output_interface};
 use bstr::{BStr, BString};
 use shirabe_php_shim::{
-    PHP_SERVER, PhpMixed, basename, bconcat, file_exists, impl_php_class, implode, path_from_bytes,
+    PHP_SERVER, PhpMixed, basename, bformat, file_exists, impl_php_class, implode, path_from_bytes,
     path_to_bytes, php_str, realpath, str_replace_arrays, sys_get_temp_dir, touch,
 };
 use shirabe_symfony_process::Process;
@@ -100,7 +100,7 @@ impl DumpCompletionCommand {
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<()> {
         let debug_file =
-            sys_get_temp_dir().join(path_from_bytes(&bconcat!("sf_", command_name, ".log")));
+            sys_get_temp_dir().join(path_from_bytes(&bformat!("sf_{command_name}.log")));
         if !file_exists(&debug_file) {
             touch(&debug_file);
         }
@@ -150,38 +150,7 @@ impl Command for DumpCompletionCommand {
             _ => PathBuf::from(full_command),
         };
 
-        self.inner.set_help(bstr::BStr::new(&bconcat!(
-            "The <info>%command.name%</> command dumps the shell completion script required\n\
-             to use shell autocompletion (currently only bash completion is supported).\n\
-             \n\
-             <comment>Static installation\n\
-             -------------------</>\n\
-             \n\
-             Dump the script to a global completion file and restart your shell:\n\
-             \n\
-             \x20\x20\x20\x20<info>%command.full_name% bash | sudo tee /etc/bash_completion.d/",
-            command_name,
-            "</>\n\
-             \n\
-             Or dump the script to a local file and source it:\n\
-             \n\
-             \x20\x20\x20\x20<info>%command.full_name% bash > completion.sh</>\n\
-             \n\
-             \x20\x20\x20\x20<comment># source the file whenever you use the project</>\n\
-             \x20\x20\x20\x20<info>source completion.sh</>\n\
-             \n\
-             \x20\x20\x20\x20<comment># or add this line at the end of your \"~/.bashrc\" file:</>\n\
-             \x20\x20\x20\x20<info>source /path/to/completion.sh</>\n\
-             \n\
-             <comment>Dynamic installation\n\
-             --------------------</>\n\
-             \n\
-             Add this to the end of your shell configuration file (e.g. <info>\"~/.bashrc\"</>):\n\
-             \n\
-             \x20\x20\x20\x20<info>eval \"$(",
-            full_command,
-            " completion bash)\"</>",
-        )));
+        self.inner.set_help(bstr::BStr::new(&bformat!("The <info>%command.name%</> command dumps the shell completion script required\nto use shell autocompletion (currently only bash completion is supported).\n\n<comment>Static installation\n-------------------</>\n\nDump the script to a global completion file and restart your shell:\n\n    <info>%command.full_name% bash | sudo tee /etc/bash_completion.d/{command_name}</>\n\nOr dump the script to a local file and source it:\n\n    <info>%command.full_name% bash > completion.sh</>\n\n    <comment># source the file whenever you use the project</>\n    <info>source completion.sh</>\n\n    <comment># or add this line at the end of your \"~/.bashrc\" file:</>\n    <info>source /path/to/completion.sh</>\n\n<comment>Dynamic installation\n--------------------</>\n\nAdd this to the end of your shell configuration file (e.g. <info>\"~/.bashrc\"</>):\n\n    <info>eval \"$({full_command} completion bash)\"</>")));
         self.inner.add_argument(
             "shell",
             Some(InputArgument::OPTIONAL),
@@ -237,22 +206,12 @@ impl Command for DumpCompletionCommand {
             };
             if !shell.is_empty() {
                 output.borrow_mut().writeln(
-                    &[bconcat!(
-                        "<error>Detected shell \"",
-                        shell,
-                        "\", which is not supported by Symfony shell completion (supported shells: \"",
-                        implode("\", \"", &supported_shells),
-                        "\").</>"
-                    )],
+                    &[bformat!("<error>Detected shell \"{shell}\", which is not supported by Symfony shell completion (supported shells: \"{}\").</>", implode("\", \"", &supported_shells))],
                     output_interface::OUTPUT_NORMAL,
                 );
             } else {
                 output.borrow_mut().writeln(
-                    &[bconcat!(
-                        "<error>Shell not detected, Symfony shell completion only supports \"",
-                        implode("\", \"", &supported_shells),
-                        "\").</>"
-                    )],
+                    &[bformat!("<error>Shell not detected, Symfony shell completion only supports \"{}\").</>", implode("\", \"", &supported_shells))],
                     output_interface::OUTPUT_NORMAL,
                 );
             }

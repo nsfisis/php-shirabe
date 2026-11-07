@@ -4,7 +4,7 @@ use crate::installer::InstallerInterface;
 use crate::package::PackageInterfaceHandle;
 use crate::repository::InstalledRepositoryInterfaceHandle;
 use bstr::BStr;
-use shirabe_php_shim::{InvalidArgumentException, PhpMixed, ToPhpString, bconcat, path_from_bytes};
+use shirabe_php_shim::{InvalidArgumentException, PhpMixed, ToPhpString, bformat, path_from_bytes};
 
 #[derive(Debug)]
 pub struct NoopInstaller;
@@ -70,8 +70,8 @@ impl InstallerInterface for NoopInstaller {
     ) -> anyhow::Result<Option<PhpMixed>> {
         let mut repo = repo.borrow_mut();
         if !repo.has_package(initial.clone())? {
-            return Err(InvalidArgumentException::new(bconcat!(
-                "Package is not installed: ",
+            return Err(InvalidArgumentException::new(bformat!(
+                "Package is not installed: {}",
                 initial.to_php_string()
             ))
             .into());
@@ -92,8 +92,8 @@ impl InstallerInterface for NoopInstaller {
     ) -> anyhow::Result<Option<PhpMixed>> {
         let mut repo = repo.borrow_mut();
         if !repo.has_package(package.clone())? {
-            return Err(InvalidArgumentException::new(bconcat!(
-                "Package is not installed: ",
+            return Err(InvalidArgumentException::new(bformat!(
+                "Package is not installed: {}",
                 package.to_php_string()
             ))
             .into());
@@ -107,7 +107,7 @@ impl InstallerInterface for NoopInstaller {
         let target_dir = package.get_target_dir();
 
         let install_path = if let Some(dir) = target_dir {
-            bconcat!(package.get_pretty_name(), "/", dir)
+            bformat!("{}/{dir}", package.get_pretty_name())
         } else {
             package.get_pretty_name()
         };

@@ -1,4 +1,4 @@
-use crate::{PhpMixed, bconcat, canonical_int_key, display_to_bytes, implode, urlencode};
+use crate::{PhpMixed, bformat, canonical_int_key, display_to_bytes, implode, urlencode};
 use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_src::standard::url::php_url_parse_ex2;
@@ -39,7 +39,7 @@ pub fn http_build_query_mixed(
     for (key, value) in data {
         // numeric_prefix is prepended only to integer keys at the top level.
         let key = if canonical_int_key(key).is_some() {
-            bconcat!(numeric_prefix.as_ref(), key)
+            bformat!("{}{key}", numeric_prefix.as_ref())
         } else {
             key.clone()
         };
@@ -60,7 +60,7 @@ pub fn http_build_query<K: AsRef<[u8]>, V: AsRef<[u8]>>(data: &[(K, V)]) -> BStr
 fn encode_pairs(pairs: &[(BString, BString)], arg_separator: &[u8]) -> BString {
     let encoded: Vec<BString> = pairs
         .iter()
-        .map(|(key, value)| bconcat!(urlencode(key), "=", urlencode(value)))
+        .map(|(key, value)| bformat!("{}={}", urlencode(key), urlencode(value)))
         .collect();
     implode(arg_separator, &encoded)
 }
@@ -70,17 +70,17 @@ fn append_query_pairs(pairs: &mut Vec<(BString, BString)>, key: BString, value: 
         // Null values are omitted from the query string entirely.
         PhpMixed::Null => {}
         PhpMixed::Bool(b) => pairs.push((key, BString::from(if *b { "1" } else { "0" }))),
-        PhpMixed::Int(i) => pairs.push((key, bconcat!(i))),
+        PhpMixed::Int(i) => pairs.push((key, bformat!("{i}"))),
         PhpMixed::Float(f) => pairs.push((key, display_to_bytes(f))),
         PhpMixed::String(s) => pairs.push((key, s.clone())),
         PhpMixed::List(items) => {
             for (i, item) in items.iter().enumerate() {
-                append_query_pairs(pairs, bconcat!(key, "[", i as i64, "]"), item);
+                append_query_pairs(pairs, bformat!("{key}[{}]", i as i64), item);
             }
         }
         PhpMixed::Array(map) | PhpMixed::Object(map) => {
             for (k, v) in map {
-                append_query_pairs(pairs, bconcat!(key, "[", k, "]"), v);
+                append_query_pairs(pairs, bformat!("{key}[{k}]"), v);
             }
         }
     }

@@ -11,7 +11,7 @@
 use crate::php_worker::lock_php_worker;
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe_php_shim::{bconcat, getenv, os_str_from_bytes, path_to_bytes};
+use shirabe_php_shim::{bformat, getenv, os_str_from_bytes, path_to_bytes};
 use std::path::{Path, PathBuf};
 use tempfile::TempDir;
 
@@ -94,7 +94,7 @@ fn run_install(work: &Path, program: &BStr, args: &[&std::ffi::OsStr]) -> Instal
     );
     // Directory walk order is filesystem-dependent; a canonical order keys the comparison.
     artifacts.sort_keys();
-    let text = bconcat!(&output.stdout, &output.stderr);
+    let text = bformat!("{}{}", &output.stdout, &output.stderr);
     #[expect(
         clippy::disallowed_methods,
         reason = "the test splits a child process's output into lines, which no PHP code does"

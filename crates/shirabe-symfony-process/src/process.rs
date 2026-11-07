@@ -13,10 +13,10 @@ use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Descriptor, PHP_ENV, PHP_SERVER, PhpMixed, PhpResource, PregMatches, ProcStatus, SEEK_END,
-    SEEK_SET, ToPhpString, bconcat, exec, fopen, fseek, fwrite, getcwd, getenv_all, implode,
-    is_dir, microtime, os_str_from_bytes, path_from_bytes, php_regex, php_str, preg_is_match,
-    preg_replace, preg_replace_callback, proc_close, proc_get_status, proc_open, proc_terminate,
-    stream_get_contents_with_length_and_offset, strpbrk, uniqid, usleep,
+    SEEK_SET, ToPhpString, bformat, bwrite, exec, fopen, fseek, fwrite, getcwd, getenv_all,
+    implode, is_dir, microtime, os_str_from_bytes, path_from_bytes, php_regex, php_str,
+    preg_is_match, preg_replace, preg_replace_callback, proc_close, proc_get_status, proc_open,
+    proc_terminate, stream_get_contents_with_length_and_offset, strpbrk, uniqid, usleep,
 };
 use std::sync::OnceLock;
 
@@ -296,7 +296,7 @@ impl Process {
 
                 if !cfg!(windows) {
                     // exec is mandatory to deal with sending a signal to the process
-                    cmd = bconcat!("exec ", cmd);
+                    cmd = bformat!("exec {cmd}");
                 }
                 cmd
             }
@@ -315,15 +315,14 @@ impl Process {
                     .iter()
                     .any(|name| k == name)
             {
-                env_pairs.push(bconcat!(k, "=", v.to_php_string()));
+                env_pairs.push(bformat!("{k}={}", v.to_php_string()));
             }
         }
 
         if !self.cwd.as_deref().map(is_dir).unwrap_or(false) {
-            return Err(RuntimeException::new(bconcat!(
-                "The provided cwd \"",
-                self.cwd.as_deref().unwrap_or(std::path::Path::new("")),
-                "\" does not exist."
+            return Err(RuntimeException::new(bformat!(
+                "The provided cwd \"{}\" does not exist.",
+                self.cwd.as_deref().unwrap_or(std::path::Path::new(""))
             ))
             .into());
         }
@@ -884,14 +883,14 @@ impl Process {
         // php://temp is an in-memory stream; fopen never fails for it.
         self.stdout = Some(
             fopen(
-                path_from_bytes(&bconcat!("php://temp/maxmemory:", 1024 * 1024)),
+                path_from_bytes(&bformat!("php://temp/maxmemory:{}", 1024 * 1024)),
                 "w+",
             )
             .unwrap(),
         );
         self.stderr = Some(
             fopen(
-                path_from_bytes(&bconcat!("php://temp/maxmemory:", 1024 * 1024)),
+                path_from_bytes(&bformat!("php://temp/maxmemory:{}", 1024 * 1024)),
                 "w+",
             )
             .unwrap(),
@@ -923,16 +922,15 @@ impl Process {
             let mut output: Vec<BString> = Vec::new();
             let mut exit_code: i64 = 0;
             exec(
-                bconcat!("taskkill /F /T /PID ", pid, " 2>&1"),
+                bformat!("taskkill /F /T /PID {pid} 2>&1"),
                 Some(&mut output),
                 Some(&mut exit_code),
             );
             if exit_code != 0 && self.is_running() {
                 if throw_exception {
-                    return Err(RuntimeException::new(bconcat!(
-                        "Unable to kill the process (",
-                        implode(" ", &output),
-                        ")."
+                    return Err(RuntimeException::new(bformat!(
+                        "Unable to kill the process ({}).",
+                        implode(" ", &output)
                     ))
                     .into());
                 }
@@ -943,10 +941,8 @@ impl Process {
             let ok = proc_terminate(self.process.as_ref().unwrap(), signal);
             if !ok {
                 if throw_exception {
-                    return Err(RuntimeException::new(bconcat!(
-                        "Error while sending signal \"",
-                        signal,
-                        "\"."
+                    return Err(RuntimeException::new(bformat!(
+                        "Error while sending signal \"{signal}\"."
                     ))
                     .into());
                 }
@@ -992,7 +988,7 @@ impl Process {
                     value = value.replace("\0", "?").into();
                 }
                 if strpbrk(&value, "\"%!\n").is_none() {
-                    return Ok(bconcat!("\"", value, "\""));
+                    return Ok(bformat!("\"{value}\""));
                 }
 
                 for (from, to) in [
@@ -1004,17 +1000,16 @@ impl Process {
                 ] {
                     value = value.replace(from, to).into();
                 }
-                value = bconcat!(
-                    "\"",
-                    preg_replace(php_regex!(r#"/(\\*)"/"#), "$1$1\\\"", &value),
-                    "\""
+                value = bformat!(
+                    "\"{}\"",
+                    preg_replace(php_regex!(r#"/(\\*)"/"#), "$1$1\\\"", &value)
                 );
                 var_count += 1;
-                let var = bconcat!(uid, var_count);
+                let var = bformat!("{uid}{var_count}");
 
                 env.insert(var.clone(), PhpMixed::string(value));
 
-                let replacement = bconcat!("!", var, "!");
+                let replacement = bformat!("!{var}!");
                 var_cache.insert(m0, replacement.clone());
                 Ok(replacement)
             },
@@ -1027,23 +1022,21 @@ impl Process {
                 ExecutableFinder::new()
                     .find("cmd.exe", None, &[])
                     .map(|spec| {
-                        bconcat!(
-                            "\"",
-                            preg_replace(php_regex!(r#"{(\\*+)"}"#), "$1$1\\\"", &spec),
-                            "\""
+                        bformat!(
+                            "\"{}\"",
+                            preg_replace(php_regex!(r#"{(\\*+)"}"#), "$1$1\\\"", &spec)
                         )
                     })
             })
             .clone();
 
-        let mut cmd = bconcat!(
+        let mut cmd = bformat!(
+            "{} /V:ON /E:ON /D /C ({})",
             com_spec.unwrap_or_else(|| "cmd".into()),
-            " /V:ON /E:ON /D /C (",
-            cmd.replace("\n", " "),
-            ")"
+            cmd.replace("\n", " ")
         );
         for (offset, filename) in self.process_pipes.as_ref().unwrap().get_files() {
-            cmd.extend_from_slice(&bconcat!(" ", offset, ">\"", filename, "\""));
+            bwrite!(cmd, " {offset}>\"{filename}\"");
         }
 
         Ok(cmd)
@@ -1052,10 +1045,8 @@ impl Process {
     /// Ensures the process is running or terminated.
     fn require_process_is_started(&self, function_name: &BStr) -> anyhow::Result<()> {
         if !self.is_started() {
-            return Err(LogicException::new(bconcat!(
-                "Process must be started before calling \"",
-                function_name,
-                "()\"."
+            return Err(LogicException::new(bformat!(
+                "Process must be started before calling \"{function_name}()\"."
             ))
             .into());
         }
@@ -1065,10 +1056,8 @@ impl Process {
     /// Ensures the process is terminated.
     fn require_process_is_terminated(&mut self, function_name: &BStr) -> anyhow::Result<()> {
         if !self.is_terminated() {
-            return Err(LogicException::new(bconcat!(
-                "Process must be terminated before calling \"",
-                function_name,
-                "()\"."
+            return Err(LogicException::new(bformat!(
+                "Process must be terminated before calling \"{function_name}()\"."
             ))
             .into());
         }
@@ -1082,7 +1071,7 @@ impl Process {
             Some(a) => a,
         };
         if !cfg!(windows) {
-            return bconcat!("'", argument.replace("'", "'\\''"), "'");
+            return bformat!("'{}'", argument.replace("'", "'\\''"));
         }
         let mut argument = BString::from(argument);
         if argument.contains(&b'\0') {
@@ -1103,7 +1092,7 @@ impl Process {
         ] {
             result = result.replace(from, to).into();
         }
-        bconcat!("\"", result, "\"")
+        bformat!("\"{result}\"")
     }
 
     fn replace_placeholders(
@@ -1116,18 +1105,12 @@ impl Process {
             |matches: &PregMatches| -> anyhow::Result<BString> {
                 let key = matches.get(1).unwrap_or_default();
                 match env.get(key) {
-                    None => Err(InvalidArgumentException::new(bconcat!(
-                        "Command line is missing a value for parameter \"",
-                        key,
-                        "\": ",
-                        commandline
+                    None => Err(InvalidArgumentException::new(bformat!(
+                        "Command line is missing a value for parameter \"{key}\": {commandline}"
                     ))
                     .into()),
-                    Some(PhpMixed::Bool(false)) => Err(InvalidArgumentException::new(bconcat!(
-                        "Command line is missing a value for parameter \"",
-                        key,
-                        "\": ",
-                        commandline
+                    Some(PhpMixed::Bool(false)) => Err(InvalidArgumentException::new(bformat!(
+                        "Command line is missing a value for parameter \"{key}\": {commandline}"
                     ))
                     .into()),
                     Some(v) => Ok(self.escape_argument(Some(&v.to_php_string()))),

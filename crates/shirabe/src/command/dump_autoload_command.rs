@@ -9,7 +9,7 @@ use crate::delegate_base_command_trait_impls_to_inner;
 use crate::io::IOInterfaceWrite;
 use crate::plugin::{CommandEvent, PluginEvents};
 use bstr::{BStr, BString};
-use shirabe_php_shim::{InvalidArgumentException, bconcat, file_exists, impl_php_class};
+use shirabe_php_shim::{InvalidArgumentException, bformat, file_exists, impl_php_class};
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::{InputInterface, InputInterfaceByName};
 use shirabe_symfony_console::output::OutputInterface;
@@ -249,17 +249,9 @@ impl Command for DumpAutoloadCommand {
         let number_of_classes = class_map.map.len();
 
         if authoritative {
-            self.get_io().write(bconcat!(
-                "<info>Generated optimized autoload files (authoritative) containing ",
-                number_of_classes,
-                " classes</info>"
-            ));
+            self.get_io().write(bformat!("<info>Generated optimized autoload files (authoritative) containing {number_of_classes} classes</info>"));
         } else if optimize {
-            self.get_io().write(bconcat!(
-                "<info>Generated optimized autoload files containing ",
-                number_of_classes,
-                " classes</info>"
-            ));
+            self.get_io().write(bformat!("<info>Generated optimized autoload files containing {number_of_classes} classes</info>"));
         } else {
             self.get_io().write("<info>Generated autoload files</info>");
         }

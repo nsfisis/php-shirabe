@@ -11,7 +11,7 @@ use shirabe::repository::{
     RepositorySet,
 };
 use shirabe::util::Platform;
-use shirabe_php_shim::bconcat;
+use shirabe_php_shim::bformat;
 use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
 
 #[allow(dead_code)]
@@ -182,7 +182,7 @@ fn test_select_lowest_with_prefer_dev_over_prerelease() {
 
         Platform::put_env("COMPOSER_PREFER_DEV_OVER_PRERELEASE", "1").unwrap();
         let dev_package = get_package("A", "dev-master");
-        let prerelease_package = get_package("A", bconcat!("1.0.0-", stability));
+        let prerelease_package = get_package("A", bformat!("1.0.0-{stability}"));
         fixtures.repo.add_package(dev_package.clone()).unwrap();
         fixtures
             .repo
@@ -217,7 +217,7 @@ fn test_select_lowest_prefers_prerelease_over_dev() {
         let mut fixtures = set_up();
 
         let dev_package = get_package("A", "dev-master");
-        let prerelease_package = get_package("A", bconcat!("1.0.0-", stability));
+        let prerelease_package = get_package("A", bformat!("1.0.0-{stability}"));
         fixtures.repo.add_package(dev_package.clone()).unwrap();
         fixtures
             .repo
@@ -574,8 +574,8 @@ fn test_select_local_repos_first() {
 fn link(source: &BStr, target: &BStr, constraint: AnyConstraint, r#type: &bstr::BStr) -> Link {
     let pretty = constraint.get_pretty_string();
     Link::new(
-        bconcat!(source),
-        bconcat!(target),
+        bformat!("{source}"),
+        bformat!("{target}"),
         constraint,
         Some(r#type.to_owned()),
         Some(pretty),
@@ -589,7 +589,7 @@ fn as_complete(
 }
 
 fn constraint(operator: &BStr, version: &BStr) -> AnyConstraint {
-    SimpleConstraint::new(operator, bconcat!(version), None).into()
+    SimpleConstraint::new(operator, bformat!("{version}"), None).into()
 }
 
 #[test]

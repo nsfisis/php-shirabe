@@ -15,7 +15,7 @@ use shirabe::repository::vcs::GitHubDriver;
 use shirabe::util::{
     Filesystem, Git as GitUtil, HttpDownloaderMockHandler, MockHandler, ProcessExecutor,
 };
-use shirabe_php_shim::{PhpMixed, base64_encode, bconcat, path_to_bytes};
+use shirabe_php_shim::{PhpMixed, base64_encode, bformat, path_to_bytes};
 use tempfile::TempDir;
 
 struct SetUp {
@@ -213,12 +213,12 @@ fn test_private_repository() {
         .set_auth_config_source(Box::new(null_config_source()));
 
     let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
-    repo_config.insert("url".into(), PhpMixed::string(bconcat!(repo_url)));
+    repo_config.insert("url".into(), PhpMixed::string(bformat!("{repo_url}")));
 
     let mut git_hub_driver = GitHubDriver::new(repo_config, io, config, http_downloader, process);
     git_hub_driver.initialize().unwrap();
     let mut tags = IndexMap::new();
-    tags.insert(bconcat!(identifier), bconcat!(sha));
+    tags.insert(bformat!("{identifier}"), bformat!("{sha}"));
     git_hub_driver.__set_tags(Some(tags.into_iter().collect::<indexmap::IndexMap<_, _>>()));
 
     assert_eq!("test_master", git_hub_driver.get_root_identifier().unwrap());
@@ -279,13 +279,13 @@ fn test_public_repository() {
     let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(None)));
 
     let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
-    repo_config.insert("url".into(), PhpMixed::string(bconcat!(repo_url)));
+    repo_config.insert("url".into(), PhpMixed::string(bformat!("{repo_url}")));
     let repo_url = "https://github.com/composer/packagist.git";
 
     let mut git_hub_driver = GitHubDriver::new(repo_config, io, config, http_downloader, process);
     git_hub_driver.initialize().unwrap();
     let mut tags = IndexMap::new();
-    tags.insert(bconcat!(identifier), bconcat!(sha));
+    tags.insert(bformat!("{identifier}"), bformat!("{sha}"));
     git_hub_driver.__set_tags(Some(tags.into_iter().collect::<indexmap::IndexMap<_, _>>()));
 
     assert_eq!("test_master", git_hub_driver.get_root_identifier().unwrap());
@@ -344,10 +344,9 @@ fn test_public_repository2() {
                 BStr::new(
                     "https://api.github.com/repos/composer/packagist/contents/composer.json?ref=feature%2F3.2-foo",
                 ),
-                bconcat!(
-                    r#"{"encoding":"base64","content":""#,
-                    b64(bconcat!(r#"{"support": {"source": ""#, repo_url, r#"" }}"#).as_bstr()),
-                    r#""}"#
+                bformat!(
+                    "{{\"encoding\":\"base64\",\"content\":\"{}\"}}",
+                    b64(bformat!("{{\"support\": {{\"source\": \"{repo_url}\" }}}}").as_bstr())
                 ),
             ),
             http_body(
@@ -360,10 +359,9 @@ fn test_public_repository2() {
                 BStr::new(
                     "https://api.github.com/repos/composer/packagist/contents/.github/FUNDING.yml",
                 ),
-                bconcat!(
-                    r#"{"encoding": "base64", "content": ""#,
-                    b64(BStr::new("custom: https://example.com")),
-                    r#""}"#
+                bformat!(
+                    "{{\"encoding\": \"base64\", \"content\": \"{}\"}}",
+                    b64(BStr::new("custom: https://example.com"))
                 ),
             ),
         ],
@@ -374,13 +372,13 @@ fn test_public_repository2() {
     let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(None)));
 
     let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
-    repo_config.insert("url".into(), PhpMixed::string(bconcat!(repo_url)));
+    repo_config.insert("url".into(), PhpMixed::string(bformat!("{repo_url}")));
     let repo_url = "https://github.com/composer/packagist.git";
 
     let mut git_hub_driver = GitHubDriver::new(repo_config, io, config, http_downloader, process);
     git_hub_driver.initialize().unwrap();
     let mut tags = IndexMap::new();
-    tags.insert(bconcat!(identifier), bconcat!(sha));
+    tags.insert(bformat!("{identifier}"), bformat!("{sha}"));
     git_hub_driver.__set_tags(Some(tags.into_iter().collect::<indexmap::IndexMap<_, _>>()));
 
     assert_eq!("test_master", git_hub_driver.get_root_identifier().unwrap());
@@ -445,10 +443,9 @@ fn test_invalid_support_data() {
                 BStr::new(
                     "https://api.github.com/repos/composer/packagist/contents/composer.json?ref=feature%2F3.2-foo",
                 ),
-                bconcat!(
-                    r#"{"encoding":"base64","content":""#,
-                    b64(bconcat!(r#"{"support": ""#, repo_url, r#"" }"#).as_bstr()),
-                    r#""}"#
+                bformat!(
+                    "{{\"encoding\":\"base64\",\"content\":\"{}\"}}",
+                    b64(bformat!("{{\"support\": \"{repo_url}\" }}").as_bstr())
                 ),
             ),
             http_body(
@@ -461,10 +458,9 @@ fn test_invalid_support_data() {
                 BStr::new(
                     "https://api.github.com/repos/composer/packagist/contents/.github/FUNDING.yml",
                 ),
-                bconcat!(
-                    r#"{"encoding": "base64", "content": ""#,
-                    b64(BStr::new("custom: https://example.com")),
-                    r#""}"#
+                bformat!(
+                    "{{\"encoding\": \"base64\", \"content\": \"{}\"}}",
+                    b64(BStr::new("custom: https://example.com"))
                 ),
             ),
         ],
@@ -475,15 +471,15 @@ fn test_invalid_support_data() {
     let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(None)));
 
     let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
-    repo_config.insert("url".into(), PhpMixed::string(bconcat!(repo_url)));
+    repo_config.insert("url".into(), PhpMixed::string(bformat!("{repo_url}")));
 
     let mut git_hub_driver = GitHubDriver::new(repo_config, io, config, http_downloader, process);
     git_hub_driver.initialize().unwrap();
     let mut tags = IndexMap::new();
-    tags.insert(bconcat!(identifier), bconcat!(sha));
+    tags.insert(bformat!("{identifier}"), bformat!("{sha}"));
     git_hub_driver.__set_tags(Some(tags.into_iter().collect::<indexmap::IndexMap<_, _>>()));
     let mut branches = IndexMap::new();
-    branches.insert(BString::from("test_master"), bconcat!(sha));
+    branches.insert(BString::from("test_master"), bformat!("{sha}"));
     git_hub_driver.__set_branches(Some(
         branches.into_iter().collect::<indexmap::IndexMap<_, _>>(),
     ));
@@ -634,10 +630,9 @@ fn test_funding_format() {
                     BStr::new(
                         "https://api.github.com/repos/composer/packagist/contents/composer.json?ref=feature%2F3.2-foo",
                     ),
-                    bconcat!(
-                        r#"{"encoding":"base64","content":""#,
-                        b64(bconcat!(r#"{"support": {"source": ""#, repo_url, r#"" }}"#).as_bstr()),
-                        r#""}"#
+                    bformat!(
+                        "{{\"encoding\":\"base64\",\"content\":\"{}\"}}",
+                        b64(bformat!("{{\"support\": {{\"source\": \"{repo_url}\" }}}}").as_bstr())
                     ),
                 ),
                 http_body(
@@ -650,10 +645,9 @@ fn test_funding_format() {
                     BStr::new(
                         "https://api.github.com/repos/composer/packagist/contents/.github/FUNDING.yml",
                     ),
-                    bconcat!(
-                        r#"{"encoding": "base64", "content": ""#,
-                        b64(funding),
-                        r#""}"#
+                    bformat!(
+                        "{{\"encoding\": \"base64\", \"content\": \"{}\"}}",
+                        b64(funding)
                     ),
                 ),
             ],
@@ -664,16 +658,16 @@ fn test_funding_format() {
         let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(None)));
 
         let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
-        repo_config.insert("url".into(), PhpMixed::string(bconcat!(repo_url)));
+        repo_config.insert("url".into(), PhpMixed::string(bformat!("{repo_url}")));
 
         let mut git_hub_driver =
             GitHubDriver::new(repo_config, io, config, http_downloader, process);
         git_hub_driver.initialize().unwrap();
         let mut tags = IndexMap::new();
-        tags.insert(bconcat!(identifier), bconcat!(sha));
+        tags.insert(bformat!("{identifier}"), bformat!("{sha}"));
         git_hub_driver.__set_tags(Some(tags.into_iter().collect::<indexmap::IndexMap<_, _>>()));
         let mut branches = IndexMap::new();
-        branches.insert(BString::from("test_master"), bconcat!(sha));
+        branches.insert(BString::from("test_master"), bformat!("{sha}"));
         git_hub_driver.__set_branches(Some(
             branches.into_iter().collect::<indexmap::IndexMap<_, _>>(),
         ));
@@ -728,9 +722,8 @@ fn test_public_repository_archived() {
     let repo_api_url = BStr::new("https://api.github.com/repos/composer/packagist");
     let identifier = "v0.0.0";
     let sha = "SOMESHA";
-    let composer_json_url = bconcat!(
-        "https://api.github.com/repos/composer/packagist/contents/composer.json?ref=",
-        sha
+    let composer_json_url = bformat!(
+        "https://api.github.com/repos/composer/packagist/contents/composer.json?ref={sha}"
     );
 
     let config = std::rc::Rc::new(std::cell::RefCell::new(config));
@@ -746,28 +739,22 @@ fn test_public_repository_archived() {
             ),
             http_body(
                 composer_json_url.as_bstr(),
-                bconcat!(
-                    r#"{"encoding": "base64", "content": ""#,
-                    b64(BStr::new(r#"{"name": "composer/packagist"}"#)),
-                    r#""}"#
+                bformat!(
+                    "{{\"encoding\": \"base64\", \"content\": \"{}\"}}",
+                    b64(BStr::new(r#"{"name": "composer/packagist"}"#))
                 ),
             ),
             http_body(
-                bconcat!(
-                    "https://api.github.com/repos/composer/packagist/commits/",
-                    sha
-                )
-                .as_bstr(),
+                bformat!("https://api.github.com/repos/composer/packagist/commits/{sha}").as_bstr(),
                 r#"{"commit": {"committer":{ "date": "2012-09-10"}}}"#,
             ),
             http_body(
                 BStr::new(
                     "https://api.github.com/repos/composer/packagist/contents/.github/FUNDING.yml",
                 ),
-                bconcat!(
-                    r#"{"encoding": "base64", "content": ""#,
-                    b64(BStr::new("custom: https://example.com")),
-                    r#""}"#
+                bformat!(
+                    "{{\"encoding\": \"base64\", \"content\": \"{}\"}}",
+                    b64(BStr::new("custom: https://example.com"))
                 ),
             ),
         ],
@@ -778,12 +765,12 @@ fn test_public_repository_archived() {
     let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(None)));
 
     let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
-    repo_config.insert("url".into(), PhpMixed::string(bconcat!(repo_url)));
+    repo_config.insert("url".into(), PhpMixed::string(bformat!("{repo_url}")));
 
     let mut git_hub_driver = GitHubDriver::new(repo_config, io, config, http_downloader, process);
     git_hub_driver.initialize().unwrap();
     let mut tags = IndexMap::new();
-    tags.insert(bconcat!(identifier), bconcat!(sha));
+    tags.insert(bformat!("{identifier}"), bformat!("{sha}"));
     git_hub_driver.__set_tags(Some(tags.into_iter().collect::<indexmap::IndexMap<_, _>>()));
 
     let data = git_hub_driver
@@ -863,11 +850,8 @@ fn test_private_repository_no_interaction() {
                 BStr::new("--mirror"),
                 BStr::new("--"),
                 repo_ssh_url,
-                bconcat!(
-                    resolved_cache_vcs_dir,
-                    "/git-github.com-composer-packagist.git/"
-                )
-                .as_bstr(),
+                bformat!("{resolved_cache_vcs_dir}/git-github.com-composer-packagist.git/")
+                    .as_bstr(),
             ]),
             cmd(["git", "remote", "-v"]),
             cmd([
@@ -881,7 +865,7 @@ fn test_private_repository_no_interaction() {
             cmd_full(
                 ["git", "show-ref", "--tags", "--dereference"],
                 0,
-                bconcat!(sha, " refs/tags/", identifier),
+                bformat!("{sha} refs/tags/{identifier}"),
                 "",
             ),
             cmd_full(
@@ -897,7 +881,7 @@ fn test_private_repository_no_interaction() {
     );
 
     let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
-    repo_config.insert("url".into(), PhpMixed::string(bconcat!(repo_url)));
+    repo_config.insert("url".into(), PhpMixed::string(bformat!("{repo_url}")));
 
     let mut git_hub_driver = GitHubDriver::new(repo_config, io, config, http_downloader, process);
     git_hub_driver.initialize().unwrap();
@@ -970,7 +954,7 @@ fn test_initialize_invalid_repo_url() {
         let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(None)));
 
         let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
-        repo_config.insert("url".into(), PhpMixed::string(bconcat!(url)));
+        repo_config.insert("url".into(), PhpMixed::string(bformat!("{url}")));
 
         let mut git_hub_driver =
             GitHubDriver::new(repo_config, io, config, http_downloader, process);
@@ -1015,7 +999,7 @@ fn test_get_empty_file_content() {
     let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(None)));
 
     let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
-    repo_config.insert("url".into(), PhpMixed::string(bconcat!(repo_url)));
+    repo_config.insert("url".into(), PhpMixed::string(bformat!("{repo_url}")));
 
     let mut git_hub_driver = GitHubDriver::new(repo_config, io, config, http_downloader, process);
     git_hub_driver.initialize().unwrap();

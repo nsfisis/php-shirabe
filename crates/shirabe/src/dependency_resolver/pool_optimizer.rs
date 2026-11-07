@@ -3,9 +3,9 @@
 use crate::dependency_resolver::{PolicyInterface, Pool, Request};
 use crate::package::version::VersionParser;
 use crate::package::{BasePackageHandle, Link};
-use bstr::{BStr, BString, ByteSlice, ByteVec};
+use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe_php_shim::{CmpOp, ToPhpString, bconcat, implode, ksort};
+use shirabe_php_shim::{CmpOp, ToPhpString, bformat, bwrite, implode, ksort};
 use shirabe_semver::constraint::{AnyConstraint, MultiConstraint, SimpleConstraint};
 use shirabe_semver::{CompilingMatcher, Intervals};
 
@@ -229,8 +229,10 @@ impl PoolOptimizer {
                         CmpOp::Eq,
                         package.get_version(),
                     ) {
-                        group_hash_parts
-                            .push(bconcat!("require:", require_constraint.get_pretty_string()));
+                        group_hash_parts.push(bformat!(
+                            "require:{}",
+                            require_constraint.get_pretty_string()
+                        ));
                     }
 
                     if !package.get_replaces().is_empty() {
@@ -241,8 +243,8 @@ impl PoolOptimizer {
                                 package.get_version(),
                             ) {
                                 // Use the same hash part as the regular require hash because that's what the replacement does
-                                group_hash_parts.push(bconcat!(
-                                    "require:",
+                                group_hash_parts.push(bformat!(
+                                    "require:{}",
                                     link.get_constraint().get_pretty_string()
                                 ));
                             }
@@ -258,8 +260,8 @@ impl PoolOptimizer {
                                 CmpOp::Eq,
                                 package.get_version(),
                             ) {
-                                group_hash_parts.push(bconcat!(
-                                    "conflict:",
+                                group_hash_parts.push(bformat!(
+                                    "conflict:{}",
                                     conflict_constraint.get_pretty_string()
                                 ));
                             }
@@ -359,7 +361,7 @@ impl PoolOptimizer {
             }
 
             // start new hash section
-            hash.push_str(bconcat!(key, ":"));
+            bwrite!(hash, "{key}:");
 
             let mut subhash: IndexMap<BString, BString> = IndexMap::new();
 
@@ -378,7 +380,7 @@ impl PoolOptimizer {
             ksort(&mut subhash);
 
             for (target, constraint) in subhash {
-                hash.push_str(&bconcat!(target, "@", constraint));
+                bwrite!(hash, "{target}@{constraint}");
             }
         }
 
@@ -447,7 +449,7 @@ impl PoolOptimizer {
                             pkg.clone()
                         };
                         self.removed_versions_by_package
-                            .entry(bconcat!(package.ptr_id()))
+                            .entry(bformat!("{}", package.ptr_id()))
                             .or_default()
                             .insert(
                                 BString::from(&pkg.get_version()[..]),
@@ -494,7 +496,7 @@ impl PoolOptimizer {
                                 pkg.clone()
                             };
                             self.removed_versions_by_package
-                                .entry(bconcat!("alias-", alias_id))
+                                .entry(bformat!("alias-{alias_id}"))
                                 .or_default()
                                 .insert(
                                     BString::from(&pkg.get_version()[..]),

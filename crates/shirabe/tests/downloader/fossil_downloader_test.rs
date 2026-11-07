@@ -11,7 +11,7 @@ use shirabe::downloader::{FossilDownloader, VcsDownloader};
 use shirabe::io::IOInterface;
 use shirabe::package::{CompletePackageHandle, PackageInterfaceHandle};
 use shirabe::util::{Filesystem, FilesystemMock, ProcessExecutor};
-use shirabe_php_shim::{PhpMixed, bconcat, error_message, path_from_bytes};
+use shirabe_php_shim::{PhpMixed, bformat, error_message, path_from_bytes};
 use shirabe_semver::VersionParser;
 use tempfile::TempDir;
 
@@ -58,8 +58,8 @@ fn get_package(
         BString::from("1.0.0"),
     );
     package.__set_source_type(Some(BString::from("fossil")));
-    package.set_source_reference(source_reference.map(|s| bconcat!(s)));
-    package.set_source_url(source_url.map(|s| bconcat!(s)));
+    package.set_source_reference(source_reference.map(|s| bformat!("{s}")));
+    package.set_source_url(source_url.map(|s| bformat!("{s}")));
     package.into()
 }
 
@@ -107,13 +107,13 @@ fn test_install() {
     let working_dir = set_up();
     let _tear_down = TearDown::new(working_dir.path().to_path_buf());
 
-    let working_dir_str = bconcat!(working_dir.path());
+    let working_dir_str = bformat!("{}", working_dir.path());
     let package = get_package(
         Some(BStr::new("trunk")),
         Some(BStr::new("http://fossil.kd2.org/kd2fw/")),
     );
 
-    let repo_file = bconcat!(working_dir_str, ".fossil");
+    let repo_file = bformat!("{working_dir_str}.fossil");
     let (process, _guard) = get_process_executor_mock(
         vec![
             cmd(vec![
@@ -186,7 +186,7 @@ fn test_update() {
     let working_dir = set_up();
     let _tear_down = TearDown::new(working_dir.path().to_path_buf());
 
-    let working_dir_str = bconcat!(working_dir.path());
+    let working_dir_str = bformat!("{}", working_dir.path());
 
     // Ensure the .fslckout metadata file exists.
     let fslckout = working_dir.path().join(".fslckout");
@@ -244,7 +244,7 @@ fn test_update() {
 fn test_remove() {
     let working_dir = set_up();
     let _tear_down = TearDown::new(working_dir.path().to_path_buf());
-    let working_dir_str = bconcat!(working_dir.path());
+    let working_dir_str = bformat!("{}", working_dir.path());
 
     // Ensure file exists
     let file = working_dir.path().join(".fslckout");

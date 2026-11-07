@@ -3,7 +3,7 @@
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    CmpOp, bconcat, ltrim_chars, php_regex, preg_match, rtrim_chars, strpos, strtr_array,
+    CmpOp, bformat, ltrim_chars, php_regex, preg_match, rtrim_chars, strpos, strtr_array,
     version_compare,
 };
 
@@ -25,18 +25,18 @@ impl Version {
         let suffix_str = matches.name("suffix").unwrap_or_default();
 
         let patch = if version_compare(version, "3.0.0", CmpOp::Lt) {
-            bconcat!(".", Self::convert_alpha_version_to_int_version(patch_str))
+            bformat!(".{}", Self::convert_alpha_version_to_int_version(patch_str))
         } else {
             BString::default()
         };
 
         *is_fips = strpos(suffix_str, "fips").is_some();
         let suffix = strtr_array(
-            bconcat!("-", ltrim_chars(suffix_str, "-")),
+            bformat!("-{}", ltrim_chars(suffix_str, "-")),
             &IndexMap::from([("-fips", ""), ("-pre", "-alpha")]),
         );
 
-        Some(rtrim_chars(bconcat!(version, patch, suffix), "-"))
+        Some(rtrim_chars(bformat!("{version}{patch}{suffix}"), "-"))
     }
 
     pub fn parse_libjpeg(libjpeg_version: impl AsRef<[u8]>) -> Option<BString> {
@@ -45,9 +45,9 @@ impl Version {
             libjpeg_version.as_ref(),
         )?;
 
-        Some(bconcat!(
+        Some(bformat!(
+            "{}.{}",
             matches.name("major").unwrap_or_default(),
-            ".",
             Self::convert_alpha_version_to_int_version(matches.name("minor").unwrap_or_default())
         ))
     }
@@ -58,9 +58,9 @@ impl Version {
             zoneinfo_version.as_ref(),
         )?;
 
-        Some(bconcat!(
+        Some(bformat!(
+            "{}.{}",
             matches.name("year").unwrap_or_default(),
-            ".",
             Self::convert_alpha_version_to_int_version(
                 matches.name("revision").unwrap_or_default()
             )
@@ -82,12 +82,11 @@ impl Version {
     }
 
     fn convert_version_id(version_id: i64, base: i64) -> BString {
-        bconcat!(
+        bformat!(
+            "{}.{}.{}",
             version_id / (base * base),
-            ".",
             (version_id / base) % base,
-            ".",
-            version_id % base,
+            version_id % base
         )
     }
 }

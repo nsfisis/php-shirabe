@@ -6,7 +6,7 @@ use bstr::{BStr, BString};
 use shirabe::installer::BinaryInstaller;
 use shirabe::io::{IOInterface, NullIO};
 use shirabe::util::{Filesystem, ProcessExecutor};
-use shirabe_php_shim::bconcat;
+use shirabe_php_shim::bformat;
 use std::fs;
 use tempfile::TempDir;
 
@@ -100,7 +100,7 @@ fn run_install_and_exec_binary_with_full_compat(contents: &[u8]) {
     let proc = ProcessExecutor::new(None);
     let mut output = bstr::BString::default();
     proc.execute(
-        bconcat!(setup.bin_dir.join("binary"), " arg"),
+        bformat!("{} arg", setup.bin_dir.join("binary")),
         &mut output,
         None,
     )

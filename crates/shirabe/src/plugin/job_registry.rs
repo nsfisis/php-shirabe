@@ -11,7 +11,7 @@ use crate::util::{HttpDownloader, ProcessExecutor};
 use bstr::BStr;
 use indexmap::IndexMap;
 use shirabe_php_rpc::{PhpThrow, PluginValue};
-use shirabe_php_shim::{bconcat, error_chain_message};
+use shirabe_php_shim::{bformat, error_chain_message};
 
 /// The service a job is counted against: the one whose `countActiveJobs()` reports it and whose
 /// tick drives it.
@@ -225,10 +225,8 @@ fn push_settle(id: u64, outcome: Result<PluginValue, PhpThrow>) -> Result<(), Ph
     match PhpCall::Function(BStr::new(function)).try_run::<PluginValue>(args) {
         Ok(Ok(_)) => Ok(()),
         Ok(Err(throw)) => Err(throw),
-        Err(error) => Err(PhpThrow::runtime(bconcat!(
-            "settling job ",
-            id,
-            " in the plugin process failed: ",
+        Err(error) => Err(PhpThrow::runtime(bformat!(
+            "settling job {id} in the plugin process failed: {}",
             error_chain_message(&error)
         ))),
     }
@@ -439,11 +437,8 @@ pub(crate) fn fail_php_jobs(ids: &[u64]) {
     for id in ids {
         settle_php_job(
             *id,
-            Err(PhpThrow::runtime(bconcat!(
-                "the promise of plugin job ",
-                id,
-                " can never settle: no job is left whose \
-                 completion could run the code that resolves it"
+            Err(PhpThrow::runtime(bformat!(
+                "the promise of plugin job {id} can never settle: no job is left whose completion could run the code that resolves it"
             ))),
         );
     }

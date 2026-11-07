@@ -4,7 +4,7 @@ use crate::package::{AliasPackage, DisplayMode, Link, PackageInterface};
 use crate::repository::{PlatformRepository, RepositoryInterfaceHandle};
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
-use shirabe_php_shim::{bconcat, implode, preg_quote, str_replace};
+use shirabe_php_shim::{bformat, implode, preg_quote, str_replace};
 use std::sync::LazyLock;
 
 pub struct SupportedLinkType {
@@ -125,10 +125,10 @@ pub trait BasePackage: PackageInterface {
         };
 
         if truncate && reference.len() == 40 && self.get_source_type().is_none_or(|t| t != "svn") {
-            return bconcat!(self.get_pretty_version(), " ", &reference[..7]);
+            return bformat!("{} {}", self.get_pretty_version(), &reference[..7]);
         }
 
-        bconcat!(self.get_pretty_version(), " ", reference)
+        bformat!("{} {reference}", self.get_pretty_version())
     }
 
     fn get_stability_priority(&self) -> i64 {

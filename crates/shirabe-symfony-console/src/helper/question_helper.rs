@@ -11,7 +11,7 @@ use crate::question::{ChoiceQuestion, QuestionInterface};
 use crate::{Cursor, Terminal};
 use bstr::{B, BStr, BString, ByteSlice};
 use shirabe_php_shim::{
-    Exception, PHP_EOL, PhpResource, SEEK_SET, ToPhpString, bconcat, copy, dir, explode, feof,
+    Exception, PHP_EOL, PhpResource, SEEK_SET, ToPhpString, bformat, copy, dir, explode, feof,
     fgetc, fgets, fopen, fread, fseek, ftell, function_exists, mb_detect_encoding, mb_strlen, ord,
     path_from_bytes, path_to_bytes, php_fopen_resource, rewind, rtrim, sapi_windows_cp_conv,
     sapi_windows_cp_get, sapi_windows_cp_set, shell_exec, stdin, str_bitand, str_repeat,
@@ -364,9 +364,7 @@ impl QuestionHelper {
         for (key, value) in choices {
             let padding = str_repeat(" ", (max_width - Helper::width(key)) as usize);
 
-            messages.push(bconcat!(
-                "  [<", tag, ">", key, padding, "</", tag, ">] ", value,
-            ));
+            messages.push(bformat!("  [<{tag}>{key}{padding}</{tag}>] {value}"));
         }
 
         messages
@@ -387,7 +385,7 @@ impl QuestionHelper {
                 false,
             )
         } else {
-            bconcat!("<error>", error.get_message(), "</error>")
+            bformat!("<error>{}</error>", error.get_message())
         };
 
         output
@@ -449,7 +447,7 @@ impl QuestionHelper {
                     && c.as_deref() == Some(b"".as_slice())
                     && question.get_default().is_null())
             {
-                shell_exec(bconcat!("stty ", stty_mode));
+                shell_exec(bformat!("stty {stty_mode}"));
                 return Err(MissingInputException::new("Aborted."));
             } else if c.as_deref() == Some(b"\x7f".as_slice()) {
                 // Backspace Character
@@ -592,14 +590,13 @@ impl QuestionHelper {
                 let characters_entered =
                     strlen(trim(self.most_recently_entered_value(&full_choice)));
                 output.borrow().write(
-                    &[bconcat!(
-                        "<hl>",
+                    &[bformat!(
+                        "<hl>{}</hl>",
                         OutputFormatter::escape_trailing_backslash(substr(
                             &matches[ofs as usize],
                             characters_entered,
                             None,
-                        )),
-                        "</hl>"
+                        ))
                     )],
                     false,
                     output_interface::OUTPUT_NORMAL,
@@ -609,7 +606,7 @@ impl QuestionHelper {
         }
 
         // Reset stty so it behaves normally again
-        shell_exec(bconcat!("stty ", stty_mode));
+        shell_exec(bformat!("stty {stty_mode}"));
 
         Ok(full_choice)
     }
@@ -637,18 +634,18 @@ impl QuestionHelper {
         trimmable: bool,
     ) -> anyhow::Result<Result<BString, RuntimeException>> {
         if cfg!(windows) {
-            let mut exe = bconcat!(dir(), "/../Resources/bin/hiddeninput.exe");
+            let mut exe = bformat!("{}/../Resources/bin/hiddeninput.exe", dir());
 
             // handle code running from a phar
             let mut tmp_exe: Option<BString> = None;
             if substr(magic_file(), 0, Some(5)) == "phar:" {
-                let tmp = bconcat!(sys_get_temp_dir(), "/hiddeninput.exe");
+                let tmp = bformat!("{}/hiddeninput.exe", sys_get_temp_dir());
                 let _ = copy(path_from_bytes(&exe), path_from_bytes(&tmp));
                 exe = tmp.clone();
                 tmp_exe = Some(tmp);
             }
 
-            let s_exec = shell_exec(bconcat!("\"", exe, "\"")).unwrap_or_default();
+            let s_exec = shell_exec(bformat!("\"{exe}\"")).unwrap_or_default();
             let value = if trimmable { rtrim(&s_exec) } else { s_exec };
             output
                 .borrow()
@@ -672,7 +669,7 @@ impl QuestionHelper {
         let value = fgets(input_stream, Some(4096));
 
         if STTY.load(std::sync::atomic::Ordering::SeqCst) && Terminal::has_stty_available() {
-            shell_exec(bconcat!("stty ", stty_mode));
+            shell_exec(bformat!("stty {stty_mode}"));
         }
 
         let mut value = match value {

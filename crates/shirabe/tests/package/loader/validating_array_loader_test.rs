@@ -5,10 +5,10 @@ use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe::package::PackageInterfaceHandle;
 use shirabe::package::loader::{InvalidPackageException, LoaderInterface, ValidatingArrayLoader};
-use shirabe_php_shim::{Catch as _, PHP_EOL, PhpMixed, bconcat};
+use shirabe_php_shim::{Catch as _, PHP_EOL, PhpMixed, bformat};
 
 fn s(v: &BStr) -> PhpMixed {
-    PhpMixed::string(bconcat!(v))
+    PhpMixed::string(bformat!("{v}"))
 }
 
 fn i(v: i64) -> PhpMixed {
@@ -33,7 +33,7 @@ fn arr(entries: Vec<(&BStr, PhpMixed)>) -> PhpMixed {
 fn list(items: Vec<PhpMixed>) -> PhpMixed {
     let mut m = IndexMap::new();
     for (idx, v) in items.into_iter().enumerate() {
-        m.insert(bconcat!(idx), v);
+        m.insert(bformat!("{idx}"), v);
     }
     PhpMixed::Array(m)
 }
@@ -82,10 +82,8 @@ fn mock_loader() -> MockLoader {
 }
 
 fn invalid_naming_error(name: &BStr) -> Vec<BString> {
-    vec![bconcat!(
-        "name : ",
-        name,
-        " is invalid, it should have a vendor name, a forward slash, and a package name. The vendor and package name can be words separated by -, . or _. The complete name should match \"^[a-z0-9]([_.-]?[a-z0-9]+)*/[a-z0-9](([_.]?|-{0,2})[a-z0-9]+)*$\"."
+    vec![bformat!(
+        "name : {name} is invalid, it should have a vendor name, a forward slash, and a package name. The vendor and package name can be words separated by -, . or _. The complete name should match \"^[a-z0-9]([_.-]?[a-z0-9]+)*/[a-z0-9](([_.]?|-{{0,2}})[a-z0-9]+)*$\"."
     )]
 }
 
@@ -1137,7 +1135,7 @@ fn warning_provider() -> Vec<(
         ),
         (
             config(vec![(BStr::new("name"), s(BStr::new("a/b"))), (BStr::new("license"), s(BStr::new("XXXXX")))]),
-            vec![bconcat!("License \"XXXXX\" is not a valid SPDX license identifier, see https://spdx.org/licenses/ if you use an open license.", PHP_EOL, "If the software is closed-source, you may use \"proprietary\" as license.").to_owned()],
+            vec![bformat!("License \"XXXXX\" is not a valid SPDX license identifier, see https://spdx.org/licenses/ if you use an open license.{PHP_EOL}If the software is closed-source, you may use \"proprietary\" as license.").to_owned()],
             true,
             Some(config(vec![
                 (BStr::new("name"), s(BStr::new("a/b"))),

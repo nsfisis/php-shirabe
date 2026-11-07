@@ -9,8 +9,8 @@ use crate::repository::{PlatformRepository, RepositoryInterface, RepositorySet};
 use bstr::{BStr, BString, ByteSlice, ByteVec};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    LogicException, PhpDisplay, PhpMixed, RuntimeException, array_keys, array_shift, bconcat,
-    implode,
+    LogicException, PhpDisplay, PhpMixed, RuntimeException, array_keys, array_shift, bformat,
+    bwrite, implode,
 };
 use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
 
@@ -311,10 +311,8 @@ impl Rule {
 
                 let packages = pool.what_provides(package_name, Some(constraint));
                 if packages.is_empty() {
-                    return Ok(bconcat!(
-                        "No package found to satisfy root composer.json require ",
-                        package_name,
-                        " ",
+                    return Ok(bformat!(
+                        "No package found to satisfy root composer.json require {package_name} {}",
                         constraint.get_pretty_string()
                     ));
                 }
@@ -327,29 +325,24 @@ impl Rule {
                 if packages_non_alias.len() == 1 {
                     let package = &packages_non_alias[0];
                     if request.is_locked_package(package.clone()) {
-                        return Ok(bconcat!(
+                        return Ok(bformat!(
+                            "{} is locked to version {} and an update of this package was not requested.",
                             package.get_pretty_name(),
-                            " is locked to version ",
-                            package.get_pretty_version(),
-                            " and an update of this package was not requested."
+                            package.get_pretty_version()
                         ));
                     }
                 }
 
-                bconcat!(
-                    "Root composer.json requires ",
-                    package_name,
-                    " ",
+                bformat!(
+                    "Root composer.json requires {package_name} {} -> satisfiable by {}.",
                     constraint.get_pretty_string(),
-                    " -> satisfiable by ",
                     self.format_packages_unique_from_packages(
                         pool,
                         packages.to_vec(),
                         is_verbose,
                         Some(constraint),
                         false
-                    ),
-                    "."
+                    )
                 )
             }
 
@@ -361,19 +354,17 @@ impl Rule {
                 let package = self.deduplicate_default_branch_alias(package_in);
 
                 if request.is_locked_package(package.clone()) {
-                    return Ok(bconcat!(
+                    return Ok(bformat!(
+                        "{} is locked to version {} and an update of this package was not requested.",
                         package.get_pretty_name(),
-                        " is locked to version ",
-                        package.get_pretty_version(),
-                        " and an update of this package was not requested."
+                        package.get_pretty_version()
                     ));
                 }
 
-                bconcat!(
+                bformat!(
+                    "{} is present at version {} and cannot be modified by Composer",
                     package.get_pretty_name(),
-                    " is present at version ",
-                    package.get_pretty_version(),
-                    " and cannot be modified by Composer"
+                    package.get_pretty_version()
                 )
             }
 
@@ -393,9 +384,9 @@ impl Rule {
                 // swap literals if they are not in the right order with package2 being the conflicter
                 if link.get_source() == package1.get_name() {
                     std::mem::swap(&mut package1, &mut package2);
-                    conflict_target = bconcat!(
+                    conflict_target = bformat!(
+                        "{} {}",
                         package1.get_pretty_name(),
-                        " ",
                         link.get_pretty_constraint()?
                     );
                 }
@@ -420,28 +411,20 @@ impl Rule {
                         }
                     }
                     if let Some(pt) = provide_type {
-                        conflict_target = bconcat!(
+                        conflict_target = bformat!(
+                            "{} {} ({} {pt} {} {})",
                             link.get_target(),
-                            " ",
                             link.get_pretty_constraint()?,
-                            " (",
                             package1.get_pretty_string(),
-                            " ",
-                            pt,
-                            " ",
                             link.get_target(),
-                            " ",
-                            provided.unwrap_or_default(),
-                            ")"
+                            provided.unwrap_or_default()
                         );
                     }
                 }
 
-                bconcat!(
-                    package2.get_pretty_string(),
-                    " conflicts with ",
-                    conflict_target,
-                    "."
+                bformat!(
+                    "{} conflicts with {conflict_target}.",
+                    package2.get_pretty_string()
                 )
             }
 
@@ -463,17 +446,15 @@ impl Rule {
 
                 let text = link.get_pretty_string(source_package);
                 if !requires.is_empty() {
-                    bconcat!(
-                        text,
-                        " -> satisfiable by ",
+                    bformat!(
+                        "{text} -> satisfiable by {}.",
                         self.format_packages_unique_from_packages(
                             pool,
                             requires,
                             is_verbose,
                             Some(link.get_constraint()),
                             false,
-                        ),
-                        "."
+                        )
                     )
                 } else {
                     let reason = Problem::get_missing_package_reason(
@@ -485,7 +466,7 @@ impl Rule {
                         Some(link.get_constraint()),
                     )?;
 
-                    return Ok(bconcat!(text, " -> ", reason.1));
+                    return Ok(bformat!("{text} -> {}", reason.1));
                 }
             }
 
@@ -502,12 +483,9 @@ impl Rule {
 
                 if package_names.len() > 1 {
                     let reason = if !package_names.contains_key(&replaced_name) {
-                        bconcat!(
-                            "They ",
-                            if literals.len() == 2 { "both" } else { "all" },
-                            " replace ",
-                            replaced_name,
-                            " and thus cannot coexist."
+                        bformat!(
+                            "They {} replace {replaced_name} and thus cannot coexist.",
+                            if literals.len() == 2 { "both" } else { "all" }
                         )
                     } else {
                         let mut replacer_names = package_names.clone();
@@ -515,21 +493,21 @@ impl Rule {
                         let replacer_names = array_keys(&replacer_names);
 
                         let mut reason_str = if replacer_names.len() == 1 {
-                            bconcat!(replacer_names[0], " replaces ")
+                            bformat!("{} replaces ", replacer_names[0])
                         } else {
-                            bconcat!("[", implode(", ", &replacer_names), "] replace ")
+                            bformat!("[{}] replace ", implode(", ", &replacer_names))
                         };
-                        reason_str.push_str(&bconcat!(
-                            replaced_name,
-                            " and thus cannot coexist with it."
-                        ));
+                        bwrite!(
+                            reason_str,
+                            "{replaced_name} and thus cannot coexist with it."
+                        );
                         reason_str
                     };
 
                     let mut installed_packages: Vec<BasePackageHandle> = vec![];
                     let mut removable_packages: Vec<BasePackageHandle> = vec![];
                     for literal in &literals {
-                        if installed_map.contains_key(bconcat!(literal.abs()).as_bytes()) {
+                        if installed_map.contains_key(bformat!("{}", literal.abs()).as_bytes()) {
                             installed_packages.push(pool.literal_to_package(*literal));
                         } else {
                             removable_packages.push(pool.literal_to_package(*literal));
@@ -537,7 +515,8 @@ impl Rule {
                     }
 
                     if !installed_packages.is_empty() && !removable_packages.is_empty() {
-                        return Ok(bconcat!(
+                        return Ok(bformat!(
+                            "{} cannot be installed as that would require removing {}. {reason}",
                             self.format_packages_unique_from_packages(
                                 pool,
                                 removable_packages,
@@ -545,35 +524,29 @@ impl Rule {
                                 None,
                                 true,
                             ),
-                            " cannot be installed as that would require removing ",
                             self.format_packages_unique_from_packages(
                                 pool,
                                 installed_packages,
                                 is_verbose,
                                 None,
                                 true,
-                            ),
-                            ". ",
-                            reason
+                            )
                         ));
                     }
 
-                    return Ok(bconcat!(
-                        "Only one of these can be installed: ",
+                    return Ok(bformat!(
+                        "Only one of these can be installed: {}. {reason}",
                         self.format_packages_unique_from_literals(
                             pool, &literals, is_verbose, None, true
-                        ),
-                        ". ",
-                        reason
+                        )
                     ));
                 }
 
-                bconcat!(
-                    "You can only install one version of a package, so only one of these can be installed: ",
+                bformat!(
+                    "You can only install one version of a package, so only one of these can be installed: {}.",
                     self.format_packages_unique_from_literals(
                         pool, &literals, is_verbose, None, true
-                    ),
-                    "."
+                    )
                 )
             }
             r if r == RULE_LEARNED => {
@@ -587,7 +560,8 @@ impl Rule {
                     let mut groups: IndexMap<BString, Vec<BasePackageHandle>> = IndexMap::new();
                     for literal in &literals {
                         let package = pool.literal_to_package(*literal);
-                        let group = if installed_map.contains_key(bconcat!(package.id()).as_bytes())
+                        let group = if installed_map
+                            .contains_key(bformat!("{}", package.id()).as_bytes())
                         {
                             if *literal > 0 { "keep" } else { "remove" }
                         } else {
@@ -599,16 +573,15 @@ impl Rule {
                         };
 
                         groups
-                            .entry(bconcat!(group))
+                            .entry(bformat!("{group}"))
                             .or_default()
                             .push(self.deduplicate_default_branch_alias(package.clone()));
                     }
                     let mut rule_texts: Vec<BString> = vec![];
                     for (group, packages) in &groups {
-                        rule_texts.push(bconcat!(
-                            group,
+                        rule_texts.push(bformat!(
+                            "{group}{} {}",
                             if packages.len() > 1 { " one of" } else { "" },
-                            " ",
                             self.format_packages_unique_from_packages(
                                 pool,
                                 packages.to_vec(),
@@ -622,7 +595,7 @@ impl Rule {
                     implode(" | ", &rule_texts)
                 };
 
-                bconcat!("Conclusion: ", rule_text, learned_string)
+                bformat!("Conclusion: {rule_text}{learned_string}")
             }
             r if r == RULE_PACKAGE_ALIAS => {
                 let alias_package = pool.literal_to_package(literals[0]);
@@ -634,11 +607,10 @@ impl Rule {
                 let package =
                     self.deduplicate_default_branch_alias(pool.literal_to_package(literals[1]));
 
-                bconcat!(
+                bformat!(
+                    "{} is an alias of {} and thus requires it to be installed too.",
                     alias_package.get_pretty_string(),
-                    " is an alias of ",
-                    package.get_pretty_string(),
-                    " and thus requires it to be installed too."
+                    package.get_pretty_string()
                 )
             }
             r if r == RULE_PACKAGE_INVERSE_ALIAS => {
@@ -652,11 +624,10 @@ impl Rule {
                 let package =
                     self.deduplicate_default_branch_alias(pool.literal_to_package(literals[0]));
 
-                bconcat!(
+                bformat!(
+                    "{} is an alias of {} and must be installed with it.",
                     alias_package.get_pretty_string(),
-                    " is an alias of ",
-                    package.get_pretty_string(),
-                    " and must be installed with it."
+                    package.get_pretty_string()
                 )
             }
             _ => {
@@ -668,7 +639,7 @@ impl Rule {
                     rule_text.push_str(pool.literal_to_pretty_string(*literal, installed_map));
                 }
 
-                bconcat!("(", rule_text, ")")
+                bformat!("({rule_text})")
             }
         })
     }

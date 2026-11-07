@@ -2,7 +2,7 @@
 
 use crate::exception::InvalidArgumentException;
 use bstr::BStr;
-use shirabe_php_shim::{PhpMixed, ToPhpString, bconcat, is_scalar, is_string};
+use shirabe_php_shim::{PhpMixed, ToPhpString, bformat, is_scalar, is_string};
 
 /// ProcessUtils is a bunch of utility methods.
 #[derive(Debug)]
@@ -20,10 +20,8 @@ impl ProcessUtils {
             }
             // TODO(plugin): Process / \Iterator / \Traversable inputs are not modeled by PhpMixed.
 
-            return Err(InvalidArgumentException::new(bconcat!(
-                "\"",
-                caller,
-                "\" only accepts strings, Traversable objects or stream resources."
+            return Err(InvalidArgumentException::new(bformat!(
+                "\"{caller}\" only accepts strings, Traversable objects or stream resources."
             ))
             .into());
         }

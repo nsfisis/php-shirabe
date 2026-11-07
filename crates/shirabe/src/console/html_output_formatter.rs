@@ -3,7 +3,7 @@
 use bstr::{BStr, BString, ByteSlice, ByteVec};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpMixed, PregMatches, bconcat, explode, intval, php_str, preg_replace_callback,
+    PhpMixed, PregMatches, bformat, bwrite, explode, intval, php_str, preg_replace_callback,
 };
 use shirabe_symfony_console::formatter::{
     OutputFormatter, OutputFormatterInterface, OutputFormatterStyleInterface,
@@ -63,12 +63,8 @@ impl HtmlOutputFormatter {
         // Regex pattern compatibility:
         // The PHP pattern writes the ESC byte as the octal escape `\033`; the `regex` crate reads
         // `\0` as a backreference, so spell ESC as `\x1b` instead.
-        let pattern = bconcat!(
-            "{\\x1b\\[([0-9;]+)m(.*?)\\x1b\\[(?:",
-            clear_escape_codes,
-            ";)*?",
-            clear_escape_codes,
-            "m}s"
+        let pattern = bformat!(
+            "{{\\x1b\\[([0-9;]+)m(.*?)\\x1b\\[(?:{clear_escape_codes};)*?{clear_escape_codes}m}}s"
         );
 
         Ok(Some(
@@ -92,12 +88,12 @@ impl HtmlOutputFormatter {
                 .iter()
                 .find(|&&(k, _)| k == code)
             {
-                out.push_str(&bconcat!("color:", color, ";"));
+                bwrite!(out, "color:{color};");
             } else if let Some(&(_, color)) = Self::AVAILABLE_BACKGROUND_COLORS
                 .iter()
                 .find(|&&(k, _)| k == code)
             {
-                out.push_str(&bconcat!("background-color:", color, ";"));
+                bwrite!(out, "background-color:{color};");
             } else if let Some(&(_, option)) =
                 Self::AVAILABLE_OPTIONS.iter().find(|&&(k, _)| k == code)
             {
@@ -109,6 +105,6 @@ impl HtmlOutputFormatter {
             }
         }
 
-        bconcat!(out, "\">", content, "</span>")
+        bformat!("{out}\">{content}</span>")
     }
 }

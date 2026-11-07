@@ -2,7 +2,7 @@
 
 use bstr::{BStr, BString, ByteSlice, ByteVec};
 use indexmap::IndexMap;
-use shirabe_php_shim::{PregMatches, bconcat, preg_match};
+use shirabe_php_shim::{PregMatches, bformat, preg_match};
 use std::sync::Mutex;
 
 #[derive(Debug, Clone)]
@@ -43,17 +43,13 @@ impl PhpFileCleaner {
                     // The possessive quantifiers (`++`, `*+`) are performance-only and become plain
                     // `+`/`*`. The `A` (anchored) modifier becomes a leading `^` over the sub-slice
                     // that begins at the search offset.
-                    pattern: bconcat!(
-                        "{^[^a-zA-Z0-9_$:>]",
-                        r#type,
-                        "\\s+[a-zA-Z_\\x7f-\\xff:][a-zA-Z0-9_\\x7f-\\xff:\\-]*}is"
-                    ),
+                    pattern: bformat!("{{^[^a-zA-Z0-9_$:>]{}\\s+[a-zA-Z_\\x7f-\\xff:][a-zA-Z0-9_\\x7f-\\xff:\\-]*}}is", r#type),
                 },
             );
         }
 
         let keys: BString = type_config.keys().map(|&key| key as char).collect();
-        let rest_pattern = bconcat!("{^[^?\"'</", keys, "]+}");
+        let rest_pattern = bformat!("{{^[^?\"'</{keys}]+}}");
 
         *REST_PATTERN.lock().unwrap() = Some(rest_pattern);
         *TYPE_CONFIG.lock().unwrap() = Some(type_config);

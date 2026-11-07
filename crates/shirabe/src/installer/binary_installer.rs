@@ -5,7 +5,7 @@ use crate::package::PackageInterfaceHandle;
 use crate::util::{Filesystem, Platform, ProcessExecutor};
 use bstr::{BStr, BString, ByteSlice};
 use shirabe_php_shim::{
-    basename, basename_with_suffix, bconcat, chmod, dirname, fclose, fgets, file_exists,
+    basename, basename_with_suffix, bformat, bwrite, chmod, dirname, fclose, fgets, file_exists,
     file_get_contents_with_max_length, file_put_contents, fopen, is_dir, is_file, is_link,
     path_from_bytes, path_to_bytes, php_regex, preg_match, realpath, rmdir, substr, trim,
     trim_chars, umask,
@@ -83,25 +83,13 @@ impl BinaryInstaller {
         Platform::workaround_filesystem_issues();
 
         for bin in &binaries {
-            let mut bin_path = PathBuf::from(path_from_bytes(&bconcat!(install_path, "/", bin)));
+            let mut bin_path = PathBuf::from(path_from_bytes(&bformat!("{install_path}/{bin}")));
             if !file_exists(&bin_path) {
-                self.io.write_error(bconcat!(
-                    "    <warning>Skipped installation of bin ",
-                    bin,
-                    " for package ",
-                    package.get_name(),
-                    ": file not found in package</warning>"
-                ));
+                self.io.write_error(bformat!("    <warning>Skipped installation of bin {bin} for package {}: file not found in package</warning>", package.get_name()));
                 continue;
             }
             if is_dir(&bin_path) {
-                self.io.write_error(bconcat!(
-                    "    <warning>Skipped installation of bin ",
-                    bin,
-                    " for package ",
-                    package.get_name(),
-                    ": found a directory at that path</warning>"
-                ));
+                self.io.write_error(bformat!("    <warning>Skipped installation of bin {bin} for package {}: found a directory at that path</warning>", package.get_name()));
                 continue;
             }
             if !self.filesystem.borrow_mut().is_absolute_path(&bin_path) {
@@ -112,17 +100,15 @@ impl BinaryInstaller {
                 bin_path = realpath(&bin_path).unwrap_or_default();
             }
             self.initialize_bin_dir();
-            let link = PathBuf::from(path_from_bytes(&bconcat!(self.bin_dir, "/", basename(bin))));
+            let link = PathBuf::from(path_from_bytes(&bformat!(
+                "{}/{}",
+                self.bin_dir,
+                basename(bin)
+            )));
             if file_exists(&link) {
                 if !is_link(&link) {
                     if warn_on_overwrite {
-                        self.io.write_error(bconcat!(
-                            "    Skipped installation of bin ",
-                            bin,
-                            " for package ",
-                            package.get_name(),
-                            ": name conflicts with an existing file"
-                        ));
+                        self.io.write_error(bformat!("    Skipped installation of bin {bin} for package {}: name conflicts with an existing file", package.get_name()));
                     }
                     continue;
                 }
@@ -158,12 +144,16 @@ impl BinaryInstaller {
             return;
         }
         for bin in &binaries {
-            let link = PathBuf::from(path_from_bytes(&bconcat!(self.bin_dir, "/", basename(bin))));
+            let link = PathBuf::from(path_from_bytes(&bformat!(
+                "{}/{}",
+                self.bin_dir,
+                basename(bin)
+            )));
             if is_link(&link) || file_exists(&link) {
                 // still checking for symlinks here for legacy support
                 self.filesystem.borrow_mut().unlink(&link);
             }
-            let bat = PathBuf::from(path_from_bytes(&bconcat!(link, ".bat")));
+            let bat = PathBuf::from(path_from_bytes(&bformat!("{link}.bat")));
             if is_file(&bat) {
                 self.filesystem.borrow_mut().unlink(&bat);
             }
@@ -214,15 +204,9 @@ impl BinaryInstaller {
         // add unixy support for cygwin and similar environments
         if ".bat" != substr(path_to_bytes(bin_path), -4, None) {
             self.install_unixy_proxy_binaries(bin_path, &link)?;
-            link = PathBuf::from(path_from_bytes(&bconcat!(link, ".bat")));
+            link = PathBuf::from(path_from_bytes(&bformat!("{link}.bat")));
             if file_exists(&link) {
-                self.io.write_error(bconcat!(
-                    "    Skipped installation of bin ",
-                    bin,
-                    ".bat proxy for package ",
-                    package.get_name(),
-                    ": a .bat proxy was already installed"
-                ));
+                self.io.write_error(bformat!("    Skipped installation of bin {bin}.bat proxy for package {}: a .bat proxy was already installed", package.get_name()));
             }
         }
         if !file_exists(&link) {
@@ -260,30 +244,18 @@ impl BinaryInstaller {
         // to ensure that _composer_autoload_path gets defined, instead
         // of running the binary directly
         if caller == "php" {
-            return Ok(bconcat!(
-                "@ECHO OFF\r\n",
-                "setlocal DISABLEDELAYEDEXPANSION\r\n",
-                "SET BIN_TARGET=%~dp0/",
+            return Ok(bformat!(
+                "@ECHO OFF\r\nsetlocal DISABLEDELAYEDEXPANSION\r\nSET BIN_TARGET=%~dp0/{}\r\nSET COMPOSER_RUNTIME_BIN_DIR=%~dp0\r\n{caller} \"%BIN_TARGET%\" %*\r\n",
                 trim_chars(
                     ProcessExecutor::escape(basename_with_suffix(path_to_bytes(link), ".bat")),
                     "\"'"
-                ),
-                "\r\n",
-                "SET COMPOSER_RUNTIME_BIN_DIR=%~dp0\r\n",
-                caller,
-                " \"%BIN_TARGET%\" %*\r\n",
+                )
             ));
         }
 
-        Ok(bconcat!(
-            "@ECHO OFF\r\n",
-            "setlocal DISABLEDELAYEDEXPANSION\r\n",
-            "SET BIN_TARGET=%~dp0/",
-            trim_chars(ProcessExecutor::escape(path_to_bytes(&bin_path)), "\"'"),
-            "\r\n",
-            "SET COMPOSER_RUNTIME_BIN_DIR=%~dp0\r\n",
-            caller,
-            " \"%BIN_TARGET%\" %*\r\n",
+        Ok(bformat!(
+            "@ECHO OFF\r\nsetlocal DISABLEDELAYEDEXPANSION\r\nSET BIN_TARGET=%~dp0/{}\r\nSET COMPOSER_RUNTIME_BIN_DIR=%~dp0\r\n{caller} \"%BIN_TARGET%\" %*\r\n",
+            trim_chars(ProcessExecutor::escape(path_to_bytes(&bin_path)), "\"'")
         ))
     }
 
@@ -321,17 +293,17 @@ impl BinaryInstaller {
             if let Some(vendor_dir) = &self.vendor_dir {
                 // ensure comparisons work accurately if the CWD is a symlink, as $link is realpath'd already
                 let vendor_dir_real = realpath(vendor_dir).unwrap_or_else(|| vendor_dir.clone());
-                globals_code.extend_from_slice(&bconcat!(
-                    "$GLOBALS['_composer_autoload_path'] = ",
+                bwrite!(
+                    globals_code,
+                    "$GLOBALS['_composer_autoload_path'] = {};\n",
                     self.filesystem.borrow_mut().find_shortest_path_code(
                         link,
-                        path_from_bytes(&bconcat!(vendor_dir_real, "/autoload.php")),
+                        path_from_bytes(&bformat!("{vendor_dir_real}/autoload.php")),
                         false,
                         true,
                         false,
-                    )?,
-                    ";\n",
-                ));
+                    )?
+                );
             }
             // Add workaround for PHPUnit process isolation
             if let Some(vendor_dir) = &self.vendor_dir
@@ -339,18 +311,16 @@ impl BinaryInstaller {
                     == self
                         .filesystem
                         .borrow()
-                        .normalize_path(path_from_bytes(&bconcat!(
-                            vendor_dir,
-                            "/phpunit/phpunit/phpunit"
+                        .normalize_path(path_from_bytes(&bformat!(
+                            "{vendor_dir}/phpunit/phpunit/phpunit"
                         )))
                         .as_os_str()
             {
                 // workaround issue on PHPUnit 6.5+ running on PHP 8+
-                globals_code.extend_from_slice(&bconcat!(
-                    "$GLOBALS['__PHPUNIT_ISOLATION_EXCLUDE_LIST'] = $GLOBALS['__PHPUNIT_ISOLATION_BLACKLIST'] = array(realpath(",
-                    bin_path_exported,
-                    "));\n",
-                ));
+                bwrite!(
+                    globals_code,
+                    "$GLOBALS['__PHPUNIT_ISOLATION_EXCLUDE_LIST'] = $GLOBALS['__PHPUNIT_ISOLATION_BLACKLIST'] = array(realpath({bin_path_exported}));\n"
+                );
                 // workaround issue on all PHPUnit versions running on PHP <8
                 phpunit_hack1 = BString::from("'phpvfscomposer://'.");
                 phpunit_hack2 = BString::from(
@@ -363,191 +333,18 @@ impl BinaryInstaller {
                 stream_hint = BString::from(
                     " using a stream wrapper to prevent the shebang from being output on PHP<8\n *",
                 );
-                stream_proxy_code = bconcat!(
-                    r#"if (PHP_VERSION_ID < 80000) {
-    if (!class_exists('Composer\BinProxyWrapper')) {
-        /**
-         * @internal
-         */
-        final class BinProxyWrapper
-        {
-            private $handle;
-            private $position;
-            private $realpath;
-
-            public function stream_open($path, $mode, $options, &$opened_path)
-            {
-                // get rid of phpvfscomposer:// prefix for __FILE__ & __DIR__ resolution
-                $opened_path = substr($path, 17);
-                $this->realpath = realpath($opened_path) ?: $opened_path;
-                $opened_path = "#,
-                    phpunit_hack1,
-                    r#"$this->realpath;
-                $this->handle = fopen($this->realpath, $mode);
-                $this->position = 0;
-
-                return (bool) $this->handle;
-            }
-
-            public function stream_read($count)
-            {
-                $data = fread($this->handle, $count);
-
-                if ($this->position === 0) {
-                    $data = preg_replace('{^#!.*\r?\n}', '', $data);
-                }"#,
-                    phpunit_hack2,
-                    r#"
-
-                $this->position += strlen($data);
-
-                return $data;
-            }
-
-            public function stream_cast($castAs)
-            {
-                return $this->handle;
-            }
-
-            public function stream_close()
-            {
-                fclose($this->handle);
-            }
-
-            public function stream_lock($operation)
-            {
-                return $operation ? flock($this->handle, $operation) : true;
-            }
-
-            public function stream_seek($offset, $whence)
-            {
-                if (0 === fseek($this->handle, $offset, $whence)) {
-                    $this->position = ftell($this->handle);
-                    return true;
-                }
-
-                return false;
-            }
-
-            public function stream_tell()
-            {
-                return $this->position;
-            }
-
-            public function stream_eof()
-            {
-                return feof($this->handle);
-            }
-
-            public function stream_stat()
-            {
-                return array();
-            }
-
-            public function stream_set_option($option, $arg1, $arg2)
-            {
-                return true;
-            }
-
-            public function url_stat($path, $flags)
-            {
-                $path = substr($path, 17);
-                if (file_exists($path)) {
-                    return stat($path);
-                }
-
-                return false;
-            }
-        }
-    }
-
-    if (
-        (function_exists('stream_get_wrappers') && in_array('phpvfscomposer', stream_get_wrappers(), true))
-        || (function_exists('stream_wrapper_register') && stream_wrapper_register('phpvfscomposer', 'Composer\BinProxyWrapper'))
-    ) {
-        return include("phpvfscomposer://" . "#,
-                    bin_path_exported,
-                    r#");
-    }
-}
-"#,
+                stream_proxy_code = bformat!(
+                    "if (PHP_VERSION_ID < 80000) {{\n    if (!class_exists('Composer\\BinProxyWrapper')) {{\n        /**\n         * @internal\n         */\n        final class BinProxyWrapper\n        {{\n            private $handle;\n            private $position;\n            private $realpath;\n\n            public function stream_open($path, $mode, $options, &$opened_path)\n            {{\n                // get rid of phpvfscomposer:// prefix for __FILE__ & __DIR__ resolution\n                $opened_path = substr($path, 17);\n                $this->realpath = realpath($opened_path) ?: $opened_path;\n                $opened_path = {phpunit_hack1}$this->realpath;\n                $this->handle = fopen($this->realpath, $mode);\n                $this->position = 0;\n\n                return (bool) $this->handle;\n            }}\n\n            public function stream_read($count)\n            {{\n                $data = fread($this->handle, $count);\n\n                if ($this->position === 0) {{\n                    $data = preg_replace('{{^#!.*\\r?\\n}}', '', $data);\n                }}{phpunit_hack2}\n\n                $this->position += strlen($data);\n\n                return $data;\n            }}\n\n            public function stream_cast($castAs)\n            {{\n                return $this->handle;\n            }}\n\n            public function stream_close()\n            {{\n                fclose($this->handle);\n            }}\n\n            public function stream_lock($operation)\n            {{\n                return $operation ? flock($this->handle, $operation) : true;\n            }}\n\n            public function stream_seek($offset, $whence)\n            {{\n                if (0 === fseek($this->handle, $offset, $whence)) {{\n                    $this->position = ftell($this->handle);\n                    return true;\n                }}\n\n                return false;\n            }}\n\n            public function stream_tell()\n            {{\n                return $this->position;\n            }}\n\n            public function stream_eof()\n            {{\n                return feof($this->handle);\n            }}\n\n            public function stream_stat()\n            {{\n                return array();\n            }}\n\n            public function stream_set_option($option, $arg1, $arg2)\n            {{\n                return true;\n            }}\n\n            public function url_stat($path, $flags)\n            {{\n                $path = substr($path, 17);\n                if (file_exists($path)) {{\n                    return stat($path);\n                }}\n\n                return false;\n            }}\n        }}\n    }}\n\n    if (\n        (function_exists('stream_get_wrappers') && in_array('phpvfscomposer', stream_get_wrappers(), true))\n        || (function_exists('stream_wrapper_register') && stream_wrapper_register('phpvfscomposer', 'Composer\\BinProxyWrapper'))\n    ) {{\n        return include(\"phpvfscomposer://\" . {bin_path_exported});\n    }}\n}}\n"
                 );
             }
 
-            return Ok(bconcat!(
-                proxy_code,
-                r#"
-<?php
-
-/**
- * Proxy PHP file generated by Composer
- *
- * This file includes the referenced bin path ("#,
-                bin_path,
-                r#")
- *"#,
-                stream_hint,
-                r#"
- * @generated
- */
-
-namespace Composer;
-
-"#,
-                globals_code,
-                "\n",
-                stream_proxy_code,
-                "\nreturn include ",
-                bin_path_exported,
-                ";\n",
+            return Ok(bformat!(
+                "{proxy_code}\n<?php\n\n/**\n * Proxy PHP file generated by Composer\n *\n * This file includes the referenced bin path ({bin_path})\n *{stream_hint}\n * @generated\n */\n\nnamespace Composer;\n\n{globals_code}\n{stream_proxy_code}\nreturn include {bin_path_exported};\n"
             ));
         }
 
-        Ok(bconcat!(
-            r#"#!/usr/bin/env sh
-
-# Support bash to support `source` with fallback on $0 if this does not run with bash
-# https://stackoverflow.com/a/35006505/6512
-selfArg="$BASH_SOURCE"
-if [ -z "$selfArg" ]; then
-    selfArg="$0"
-fi
-
-self=$(realpath "$selfArg" 2> /dev/null)
-if [ -z "$self" ]; then
-    self="$selfArg"
-fi
-
-dir=$(cd "${self%[/\\]*}" > /dev/null; cd "#,
-            bin_dir,
-            r#" && pwd)
-
-if [ -d /proc/cygdrive ]; then
-    case $(which php) in
-        $(readlink -n /proc/cygdrive)/*)
-            # We are in Cygwin using Windows php, so the path must be translated
-            dir=$(cygpath -m "$dir");
-            ;;
-    esac
-fi
-
-export COMPOSER_RUNTIME_BIN_DIR="$(cd "${self%[/\\]*}" > /dev/null; pwd)"
-
-# If bash is sourcing this file, we have to source the target as well
-bashSource="$BASH_SOURCE"
-if [ -n "$bashSource" ]; then
-    if [ "$bashSource" != "$0" ]; then
-        source "${dir}/"#,
-            bin_file,
-            r#"" "$@"
-        return
-    fi
-fi
-
-exec "${dir}/"#,
-            bin_file,
-            r#"" "$@"
-"#,
+        Ok(bformat!(
+            "#!/usr/bin/env sh\n\n# Support bash to support `source` with fallback on $0 if this does not run with bash\n# https://stackoverflow.com/a/35006505/6512\nselfArg=\"$BASH_SOURCE\"\nif [ -z \"$selfArg\" ]; then\n    selfArg=\"$0\"\nfi\n\nself=$(realpath \"$selfArg\" 2> /dev/null)\nif [ -z \"$self\" ]; then\n    self=\"$selfArg\"\nfi\n\ndir=$(cd \"${{self%[/\\\\]*}}\" > /dev/null; cd {bin_dir} && pwd)\n\nif [ -d /proc/cygdrive ]; then\n    case $(which php) in\n        $(readlink -n /proc/cygdrive)/*)\n            # We are in Cygwin using Windows php, so the path must be translated\n            dir=$(cygpath -m \"$dir\");\n            ;;\n    esac\nfi\n\nexport COMPOSER_RUNTIME_BIN_DIR=\"$(cd \"${{self%[/\\\\]*}}\" > /dev/null; pwd)\"\n\n# If bash is sourcing this file, we have to source the target as well\nbashSource=\"$BASH_SOURCE\"\nif [ -n \"$bashSource\" ]; then\n    if [ \"$bashSource\" != \"$0\" ]; then\n        source \"${{dir}}/{bin_file}\" \"$@\"\n        return\n    fi\nfi\n\nexec \"${{dir}}/{bin_file}\" \"$@\"\n"
         ))
     }
 }

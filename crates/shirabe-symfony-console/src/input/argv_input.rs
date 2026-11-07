@@ -7,7 +7,7 @@ use crate::input::{
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpDisplay, PhpResource, ToPhpString, bconcat, implode, mb_detect_encoding, mb_substr,
+    PhpDisplay, PhpResource, ToPhpString, bformat, implode, mb_detect_encoding, mb_substr,
     path_to_bytes, php_regex, preg_match, strlen, strpos, substr,
 };
 
@@ -173,10 +173,8 @@ impl ArgvInput {
                     None => name_i,
                     Some(encoding) => mb_substr(name, i, Some(1), Some(encoding.as_bstr())),
                 };
-                return Err(RuntimeException::new(bconcat!(
-                    "The \"-",
-                    bad,
-                    "\" option does not exist."
+                return Err(RuntimeException::new(bformat!(
+                    "The \"-{bad}\" option does not exist."
                 ))
                 .into());
             }
@@ -283,18 +281,15 @@ impl ArgvInput {
                 let names: Vec<BString> = all.keys().cloned().collect();
                 match &symfony_command_name {
                     Some(symfony_command_name) if !symfony_command_name.is_null() => {
-                        bconcat!(
-                            "Too many arguments to \"",
+                        bformat!(
+                            "Too many arguments to \"{}\" command, expected arguments \"{}\".",
                             symfony_command_name.to_php_string(),
-                            "\" command, expected arguments \"",
-                            implode("\" \"", &names),
-                            "\"."
+                            implode("\" \"", &names)
                         )
                     }
-                    _ => bconcat!(
-                        "Too many arguments, expected arguments \"",
-                        implode("\" \"", &names),
-                        "\"."
+                    _ => bformat!(
+                        "Too many arguments, expected arguments \"{}\".",
+                        implode("\" \"", &names)
                     ),
                 }
             } else if symfony_command_name
@@ -302,15 +297,12 @@ impl ArgvInput {
                 .map(|n| !n.is_null())
                 .unwrap_or(false)
             {
-                bconcat!(
-                    "No arguments expected for \"",
-                    symfony_command_name.unwrap().to_php_string(),
-                    "\" command, got \"",
-                    token,
-                    "\"."
+                bformat!(
+                    "No arguments expected for \"{}\" command, got \"{token}\".",
+                    symfony_command_name.unwrap().to_php_string()
                 )
             } else {
-                bconcat!("No arguments expected, got \"", token, "\".")
+                bformat!("No arguments expected, got \"{token}\".")
             };
 
             return Err(RuntimeException::new(message).into());
@@ -322,10 +314,8 @@ impl ArgvInput {
     /// Adds a short option value.
     fn add_short_option(&mut self, shortcut: &BStr, value: InputValue) -> anyhow::Result<()> {
         if !self.inner.definition.has_shortcut(shortcut) {
-            return Err(RuntimeException::new(bconcat!(
-                "The \"-",
-                shortcut,
-                "\" option does not exist."
+            return Err(RuntimeException::new(bformat!(
+                "The \"-{shortcut}\" option does not exist."
             ))
             .into());
         }
@@ -343,20 +333,16 @@ impl ArgvInput {
     fn add_long_option(&mut self, name: &BStr, mut value: InputValue) -> anyhow::Result<()> {
         if !self.inner.definition.has_option(name) {
             if !self.inner.definition.has_negation(name) {
-                return Err(RuntimeException::new(bconcat!(
-                    "The \"--",
-                    name,
-                    "\" option does not exist."
+                return Err(RuntimeException::new(bformat!(
+                    "The \"--{name}\" option does not exist."
                 ))
                 .into());
             }
 
             let option_name = self.inner.definition.negation_to_name(name)?;
             if !value.is_null() {
-                return Err(RuntimeException::new(bconcat!(
-                    "The \"--",
-                    name,
-                    "\" option does not accept a value."
+                return Err(RuntimeException::new(bformat!(
+                    "The \"--{name}\" option does not accept a value."
                 ))
                 .into());
             }
@@ -370,10 +356,8 @@ impl ArgvInput {
         let option = self.inner.definition.get_option(name)?;
 
         if !value.is_null() && !option.accept_value() {
-            return Err(RuntimeException::new(bconcat!(
-                "The \"--",
-                name,
-                "\" option does not accept a value."
+            return Err(RuntimeException::new(bformat!(
+                "The \"--{name}\" option does not accept a value."
             ))
             .into());
         }
@@ -396,10 +380,8 @@ impl ArgvInput {
 
         if value.is_null() {
             if option.is_value_required() {
-                return Err(RuntimeException::new(bconcat!(
-                    "The \"--",
-                    name,
-                    "\" option requires a value."
+                return Err(RuntimeException::new(bformat!(
+                    "The \"--{name}\" option requires a value."
                 ))
                 .into());
             }
@@ -489,7 +471,7 @@ impl ArgvInput {
                 //   For short options, test for '-o' at beginning
                 let value = value.as_ref();
                 let leading = if value.starts_with(b"--") {
-                    bconcat!(value, "=")
+                    bformat!("{value}=")
                 } else {
                     BString::from(value)
                 };
@@ -530,7 +512,7 @@ impl ArgvInput {
                 //   For long options, test for '--option=' at beginning
                 //   For short options, test for '-o' at beginning
                 let leading = if value.starts_with(b"--") {
-                    bconcat!(value, "=")
+                    bformat!("{value}=")
                 } else {
                     BString::from(value)
                 };
@@ -551,7 +533,8 @@ impl PhpDisplay for ArgvInput {
             .iter()
             .map(|token| {
                 if let Some(r#match) = preg_match(php_regex!("{^(-[^=]+=)(.+)}"), token) {
-                    return bconcat!(
+                    return bformat!(
+                        "{}{}",
                         r#match.get(1).unwrap_or_default(),
                         self.inner
                             .escape_token(r#match.get(2).unwrap_or_default().as_bstr())

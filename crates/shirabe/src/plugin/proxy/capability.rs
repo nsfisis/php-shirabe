@@ -6,7 +6,7 @@ use crate::plugin::php_call::PhpCall;
 use crate::plugin::proxy::{PhpCommandProxy, php_is_a};
 use bstr::BStr;
 use shirabe_php_rpc::{PhpObjHandle, PluginValue};
-use shirabe_php_shim::{UnexpectedValueException, bconcat};
+use shirabe_php_shim::{UnexpectedValueException, bformat};
 
 /// `Capability` adapter for a capability entity living in the PHP child process, for
 /// capability interfaces that add no methods of their own (the plain
@@ -76,10 +76,9 @@ impl CommandProvider for PhpCommandProviderProxy {
             PluginValue::List(items) => items,
             PluginValue::Array(map) => map.into_values().collect(),
             _ => {
-                return Err(UnexpectedValueException::new(bconcat!(
-                    "Plugin capability ",
-                    self.handle.class(),
-                    " failed to return an array from getCommands"
+                return Err(UnexpectedValueException::new(bformat!(
+                    "Plugin capability {} failed to return an array from getCommands",
+                    self.handle.class()
                 ))
                 .into());
             }
@@ -102,10 +101,6 @@ impl CommandProvider for PhpCommandProviderProxy {
 }
 
 fn invalid_command_error(capability: &PhpObjHandle) -> anyhow::Error {
-    UnexpectedValueException::new(bconcat!(
-        "Plugin capability ",
-        capability.class(),
-        " returned an invalid value, we expected an array of Composer\\Command\\BaseCommand objects"
-    ))
+    UnexpectedValueException::new(bformat!("Plugin capability {} returned an invalid value, we expected an array of Composer\\Command\\BaseCommand objects", capability.class()))
     .into()
 }

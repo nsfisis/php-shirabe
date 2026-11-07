@@ -5,7 +5,7 @@ use crate::command::Command;
 use crate::exception::CommandNotFoundException;
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe_php_shim::{bconcat, json_bytes, php_str};
+use shirabe_php_shim::{bformat, json_bytes, php_str};
 
 /// A namespace entry, `['id' => string, 'commands' => string[]]` in PHP.
 #[derive(Debug, Clone, serde::Serialize)]
@@ -78,7 +78,7 @@ impl ApplicationDescription {
             .unwrap_or(false);
         if !in_commands && !in_aliases {
             return Err(CommandNotFoundException::new(
-                bconcat!("Command \"", name, "\" does not exist."),
+                bformat!("Command \"{name}\" does not exist."),
                 vec![],
                 0,
             )

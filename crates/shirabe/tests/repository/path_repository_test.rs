@@ -10,7 +10,7 @@ use shirabe::repository::PathRepository;
 use shirabe::util::r#loop::Loop;
 use shirabe::util::{HttpDownloader, Platform, ProcessExecutor};
 use shirabe_php_shim::{
-    PhpMixed, bconcat, file_get_contents, hash, path_from_bytes, path_to_bytes, realpath,
+    PhpMixed, bformat, file_get_contents, hash, path_from_bytes, path_to_bytes, realpath,
     serialize, str_replace,
 };
 use std::path::Path;
@@ -47,7 +47,7 @@ fn create_path_repo(options: IndexMap<BString, PhpMixed>) -> PathRepository {
 fn coordinates(pairs: Vec<(&BStr, PhpMixed)>) -> IndexMap<BString, PhpMixed> {
     let mut map: IndexMap<BString, PhpMixed> = IndexMap::new();
     for (key, value) in pairs {
-        map.insert(bconcat!(key), value);
+        map.insert(bformat!("{key}"), value);
     }
     map
 }

@@ -5,7 +5,7 @@ use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, FilesystemIterator, Phar, PharData, RuntimeException, UnexpectedValueException,
-    bconcat, bzcompress, file_exists, file_put_contents, gzcompress, path_from_bytes,
+    bformat, bzcompress, file_exists, file_put_contents, gzcompress, path_from_bytes,
     path_to_bytes, realpath, str_repeat, strrpos, unlink,
 };
 use std::path::{Path, PathBuf};
@@ -65,7 +65,7 @@ impl ArchiverInterface for PharArchiver {
             let filename = BString::from(&target_bytes[..pos.saturating_sub(1)]);
 
             let target = if compress_formats.contains_key(format.as_bytes()) {
-                path_from_bytes(&bconcat!(&filename, ".tar")).to_path_buf()
+                path_from_bytes(&bformat!("{filename}.tar")).to_path_buf()
             } else {
                 target.to_path_buf()
             };
@@ -82,7 +82,7 @@ impl ArchiverInterface for PharArchiver {
             files_only.add_empty_dir(&phar, &sources)?;
 
             if !file_exists(&target) {
-                let target = path_from_bytes(&bconcat!(&filename, ".", format)).to_path_buf();
+                let target = path_from_bytes(&bformat!("{filename}.{format}")).to_path_buf();
                 drop(phar);
 
                 if format == "tar" {
@@ -103,10 +103,8 @@ impl ArchiverInterface for PharArchiver {
                 } else if format == "tar.gz" || format == "tar.bz2" {
                     let compress_algo = *compress_formats.get(format.as_bytes()).unwrap();
                     if !PharData::can_compress(compress_algo) {
-                        return Err(RuntimeException::new(bconcat!(
-                            "Can not compress to ",
-                            format,
-                            " format"
+                        return Err(RuntimeException::new(bformat!(
+                            "Can not compress to {format} format"
                         ))
                         .into());
                     }
@@ -125,10 +123,8 @@ impl ArchiverInterface for PharArchiver {
             if compress_formats.contains_key(format.as_bytes()) {
                 let compress_algo = *compress_formats.get(format.as_bytes()).unwrap();
                 if !PharData::can_compress(compress_algo) {
-                    return Err(RuntimeException::new(bconcat!(
-                        "Can not compress to ",
-                        format,
-                        " format"
+                    return Err(RuntimeException::new(bformat!(
+                        "Can not compress to {format} format"
                     ))
                     .into());
                 }
@@ -137,7 +133,7 @@ impl ArchiverInterface for PharArchiver {
 
                 phar.compress(compress_algo)?;
 
-                let target = path_from_bytes(&bconcat!(&filename, ".", format)).to_path_buf();
+                let target = path_from_bytes(&bformat!("{filename}.{format}")).to_path_buf();
                 return Ok(target);
             }
 
@@ -148,12 +144,8 @@ impl ArchiverInterface for PharArchiver {
             let Some(caught) = e.catch::<UnexpectedValueException>() else {
                 return e;
             };
-            let message = bconcat!(
-                "Could not create archive '",
-                target_outer,
-                "' from '",
-                sources,
-                "': ",
+            let message = bformat!(
+                "Could not create archive '{target_outer}' from '{sources}': {}",
                 caught.get_message()
             );
             let code = caught.get_code();

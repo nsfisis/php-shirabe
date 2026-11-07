@@ -28,7 +28,7 @@ use bstr::{BStr, BString, ByteSlice, ByteVec};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     CmpOp, DATE_ATOM, InvalidArgumentException, LogicException, PhpMixed, STR_PAD_RIGHT,
-    ToPhpString, UnexpectedValueException, array_search, bconcat, date_format_to_strftime,
+    ToPhpString, UnexpectedValueException, array_search, bformat, bwrite, date_format_to_strftime,
     date_local, display_to_bytes, extension_loaded, get_class, impl_php_class, implode,
     in_array_loose, in_array_strict, intval, json_bytes, ltrim_chars, path_to_bytes, php_regex,
     preg_is_match, preg_match, preg_quote, preg_replace, realpath, rtrim, str_pad, str_repeat,
@@ -129,19 +129,15 @@ impl ShowCommand {
                 } else {
                     0
                 };
-                io.write_no_newline(bconcat!(
-                    indent,
-                    "<href=",
+                io.write_no_newline(bformat!(
+                    "{indent}<href={}>{name}</>{}",
                     OutputFormatter::escape(&link).expect("OutputFormatter::escape failed"),
-                    ">",
-                    name,
-                    "</>",
                     str_repeat(" ", pad)
                 ));
             } else {
                 let width_pad = if pad_name { name_length } else { 0 };
-                io.write_no_newline(bconcat!(
-                    indent,
+                io.write_no_newline(bformat!(
+                    "{indent}{}",
                     str_pad(name, width_pad, " ", STR_PAD_RIGHT)
                 ));
             }
@@ -149,8 +145,8 @@ impl ShowCommand {
                 && write_version
             {
                 let width_pad = if pad_version { version_length } else { 0 };
-                io.write_no_newline(bconcat!(
-                    " ",
+                io.write_no_newline(bformat!(
+                    " {}",
                     str_pad(version, width_pad, " ", STR_PAD_RIGHT)
                 ));
             }
@@ -165,17 +161,12 @@ impl ShowCommand {
                         .replace("up-to-date", "=")
                         .replace("semver-safe-update", "!")
                         .replace("update-possible", "~");
-                    latest_version = bconcat!(marker, " ", latest_version);
+                    latest_version = bformat!("{marker} {latest_version}");
                 }
                 let width_pad = if pad_latest { latest_length } else { 0 };
-                io.write_no_newline(bconcat!(
-                    " <",
-                    style,
-                    ">",
-                    str_pad(&latest_version, width_pad, " ", STR_PAD_RIGHT),
-                    "</",
-                    style,
-                    ">"
+                io.write_no_newline(bformat!(
+                    " <{style}>{}</{style}>",
+                    str_pad(&latest_version, width_pad, " ", STR_PAD_RIGHT)
                 ));
                 if write_release_date && let Some(age) = &package.release_age {
                     let width_pad = if pad_release_date {
@@ -183,7 +174,10 @@ impl ShowCommand {
                     } else {
                         0
                     };
-                    io.write_no_newline(bconcat!(" ", str_pad(age, width_pad, " ", STR_PAD_RIGHT)));
+                    io.write_no_newline(bformat!(
+                        " {}",
+                        str_pad(age, width_pad, " ", STR_PAD_RIGHT)
+                    ));
                 }
             }
             if let Some(Some(description)) = &package.description
@@ -216,29 +210,29 @@ impl ShowCommand {
                             .char_indices()
                             .nth((remaining as usize).saturating_sub(3))
                             .map_or(description.len(), |(start, _, _)| start);
-                        description = bconcat!(&description[..end], "...");
+                        description = bformat!("{}...", &description[..end]);
                     }
                 } else {
                     // Fallback when mbstring is not available: do a conservative byte-based cut.
                     // Ensure cut length is non-negative and leave room for the ellipsis.
                     let cut = (remaining - 3).max(0) as usize;
                     if description.len() > cut {
-                        description = bconcat!(&description[..cut], "...");
+                        description = bformat!("{}...", &description[..cut]);
                     }
                 }
 
-                io.write_no_newline(bconcat!(" ", description));
+                io.write_no_newline(bformat!(" {description}"));
             }
             if let Some(path) = &package.path {
                 let path_str = match path {
                     Some(s) => s.clone(),
                     None => BString::from("null"),
                 };
-                io.write_no_newline(bconcat!(" ", path_str));
+                io.write_no_newline(bformat!(" {path_str}"));
             }
             io.write("");
             if let Some(warning) = &package.warning {
-                io.write(bconcat!("<warning>", warning, "</warning>"));
+                io.write(bformat!("<warning>{warning}</warning>"));
             }
         }
     }
@@ -340,8 +334,8 @@ impl ShowCommand {
         if let Some(ref mp) = matched_package
             && mp.as_complete().is_none()
         {
-            return Err(LogicException::new(bconcat!(
-                "ShowCommand::getPackage can only work with CompletePackageInterface, but got ",
+            return Err(LogicException::new(bformat!(
+                "ShowCommand::getPackage can only work with CompletePackageInterface, but got {}",
                 get_class(&PhpMixed::Null)
             ))
             .into());
@@ -371,7 +365,7 @@ impl ShowCommand {
             self.get_io().write("\n<info>suggests</info>");
             for (suggested, reason) in package.get_suggests().iter() {
                 self.get_io()
-                    .write(bconcat!(suggested, " <comment>", reason, "</comment>"));
+                    .write(bformat!("{suggested} <comment>{reason}</comment>"));
             }
         }
 
@@ -392,27 +386,25 @@ impl ShowCommand {
         let is_installed_package = !PlatformRepository::is_platform_package(package.get_name())
             && installed_repo.has_package(package.clone().into())?;
 
-        self.get_io().write(bconcat!(
-            "<info>name</info>     : ",
+        self.get_io().write(bformat!(
+            "<info>name</info>     : {}",
             package.get_pretty_name()
         ));
-        self.get_io().write(bconcat!(
-            "<info>descrip.</info> : ",
+        self.get_io().write(bformat!(
+            "<info>descrip.</info> : {}",
             package.get_description().unwrap_or_default()
         ));
         let keywords = package.get_keywords();
-        self.get_io().write(bconcat!(
-            "<info>keywords</info> : ",
+        self.get_io().write(bformat!(
+            "<info>keywords</info> : {}",
             implode(", ", &keywords)
         ));
         self.print_versions(package.clone(), versions, installed_repo)?;
         if is_installed_package && let Some(rd) = package.get_release_date() {
             let rel = self.get_relative_time(&rd);
-            self.get_io().write(bconcat!(
-                "<info>released</info> : ",
-                display_to_bytes(rd.format(date_format_to_strftime(b"Y-m-d"))),
-                ", ",
-                rel
+            self.get_io().write(bformat!(
+                "<info>released</info> : {}, {rel}",
+                display_to_bytes(rd.format(date_format_to_strftime(b"Y-m-d")))
             ));
         }
         let latest: PackageInterfaceHandle = if let Some(latest) = latest_package {
@@ -421,49 +413,37 @@ impl ShowCommand {
                 None => BString::default(),
                 Some(rd) => {
                     let rel = self.get_relative_time(&rd);
-                    bconcat!(
-                        " released ",
-                        display_to_bytes(rd.format(date_format_to_strftime(b"Y-m-d"))),
-                        ", ",
-                        rel
+                    bformat!(
+                        " released {}, {rel}",
+                        display_to_bytes(rd.format(date_format_to_strftime(b"Y-m-d")))
                     )
                 }
             };
-            self.get_io().write(bconcat!(
-                "<info>latest</info>   : <",
-                style,
-                ">",
-                latest.get_pretty_version(),
-                "</",
-                style,
-                ">",
-                released_time
+            self.get_io().write(bformat!(
+                "<info>latest</info>   : <{style}>{}</{style}>{released_time}",
+                latest.get_pretty_version()
             ));
             latest
         } else {
             package.clone().into()
         };
         self.get_io()
-            .write(bconcat!("<info>type</info>     : ", package.get_type()));
+            .write(bformat!("<info>type</info>     : {}", package.get_type()));
         self.print_licenses(package.clone());
-        self.get_io().write(bconcat!(
-            "<info>homepage</info> : ",
+        self.get_io().write(bformat!(
+            "<info>homepage</info> : {}",
             package.get_homepage().unwrap_or_default()
         ));
-        self.get_io().write(bconcat!(
-            "<info>source</info>   : [",
+        self.get_io().write(bformat!(
+            "<info>source</info>   : [{}] <comment>{}</comment> {}",
             package.get_source_type().unwrap_or_default(),
-            "] <comment>",
             package.get_source_url().unwrap_or_default(),
-            "</comment> ",
             package.get_source_reference().unwrap_or_default()
         ));
-        self.get_io().write(bconcat!(
-            "<info>dist</info>     : [",
+        self.get_io().write(bformat!(
+            "<info>dist</info>     : [{}] <comment>{}</comment> {}",
             package.get_dist_type().unwrap_or_default(),
-            "] <comment>",
             package.get_dist_url().unwrap_or_default(),
-            "</comment> ",
             package.get_dist_reference().unwrap_or_default()
         ));
         if is_installed_package {
@@ -475,16 +455,16 @@ impl ShowCommand {
                     .get_install_path(package.clone().into())
             });
             if let Some(p) = path {
-                self.get_io().write(bconcat!(
-                    "<info>path</info>     : ",
+                self.get_io().write(bformat!(
+                    "<info>path</info>     : {}",
                     realpath(&p).unwrap_or_default()
                 ));
             } else {
                 self.get_io().write("<info>path</info>     : null");
             }
         }
-        self.get_io().write(bconcat!(
-            "<info>names</info>    : ",
+        self.get_io().write(bformat!(
+            "<info>names</info>    : {}",
             implode(", ", &package.get_names(true))
         ));
 
@@ -492,15 +472,11 @@ impl ShowCommand {
             && c.is_abandoned()
         {
             let replacement = match c.get_replacement_package() {
-                Some(rp) => bconcat!(" The author suggests using the ", rp, " package instead."),
+                Some(rp) => bformat!(" The author suggests using the {rp} package instead."),
                 None => BString::default(),
             };
 
-            self.get_io().write_error(bconcat!(
-                "<warning>Attention: This package is abandoned and no longer maintained.",
-                replacement,
-                "</warning>"
-            ));
+            self.get_io().write_error(bformat!("<warning>Attention: This package is abandoned and no longer maintained.{replacement}</warning>"));
         }
 
         let support = package.get_support();
@@ -508,7 +484,7 @@ impl ShowCommand {
             self.get_io().write("\n<info>support</info>");
             for (r#type, value) in support.iter() {
                 self.get_io()
-                    .write(bconcat!("<comment>", r#type, "</comment> : ", value));
+                    .write(bformat!("<comment>{}</comment> : {value}", r#type));
             }
         }
 
@@ -517,7 +493,7 @@ impl ShowCommand {
             self.get_io().write("\n<info>autoload</info>");
             for (r#type, autoloads) in autoload_config.iter() {
                 self.get_io()
-                    .write(bconcat!("<comment>", r#type, "</comment>"));
+                    .write(bformat!("<comment>{}</comment>", r#type));
 
                 if r#type == "psr-0" || r#type == "psr-4" {
                     if let PhpMixed::Array(map) = autoloads {
@@ -535,7 +511,7 @@ impl ShowCommand {
                             } else {
                                 name.as_bstr()
                             };
-                            self.get_io().write(bconcat!(name_disp, " => ", path_str));
+                            self.get_io().write(bformat!("{name_disp} => {path_str}"));
                         }
                     }
                 } else if r#type == "classmap"
@@ -578,13 +554,13 @@ impl ShowCommand {
                 if let Some(found) = array_search(&installed_version, &key_map)
                     && let Some(idx) = versions_keys.iter().position(|v| v == &found)
                 {
-                    versions_keys[idx] = bconcat!("<info>* ", installed_version, "</info>");
+                    versions_keys[idx] = bformat!("<info>* {installed_version}</info>");
                 }
             }
         }
 
-        self.get_io().write(bconcat!(
-            "<info>versions</info> : ",
+        self.get_io().write(bformat!(
+            "<info>versions</info> : {}",
             implode(", ", &versions_keys)
         ));
 
@@ -602,14 +578,13 @@ impl ShowCommand {
         let io = self.get_io();
         let links = package.get_links_for_type(link_type);
         if !links.is_empty() {
-            io.write(bconcat!("\n<info>", title, "</info>"));
+            io.write(bformat!("\n<info>{title}</info>"));
 
             for link in links.iter() {
-                io.write(bconcat!(
+                io.write(bformat!(
+                    "{} <comment>{}</comment>",
                     link.1.get_target(),
-                    " <comment>",
-                    link.1.get_pretty_constraint()?,
-                    "</comment>"
+                    link.1.get_pretty_constraint()?
                 ));
             }
         }
@@ -631,20 +606,18 @@ impl ShowCommand {
                 None => license_id.clone(),
                 Some(license) => {
                     if license.is_osi_approved {
-                        bconcat!(
+                        bformat!(
+                            "{} ({license_id}) (OSI approved) {}",
                             license.name,
-                            " (",
-                            license_id,
-                            ") (OSI approved) ",
                             license.url
                         )
                     } else {
-                        bconcat!(license.name, " (", license_id, ") ", license.url)
+                        bformat!("{} ({license_id}) {}", license.name, license.url)
                     }
                 }
             };
 
-            io.write(bconcat!("<info>license</info>  : ", out));
+            io.write(bformat!("<info>license</info>  : {out}"));
         }
     }
 
@@ -912,12 +885,12 @@ impl ShowCommand {
     fn display_package_tree(&self, array_tree: Vec<PackageTree>) {
         for package in array_tree.iter() {
             self.get_io()
-                .write_no_newline(bconcat!("<info>", package.name, "</info>"));
+                .write_no_newline(bformat!("<info>{}</info>", package.name));
             self.get_io()
-                .write_no_newline(bconcat!(" ", package.version));
+                .write_no_newline(bformat!(" {}", package.version));
             if let Some(description) = &package.description {
-                self.get_io().write(bconcat!(
-                    " ",
+                self.get_io().write(bformat!(
+                    " {}",
                     strtok_first(description, "\r\n").unwrap_or_default()
                 ));
             } else {
@@ -936,15 +909,9 @@ impl ShowCommand {
                     }
                     let level: usize = 1;
                     let color = self.colors.borrow().get(level).cloned().unwrap_or_default();
-                    let info = bconcat!(
-                        tree_bar,
-                        "──<",
-                        color,
-                        ">",
+                    let info = bformat!(
+                        "{tree_bar}──<{color}>{}</{color}> {}",
                         require.name,
-                        "</",
-                        color,
-                        "> ",
                         require.version
                     );
                     self.write_tree_line(BStr::new(&info));
@@ -1027,14 +994,14 @@ impl ShowCommand {
             Some(r) => r,
             None => return,
         };
-        let mut tree_bar = bconcat!(previous_tree_bar, "  ├");
+        let mut tree_bar = bformat!("{previous_tree_bar}  ├");
         let mut i = 0_usize;
         let total = requires.len();
         for require in requires.iter() {
             let mut current_tree = packages_in_tree.to_vec();
             i += 1;
             if i == total {
-                tree_bar = bconcat!(previous_tree_bar, "  └");
+                tree_bar = bformat!("{previous_tree_bar}  └");
             }
             let color_ident = level % self.colors.borrow().len();
             let color = self
@@ -1049,18 +1016,10 @@ impl ShowCommand {
             } else {
                 ""
             };
-            let info = rtrim(bconcat!(
-                tree_bar,
-                "──<",
-                color,
-                ">",
+            let info = rtrim(bformat!(
+                "{tree_bar}──<{color}>{}</{color}> {} {circular_warn}",
                 require.name,
-                "</",
-                color,
-                "> ",
-                require.version,
-                " ",
-                circular_warn
+                require.version
             ));
             self.write_tree_line(BStr::new(&info));
 
@@ -1145,7 +1104,7 @@ impl ShowCommand {
 
         let mut constraint = package.get_version();
         if !constraint.starts_with(b"dev-") {
-            constraint = bconcat!("^", constraint);
+            constraint = bformat!("^{constraint}");
         }
         if !latest_package.get_version().is_empty()
             && Semver::satisfies(latest_package.get_version(), constraint)?
@@ -1195,9 +1154,9 @@ impl ShowCommand {
         if let Some(flag_value) = flags.get(bstr::B(&name)) {
             let key_map: IndexMap<BString, BString> = base_package::STABILITIES
                 .iter()
-                .map(|(k, v)| (BString::from(*k), bconcat!(v)))
+                .map(|(k, v)| (BString::from(*k), bformat!("{v}")))
                 .collect();
-            let needle = bconcat!(flag_value);
+            let needle = bformat!("{flag_value}");
             if let Some(found_key) = array_search(&needle, &key_map) {
                 stability = found_key;
             }
@@ -1229,16 +1188,14 @@ impl ShowCommand {
                 let first_meaningful = intval(&PhpMixed::string(
                     groups.name("first_meaningful").unwrap_or_default(),
                 ));
-                target_version = Some(bconcat!(
-                    ">=",
-                    zero_major,
-                    first_meaningful + 1,
-                    ",<9999999-dev"
+                target_version = Some(bformat!(
+                    ">={zero_major}{},<9999999-dev",
+                    first_meaningful + 1
                 ));
             }
 
             if minor_only {
-                target_version = Some(bconcat!("^", package.get_version()));
+                target_version = Some(bformat!("^{}", package.get_version()));
             }
 
             if patch_only {
@@ -1253,7 +1210,7 @@ impl ShowCommand {
                 while trimmed_version.iter().filter(|&&c| c == b'.').count() + 1 < parts_needed {
                     trimmed_version.push_str(".0");
                 }
-                target_version = Some(bconcat!("~", trimmed_version));
+                target_version = Some(bformat!("~{trimmed_version}"));
             }
         }
 
@@ -1339,15 +1296,15 @@ impl ShowCommand {
 
         let months = days / 30;
         if months < 1 && days < 31 {
-            return bconcat!(days / 7, " weeks ago");
+            return bformat!("{} weeks ago", days / 7);
         }
 
         let years = days / 365;
         if years < 1 {
-            return bconcat!(months, " month", if months > 1 { "s" } else { "" }, " ago");
+            return bformat!("{months} month{} ago", if months > 1 { "s" } else { "" });
         }
 
-        bconcat!(years, " year", if years > 1 { "s" } else { "" }, " ago")
+        bformat!("{years} year{} ago", if years > 1 { "s" } else { "" })
     }
 
     fn same_repository<T, U>(a: &T, b: &U) -> bool
@@ -1598,10 +1555,8 @@ impl Command for ShowCommand {
                 PhpMixed::string(BString::from("json")),
             ],
         ) {
-            self.get_io().write_error(bconcat!(
-                "Unsupported format \"",
-                format,
-                "\". See help for supported formats."
+            self.get_io().write_error(bformat!(
+                "Unsupported format \"{format}\". See help for supported formats."
             ));
 
             return Ok(1);
@@ -1690,7 +1645,7 @@ impl Command for ShowCommand {
                 repos = RepositoryInterfaceHandle::new(CompositeRepository::new(
                     default_repos.into_values().collect(),
                 ));
-                self.get_io().write_error(bconcat!("No composer.json found in the current directory, showing available packages from ", implode(", ", &names)));
+                self.get_io().write_error(bformat!("No composer.json found in the current directory, showing available packages from {}", implode(", ", &names)));
                 installed_repo = RepositoryInterfaceHandle::new(ir);
             }
         } else if input.borrow().get_option("all")?.as_bool() == Some(true) && composer.is_some() {
@@ -1737,10 +1692,7 @@ impl Command for ShowCommand {
             let default_repos =
                 RepositoryFactory::default_repos_with_default_manager(self.get_io())?;
             let names: Vec<BString> = default_repos.keys().cloned().collect();
-            self.get_io().write_error(bconcat!(
-                "No composer.json found in the current directory, showing available packages from ",
-                implode(", ", &names)
-            ));
+            self.get_io().write_error(bformat!("No composer.json found in the current directory, showing available packages from {}", implode(", ", &names)));
             installed_repo = RepositoryInterfaceHandle::new(InstalledRepository::new(vec![
                 platform_repo.clone().into(),
             ]));
@@ -1904,10 +1856,9 @@ impl Command for ShowCommand {
                         .collect::<Vec<_>>(),
                 )
             {
-                return Err(InvalidArgumentException::new(bconcat!(
-                    "Package \"",
-                    pkg.get_name(),
-                    "\" is installed but not a direct dependent of the root package."
+                return Err(InvalidArgumentException::new(bformat!(
+                    "Package \"{}\" is installed but not a direct dependent of the root package.",
+                    pkg.get_name()
                 ))
                 .into());
             }
@@ -1921,11 +1872,11 @@ impl Command for ShowCommand {
                 if let Some(working_dir) =
                     options.get(bstr::B("working-dir")).filter(|v| !v.is_null())
                 {
-                    hint.push_str(&bconcat!(
-                        " in ",
-                        working_dir.as_string().unwrap_or_default(),
-                        "/composer.json"
-                    ));
+                    bwrite!(
+                        hint,
+                        " in {}/composer.json",
+                        working_dir.as_string().unwrap_or_default()
+                    );
                 }
                 if PlatformRepository::is_platform_package(pf)
                     && input.borrow().get_option("platform")?.as_bool() != Some(true)
@@ -1938,12 +1889,8 @@ impl Command for ShowCommand {
                     hint.push_str(", try using --available (-a) to show all available packages");
                 }
 
-                return Err(InvalidArgumentException::new(bconcat!(
-                    "Package \"",
-                    pf,
-                    "\" not found",
-                    hint,
-                    "."
+                return Err(InvalidArgumentException::new(bformat!(
+                    "Package \"{pf}\" not found{hint}."
                 ))
                 .into());
             }
@@ -2022,8 +1969,8 @@ impl Command for ShowCommand {
                 };
                 if let Some(path) = path {
                     let real = realpath(&path).unwrap_or_default();
-                    self.get_io().write(bconcat!(
-                        " ",
+                    self.get_io().write(bformat!(
+                        " {}",
                         strtok_first(path_to_bytes(&real), "\r\n").unwrap_or_default()
                     ));
                 } else {
@@ -2094,7 +2041,7 @@ impl Command for ShowCommand {
         let mut package_filter_regex: Option<BString> = None;
         if let Some(ref pf) = package_filter {
             let escaped = preg_quote(pf, None);
-            package_filter_regex = Some(bconcat!("{^", str_replace("\\*", ".*?", escaped), "$}i"));
+            package_filter_regex = Some(bformat!("{{^{}$}}i", str_replace("\\*", ".*?", escaped)));
         }
 
         let mut package_list_filter: Option<Vec<BString>> = None;
@@ -2352,7 +2299,7 @@ impl Command for ShowCommand {
                                     self.get_relative_time(&release_date),
                                 );
                                 if !age.contains_str(" old") {
-                                    age = bconcat!("from ", age);
+                                    age = bformat!("from {age}");
                                 }
                                 release_date_length = release_date_length.max(age.len());
                                 package_view_data.release_age = Some(age);
@@ -2415,16 +2362,13 @@ impl Command for ShowCommand {
                         {
                             let replacement_package_name = c.get_replacement_package();
                             let replacement = if let Some(ref rp) = replacement_package_name {
-                                bconcat!("Use ", rp, " instead")
+                                bformat!("Use {rp} instead")
                             } else {
                                 BString::from("No replacement was suggested")
                             };
-                            let package_warning = bconcat!(
-                                "Package ",
-                                package.get_pretty_name(),
-                                " is abandoned, you should avoid using it. ",
-                                replacement,
-                                "."
+                            let package_warning = bformat!(
+                                "Package {} is abandoned, you should avoid using it. {replacement}.",
+                                package.get_pretty_name()
                             );
                             package_view_data.warning = Some(package_warning);
                             package_is_abandoned = match replacement_package_name {
@@ -2519,9 +2463,9 @@ impl Command for ShowCommand {
                 if show_all_types {
                     if r#type == "available" {
                         self.get_io()
-                            .write(bconcat!("<comment>", r#type, "</comment>:"));
+                            .write(bformat!("<comment>{}</comment>:", r#type));
                     } else {
-                        self.get_io().write(bconcat!("<info>", r#type, "</info>:"));
+                        self.get_io().write(bformat!("<info>{}</info>:", r#type));
                     }
                 }
 

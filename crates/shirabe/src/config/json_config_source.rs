@@ -6,7 +6,7 @@ use crate::util::Filesystem;
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    Catch as _, PHP_EOL, PhpMixed, RuntimeException, bconcat, chmod, explode, file_get_contents,
+    Catch as _, PHP_EOL, PhpMixed, RuntimeException, bformat, chmod, explode, file_get_contents,
     file_put_contents, implode, is_writable, path_to_bytes, php_str,
 };
 
@@ -30,19 +30,17 @@ impl JsonConfigSource {
         let contents;
         if self.file.borrow().exists() {
             if !is_writable(self.file.borrow().get_path()) {
-                return Err(RuntimeException::new(bconcat!(
-                    "The file \"",
-                    self.file.borrow().get_path(),
-                    "\" is not writable."
+                return Err(RuntimeException::new(bformat!(
+                    "The file \"{}\" is not writable.",
+                    self.file.borrow().get_path()
                 ))
                 .into());
             }
 
             if !Filesystem::is_readable(self.file.borrow().get_path()) {
-                return Err(RuntimeException::new(bconcat!(
-                    "The file \"",
-                    self.file.borrow().get_path(),
-                    "\" is not readable."
+                return Err(RuntimeException::new(bformat!(
+                    "The file \"{}\" is not readable.",
+                    self.file.borrow().get_path()
                 ))
                 .into());
             }
@@ -87,7 +85,7 @@ impl JsonConfigSource {
                     && inner.is_empty()
                 {
                     // PHP: $config[$prop] = new \stdClass;
-                    map.insert(bconcat!(prop), PhpMixed::Object(IndexMap::new()));
+                    map.insert(bformat!("{prop}"), PhpMixed::Object(IndexMap::new()));
                 }
             }
             for prop in ["psr-0", "psr-4"] {
@@ -97,14 +95,15 @@ impl JsonConfigSource {
                         && let Some(PhpMixed::Array(inner_map)) = autoload_map.get(B(prop))
                         && inner_map.is_empty()
                     {
-                        autoload_map.insert(bconcat!(prop), PhpMixed::Object(IndexMap::new()));
+                        autoload_map.insert(bformat!("{prop}"), PhpMixed::Object(IndexMap::new()));
                     }
                     if let Some(autoload_dev) = map.get_mut(B("autoload-dev"))
                         && let PhpMixed::Array(autoload_dev_map) = autoload_dev
                         && let Some(PhpMixed::Array(inner_map)) = autoload_dev_map.get(B(prop))
                         && inner_map.is_empty()
                     {
-                        autoload_dev_map.insert(bconcat!(prop), PhpMixed::Object(IndexMap::new()));
+                        autoload_dev_map
+                            .insert(bformat!("{prop}"), PhpMixed::Object(IndexMap::new()));
                     }
                 }
             }
@@ -125,7 +124,7 @@ impl JsonConfigSource {
                     && let Some(PhpMixed::Array(inner_map)) = cfg_map.get(B(prop))
                     && inner_map.is_empty()
                 {
-                    cfg_map.insert(bconcat!(prop), PhpMixed::Object(IndexMap::new()));
+                    cfg_map.insert(bformat!("{prop}"), PhpMixed::Object(IndexMap::new()));
                 }
             }
             self.file.borrow().write(config)?;
@@ -143,9 +142,8 @@ impl JsonConfigSource {
                 };
                 // restore contents to the original state
                 file_put_contents(self.file.borrow().get_path(), &contents);
-                let message = bconcat!(
-                    "Failed to update composer.json with a valid format, reverting to the original content. Please report an issue to us with details (command you run and a copy of your composer.json). ",
-                    PHP_EOL,
+                let message = bformat!(
+                    "Failed to update composer.json with a valid format, reverting to the original content. Please report an issue to us with details (command you run and a copy of your composer.json). {PHP_EOL}{}",
                     implode(PHP_EOL, jve.get_errors())
                 );
                 return Err(RuntimeException::with_code_and_previous(
@@ -388,10 +386,8 @@ impl ConfigSourceInterface for JsonConfigSource {
                     }
                 }
                 let Some(index_to_insert) = index_to_insert else {
-                    return Err(RuntimeException::new(bconcat!(
-                        "The referenced repository \"",
-                        reference_name,
-                        "\" does not exist."
+                    return Err(RuntimeException::new(bformat!(
+                        "The referenced repository \"{reference_name}\" does not exist."
                     ))
                     .into());
                 };

@@ -12,7 +12,7 @@ use crate::util::{HttpDownloader, ProcessExecutor};
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    InvalidArgumentException, PhpMixed, RuntimeException, bconcat, json_encode,
+    InvalidArgumentException, PhpMixed, RuntimeException, bformat, json_encode,
 };
 use shirabe_semver::constraint::AnyConstraint;
 
@@ -100,8 +100,8 @@ impl RepositoryManager {
         name: Option<&BStr>,
     ) -> anyhow::Result<RepositoryInterfaceHandle> {
         if !self.repository_classes.contains_key(r#type) {
-            return Err(InvalidArgumentException::new(bconcat!(
-                "Repository type is not registered: ",
+            return Err(InvalidArgumentException::new(bformat!(
+                "Repository type is not registered: {}",
                 r#type
             ))
             .into());
@@ -112,13 +112,7 @@ impl RepositoryManager {
                 config.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
             ))
             .unwrap_or_default();
-            self.io.write_error(bconcat!(
-                "<warning>Repository \"",
-                name.unwrap_or_default(),
-                "\" (",
-                config_json,
-                ") has a packagist key which should be in its own repository definition</warning>"
-            ));
+            self.io.write_error(bformat!("<warning>Repository \"{}\" ({config_json}) has a packagist key which should be in its own repository definition</warning>", name.unwrap_or_default()));
         }
 
         let class = self.repository_classes[r#type].clone();
@@ -199,9 +193,8 @@ impl RepositoryManager {
             }
             // TODO(plugin): `setRepositoryClass` lets a plugin register a repository class of
             // its own, which needs a Rust-side counterpart before it can be built here.
-            _ => Err(RuntimeException::new(bconcat!(
-                "Repository class has no Rust implementation: ",
-                class
+            _ => Err(RuntimeException::new(bformat!(
+                "Repository class has no Rust implementation: {class}"
             ))
             .into()),
         }
@@ -209,7 +202,7 @@ impl RepositoryManager {
 
     pub fn set_repository_class(&mut self, r#type: &BStr, class: &BStr) {
         self.repository_classes
-            .insert(bstr::BString::from(r#type), bconcat!(class));
+            .insert(bstr::BString::from(r#type), bformat!("{class}"));
     }
 
     pub fn get_repositories(&self) -> &Vec<RepositoryInterfaceHandle> {

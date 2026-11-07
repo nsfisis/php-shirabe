@@ -1,7 +1,9 @@
 //! ref: composer/vendor/composer/semver/src/Constraint/Bound.php sha1:7106e51a8b7f25dc36ed4550d0b3c0e337e3c94b
 
 use bstr::{BStr, BString, ByteSlice};
-use shirabe_php_shim::{InvalidArgumentException, PhpDisplay, bconcat, version_compare_ordering};
+use shirabe_php_shim::{
+    InvalidArgumentException, PhpDisplay, bformat, bwrite, version_compare_ordering,
+};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Bound {
@@ -30,7 +32,7 @@ impl Bound {
     }
 
     pub fn is_positive_infinity(&self) -> bool {
-        self.get_version() == bconcat!(i64::MAX, ".0.0.0") && !self.is_inclusive()
+        self.get_version() == bformat!("{}.0.0.0", i64::MAX) && !self.is_inclusive()
     }
 
     pub fn compare_to(&self, other: &Bound, operator: impl AsRef<[u8]>) -> anyhow::Result<bool> {
@@ -65,19 +67,21 @@ impl Bound {
     }
 
     pub fn positive_infinity() -> Self {
-        Bound::new(bconcat!(i64::MAX, ".0.0.0"), false)
+        Bound::new(bformat!("{}.0.0.0", i64::MAX), false)
     }
 }
 
 impl PhpDisplay for Bound {
     fn fmt(&self, out: &mut BString) {
-        out.extend_from_slice(&bconcat!(
+        bwrite!(
+            out,
+            "{}{}",
             self.get_version(),
             if self.is_inclusive() {
                 " [inclusive]"
             } else {
                 " [exclusive]"
             }
-        ));
+        );
     }
 }

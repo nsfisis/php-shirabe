@@ -4,7 +4,7 @@ use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe::json::{JsonEncodeOptions, JsonFile, JsonValidationException};
 use shirabe_php_shim::{
-    Catch as _, PhpMixed, bconcat, error_message, json_decode_assoc, json_decode_obj,
+    Catch as _, PhpMixed, bformat, error_message, json_decode_assoc, json_decode_obj,
     path_to_bytes, str_replace,
 };
 use shirabe_seld_json_lint::ParsingException;
@@ -283,7 +283,7 @@ fn test_schema_validation_error() {
     let file = file_tmp.path().to_path_buf();
     std::fs::write(&file, b"{ \"name\": null }").unwrap();
     let json = JsonFile::new(file.clone(), None, None).unwrap();
-    let expected_message = bconcat!("\"", file, "\" does not match the expected JSON schema");
+    let expected_message = bformat!("\"{file}\" does not match the expected JSON schema");
     let expected_error = BString::from("name : null is not of type \"string\"");
 
     let err = json
@@ -326,7 +326,7 @@ fn test_schema_validation_lax_additional_properties() {
         .unwrap_err();
     let e = err.catch::<JsonValidationException>().unwrap();
     assert_eq!(
-        bconcat!("\"", file, "\" does not match the expected JSON schema"),
+        bformat!("\"{file}\" does not match the expected JSON schema"),
         e.get_message()
     );
     assert_eq!(
@@ -349,7 +349,7 @@ fn test_schema_validation_lax_required() {
     let file = file_tmp.path().to_path_buf();
     let json = JsonFile::new(file.clone(), None, None).unwrap();
 
-    let expected_message = bconcat!("\"", file, "\" does not match the expected JSON schema");
+    let expected_message = bformat!("\"{file}\" does not match the expected JSON schema");
 
     std::fs::write(&file, b"{ }").unwrap();
     let err = json

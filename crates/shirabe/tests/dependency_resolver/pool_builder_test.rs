@@ -16,7 +16,7 @@ use shirabe::repository::{
     RepositoryFactory, RepositoryInterfaceHandle, RepositorySet, RootAliasInput,
 };
 use shirabe_php_shim::{
-    PhpMixed, bconcat, display_to_bytes, file_get_contents, path_to_bytes, php_regex,
+    PhpMixed, bformat, display_to_bytes, file_get_contents, path_to_bytes, php_regex,
     preg_is_match, preg_split_delim_capture, str_replace, utf8_text,
 };
 use std::path::PathBuf;
@@ -81,7 +81,7 @@ fn read_test_file(
             if !section_info.iter().any(|(name, _)| *name == token) {
                 panic!(
                     "The test file \"{}\" must not contain a section named \"{}\".",
-                    str_replace(bconcat!(fixtures_dir, "/"), "", path_to_bytes(file))
+                    str_replace(bformat!("{fixtures_dir}/"), "", path_to_bytes(file))
                         .display_lossy(),
                     token.display_lossy()
                 );
@@ -97,7 +97,7 @@ fn read_test_file(
         if *required && !data.contains_key(B(section)) {
             panic!(
                 "The test file \"{}\" must have a section named \"{}\".",
-                str_replace(bconcat!(fixtures_dir, "/"), "", path_to_bytes(file)).display_lossy(),
+                str_replace(bformat!("{fixtures_dir}/"), "", path_to_bytes(file)).display_lossy(),
                 section.display_lossy()
             );
         }
@@ -166,7 +166,7 @@ fn get_integration_tests(fixtures_dir: &std::path::Path) -> IndexMap<BString, In
         tests.insert(
             basename,
             IntegrationTest {
-                file: str_replace(bconcat!(fixtures_dir, "/"), "", path_to_bytes(&file)),
+                file: str_replace(bformat!("{fixtures_dir}/"), "", path_to_bytes(&file)),
                 message,
                 expect,
                 expect_optimized,
@@ -197,7 +197,7 @@ fn php_sort_mixed(values: &mut [PhpMixed]) {
         };
         let str_of = |m: &PhpMixed| -> BString {
             match m {
-                PhpMixed::Int(i) => bconcat!(i),
+                PhpMixed::Int(i) => bformat!("{i}"),
                 PhpMixed::Float(f) => display_to_bytes(f),
                 PhpMixed::String(s) => s.clone(),
                 _ => BString::default(),
@@ -248,7 +248,7 @@ fn get_package_result_set(
 
             let mut suffix = BString::default();
             if let Some(source_reference) = package.get_source_reference() {
-                suffix = bconcat!("#", source_reference);
+                suffix = bformat!("#{source_reference}");
             }
             if let Some(repo) = package.get_repository()
                 && repo.is::<LockArrayRepository>()
@@ -267,33 +267,25 @@ fn get_package_result_set(
                     }
                 }
                 if let Some(id) = matched {
-                    return PhpMixed::string(bconcat!(
+                    return PhpMixed::string(bformat!(
+                        "{}-{}{suffix} (alias of {id})",
                         package.get_name(),
-                        "-",
-                        package.get_version(),
-                        suffix,
-                        " (alias of ",
-                        id,
-                        ")"
+                        package.get_version()
                     ));
                 }
 
-                return PhpMixed::string(bconcat!(
+                return PhpMixed::string(bformat!(
+                    "{}-{}{suffix} (alias of {})",
                     package.get_name(),
-                    "-",
                     package.get_version(),
-                    suffix,
-                    " (alias of ",
-                    alias_of.get_version(),
-                    ")"
+                    alias_of.get_version()
                 ));
             }
 
-            PhpMixed::string(bconcat!(
+            PhpMixed::string(bformat!(
+                "{}-{}{suffix}",
                 package.get_name(),
-                "-",
-                package.get_version(),
-                suffix
+                package.get_version()
             ))
         })
         .collect()

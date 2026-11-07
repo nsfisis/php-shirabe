@@ -2,7 +2,7 @@
 
 use crate::dependency_resolver::{ReasonData, Rule, RuleBase};
 use bstr::BString;
-use shirabe_php_shim::{PhpDisplay, bconcat};
+use shirabe_php_shim::{PhpDisplay, bformat, bwrite};
 
 #[derive(Debug)]
 pub struct Rule2Literals {
@@ -35,7 +35,7 @@ impl Rule2Literals {
     }
 
     pub fn get_hash(&self) -> BString {
-        bconcat!(self.literal1, ",", self.literal2)
+        bformat!("{},{}", self.literal1, self.literal2)
     }
 
     pub fn equals(&self, rule: &Rule) -> bool {
@@ -76,6 +76,6 @@ impl PhpDisplay for Rule2Literals {
             b"("
         });
 
-        out.extend_from_slice(&bconcat!(self.literal1, "|", self.literal2, ")"));
+        bwrite!(out, "{}|{})", self.literal1, self.literal2);
     }
 }

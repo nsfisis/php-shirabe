@@ -7,7 +7,7 @@ use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     JSON_INVALID_UTF8_IGNORE, JSON_UNESCAPED_SLASHES, JSON_UNESCAPED_UNICODE, PhpMixed,
-    UnexpectedValueException, array_merge, bconcat, in_array_strict, json_encode_ex, php_regex,
+    UnexpectedValueException, array_merge, bformat, in_array_strict, json_encode_ex, php_regex,
     php_str, preg_is_match,
 };
 
@@ -78,11 +78,7 @@ pub trait BaseIO: IOInterface {
             {
                 return;
             }
-            self.write_error(bconcat!(
-                "<warning>Warning: You should avoid overwriting already defined auth settings for ",
-                repository_name,
-                ".</warning>"
-            ));
+            self.write_error(bformat!("<warning>Warning: You should avoid overwriting already defined auth settings for {repository_name}.</warning>"));
         }
         BaseIO::set_authentication(self, repository_name, username, password);
     }
@@ -122,9 +118,8 @@ pub trait BaseIO: IOInterface {
             {
                 <Self as BaseIO>::debug(
                     self,
-                    BStr::new(&bconcat!(
-                        domain,
-                        " is not in the configured github-domains, adding it implicitly as authentication is configured for this domain"
+                    BStr::new(&bformat!(
+                        "{domain} is not in the configured github-domains, adding it implicitly as authentication is configured for this domain"
                     )),
                     &[],
                 );
@@ -140,13 +135,7 @@ pub trait BaseIO: IOInterface {
             }
 
             if !preg_is_match(php_regex!(r"{^[.A-Za-z0-9_]+$}"), token_str.as_bstr()) {
-                return Err(UnexpectedValueException::new(bconcat!(
-                    "Your github oauth token for ",
-                    domain,
-                    " contains invalid characters: \"",
-                    token_str,
-                    "\""
-                ))
+                return Err(UnexpectedValueException::new(bformat!("Your github oauth token for {domain} contains invalid characters: \"{token_str}\""))
                 .into());
             }
             self.check_and_set_authentication(
@@ -163,9 +152,8 @@ pub trait BaseIO: IOInterface {
             {
                 <Self as BaseIO>::debug(
                     self,
-                    BStr::new(&bconcat!(
-                        domain,
-                        " is not in the configured gitlab-domains, adding it implicitly as authentication is configured for this domain"
+                    BStr::new(&bformat!(
+                        "{domain} is not in the configured gitlab-domains, adding it implicitly as authentication is configured for this domain"
                     )),
                     &[],
                 );
@@ -199,9 +187,8 @@ pub trait BaseIO: IOInterface {
             {
                 <Self as BaseIO>::debug(
                     self,
-                    BStr::new(&bconcat!(
-                        domain,
-                        " is not in the configured gitlab-domains, adding it implicitly as authentication is configured for this domain"
+                    BStr::new(&bformat!(
+                        "{domain} is not in the configured gitlab-domains, adding it implicitly as authentication is configured for this domain"
                     )),
                     &[],
                 );
@@ -243,9 +230,8 @@ pub trait BaseIO: IOInterface {
             if !in_array_strict(PhpMixed::string(domain.clone()), &forgejo_domains) {
                 <Self as BaseIO>::debug(
                     self,
-                    BStr::new(&bconcat!(
-                        domain,
-                        " is not in the configured forgejo-domains, adding it implicitly as authentication is configured for this domain"
+                    BStr::new(&bformat!(
+                        "{domain} is not in the configured forgejo-domains, adding it implicitly as authentication is configured for this domain"
                     )),
                     &[],
                 );
@@ -334,7 +320,7 @@ pub trait BaseIO: IOInterface {
                 }
 
                 if !ssl_options.contains_key(B("local_cert")) {
-                    self.write_error(bconcat!("<warning>Warning: Client certificate configuration is missing key `local_cert` for ", domain, ".</warning>"));
+                    self.write_error(bformat!("<warning>Warning: Client certificate configuration is missing key `local_cert` for {domain}.</warning>"));
                     continue;
                 }
 
@@ -398,7 +384,7 @@ pub trait BaseIO: IOInterface {
                 JSON_INVALID_UTF8_IGNORE | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE,
             );
             if let Ok(json_str) = json {
-                message_str = bconcat!(message_str, " ", json_str);
+                message_str = bformat!("{message_str} {json_str}");
             }
         }
 
@@ -410,17 +396,17 @@ pub trait BaseIO: IOInterface {
         ]
         .contains(&level)
         {
-            self.write_error(bconcat!("<error>", message_str, "</error>"));
+            self.write_error(bformat!("<error>{message_str}</error>"));
         } else if level == LogLevel::WARNING {
-            self.write_error(bconcat!("<warning>", message_str, "</warning>"));
+            self.write_error(bformat!("<warning>{message_str}</warning>"));
         } else if level == LogLevel::NOTICE {
             self.write_error_with_verbosity(
-                bconcat!("<info>", message_str, "</info>"),
+                bformat!("<info>{message_str}</info>"),
                 io_interface::VERBOSE,
             );
         } else if level == LogLevel::INFO {
             self.write_error_with_verbosity(
-                bconcat!("<info>", message_str, "</info>"),
+                bformat!("<info>{message_str}</info>"),
                 io_interface::VERY_VERBOSE,
             );
         } else {

@@ -14,13 +14,13 @@ use shirabe::repository::{
     RepositoryInterface, RepositoryInterfaceHandle, RepositorySet, SearchResult,
     SecurityAdvisoryResult,
 };
-use shirabe_php_shim::{PhpMixed, bconcat, date_create, error_message, str_replace, trim};
+use shirabe_php_shim::{PhpMixed, bformat, date_create, error_message, str_replace, trim};
 use shirabe_semver::VersionParser;
 use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
 use shirabe_symfony_console::output::output_interface;
 
 fn constraint(operator: &BStr, version: &BStr) -> shirabe_semver::constraint::AnyConstraint {
-    SimpleConstraint::new(operator, bconcat!(version), None).into()
+    SimpleConstraint::new(operator, bformat!("{version}"), None).into()
 }
 
 fn full_advisory() -> std::rc::Rc<AnySecurityAdvisory> {
@@ -46,7 +46,7 @@ fn full_advisory_with_id(advisory_id: &BStr) -> std::rc::Rc<AnySecurityAdvisory>
     source.insert(BString::from("remoteId"), BString::from("remoteID"));
     std::rc::Rc::new(AnySecurityAdvisory::Full(SecurityAdvisory::new(
         BString::from("foo/bar"),
-        bconcat!(advisory_id),
+        bformat!("{advisory_id}"),
         constraint(BStr::new("="), BStr::new("1.0.0.0")),
         BString::from("test"),
         vec![source.into_iter().collect::<indexmap::IndexMap<_, _>>()],
@@ -60,7 +60,7 @@ fn full_advisory_with_id(advisory_id: &BStr) -> std::rc::Rc<AnySecurityAdvisory>
 fn partial_advisory(advisory_id: &BStr) -> std::rc::Rc<AnySecurityAdvisory> {
     std::rc::Rc::new(AnySecurityAdvisory::Partial(PartialSecurityAdvisory::new(
         BString::from("foo/bar"),
-        bconcat!(advisory_id),
+        bformat!("{advisory_id}"),
         constraint(BStr::new("="), BStr::new("1.0.0.0")),
     )))
 }
@@ -344,18 +344,18 @@ fn mock_advisory(
     severity: &BStr,
 ) -> std::rc::Rc<AnySecurityAdvisory> {
     let mut source: IndexMap<BString, BString> = IndexMap::new();
-    source.insert(BString::from("name"), bconcat!(source_name));
-    source.insert(BString::from("remoteId"), bconcat!(remote_id));
+    source.insert(BString::from("name"), bformat!("{source_name}"));
+    source.insert(BString::from("remoteId"), bformat!("{remote_id}"));
     std::rc::Rc::new(AnySecurityAdvisory::Full(SecurityAdvisory::new(
-        bconcat!(package_name),
-        bconcat!(advisory_id),
+        bformat!("{package_name}"),
+        bformat!("{advisory_id}"),
         VersionParser.parse_constraints(affected_versions).unwrap(),
-        bconcat!(title),
+        bformat!("{title}"),
         vec![source.into_iter().collect::<indexmap::IndexMap<_, _>>()],
         date_create::<Utc>(reported_at).unwrap(),
-        Some(bconcat!(cve)),
-        Some(bconcat!(link)),
-        Some(bconcat!(severity)),
+        Some(bformat!("{cve}")),
+        Some(bformat!("{link}")),
+        Some(bformat!("{severity}")),
     )))
 }
 

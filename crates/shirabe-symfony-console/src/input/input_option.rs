@@ -3,7 +3,7 @@
 use crate::exception::{InvalidArgumentException, LogicException};
 use crate::input::InputValue;
 use bstr::{BStr, BString, ByteSlice};
-use shirabe_php_shim::{bconcat, implode, ltrim_chars, php_regex, preg_split};
+use shirabe_php_shim::{bformat, implode, ltrim_chars, php_regex, preg_split};
 
 #[derive(Debug, Clone)]
 pub struct InputOption {
@@ -44,10 +44,8 @@ impl InputOption {
         let mode = match mode {
             None => Self::VALUE_NONE,
             Some(m) if !(1..(Self::VALUE_NEGATABLE << 1)).contains(&m) => {
-                return Err(InvalidArgumentException::new(bconcat!(
-                    "Option mode \"",
-                    m,
-                    "\" is not valid."
+                return Err(InvalidArgumentException::new(bformat!(
+                    "Option mode \"{m}\" is not valid."
                 ))
                 .into());
             }

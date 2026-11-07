@@ -7,7 +7,7 @@ use crate::test_case::{
 use bstr::BStr;
 use serial_test::serial;
 use shirabe::package::PackageInterfaceHandle;
-use shirabe_php_shim::{bconcat, trim};
+use shirabe_php_shim::{bformat, trim};
 use shirabe_symfony_console::input::{InputValue, ParameterName};
 
 /// ref: HomeCommandTest::testHomeCommandWithShowFlag
@@ -24,10 +24,10 @@ fn run_use_case(
 
     for (pkg, url) in urls {
         if *pkg == "vendor/package" {
-            package.set_homepage(bconcat!(url));
+            package.set_homepage(bformat!("{url}"));
         }
         if *pkg == "vendor/devpackage" {
-            dev_package.set_homepage(bconcat!(url));
+            dev_package.set_homepage(bformat!("{url}"));
         }
     }
 

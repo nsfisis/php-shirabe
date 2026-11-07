@@ -17,7 +17,7 @@
 //!
 //! See docs/dev/regex-porting.md for the regex porting rules.
 
-use crate::{PcreException, bconcat, utf8_text};
+use crate::{PcreException, bformat, utf8_text};
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use std::sync::{Arc, LazyLock, Mutex};
@@ -105,11 +105,10 @@ pub fn pcre_check_utf8_subject(
     }
 
     Err(PcreException::with_code_and_previous(
-        bconcat!(
+        bformat!(
+            "{}(): failed executing \"{}\": Malformed UTF-8 characters, possibly incorrectly encoded",
             function.as_ref(),
-            "(): failed executing \"",
-            pattern.as_ref(),
-            "\": Malformed UTF-8 characters, possibly incorrectly encoded"
+            pattern.as_ref()
         ),
         PREG_BAD_UTF8_ERROR,
         None,
@@ -638,7 +637,7 @@ fn php_replacement_group(bytes: &[u8]) -> (usize, usize) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::bconcat;
+    use crate::bformat;
 
     #[test]
     fn preg_quote_keeps_bytes_that_are_not_utf8() {
@@ -647,14 +646,14 @@ mod tests {
 
     #[test]
     fn a_quoted_byte_that_is_not_utf8_matches_itself() {
-        let pattern = bconcat!("/^", preg_quote(b"a.\xff", None), "$/");
+        let pattern = bformat!("/^{}$/", preg_quote(b"a.\xff", None));
         assert!(preg_is_match(&pattern, b"a.\xff"));
         assert!(!preg_is_match(&pattern, b"a.\xfe"));
     }
 
     #[test]
     fn a_quoted_nul_matches_itself() {
-        let pattern = bconcat!("/^", preg_quote(b"a\0b", None), "$/");
+        let pattern = bformat!("/^{}$/", preg_quote(b"a\0b", None));
         assert!(preg_is_match(&pattern, b"a\0b"));
         assert!(preg_is_match("/^a\\0b$/", b"a\0b"));
         assert!(preg_is_match("/^\\012$/", b"\n"));

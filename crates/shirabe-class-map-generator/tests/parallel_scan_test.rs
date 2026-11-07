@@ -2,7 +2,7 @@ use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe_class_map_generator::class_map_generator::ClassMapGenerator;
 use shirabe_class_map_generator::file_list::FileList;
-use shirabe_php_shim::{bconcat, display_to_bytes, path_from_bytes, path_to_bytes};
+use shirabe_php_shim::{bformat, display_to_bytes, path_from_bytes, path_to_bytes};
 use std::os::unix::fs::PermissionsExt;
 
 #[derive(Debug, PartialEq)]
@@ -22,43 +22,30 @@ fn write(path: &BStr, contents: &BStr) {
 fn build_tree(root: &BStr) {
     for i in 0..40usize {
         write(
-            bconcat!(root, "/classmap/dir", i % 4, "/File", i, ".php").as_ref(),
-            bconcat!(
-                "<?php\nnamespace Foo;\nclass Unique",
-                i,
-                " {}\nclass Shared",
-                i % 3,
-                " {}\ninterface Common {}\n"
-            )
+            bformat!("{root}/classmap/dir{}/File{i}.php", i % 4).as_ref(),
+            bformat!("<?php\nnamespace Foo;\nclass Unique{i} {{}}\nclass Shared{} {{}}\ninterface Common {{}}\n", i % 3)
             .as_ref(),
         );
     }
     write(
-        bconcat!(root, "/classmap/empty.php").as_ref(),
+        bformat!("{root}/classmap/empty.php").as_ref(),
         "  \n".into(),
     );
     write(
-        bconcat!(root, "/classmap/readme.txt").as_ref(),
+        bformat!("{root}/classmap/readme.txt").as_ref(),
         "class NotScanned {}".into(),
     );
 
     for i in 0..20usize {
         let namespace = if i % 5 == 0 { 9 } else { i % 2 };
         write(
-            bconcat!(root, "/psr4/Sub", i % 2, "/Klass", i, ".php").as_ref(),
-            bconcat!(
-                "<?php\nnamespace Acme\\Sub",
-                namespace,
-                ";\nclass Klass",
-                i,
-                " {}\n"
-            )
-            .as_ref(),
+            bformat!("{root}/psr4/Sub{}/Klass{i}.php", i % 2).as_ref(),
+            bformat!("<?php\nnamespace Acme\\Sub{namespace};\nclass Klass{i} {{}}\n").as_ref(),
         );
     }
     std::os::unix::fs::symlink(
-        path_from_bytes(&bconcat!(root, "/psr4/Sub0")),
-        path_from_bytes(&bconcat!(root, "/psr4/Alias")),
+        path_from_bytes(&bformat!("{root}/psr4/Sub0")),
+        path_from_bytes(&bformat!("{root}/psr4/Alias")),
     )
     .unwrap();
 }
@@ -76,7 +63,7 @@ fn scan(root: &BStr, max_parse_threads: usize) -> ScanOutcome {
         ("unreadable", "classmap", None),
     ] {
         if let Err(e) = generator.scan_paths(
-            bconcat!(root, "/", path),
+            bformat!("{root}/{path}"),
             None,
             autoload_type.into(),
             namespace.map(BString::from),
@@ -103,7 +90,7 @@ fn parallel_scan_matches_sequential_scan() {
     build_tree(root);
     let mut locked = true;
     for i in 0..4usize {
-        let path = bconcat!(root, "/unreadable/Locked", i, ".php");
+        let path = bformat!("{root}/unreadable/Locked{i}.php");
         write(path.as_ref(), "<?php class Locked {}".into());
         std::fs::set_permissions(path_from_bytes(&path), PermissionsExt::from_mode(0o000)).unwrap();
         // Permissions do not restrict a privileged user.

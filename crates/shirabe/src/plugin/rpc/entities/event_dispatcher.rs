@@ -6,7 +6,7 @@ use crate::plugin::rpc::codec::arg;
 use crate::plugin::rpc::dispatch::unavailable_method;
 use bstr::{BStr, BString, ByteSlice};
 use shirabe_php_rpc::{PhpThrow, PluginValue};
-use shirabe_php_shim::bconcat;
+use shirabe_php_shim::bformat;
 
 /// PHP's `is_callable($value)`, answered by the worker because only its own function and class
 /// tables can say whether a string or a `[$object, 'method']` pair names something callable.
@@ -49,10 +49,8 @@ pub(crate) fn dispatch_event_dispatcher_method(
                 // TODO(plugin): dispatching a worker-constructed event through the Rust-side
                 // dispatcher needs the event object (and the console input it carries) proxied
                 // back into this process, so only the no-listener case is answered here.
-                return Err(PhpThrow::runtime(bconcat!(
-                    "dispatching `",
-                    name,
-                    "` from the plugin process is not supported yet while listeners are registered for it"
+                return Err(PhpThrow::runtime(bformat!(
+                    "dispatching `{name}` from the plugin process is not supported yet while listeners are registered for it"
                 )));
             }
             // TODO(plugin): answering 0 here skips what `do_dispatch` does before it reaches the

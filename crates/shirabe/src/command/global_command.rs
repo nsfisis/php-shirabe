@@ -9,7 +9,7 @@ use crate::io::IOInterfaceWrite;
 use crate::util::{Filesystem, Platform};
 use bstr::BString;
 use shirabe_php_shim::{
-    RuntimeException, ToPhpString, bconcat, chdir, impl_php_class, path_from_bytes, php_regex,
+    RuntimeException, ToPhpString, bformat, chdir, impl_php_class, path_from_bytes, php_regex,
     preg_replace_with_limit_and_count, preg_split,
 };
 use shirabe_symfony_console::command::Command;
@@ -69,18 +69,16 @@ impl GlobalCommand {
 
         chdir(home).map_err(|e| {
             RuntimeException::with_code_and_previous(
-                bconcat!("Could not switch to home directory \"", home, "\""),
+                bformat!("Could not switch to home directory \"{home}\""),
                 0,
                 Some(std::sync::Arc::new(e)),
             )
         })?;
 
         if !quiet {
-            self.get_io().borrow().write_error(bconcat!(
-                "<info>Changed current directory to ",
-                home,
-                "</info>"
-            ));
+            self.get_io()
+                .borrow()
+                .write_error(bformat!("<info>Changed current directory to {home}</info>"));
         }
 
         let new_input_str = preg_replace_with_limit_and_count(

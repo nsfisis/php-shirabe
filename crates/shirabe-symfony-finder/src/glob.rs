@@ -1,7 +1,7 @@
 //! ref: composer/vendor/symfony/finder/Glob.php sha1:c3790810cef503a99d883b9353bc7fa278b5b04f
 
 use bstr::{BStr, BString, ByteSlice, ByteVec};
-use shirabe_php_shim::{bconcat, implode};
+use shirabe_php_shim::{bformat, implode};
 
 // Regex pattern compatibility:
 // PHP's Glob::toRegex builds its regex in a single character loop and emits PCRE-only
@@ -76,15 +76,14 @@ enum Out {
 
 impl Glob {
     pub fn to_regex(glob: &BStr, strict_leading_dot: bool, strict_wildcard_slash: bool) -> BString {
-        bconcat!(
-            "#^",
+        bformat!(
+            "#^{}$#",
             expand(
                 glob,
                 strict_leading_dot,
                 strict_wildcard_slash,
                 Terminal::EndAnchor
-            ),
-            "$#"
+            )
         )
     }
 
@@ -277,7 +276,7 @@ fn globstar(ctx: Ctx, trailing_slash_optional: bool) -> BString {
         "[^/]+"
     };
     let slash = if trailing_slash_optional { "/?" } else { "/" };
-    bconcat!("/(?:", step, slash, ")*")
+    bformat!("/(?:{step}{slash})*")
 }
 
 fn render_seq(tokens: &[Token], ctx: Ctx) -> Out {
@@ -316,7 +315,7 @@ fn render_seq(tokens: &[Token], ctx: Ctx) -> Out {
                         }
                     }
                     return match join_branches(branches) {
-                        Some(joined) => Out::Ok(bconcat!(out, joined)),
+                        Some(joined) => Out::Ok(bformat!("{out}{joined}")),
                         None => Out::Dead,
                     };
                 }
@@ -351,7 +350,7 @@ fn render_group_isolated(alternatives: &[Vec<Token>], closed: bool, ctx: Ctx) ->
         return Out::Dead;
     }
     let close = if closed { ")" } else { "" };
-    Out::Ok(bconcat!("(", implode("|", &rendered), close))
+    Out::Ok(bformat!("({}{close}", implode("|", &rendered)))
 }
 
 /// Renders the remainder of the pattern under the constraint that the next matched
@@ -365,7 +364,7 @@ fn apply_no_dot(tokens: &[Token], ctx: Ctx) -> Out {
         Token::Text(text) if text == "[" => {
             if let Some((class, after)) = scan_char_class(tokens) {
                 prefix(
-                    bconcat!("[", class, "&&[^.]]"),
+                    bformat!("[{class}&&[^.]]"),
                     render_seq(&tokens[after..], ctx),
                 )
             } else {
@@ -381,11 +380,11 @@ fn apply_no_dot(tokens: &[Token], ctx: Ctx) -> Out {
             } else {
                 "[^.\\n].*"
             };
-            let consumed = prefix(bconcat!(head), render_seq(rest, ctx));
+            let consumed = prefix(bformat!("{head}"), render_seq(rest, ctx));
             let skipped = apply_no_dot(rest, ctx);
             match (consumed, skipped) {
                 (Out::Escapes, _) | (_, Out::Escapes) => Out::Escapes,
-                (Out::Ok(a), Out::Ok(b)) => Out::Ok(bconcat!("(?:", a, "|", b, ")")),
+                (Out::Ok(a), Out::Ok(b)) => Out::Ok(bformat!("(?:{a}|{b})")),
                 (Out::Ok(a), Out::Dead) => Out::Ok(a),
                 (Out::Dead, Out::Ok(b)) => Out::Ok(b),
                 (Out::Dead, Out::Dead) => Out::Dead,
@@ -397,7 +396,7 @@ fn apply_no_dot(tokens: &[Token], ctx: Ctx) -> Out {
             } else {
                 "[^.\\n]"
             };
-            prefix(bconcat!(head), render_seq(rest, ctx))
+            prefix(bformat!("{head}"), render_seq(rest, ctx))
         }
         // The construct starts with a literal `/`, which satisfies the constraint.
         Token::Globstar { .. } => render_seq(tokens, ctx),
@@ -434,7 +433,7 @@ fn apply_no_dot(tokens: &[Token], ctx: Ctx) -> Out {
 
 fn prefix(head: BString, tail: Out) -> Out {
     match tail {
-        Out::Ok(tail) => Out::Ok(bconcat!(head, tail)),
+        Out::Ok(tail) => Out::Ok(bformat!("{head}{tail}")),
         other => other,
     }
 }
@@ -443,7 +442,7 @@ fn join_branches(mut branches: Vec<BString>) -> Option<BString> {
     match branches.len() {
         0 => None,
         1 => branches.pop(),
-        _ => Some(bconcat!("(?:", implode("|", &branches), ")")),
+        _ => Some(bformat!("(?:{})", implode("|", &branches))),
     }
 }
 

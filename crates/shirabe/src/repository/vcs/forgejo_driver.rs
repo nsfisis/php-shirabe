@@ -11,7 +11,7 @@ use crate::util::{Forgejo, ForgejoRepositoryData, ForgejoUrl, HttpDownloader, Pr
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    Catch as _, PhpMixed, RuntimeException, base64_decode, bconcat, date_create, explode,
+    Catch as _, PhpMixed, RuntimeException, base64_decode, bformat, date_create, explode,
     extension_loaded, in_array_strict, path_from_bytes, php_regex, preg_match, strtolower,
     urlencode,
 };
@@ -48,17 +48,15 @@ impl ForgejoDriver {
         let forgejo_url = ForgejoUrl::create(self.inner.url.as_bstr())?;
         self.inner.origin_url = forgejo_url.origin_url.clone();
 
-        let cache_dir = bconcat!(
+        let cache_dir = bformat!(
+            "{}/{}/{}/{}",
             self.inner
                 .config
                 .borrow()
                 .get_path("cache-repo-dir")?
                 .as_bstr(),
-            "/",
             forgejo_url.origin_url,
-            "/",
             forgejo_url.owner,
-            "/",
             forgejo_url.repository
         );
         self.forgejo_url = Some(forgejo_url);
@@ -89,7 +87,7 @@ impl ForgejoDriver {
         }
 
         let api_url = self.forgejo_url.as_ref().unwrap().api_url.clone();
-        let resource_url = bconcat!(api_url, "/contents/", file, "?ref=", urlencode(identifier));
+        let resource_url = bformat!("{api_url}/contents/{file}?ref={}", urlencode(identifier));
         let response = self.get_contents(resource_url.as_bstr(), false)??;
         let mut resource = response.decode_json()?;
 
@@ -134,19 +132,13 @@ impl ForgejoDriver {
         match content_b64 {
             Some(b64) => match base64_decode(b64) {
                 Some(bytes) => Ok(Some(bstr::BString::from(bytes))),
-                None => Err(RuntimeException::new(bconcat!(
-                    "Could not retrieve ",
-                    file,
-                    " for ",
-                    identifier
+                None => Err(RuntimeException::new(bformat!(
+                    "Could not retrieve {file} for {identifier}"
                 ))
                 .into()),
             },
-            None => Err(RuntimeException::new(bconcat!(
-                "Could not retrieve ",
-                file,
-                " for ",
-                identifier
+            None => Err(RuntimeException::new(bformat!(
+                "Could not retrieve {file} for {identifier}"
             ))
             .into()),
         }
@@ -161,11 +153,9 @@ impl ForgejoDriver {
         }
 
         let api_url = self.forgejo_url.as_ref().unwrap().api_url.clone();
-        let resource_url = bconcat!(
-            api_url,
-            "/git/commits/",
-            urlencode(identifier),
-            "?verification=false&files=false"
+        let resource_url = bformat!(
+            "{api_url}/git/commits/{}?verification=false&files=false",
+            urlencode(identifier)
         );
         let commit = self
             .get_contents(resource_url.as_bstr(), false)??
@@ -183,7 +173,7 @@ impl ForgejoDriver {
         };
 
         let date_str = date_str.ok_or_else(|| {
-            RuntimeException::new(bconcat!("Could not parse commit date for ", identifier))
+            RuntimeException::new(bformat!("Could not parse commit date for {identifier}"))
         })?;
 
         let date: chrono::DateTime<chrono::FixedOffset> = date_create(date_str)?;
@@ -211,7 +201,7 @@ impl ForgejoDriver {
         if self.branches.is_none() {
             let mut branches = IndexMap::new();
             let api_url = self.forgejo_url.as_ref().unwrap().api_url.clone();
-            let mut resource: Option<BString> = Some(bconcat!(api_url, "/branches?per_page=100"));
+            let mut resource: Option<BString> = Some(bformat!("{api_url}/branches?per_page=100"));
 
             while let Some(url) = resource {
                 let response = self.get_contents(url.as_bstr(), false)??;
@@ -252,7 +242,7 @@ impl ForgejoDriver {
         if self.tags.is_none() {
             let mut tags = IndexMap::new();
             let api_url = self.forgejo_url.as_ref().unwrap().api_url.clone();
-            let mut resource: Option<BString> = Some(bconcat!(api_url, "/tags?per_page=100"));
+            let mut resource: Option<BString> = Some(bformat!("{api_url}/tags?per_page=100"));
 
             while let Some(url) = resource {
                 let response = self.get_contents(url.as_bstr(), false)??;
@@ -286,11 +276,9 @@ impl ForgejoDriver {
     }
 
     pub fn get_dist(&self, identifier: &BStr) -> Option<IndexMap<BString, BString>> {
-        let url = bconcat!(
-            self.forgejo_url.as_ref().unwrap().api_url,
-            "/archive/",
-            identifier,
-            ".zip"
+        let url = bformat!(
+            "{}/archive/{identifier}.zip",
+            self.forgejo_url.as_ref().unwrap().api_url
         );
         let mut map = IndexMap::new();
         map.insert(BString::from("type"), BString::from("zip"));
@@ -382,15 +370,15 @@ impl ForgejoDriver {
                         .find(|(_, v)| v == identifier)
                         .map(|(k, _)| k)
                     {
-                        bconcat!(html_url, "/tag/", label)
+                        bformat!("{html_url}/tag/{label}")
                     } else if let Some(label) = branches
                         .into_iter()
                         .find(|(_, v)| v == identifier)
                         .map(|(k, _)| k)
                     {
-                        bconcat!(html_url, "/branch/", label)
+                        bformat!("{html_url}/branch/{label}")
                     } else {
-                        bconcat!(html_url, "/commit/", identifier)
+                        bformat!("{html_url}/commit/{identifier}")
                     };
 
                     if let Some(PhpMixed::Array(support)) = composer_map.get_mut(B("support")) {
@@ -404,12 +392,12 @@ impl ForgejoDriver {
                     .is_some_and(|arr| arr.contains_key(B("issues")));
 
                 if !has_issues && self.repository_data.as_ref().is_some_and(|r| r.has_issues) {
-                    let issues_url = bconcat!(
+                    let issues_url = bformat!(
+                        "{}/issues",
                         self.repository_data
                             .as_ref()
                             .map(|r| r.html_url.clone())
-                            .unwrap_or_default(),
-                        "/issues"
+                            .unwrap_or_default()
                     );
                     if let Some(PhpMixed::Array(support)) = composer_map.get_mut(B("support")) {
                         support.insert("issues".into(), PhpMixed::string(issues_url));
@@ -481,11 +469,7 @@ impl ForgejoDriver {
 
         if !extension_loaded("openssl") {
             io.write_error_with_verbosity(
-                bconcat!(
-                    "Skipping Forgejo driver for ",
-                    url,
-                    " because the OpenSSL PHP extension is missing."
-                ),
+                bformat!("Skipping Forgejo driver for {url} because the OpenSSL PHP extension is missing."),
                 io_interface::VERBOSE,
             );
 
@@ -589,10 +573,9 @@ impl ForgejoDriver {
                 {
                     let origin_url = self.forgejo_url.as_ref().unwrap().origin_url.clone();
                     let message = if e.get_code() == 429 {
-                        Some(bconcat!(
-                            "API limit exhausted. Enter your Forgejo credentials to get a larger API limit (<info>",
-                            self.inner.url,
-                            "</info>)"
+                        Some(bformat!(
+                            "API limit exhausted. Enter your Forgejo credentials to get a larger API limit (<info>{}</info>)",
+                            self.inner.url
                         ))
                     } else {
                         None
@@ -626,7 +609,7 @@ impl ForgejoDriver {
             Ok(()) => Ok(true),
             Err(e) => {
                 self.git_driver = None;
-                self.inner.io.write_error(bconcat!("<error>Failed to clone the ", ssh_url, " repository, try running in interactive mode so that you can enter your Forgejo credentials</error>"));
+                self.inner.io.write_error(bformat!("<error>Failed to clone the {ssh_url} repository, try running in interactive mode so that you can enter your Forgejo credentials</error>"));
                 Err(e)
             }
         }

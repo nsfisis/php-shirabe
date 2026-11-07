@@ -17,7 +17,7 @@ use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_rpc::PlatformInfo;
 use shirabe_php_shim::{
-    InvalidArgumentException, PhpMixed, UnexpectedValueException, array_slice_strs, bconcat,
+    InvalidArgumentException, PhpMixed, UnexpectedValueException, array_slice_strs, bformat,
     explode, get_class, get_debug_type, implode, intval, is_string, php_regex, php_str,
     preg_is_match, preg_match, preg_replace, str_replace, strpos, strtolower, var_export,
 };
@@ -63,22 +63,15 @@ impl PlatformRepository {
         let mut overrides_map: IndexMap<BString, PlatformOverride> = IndexMap::new();
         for (name, version) in overrides {
             if !is_string(&version) && !matches!(version, PhpMixed::Bool(false)) {
-                return Err(UnexpectedValueException::new(bconcat!(
-                    "config.platform.",
-                    name,
-                    " should be a string or false, but got ",
+                return Err(UnexpectedValueException::new(bformat!(
+                    "config.platform.{name} should be a string or false, but got {} {}",
                     get_debug_type(&version),
-                    " ",
                     var_export(&version, true)
                 ))
                 .into());
             }
             if name == "php" && matches!(version, PhpMixed::Bool(false)) {
-                return Err(UnexpectedValueException::new(bconcat!(
-                    "config.platform.",
-                    name,
-                    " cannot be set to false as you cannot disable php entirely."
-                ))
+                return Err(UnexpectedValueException::new(bformat!("config.platform.{name} cannot be set to false as you cannot disable php entirely."))
                 .into());
             }
             overrides_map.insert(
@@ -153,8 +146,8 @@ impl PlatformRepository {
         for r#override in &overrides {
             // Check that it's a platform package.
             if !Self::is_platform_package(&r#override.name) {
-                return Err(InvalidArgumentException::new(bconcat!(
-                    "Invalid platform package name in config.platform: ",
+                return Err(InvalidArgumentException::new(bformat!(
+                    "Invalid platform package name in config.platform: {}",
                     r#override.name
                 ))
                 .into());
@@ -339,7 +332,7 @@ impl PlatformRepository {
                     ) {
                         self.add_library(
                             &mut libraries,
-                            bstr::BStr::new(&bconcat!(name, "-librabbitmq")),
+                            bstr::BStr::new(&bformat!("{name}-librabbitmq")),
                             librabbitmq_matches.name("version"),
                             Some("AMQP librabbitmq version"),
                             &[],
@@ -356,7 +349,7 @@ impl PlatformRepository {
                             BString::from(protocol_matches.name("version").unwrap_or_default());
                         self.add_library(
                             &mut libraries,
-                            bstr::BStr::new(&bconcat!(name, "-protocol")),
+                            bstr::BStr::new(&bformat!("{name}-protocol")),
                             Some(str_replace("-", ".", &version_str)),
                             Some("AMQP protocol version"),
                             &[],
@@ -417,10 +410,10 @@ impl PlatformRepository {
                             };
                             self.add_library(
                                 &mut libraries,
-                                bconcat!(name, "-openssl", if is_fips { "-fips" } else { "" })
+                                bformat!("{name}-openssl{}", if is_fips { "-fips" } else { "" })
                                     .as_bstr(),
                                 Some(&parsed_version),
-                                Some(&bconcat!("curl OpenSSL version (", parsed_version, ")")),
+                                Some(&bformat!("curl OpenSSL version ({parsed_version})")),
                                 &[],
                                 &fips_provides,
                             )?;
@@ -435,7 +428,7 @@ impl PlatformRepository {
                                     let m1 = BString::from(
                                         securetransport_matches.get(1).unwrap_or_default(),
                                     );
-                                    ssl_lib = bconcat!("curl-", m1);
+                                    ssl_lib = bformat!("curl-{m1}");
                                 } else {
                                     shortlib = library.clone();
                                     ssl_lib = "curl-openssl".into();
@@ -446,9 +439,9 @@ impl PlatformRepository {
                             }
                             self.add_library(
                                 &mut libraries,
-                                bconcat!(name, "-", shortlib).as_bstr(),
+                                bformat!("{name}-{shortlib}").as_bstr(),
                                 Some(&ssl_version),
-                                Some(&bconcat!("curl ", library, " version (", ssl_version, ")")),
+                                Some(&bformat!("curl {library} version ({ssl_version})")),
                                 &[ssl_lib],
                                 &[],
                             )?;
@@ -468,9 +461,9 @@ impl PlatformRepository {
                             BString::from(ssh_matches.name("version").unwrap_or_default());
                         self.add_library(
                             &mut libraries,
-                            bstr::BStr::new(&bconcat!(name, "-", strtolower(&ssh_library))),
+                            bstr::BStr::new(&bformat!("{name}-{}", strtolower(&ssh_library))),
                             Some(&ssh_version),
-                            Some(&*bconcat!("curl ", &ssh_library, " version")),
+                            Some(&*bformat!("curl {ssh_library} version")),
                             &[],
                             &[],
                         )?;
@@ -482,7 +475,7 @@ impl PlatformRepository {
                     {
                         self.add_library(
                             &mut libraries,
-                            bstr::BStr::new(&bconcat!(name, "-zlib")),
+                            bstr::BStr::new(&bformat!("{name}-zlib")),
                             zlib_matches.name("version"),
                             Some("curl zlib version"),
                             &[],
@@ -500,7 +493,7 @@ impl PlatformRepository {
                     {
                         self.add_library(
                             &mut libraries,
-                            bstr::BStr::new(&bconcat!(name, "-timelib")),
+                            bstr::BStr::new(&bformat!("{name}-timelib")),
                             timelib_matches.name("version"),
                             Some("date timelib version"),
                             &[],
@@ -534,13 +527,13 @@ impl PlatformRepository {
                                 Some(
                                     "zoneinfo (\"Olson\") database for date (replaced by timezonedb)",
                                 ),
-                                &[bconcat!(name, "-zoneinfo")],
+                                &[bformat!("{name}-zoneinfo")],
                                 &[],
                             )?;
                             } else {
                                 self.add_library(
                                     &mut libraries,
-                                    bstr::BStr::new(&bconcat!(name, "-zoneinfo")),
+                                    bstr::BStr::new(&bformat!("{name}-zoneinfo")),
                                     Some(&zoneinfo_version),
                                     Some("zoneinfo (\"Olson\") database for date"),
                                     &[],
@@ -560,7 +553,7 @@ impl PlatformRepository {
                     {
                         self.add_library(
                             &mut libraries,
-                            bstr::BStr::new(&bconcat!(name, "-libmagic")),
+                            bstr::BStr::new(&bformat!("{name}-libmagic")),
                             magic_matches.name("version"),
                             Some("fileinfo libmagic version"),
                             &[],
@@ -595,7 +588,7 @@ impl PlatformRepository {
                         let parsed = Version::parse_libjpeg(&libjpeg_version).unwrap_or_default();
                         self.add_library(
                             &mut libraries,
-                            bstr::BStr::new(&bconcat!(name, "-libjpeg")),
+                            bstr::BStr::new(&bformat!("{name}-libjpeg")),
                             Some(&parsed),
                             Some("libjpeg version for gd"),
                             &[],
@@ -608,7 +601,7 @@ impl PlatformRepository {
                     {
                         self.add_library(
                             &mut libraries,
-                            bstr::BStr::new(&bconcat!(name, "-libpng")),
+                            bstr::BStr::new(&bformat!("{name}-libpng")),
                             libpng_matches.name("version"),
                             Some("libpng version for gd"),
                             &[],
@@ -621,7 +614,7 @@ impl PlatformRepository {
                     {
                         self.add_library(
                             &mut libraries,
-                            bstr::BStr::new(&bconcat!(name, "-freetype")),
+                            bstr::BStr::new(&bformat!("{name}-freetype")),
                             freetype_matches.name("version"),
                             Some("freetype version for gd"),
                             &[],
@@ -639,7 +632,7 @@ impl PlatformRepository {
                         let converted = Version::convert_libxpm_version_id(version_id);
                         self.add_library(
                             &mut libraries,
-                            bstr::BStr::new(&bconcat!(name, "-libxpm")),
+                            bstr::BStr::new(&bformat!("{name}-libxpm")),
                             Some(&converted),
                             Some("libxpm version for gd"),
                             &[],
@@ -758,7 +751,7 @@ impl PlatformRepository {
                                 &intl_char_versions
                                     .iter()
                                     .take(3)
-                                    .map(|part| bconcat!(part))
+                                    .map(|part| bformat!("{part}"))
                                     .collect::<Vec<BString>>(),
                             )[..],
                         );
@@ -787,12 +780,12 @@ impl PlatformRepository {
                         let mut version_built =
                             BString::from(matches.name("version").unwrap_or_default());
                         if let Some(patch) = matches.name("patch") {
-                            version_built = bconcat!(version_built, ".", patch);
+                            version_built = bformat!("{version_built}.{patch}");
                         }
 
                         self.add_library(
                             &mut libraries,
-                            bstr::BStr::new(&bconcat!(name, "-imagemagick")),
+                            bstr::BStr::new(&bformat!("{name}-imagemagick")),
                             Some(&version_built),
                             None::<&BStr>,
                             &[BString::from("imagick")],
@@ -818,9 +811,9 @@ impl PlatformRepository {
                             BString::from(vendor_matches.name("vendor").unwrap_or_default());
                         self.add_library(
                             &mut libraries,
-                            bstr::BStr::new(&bconcat!(name, "-", strtolower(&vendor))),
+                            bstr::BStr::new(&bformat!("{name}-{}", strtolower(&vendor))),
                             Some(&converted),
-                            Some(&*bconcat!(vendor, " version of ldap")),
+                            Some(&*bformat!("{vendor} version of ldap")),
                             &[],
                             &[],
                         )?;
@@ -837,7 +830,7 @@ impl PlatformRepository {
                         .collect();
                     let libxml_provides: Vec<BString> = intersected
                         .iter()
-                        .map(|extension| bconcat!(extension, "-libxml"))
+                        .map(|extension| bformat!("{extension}-libxml"))
                         .collect();
                     let libxml_dotted = platform_info.get_constant("LIBXML_DOTTED_VERSION", None);
                     let libxml_dotted_str = match &libxml_dotted {
@@ -863,7 +856,7 @@ impl PlatformRepository {
                     {
                         self.add_library(
                             &mut libraries,
-                            bstr::BStr::new(&bconcat!(name, "-libmbfl")),
+                            bstr::BStr::new(&bformat!("{name}-libmbfl")),
                             libmbfl_matches.name("version"),
                             Some("mbstring libmbfl version"),
                             &[],
@@ -879,7 +872,7 @@ impl PlatformRepository {
                         };
                         self.add_library(
                             &mut libraries,
-                            bstr::BStr::new(&bconcat!(name, "-oniguruma")),
+                            bstr::BStr::new(&bformat!("{name}-oniguruma")),
                             oniguruma_str.as_deref(),
                             Some("mbstring oniguruma version"),
                             &[],
@@ -897,7 +890,7 @@ impl PlatformRepository {
                         ) {
                             self.add_library(
                                 &mut libraries,
-                                bstr::BStr::new(&bconcat!(name, "-oniguruma")),
+                                bstr::BStr::new(&bformat!("{name}-oniguruma")),
                                 oniguruma_matches.name("version"),
                                 Some("mbstring oniguruma version"),
                                 &[],
@@ -917,7 +910,7 @@ impl PlatformRepository {
                     ) {
                         self.add_library(
                             &mut libraries,
-                            bstr::BStr::new(&bconcat!(name, "-libmemcached")),
+                            bstr::BStr::new(&bformat!("{name}-libmemcached")),
                             matches.name("version"),
                             Some("libmemcached version"),
                             &[],
@@ -947,7 +940,7 @@ impl PlatformRepository {
                         }
                         self.add_library(
                             &mut libraries,
-                            bconcat!(name, if is_fips { "-fips" } else { "" }).as_bstr(),
+                            bformat!("{name}{}", if is_fips { "-fips" } else { "" }).as_bstr(),
                             Some(&parsed_version),
                             Some(&openssl_text_str),
                             &[],
@@ -983,7 +976,7 @@ impl PlatformRepository {
                     ) {
                         self.add_library(
                             &mut libraries,
-                            bstr::BStr::new(&bconcat!(name, "-unicode")),
+                            bstr::BStr::new(&bformat!("{name}-unicode")),
                             pcre_unicode_matches.name("version"),
                             Some("PCRE Unicode version support"),
                             &[],
@@ -1003,9 +996,9 @@ impl PlatformRepository {
                     ) {
                         self.add_library(
                             &mut libraries,
-                            bstr::BStr::new(&bconcat!(name, "-mysqlnd")),
+                            bstr::BStr::new(&bformat!("{name}-mysqlnd")),
                             matches.name("version"),
-                            Some(&*bconcat!("mysqlnd library version for ", name)),
+                            Some(&*bformat!("mysqlnd library version for {name}")),
                             &[],
                             &[],
                         )?;
@@ -1021,7 +1014,7 @@ impl PlatformRepository {
                     ) {
                         self.add_library(
                             &mut libraries,
-                            bstr::BStr::new(&bconcat!(name, "-libmongoc")),
+                            bstr::BStr::new(&bformat!("{name}-libmongoc")),
                             libmongoc_matches.name("version"),
                             Some("libmongoc version of mongodb"),
                             &[],
@@ -1035,7 +1028,7 @@ impl PlatformRepository {
                     ) {
                         self.add_library(
                             &mut libraries,
-                            bstr::BStr::new(&bconcat!(name, "-libbson")),
+                            bstr::BStr::new(&bformat!("{name}-libbson")),
                             libbson_matches.name("version"),
                             Some("libbson version of mongodb"),
                             &[],
@@ -1069,9 +1062,9 @@ impl PlatformRepository {
                         ) {
                             self.add_library(
                                 &mut libraries,
-                                bstr::BStr::new(&bconcat!(name, "-libpq")),
+                                bstr::BStr::new(&bformat!("{name}-libpq")),
                                 matches.name("version"),
-                                Some(&*bconcat!("libpq for ", name)),
+                                Some(&*bformat!("libpq for {name}")),
                                 &[],
                                 &[],
                             )?;
@@ -1088,9 +1081,9 @@ impl PlatformRepository {
                     ) {
                         self.add_library(
                             &mut libraries,
-                            bstr::BStr::new(&bconcat!(name, "-libpq")),
+                            bstr::BStr::new(&bformat!("{name}-libpq")),
                             matches.name("version"),
-                            Some(&*bconcat!("libpq for ", name)),
+                            Some(&*bformat!("libpq for {name}")),
                             &[],
                             &[],
                         )?;
@@ -1108,9 +1101,9 @@ impl PlatformRepository {
                     ) {
                         self.add_library(
                             &mut libraries,
-                            bstr::BStr::new(&bconcat!(name, "-libpq")),
+                            bstr::BStr::new(&bformat!("{name}-libpq")),
                             matches.name("linked"),
-                            Some(&*bconcat!("libpq for ", name)),
+                            Some(&*bformat!("libpq for {name}")),
                             &[],
                             &[],
                         )?;
@@ -1130,18 +1123,17 @@ impl PlatformRepository {
                             .get_constant("RD_KAFKA_VERSION", None)
                             .as_int()
                             .unwrap_or(0);
-                        let version_built = bconcat!(
+                        let version_built = bformat!(
+                            "{}.{}.{}",
                             (lib_rd_kafka_version_int & 0x7F000000) >> 24,
-                            ".",
                             (lib_rd_kafka_version_int & 0x00FF0000) >> 16,
-                            ".",
-                            (lib_rd_kafka_version_int & 0x0000FF00) >> 8,
+                            (lib_rd_kafka_version_int & 0x0000FF00) >> 8
                         );
                         self.add_library(
                             &mut libraries,
-                            bstr::BStr::new(&bconcat!(name, "-librdkafka")),
+                            bstr::BStr::new(&bformat!("{name}-librdkafka")),
                             Some(&version_built),
-                            Some(&*bconcat!("librdkafka for ", name)),
+                            Some(&*bformat!("librdkafka for {name}")),
                             &[],
                             &[],
                         )?;
@@ -1182,7 +1174,7 @@ impl PlatformRepository {
                     {
                         self.add_library(
                             &mut libraries,
-                            bstr::BStr::new(&bconcat!(name, "-sqlite")),
+                            bstr::BStr::new(&bformat!("{name}-sqlite")),
                             matches.name("version"),
                             None::<&BStr>,
                             &[],
@@ -1199,7 +1191,7 @@ impl PlatformRepository {
                     {
                         self.add_library(
                             &mut libraries,
-                            bstr::BStr::new(&bconcat!(name, "-libssh2")),
+                            bstr::BStr::new(&bformat!("{name}-libssh2")),
                             matches.name("version"),
                             None::<&BStr>,
                             &[],
@@ -1250,7 +1242,7 @@ impl PlatformRepository {
                     {
                         self.add_library(
                             &mut libraries,
-                            bstr::BStr::new(&bconcat!(name, "-libyaml")),
+                            bstr::BStr::new(&bformat!("{name}-libyaml")),
                             matches.name("version"),
                             Some("libyaml version of yaml"),
                             &[],
@@ -1269,7 +1261,7 @@ impl PlatformRepository {
                         };
                         self.add_library(
                             &mut libraries,
-                            bstr::BStr::new(&bconcat!(name, "-libzip")),
+                            bstr::BStr::new(&bformat!("{name}-libzip")),
                             libzip_str.as_deref(),
                             None::<&BStr>,
                             &[BString::from("zip")],
@@ -1349,8 +1341,8 @@ impl PlatformRepository {
 
     pub fn add_package(&mut self, package: PackageInterfaceHandle) -> anyhow::Result<()> {
         if package.as_complete().is_none() {
-            return Err(UnexpectedValueException::new(bconcat!(
-                "Expected CompletePackage but got ",
+            return Err(UnexpectedValueException::new(bformat!(
+                "Expected CompletePackage but got {}",
                 get_class(&PhpMixed::Null)
             ))
             .into());
@@ -1375,16 +1367,16 @@ impl PlatformRepository {
                 if package.get_version() == ov.get_version() {
                     BString::from("same as actual")
                 } else {
-                    bconcat!("actual: ", package.get_pretty_version())
+                    bformat!("actual: {}", package.get_pretty_version())
                 }
             } else {
-                bconcat!("actual: ", package.get_pretty_version())
+                bformat!("actual: {}", package.get_pretty_version())
             };
             if let Some(overrider) = overrider
                 && let Some(overrider) = overrider.as_complete()
             {
                 let description = overrider.get_description().unwrap_or_default();
-                overrider.set_description(bconcat!(description, ", ", actual_text));
+                overrider.set_description(bformat!("{description}, {actual_text}"));
             }
 
             return Ok(());
@@ -1401,10 +1393,10 @@ impl PlatformRepository {
             let actual_text = if package.get_version() == overrider.get_version() {
                 BString::from("same as actual")
             } else {
-                bconcat!("actual: ", package.get_pretty_version())
+                bformat!("actual: {}", package.get_pretty_version())
             };
             let current_description = overrider.get_description().unwrap_or_default();
-            overrider.set_description(bconcat!(current_description, ", ", actual_text));
+            overrider.set_description(bformat!("{current_description}, {actual_text}"));
 
             return Ok(());
         }
@@ -1462,9 +1454,8 @@ impl PlatformRepository {
 
     fn add_disabled_package(&mut self, package: CompletePackageInterfaceHandle) {
         let current_description = package.get_description().unwrap_or_default();
-        package.set_description(bconcat!(
-            current_description,
-            ". <warning>Package disabled via config.platform</warning>"
+        package.set_description(bformat!(
+            "{current_description}. <warning>Package disabled via config.platform</warning>"
         ));
         let mut extra: IndexMap<BString, PhpMixed> = IndexMap::new();
         extra.insert("config.platform".into(), PhpMixed::Bool(true));
@@ -1493,7 +1484,7 @@ impl PlatformRepository {
         {
             Ok(v) => v,
             Err(_) => {
-                extra_description = Some(bconcat!(" (actual version: ", pretty_version, ")"));
+                extra_description = Some(bformat!(" (actual version: {pretty_version})"));
                 if let Some(m) = preg_match(
                     php_regex!("{^(\\d+\\.\\d+\\.\\d+(?:\\.\\d+)?)}"),
                     &pretty_version,
@@ -1511,10 +1502,8 @@ impl PlatformRepository {
 
         let package_name = self.build_package_name(name);
         let mut ext = CompletePackage::new(package_name, version.clone(), pretty_version);
-        ext.set_description(bconcat!(
-            "The ",
-            name,
-            " PHP extension",
+        ext.set_description(bformat!(
+            "The {name} PHP extension{}",
             extra_description.unwrap_or_default()
         ));
         ext.inner.set_type("php-ext".into());
@@ -1539,7 +1528,7 @@ impl PlatformRepository {
     }
 
     fn build_package_name(&self, name: &BStr) -> BString {
-        bconcat!("ext-", str_replace(" ", "-", strtolower(name)))
+        bformat!("ext-{}", str_replace(" ", "-", strtolower(name)))
     }
 
     fn add_library(
@@ -1567,17 +1556,17 @@ impl PlatformRepository {
 
         // avoid adding the same lib twice even if two conflicting extensions provide the same lib
         // see https://github.com/composer/composer/issues/12082
-        if libraries.contains_key(&bconcat!("lib-", name)) {
+        if libraries.contains_key(&bformat!("lib-{name}")) {
             return Ok(());
         }
-        libraries.insert(bconcat!("lib-", name), true);
+        libraries.insert(bformat!("lib-{name}"), true);
 
         let description = description
             .map(|d| BString::from(d.as_ref()))
-            .unwrap_or_else(|| bconcat!("The ", name, " library"));
+            .unwrap_or_else(|| bformat!("The {name} library"));
 
         let mut lib = CompletePackage::new(
-            bconcat!("lib-", name),
+            bformat!("lib-{name}"),
             version.clone(),
             bstr::BString::from(pretty_version),
         );
@@ -1589,8 +1578,8 @@ impl PlatformRepository {
             replace_links.insert(
                 replace_lower.clone(),
                 Link::new(
-                    bconcat!("lib-", name),
-                    bconcat!("lib-", replace_lower),
+                    bformat!("lib-{name}"),
+                    bformat!("lib-{replace_lower}"),
                     SimpleConstraint::new("=", BString::from(&version[..]), None).into(),
                     Some(Link::TYPE_REPLACE.to_owned()),
                     Some(bstr::BString::from(lib.get_pretty_version())),
@@ -1603,8 +1592,8 @@ impl PlatformRepository {
             provide_links.insert(
                 provide_lower.clone(),
                 Link::new(
-                    bconcat!("lib-", name),
-                    bconcat!("lib-", provide_lower),
+                    bformat!("lib-{name}"),
+                    bformat!("lib-{provide_lower}"),
                     SimpleConstraint::new("=", BString::from(&version[..]), None).into(),
                     Some(Link::TYPE_PROVIDE.to_owned()),
                     Some(bstr::BString::from(lib.get_pretty_version())),

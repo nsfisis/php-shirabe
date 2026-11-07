@@ -7,7 +7,7 @@ use indexmap::IndexMap;
 use shirabe::downloader::{DownloadManager, DownloaderInterface};
 use shirabe::io::IOInterface;
 use shirabe::package::{CompletePackageHandle, PackageInterfaceHandle};
-use shirabe_php_shim::{PhpMixed, RuntimeException, bconcat, impl_php_class, php_str};
+use shirabe_php_shim::{PhpMixed, RuntimeException, bformat, impl_php_class, php_str};
 use shirabe_semver::VersionParser;
 
 // PHP mocks `Composer\Downloader\DownloaderInterface` with getMockBuilder.
@@ -96,7 +96,7 @@ fn make_package(name: &BStr, is_dev: bool) -> PackageInterfaceHandle {
             BString::from("1.0.0"),
         )
     };
-    CompletePackageHandle::new(bconcat!(name), version, pretty).into()
+    CompletePackageHandle::new(bformat!("{name}"), version, pretty).into()
 }
 
 /// ref: DownloadManagerTest::createDownloaderMock
@@ -627,7 +627,7 @@ fn test_get_available_sources_update_sticks_to_same_source() {
     for case in cases {
         let initial = case.prev_pkg_source.map(|source| {
             let package = make_package(BStr::new("dummy/pkg"), case.prev_pkg_is_dev);
-            package.set_installation_source(Some(bconcat!(source)));
+            package.set_installation_source(Some(bformat!("{source}")));
             package
         });
 
@@ -640,7 +640,7 @@ fn test_get_available_sources_update_sticks_to_same_source() {
         }
 
         let result = manager.__get_available_sources(target, initial).unwrap();
-        let expected: Vec<BString> = case.expected.iter().map(|s| bconcat!(s)).collect();
+        let expected: Vec<BString> = case.expected.iter().map(|s| bformat!("{s}")).collect();
         assert_eq!(result, expected);
     }
 }

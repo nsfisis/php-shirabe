@@ -7,7 +7,7 @@ use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::util::{HttpDownloader, ProcessExecutor, StreamContextOptions};
 use bstr::{BStr, BString};
 use shirabe_php_shim::{
-    Catch as _, PhpMixed, bconcat, date_local, explode_limit, implode, in_array_loose, intval,
+    Catch as _, PhpMixed, bformat, date_local, explode_limit, implode, in_array_loose, intval,
     php_regex, php_str, preg_is_match, preg_match, rawurlencode, str_replace, stripos, strtolower,
     trim,
 };
@@ -98,10 +98,10 @@ impl GitHub {
                 .execute(&[BString::from("hostname")], &mut output, None)?
                 == 0
             {
-                note = bconcat!(note, " on ", trim(&output));
+                note = bformat!("{note} on {}", trim(&output));
             }
         }
-        note = bconcat!(note, " ", date_local("Y-m-d Hi", None));
+        note = bformat!("{note} {}", date_local("Y-m-d Hi", None));
 
         let (local_name, auth_name): (Option<BString>, BString) = {
             let cfg = self.config.borrow();
@@ -112,15 +112,12 @@ impl GitHub {
         };
         let prefix = local_name
             .as_ref()
-            .map(|n| bconcat!(n, " OR "))
+            .map(|n| bformat!("{n} OR "))
             .unwrap_or_default();
         let lines = [
             BString::from("You need to provide a GitHub access token."),
-            bconcat!(
-                "Tokens will be stored in plain text in \"",
-                prefix,
-                auth_name,
-                "\" for future use by Composer."
+            bformat!(
+                "Tokens will be stored in plain text in \"{prefix}{auth_name}\" for future use by Composer."
             ),
             BString::from(
                 "Due to the security risk of tokens being exfiltrated, use tokens with short expiration times and only the minimum permissions necessary.",
@@ -140,11 +137,8 @@ impl GitHub {
                 "from private GitHub repositories over HTTPS, use a fine-grained token with read-only access to public information.",
             ),
             BString::from("Use the following URL to create such a token:"),
-            bconcat!(
-                "https://",
-                origin_url,
-                "/settings/personal-access-tokens/new?name=",
-                encoded_note
+            bformat!(
+                "https://{origin_url}/settings/personal-access-tokens/new?name={encoded_note}"
             ),
             BString::default(),
         ];
@@ -160,11 +154,8 @@ impl GitHub {
             BString::from(
                 "to the right user or organisation. Additionally, you can scope permissions down to apply only to selected repositories.",
             ),
-            bconcat!(
-                "https://",
-                origin_url,
-                "/settings/personal-access-tokens/new?contents=read&name=",
-                encoded_note
+            bformat!(
+                "https://{origin_url}/settings/personal-access-tokens/new?contents=read&name={encoded_note}"
             ),
             BString::default(),
         ];
@@ -181,11 +172,8 @@ impl GitHub {
                 "private repositories across multiple organisations at the same time and using directory-specific authentication sources",
             ),
             BString::from("is not an option. You can generate a classic token here:"),
-            bconcat!(
-                "https://",
-                origin_url,
-                "/settings/tokens/new?scopes=repo&description=",
-                encoded_note
+            bformat!(
+                "https://{origin_url}/settings/tokens/new?scopes=repo&description={encoded_note}"
             ),
             BString::default(),
         ];
@@ -224,7 +212,7 @@ impl GitHub {
         let api_url = if origin_url == "github.com" {
             BString::from("api.github.com/")
         } else {
-            bconcat!(origin_url, "/api/v3/")
+            bformat!("{origin_url}/api/v3/")
         };
 
         let mut http_options = StreamContextOptions::new();
@@ -233,7 +221,7 @@ impl GitHub {
         match self
             .http_downloader
             .borrow_mut()
-            .get(bconcat!("https://", api_url), http_options)
+            .get(bformat!("https://{api_url}"), http_options)
         {
             Ok(_) => {}
             Err(te) => {
@@ -257,7 +245,7 @@ impl GitHub {
                 .borrow()
                 .get_local_auth_config_source()
                 .is_some();
-        let key = bconcat!("github-oauth.", origin_url);
+        let key = bformat!("github-oauth.{origin_url}");
         {
             let mut cfg = self.config.borrow_mut();
             cfg.get_config_source_mut()

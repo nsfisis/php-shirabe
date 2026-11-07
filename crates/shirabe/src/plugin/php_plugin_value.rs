@@ -18,7 +18,7 @@ use crate::util::http::Response;
 use bstr::{BStr, BString, ByteSlice};
 use shirabe_class_map_generator::class_map::ClassMap;
 use shirabe_php_rpc::{FromWire, PhpObject, PhpThrow, PluginValue, ToWire, wire};
-use shirabe_php_shim::{bconcat, display_to_bytes, php_str};
+use shirabe_php_shim::{bformat, display_to_bytes, php_str};
 use shirabe_semver::constraint::{
     AnyConstraint, MatchAllConstraint, MatchNoneConstraint, MultiConstraint, SimpleConstraint,
 };
@@ -44,7 +44,7 @@ fn property<T: FromWire>(
     value: Option<&PluginValue>,
 ) -> Result<T, PhpThrow> {
     T::from_wire(value.unwrap_or(&wire::NULL)).map_err(|throw| PhpThrow {
-        message: bconcat!(context.as_ref(), ": ", throw.message),
+        message: bformat!("{}: {}", context.as_ref(), throw.message),
         ..throw
     })
 }
@@ -103,8 +103,8 @@ fn constraint_to_wire(constraint: &AnyConstraint) -> PluginValue {
 
 fn constraint_from_wire(value: &PluginValue) -> Result<AnyConstraint, PhpThrow> {
     let object = as_object(value).ok_or_else(|| {
-        PhpThrow::runtime(bconcat!(
-            "expected a semver constraint from the plugin, got ",
+        PhpThrow::runtime(bformat!(
+            "expected a semver constraint from the plugin, got {}",
             display_to_bytes(format_args!("{value:?}"))
         ))
     })?;
@@ -117,9 +117,8 @@ fn constraint_from_wire(value: &PluginValue) -> Result<AnyConstraint, PhpThrow> 
         class if class == CONSTRAINT_CLASS => {
             let code: i64 = property("a semver constraint operator", object.protected("operator"))?;
             let operator = SimpleConstraint::from_operator_constant(code).ok_or_else(|| {
-                PhpThrow::runtime(bconcat!(
-                    "a semver constraint has an unknown operator: ",
-                    code
+                PhpThrow::runtime(bformat!(
+                    "a semver constraint has an unknown operator: {code}"
                 ))
             })?;
             AnyConstraint::Simple(SimpleConstraint::new(
@@ -140,8 +139,8 @@ fn constraint_from_wire(value: &PluginValue) -> Result<AnyConstraint, PhpThrow> 
                     .map(constraint_from_wire)
                     .collect::<Result<Vec<_>, _>>()?,
                 other => {
-                    return Err(PhpThrow::runtime(bconcat!(
-                        "a MultiConstraint expects a list of constraints, got ",
+                    return Err(PhpThrow::runtime(bformat!(
+                        "a MultiConstraint expects a list of constraints, got {}",
                         display_to_bytes(format_args!("{other:?}"))
                     )));
                 }
@@ -170,10 +169,8 @@ fn constraint_from_wire(value: &PluginValue) -> Result<AnyConstraint, PhpThrow> 
         // TODO(plugin): a plugin-defined ConstraintInterface implementation has no Rust
         // counterpart; the four composer/semver classes are the whole vocabulary here.
         other => {
-            return Err(PhpThrow::runtime(bconcat!(
-                "the semver constraint class `",
-                other,
-                "` cannot cross the plugin boundary"
+            return Err(PhpThrow::runtime(bformat!(
+                "the semver constraint class `{other}` cannot cross the plugin boundary"
             )));
         }
     })
@@ -277,18 +274,17 @@ pub(crate) fn link_to_wire(link: &Link) -> PluginValue {
 
 pub(crate) fn link_from_wire(value: &PluginValue) -> Result<Link, PhpThrow> {
     let object = as_object(value).ok_or_else(|| {
-        PhpThrow::runtime(bconcat!(
-            "expected a Link from the plugin, got ",
+        PhpThrow::runtime(bformat!(
+            "expected a Link from the plugin, got {}",
             display_to_bytes(format_args!("{value:?}"))
         ))
     })?;
     if object.class != LINK_CLASS {
         // TODO(plugin): Link subclasses have no Rust counterpart; the port models links as a
         // single value type.
-        return Err(PhpThrow::runtime(bconcat!(
-            "the class `",
-            object.class,
-            "` cannot cross the plugin boundary as a Link"
+        return Err(PhpThrow::runtime(bformat!(
+            "the class `{}` cannot cross the plugin boundary as a Link",
+            object.class
         )));
     }
     let constraint = constraint_from_wire(

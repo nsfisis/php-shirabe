@@ -15,7 +15,7 @@ use shirabe::repository::{FilesystemRepository, RepositoryInterface};
 use shirabe::util::Filesystem;
 use shirabe_php_rpc::{PluginValue, ToWire};
 use shirabe_php_shim::{
-    Catch as _, PhpMixed, bconcat, display_to_bytes, path_from_bytes, path_to_bytes,
+    Catch as _, PhpMixed, bformat, display_to_bytes, path_from_bytes, path_to_bytes,
 };
 use shirabe_semver::VersionParser;
 
@@ -23,10 +23,9 @@ use shirabe_semver::VersionParser;
 /// materialized as a real temp file whose decoded JSON reproduces the mock return value exactly.
 fn create_temp_json_file(contents: &BStr) -> std::path::PathBuf {
     let mut path = std::env::temp_dir();
-    let unique = bconcat!(
-        "shirabe_filesystemrepositorytest_",
+    let unique = bformat!(
+        "shirabe_filesystemrepositorytest_{}_{}",
         std::process::id(),
-        "_",
         display_to_bytes(
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
@@ -76,10 +75,9 @@ fn test_corrupted_repository_file() {
 #[test]
 fn test_unexistent_repository_file() {
     let mut path = std::env::temp_dir();
-    path.push(path_from_bytes(&bconcat!(
-        "shirabe_filesystemrepositorytest_missing_",
+    path.push(path_from_bytes(&bformat!(
+        "shirabe_filesystemrepositorytest_missing_{}_{}",
         std::process::id(),
-        "_",
         display_to_bytes(
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
@@ -141,10 +139,9 @@ fn test_repository_write() {
     // and read back. write() never reads the file (it dumps the in-memory packages), so the mocked
     // read()/exists() return values are irrelevant to the result.
     let base = std::fs::canonicalize(std::env::temp_dir()).unwrap();
-    let repo_dir = base.join(path_from_bytes(&bconcat!(
-        "shirabe_repo_write_test_",
+    let repo_dir = base.join(path_from_bytes(&bformat!(
+        "shirabe_repo_write_test_{}_{}",
         std::process::id(),
-        "_",
         display_to_bytes(
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
@@ -226,8 +223,8 @@ fn configure_links(
     let mut map: IndexMap<BString, PhpMixed> = IndexMap::new();
     for (target, constraint) in links {
         map.insert(
-            bconcat!((*target)),
-            PhpMixed::string(bconcat!((*constraint))),
+            bformat!("{}", (*target)),
+            PhpMixed::string(bformat!("{}", (*constraint))),
         );
     }
     ArrayLoader::new(None, false)
@@ -349,7 +346,7 @@ fn test_repository_writes_installed_php() {
             return Some(cwd.clone());
         }
         // check for relative paths
-        Some(path_from_bytes(&bconcat!("vendor/", package.get_name())).to_path_buf())
+        Some(path_from_bytes(&bformat!("vendor/{}", package.get_name())).to_path_buf())
     });
 
     repository.write(true, &im).unwrap();
@@ -403,7 +400,7 @@ fn test_safely_load_installed_versions() {
     let root = PhpMixed::Array(IndexMap::from([
         (
             "install_path".into(),
-            PhpMixed::string(bconcat!(fixtures_dir, "/./")),
+            PhpMixed::string(bformat!("{fixtures_dir}/./")),
         ),
         (
             "aliases".into(),
@@ -425,7 +422,9 @@ fn test_safely_load_installed_versions() {
         ),
         (
             "install_path".into(),
-            PhpMixed::string(bconcat!(fixtures_dir, "/vendor/{${passthru('bash -i')}}")),
+            PhpMixed::string(bformat!(
+                "{fixtures_dir}/vendor/{{${{passthru('bash -i')}}}}"
+            )),
         ),
         ("empty array".into(), PhpMixed::List(vec![])),
     ]));

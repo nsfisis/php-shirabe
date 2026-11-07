@@ -3,7 +3,7 @@
 use crate::dependency_resolver::operation::SolverOperation;
 use crate::package::{AliasPackageHandle, DisplayMode};
 use bstr::{BStr, BString};
-use shirabe_php_shim::{PhpDisplay, bconcat, php_str};
+use shirabe_php_shim::{PhpDisplay, bformat, php_str};
 
 #[derive(Debug, Clone)]
 pub struct MarkAliasUninstalledOperation {
@@ -20,19 +20,15 @@ impl MarkAliasUninstalledOperation {
     }
 
     pub fn show(&self, _lock: bool) -> bstr::BString {
-        bconcat!(
-            "Marking <info>",
+        bformat!(
+            "Marking <info>{}</info> (<comment>{}</comment>) as uninstalled, alias of <info>{}</info> (<comment>{}</comment>)",
             self.package.get_pretty_name(),
-            "</info> (<comment>",
             self.package
                 .get_full_pretty_version(true, DisplayMode::SourceRefIfDev),
-            "</comment>) as uninstalled, alias of <info>",
             self.package.get_alias_of().get_pretty_name(),
-            "</info> (<comment>",
             self.package
                 .get_alias_of()
-                .get_full_pretty_version(true, DisplayMode::SourceRefIfDev),
-            "</comment>)"
+                .get_full_pretty_version(true, DisplayMode::SourceRefIfDev)
         )
     }
 }

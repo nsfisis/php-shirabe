@@ -5,7 +5,7 @@ use crate::util::{CommandLine, Filesystem, Platform, ProcessExecutor};
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    Exception, PHP_EOL, PhpMixed, PhpResource, bconcat, chdir, date_local, explode, fclose, feof,
+    Exception, PHP_EOL, PhpMixed, PhpResource, bformat, chdir, date_local, explode, fclose, feof,
     fgets, file_get_contents, fopen, fwrite, gethostname, json_decode_assoc, path_from_bytes,
     php_regex, preg_replace, str_replace_array, strcmp, strlen, strpos, strrpos, substr, time,
     trim,
@@ -132,7 +132,7 @@ impl Perforce {
     }
 
     pub fn generate_unique_perforce_client_name(&self) -> BString {
-        bconcat!(gethostname().into_encoded_bytes(), "_", time())
+        bformat!("{}_{}", gethostname().into_encoded_bytes(), time())
     }
 
     pub fn cleanup_client_spec(&mut self) {
@@ -159,11 +159,9 @@ impl Perforce {
         if self.p4_client.is_none() {
             let stream = self.get_stream();
             let clean_stream_name = str_replace_array(&["//", "/", "@"], &["", "_", ""], &stream);
-            self.p4_client = Some(bconcat!(
-                "composer_perforce_",
-                self.unique_perforce_client_name,
-                "_",
-                clean_stream_name
+            self.p4_client = Some(bformat!(
+                "composer_perforce_{}_{clean_stream_name}",
+                self.unique_perforce_client_name
             ));
         }
 
@@ -203,14 +201,13 @@ impl Perforce {
     pub fn get_stream(&mut self) -> BString {
         if self.p4_stream.is_none() {
             if self.is_stream() {
-                self.p4_stream = Some(bconcat!(
-                    "//",
+                self.p4_stream = Some(bformat!(
+                    "//{}/{}",
                     self.p4_depot.clone().unwrap_or_default(),
-                    "/",
                     self.p4_branch.clone().unwrap_or_default()
                 ));
             } else {
-                self.p4_stream = Some(bconcat!("//", self.p4_depot.clone().unwrap_or_default()));
+                self.p4_stream = Some(bformat!("//{}", self.p4_depot.clone().unwrap_or_default()));
             }
         }
 
@@ -227,7 +224,7 @@ impl Perforce {
 
     pub fn get_p4_client_spec(&mut self) -> PathBuf {
         let client = self.get_client();
-        path_from_bytes(&bconcat!(&self.path, "/", client, ".p4.spec")).to_path_buf()
+        path_from_bytes(&bformat!("{}/{client}.p4.spec", &self.path)).to_path_buf()
     }
 
     pub fn get_user(&self) -> Option<BString> {
@@ -253,14 +250,14 @@ impl Perforce {
             .as_string()
             .map(BStr::to_owned);
         let command = if self.windows_flag {
-            bconcat!(
+            bformat!(
+                "{} set P4USER={}",
                 Self::get_p4_executable(),
-                " set P4USER=",
                 ProcessExecutor::escape(self.p4_user.clone().unwrap_or_default())
             )
         } else {
-            bconcat!(
-                "export P4USER=",
+            bformat!(
+                "export P4USER={}",
                 ProcessExecutor::escape(self.p4_user.clone().unwrap_or_default())
             )
         };
@@ -271,7 +268,7 @@ impl Perforce {
 
     fn get_p4_variable(&mut self, name: &BStr) -> Option<BString> {
         if self.windows_flag {
-            let command = bconcat!(Self::get_p4_executable(), " set");
+            let command = bformat!("{} set", Self::get_p4_executable());
             self.execute_command(CommandLine::Shell(command));
             let result = trim(&self.command_result);
             let res_array = explode(PHP_EOL, &result);
@@ -296,7 +293,7 @@ impl Perforce {
             return None;
         }
 
-        let command = bconcat!("echo $", name);
+        let command = bformat!("echo ${name}");
         self.execute_command(CommandLine::Shell(command));
         let result = trim(&self.command_result);
 
@@ -309,10 +306,9 @@ impl Perforce {
         }
         let mut password = self.get_p4_variable(BStr::new("P4PASSWD"));
         if strlen(password.clone().unwrap_or_default()) <= 0 {
-            password = self.io.ask_and_hide_answer(bconcat!(
-                "Enter password for Perforce user ",
-                self.get_user().unwrap_or_default(),
-                ": "
+            password = self.io.ask_and_hide_answer(bformat!(
+                "Enter password for Perforce user {}: ",
+                self.get_user().unwrap_or_default()
             ))?;
         }
         self.p4_password = password.clone();
@@ -354,13 +350,12 @@ impl Perforce {
                 if index.is_none() {
                     return Ok(false);
                 }
-                return Err(Exception::new(bconcat!(
-                    "p4 command not found in path: ",
-                    error_output
+                return Err(Exception::new(bformat!(
+                    "p4 command not found in path: {error_output}"
                 ))
                 .into());
             }
-            return Err(Exception::new(bconcat!("Invalid user name: ", user)).into());
+            return Err(Exception::new(bformat!("Invalid user name: {user}")).into());
         }
 
         Ok(true)
@@ -388,7 +383,7 @@ impl Perforce {
         chdir(&self.path);
         let mut p4_sync_command = self.generate_p4_command(vec!["sync".into(), "-f".into()], true);
         if let Some(source_reference) = source_reference {
-            p4_sync_command.push(bconcat!("@", source_reference));
+            p4_sync_command.push(bformat!("@{source_reference}"));
         }
         self.execute_command(CommandLine::Args(p4_sync_command));
         chdir(&prev_dir);
@@ -398,73 +393,63 @@ impl Perforce {
 
     pub fn write_client_spec_to_file(&mut self, spec: &PhpResource) {
         let client = self.get_client();
-        fwrite(spec, bconcat!("Client: ", client, PHP_EOL, PHP_EOL), None);
+        fwrite(spec, bformat!("Client: {client}{PHP_EOL}{PHP_EOL}"), None);
         fwrite(
             spec,
-            bconcat!(
-                "Update: ",
-                date_local("Y/m/d H:i:s", None),
-                PHP_EOL,
-                PHP_EOL
+            bformat!(
+                "Update: {}{PHP_EOL}{PHP_EOL}",
+                date_local("Y/m/d H:i:s", None)
             ),
             None,
         );
         fwrite(
             spec,
-            bconcat!("Access: ", date_local("Y/m/d H:i:s", None), PHP_EOL),
+            bformat!("Access: {}{PHP_EOL}", date_local("Y/m/d H:i:s", None)),
             None,
         );
         fwrite(
             spec,
-            bconcat!(
-                "Owner:  ",
-                self.get_user().unwrap_or_default(),
-                PHP_EOL,
-                PHP_EOL
+            bformat!(
+                "Owner:  {}{PHP_EOL}{PHP_EOL}",
+                self.get_user().unwrap_or_default()
             ),
             None,
         );
-        fwrite(spec, bconcat!("Description:", PHP_EOL), None);
+        fwrite(spec, bformat!("Description:{PHP_EOL}"), None);
         fwrite(
             spec,
-            bconcat!(
-                "  Created by ",
-                self.get_user().unwrap_or_default(),
-                " from composer.",
-                PHP_EOL,
-                PHP_EOL
+            bformat!(
+                "  Created by {} from composer.{PHP_EOL}{PHP_EOL}",
+                self.get_user().unwrap_or_default()
             ),
             None,
         );
         fwrite(
             spec,
-            bconcat!("Root: ", self.get_path(), PHP_EOL, PHP_EOL),
+            bformat!("Root: {}{PHP_EOL}{PHP_EOL}", self.get_path()),
             None,
         );
         fwrite(
             spec,
-            bconcat!(
-                "Options:  noallwrite noclobber nocompress unlocked modtime rmdir",
-                PHP_EOL,
-                PHP_EOL
+            bformat!(
+                "Options:  noallwrite noclobber nocompress unlocked modtime rmdir{PHP_EOL}{PHP_EOL}"
             ),
             None,
         );
         fwrite(
             spec,
-            bconcat!("SubmitOptions:  revertunchanged", PHP_EOL, PHP_EOL),
+            bformat!("SubmitOptions:  revertunchanged{PHP_EOL}{PHP_EOL}"),
             None,
         );
-        fwrite(spec, bconcat!("LineEnd:  local", PHP_EOL, PHP_EOL), None);
+        fwrite(spec, bformat!("LineEnd:  local{PHP_EOL}{PHP_EOL}"), None);
         if self.is_stream() {
-            fwrite(spec, bconcat!("Stream:", PHP_EOL), None);
+            fwrite(spec, bformat!("Stream:{PHP_EOL}"), None);
             let stream_clone = self.p4_stream.clone().unwrap_or_default();
             fwrite(
                 spec,
-                bconcat!(
-                    "  ",
-                    self.get_stream_without_label(stream_clone.as_bstr()),
-                    PHP_EOL
+                bformat!(
+                    "  {}{PHP_EOL}",
+                    self.get_stream_without_label(stream_clone.as_bstr())
                 ),
                 None,
             );
@@ -473,7 +458,7 @@ impl Perforce {
             let client = self.get_client();
             fwrite(
                 spec,
-                bconcat!("View:  ", stream, "/...  //", client, "/... ", PHP_EOL),
+                bformat!("View:  {stream}/...  //{client}/... {PHP_EOL}"),
                 None,
             );
         }
@@ -532,8 +517,8 @@ impl Perforce {
                 process.run(None, indexmap::IndexMap::new())?;
 
                 if !process.is_successful() {
-                    return Err(Exception::new(bconcat!(
-                        "Error logging in:",
+                    return Err(Exception::new(bformat!(
+                        "Error logging in:{}",
                         self.process.borrow().get_error_output()
                     ))
                     .into());
@@ -580,14 +565,13 @@ impl Perforce {
     pub fn get_file_path(&mut self, file: &BStr, identifier: &BStr) -> Option<BString> {
         let index = strpos(identifier, "@");
         if index.is_none() {
-            return Some(bconcat!(identifier, "/", file));
+            return Some(bformat!("{identifier}/{file}"));
         }
         let idx = index.unwrap() as i64;
 
-        let path = bconcat!(
+        let path = bformat!(
+            "{}/{file}{}",
             substr(identifier, 0, Some(idx)),
-            "/",
-            file,
             substr(identifier, idx, None)
         );
         let command = self.generate_p4_command(vec!["files".into(), path], false);
@@ -600,11 +584,9 @@ impl Perforce {
                 let phrase = trim(substr(&result, i3 as i64, None));
                 let fields = explode(" ", &phrase);
 
-                return Some(bconcat!(
+                return Some(bformat!(
+                    "{}/{file}@{}",
                     substr(identifier, 0, Some(idx)),
-                    "/",
-                    file,
-                    "@",
                     fields.get(1).cloned().unwrap_or_default()
                 ));
             }
@@ -622,7 +604,7 @@ impl Perforce {
             let command = self.generate_p4_command(
                 vec![
                     "streams".into(),
-                    bconcat!("//", self.p4_depot.clone().unwrap_or_default(), "/..."),
+                    bformat!("//{}/...", self.p4_depot.clone().unwrap_or_default()),
                 ],
                 true,
             );
@@ -643,7 +625,7 @@ impl Perforce {
         }
         let stream = self.get_stream();
         let command =
-            self.generate_p4_command(vec!["changes".into(), bconcat!(stream, "/...")], false);
+            self.generate_p4_command(vec!["changes".into(), bformat!("{stream}/...")], false);
         self.execute_command(CommandLine::Args(command));
         let result = self.command_result.clone();
         let res_array = explode(PHP_EOL, &result);
@@ -654,13 +636,12 @@ impl Perforce {
         let mut result = IndexMap::new();
         result.insert(
             "master".into(),
-            bconcat!(
+            bformat!(
+                "{}@{last_commit_num}",
                 possible_branches
                     .get(self.p4_branch.clone().unwrap_or_default().as_slice())
                     .cloned()
-                    .unwrap_or_default(),
-                "@",
-                last_commit_num
+                    .unwrap_or_default()
             ),
         );
         result
@@ -677,7 +658,7 @@ impl Perforce {
             if strpos(line, "Label").is_some() {
                 let fields = explode(" ", line);
                 let key = fields.get(1).cloned().unwrap_or_default();
-                tags.insert(key.clone(), bconcat!(stream, "@", key));
+                tags.insert(key.clone(), bformat!("{stream}@{key}"));
             }
         }
 
@@ -729,11 +710,11 @@ impl Perforce {
         let from_change_list = self.get_change_list(from_reference)?;
         let to_change_list = self.get_change_list(to_reference)?;
         let index = strpos(from_reference, "@").unwrap_or(0);
-        let main = bconcat!(substr(from_reference, 0, Some(index as i64)), "/...");
+        let main = bformat!("{}/...", substr(from_reference, 0, Some(index as i64)));
         let command = self.generate_p4_command(
             vec![
                 "filelog".into(),
-                bconcat!(main, "@", from_change_list, ",", to_change_list),
+                bformat!("{main}@{from_change_list},{to_change_list}"),
             ],
             true,
         );

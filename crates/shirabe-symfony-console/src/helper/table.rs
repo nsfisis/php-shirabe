@@ -9,7 +9,7 @@ use crate::output::{OUTPUT_NORMAL, OutputInterface};
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpDisplay, PhpMixed, ToPhpString, array_splice, bconcat, explode, get_debug_type,
+    PhpDisplay, PhpMixed, ToPhpString, array_splice, bformat, explode, get_debug_type,
     http_build_query_mixed, implode, mb_detect_encoding, mb_str_split, mb_strwidth, php_regex,
     preg_is_match, sprintf, str_pad, str_repeat, str_replace, strlen, strstr, substr_count,
 };
@@ -282,10 +282,8 @@ impl Table {
             return Ok(Ok(style.clone()));
         }
 
-        Ok(Err(InvalidArgumentException::new(bconcat!(
-            "Style \"",
-            name,
-            "\" is not defined."
+        Ok(Err(InvalidArgumentException::new(bformat!(
+            "Style \"{name}\" is not defined."
         ))))
     }
 
@@ -650,7 +648,7 @@ impl Table {
                     Some(fmt) => cell_format = fmt,
                     None => {
                         let tag = http_build_query_mixed(&cell_style.get_tag_options(), "", ";");
-                        cell_format = bconcat!("<", tag, ">%s</>");
+                        cell_format = bformat!("<{tag}>%s</>");
                     }
                 }
 
@@ -748,7 +746,7 @@ impl Table {
                     eol,
                     str_replace(
                         eol,
-                        bconcat!("<fg=default;bg=default></>", eol),
+                        bformat!("<fg=default;bg=default></>{eol}"),
                         cell.to_php_string(),
                     ),
                 );
@@ -832,11 +830,7 @@ impl Table {
                     };
                     let exploded = explode(
                         eol,
-                        str_replace(
-                            eol,
-                            bconcat!("<fg=default;bg=default>", eol, "</>"),
-                            &cell_str,
-                        ),
+                        str_replace(eol, bformat!("<fg=default;bg=default>{eol}</>"), &cell_str),
                     );
                     lines = exploded
                         .iter()
@@ -1144,10 +1138,8 @@ impl Table {
             return Ok(Ok(style.clone()));
         }
 
-        Ok(Err(InvalidArgumentException::new(bconcat!(
-            "Style \"",
-            name,
-            "\" is not defined."
+        Ok(Err(InvalidArgumentException::new(bformat!(
+            "Style \"{name}\" is not defined."
         ))))
     }
 

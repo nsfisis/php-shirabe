@@ -8,7 +8,7 @@ use crate::util::{HttpDownloader, HttpOptions, ProcessExecutor, StreamContextOpt
 use bstr::{B, BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    Catch as _, LogicException, PhpMixed, bconcat, json_encode, php_str, time, trim,
+    Catch as _, LogicException, PhpMixed, bformat, json_encode, php_str, time, trim,
 };
 
 #[derive(Debug)]
@@ -134,16 +134,16 @@ impl Bitbucket {
         let token_map = match token {
             PhpMixed::Array(ref m) => m.clone(),
             _ => {
-                return Err(LogicException::new(bconcat!(
-                    "Expected a token configured with expires_in and access_token present, got ",
+                return Err(LogicException::new(bformat!(
+                    "Expected a token configured with expires_in and access_token present, got {}",
                     json_encode(&token).unwrap_or_default()
                 ))
                 .into());
             }
         };
         if !token_map.contains_key(B("expires_in")) || !token_map.contains_key(B("access_token")) {
-            return Err(LogicException::new(bconcat!(
-                "Expected a token configured with expires_in and access_token present, got ",
+            return Err(LogicException::new(bformat!(
+                "Expected a token configured with expires_in and access_token present, got {}",
                 json_encode(&token).unwrap_or_default()
             ))
             .into());
@@ -175,14 +175,9 @@ impl Bitbucket {
         self.io.write_error(url);
         let local_name_prefix = local_auth_config_name
             .as_ref()
-            .map(|name| bconcat!(name, " OR "))
+            .map(|name| bformat!("{name} OR "))
             .unwrap_or_default();
-        self.io.write_error(bconcat!(
-            "to create a consumer. It will be stored in \"",
-            local_name_prefix,
-            auth_config_source_name,
-            "\" for future use by Composer."
-        ));
+        self.io.write_error(bformat!("to create a consumer. It will be stored in \"{local_name_prefix}{auth_config_source_name}\" for future use by Composer."));
         self.io.write_error("Ensure you enter a \"Callback URL\" (http://example.com is fine) or it will not be possible to create an Access Token (this callback url will not be used by composer)");
 
         let mut store_in_local_auth_config = false;
@@ -237,7 +232,7 @@ impl Bitbucket {
         self.config
             .borrow_mut()
             .get_auth_config_source_mut()
-            .remove_config_setting(bstr::BStr::new(&bconcat!("http-basic.", origin_url)))?;
+            .remove_config_setting(bstr::BStr::new(&bformat!("http-basic.{origin_url}")))?;
 
         self.io
             .write_error("<info>Consumer stored successfully.</info>");
@@ -300,7 +295,7 @@ impl Bitbucket {
         self.config
             .borrow_mut()
             .get_config_source_mut()
-            .remove_config_setting(bstr::BStr::new(&bconcat!("bitbucket-oauth.", origin_url)))?;
+            .remove_config_setting(bstr::BStr::new(&bformat!("bitbucket-oauth.{origin_url}")))?;
 
         let token = self.token.as_ref().ok_or_else(|| {
             LogicException::new(BString::from(
@@ -313,8 +308,8 @@ impl Bitbucket {
             .ok_or_else(|| {
                 let token_mixed =
                     PhpMixed::Array(token.iter().map(|(k, v)| (k.clone(), v.clone())).collect());
-                LogicException::new(bconcat!(
-                    "Expected a token configured with expires_in present, got ",
+                LogicException::new(bformat!(
+                    "Expected a token configured with expires_in present, got {}",
                     json_encode(&token_mixed).unwrap_or_default()
                 ))
             })?;
@@ -339,7 +334,7 @@ impl Bitbucket {
             .borrow_mut()
             .get_auth_config_source_mut()
             .add_config_setting(
-                bstr::BStr::new(&bconcat!("bitbucket-oauth.", origin_url)),
+                bstr::BStr::new(&bformat!("bitbucket-oauth.{origin_url}")),
                 PhpMixed::Array(consumer),
             )?;
 

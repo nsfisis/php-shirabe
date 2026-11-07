@@ -15,7 +15,7 @@ use crate::util::{
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    Catch as _, InvalidArgumentException, LogicException, PHP_EOL, PhpJson, PhpMixed, bconcat,
+    Catch as _, InvalidArgumentException, LogicException, PHP_EOL, PhpJson, PhpMixed, bformat,
     empty, extension_loaded, implode, intval, is_numeric, path_to_bytes, pcre_check_utf8_subject,
     php_regex, php_truthy, preg_is_match, preg_match, preg_replace, rawurldecode, stripos, strpos,
     substr, ucfirst, utf8_text,
@@ -258,11 +258,7 @@ impl HttpDownloader {
 
     /// The exception PHP's canceler raises for a job that had started.
     pub(crate) fn canceled(url: &BStr) -> IrrecoverableDownloadException {
-        IrrecoverableDownloadException::new(bconcat!(
-            "Download of ",
-            Url::sanitize(url),
-            " canceled"
-        ))
+        IrrecoverableDownloadException::new(bformat!("Download of {} canceled", Url::sanitize(url)))
     }
 
     /// The part of PHP's `addJob` that runs before the promise exists: the request options merged
@@ -378,7 +374,10 @@ impl HttpDownloader {
             }
 
             let mut e = TransportException::new(
-                bconcat!("Network disabled, request canceled: ", Url::sanitize(&url)),
+                bformat!(
+                    "Network disabled, request canceled: {}",
+                    Url::sanitize(&url)
+                ),
                 499,
             );
             e.set_status_code(Some(499));
@@ -415,7 +414,7 @@ impl HttpDownloader {
                     url.to_owned(),
                     None,
                     Vec::new(),
-                    Some(bconcat!(path_to_bytes(copy_to), "~").into()),
+                    Some(bformat!("{}~", path_to_bytes(copy_to)).into()),
                 ))
             } else {
                 let body = match self.local.get_contents(origin, url, false, options)? {
@@ -431,7 +430,7 @@ impl HttpDownloader {
 
             let headers = self.rfs.get_last_headers()?;
             let code = RemoteFilesystem::find_status_code(&headers);
-            let body = Some(bconcat!(path_to_bytes(copy_to), "~").into());
+            let body = Some(bformat!("{}~", path_to_bytes(copy_to)).into());
             Ok(Response::new(url.to_owned(), code, headers, body))
         } else {
             let result = self.rfs.get_contents(origin, url, false, options)?;
@@ -481,7 +480,7 @@ impl HttpDownloader {
                 continue;
             }
 
-            let versions_key = bconcat!(r#type, "-versions");
+            let versions_key = bformat!("{}-versions", r#type);
             if let Some(versions_value) = data.get(B(&versions_key))
                 && !empty(versions_value)
             {
@@ -498,18 +497,13 @@ impl HttpDownloader {
                 }
             }
 
-            io.write_error(bconcat!(
-                "<",
+            io.write_error(bformat!(
+                "<{}>{} from {}: {}</{}>",
                 r#type,
-                ">",
                 ucfirst(r#type),
-                " from ",
                 Url::sanitize(url),
-                ": ",
                 clean_message(entry.unwrap().as_string().unwrap_or_default())?,
-                "</",
-                r#type,
-                ">"
+                r#type
             ));
         }
 
@@ -540,23 +534,18 @@ impl HttpDownloader {
                             continue;
                         }
 
-                        io.write_error(bconcat!(
-                            "<",
+                        io.write_error(bformat!(
+                            "<{}>{} from {}: {}</{}>",
                             r#type,
-                            ">",
                             ucfirst(&r#type),
-                            " from ",
                             Url::sanitize(url),
-                            ": ",
                             clean_message(
                                 spec_map
                                     .get(B("message"))
                                     .and_then(|v| v.as_string())
                                     .unwrap_or_default()
                             )?,
-                            "</",
-                            r#type,
-                            ">"
+                            r#type
                         ));
                     }
                 }
@@ -740,8 +729,8 @@ impl HttpDownloader {
             .and_then(|e| e.first())
             .map(|first| {
                 let opts = if first.options.is_some() {
-                    bconcat!(
-                        "\" with options \"",
+                    bformat!(
+                        "\" with options \"{}",
                         BString::from(
                             serde_json::to_vec(&PhpJson::new(
                                 &first.options.clone().map(PhpMixed::Array),
@@ -752,7 +741,7 @@ impl HttpDownloader {
                 } else {
                     BString::default()
                 };
-                bconcat!("Expected \"", first.url, opts, "\" at this point.")
+                bformat!("Expected \"{}{opts}\" at this point.", first.url)
             })
             .unwrap_or_else(|| BString::from("Expected no more calls at this point."));
         let prior_calls = if mock.log.len() > 1 {
@@ -790,7 +779,7 @@ impl HttpDownloader {
         }
 
         let mut e = TransportException::new(
-            bconcat!("The \"", url, "\" file could not be downloaded"),
+            bformat!("The \"{url}\" file could not be downloaded"),
             status,
         );
         e.set_headers(headers);
@@ -910,7 +899,7 @@ mod tests {
             }
             stream.write_all(response).unwrap();
         });
-        bconcat!("http://", display_to_bytes(addr), "/")
+        bformat!("http://{}/", display_to_bytes(addr))
     }
 
     fn http_options(follow_location: bool, ignore_errors: bool) -> StreamContextOptions {

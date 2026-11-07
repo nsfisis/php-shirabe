@@ -6,7 +6,7 @@ use crate::helper::{
 };
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
-use shirabe_php_shim::bconcat;
+use shirabe_php_shim::bformat;
 
 /// HelperSet represents a set of helpers to be used with a command.
 #[derive(Debug)]
@@ -61,10 +61,8 @@ impl HelperSet {
         name: &BStr,
     ) -> anyhow::Result<std::rc::Rc<std::cell::RefCell<dyn HelperInterface>>> {
         if !self.has(name) {
-            anyhow::bail!(InvalidArgumentException::new(bconcat!(
-                "The helper \"",
-                name,
-                "\" is not defined."
+            anyhow::bail!(InvalidArgumentException::new(bformat!(
+                "The helper \"{name}\" is not defined."
             )));
         }
 

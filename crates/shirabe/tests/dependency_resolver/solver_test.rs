@@ -13,7 +13,7 @@ use shirabe::repository::{
     ArrayRepository, LockArrayRepository, LockArrayRepositoryHandle, RepositoryInterfaceHandle,
     RepositorySet,
 };
-use shirabe_php_shim::bconcat;
+use shirabe_php_shim::bformat;
 use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint, MultiConstraint};
 
 #[allow(dead_code)]
@@ -54,8 +54,8 @@ fn set_up() -> Fixtures {
 fn link(source: &BStr, target: &BStr, constraint: AnyConstraint, r#type: &bstr::BStr) -> Link {
     let pretty = constraint.get_pretty_string();
     Link::new(
-        bconcat!(source),
-        bconcat!(target),
+        bformat!("{source}"),
+        bformat!("{target}"),
         constraint,
         Some(r#type.to_owned()),
         Some(pretty),
@@ -71,11 +71,11 @@ fn link_pretty(
     pretty: &BStr,
 ) -> Link {
     Link::new(
-        bconcat!(source),
-        bconcat!(target),
+        bformat!("{source}"),
+        bformat!("{target}"),
         constraint,
         Some(r#type.to_owned()),
-        Some(bconcat!(pretty)),
+        Some(bformat!("{pretty}")),
     )
 }
 
@@ -144,7 +144,7 @@ fn check_solver_result_repo_set(
             let to = update.get_target_package();
             result_readable.push((
                 BString::from("update"),
-                bconcat!(from.get_unique_name(), " => ", to.get_unique_name()),
+                bformat!("{} => {}", from.get_unique_name(), to.get_unique_name()),
             ));
             result_ids.push((BString::from("update"), vec![from.ptr_id(), to.ptr_id()]));
         } else {
@@ -156,8 +156,8 @@ fn check_solver_result_repo_set(
                 other => panic!("Unexpected operation: {}", BStr::new(other).display_lossy()),
             };
             let package = operation.get_target_package();
-            result_readable.push((bconcat!(job), package.get_unique_name()));
-            result_ids.push((bconcat!(job), vec![package.ptr_id()]));
+            result_readable.push((bformat!("{job}"), package.get_unique_name()));
+            result_ids.push((bformat!("{job}"), vec![package.ptr_id()]));
         }
     }
 
@@ -166,13 +166,13 @@ fn check_solver_result_repo_set(
     for job in &expected {
         match job {
             ExpectedJob::Single { job, package } => {
-                expected_readable.push((bconcat!(job), package.get_unique_name()));
-                expected_ids.push((bconcat!(job), vec![package.ptr_id()]));
+                expected_readable.push((bformat!("{job}"), package.get_unique_name()));
+                expected_ids.push((bformat!("{job}"), vec![package.ptr_id()]));
             }
             ExpectedJob::Update { from, to } => {
                 expected_readable.push((
                     BString::from("update"),
-                    bconcat!(from.get_unique_name(), " => ", to.get_unique_name()),
+                    bformat!("{} => {}", from.get_unique_name(), to.get_unique_name()),
                 ));
                 expected_ids.push((BString::from("update"), vec![from.ptr_id(), to.ptr_id()]));
             }
@@ -2641,9 +2641,9 @@ fn test_learn_positive_literal() {
         if let AnyOperation::Update(update) = &**operation {
             result.push((
                 BString::from("update"),
-                bconcat!(
+                bformat!(
+                    "{} => {}",
                     update.get_initial_package().get_unique_name(),
-                    " => ",
                     update.get_target_package().get_unique_name()
                 ),
             ));

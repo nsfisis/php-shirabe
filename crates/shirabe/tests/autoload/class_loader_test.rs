@@ -2,7 +2,7 @@
 
 use bstr::BStr;
 use shirabe::autoload::ClassLoader;
-use shirabe_php_shim::bconcat;
+use shirabe_php_shim::bformat;
 
 // ref: ClassLoaderTest::getLoadClassTests
 fn get_find_file_tests() -> Vec<(&'static BStr, &'static BStr)> {
@@ -27,7 +27,8 @@ fn get_find_file_tests() -> Vec<(&'static BStr, &'static BStr)> {
 // ref: ClassLoaderTest::testLoadClass
 #[test]
 fn test_find_file() {
-    let fixtures = bconcat!(
+    let fixtures = bformat!(
+        "{}",
         std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../composer/tests/Composer/Test/Autoload/Fixtures")
             .canonicalize()
@@ -43,7 +44,7 @@ fn test_find_file() {
             .unwrap();
         assert_eq!(
             loader.find_file(class).unwrap(),
-            Some(bconcat!(fixtures, "/", file)),
+            Some(bformat!("{fixtures}/{file}")),
             "->findFile() finds '{}'",
             class.display_lossy()
         );

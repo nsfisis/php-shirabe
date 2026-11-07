@@ -12,7 +12,7 @@ use shirabe::downloader::{PerforceDownloader, VcsDownloader};
 use shirabe::io::{IOInterface, NORMAL};
 use shirabe::package::{CompletePackageHandle, PackageInterfaceHandle};
 use shirabe::util::{Filesystem, MockHandler};
-use shirabe_php_shim::{PhpMixed, bconcat, path_to_bytes};
+use shirabe_php_shim::{PhpMixed, bformat, path_to_bytes};
 use shirabe_semver::VersionParser;
 
 // A getMockBuilder('Composer\Util\Perforce') stand-in: the seam trait extracted from the
@@ -71,7 +71,7 @@ fn make_package(source_reference: Option<&BStr>) -> PackageInterfaceHandle {
         norm_version,
         BString::from("1.0.0"),
     );
-    package.set_source_reference(source_reference.map(|s| bconcat!(s)));
+    package.set_source_reference(source_reference.map(|s| bformat!("{s}")));
     package.into()
 }
 
@@ -137,7 +137,7 @@ fn do_install_workflow(source_ref: &'static BStr, expected_label: Option<BString
     io_mock
         .borrow_mut()
         .expects(
-            vec![Expectation::text_regex(bconcat!("Cloning ", source_ref))],
+            vec![Expectation::text_regex(bformat!("Cloning {source_ref}"))],
             false,
         )
         .unwrap();

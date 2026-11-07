@@ -10,7 +10,7 @@ use crate::json::JsonFile;
 use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    InvalidArgumentException, PhpMixed, RuntimeException, ToPhpString, bconcat, impl_php_class,
+    InvalidArgumentException, PhpMixed, RuntimeException, ToPhpString, bformat, impl_php_class,
     parse_url, path_to_bytes, php_regex, preg_is_match, strtolower,
 };
 use shirabe_symfony_console::command::Command;
@@ -77,7 +77,10 @@ impl RepositoryCommand {
         if !packagist_present {
             let mut packagist_entry = IndexMap::new();
             packagist_entry.insert("packagist.org".into(), PhpMixed::Bool(false));
-            repos.insert(bconcat!(repos.len()), PhpMixed::Array(packagist_entry));
+            repos.insert(
+                bformat!("{}", repos.len()),
+                PhpMixed::Array(packagist_entry),
+            );
         }
 
         if repos.is_empty() {
@@ -87,7 +90,7 @@ impl RepositoryCommand {
 
         for (key, repo) in &repos {
             if matches!(*repo, PhpMixed::Bool(false)) {
-                io.write(bconcat!("[", key, "] <info>disabled</info>"));
+                io.write(bformat!("[{key}] <info>disabled</info>"));
                 continue;
             }
 
@@ -97,7 +100,7 @@ impl RepositoryCommand {
                     && matches!(*first_val, PhpMixed::Bool(false))
                 {
                     let first_key = repo_map.keys().next().unwrap();
-                    io.write(bconcat!("[", first_key, "] <info>disabled</info>"));
+                    io.write(bformat!("[{first_key}] <info>disabled</info>"));
                     continue;
                 }
 
@@ -113,7 +116,7 @@ impl RepositoryCommand {
                     Some(url) => BString::from(url),
                     None => JsonFile::encode(repo)?,
                 };
-                io.write(bconcat!("[", name, "] <info>", r#type, "</info> ", url));
+                io.write(bformat!("[{name}] <info>{}</info> {url}", r#type));
             }
         }
 
@@ -483,11 +486,7 @@ impl Command for RepositoryCommand {
                         self.get_io().write(url);
                         return Ok(0);
                     }
-                    return Err(InvalidArgumentException::new(bconcat!(
-                        "The ",
-                        name_str,
-                        " repository does not have a URL"
-                    ))
+                    return Err(InvalidArgumentException::new(bformat!("The {name_str} repository does not have a URL"))
                     .into());
                 }
                 for (_key, val) in &repos {
@@ -500,19 +499,11 @@ impl Command for RepositoryCommand {
                             self.get_io().write(url);
                             return Ok(0);
                         }
-                        return Err(InvalidArgumentException::new(bconcat!(
-                            "The ",
-                            name_str,
-                            " repository does not have a URL"
-                        ))
+                        return Err(InvalidArgumentException::new(bformat!("The {name_str} repository does not have a URL"))
                         .into());
                     }
                 }
-                Err(InvalidArgumentException::new(bconcat!(
-                    "There is no ",
-                    name_str,
-                    " repository defined"
-                ))
+                Err(InvalidArgumentException::new(bformat!("There is no {name_str} repository defined"))
                 .into())
             }
             b"disable" => {
@@ -563,11 +554,7 @@ impl Command for RepositoryCommand {
                 ))
                 .into())
             }
-            _ => Err(InvalidArgumentException::new(bconcat!(
-                "Unknown action \"",
-                action,
-                "\". Use list, add, remove, set-url, get-url, enable, disable"
-            ))
+            _ => Err(InvalidArgumentException::new(bformat!("Unknown action \"{action}\". Use list, add, remove, set-url, get-url, enable, disable"))
             .into()),
         }
     }

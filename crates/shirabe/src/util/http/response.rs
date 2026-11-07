@@ -2,7 +2,7 @@
 
 use crate::json::JsonFile;
 use bstr::{BStr, BString, ByteSlice};
-use shirabe_php_shim::{PhpMixed, bconcat, php_regex, preg_is_match, preg_match, preg_quote};
+use shirabe_php_shim::{PhpMixed, bformat, php_regex, preg_is_match, preg_match, preg_quote};
 
 #[derive(Debug)]
 pub struct Response {
@@ -75,7 +75,7 @@ impl Response {
 
     pub fn find_header_value(headers: &[BString], name: &BStr) -> Option<BString> {
         let mut value = None;
-        let pattern = bconcat!("{^", preg_quote(name, None), ":\\s*(.+?)\\s*$}i");
+        let pattern = bformat!("{{^{}:\\s*(.+?)\\s*$}}i", preg_quote(name, None));
         for header in headers {
             if let Some(matches) = preg_match(&pattern, header)
                 && let Some(s) = matches.get(1)

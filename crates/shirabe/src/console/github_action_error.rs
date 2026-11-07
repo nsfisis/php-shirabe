@@ -3,7 +3,7 @@
 use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::util::Platform;
 use bstr::{BStr, BString};
-use shirabe_php_shim::{bconcat, str_replace};
+use shirabe_php_shim::{bformat, str_replace};
 
 #[derive(Debug)]
 pub struct GithubActionError {
@@ -26,20 +26,15 @@ impl GithubActionError {
 
             if file_truthy && line_truthy {
                 let file = self.escape_property(file.unwrap());
-                self.io.write(bconcat!(
-                    "::error file=",
-                    file,
-                    ",line=",
-                    line.unwrap(),
-                    "::",
-                    message
+                self.io.write(bformat!(
+                    "::error file={file},line={}::{message}",
+                    line.unwrap()
                 ));
             } else if file_truthy {
                 let file = self.escape_property(file.unwrap());
-                self.io
-                    .write(bconcat!("::error file=", file, "::", message));
+                self.io.write(bformat!("::error file={file}::{message}"));
             } else {
-                self.io.write(bconcat!("::error ::", message));
+                self.io.write(bformat!("::error ::{message}"));
             }
         }
     }

@@ -7,7 +7,7 @@ use crate::plugin::rpc::table::package_handle_value;
 use crate::repository::RepositoryInterfaceHandle;
 use bstr::{BStr, ByteSlice};
 use shirabe_php_rpc::{PhpThrow, PluginValue, ToWire};
-use shirabe_php_shim::bconcat;
+use shirabe_php_shim::bformat;
 
 pub(crate) fn dispatch_repository_method(
     repository: &RepositoryInterfaceHandle,
@@ -28,11 +28,7 @@ pub(crate) fn dispatch_repository_method(
             let writable = borrowed
                 .as_writable_repository_interface_mut()
                 .ok_or_else(|| {
-                    PhpThrow::runtime(bconcat!(
-                        "the repository behind this handle is not writable, so `",
-                        method_name,
-                        "` cannot be called on it"
-                    ))
+                    PhpThrow::runtime(bformat!("the repository behind this handle is not writable, so `{method_name}` cannot be called on it"))
                 })?;
             let outcome = match method_name.as_bytes() {
                 b"addPackage" => writable.add_package(package),
@@ -40,7 +36,7 @@ pub(crate) fn dispatch_repository_method(
                 _ => unreachable!(),
             };
             outcome
-                .map_err(|error| error_throw(bconcat!(method_name, " failed over RPC"), &error))?;
+                .map_err(|error| error_throw(bformat!("{method_name} failed over RPC"), &error))?;
             Ok(PluginValue::Null)
         }
         b"getPackages" => {

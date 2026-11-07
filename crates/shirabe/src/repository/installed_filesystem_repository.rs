@@ -11,7 +11,7 @@ use crate::repository::{
 use crate::util::Filesystem;
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
-use shirabe_php_shim::bconcat;
+use shirabe_php_shim::bformat;
 use shirabe_semver::constraint::AnyConstraint;
 
 #[derive(Debug)]
@@ -55,7 +55,7 @@ impl InstalledFilesystemRepository {
     }
 
     pub fn get_repo_name(&self) -> anyhow::Result<BString> {
-        Ok(bconcat!("installed ", self.inner.get_repo_name()?))
+        Ok(bformat!("installed {}", self.inner.get_repo_name()?))
     }
 }
 
@@ -165,7 +165,7 @@ impl RepositoryInterface for InstalledFilesystemRepository {
         self.inner.get_providers(package_name)
     }
     fn get_repo_name(&self) -> anyhow::Result<BString> {
-        Ok(bconcat!("installed ", self.inner.get_repo_name()?))
+        Ok(bformat!("installed {}", self.inner.get_repo_name()?))
     }
     fn as_advisory_provider(&self) -> Option<&dyn AdvisoryProviderInterface> {
         None

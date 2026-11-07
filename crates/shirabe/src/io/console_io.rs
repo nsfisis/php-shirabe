@@ -6,7 +6,7 @@ use crate::question::StrictConfirmationQuestion;
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::{IndexMap, indexmap};
 use shirabe_php_shim::{
-    bconcat, canonical_int_key, display_to_bytes, error_message, mb_check_encoding,
+    bformat, canonical_int_key, display_to_bytes, error_message, mb_check_encoding,
     mb_convert_encoding, microtime, preg_replace, str_repeat, strip_tags, strlen,
 };
 use shirabe_symfony_console::helper::{
@@ -90,11 +90,9 @@ impl ConsoleIO {
                 Err(_) => BString::from("<unknown>"),
             };
             let time_spent = microtime() - start_time;
-            bconcat!(
-                "[",
-                memory_usage,
-                display_to_bytes(format_args!("/{:.2}s] ", time_spent)),
-                messages
+            bformat!(
+                "[{memory_usage}{}{messages}",
+                display_to_bytes(format_args!("/{:.2}s] ", time_spent))
             )
         } else {
             BString::from(messages)
@@ -230,15 +228,11 @@ impl ConsoleIO {
         // pair is preserved while a lone CR is removed.
         let (pattern, replacement) = if allow_newlines {
             (
-                bconcat!(
-                    r#"@"#,
-                    escape_pattern,
-                    r#"|[\x01-\x09\x0B\x0C\x0E-\x1A]|(\r\n)|\r@u"#
-                ),
+                bformat!("@{escape_pattern}|[\\x01-\\x09\\x0B\\x0C\\x0E-\\x1A]|(\\r\\n)|\\r@u"),
                 "$1",
             )
         } else {
-            (bconcat!("{", escape_pattern, "|[\\x01-\\x1A]}u"), "")
+            (bformat!("{{{escape_pattern}|[\\x01-\\x1A]}}u"), "")
         };
         let messages = Self::ensure_valid_utf8(messages.as_ref());
 

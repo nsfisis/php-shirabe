@@ -16,7 +16,7 @@ use crate::repository::{
 use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    InvalidArgumentException, PhpMixed, STR_PAD_RIGHT, bconcat, impl_php_class, implode,
+    InvalidArgumentException, PhpMixed, STR_PAD_RIGHT, bformat, impl_php_class, implode,
     in_array_loose, json_bytes, preg_quote, str_pad, str_repeat, substr,
 };
 use shirabe_symfony_console::command::Command;
@@ -155,10 +155,8 @@ impl Command for SearchCommand {
                 PhpMixed::string(BString::from("json")),
             ],
         ) {
-            io.write_error(bconcat!(
-                "Unsupported format \"",
-                format,
-                "\". See help for supported formats."
+            io.write_error(bformat!(
+                "Unsupported format \"{format}\". See help for supported formats."
             ));
             return Ok(1);
         }
@@ -260,28 +258,23 @@ impl Command for SearchCommand {
                 };
                 let remaining = width - name_length - warning.len() as i64 - 2;
                 let description = if description.len() as i64 > remaining {
-                    bconcat!(substr(&description, 0, Some(remaining - 3)), "...")
+                    bformat!("{}...", substr(&description, 0, Some(remaining - 3)))
                 } else {
                     description
                 };
 
                 let link = result.url.as_deref();
                 if let Some(link) = link {
-                    io.write(bconcat!(
-                        "<href=",
+                    io.write(bformat!(
+                        "<href={}>{}</>{}{warning}{description}",
                         OutputFormatter::escape(link)?,
-                        ">",
                         result.name,
-                        "</>",
-                        str_repeat(" ", name_length as usize - result.name.len()),
-                        warning,
-                        description
+                        str_repeat(" ", name_length as usize - result.name.len())
                     ));
                 } else {
-                    io.write(bconcat!(
-                        str_pad(&result.name, name_length as usize, " ", STR_PAD_RIGHT),
-                        warning,
-                        description
+                    io.write(bformat!(
+                        "{}{warning}{description}",
+                        str_pad(&result.name, name_length as usize, " ", STR_PAD_RIGHT)
                     ));
                 }
             }

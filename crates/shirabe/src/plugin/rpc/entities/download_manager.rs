@@ -12,7 +12,7 @@ use crate::plugin::rpc::table::{R_TABLE, RustEntity};
 use crate::util::HttpDownloader;
 use bstr::{BStr, BString, ByteSlice};
 use shirabe_php_rpc::{PhpThrow, PluginValue, ToWire};
-use shirabe_php_shim::{PhpMixed, bconcat, path_from_bytes};
+use shirabe_php_shim::{PhpMixed, bformat, path_from_bytes};
 
 /// The download manager's contract is asynchronous on both sides: PHP declares a
 /// `PromiseInterface` return, Rust an `async fn`. Each call registers its future as a job and
@@ -115,10 +115,8 @@ pub(crate) fn dispatch_download_manager_method(
         // chain and rejects with that job's own exception; the root is not known here.
         error_throw(
             BStr::new(""),
-            &IrrecoverableDownloadException::new(bconcat!(
-                "DownloadManager::",
-                method_name,
-                "() canceled"
+            &IrrecoverableDownloadException::new(bformat!(
+                "DownloadManager::{method_name}() canceled"
             ))
             .into(),
         ),
@@ -127,7 +125,7 @@ pub(crate) fn dispatch_download_manager_method(
             future
                 .await
                 .map(|resolved| resolved.to_wire())
-                .map_err(|error| error_throw(bconcat!(method, " failed over RPC"), &error))
+                .map_err(|error| error_throw(bformat!("{method} failed over RPC"), &error))
         }),
     ))
 }

@@ -3,7 +3,7 @@
 use crate::exception::{InvalidArgumentException, LogicException};
 use crate::input::InputValue;
 use bstr::{BStr, BString, ByteSlice};
-use shirabe_php_shim::bconcat;
+use shirabe_php_shim::bformat;
 
 #[derive(Debug, Clone)]
 pub struct InputArgument {
@@ -27,10 +27,8 @@ impl InputArgument {
         let mode = match mode {
             None => Self::OPTIONAL,
             Some(m) if !(1..=7).contains(&m) => {
-                return Err(InvalidArgumentException::new(bconcat!(
-                    "Argument mode \"",
-                    m,
-                    "\" is not valid."
+                return Err(InvalidArgumentException::new(bformat!(
+                    "Argument mode \"{m}\" is not valid."
                 ))
                 .into());
             }

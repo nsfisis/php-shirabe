@@ -8,7 +8,7 @@ use crate::input::{
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpDisplay, PhpResource, bconcat, php_regex, php_str, preg_match, str_replace_arr,
+    PhpDisplay, PhpResource, bformat, php_regex, php_str, preg_match, str_replace_arr,
     stripcslashes, strlen, substr,
 };
 
@@ -74,44 +74,39 @@ impl StringInput {
                 }
                 cursor += strlen(m.get(0).unwrap_or_default());
             } else if let Some(m) = preg_match(
-                bconcat!(
-                    r#"/^([^="'\s]+?)(=?)("#,
-                    Self::REGEX_QUOTED_STRING,
-                    r#"+)/"#
-                ),
+                bformat!("/^([^=\"'\\s]+?)(=?)({}+)/", Self::REGEX_QUOTED_STRING),
                 rest,
             ) {
                 let inner = substr(m.get(3).unwrap_or_default(), 1, Some(-1));
                 let replaced = str_replace_arr(&["\"'", "'\"", "''", "\"\""], "", &inner);
-                token = Some(bconcat!(
+                token = Some(bformat!(
+                    "{}{}{}{}",
                     token.unwrap_or_default(),
                     m.get(1).unwrap_or_default(),
                     m.get(2).unwrap_or_default(),
                     stripcslashes(&replaced)
                 ));
                 cursor += strlen(m.get(0).unwrap_or_default());
-            } else if let Some(m) =
-                preg_match(bconcat!(r"/^", Self::REGEX_QUOTED_STRING, r"/"), rest)
-            {
-                token = Some(bconcat!(
+            } else if let Some(m) = preg_match(bformat!("/^{}/", Self::REGEX_QUOTED_STRING), rest) {
+                token = Some(bformat!(
+                    "{}{}",
                     token.unwrap_or_default(),
                     stripcslashes(substr(m.get(0).unwrap_or_default(), 1, Some(-1)))
                 ));
                 cursor += strlen(m.get(0).unwrap_or_default());
-            } else if let Some(m) =
-                preg_match(bconcat!(r"/^", Self::REGEX_UNQUOTED_STRING, r"/"), rest)
+            } else if let Some(m) = preg_match(bformat!("/^{}/", Self::REGEX_UNQUOTED_STRING), rest)
             {
-                token = Some(bconcat!(
+                token = Some(bformat!(
+                    "{}{}",
                     token.unwrap_or_default(),
                     m.get(1).unwrap_or_default()
                 ));
                 cursor += strlen(m.get(0).unwrap_or_default());
             } else {
                 // should never happen
-                return Err(InvalidArgumentException::new(bconcat!(
-                    "Unable to parse input near \"... ",
-                    substr(input, cursor, Some(10)),
-                    " ...\"."
+                return Err(InvalidArgumentException::new(bformat!(
+                    "Unable to parse input near \"... {} ...\".",
+                    substr(input, cursor, Some(10))
                 ))
                 .into());
             }

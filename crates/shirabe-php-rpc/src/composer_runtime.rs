@@ -5,7 +5,7 @@
 use crate::{PluginValue, call_internal_function};
 use bstr::{BStr, BString};
 use shirabe_php_shim::{
-    AnyThrowable, Phar, RuntimeException, bconcat, display_to_bytes, getenv, os_str_from_bytes,
+    AnyThrowable, Phar, RuntimeException, bformat, display_to_bytes, getenv, os_str_from_bytes,
     path_from_bytes, path_to_bytes, php_str,
 };
 
@@ -50,7 +50,7 @@ fn resolve(
         return Ok(path_to_bytes(&directory).into());
     }
     if worker_opens_bundle()? {
-        return Ok(bconcat!("phar://", ALIAS));
+        return Ok(bformat!("phar://{ALIAS}"));
     }
     Ok(path_to_bytes(&extract_into(&cache_dir()?.join("runtime"))?).into())
 }
@@ -63,13 +63,7 @@ fn override_directory() -> anyhow::Result<Option<std::path::PathBuf>> {
     };
     let directory = std::path::PathBuf::from(directory);
     if !directory.join("vendor/autoload.php").is_file() {
-        return Err(RuntimeException::new(bconcat!(
-            OVERRIDE_ENV,
-            " points at ",
-            directory,
-            ", which has no vendor/autoload.php; install the checkout's dependencies or unset it \
-             to use the runtime the executable carries"
-        ))
+        return Err(RuntimeException::new(bformat!("{OVERRIDE_ENV} points at {directory}, which has no vendor/autoload.php; install the checkout's dependencies or unset it to use the runtime the executable carries"))
         .into());
     }
     Ok(Some(directory))
@@ -89,7 +83,9 @@ fn worker_opens_bundle() -> anyhow::Result<bool> {
             PluginValue::string(BUNDLE_ID),
         ],
     )?
-    .map_err(|throw| RuntimeException::new(bconcat!(throw.exception_class, ": ", throw.message)))?;
+    .map_err(|throw| {
+        RuntimeException::new(bformat!("{}: {}", throw.exception_class, throw.message))
+    })?;
     match opened {
         PluginValue::Bool(opened) => Ok(opened),
         other => Err(anyhow::anyhow!(
@@ -205,7 +201,7 @@ mod tests {
         let cache = tempfile::tempdir().unwrap();
         assert_eq!(
             base_path(|| Ok(cache.path().to_path_buf())).unwrap(),
-            bconcat!("phar://", ALIAS)
+            bformat!("phar://{ALIAS}")
         );
     }
 

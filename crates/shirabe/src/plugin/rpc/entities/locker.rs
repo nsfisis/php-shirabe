@@ -8,7 +8,7 @@ use crate::plugin::rpc::table::repository_handle_value;
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_rpc::{PhpThrow, PluginValue, ToWire};
-use shirabe_php_shim::{PhpMixed, bconcat};
+use shirabe_php_shim::{PhpMixed, bformat};
 
 pub(crate) fn dispatch_locker_method(
     locker: &std::rc::Rc<std::cell::RefCell<dyn LockerInterface>>,
@@ -16,7 +16,7 @@ pub(crate) fn dispatch_locker_method(
     args: &[PluginValue],
 ) -> Result<PluginValue, PhpThrow> {
     let failed =
-        |error: anyhow::Error| error_throw(bconcat!(method_name, " failed over RPC"), &error);
+        |error: anyhow::Error| error_throw(bformat!("{method_name} failed over RPC"), &error);
     let with_dev_reqs = || arg_or::<bool>(method_name, args, 0, false);
     match method_name.as_bytes() {
         b"isLocked" => Ok(locker.borrow_mut().is_locked().to_wire()),
@@ -104,10 +104,8 @@ pub(crate) fn dispatch_locker_method(
         }
         // TODO(plugin): `JsonFile` has no proxy stub, so the lock file cannot be handed out and
         // no plugin holds a JsonFile it could pass to `updateHash()`.
-        b"getJsonFile" | b"updateHash" => Err(PhpThrow::runtime(bconcat!(
-            "the Locker method `",
-            method_name,
-            "` is not available over RPC yet: JsonFile cannot cross the boundary"
+        b"getJsonFile" | b"updateHash" => Err(PhpThrow::runtime(bformat!(
+            "the Locker method `{method_name}` is not available over RPC yet: JsonFile cannot cross the boundary"
         ))),
         other => Err(unavailable_method("Locker", other)),
     }

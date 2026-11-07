@@ -9,7 +9,7 @@ use crate::util::{Filesystem, SyncHelper};
 use bstr::{BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    InvalidArgumentException, RuntimeException, bconcat, bin2hex, file_exists, hash, implode,
+    InvalidArgumentException, RuntimeException, bformat, bin2hex, file_exists, hash, implode,
     path_from_bytes, php_regex, preg_is_match, preg_replace, random_bytes, realpath, str_replace,
     sys_get_temp_dir,
 };
@@ -132,10 +132,8 @@ impl ArchiveManager {
         let usable_archiver_idx = match usable_archiver_idx {
             Some(i) => i,
             None => {
-                return Err(RuntimeException::new(bconcat!(
-                    "No archiver found to support ",
-                    format,
-                    " format"
+                return Err(RuntimeException::new(bformat!(
+                    "No archiver found to support {format} format"
                 ))
                 .into());
             }
@@ -150,10 +148,9 @@ impl ArchiveManager {
             source_path = realpath(".").unwrap_or_else(|| PathBuf::from("."));
         } else {
             let random_suffix = bin2hex(random_bytes(5));
-            source_path = path_from_bytes(&bconcat!(
-                sys_get_temp_dir(),
-                "/composer_archive",
-                random_suffix
+            source_path = path_from_bytes(&bformat!(
+                "{}/composer_archive{random_suffix}",
+                sys_get_temp_dir()
             ))
             .to_path_buf();
             filesystem.ensure_directory_exists(&source_path)?;
@@ -190,7 +187,7 @@ impl ArchiveManager {
                 return Err(e);
             }
 
-            let composer_json_path = bconcat!(&source_path, "/composer.json");
+            let composer_json_path = bformat!("{source_path}/composer.json");
             let composer_json_path = path_from_bytes(&composer_json_path);
             if file_exists(composer_json_path) {
                 let json_file = JsonFile::new(composer_json_path, None, None)?;
@@ -230,12 +227,9 @@ impl ArchiveManager {
         let exclude_patterns = self.build_exclude_patterns(&package_name_parts, &supported_formats);
 
         filesystem.ensure_directory_exists(&target_dir)?;
-        let target = path_from_bytes(&bconcat!(
-            realpath(&target_dir).unwrap_or_else(|| target_dir.clone()),
-            "/",
-            package_name,
-            ".",
-            &format
+        let target = path_from_bytes(&bformat!(
+            "{}/{package_name}.{format}",
+            realpath(&target_dir).unwrap_or_else(|| target_dir.clone())
         ))
         .to_path_buf();
         if let Some(parent) = target.parent() {
@@ -247,12 +241,9 @@ impl ArchiveManager {
         }
 
         let tmp_suffix = bin2hex(random_bytes(5));
-        let temp_target = path_from_bytes(&bconcat!(
-            sys_get_temp_dir(),
-            "/composer_archive",
-            tmp_suffix,
-            ".",
-            &format
+        let temp_target = path_from_bytes(&bformat!(
+            "{}/composer_archive{tmp_suffix}.{format}",
+            sys_get_temp_dir()
         ))
         .to_path_buf();
         if let Some(parent) = temp_target.parent() {
@@ -285,12 +276,12 @@ impl ArchiveManager {
     ) -> Vec<BString> {
         let mut base = parts[bstr::B("base")].clone();
         if parts.len() > 1 {
-            base = bconcat!(&base, "-*");
+            base = bformat!("{base}-*");
         }
 
         let mut patterns = vec![];
         for format in formats {
-            patterns.push(bconcat!(&base, ".", format));
+            patterns.push(bformat!("{base}.{format}"));
         }
 
         patterns

@@ -6,7 +6,7 @@ use indexmap::IndexMap;
 use shirabe::config::{ConfigSourceInterface, JsonConfigSource};
 use shirabe::json::JsonFile;
 use shirabe::util::Filesystem;
-use shirabe_php_shim::{PhpMixed, bconcat, path_from_bytes};
+use shirabe_php_shim::{PhpMixed, bformat, path_from_bytes};
 use std::path::PathBuf;
 use tempfile::TempDir;
 
@@ -203,10 +203,8 @@ fn provide_add_link_data() -> Vec<(
             r#type,
             name,
             value,
-            fixture_path(path_from_bytes(&bconcat!(
-                "addLink/",
-                fixture_basename,
-                ".json"
+            fixture_path(path_from_bytes(&bformat!(
+                "addLink/{fixture_basename}.json"
             ))),
         )
     };
@@ -372,17 +370,13 @@ fn provide_remove_link_data() -> Vec<(PathBuf, &'static BStr, &'static BStr, Pat
          fixture_basename: &BStr,
          after: Option<&PathBuf>| {
             let after = after.cloned().unwrap_or_else(|| {
-                fixture_path(path_from_bytes(&bconcat!(
-                    "removeLink/",
-                    fixture_basename,
-                    "-after.json"
+                fixture_path(path_from_bytes(&bformat!(
+                    "removeLink/{fixture_basename}-after.json"
                 )))
             });
             (
-                fixture_path(path_from_bytes(&bconcat!(
-                    "removeLink/",
-                    fixture_basename,
-                    ".json"
+                fixture_path(path_from_bytes(&bformat!(
+                    "removeLink/{fixture_basename}.json"
                 ))),
                 r#type,
                 name,

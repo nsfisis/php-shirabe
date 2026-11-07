@@ -2,7 +2,7 @@
 
 use bstr::BString;
 use shirabe_php_shim::{
-    Descriptor, PhpMixed, PhpResource, bconcat, fclose, function_exists, getenv, intval,
+    Descriptor, PhpMixed, PhpResource, bformat, fclose, function_exists, getenv, intval,
     path_to_bytes, php_fopen_resource, php_regex, preg_match, proc_close, proc_open,
     sapi_windows_cp_get, sapi_windows_cp_set, sapi_windows_vt100_support, shell_exec,
     stream_get_contents, trim,
@@ -62,8 +62,8 @@ impl Terminal {
             return stty;
         }
 
-        let result = shell_exec(bconcat!(
-            "stty 2> ",
+        let result = shell_exec(bformat!(
+            "stty 2> {}",
             if cfg!(windows) { "NUL" } else { "/dev/null" }
         ))
         .is_some();

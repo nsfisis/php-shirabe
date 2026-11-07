@@ -4,7 +4,7 @@ use bstr::{BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe::io::{IOInterface, NullIO};
 use shirabe::repository::ArtifactRepository;
-use shirabe_php_shim::{PhpMixed, bconcat, extension_loaded, path_to_bytes, str_replace};
+use shirabe_php_shim::{PhpMixed, bformat, extension_loaded, path_to_bytes, str_replace};
 
 /// Returns true when the test should be skipped because the zip extension is
 /// unavailable, mirroring PHP's markTestSkipped in setUp.
@@ -55,7 +55,13 @@ fn test_extracts_configs_from_zip_archives() {
         .__get_packages()
         .unwrap()
         .iter()
-        .map(|package| bconcat!(package.get_pretty_name(), "-", package.get_pretty_version()))
+        .map(|package| {
+            bformat!(
+                "{}-{}",
+                package.get_pretty_name(),
+                package.get_pretty_version()
+            )
+        })
         .collect();
 
     expected_packages.sort();

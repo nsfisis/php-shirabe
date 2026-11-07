@@ -23,7 +23,7 @@ use crate::util::{Filesystem, Platform, ProcessExecutor, StreamContextOptions};
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    LogicException, PhpMixed, bconcat, get_debug_type, impl_php_class, implode, path_from_bytes,
+    LogicException, PhpMixed, bformat, get_debug_type, impl_php_class, implode, path_from_bytes,
     path_to_bytes, php_regex, php_str, preg_match, strtolower,
 };
 use shirabe_symfony_console::command::Command;
@@ -177,10 +177,8 @@ impl ArchiveCommand {
             composer.get_package().clone().into()
         };
 
-        io.write_error(bconcat!(
-            "<info>Creating the archive into \"",
-            dest,
-            "\".</info>"
+        io.write_error(bformat!(
+            "<info>Creating the archive into \"{dest}\".</info>"
         ));
         let package_path = archive_manager
             .archive(
@@ -231,8 +229,8 @@ impl ArchiveCommand {
         } else {
             let default_repos = RepositoryFactory::default_repos_with_default_manager(io.clone())?;
             let repo_names: Vec<&BString> = default_repos.keys().collect();
-            io.write_error(bconcat!(
-                "No composer.json found in the current directory, searching packages from ",
+            io.write_error(bformat!(
+                "No composer.json found in the current directory, searching packages from {}",
                 implode(", ", &repo_names)
             ));
             repo = CompositeRepository::new(default_repos.into_values().collect());
@@ -280,34 +278,30 @@ impl ArchiveCommand {
             )?;
             let p = best.unwrap_or_else(|| packages.into_iter().next().unwrap());
 
-            io.write_error(bconcat!(
-                "<info>Found multiple matches, selected ",
-                p.get_pretty_string(),
-                ".</info>"
+            io.write_error(bformat!(
+                "<info>Found multiple matches, selected {}.</info>",
+                p.get_pretty_string()
             ));
             // alternatives message omitted for brevity (already logged via p being selected)
             io.write_error("<comment>Please use a more specific constraint to pick a different package.</comment>");
             p
         } else if packages.len() == 1 {
             let p: PackageInterfaceHandle = packages.into_iter().next().unwrap();
-            io.write_error(bconcat!(
-                "<info>Found an exact match ",
-                p.get_pretty_string(),
-                ".</info>"
+            io.write_error(bformat!(
+                "<info>Found an exact match {}.</info>",
+                p.get_pretty_string()
             ));
             p
         } else {
-            io.write_error(bconcat!(
-                "<error>Could not find a package matching ",
-                package_name,
-                ".</error>"
+            io.write_error(bformat!(
+                "<error>Could not find a package matching {package_name}.</error>"
             ));
             return Ok(None);
         };
 
         let Some(complete) = package.as_complete() else {
-            return Err(LogicException::new(bconcat!(
-                "Expected a CompletePackageInterface instance but found ",
+            return Err(LogicException::new(bformat!(
+                "Expected a CompletePackageInterface instance but found {}",
                 get_debug_type(&PhpMixed::Null)
             ))
             .into());

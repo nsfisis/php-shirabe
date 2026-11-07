@@ -19,7 +19,7 @@ use shirabe::repository::{InstalledFilesystemRepository, WritableRepositoryInter
 use shirabe::util::r#loop::Loop;
 use shirabe::util::{Git as GitUtil, HttpDownloader, Platform, ProcessExecutor};
 use shirabe_php_shim::{
-    PHP_ENV, PHP_EOL, PHP_SERVER, PhpResource, bconcat, function_exists, fwrite_resource, getenv,
+    PHP_ENV, PHP_EOL, PHP_SERVER, PhpResource, bformat, function_exists, fwrite_resource, getenv,
     path_from_bytes, path_to_bytes, php_fopen_resource, putenv, realpath, rewind,
     stream_get_contents, sys_get_temp_dir,
 };
@@ -95,7 +95,7 @@ pub fn get_version_constraint(
     AnyConstraint::Simple(SimpleConstraint::new(
         operator,
         normalized,
-        Some(bconcat!(operator, " ", version)),
+        Some(bformat!("{operator} {version}")),
     ))
 }
 
@@ -286,7 +286,7 @@ pub fn create_installed_json(
     );
     for pkg in packages.iter().chain(dev_packages.iter()) {
         repo.add_package(pkg.clone()).unwrap();
-        std::fs::create_dir_all(path_from_bytes(&bconcat!("vendor/", pkg.get_name()))).unwrap();
+        std::fs::create_dir_all(path_from_bytes(&bformat!("vendor/{}", pkg.get_name()))).unwrap();
     }
 
     let io = null_io();
@@ -494,7 +494,7 @@ impl ApplicationTester {
     fn create_stream(inputs: &[BString]) -> PhpResource {
         let stream = php_fopen_resource("php://memory", "r+");
         for input in inputs {
-            fwrite_resource(&stream, bconcat!(input, PHP_EOL));
+            fwrite_resource(&stream, bformat!("{input}{PHP_EOL}"));
         }
         rewind(&stream);
         stream

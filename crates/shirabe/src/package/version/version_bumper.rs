@@ -7,7 +7,7 @@ use crate::package::version::VersionParser;
 use crate::util::Platform;
 use bstr::BString;
 use shirabe_php_shim::{
-    bconcat, explode, implode, php_regex, preg_is_match, preg_match_all, preg_replace,
+    bformat, explode, implode, php_regex, preg_is_match, preg_match_all, preg_replace,
     substr_count, substr_replace,
 };
 use shirabe_semver::Intervals;
@@ -55,7 +55,7 @@ impl VersionBumper {
         let major = preg_replace(php_regex!(r"{^([1-9][0-9]*|0\.\d+).*}"), "$1", &version);
         let version_without_suffix =
             preg_replace(php_regex!(r"{(?:\.(?:0|9999999))+(-dev)?$}"), "", &version);
-        let new_pretty_constraint = bconcat!("^", &version_without_suffix);
+        let new_pretty_constraint = bformat!("^{version_without_suffix}");
 
         if !preg_is_match(php_regex!(r"{^\^\d+(\.\d+)*$}"), &new_pretty_constraint) {
             return Ok(pretty_constraint);
@@ -69,24 +69,8 @@ impl VersionBumper {
         // does not shift the rewrite. The single-character `|`/space/comma separators are not consumed
         // by both an adjacent trailing and leading match, but Composer never packs two same-major
         // constraints around a single such separator (alternatives use `||`, ranges use spaces).
-        let pattern = bconcat!(
-            r#"{
-            (?:^|[,\ |]) # leading separator
-            (?P<constraint>
-                \^v?"#,
-            &major,
-            r#"(?:\.\d+)* # e.g. ^2.anything
-                | ~v?"#,
-            &major,
-            r#"(?:\.\d+){1,3} # e.g. ~2.2 or ~2.2.2 or ~2.2.2.2
-                | v?"#,
-            &major,
-            r#"(?:\.[*x])+ # e.g. 2.* or 2.*.* or 2.x.x.x etc
-                | >=v?\d(?:\.\d+)* # e.g. >=2 or >=1.2 etc
-                | \* # full wildcard
-            )
-            (?:$|[,\ |@]) # trailing separator
-        }x"#
+        let pattern = bformat!(
+            "{{\n            (?:^|[,\\ |]) # leading separator\n            (?P<constraint>\n                \\^v?{major}(?:\\.\\d+)* # e.g. ^2.anything\n                | ~v?{major}(?:\\.\\d+){{1,3}} # e.g. ~2.2 or ~2.2.2 or ~2.2.2.2\n                | v?{major}(?:\\.[*x])+ # e.g. 2.* or 2.*.* or 2.x.x.x etc\n                | >=v?\\d(?:\\.\\d+)* # e.g. >=2 or >=1.2 etc\n                | \\* # full wildcard\n            )\n            (?:$|[,\\ |@]) # trailing separator\n        }}x"
         );
 
         let constraint_matches: Vec<(BString, i64)> = preg_match_all(&pattern, &pretty_constraint)
@@ -116,11 +100,11 @@ impl VersionBumper {
                     while version_bits.len() < needed_len {
                         version_bits.push("0".into());
                     }
-                    bconcat!("~", implode(".", &version_bits[..needed_len]))
+                    bformat!("~{}", implode(".", &version_bits[..needed_len]))
                 } else if match_str == "*" || match_str.starts_with(b">=") {
-                    bconcat!(">=", &version_without_suffix, suffix)
+                    bformat!(">={version_without_suffix}{suffix}")
                 } else {
-                    bconcat!(&new_pretty_constraint, suffix)
+                    bformat!("{new_pretty_constraint}{suffix}")
                 };
                 modified = substr_replace(
                     &modified,

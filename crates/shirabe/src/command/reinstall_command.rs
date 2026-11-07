@@ -16,7 +16,7 @@ use crate::repository::InstalledRepositoryInterfaceHandle;
 use crate::script::ScriptEvents;
 use crate::util::Platform;
 use bstr::{BStr, BString};
-use shirabe_php_shim::{InvalidArgumentException, bconcat, impl_php_class, preg_is_match};
+use shirabe_php_shim::{InvalidArgumentException, bformat, impl_php_class, preg_is_match};
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::{InputInterface, InputInterfaceByName};
 use shirabe_symfony_console::output::OutputInterface;
@@ -137,11 +137,7 @@ impl Command for ReinstallCommand {
                     }
                 }
                 if !matched {
-                    io.write_error(bconcat!(
-                        "<warning>Pattern \"",
-                        pattern,
-                        "\" does not match any currently installed packages.</warning>"
-                    ));
+                    io.write_error(bformat!("<warning>Pattern \"{pattern}\" does not match any currently installed packages.</warning>"));
                 }
             }
         }

@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/Util/IniHelper.php sha1:1533d2baf9088a804193ca464c0081145da3ede4
 
 use bstr::BString;
-use shirabe_php_shim::bconcat;
+use shirabe_php_shim::bformat;
 
 pub struct IniHelper;
 
@@ -42,9 +42,8 @@ impl IniHelper {
             ));
         }
 
-        Ok(bconcat!(
-            "The php.ini used by your command-line PHP is: ",
-            ini
+        Ok(bformat!(
+            "The php.ini used by your command-line PHP is: {ini}"
         ))
     }
 }

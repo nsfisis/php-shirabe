@@ -13,7 +13,7 @@ use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     InvalidArgumentException, PATHINFO_EXTENSION, PhpMixed, ToPhpString, UnexpectedValueException,
-    bconcat, get_debug_type, json_encode, path_from_bytes, path_to_bytes, pathinfo, php_regex,
+    bformat, get_debug_type, json_encode, path_from_bytes, path_to_bytes, pathinfo, php_regex,
     preg_replace, realpath, strtr,
 };
 
@@ -59,7 +59,7 @@ impl RepositoryFactory {
                 repo_config.insert("type".into(), PhpMixed::string(BString::from("composer")));
                 repo_config.insert(
                     "url".into(),
-                    PhpMixed::string(bconcat!("file://", real_path)),
+                    PhpMixed::string(bformat!("file://{real_path}")),
                 );
                 return Ok(repo_config);
             } else if allow_filesystem {
@@ -68,11 +68,7 @@ impl RepositoryFactory {
                 repo_config.insert("json".into(), PhpMixed::string(repository));
                 return Ok(repo_config);
             } else {
-                return Err(InvalidArgumentException::new(bconcat!(
-                    "Invalid repository URL (",
-                    repository,
-                    ") given. This file does not contain a valid composer repository."
-                ))
+                return Err(InvalidArgumentException::new(bformat!("Invalid repository URL ({repository}) given. This file does not contain a valid composer repository."))
                 .into());
             }
         }
@@ -84,11 +80,7 @@ impl RepositoryFactory {
             return Ok(repo_config);
         }
 
-        Err(InvalidArgumentException::new(bconcat!(
-            "Invalid repository url (",
-            repository,
-            ") given. Has to be a .json file, an http url or a JSON object."
-        ))
+        Err(InvalidArgumentException::new(bformat!("Invalid repository url ({repository}) given. Has to be a .json file, an http url or a JSON object."))
         .into())
     }
 
@@ -287,12 +279,9 @@ impl RepositoryFactory {
                 }
                 PhpMixed::Array(repo_arr) => {
                     if !repo_arr.contains_key(B("type")) {
-                        return Err(UnexpectedValueException::new(bconcat!(
-                            "Repository \"",
-                            index,
-                            "\" (",
-                            json_encode(&repo).unwrap_or_default(),
-                            ") must have a type defined"
+                        return Err(UnexpectedValueException::new(bformat!(
+                            "Repository \"{index}\" ({}) must have a type defined",
+                            json_encode(&repo).unwrap_or_default()
                         ))
                         .into());
                     }
@@ -328,20 +317,16 @@ impl RepositoryFactory {
                         let created = rm.create_repository(
                             repo_type.as_bstr(),
                             repo_config_map,
-                            Some(bconcat!(index).as_bstr()),
+                            Some(bformat!("{index}").as_bstr()),
                         )?;
                         repo_map.insert(name, created);
                     }
                 }
                 _ => {
-                    return Err(UnexpectedValueException::new(bconcat!(
-                        "Repository \"",
-                        index,
-                        "\" (",
+                    return Err(UnexpectedValueException::new(bformat!(
+                        "Repository \"{index}\" ({}) should be an array, {} given",
                         json_encode(&repo).unwrap_or_default(),
-                        ") should be an array, ",
-                        get_debug_type(&repo),
-                        " given"
+                        get_debug_type(&repo)
                     ))
                     .into());
                 }
@@ -385,7 +370,7 @@ impl RepositoryFactory {
             &if let Some(url) = repo.get(B("url")).and_then(|v| v.as_string()) {
                 preg_replace(php_regex!("{^https?://}i"), "", url)
             } else {
-                bconcat!(index)
+                bformat!("{index}")
             }[..],
         );
         while existing_repos.contains_key(&name) {

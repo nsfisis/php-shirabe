@@ -9,7 +9,7 @@
 use crate::e2e_extension_installer_test::{copy_dir, upstream_composer_bin};
 use crate::php_worker::lock_php_worker;
 use bstr::{BStr, BString, ByteSlice};
-use shirabe_php_shim::{bconcat, os_str_from_bytes, path_from_bytes, utf8_text};
+use shirabe_php_shim::{bformat, os_str_from_bytes, path_from_bytes, utf8_text};
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use tempfile::TempDir;
@@ -43,7 +43,7 @@ impl HttpServer {
             .local_addr()
             .unwrap()
             .port();
-        let address = bconcat!("127.0.0.1:", port);
+        let address = bformat!("127.0.0.1:{port}");
         let child = std::process::Command::new("php")
             .arg("-S")
             .arg(os_str_from_bytes(&address))
@@ -58,7 +58,7 @@ impl HttpServer {
             .unwrap();
         let server = Self {
             child,
-            base_url: bconcat!("http://", address),
+            base_url: bformat!("http://{address}"),
         };
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
         while std::net::TcpStream::connect(
@@ -107,7 +107,7 @@ fn install(program: &BStr, prefix_args: &[&OsStr], http_base_url: &BStr) -> Run 
     };
     Run {
         exit_code: output.status.code().unwrap_or(-1),
-        output: bconcat!(&output.stdout, &output.stderr),
+        output: bformat!("{}{}", &output.stdout, &output.stderr),
         trace: read(BStr::new("async-trace.txt")),
         installer_trace: read(BStr::new("async-installer-trace.txt")),
         asset: read(BStr::new("assets/shirabe-test/async-asset-a/asset.txt")),

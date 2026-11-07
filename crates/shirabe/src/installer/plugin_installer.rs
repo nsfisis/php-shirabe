@@ -10,7 +10,7 @@ use crate::plugin::PluginManager;
 use crate::repository::InstalledRepositoryInterfaceHandle;
 use crate::util::{Filesystem, Platform};
 use bstr::{B, BStr};
-use shirabe_php_shim::{PhpMixed, UnexpectedValueException, bconcat, empty, error_message};
+use shirabe_php_shim::{PhpMixed, UnexpectedValueException, bformat, empty, error_message};
 
 #[derive(Debug)]
 pub struct PluginInstaller {
@@ -46,10 +46,9 @@ impl PluginInstaller {
         repo: &InstalledRepositoryInterfaceHandle,
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<()> {
-        self.inner.io.write_error(bconcat!(
-            "Plugin initialization failed (",
-            error_message(&e),
-            "), uninstalling plugin"
+        self.inner.io.write_error(bformat!(
+            "Plugin initialization failed ({}), uninstalling plugin",
+            error_message(&e)
         ));
         self.inner.uninstall(repo, package).await?;
         Err(e)
@@ -119,7 +118,7 @@ impl InstallerInterface for PluginInstaller {
         let extra = package.get_extra();
         let class = extra.get(B("class")).cloned().unwrap_or(PhpMixed::Null);
         if empty(&class) {
-            return Err(UnexpectedValueException::new(bconcat!("Error while installing ", package.get_pretty_name(), ", composer-plugin packages should have a class defined in their extra key to be usable.")).into());
+            return Err(UnexpectedValueException::new(bformat!("Error while installing {}, composer-plugin packages should have a class defined in their extra key to be usable.", package.get_pretty_name())).into());
         }
 
         self.inner.download(package, prev_package).await

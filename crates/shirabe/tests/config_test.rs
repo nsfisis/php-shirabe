@@ -9,7 +9,7 @@ use shirabe::{
     io::{IOInterface, io_interface},
     util::Platform,
 };
-use shirabe_php_shim::{PhpMixed, bconcat, error_message, rtrim_chars};
+use shirabe_php_shim::{PhpMixed, bformat, error_message, rtrim_chars};
 
 #[path = "common/io_mock.rs"]
 #[allow(dead_code)] // io_mock exposes more helpers than this binary uses
@@ -33,13 +33,16 @@ fn assert_map_equals(expected: &IndexMap<BString, PhpMixed>, actual: &IndexMap<B
 
 fn repo(r#type: &BStr, url: &BStr) -> PhpMixed {
     let mut m: IndexMap<BString, PhpMixed> = IndexMap::new();
-    m.insert("type".into(), PhpMixed::string(bconcat!(r#type)));
-    m.insert("url".into(), PhpMixed::string(bconcat!(url)));
+    m.insert("type".into(), PhpMixed::string(bformat!("{}", r#type)));
+    m.insert("url".into(), PhpMixed::string(bformat!("{url}")));
     PhpMixed::Array(m)
 }
 
 fn map(pairs: Vec<(&BStr, PhpMixed)>) -> IndexMap<BString, PhpMixed> {
-    pairs.into_iter().map(|(k, v)| (bconcat!(k), v)).collect()
+    pairs
+        .into_iter()
+        .map(|(k, v)| (bformat!("{k}"), v))
+        .collect()
 }
 
 fn disable(name: &BStr) -> PhpMixed {
@@ -389,7 +392,7 @@ fn test_var_replacement() {
         config.get("bin-dir").unwrap()
     );
     assert_eq!(
-        PhpMixed::string(bconcat!(home, "/foo")),
+        PhpMixed::string(bformat!("{home}/foo")),
         config.get("cache-dir").unwrap()
     );
 }
@@ -425,7 +428,7 @@ fn test_realpath_replacement() {
         config.get("vendor-dir").unwrap()
     );
     assert_eq!(
-        PhpMixed::string(bconcat!(home, "/foo")),
+        PhpMixed::string(bformat!("{home}/foo")),
         config.get("bin-dir").unwrap()
     );
     assert_eq!(
@@ -587,9 +590,8 @@ fn test_prohibited_urls_throw_exception() {
             .prohibit_url_by_config(url.into(), None, &IndexMap::new())
             .unwrap_err();
         assert!(
-            error_message(&err).contains_str(bconcat!(
-                "Your configuration does not allow connections to ",
-                url
+            error_message(&err).contains_str(bformat!(
+                "Your configuration does not allow connections to {url}"
             )),
             "url {url:?}: {err}"
         );

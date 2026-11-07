@@ -18,7 +18,7 @@ use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, Exception, InvalidArgumentException, LogicException, PHP_EOL, PhpMixed, array_keys,
-    array_slice, asort, bconcat, explode, file_get_contents, implode, in_array_strict, intval,
+    array_slice, asort, bformat, explode, file_get_contents, implode, in_array_strict, intval,
     is_array, is_file, is_numeric, json_decode_assoc, levenshtein, php_regex, preg_is_match,
     preg_match, sprintf, strlen, strpos, trim, utf8_text,
 };
@@ -142,7 +142,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                         requirement_field(&requirement, BStr::new("version")),
                     )
                 {
-                    io.write_error(bconcat!("<warning>The \"", requirement_field(&requirement, BStr::new("version")), "\" constraint for \"", requirement_field(&requirement, BStr::new("name")), "\" appears too strict and will likely not match what you want. See https://getcomposer.org/constraints</warning>"));
+                    io.write_error(bformat!("<warning>The \"{}\" constraint for \"{}\" appears too strict and will likely not match what you want. See https://getcomposer.org/constraints</warning>", requirement_field(&requirement, BStr::new("version")), requirement_field(&requirement, BStr::new("name"))));
                 }
 
                 if !requirement.contains_key(B("version")) {
@@ -162,22 +162,19 @@ pub trait PackageDiscoveryTrait: BaseCommand {
 
                     if use_best_version_constraint {
                         requirement.insert("version".into(), version.clone());
-                        io.write_error(bconcat!(
-                            "Using version <info>",
-                            version,
-                            "</info> for <info>",
-                            requirement_field(&requirement, BStr::new("name")),
-                            "</info>"
+                        io.write_error(bformat!(
+                            "Using version <info>{version}</info> for <info>{}</info>",
+                            requirement_field(&requirement, BStr::new("name"))
                         ));
                     } else {
                         requirement.insert("version".into(), "guess".into());
                     }
                 }
 
-                result.push(bconcat!(
+                result.push(bformat!(
+                    "{} {}",
                     requirement_field(&requirement, BStr::new("name")),
-                    " ",
-                    requirement_field(&requirement, BStr::new("version")),
+                    requirement_field(&requirement, BStr::new("version"))
                 ));
             }
 
@@ -261,20 +258,19 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                         if let Some(ai) = &found_package.abandoned {
                             let replacement = match ai {
                                 AbandonedInfo::Replacement(r) => {
-                                    bconcat!("Use ", r, " instead")
+                                    bformat!("Use {r} instead")
                                 }
                                 AbandonedInfo::Abandoned => {
                                     BString::from("No replacement was suggested")
                                 }
                             };
-                            abandoned =
-                                bconcat!("<warning>Abandoned. ", replacement, ".</warning>");
+                            abandoned = bformat!("<warning>Abandoned. {replacement}.</warning>");
                         }
 
                         choices.push(sprintf(
                             " <info>%5s</info> %s %s",
                             &[
-                                PhpMixed::string(bconcat!("[", position, "]")),
+                                PhpMixed::string(bformat!("[{position}]")),
                                 PhpMixed::string(found_package.name.clone()),
                                 PhpMixed::string(abandoned),
                             ],
@@ -282,12 +278,9 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                     }
 
                     io.write_error("");
-                    io.write_error(bconcat!(
-                        "Found <info>",
-                        matches.len() as i64,
-                        "</info> packages matching <info>",
-                        package,
-                        "</info>"
+                    io.write_error(bformat!(
+                        "Found <info>{}</info> packages matching <info>{package}</info>",
+                        matches.len() as i64
                     ));
                     io.write_error("");
 
@@ -322,10 +315,9 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                                     // validate version constraint
                                     version_parser_clone.parse_constraints(&v)?;
 
-                                    return Ok(InputValue::String(bconcat!(
-                                        m.name("name").unwrap_or_default(),
-                                        " ",
-                                        v
+                                    return Ok(InputValue::String(bformat!(
+                                        "{} {v}",
+                                        m.name("name").unwrap_or_default()
                                     )));
                                 }
 
@@ -382,12 +374,8 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                                     fixed,
                                 )?;
 
-                            io.write_error(bconcat!(
-                                "Using version <info>",
-                                c,
-                                "</info> for <info>",
-                                package,
-                                "</info>"
+                            io.write_error(bformat!(
+                                "Using version <info>{c}</info> for <info>{package}</info>"
                             ));
 
                             c
@@ -396,7 +384,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                         _ => BString::default(),
                     };
 
-                    package = bconcat!(package, " ", constraint);
+                    package = bformat!("{package} {constraint}");
                 }
 
                 if !package.is_empty() {
@@ -476,7 +464,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                     constraint = self
                         .get_io()
                         .ask_and_validate(
-                            bconcat!("Package \"<info>", name, "</info>\" does not exist but is provided by ", providers_count, " packages. Which version constraint would you like to use? [<info>*</info>] "),
+                            bformat!("Package \"<info>{name}</info>\" does not exist but is provided by {providers_count} packages. Which version constraint would you like to use? [<info>*</info>] "),
                             validator,
                             Some(3),
                             InputValue::from("*"),
@@ -506,7 +494,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                     ShowWarnings::Always,
                 )?;
                 if let Some(candidate) = candidate {
-                    return Err(InvalidArgumentException::new(bconcat!("Package ", name, " has requirements incompatible with your PHP version, PHP extensions and Composer version", self.get_platform_exception_details(
+                    return Err(InvalidArgumentException::new(bformat!("Package {name} has requirements incompatible with your PHP version, PHP extensions and Composer version{}", self.get_platform_exception_details(
                             candidate,
                             platform_repo,
                         )?))
@@ -535,19 +523,19 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                     ShowWarnings::Always,
                 )?;
                 if let Some(all_repos_package) = all_repos_package {
-                    return Err(InvalidArgumentException::new(bconcat!("Package ", name, " exists in ", all_repos_package
+                    return Err(InvalidArgumentException::new(bformat!("Package {name} exists in {} and {} which has a higher repository priority. The packages from the higher priority repository do not match your minimum-stability and are therefore not installable. That repository is canonical so the lower priority repo's packages are not installable. See https://getcomposer.org/repoprio for details and assistance.", all_repos_package
                             .get_repository()
                             .map(|r| r.get_repo_name())
                             .transpose()?
-                            .unwrap_or_default(), " and ", package
+                            .unwrap_or_default(), package
                             .get_repository()
                             .map(|r| r.get_repo_name())
                             .transpose()?
-                            .unwrap_or_default(), " which has a higher repository priority. The packages from the higher priority repository do not match your minimum-stability and are therefore not installable. That repository is canonical so the lower priority repo's packages are not installable. See https://getcomposer.org/repoprio for details and assistance."))
+                            .unwrap_or_default()))
                     .into());
                 }
 
-                return Err(InvalidArgumentException::new(bconcat!("Could not find a version of package ", name, " matching your minimum-stability (", effective_minimum_stability, "). Require it with an explicit version constraint allowing its desired stability."))
+                return Err(InvalidArgumentException::new(bformat!("Could not find a version of package {name} matching your minimum-stability ({effective_minimum_stability}). Require it with an explicit version constraint allowing its desired stability."))
                 .into());
             }
             // Check whether the PHP version was the problem for all versions
@@ -573,22 +561,14 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                         ShowWarnings::Always,
                     )?;
                     if no_match.is_none() {
-                        additional = bconcat!(
-                            PHP_EOL,
-                            PHP_EOL,
-                            "Additionally, the package was only found with a stability of \"",
-                            candidate.get_stability(),
-                            "\" while your minimum stability is \"",
-                            effective_minimum_stability,
-                            "\"."
-                        )
+                        additional = bformat!("{PHP_EOL}{PHP_EOL}Additionally, the package was only found with a stability of \"{}\" while your minimum stability is \"{effective_minimum_stability}\".", candidate.get_stability())
                         .to_owned();
                     }
 
-                    return Err(InvalidArgumentException::new(bconcat!("Could not find package ", name, " in any version matching your PHP version, PHP extensions and Composer version", self.get_platform_exception_details(
+                    return Err(InvalidArgumentException::new(bformat!("Could not find package {name} in any version matching your PHP version, PHP extensions and Composer version{}{additional}", self.get_platform_exception_details(
                             candidate,
                             platform_repo,
-                        )?, additional))
+                        )?))
                     .into());
                 }
             }
@@ -603,21 +583,17 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                         .map(|s| PhpMixed::string(s.clone()))
                         .collect::<Vec<_>>(),
                 ) {
-                    return Err(InvalidArgumentException::new(bconcat!("Could not find package ", name, ". It was however found via repository search, which indicates a consistency issue with the repository."))
+                    return Err(InvalidArgumentException::new(bformat!("Could not find package {name}. It was however found via repository search, which indicates a consistency issue with the repository."))
                     .into());
                 }
 
                 if input.borrow().is_interactive() {
                     let result_mixed = io.select(
-                        bconcat!(
-                            "<error>Could not find package ",
-                            name,
-                            ".</error>\nPick one of these or leave empty to abort:"
-                        ),
+                        bformat!("<error>Could not find package {name}.</error>\nPick one of these or leave empty to abort:"),
                         similar
                             .iter()
                             .enumerate()
-                            .map(|(index, similar)| (bconcat!(index), similar.clone()))
+                            .map(|(index, similar)| (bformat!("{index}"), similar.clone()))
                             .collect(),
                         InputValue::Bool(false),
                         Some(1),
@@ -640,22 +616,19 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                     }
                 }
 
-                return Err(InvalidArgumentException::new(bconcat!(
-                    "Could not find package ",
-                    name,
-                    ".\n\nDid you mean ",
+                return Err(InvalidArgumentException::new(bformat!(
+                    "Could not find package {name}.\n\nDid you mean {}?\n    {}",
                     if similar.len() > 1 {
                         "one of these"
                     } else {
                         "this"
                     },
-                    "?\n    ",
                     implode("\n    ", &similar)
                 ))
                 .into());
             }
 
-            return Err(InvalidArgumentException::new(bconcat!("Could not find a matching version of package ", name, ". Check the package spelling, your version constraint and that the package is available in a stability which matches your minimum-stability (", effective_minimum_stability, ")."))
+            return Err(InvalidArgumentException::new(bformat!("Could not find a matching version of package {name}. Check the package spelling, your version constraint and that the package is available in a stability which matches your minimum-stability ({effective_minimum_stability})."))
             .into());
         }
 
@@ -743,17 +716,14 @@ pub trait PackageDiscoveryTrait: BaseCommand {
             let platform_pkg = match platform_pkg {
                 None => {
                     if platform_repo.is_platform_package_disabled(link.get_target().as_bstr()) {
-                        details.push(bconcat!(candidate.get_pretty_name(), " ", candidate.get_pretty_version(), " requires ", link.get_target(), " ", link.get_pretty_constraint()?, " but it is disabled by your platform config. Enable it again with \"shirabe config platform.", link.get_target(), " --unset\"."));
+                        details.push(bformat!("{} {} requires {} {} but it is disabled by your platform config. Enable it again with \"shirabe config platform.{} --unset\".", candidate.get_pretty_name(), candidate.get_pretty_version(), link.get_target(), link.get_pretty_constraint()?, link.get_target()));
                     } else {
-                        details.push(bconcat!(
+                        details.push(bformat!(
+                            "{} {} requires {} {} but it is not present.",
                             candidate.get_pretty_name(),
-                            " ",
                             candidate.get_pretty_version(),
-                            " requires ",
                             link.get_target(),
-                            " ",
-                            link.get_pretty_constraint()?,
-                            " but it is not present."
+                            link.get_pretty_constraint()?
                         ));
                     }
                     continue;
@@ -775,29 +745,16 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                 let has_config_platform = platform_extra.contains_key(B("config.platform"));
                 let is_complete = platform_pkg.as_complete().is_some();
                 if has_config_platform && is_complete {
-                    platform_pkg_version = bconcat!(
-                        platform_pkg_version,
-                        " (",
+                    platform_pkg_version = bformat!(
+                        "{platform_pkg_version} ({})",
                         platform_pkg
                             .as_complete()
                             .unwrap()
                             .get_description()
-                            .unwrap_or_default(),
-                        ")"
+                            .unwrap_or_default()
                     );
                 }
-                details.push(bconcat!(
-                    candidate.get_pretty_name(),
-                    " ",
-                    candidate.get_pretty_version(),
-                    " requires ",
-                    link.get_target(),
-                    " ",
-                    link.get_pretty_constraint()?,
-                    " which does not match your installed version ",
-                    platform_pkg_version,
-                    "."
-                ));
+                details.push(bformat!("{} {} requires {} {} which does not match your installed version {platform_pkg_version}.", candidate.get_pretty_name(), candidate.get_pretty_version(), link.get_target(), link.get_pretty_constraint()?));
             }
         }
 
@@ -805,11 +762,9 @@ pub trait PackageDiscoveryTrait: BaseCommand {
             return Ok(BString::default());
         }
 
-        Ok(bconcat!(
-            ":",
-            PHP_EOL,
-            "  - ",
-            implode(bconcat!(PHP_EOL, "  - "), &details)
+        Ok(bformat!(
+            ":{PHP_EOL}  - {}",
+            implode(bformat!("{PHP_EOL}  - "), &details)
         )
         .to_owned())
     }

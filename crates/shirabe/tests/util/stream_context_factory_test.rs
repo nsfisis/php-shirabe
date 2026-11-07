@@ -17,16 +17,21 @@ use indexmap::IndexMap;
 use shirabe::util::http::ProxyManager;
 use shirabe::util::{Platform, StreamContextFactory};
 use shirabe_php_shim::{
-    PhpMixed, base64_encode, bconcat, error_message, extension_loaded, implode,
+    PhpMixed, base64_encode, bformat, error_message, extension_loaded, implode,
     stream_context_get_options, stripos,
 };
 
 fn s(value: &BStr) -> PhpMixed {
-    PhpMixed::string(bconcat!(value))
+    PhpMixed::string(bformat!("{value}"))
 }
 
 fn arr(entries: Vec<(&BStr, PhpMixed)>) -> PhpMixed {
-    PhpMixed::Array(entries.into_iter().map(|(k, v)| (bconcat!(k), v)).collect())
+    PhpMixed::Array(
+        entries
+            .into_iter()
+            .map(|(k, v)| (bformat!("{k}"), v))
+            .collect(),
+    )
 }
 
 fn list(items: Vec<PhpMixed>) -> PhpMixed {
@@ -34,7 +39,10 @@ fn list(items: Vec<PhpMixed>) -> PhpMixed {
 }
 
 fn map(entries: Vec<(&BStr, PhpMixed)>) -> IndexMap<BString, PhpMixed> {
-    entries.into_iter().map(|(k, v)| (bconcat!(k), v)).collect()
+    entries
+        .into_iter()
+        .map(|(k, v)| (bformat!("{k}"), v))
+        .collect()
 }
 
 // `PhpMixed`'s `PartialEq` models PHP's `===` (order-sensitive for associative arrays). These
@@ -155,8 +163,8 @@ fn test_http_proxy() {
                 BStr::new("header"),
                 list(vec![
                     s(BStr::new("User-Agent: foo")),
-                    s(bconcat!(
-                        "Proxy-Authorization: Basic ",
+                    s(bformat!(
+                        "Proxy-Authorization: Basic {}",
                         base64_encode("username:p@ssword")
                     )
                     .as_bstr()),
@@ -303,8 +311,8 @@ fn test_options_are_preserved() {
                 list(vec![
                     s(BStr::new("User-Agent: foo")),
                     s(BStr::new("X-Foo: bar")),
-                    s(bconcat!(
-                        "Proxy-Authorization: Basic ",
+                    s(bformat!(
+                        "Proxy-Authorization: Basic {}",
                         base64_encode("username:password")
                     )
                     .as_bstr()),
@@ -349,8 +357,8 @@ fn test_http_proxy_without_port() {
                 BStr::new("header"),
                 list(vec![
                     s(BStr::new("User-Agent: foo")),
-                    s(bconcat!(
-                        "Proxy-Authorization: Basic ",
+                    s(bformat!(
+                        "Proxy-Authorization: Basic {}",
                         base64_encode("username:password")
                     )
                     .as_bstr()),

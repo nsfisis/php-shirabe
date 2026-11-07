@@ -13,7 +13,7 @@ use crate::repository::{
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    bconcat, explode_with_limit, implode, php_regex, preg_is_match, preg_quote, preg_split,
+    bformat, explode_with_limit, implode, php_regex, preg_is_match, preg_quote, preg_split,
     strtolower,
 };
 use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
@@ -223,12 +223,9 @@ impl RepositoryInterface for ArrayRepository {
 
     fn get_repo_name(&self) -> anyhow::Result<BString> {
         let count = self.base_count();
-        Ok(bconcat!(
-            "array repo (defining ",
-            count,
-            " package",
-            if count > 1 { "s" } else { "" },
-            ")"
+        Ok(bformat!(
+            "array repo (defining {count} package{})",
+            if count > 1 { "s" } else { "" }
         ))
     }
 
@@ -270,12 +267,12 @@ impl RepositoryInterface for ArrayRepository {
                         .unwrap_or(false)
                 {
                     // add selected packages which match stability requirements
-                    result.insert(bconcat!(package.ptr_id()), package.clone());
+                    result.insert(bformat!("{}", package.ptr_id()), package.clone());
                     // add the aliased package for packages where the alias matches
                     if let Some(alias) = package.as_alias() {
                         let aliased = alias.get_alias_of();
-                        if !result.contains_key(bconcat!(aliased.ptr_id()).as_slice()) {
-                            result.insert(bconcat!(aliased.ptr_id()), aliased.into());
+                        if !result.contains_key(bformat!("{}", aliased.ptr_id()).as_slice()) {
+                            result.insert(bformat!("{}", aliased.ptr_id()), aliased.into());
                         }
                     }
                 }
@@ -288,8 +285,8 @@ impl RepositoryInterface for ArrayRepository {
         for package in &packages {
             if let Some(alias) = package.as_alias() {
                 let aliased = alias.get_alias_of();
-                if result.contains_key(bconcat!(aliased.ptr_id()).as_slice()) {
-                    result.insert(bconcat!(package.ptr_id()), package.clone());
+                if result.contains_key(bformat!("{}", aliased.ptr_id()).as_slice()) {
+                    result.insert(bformat!("{}", package.ptr_id()), package.clone());
                 }
             }
         }
@@ -324,11 +321,11 @@ impl RepositoryInterface for ArrayRepository {
     ) -> anyhow::Result<Vec<SearchResult>> {
         let regex = if mode == SEARCH_FULLTEXT {
             let parts = preg_split(php_regex!("{\\s+}"), preg_quote(&query, None));
-            bconcat!("{(?:", implode("|", &parts), ")}i")
+            bformat!("{{(?:{})}}i", implode("|", &parts))
         } else {
             // vendor/name searches expect the caller to have preg_quoted the query
             let parts = preg_split(php_regex!("{\\s+}"), &query);
-            bconcat!("{(?:", implode("|", &parts), ")}i")
+            bformat!("{{(?:{})}}i", implode("|", &parts))
         };
 
         let mut matches: IndexMap<BString, SearchResult> = IndexMap::new();
@@ -353,9 +350,9 @@ impl RepositoryInterface for ArrayRepository {
                 && complete.is_some()
                 && preg_is_match(
                     &regex,
-                    bconcat!(
+                    bformat!(
+                        "{} {}",
                         implode(" ", &complete.as_ref().unwrap().get_keywords()),
-                        " ",
                         complete
                             .as_ref()
                             .unwrap()

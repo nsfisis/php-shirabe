@@ -2,7 +2,7 @@
 
 use crate::Process;
 use crate::exception::RuntimeException;
-use shirabe_php_shim::{PhpMixed, ToPhpString, bconcat, impl_php_exception};
+use shirabe_php_shim::{PhpMixed, ToPhpString, bformat, impl_php_exception};
 
 #[derive(Debug)]
 pub struct ProcessTimedOutException {
@@ -14,14 +14,12 @@ impl ProcessTimedOutException {
     pub fn new(process: &Process) -> Self {
         let exceeded_timeout = process.get_timeout();
 
-        let message = bconcat!(
-            "The process \"",
+        let message = bformat!(
+            "The process \"{}\" exceeded the timeout of {} seconds.",
             process.get_command_line(),
-            "\" exceeded the timeout of ",
             exceeded_timeout
                 .map(|t| PhpMixed::Float(t).to_php_string())
-                .unwrap_or_default(),
-            " seconds."
+                .unwrap_or_default()
         );
 
         Self {

@@ -15,7 +15,7 @@ pub use wire::{FromWire, ToWire};
 use bstr::{B, BStr, BString, ByteSlice};
 use frame::Frame;
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpMixed, bconcat, os_str_from_bytes, path_from_bytes, php_str};
+use shirabe_php_shim::{PhpMixed, bformat, os_str_from_bytes, path_from_bytes, php_str};
 use shirabe_symfony_process::PhpExecutableFinder;
 use std::os::unix::net::UnixStream;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -467,7 +467,7 @@ impl PlatformInfo {
     fn constant_key(constant_name: impl AsRef<[u8]>, class: Option<&BStr>) -> BString {
         let constant_name = constant_name.as_ref();
         match class {
-            Some(class) => bconcat!(class, "::", constant_name),
+            Some(class) => bformat!("{class}::{constant_name}"),
             None => BString::from(constant_name),
         }
     }
@@ -529,7 +529,7 @@ pub fn get_platform_info() -> anyhow::Result<&'static PlatformInfo> {
 fn query<T: FromWire>(name: impl AsRef<[u8]>, request: impl ToWire) -> anyhow::Result<T> {
     let name = name.as_ref().as_bstr();
     let value = call_internal_function(name, vec![request.to_wire()])??;
-    Ok(protocol_value(&value, bconcat!("the answer of ", name)))
+    Ok(protocol_value(&value, bformat!("the answer of {name}")))
 }
 
 /// An answer typed `T|false`, with `false` mapped to `None`. Any other answer that does not decode
@@ -545,7 +545,7 @@ fn or_false<T: FromWire>(value: &PluginValue, what: impl AsRef<[u8]>) -> Option<
 fn string_or_false(name: impl AsRef<[u8]>, arg: &BStr) -> anyhow::Result<Option<BString>> {
     let name = name.as_ref().as_bstr();
     let value: PluginValue = query(name, arg)?;
-    Ok(or_false(&value, bconcat!("the answer of ", name)))
+    Ok(or_false(&value, bformat!("the answer of {name}")))
 }
 
 /// PHP `phpversion($extension)`.
@@ -757,12 +757,8 @@ impl RustMethodDispatcher for RefuseCallbacks {
         _args: Vec<PluginValue>,
         _out_params: &mut IndexMap<u32, PluginValue>,
     ) -> Result<PluginValue, PhpThrow> {
-        Err(PhpThrow::runtime(bconcat!(
-            "no Rust method dispatcher is active for this call (rhandle ",
-            rhandle,
-            ", method `",
-            method_name,
-            "`)"
+        Err(PhpThrow::runtime(bformat!(
+            "no Rust method dispatcher is active for this call (rhandle {rhandle}, method `{method_name}`)"
         )))
     }
 }
@@ -1118,7 +1114,7 @@ fn spawn_worker() -> anyhow::Result<Worker> {
     }
     command
         .arg(&script_path)
-        .arg(os_str_from_bytes(&bconcat!(WORKER_SOCKET_FD)))
+        .arg(os_str_from_bytes(&bformat!("{WORKER_SOCKET_FD}")))
         .arg(&stubs_dir)
         .arg(&guards_dir);
     // SAFETY: the closure only calls async-signal-safe syscalls, as required between fork and

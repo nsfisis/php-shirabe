@@ -12,7 +12,7 @@ use crate::output::OutputInterface;
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    AsAny, PHP_SERVER, PhpClass, PhpMixed, bconcat, explode, is_numeric_to_int, path_to_bytes,
+    AsAny, PHP_SERVER, PhpClass, PhpMixed, bformat, explode, is_numeric_to_int, path_to_bytes,
     php_regex, preg_is_match, str_replace_array, trim,
 };
 use std::cell::{Cell, Ref};
@@ -107,10 +107,8 @@ impl CommandData {
     /// Throws InvalidArgumentException when the name is invalid.
     fn validate_name(&self, name: &BStr) -> anyhow::Result<Result<(), InvalidArgumentException>> {
         if !preg_is_match(php_regex!(r"/^[^\:]++(\:[^\:]++)*$/"), name) {
-            return Ok(Err(InvalidArgumentException::new(bconcat!(
-                "Command name \"",
-                name,
-                "\" is invalid."
+            return Ok(Err(InvalidArgumentException::new(bformat!(
+                "Command name \"{name}\" is invalid."
             ))));
         }
 
@@ -684,7 +682,7 @@ impl Command for CommandData {
             if is_single_command {
                 php_self.into()
             } else {
-                bconcat!(php_self, " ", name.unwrap_or_default())
+                bformat!("{php_self} {}", name.unwrap_or_default())
             },
         ];
 
@@ -723,9 +721,9 @@ impl Command for CommandData {
         let key = BString::from(if short { "short" } else { "long" });
 
         if !self.synopsis.borrow().contains_key(&key) {
-            let value = trim(bconcat!(
+            let value = trim(bformat!(
+                "{} {}",
                 self.name.borrow().clone().unwrap_or_default(),
-                " ",
                 self.definition
                     .borrow()
                     .as_ref()
@@ -742,7 +740,7 @@ impl Command for CommandData {
         let mut usage = BString::from(usage);
         let name = self.name.borrow().clone().unwrap_or_default();
         if !usage.starts_with(&name) {
-            usage = bconcat!(name, " ", usage);
+            usage = bformat!("{name} {usage}");
         }
 
         self.usages.borrow_mut().push(usage);
@@ -758,10 +756,8 @@ impl Command for CommandData {
     ) -> anyhow::Result<std::rc::Rc<std::cell::RefCell<dyn HelperInterface>>> {
         let helper_set = match &*self.helper_set.borrow() {
             None => {
-                anyhow::bail!(LogicException::new(bconcat!(
-                    "Cannot retrieve helper \"",
-                    name,
-                    "\" because there is no HelperSet defined. Did you forget to add your command to the application or to set the application on the command using the setApplication() method? You can also set the HelperSet directly using the setHelperSet() method."
+                anyhow::bail!(LogicException::new(bformat!(
+                    "Cannot retrieve helper \"{name}\" because there is no HelperSet defined. Did you forget to add your command to the application or to set the application on the command using the setApplication() method? You can also set the HelperSet directly using the setHelperSet() method."
                 )));
             }
             Some(helper_set) => helper_set.clone(),

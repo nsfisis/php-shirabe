@@ -10,7 +10,7 @@ use shirabe::io::{IOInterface, NullIO};
 use shirabe::repository::vcs::GitBitbucketDriver;
 use shirabe::util::{Filesystem, HttpDownloader, HttpDownloaderMockHandler, ProcessExecutor};
 use shirabe_php_shim::{
-    Catch as _, InvalidArgumentException, PhpMixed, RuntimeException, bconcat, path_to_bytes,
+    Catch as _, InvalidArgumentException, PhpMixed, RuntimeException, bformat, path_to_bytes,
 };
 use tempfile::TempDir;
 
@@ -71,7 +71,7 @@ fn get_driver(
     http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
 ) -> anyhow::Result<GitBitbucketDriver> {
     let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
-    repo_config.insert("url".into(), PhpMixed::string(bconcat!(url)));
+    repo_config.insert("url".into(), PhpMixed::string(bformat!("{url}")));
 
     let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
         io.clone(),
@@ -331,7 +331,7 @@ fn test_invalid_support_data() {
                 urls[0],
                 r#"{"mainbranch": {"name": "main"}, "scm":"git","website":"","has_wiki":false,"name":"repo","links":{"branches":{"href":"https:\/\/api.bitbucket.org\/2.0\/repositories\/user\/repo\/refs\/branches"},"tags":{"href":"https:\/\/api.bitbucket.org\/2.0\/repositories\/user\/repo\/refs\/tags"},"clone":[{"href":"https:\/\/user@bitbucket.org\/user\/repo.git","name":"https"},{"href":"ssh:\/\/git@bitbucket.org\/user\/repo.git","name":"ssh"}],"html":{"href":"https:\/\/bitbucket.org\/user\/repo"}},"language":"php","created_on":"2015-02-18T16:22:24.688+00:00","updated_on":"2016-05-17T13:20:21.993+00:00","is_private":true,"has_issues":false}"#,
             ),
-            http_body(urls[1], bconcat!(r#"{"support": ""#, repo_url, r#""}"#)),
+            http_body(urls[1], bformat!("{{\"support\": \"{repo_url}\"}}")),
             http_body(urls[2], r#"{"date": "2016-05-17T13:19:52+00:00"}"#),
             http_body(
                 urls[3],

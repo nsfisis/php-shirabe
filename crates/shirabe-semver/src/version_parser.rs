@@ -3,7 +3,7 @@
 use crate::constraint::{AnyConstraint, MatchAllConstraint, MultiConstraint, SimpleConstraint};
 use bstr::{BStr, BString, ByteVec};
 use shirabe_php_shim::{
-    InvalidArgumentException, PhpMixed, PregMatches, UnexpectedValueException, bconcat,
+    InvalidArgumentException, PhpMixed, PregMatches, UnexpectedValueException, bformat, bwrite,
     error_message, intval, ltrim_chars, php_regex, php_str, preg_is_match, preg_match, preg_quote,
     preg_replace, preg_split, str_replace, str_replace_arr, strtolower, substr, trim,
 };
@@ -33,7 +33,7 @@ impl VersionParser {
             return "dev".into();
         }
 
-        let pattern = bconcat!("{", MODIFIER_REGEX, "(?:\\+.*)?$}i");
+        let pattern = bformat!("{{{MODIFIER_REGEX}(?:\\+.*)?$}}i");
         let lower = strtolower(&version);
         let match_ = preg_match(&pattern, &lower);
 
@@ -70,11 +70,7 @@ impl VersionParser {
             stability.as_slice(),
             b"stable" | b"rc" | b"beta" | b"alpha" | b"dev"
         ) {
-            return Err(InvalidArgumentException::new(bconcat!(
-                "Invalid stability string \"",
-                stability,
-                "\", expected one of stable, RC, beta, alpha or dev"
-            ))
+            return Err(InvalidArgumentException::new(bformat!("Invalid stability string \"{stability}\", expected one of stable, RC, beta, alpha or dev"))
             .into());
         }
 
@@ -102,7 +98,7 @@ impl VersionParser {
         }
 
         // strip off stability flag
-        let stab_pattern = bconcat!("{@(?:", STABILITIES_REGEX, ")$}i");
+        let stab_pattern = bformat!("{{@(?:{STABILITIES_REGEX})$}}i");
         if let Some(match_) = preg_match(&stab_pattern, &version) {
             let match0_len = match_.get(0).unwrap_or_default().len();
             version = BString::from(&version[..version.len() - match0_len]);
@@ -111,12 +107,12 @@ impl VersionParser {
         // normalize master/trunk/default branches to dev-name for BC with 1.x as these used to
         // be valid constraints
         if matches!(version.as_slice(), b"master" | b"trunk" | b"default") {
-            version = bconcat!("dev-", version);
+            version = bformat!("dev-{version}");
         }
 
         // if requirement is branch-like, use full name
         if strtolower(&version).starts_with(b"dev-") {
-            return Ok(bconcat!("dev-", substr(&version, 4, None)));
+            return Ok(bformat!("dev-{}", substr(&version, 4, None)));
         }
 
         // strip off build metadata
@@ -134,30 +130,26 @@ impl VersionParser {
         // repetition `(?:\d{1,5})+` (i.e. `\d+`), which wrongly let 6+ digit numbers
         // (e.g. date versions like 20121020) match here. The plain `\d{1,5}` is
         // equivalent to the possessive form for this pattern.
-        let classical_pattern = bconcat!(
-            "{^v?(\\d{1,5})(\\.\\d++)?(\\.\\d++)?(\\.\\d++)?",
-            MODIFIER_REGEX,
-            "$}i"
-        );
+        let classical_pattern =
+            bformat!("{{^v?(\\d{{1,5}})(\\.\\d++)?(\\.\\d++)?(\\.\\d++)?{MODIFIER_REGEX}$}}i");
         if let Some(m) = preg_match(&classical_pattern, &subject) {
             let m2 = m.get(2).unwrap_or_default();
             let m3 = m.get(3).unwrap_or_default();
             let m4 = m.get(4).unwrap_or_default();
             let zero = BStr::new(".0");
-            version = bconcat!(
+            version = bformat!(
+                "{}{}{}{}",
                 m.get(1).unwrap_or_default(),
                 if m2.is_empty() { zero } else { m2 },
                 if m3.is_empty() { zero } else { m3 },
-                if m4.is_empty() { zero } else { m4 },
+                if m4.is_empty() { zero } else { m4 }
             );
             index = Some(5);
             matches = Some(m);
         } else {
             // match date(time) based versioning
-            let datetime_pattern = bconcat!(
-                "{^v?(\\d{4}(?:[.:-]?\\d{2}){1,6}(?:[.:-]?\\d{1,3}){0,2})",
-                MODIFIER_REGEX,
-                "$}i"
+            let datetime_pattern = bformat!(
+                "{{^v?(\\d{{4}}(?:[.:-]?\\d{{2}}){{1,6}}(?:[.:-]?\\d{{1,3}}){{0,2}}){MODIFIER_REGEX}$}}i"
             );
             if let Some(m) = preg_match(&datetime_pattern, &subject) {
                 version = preg_replace(php_regex!("{\\D}"), ".", m.get(1).unwrap_or_default());
@@ -175,9 +167,8 @@ impl VersionParser {
                     return Ok(version);
                 }
                 let mi1 = matches.get(idx + 1).unwrap_or_default();
-                version = bconcat!(
-                    version,
-                    "-",
+                version = bformat!(
+                    "{version}-{}{}",
                     self.expand_stability(mi),
                     if !mi1.is_empty() {
                         ltrim_chars(mi1, ".-")
@@ -208,45 +199,29 @@ impl VersionParser {
         }
 
         let extra_message = if preg_is_match(
-            bconcat!(
-                "{ +as +",
-                preg_quote(&version, None),
-                "(?:@(?:",
-                STABILITIES_REGEX,
-                "))?$}"
+            bformat!(
+                "{{ +as +{}(?:@(?:{STABILITIES_REGEX}))?$}}",
+                preg_quote(&version, None)
             ),
             &full_version,
         ) {
-            bconcat!(
-                " in \"",
-                full_version,
-                "\", the alias must be an exact version"
-            )
+            bformat!(" in \"{full_version}\", the alias must be an exact version")
         } else if preg_is_match(
-            bconcat!(
-                "{^",
-                preg_quote(&version, None),
-                "(?:@(?:",
-                STABILITIES_REGEX,
-                "))?  +as +}"
+            bformat!(
+                "{{^{}(?:@(?:{STABILITIES_REGEX}))?  +as +}}",
+                preg_quote(&version, None)
             ),
             &full_version,
         ) {
-            bconcat!(
-                " in \"",
-                full_version,
-                "\", the alias source must be an exact version, if it is a branch name you should \
-                prefix it with dev-"
+            bformat!(
+                " in \"{full_version}\", the alias source must be an exact version, if it is a branch name you should prefix it with dev-"
             )
         } else {
             BString::default()
         };
 
-        Err(UnexpectedValueException::new(bconcat!(
-            "Invalid version string \"",
-            orig_version,
-            "\"",
-            extra_message
+        Err(UnexpectedValueException::new(bformat!(
+            "Invalid version string \"{orig_version}\"{extra_message}"
         ))
         .into())
     }
@@ -258,7 +233,7 @@ impl VersionParser {
             branch.as_ref(),
         ) {
             let version = matches.get(1).unwrap_or_default();
-            return Some(bconcat!(version, "."));
+            return Some(bformat!("{version}."));
         }
 
         None
@@ -283,10 +258,10 @@ impl VersionParser {
                 }
             }
 
-            return Ok(bconcat!(str_replace("x", "9999999", &version), "-dev"));
+            return Ok(bformat!("{}-dev", str_replace("x", "9999999", &version)));
         }
 
-        Ok(bconcat!("dev-", name))
+        Ok(bformat!("dev-{name}"))
     }
 
     #[deprecated(
@@ -355,7 +330,7 @@ impl VersionParser {
 
         // strip @stability flags, and keep it for later use
         let mut stability_modifier: Option<BString> = None;
-        let stab_pattern = bconcat!("{^([^,\\s]*?)@(", STABILITIES_REGEX, ")$}i");
+        let stab_pattern = bformat!("{{^([^,\\s]*?)@({STABILITIES_REGEX})$}}i");
         if let Some(match_) = preg_match(&stab_pattern, &constraint) {
             let m1 = match_.get(1).unwrap_or_default().to_owned();
             let m2 = match_.get(2).unwrap_or_default().to_owned();
@@ -387,10 +362,8 @@ impl VersionParser {
             return Ok(vec![AnyConstraint::MatchAll(MatchAllConstraint::new(None))]);
         }
 
-        let version_regex = bconcat!(
-            "v?(\\d++)(?:\\.(\\d++))?(?:\\.(\\d++))?(?:\\.(\\d++))?(?:",
-            MODIFIER_REGEX,
-            "|\\.([xX*][.-]?dev))(?:\\+[^\\s]+)?"
+        let version_regex = bformat!(
+            "v?(\\d++)(?:\\.(\\d++))?(?:\\.(\\d++))?(?:\\.(\\d++))?(?:{MODIFIER_REGEX}|\\.([xX*][.-]?dev))(?:\\+[^\\s]+)?"
         );
 
         // Tilde Range
@@ -399,14 +372,10 @@ impl VersionParser {
         // than the previous version, to ensure that unstable instances of the current version are
         // allowed. However, if a stability suffix is added to the constraint, then a >= match on
         // the current version is used instead.
-        let tilde_pattern = bconcat!("{^~>?", version_regex, "$}i");
+        let tilde_pattern = bformat!("{{^~>?{version_regex}$}}i");
         if let Some(matches) = preg_match(&tilde_pattern, &constraint) {
             if constraint.starts_with(b"~>") {
-                return Err(UnexpectedValueException::new(bconcat!(
-                    "Could not parse version constraint ",
-                    constraint,
-                    ": Invalid operator \"~>\", you probably meant to use the \"~\" operator"
-                ))
+                return Err(UnexpectedValueException::new(bformat!("Could not parse version constraint {constraint}: Invalid operator \"~>\", you probably meant to use the \"~\" operator"))
                 .into());
             }
 
@@ -438,7 +407,7 @@ impl VersionParser {
             };
 
             let low_version = self.normalize(
-                bconcat!(substr(&constraint, 1, None), stability_suffix),
+                bformat!("{}{stability_suffix}", substr(&constraint, 1, None)),
                 None,
             )?;
             let lower_bound = SimpleConstraint::new(">=", low_version, None);
@@ -446,15 +415,15 @@ impl VersionParser {
             // For upper bound, we increment the position of one more significance,
             // but highPosition = 0 would be illegal
             let high_position = (position - 1).max(1);
-            let high_version = bconcat!(
+            let high_version = bformat!(
+                "{}-dev",
                 self.manipulate_version_string(
                     |i| matches.get(i),
                     high_position,
                     1,
                     BStr::new("0")
                 )
-                .unwrap_or_default(),
-                "-dev"
+                .unwrap_or_default()
             );
             let upper_bound = SimpleConstraint::new("<", high_version, None);
 
@@ -469,7 +438,7 @@ impl VersionParser {
         // Allows changes that do not modify the left-most non-zero digit in the [major, minor,
         // patch] tuple. In other words, this allows patch and minor updates for versions 1.0.0
         // and above, patch updates for versions 0.X >=0.1.0, and no updates for versions 0.0.X
-        let caret_pattern = bconcat!("{^\\^", version_regex, "($)}i");
+        let caret_pattern = bformat!("{{^\\^{version_regex}($)}}i");
         if let Some(matches) = preg_match(&caret_pattern, &constraint) {
             // Work out which position in the version we are operating at
             let m1 = matches.get(1).unwrap_or_default();
@@ -494,17 +463,17 @@ impl VersionParser {
             };
 
             let low_version = self.normalize(
-                bconcat!(substr(&constraint, 1, None), stability_suffix),
+                bformat!("{}{stability_suffix}", substr(&constraint, 1, None)),
                 None,
             )?;
             let lower_bound = SimpleConstraint::new(">=", low_version, None);
 
             // For upper bound, we increment the position of one more significance,
             // but highPosition = 0 would be illegal
-            let high_version = bconcat!(
+            let high_version = bformat!(
+                "{}-dev",
                 self.manipulate_version_string(|i| matches.get(i), position, 1, BStr::new("0"))
-                    .unwrap_or_default(),
-                "-dev"
+                    .unwrap_or_default()
             );
             let upper_bound = SimpleConstraint::new("<", high_version, None);
 
@@ -531,15 +500,15 @@ impl VersionParser {
                 1
             };
 
-            let low_version = bconcat!(
+            let low_version = bformat!(
+                "{}-dev",
                 self.manipulate_version_string(|i| matches.get(i), position, 0, BStr::new("0"))
-                    .unwrap_or_default(),
-                "-dev"
+                    .unwrap_or_default()
             );
-            let high_version = bconcat!(
+            let high_version = bformat!(
+                "{}-dev",
                 self.manipulate_version_string(|i| matches.get(i), position, 1, BStr::new("0"))
-                    .unwrap_or_default(),
-                "-dev"
+                    .unwrap_or_default()
             );
 
             if low_version == "0.0.0.0-dev" {
@@ -563,13 +532,8 @@ impl VersionParser {
         // version is provided as the second version in the inclusive range, then all versions
         // that start with the supplied parts of the tuple are accepted, but nothing that would
         // be greater than the provided tuple parts.
-        let hyphen_pattern = bconcat!(
-            "{^(?P<from>",
-            version_regex,
-            ") +- +(?P<to>",
-            version_regex,
-            ")($)}i"
-        );
+        let hyphen_pattern =
+            bformat!("{{^(?P<from>{version_regex}) +- +(?P<to>{version_regex})($)}}i");
         if let Some(matches) = preg_match(&hyphen_pattern, &constraint) {
             // matches[1]='from' string, matches[2..9]=from captures, matches[10]='to' string,
             // matches[11..18]=to captures, matches[19]='($)'
@@ -586,7 +550,7 @@ impl VersionParser {
             let from_str = matches.get(1).unwrap_or_default(); // matches['from']
             let low_version = self.normalize(from_str, None)?;
             let lower_bound =
-                SimpleConstraint::new(">=", bconcat!(low_version, low_stability_suffix), None);
+                SimpleConstraint::new(">=", bformat!("{low_version}{low_stability_suffix}"), None);
 
             // PHP's empty() on "0" returns true, but here we only check for truly empty/missing
             let empty = |x: Option<&BStr>| -> bool { x.is_none_or(|s| s.is_empty()) };
@@ -618,10 +582,10 @@ impl VersionParser {
                 self.normalize(to_str, None)?;
 
                 let position = if empty(matches.get(12)) { 1 } else { 2 };
-                let hv = bconcat!(
+                let hv = bformat!(
+                    "{}-dev",
                     self.manipulate_version_string(|i| high_match[i], position, 1, BStr::new("0"))
-                        .unwrap_or_default(),
-                    "-dev"
+                        .unwrap_or_default()
                 );
                 SimpleConstraint::new("<", hv, None)
             };
@@ -647,7 +611,7 @@ impl VersionParser {
                     if version_str.ends_with(b"-dev")
                         && preg_is_match(php_regex!("{^[0-9a-zA-Z-./]+$}"), version_str)
                     {
-                        self.normalize(bconcat!("dev-", substr(version_str, 0, Some(-4))), None)
+                        self.normalize(bformat!("dev-{}", substr(version_str, 0, Some(-4))), None)
                     } else {
                         Err(e)
                     }
@@ -663,10 +627,10 @@ impl VersionParser {
                     && let Some(ref stab_mod) = stability_modifier
                     && Self::parse_stability(&version) == "stable"
                 {
-                    version = bconcat!(version, "-", stab_mod);
+                    version = bformat!("{version}-{stab_mod}");
                 }
                 if op == b"<" || op == b">=" {
-                    let modifier_pattern = bconcat!("{-", MODIFIER_REGEX, "$}");
+                    let modifier_pattern = bformat!("{{-{MODIFIER_REGEX}$}}");
                     if !preg_is_match(&modifier_pattern, strtolower(version_str))
                         && !version_str.starts_with(b"dev-")
                     {
@@ -680,16 +644,15 @@ impl VersionParser {
                 ))]);
             }
 
-            let mut message = bconcat!("Could not parse version constraint ", constraint);
+            let mut message = bformat!("Could not parse version constraint {constraint}");
             if let Some(error) = version_error {
-                message.push_str(bconcat!(": ", error));
+                bwrite!(message, ": {error}");
             }
             return Err(UnexpectedValueException::new(message).into());
         }
 
-        Err(UnexpectedValueException::new(bconcat!(
-            "Could not parse version constraint ",
-            constraint
+        Err(UnexpectedValueException::new(bformat!(
+            "Could not parse version constraint {constraint}"
         ))
         .into())
     }
@@ -724,8 +687,12 @@ impl VersionParser {
             }
         }
 
-        Some(bconcat!(
-            parts[1], ".", parts[2], ".", parts[3], ".", parts[4]
+        Some(bformat!(
+            "{}.{}.{}.{}",
+            parts[1],
+            parts[2],
+            parts[3],
+            parts[4]
         ))
     }
 

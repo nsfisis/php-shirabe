@@ -13,7 +13,7 @@ use crate::repository::{PlatformRepository, RepositoryInterface, RepositorySetIn
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    CmpOp, UnexpectedValueException, bconcat, explode, explode_with_limit, implode, php_regex,
+    CmpOp, UnexpectedValueException, bformat, explode, explode_with_limit, implode, php_regex,
     preg_is_match, preg_replace, str_replace, strtolower, version_compare,
 };
 use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
@@ -66,9 +66,8 @@ impl VersionSelector {
         show_warnings: ShowWarnings,
     ) -> anyhow::Result<Option<PackageInterfaceHandle>> {
         let Some(min_priority) = base_package::stability_priority(preferred_stability) else {
-            return Err(UnexpectedValueException::new(bconcat!(
-                "Expected a valid stability name as 3rd argument, got ",
-                preferred_stability
+            return Err(UnexpectedValueException::new(bformat!(
+                "Expected a valid stability name as 3rd argument, got {preferred_stability}"
             ))
             .into());
         };
@@ -175,7 +174,7 @@ impl VersionSelector {
                             ShowWarnings::Predicate(f) => f(pkg),
                         };
                         if should_warn {
-                            let warn_key = bconcat!(pkg.get_name(), "/", link.get_target());
+                            let warn_key = bformat!("{}/{}", pkg.get_name(), link.get_target());
                             let is_first_warning = !already_warned_names.contains_key(&warn_key);
                             already_warned_names.insert(warn_key, true);
                             let latest = if is_latest_version {
@@ -184,22 +183,7 @@ impl VersionSelector {
                                 ""
                             };
                             io.write_error_with_verbosity(
-                                bconcat!(
-                                    "<warning>Cannot use ",
-                                    pkg.get_pretty_name(),
-                                    latest,
-                                    " ",
-                                    pkg.get_pretty_version(),
-                                    " as it ",
-                                    link.get_description(),
-                                    " ",
-                                    link.get_target(),
-                                    " ",
-                                    link.get_pretty_constraint()?,
-                                    " which ",
-                                    reason,
-                                    ".</>"
-                                ),
+                                bformat!("<warning>Cannot use {}{latest} {} as it {} {} {} which {reason}.</>", pkg.get_pretty_name(), pkg.get_pretty_version(), link.get_description(), link.get_target(), link.get_pretty_constraint()?),
                                 if is_first_warning {
                                     io_interface::NORMAL
                                 } else {
@@ -252,7 +236,7 @@ impl VersionSelector {
     ) -> anyhow::Result<BString> {
         if package.get_name().starts_with(b"ext-") {
             let php = shirabe_php_rpc::get_php_version()?;
-            let php_version = bconcat!(php.major, ".", php.minor, ".", php.release);
+            let php_version = bformat!("{}.{}.{}", php.major, php.minor, php.release);
             let package_version = package.get_version();
             let ext_parts = explode_with_limit(".", package_version, 4);
             let ext_version = implode(".", &ext_parts[..3.min(ext_parts.len())]);
@@ -313,12 +297,12 @@ impl VersionSelector {
             let version = implode(".", &semantic_version_parts);
 
             let version = if stability != "stable" {
-                bconcat!(version, "@", stability)
+                bformat!("{version}@{stability}")
             } else {
                 version
             };
 
-            Ok(bconcat!("^", version))
+            Ok(bformat!("^{version}"))
         } else {
             Ok(pretty_version.into())
         }

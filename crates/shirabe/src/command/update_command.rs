@@ -24,7 +24,7 @@ use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, RuntimeException, array_filter, array_intersect,
-    array_merge_map, array_search_in_vec, bconcat, impl_php_class, php_regex, preg_is_match,
+    array_merge_map, array_search_in_vec, bformat, impl_php_class, php_regex, preg_is_match,
     preg_match, preg_replace, strtolower,
 };
 use shirabe_semver::Intervals;
@@ -141,12 +141,9 @@ impl UpdateCommand {
             {
                 autocompleter_values.insert(
                     package.get_name(),
-                    bconcat!(
-                        "<comment>",
-                        current_version,
-                        "</comment> => <comment>",
-                        latest.get_pretty_version(),
-                        "</comment>",
+                    bformat!(
+                        "<comment>{current_version}</comment> => <comment>{}</comment>",
+                        latest.get_pretty_version()
                     ),
                 );
             }
@@ -187,11 +184,7 @@ impl UpdateCommand {
         table.render()?;
 
         if io.ask_confirmation(
-            bconcat!(
-                "Would you like to continue and update the above package",
-                if 1 == packages.len() { "" } else { "s" },
-                " [<comment>yes</comment>]? "
-            ),
+            bformat!("Would you like to continue and update the above package{} [<comment>yes</comment>]? ", if 1 == packages.len() { "" } else { "s" }),
             true,
         )? {
             return Ok(packages);
@@ -391,24 +384,8 @@ impl Command for UpdateCommand {
             if let Some(root_req) = root_requirements.get(&package)
                 && !Intervals::have_intersections(&parsed_constraint, root_req.get_constraint())?
             {
-                io.write_error(bconcat!(
-                    "<error>The temporary constraint \"",
-                    constraint,
-                    "\" for \"",
-                    package,
-                    "\" must be a subset of the constraint in your composer.json (",
-                    root_req.get_pretty_constraint()?,
-                    ")</error>"
-                ));
-                io.write(bconcat!(
-                    "<info>Run `shirabe require ",
-                    package,
-                    "` or `shirabe require ",
-                    package,
-                    ":",
-                    constraint,
-                    "` instead to replace the constraint</info>"
-                ));
+                io.write_error(bformat!("<error>The temporary constraint \"{constraint}\" for \"{package}\" must be a subset of the constraint in your composer.json ({})</error>", root_req.get_pretty_constraint()?));
+                io.write(bformat!("<info>Run `shirabe require {package}` or `shirabe require {package}:{constraint}` instead to replace the constraint</info>"));
 
                 return Ok(FAILURE);
             }
@@ -441,8 +418,8 @@ impl Command for UpdateCommand {
                 let Some(matches) = matches else {
                     continue;
                 };
-                let constraint =
-                    parser.parse_constraints(bconcat!("~", matches.get(1).unwrap_or_default()))?;
+                let constraint = parser
+                    .parse_constraints(bformat!("~{}", matches.get(1).unwrap_or_default()))?;
                 if let Some(existing) = temporary_constraints.get(&package.get_name()) {
                     temporary_constraints.insert(
                         package.get_name(),

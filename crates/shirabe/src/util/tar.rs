@@ -2,7 +2,7 @@
 
 use bstr::BString;
 use indexmap::IndexMap;
-use shirabe_php_shim::{PharData, RuntimeException, bconcat, implode};
+use shirabe_php_shim::{PharData, RuntimeException, bformat, implode};
 
 pub struct Tar;
 
@@ -28,14 +28,14 @@ impl Tar {
             if folder_file.is_dir() {
                 top_level_paths.insert(name, true);
                 if top_level_paths.len() > 1 {
-                    return Err(RuntimeException::new(bconcat!("Archive has more than one top level directories, and no composer.json was found on the top level, so it's an invalid archive. Top level paths found were: ", implode(",", &top_level_paths.keys().collect::<Vec<_>>()))).into());
+                    return Err(RuntimeException::new(bformat!("Archive has more than one top level directories, and no composer.json was found on the top level, so it's an invalid archive. Top level paths found were: {}", implode(",", &top_level_paths.keys().collect::<Vec<_>>()))).into());
                 }
             }
         }
 
-        let composer_json_path = bconcat!(
-            top_level_paths.keys().next().cloned().unwrap_or_default(),
-            "/composer.json"
+        let composer_json_path = bformat!(
+            "{}/composer.json",
+            top_level_paths.keys().next().cloned().unwrap_or_default()
         );
         if !top_level_paths.is_empty()
             && let Some(file) = phar.get(&composer_json_path)

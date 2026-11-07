@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/Util/ForgejoUrl.php sha1:8480d4237e6f93687fb716042375cc06a4b381bb
 
 use bstr::{BStr, BString};
-use shirabe_php_shim::{InvalidArgumentException, bconcat, php_str, preg_match, strtolower};
+use shirabe_php_shim::{InvalidArgumentException, bformat, php_str, preg_match, strtolower};
 
 #[derive(Debug)]
 pub struct ForgejoUrl {
@@ -28,9 +28,8 @@ impl ForgejoUrl {
     pub fn create(repo_url: &BStr) -> anyhow::Result<Self> {
         match Self::try_from(Some(repo_url)) {
             Some(url) => Ok(url),
-            None => Err(InvalidArgumentException::new(bconcat!(
-                "This is not a valid Forgejo URL: ",
-                repo_url
+            None => Err(InvalidArgumentException::new(bformat!(
+                "This is not a valid Forgejo URL: {repo_url}"
             ))
             .into()),
         }
@@ -46,23 +45,20 @@ impl ForgejoUrl {
                 .or_else(|| matches.get(2))
                 .unwrap_or_default(),
         );
-        let api_base = bconcat!(origin_url, "/api/v1");
+        let api_base = bformat!("{origin_url}/api/v1");
         let owner = BString::from(matches.get(3).unwrap_or_default());
         let repository = BString::from(matches.get(4).unwrap_or_default());
-        let api_url = bconcat!("https://", api_base, "/repos/", owner, "/", repository);
+        let api_url = bformat!("https://{api_base}/repos/{owner}/{repository}");
 
         Some(Self::new(owner, repository, origin_url, api_url))
     }
 
     pub fn generate_ssh_url(&self) -> BString {
-        bconcat!(
-            "git@",
+        bformat!(
+            "git@{}:{}/{}.git",
             self.origin_url,
-            ":",
             self.owner,
-            "/",
-            self.repository,
-            ".git"
+            self.repository
         )
     }
 }

@@ -3,7 +3,7 @@
 use crate::test_case::{RunOptions, get_application_tester, init_temp_composer};
 use bstr::ByteSlice;
 use serial_test::serial;
-use shirabe_php_shim::{bconcat, str_replace};
+use shirabe_php_shim::{bformat, str_replace};
 use shirabe_symfony_console::input::{InputValue, ParameterName};
 
 /// ref: RunScriptCommandTest::testDetectAndPassDevModeToEventAndToDispatching
@@ -261,7 +261,7 @@ class MyCommand extends Command
             config produces ('./MyCommand.php') only resolves when the test runs first in the binary"]
 fn test_execution_of_symfony_command_with_configuration() {
     let cmd_name = "custom-cmd-123";
-    let cmd_alias = bconcat!(cmd_name, "-alias");
+    let cmd_alias = bformat!("{cmd_name}-alias");
     let cmd_desc = "This is a Symfony command with custom configuration";
     let wrong_desc = "this should be ignored";
 

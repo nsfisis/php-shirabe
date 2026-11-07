@@ -10,7 +10,7 @@ use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     AnyThrowable, CmpOp, InvalidArgumentException, PHP_EOL, PhpMixed, PregMatches,
-    RuntimeException, ToPhpString, TypeError, array_map, bconcat, clearstatcache, error_message,
+    RuntimeException, ToPhpString, TypeError, array_map, bformat, clearstatcache, error_message,
     explode, explode_with_limit, get_debug_type, implode, in_array_loose, is_dir, path_to_bytes,
     php_regex, preg_is_match, preg_match, preg_quote, preg_replace, rawurldecode, rawurlencode,
     str_replace_array, strlen, strpos, substr, trim, version_compare,
@@ -52,20 +52,15 @@ impl Git {
         io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
     ) -> anyhow::Result<()> {
         if output.contains_str("fatal: detected dubious ownership") {
-            let msg = bconcat!(
-                "The repository at \"",
-                path,
-                "\" does not have the correct ownership and git refuses to use it:",
-                PHP_EOL,
-                PHP_EOL,
-                output
+            let msg = bformat!(
+                "The repository at \"{path}\" does not have the correct ownership and git refuses to use it:{PHP_EOL}{PHP_EOL}{output}"
             );
             match io {
                 None => {
                     return Err(RuntimeException::new(msg).into());
                 }
                 Some(io) => {
-                    io.write_error(bconcat!("<warning>", msg, "</warning>"));
+                    io.write_error(bformat!("<warning>{msg}</warning>"));
                 }
             }
         }
@@ -192,7 +187,7 @@ impl Git {
         };
 
         if preg_is_match(php_regex!(r"{^ssh://[^@]+@[^:]+:[^0-9]+}"), url) {
-            return Err(InvalidArgumentException::new(bconcat!("The source URL ", url, " is invalid, ssh URLs should have a port number after \":\".\nUse ssh://git@example.com:22/path or just git@example.com:path if you do not want to provide a password or custom port."))
+            return Err(InvalidArgumentException::new(bformat!("The source URL {url} is invalid, ssh URLs should have a port number after \":\".\nUse ssh://git@example.com:22/path or just git@example.com:path if you do not want to provide a password or custom port."))
             .into());
         }
 
@@ -222,10 +217,9 @@ impl Git {
         let protocols = self.config.borrow().get_github_protocols()?;
         // public github, autoswitch protocols
         if let Some(m) = preg_match(
-            bconcat!(
-                "{^(?:https?|git)://",
-                Self::get_github_domains_regex(&self.config.borrow())?,
-                "/(.*)}"
+            bformat!(
+                "{{^(?:https?|git)://{}/(.*)}}",
+                Self::get_github_domains_regex(&self.config.borrow())?
             ),
             url,
         ) {
@@ -235,9 +229,9 @@ impl Git {
                 let m1 = m.get(1).unwrap_or_default();
                 let m2 = m.get(2).unwrap_or_default();
                 let proto_url = if protocol == "ssh" {
-                    bconcat!("git@", m1, ":", m2)
+                    bformat!("git@{m1}:{m2}")
                 } else {
-                    bconcat!(protocol, "://", m1, "/", m2)
+                    bformat!("{protocol}://{m1}/{m2}")
                 };
 
                 if run_commands_inline(
@@ -249,10 +243,8 @@ impl Git {
                 {
                     return Ok(());
                 }
-                messages.push(bconcat!(
-                    "- ",
-                    proto_url,
-                    "\n",
+                messages.push(bformat!(
+                    "- {proto_url}\n{}",
                     preg_replace(r"#^#m", "  ", self.process.borrow().get_error_output())
                 ));
 
@@ -265,12 +257,9 @@ impl Git {
             let m1 = m.get(1).unwrap_or_default();
             if !self.io.has_authentication(m1) && !self.io.is_interactive() {
                 self.throw_exception(
-                    bconcat!(
-                        "Failed to clone ",
-                        url,
-                        " via ",
+                    bformat!(
+                        "Failed to clone {url} via {} protocols, aborting.\n\n{}",
                         implode(", ", protocols_list),
-                        " protocols, aborting.\n\n",
                         implode("\n", &messages)
                     )
                     .as_bstr(),
@@ -282,10 +271,9 @@ impl Git {
         // if we have a private github url and the ssh protocol is disabled then we skip it and directly fallback to https
         let protocols = self.config.borrow().get_github_protocols()?;
         let bypass_ssh_for_github = preg_is_match(
-            bconcat!(
-                "{^git@",
-                Self::get_github_domains_regex(&self.config.borrow())?,
-                ":(.+?)\\.git$}i"
+            bformat!(
+                "{{^git@{}:(.+?)\\.git$}}i",
+                Self::get_github_domains_regex(&self.config.borrow())?
             ),
             url,
         ) && !protocols.iter().any(|protocol| protocol == "ssh");
@@ -303,19 +291,17 @@ impl Git {
             let mut error_msg = self.process.borrow().get_error_output();
             // private github repository without ssh key access, try https with auth
             let github_matched = match preg_match(
-                bconcat!(
-                    "{^git@",
-                    Self::get_github_domains_regex(&self.config.borrow())?,
-                    ":(.+?)\\.git$}i"
+                bformat!(
+                    "{{^git@{}:(.+?)\\.git$}}i",
+                    Self::get_github_domains_regex(&self.config.borrow())?
                 ),
                 url,
             ) {
                 Some(m) => Some(m),
                 None => preg_match(
-                    bconcat!(
-                        "{^https?://",
-                        Self::get_github_domains_regex(&self.config.borrow())?,
-                        "/(.*?)(?:\\.git)?$}i"
+                    bformat!(
+                        "{{^https?://{}/(.*?)(?:\\.git)?$}}i",
+                        Self::get_github_domains_regex(&self.config.borrow())?
                     ),
                     url,
                 ),
@@ -352,16 +338,10 @@ impl Git {
                         .cloned()
                         .unwrap_or(None)
                         .unwrap_or_default();
-                    let auth_url = bconcat!(
-                        "https://",
+                    let auth_url = bformat!(
+                        "https://{}:{}@{m1}/{m2}.git",
                         rawurlencode(&username),
-                        ":",
-                        rawurlencode(&password),
-                        "@",
-                        m1,
-                        "/",
-                        m2,
-                        ".git"
+                        rawurlencode(&password)
                     );
                     if run_commands_inline(
                         auth_url.as_bstr(),
@@ -435,15 +415,10 @@ impl Git {
                         username = BString::from("x-bitbucket-api-token-auth");
                     }
 
-                    let auth_url = bconcat!(
-                        "https://",
+                    let auth_url = bformat!(
+                        "https://{}:{}@{domain_bytes}/{repo_with_git_part}",
                         rawurlencode(&username),
-                        ":",
-                        rawurlencode(&password),
-                        "@",
-                        domain_bytes,
-                        "/",
-                        repo_with_git_part
+                        rawurlencode(&password)
                     );
 
                     if run_commands_inline(
@@ -489,15 +464,10 @@ impl Git {
                         .cloned()
                         .unwrap_or(None)
                         .unwrap_or_default();
-                    let auth_url = bconcat!(
-                        "https://",
+                    let auth_url = bformat!(
+                        "https://{}:{}@{domain_bytes}/{repo_with_git_part}",
                         rawurlencode(&username),
-                        ":",
-                        rawurlencode(&password),
-                        "@",
-                        domain_bytes,
-                        "/",
-                        repo_with_git_part
+                        rawurlencode(&password)
                     );
                     if run_commands_inline(
                         auth_url.as_bstr(),
@@ -512,7 +482,7 @@ impl Git {
                     credentials = vec![rawurlencode(&username), rawurlencode(&password)];
                 }
                 // Falling back to ssh
-                let ssh_url = bconcat!("git@bitbucket.org:", repo_with_git_part);
+                let ssh_url = bformat!("git@bitbucket.org:{repo_with_git_part}");
                 self.io.write_error(
                     "    No bitbucket authentication configured. Falling back to ssh.",
                 );
@@ -528,19 +498,17 @@ impl Git {
 
                 error_msg = self.process.borrow().get_error_output();
             } else if let Some(m) = match preg_match(
-                bconcat!(
-                    "{^(git)@",
-                    Self::get_gitlab_domains_regex(&self.config.borrow())?,
-                    ":(.+?\\.git)$}i"
+                bformat!(
+                    "{{^(git)@{}:(.+?\\.git)$}}i",
+                    Self::get_gitlab_domains_regex(&self.config.borrow())?
                 ),
                 url,
             ) {
                 Some(m) => Some(m),
                 None => preg_match(
-                    bconcat!(
-                        "{^(https?)://",
-                        Self::get_gitlab_domains_regex(&self.config.borrow())?,
-                        "/(.*)}i"
+                    bformat!(
+                        "{{^(https?)://{}/(.*)}}i",
+                        Self::get_gitlab_domains_regex(&self.config.borrow())?
                     ),
                     url,
                 ),
@@ -592,28 +560,16 @@ impl Git {
                         || password == "oauth2"
                         || password == "gitlab-ci-token"
                     {
-                        bconcat!(
-                            m1,
-                            "://",
+                        bformat!(
+                            "{m1}://{}:{}@{m2}/{m3}",
                             rawurlencode(&password),
-                            ":",
-                            rawurlencode(&username),
-                            "@",
-                            m2,
-                            "/",
-                            m3
+                            rawurlencode(&username)
                         ) // swap username and password
                     } else {
-                        bconcat!(
-                            m1,
-                            "://",
+                        bformat!(
+                            "{m1}://{}:{}@{m2}/{m3}",
                             rawurlencode(&username),
-                            ":",
-                            rawurlencode(&password),
-                            "@",
-                            m2,
-                            "/",
-                            m3
+                            rawurlencode(&password)
                         )
                     };
 
@@ -658,13 +614,10 @@ impl Git {
                         }
                     }
 
-                    self.io.write_error(bconcat!(
-                        "    Authentication required (<info>",
-                        m2,
-                        "</info>):"
-                    ));
+                    self.io
+                        .write_error(bformat!("    Authentication required (<info>{m2}</info>):"));
                     self.io.write_error_with_verbosity(
-                        bconcat!("<warning>", trim(&error_msg), "</warning>"),
+                        bformat!("<warning>{}</warning>", trim(&error_msg)),
                         io_interface::VERBOSE,
                     );
                     let mut auth_map: IndexMap<BString, Option<BString>> = IndexMap::new();
@@ -694,14 +647,10 @@ impl Git {
                         .cloned()
                         .unwrap_or(None)
                         .unwrap_or_default();
-                    let auth_url = bconcat!(
-                        m1,
+                    let auth_url = bformat!(
+                        "{m1}{}:{}@{m2}{m3}",
                         rawurlencode(&username),
-                        ":",
-                        rawurlencode(&password),
-                        "@",
-                        m2,
-                        m3
+                        rawurlencode(&password)
                     );
 
                     if run_commands_inline(
@@ -740,7 +689,7 @@ impl Git {
                 error_msg = self.mask_credentials(error_msg.as_bstr(), &credentials);
             }
             self.throw_exception(
-                bconcat!("Failed to execute ", last_command_str, "\n\n", error_msg).as_bstr(),
+                bformat!("Failed to execute {last_command_str}\n\n{error_msg}").as_bstr(),
                 url,
             )?;
         }
@@ -758,10 +707,8 @@ impl Git {
                 .as_ref()
                 .is_none_or(|v| v != "prime")
         {
-            self.io.write_error(bconcat!(
-                "<warning>Aborting git mirror sync of ",
-                url,
-                " as network is disabled</warning>"
+            self.io.write_error(bformat!(
+                "<warning>Aborting git mirror sync of {url} as network is disabled</warning>"
             ));
 
             return Ok(false);
@@ -831,7 +778,7 @@ impl Git {
 
             if let Err(e) = outcome {
                 self.io.write_error_with_verbosity(
-                    bconcat!("<error>Sync mirror failed: ", error_message(&e), "</error>"),
+                    bformat!("<error>Sync mirror failed: {}</error>", error_message(&e)),
                     io_interface::DEBUG,
                 );
 
@@ -925,12 +872,12 @@ impl Git {
                 // see https://github.com/composer/composer/discussions/11002
                 if branches.is_some()
                     && !preg_is_match(
-                        bconcat!(r"{^[\s*]*v?", preg_quote(&branch, None), r"$}m"),
+                        bformat!("{{^[\\s*]*v?{}$}}m", preg_quote(&branch, None)),
                         branches.as_deref().map(Vec::as_slice).unwrap_or_default(),
                     )
                     && tags.is_some()
                     && !preg_is_match(
-                        bconcat!(r"{^[\s*]*", preg_quote(&branch, None), r"$}m"),
+                        bformat!("{{^[\\s*]*{}$}}m", preg_quote(&branch, None)),
                         tags.as_deref().map(Vec::as_slice).unwrap_or_default(),
                     )
                 {
@@ -1036,7 +983,7 @@ impl Git {
                     "rev-parse".into(),
                     "--quiet".into(),
                     "--verify".into(),
-                    bconcat!(r#ref, "^{commit}"),
+                    bformat!("{}^{{commit}}", r#ref),
                 ],
                 &mut ignored_output,
                 Some(dir),
@@ -1150,10 +1097,9 @@ impl Git {
             Ok(v) => v,
             Err(e) => {
                 self.io.write_error_with_verbosity(
-                    bconcat!(
-                        "<error>Failed to fetch root identifier from remote: ",
-                        error_message(&e),
-                        "</error>"
+                    bformat!(
+                        "<error>Failed to fetch root identifier from remote: {}</error>",
+                        error_message(&e)
                     ),
                     io_interface::DEBUG,
                 );
@@ -1215,16 +1161,15 @@ impl Git {
                 domain,
                 PhpMixed::List(_) | PhpMixed::Array(_) | PhpMixed::Object(_)
             ) {
-                return Err(TypeError::new(bconcat!(
-                    "preg_quote(): Argument #1 ($str) must be of type string, ",
-                    get_debug_type(&domain),
-                    " given"
+                return Err(TypeError::new(bformat!(
+                    "preg_quote(): Argument #1 ($str) must be of type string, {} given",
+                    get_debug_type(&domain)
                 ))
                 .into());
             }
             escaped.push(preg_quote(domain.to_php_string(), None));
         }
-        Ok(bconcat!("(", implode("|", &escaped), ")"))
+        Ok(bformat!("({})", implode("|", &escaped)))
     }
 
     fn throw_exception(&mut self, message: &BStr, url: &BStr) -> anyhow::Result<()> {
@@ -1239,12 +1184,7 @@ impl Git {
         )? != 0
         {
             return Err(RuntimeException::new(
-                Url::sanitize(bconcat!(
-                    "Failed to clone ",
-                    url,
-                    ", git was not found, check that it is installed and in your PATH env.\n\n",
-                    self.process.borrow().get_error_output()
-                ))
+                Url::sanitize(bformat!("Failed to clone {url}, git was not found, check that it is installed and in your PATH env.\n\n{}", self.process.borrow().get_error_output()))
                 .to_owned(),
             )
             .into());
@@ -1308,13 +1248,13 @@ impl Git {
             ) {
                 masked_credentials.push(credential.clone());
             } else if strlen(credential) > 6 {
-                masked_credentials.push(bconcat!(
+                masked_credentials.push(bformat!(
+                    "{}...{}",
                     substr(credential, 0, Some(3)),
-                    "...",
                     substr(credential, -3, None)
                 ));
             } else if strlen(credential) > 3 {
-                masked_credentials.push(bconcat!(substr(credential, 0, Some(3)), "..."));
+                masked_credentials.push(bformat!("{}...", substr(credential, 0, Some(3))));
             } else {
                 masked_credentials.push("XXX".into());
             }

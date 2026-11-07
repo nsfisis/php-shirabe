@@ -12,7 +12,7 @@ use crate::util::{Filesystem, ProcessExecutor, Svn as SvnUtil};
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    CmpOp, PhpMixed, RuntimeException, bconcat, error_message, impl_php_class, implode, is_dir,
+    CmpOp, PhpMixed, RuntimeException, bformat, error_message, impl_php_class, implode, is_dir,
     path_from_bytes, path_to_bytes, php_regex, preg_is_match, preg_match, preg_replace, preg_split,
     version_compare,
 };
@@ -58,9 +58,9 @@ impl SvnDownloader {
         util.set_cache_credentials(self.cache_credentials.get());
         util.execute(command, url, cwd, path, self.inner.io.is_verbose())
             .map_err(|e| {
-                RuntimeException::new(bconcat!(
+                RuntimeException::new(bformat!(
+                    "{} could not be downloaded, {}",
                     package.get_pretty_name(),
-                    " could not be downloaded, ",
                     error_message(&e)
                 ))
                 .into()
@@ -75,8 +75,8 @@ impl SvnDownloader {
             Some(path),
         )? != 0
         {
-            return Err(RuntimeException::new(bconcat!(
-                "Could not reset changes\n\n:",
+            return Err(RuntimeException::new(bformat!(
+                "Could not reset changes\n\n:{}",
                 self.inner.process.borrow().get_error_output()
             ))
             .into());
@@ -93,10 +93,8 @@ impl SvnDownloader {
         path: &Path,
     ) -> anyhow::Result<()> {
         if self.get_local_changes(package, path).await?.is_some() {
-            return Err(RuntimeException::new(bconcat!(
-                "Source directory ",
-                path,
-                " has uncommitted changes."
+            return Err(RuntimeException::new(bformat!(
+                "Source directory {path} has uncommitted changes."
             ))
             .into());
         }
@@ -172,15 +170,15 @@ impl VcsDownloader for SvnDownloader {
             }
         }
 
-        self.inner.io.write_error(bconcat!(
-            " Checking out ",
+        self.inner.io.write_error(bformat!(
+            " Checking out {}",
             package.get_source_reference().unwrap_or_default()
         ));
         self.execute(
             package,
             url,
             vec!["svn".into(), "co".into()],
-            bconcat!(url, "/", r#ref.unwrap_or_default()).as_bstr(),
+            bformat!("{url}/{}", r#ref.unwrap_or_default()).as_bstr(),
             None,
             Some(path),
         )?;
@@ -199,11 +197,7 @@ impl VcsDownloader for SvnDownloader {
         let r#ref = target.get_source_reference();
 
         if !self.has_metadata_repository(path) {
-            return Err(RuntimeException::new(bconcat!(
-                "The .svn directory is missing from ",
-                path,
-                ", see https://getcomposer.org/commit-deps for more information"
-            ))
+            return Err(RuntimeException::new(bformat!("The .svn directory is missing from {path}, see https://getcomposer.org/commit-deps for more information"))
             .into());
         }
 
@@ -222,8 +216,8 @@ impl VcsDownloader for SvnDownloader {
             flags.push("--ignore-ancestry".into());
         }
 
-        self.inner.io.write_error(bconcat!(
-            " Checking out ",
+        self.inner.io.write_error(bformat!(
+            " Checking out {}",
             r#ref.clone().unwrap_or_default()
         ));
         let mut command: Vec<BString> = vec!["svn".into(), "switch".into()];
@@ -232,7 +226,7 @@ impl VcsDownloader for SvnDownloader {
             target,
             url,
             command,
-            bconcat!(url, "/", r#ref.unwrap_or_default()).as_bstr(),
+            bformat!("{url}/{}", r#ref.unwrap_or_default()).as_bstr(),
             Some(path),
             None,
         )?;
@@ -263,15 +257,13 @@ impl VcsDownloader for SvnDownloader {
         let changes_str = changes.unwrap();
         let changes: Vec<BString> = preg_split(php_regex!(r"{\s*\r?\n\s*}"), &changes_str)
             .into_iter()
-            .map(|elem| bconcat!("    ", elem))
+            .map(|elem| bformat!("    {elem}"))
             .collect();
         let count_changes = changes.len() as i64;
-        self.inner.io.write_error(bconcat!(
-            "    <error>",
+        self.inner.io.write_error(bformat!(
+            "    <error>{} has modified file{}:</error>",
             package.get_pretty_name(),
-            " has modified file",
-            if count_changes == 1 { "" } else { "s" },
-            ":</error>"
+            if count_changes == 1 { "" } else { "s" }
         ));
         let slice_end = 10_usize.min(changes.len());
         for line in &changes[..slice_end] {
@@ -279,13 +271,7 @@ impl VcsDownloader for SvnDownloader {
         }
         if count_changes > 10 {
             let remaining_changes = count_changes - 10;
-            self.inner.io.write_error(bconcat!(
-                "    <info>",
-                remaining_changes,
-                " more file",
-                if remaining_changes == 1 { "" } else { "s" },
-                " modified, choose \"v\" to view the full list</info>"
-            ));
+            self.inner.io.write_error(bformat!("    <info>{remaining_changes} more file{} modified, choose \"v\" to view the full list</info>", if remaining_changes == 1 { "" } else { "s" }));
         }
 
         loop {
@@ -313,14 +299,13 @@ impl VcsDownloader for SvnDownloader {
                 }
                 _ => {
                     let help_lines = vec![
-                        bconcat!(
-                            "    y - discard changes and apply the ",
+                        bformat!(
+                            "    y - discard changes and apply the {}",
                             if update { "update" } else { "uninstall" }
                         ),
-                        bconcat!(
-                            "    n - abort the ",
-                            if update { "update" } else { "uninstall" },
-                            " and let you manually clean things up"
+                        bformat!(
+                            "    n - abort the {} and let you manually clean things up",
+                            if update { "update" } else { "uninstall" }
                         ),
                         BString::from("    v - view modified files"),
                         BString::from("    ? - print help"),
@@ -361,10 +346,9 @@ impl VcsDownloader for SvnDownloader {
                 .execute(&command, &mut output, Some(path))?
                 != 0
             {
-                return Err(RuntimeException::new(bconcat!(
-                    "Failed to execute ",
+                return Err(RuntimeException::new(bformat!(
+                    "Failed to execute {}\n\n{}",
                     implode(" ", &command),
-                    "\n\n",
                     self.inner.process.borrow().get_error_output()
                 ))
                 .into());
@@ -374,9 +358,8 @@ impl VcsDownloader for SvnDownloader {
             let base_url = if let Some(matches) = preg_match(url_pattern, &output) {
                 matches.get(1).unwrap_or_default().to_owned()
             } else {
-                return Err(RuntimeException::new(bconcat!(
-                    "Unable to determine svn url for path ",
-                    path
+                return Err(RuntimeException::new(bformat!(
+                    "Unable to determine svn url for path {path}"
                 ))
                 .into());
             };
@@ -389,7 +372,7 @@ impl VcsDownloader for SvnDownloader {
                 "svn".into(),
                 "log".into(),
                 "-r".into(),
-                bconcat!(from_revision, ":", to_revision),
+                bformat!("{from_revision}:{to_revision}"),
                 "--incremental".into(),
             ];
 
@@ -402,27 +385,22 @@ impl VcsDownloader for SvnDownloader {
             util.set_cache_credentials(self.cache_credentials.get());
             util.execute_local(command.clone(), path, None, self.inner.io.is_verbose())
                 .map_err(|e| {
-                    RuntimeException::new(bconcat!(
-                        "Failed to execute ",
+                    RuntimeException::new(bformat!(
+                        "Failed to execute {}\n\n{}",
                         implode(" ", &command),
-                        "\n\n",
                         error_message(&e)
                     ))
                     .into()
                 })
         } else {
-            Ok(bconcat!(
-                "Could not retrieve changes between ",
-                from_reference,
-                " and ",
-                to_reference,
-                " due to missing revision information"
+            Ok(bformat!(
+                "Could not retrieve changes between {from_reference} and {to_reference} due to missing revision information"
             ))
         }
     }
 
     fn has_metadata_repository(&self, path: &Path) -> bool {
-        is_dir(path_from_bytes(&bconcat!(path, "/.svn")))
+        is_dir(path_from_bytes(&bformat!("{path}/.svn")))
     }
 }
 

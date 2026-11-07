@@ -8,7 +8,7 @@ use shirabe::config::Config;
 use shirabe::io::{IOInterface, NullIO};
 use shirabe::repository::vcs::PerforceDriver;
 use shirabe::util::{Filesystem, HttpDownloader, MockHandler};
-use shirabe_php_shim::{PhpMixed, bconcat, path_to_bytes, php_str};
+use shirabe_php_shim::{PhpMixed, bformat, path_to_bytes, php_str};
 use tempfile::TempDir;
 
 const TEST_URL: &BStr = php_str(b"TEST_PERFORCE_URL");
@@ -72,9 +72,9 @@ fn set_up() -> SetUp {
     let test_path = get_unique_tmp_directory();
     let config = get_test_config(test_path.path());
     let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
-    repo_config.insert("url".into(), PhpMixed::string(bconcat!(TEST_URL)));
-    repo_config.insert("depot".into(), PhpMixed::string(bconcat!(TEST_DEPOT)));
-    repo_config.insert("branch".into(), PhpMixed::string(bconcat!(TEST_BRANCH)));
+    repo_config.insert("url".into(), PhpMixed::string(bformat!("{TEST_URL}")));
+    repo_config.insert("depot".into(), PhpMixed::string(bformat!("{TEST_DEPOT}")));
+    repo_config.insert("branch".into(), PhpMixed::string(bformat!("{TEST_BRANCH}")));
 
     SetUp {
         test_path,
@@ -191,7 +191,7 @@ fn test_has_composer_file_returns_false_on_no_composer_file() {
     let _tear_down = TearDown::new(test_path.path().to_path_buf());
 
     let identifier = "TEST_IDENTIFIER";
-    let formatted_depot_path = bconcat!("//", TEST_DEPOT, "/", identifier);
+    let formatted_depot_path = bformat!("//{TEST_DEPOT}/{identifier}");
 
     let (mut driver, _process_guard) = make_driver(config, &repo_config);
     let mut perforce = MockPerforce::new();
@@ -220,7 +220,7 @@ fn test_has_composer_file_returns_true_with_one_or_more_composer_files() {
     let _tear_down = TearDown::new(test_path.path().to_path_buf());
 
     let identifier = "TEST_IDENTIFIER";
-    let formatted_depot_path = bconcat!("//", TEST_DEPOT, "/", identifier);
+    let formatted_depot_path = bformat!("//{TEST_DEPOT}/{identifier}");
 
     let (mut driver, _process_guard) = make_driver(config, &repo_config);
     let mut perforce = MockPerforce::new();

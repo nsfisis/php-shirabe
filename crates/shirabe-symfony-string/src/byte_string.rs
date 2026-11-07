@@ -3,7 +3,7 @@
 use crate::CodePointString;
 use crate::exception::InvalidArgumentException;
 use bstr::{BStr, BString, ByteSlice};
-use shirabe_php_shim::{bconcat, mb_convert_encoding, mb_detect_encoding, utf8_text};
+use shirabe_php_shim::{bformat, mb_convert_encoding, mb_detect_encoding, utf8_text};
 
 #[derive(Debug, Clone)]
 pub struct ByteString {
@@ -41,10 +41,8 @@ impl ByteString {
         let valid_encoding =
             mb_detect_encoding(&self.string, Some(vec![from_encoding.to_owned()]), true).is_some();
         if !valid_encoding {
-            return Err(InvalidArgumentException::new(bconcat!(
-                "Invalid \"",
-                from_encoding,
-                "\" string."
+            return Err(InvalidArgumentException::new(bformat!(
+                "Invalid \"{from_encoding}\" string."
             )));
         }
 

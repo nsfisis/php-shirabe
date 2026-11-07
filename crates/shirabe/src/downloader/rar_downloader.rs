@@ -13,7 +13,7 @@ use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_rpc::rar::RarArchive;
 use shirabe_php_shim::{
-    PhpMixed, RuntimeException, UnexpectedValueException, bconcat, impl_php_class, implode,
+    PhpMixed, RuntimeException, UnexpectedValueException, bformat, impl_php_class, implode,
     path_to_bytes,
 };
 
@@ -87,10 +87,9 @@ impl ArchiveDownloader for RarDownloader {
                 return Ok(None);
             }
 
-            process_error = Some(bconcat!(
-                "Failed to execute ",
+            process_error = Some(bformat!(
+                "Failed to execute {}\n\n{}",
                 implode(" ", &command),
-                "\n\n",
                 self.inner.process.borrow().get_error_output()
             ));
         }
@@ -98,15 +97,12 @@ impl ArchiveDownloader for RarDownloader {
         if !shirabe_php_rpc::class_exists("RarArchive")? {
             let ini_message = IniHelper::get_message()?;
             let error = if !Platform::is_windows() {
-                bconcat!(
-                    "Could not decompress the archive, enable the PHP rar extension.\n",
-                    ini_message
+                bformat!(
+                    "Could not decompress the archive, enable the PHP rar extension.\n{ini_message}"
                 )
             } else {
-                bconcat!(
-                    "Could not decompress the archive, enable the PHP rar extension or install unrar.\n",
-                    ini_message,
-                    "\n",
+                bformat!(
+                    "Could not decompress the archive, enable the PHP rar extension or install unrar.\n{ini_message}\n{}",
                     process_error.clone().unwrap_or_default()
                 )
             };
@@ -115,9 +111,8 @@ impl ArchiveDownloader for RarDownloader {
 
         let rar_archive = RarArchive::open(file)?;
         if rar_archive.is_none() {
-            return Err(UnexpectedValueException::new(bconcat!(
-                "Could not open RAR archive: ",
-                file
+            return Err(UnexpectedValueException::new(bformat!(
+                "Could not open RAR archive: {file}"
             ))
             .into());
         }

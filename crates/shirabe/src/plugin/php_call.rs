@@ -9,7 +9,7 @@ use crate::plugin::rpc::dispatch::PluginRpcDispatcher;
 use crate::plugin::throwable_bridge::throw_into_error;
 use bstr::BStr;
 use shirabe_php_rpc::{FromWire, PhpObjHandle, PhpThrow, PluginValue, RustMethodDispatcher};
-use shirabe_php_shim::{RuntimeException, bconcat};
+use shirabe_php_shim::{RuntimeException, bformat};
 
 /// What a call into the worker runs.
 #[derive(Debug, Clone, Copy)]
@@ -74,14 +74,13 @@ impl PhpCall<'_> {
     /// The error of an answer that did not decode, naming the call.
     pub fn unsupported_shape(self, throw: PhpThrow) -> anyhow::Error {
         let callee = match self {
-            PhpCall::Function(name) => bconcat!(name, "()"),
-            PhpCall::Method(handle, method) => bconcat!(handle.class(), "::", method, "()"),
-            PhpCall::StaticMethod(class, method) => bconcat!(class, "::", method, "()"),
-            PhpCall::New(class) => bconcat!("new ", class),
+            PhpCall::Function(name) => bformat!("{name}()"),
+            PhpCall::Method(handle, method) => bformat!("{}::{method}()", handle.class()),
+            PhpCall::StaticMethod(class, method) => bformat!("{class}::{method}()"),
+            PhpCall::New(class) => bformat!("new {class}"),
         };
-        RuntimeException::new(bconcat!(
-            callee,
-            " returned an unsupported shape over RPC: ",
+        RuntimeException::new(bformat!(
+            "{callee} returned an unsupported shape over RPC: {}",
             throw.message
         ))
         .into()

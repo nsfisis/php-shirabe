@@ -1,9 +1,9 @@
 //! ref: composer/src/Composer/DependencyResolver/Decisions.php sha1:b7885dc0c6742ad7a6e7555b04efcae525701c2c
 
 use crate::dependency_resolver::{Pool, Rule, SolverBugException};
-use bstr::{BString, ByteVec};
+use bstr::BString;
 use indexmap::IndexMap;
-use shirabe_php_shim::{LogicException, PhpDisplay, ToPhpString, bconcat};
+use shirabe_php_shim::{LogicException, PhpDisplay, ToPhpString, bformat, bwrite};
 
 pub struct Decisions {
     pool: std::rc::Rc<std::cell::RefCell<Pool>>,
@@ -100,9 +100,8 @@ impl Decisions {
 
         panic!(
             "{}",
-            LogicException::new(bconcat!(
-                "Did not find a decision rule using ",
-                literal_or_package_id
+            LogicException::new(bformat!(
+                "Did not find a decision rule using {literal_or_package_id}"
             ))
             .get_message()
             .display_lossy()
@@ -162,17 +161,7 @@ impl Decisions {
             let package = pool.literal_to_package(literal);
             panic!(
                 "{}",
-                SolverBugException::new(bconcat!(
-                    "Trying to decide ",
-                    literal_string,
-                    " on level ",
-                    level,
-                    ", even though ",
-                    package.to_php_string(),
-                    " was previously decided as ",
-                    previous_decision,
-                    "."
-                ))
+                SolverBugException::new(bformat!("Trying to decide {literal_string} on level {level}, even though {} was previously decided as {previous_decision}.", package.to_php_string()))
                 .0
                 .get_message()
                 .display_lossy()
@@ -194,9 +183,9 @@ impl Decisions {
             let key = if let Some(pool) = pool {
                 pool.literal_to_package(*package_id).to_php_string()
             } else {
-                bconcat!(package_id)
+                bformat!("{package_id}")
             };
-            str.push_str(bconcat!(key, ":", *level, ","));
+            bwrite!(str, "{key}:{},", *level);
         }
         str.push(b']');
 

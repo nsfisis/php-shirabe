@@ -8,7 +8,7 @@ use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, LogicException, PHP_EOL, PhpMixed, PregMatches, RuntimeException, array_intersect,
-    array_map, bconcat, display_to_bytes, escapeshellarg, explode, implode, in_array_strict,
+    array_map, bformat, display_to_bytes, escapeshellarg, explode, implode, in_array_strict,
     intval, is_dir, is_numeric, path_from_bytes, path_to_bytes, php_regex, php_str, preg_is_match,
     preg_match, preg_replace, preg_replace_callback, preg_replace_with_limit_and_count, preg_split,
     rtrim_chars, str_replace, strcspn, strlen, strpbrk, strtolower, strtr_array, substr_replace,
@@ -310,10 +310,9 @@ impl ProcessExecutor {
             && let Some(io) = &self.io
         {
             io.write_error_with_verbosity(
-                bconcat!(
-                    "Received ",
-                    signals.last_signal().as_str(),
-                    ", aborting when child process is done"
+                bformat!(
+                    "Received {}, aborting when child process is done",
+                    signals.last_signal().as_str()
                 ),
                 io_interface::DEBUG,
             );
@@ -363,9 +362,9 @@ impl ProcessExecutor {
         if let Some(cwd) = cwd
             && requires_git_dir_env
         {
-            let is_bare_repository = !is_dir(path_from_bytes(&bconcat!(
-                rtrim_chars(path_to_bytes(cwd), "/"),
-                "/.git"
+            let is_bare_repository = !is_dir(path_from_bytes(&bformat!(
+                "{}/.git",
+                rtrim_chars(path_to_bytes(cwd), "/")
             )));
             if is_bare_repository {
                 let mut config_value = BString::default();
@@ -439,10 +438,9 @@ impl ProcessExecutor {
                 .as_ref()
                 .filter(|exps| !exps.is_empty())
                 .map(|exps| {
-                    bconcat!(
-                        "Expected ",
-                        display_to_bytes(format_args!("{:?}", exps[0].cmd)),
-                        " at this point."
+                    bformat!(
+                        "Expected {} at this point.",
+                        display_to_bytes(format_args!("{:?}", exps[0].cmd))
                     )
                 })
                 .unwrap_or_else(|| BString::from("Expected no more calls at this point."));
@@ -453,19 +451,7 @@ impl ProcessExecutor {
             // `GitDriver::supports`) treat a mismatch as an ordinary recoverable failure. Using
             // the same `RuntimeException` type here keeps `catch::<RuntimeException>()` checks
             // working the same way against a mismatch.
-            return Err(RuntimeException::new(bconcat!(
-                "Received unexpected command ",
-                display_to_bytes(format_args!("{:?}", command)),
-                " in \"",
-                cwd.unwrap_or(Path::new("")),
-                "\"",
-                PHP_EOL,
-                expected,
-                PHP_EOL,
-                "Received calls:",
-                PHP_EOL,
-                received
-            ))
+            return Err(RuntimeException::new(bformat!("Received unexpected command {} in \"{}\"{PHP_EOL}{expected}{PHP_EOL}Received calls:{PHP_EOL}{received}", display_to_bytes(format_args!("{:?}", command)), cwd.unwrap_or(Path::new(""))))
             .into());
         }
 
@@ -798,7 +784,7 @@ impl ProcessExecutor {
                     return Ok("://***:***@".into());
                 }
 
-                Ok(bconcat!("://", m.name("user").unwrap_or_default(), ":***@"))
+                Ok(bformat!("://{}:***@", m.name("user").unwrap_or_default()))
             },
             &command_string,
         )
@@ -808,15 +794,12 @@ impl ProcessExecutor {
             "--password '***' ",
             &safe_command,
         );
-        io.as_ref().unwrap().write_error(bconcat!(
-            "Executing",
+        io.as_ref().unwrap().write_error(bformat!(
+            "Executing{} command ({}): {safe_command}",
             if r#async { " async" } else { "" },
-            " command (",
             cwd.map_or(BString::from("CWD"), |cwd| BString::from(path_to_bytes(
                 cwd
-            ))),
-            "): ",
-            safe_command
+            )))
         ));
     }
 
@@ -828,7 +811,7 @@ impl ProcessExecutor {
         }
 
         if !Platform::is_windows() {
-            return bconcat!("'", str_replace("'", "'\\''", &argument), "'");
+            return bformat!("'{}'", str_replace("'", "'\\''", &argument));
         }
 
         // New lines break cmd.exe command parsing
@@ -868,7 +851,7 @@ impl ProcessExecutor {
         }
 
         if quote {
-            argument = bconcat!("\"", preg_replace(r"/(\\*)$/", "$1$1", &argument), "\"");
+            argument = bformat!("\"{}\"", preg_replace(r"/(\\*)$/", "$1$1", &argument));
         }
 
         if meta {

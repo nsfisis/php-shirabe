@@ -7,7 +7,7 @@ use crate::formatter::{
 };
 use bstr::{BStr, BString, ByteSlice};
 use shirabe_php_shim::{
-    PregMatches, bconcat, byte_at, explode, implode, ltrim, mb_detect_encoding, php_regex,
+    PregMatches, bformat, byte_at, explode, implode, ltrim, mb_detect_encoding, php_regex,
     preg_match, preg_match_all, preg_replace, rtrim_chars, str_repeat, str_replace, strlen,
     strtolower, strtr_array, substr,
 };
@@ -185,7 +185,7 @@ impl OutputFormatter {
         let prefix;
         if *current_line_length != 0 {
             let i = width - *current_line_length;
-            prefix = bconcat!(substr(&text, 0, Some(i)), "\n");
+            prefix = bformat!("{}\n", substr(&text, 0, Some(i)));
             text = substr(&text, i, None);
         } else {
             prefix = BString::default();
@@ -196,11 +196,11 @@ impl OutputFormatter {
                 .and_then(|matches| matches.get(1))
                 .unwrap_or_default(),
         );
-        text = bconcat!(prefix, self.add_line_breaks(text.as_bstr(), width)?);
-        text = bconcat!(rtrim_chars(&text, "\n"), trailing);
+        text = bformat!("{prefix}{}", self.add_line_breaks(text.as_bstr(), width)?);
+        text = bformat!("{}{trailing}", rtrim_chars(&text, "\n"));
 
         if *current_line_length == 0 && !current.is_empty() && substr(current, -1, None) != "\n" {
-            text = bconcat!("\n", text);
+            text = bformat!("\n{text}");
         }
 
         let mut lines = explode("\n", &text);
@@ -259,12 +259,9 @@ impl OutputFormatterInterface for OutputFormatter {
     ) -> anyhow::Result<std::rc::Rc<std::cell::RefCell<Box<dyn OutputFormatterStyleInterface>>>>
     {
         if !self.has_style(name) {
-            return Err(InvalidArgumentException::new(bconcat!(
-                "Undefined style: \"",
-                name,
-                "\"."
-            ))
-            .into());
+            return Err(
+                InvalidArgumentException::new(bformat!("Undefined style: \"{name}\".")).into(),
+            );
         }
 
         Ok(std::rc::Rc::clone(&self.styles[strtolower(name).as_bstr()]))
@@ -292,7 +289,7 @@ impl WrappableOutputFormatterInterface for OutputFormatter {
         let close_tag_regex = "[a-z][^<>]*";
         let mut current_line_length: i64 = 0;
         let matches = preg_match_all(
-            bconcat!("#<((", open_tag_regex, ") | /(", close_tag_regex, ")?)>#ix"),
+            bformat!("#<(({open_tag_regex}) | /({close_tag_regex})?)>#ix"),
             message,
         );
         for match_ in matches {

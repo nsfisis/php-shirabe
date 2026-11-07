@@ -4,7 +4,7 @@ use crate::exception::InvalidArgumentException;
 use bstr::{B, BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpMixed, STR_PAD_BOTH, STR_PAD_LEFT, STR_PAD_RIGHT, bconcat, implode, php_str,
+    PhpMixed, STR_PAD_BOTH, STR_PAD_LEFT, STR_PAD_RIGHT, bformat, implode, php_str,
 };
 
 pub const DEFAULT_ALIGN: &BStr = php_str(b"left");
@@ -44,10 +44,9 @@ impl TableCellStyle {
             .filter(|key| !this_options.contains_key(*key))
             .collect();
         if !diff.is_empty() {
-            return Err(InvalidArgumentException::new(bconcat!(
-                "The TableCellStyle does not support the following options: '",
-                implode("', '", &diff),
-                "'."
+            return Err(InvalidArgumentException::new(bformat!(
+                "The TableCellStyle does not support the following options: '{}'.",
+                implode("', '", &diff)
             )));
         }
 
@@ -57,10 +56,9 @@ impl TableCellStyle {
                 _ => b"",
             };
             if align_map(align).is_none() {
-                return Err(InvalidArgumentException::new(bconcat!(
-                    "Wrong align value. Value must be following: '",
-                    implode("', '", &align_map_keys()),
-                    "'."
+                return Err(InvalidArgumentException::new(bformat!(
+                    "Wrong align value. Value must be following: '{}'.",
+                    implode("', '", &align_map_keys())
                 )));
             }
         }

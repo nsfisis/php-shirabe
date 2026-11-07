@@ -9,7 +9,7 @@ use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use serde::de::Error as _;
 use shirabe_php_shim::{
-    Catch as _, PhpMixed, bconcat, error_message, file_get_contents, php_regex, preg_is_match,
+    Catch as _, PhpMixed, bformat, error_message, file_get_contents, php_regex, preg_is_match,
     preg_replace, str_replace, strtolower,
 };
 use shirabe_spdx_licenses::SpdxLicenses;
@@ -76,13 +76,8 @@ impl ConfigValidator {
         if manifest.is_some() {
             let contents = file_get_contents(file).unwrap_or_default();
             if let Some((key, line)) = detect_duplicate_keys(&contents) {
-                warnings.push(bconcat!(
-                    "Key ",
-                    key,
-                    " is a duplicate in ",
-                    file,
-                    " at line ",
-                    line
+                warnings.push(bformat!(
+                    "Key {key} is a duplicate in {file} at line {line}"
                 ));
             }
         }
@@ -127,25 +122,11 @@ impl ConfigValidator {
                 let spdx_license = license_validator.get_license_by_identifier(license);
                 if spdx_license.is_some_and(|l| l.is_deprecated_license_id) {
                     if preg_is_match(php_regex!(r"{^[AL]?GPL-[123](\.[01])?\+$}i"), license) {
-                        warnings.push(bconcat!(
-                            "License \"",
-                            license,
-                            "\" is a deprecated SPDX license identifier, use \"",
-                            str_replace("+", "", license),
-                            "-or-later\" instead"
-                        ));
+                        warnings.push(bformat!("License \"{license}\" is a deprecated SPDX license identifier, use \"{}-or-later\" instead", str_replace("+", "", license)));
                     } else if preg_is_match(php_regex!(r"{^[AL]?GPL-[123](\.[01])?$}i"), license) {
-                        warnings.push(bconcat!(
-                            "License \"",
-                            license,
-                            "\" is a deprecated SPDX license identifier, use \"",
-                            license,
-                            "-only\" or \"",
-                            license,
-                            "-or-later\" instead"
-                        ));
+                        warnings.push(bformat!("License \"{license}\" is a deprecated SPDX license identifier, use \"{license}-only\" or \"{license}-or-later\" instead"));
                     } else {
-                        warnings.push(bconcat!("License \"", license, "\" is a deprecated SPDX license identifier, see https://spdx.org/licenses/"));
+                        warnings.push(bformat!("License \"{license}\" is a deprecated SPDX license identifier, see https://spdx.org/licenses/"));
                     }
                 }
             }
@@ -166,7 +147,7 @@ impl ConfigValidator {
             );
             let suggest_name = strtolower(&suggest_name);
 
-            publish_errors.push(bconcat!("Name \"", name, "\" does not match the best practice (e.g. lower-cased/with-dashes). We suggest using \"", suggest_name, "\" instead. As such you will not be able to submit it to Packagist."));
+            publish_errors.push(bformat!("Name \"{name}\" does not match the best practice (e.g. lower-cased/with-dashes). We suggest using \"{suggest_name}\" instead. As such you will not be able to submit it to Packagist."));
         }
 
         if let Some(PhpMixed::String(t)) = manifest.get(B("type"))
@@ -192,7 +173,7 @@ impl ConfigValidator {
                 } else {
                     "is"
                 };
-                warnings.push(bconcat!(bstr::join(", ", &require_overrides).as_bstr(), " ", plural, " required both in require and require-dev, this can lead to unexpected behavior"));
+                warnings.push(bformat!("{} {plural} required both in require and require-dev, this can lead to unexpected behavior", bstr::join(", ", &require_overrides).as_bstr()));
             }
         }
 
@@ -203,17 +184,7 @@ impl ConfigValidator {
                     if let Some(PhpMixed::Array(require_map)) = manifest.get(B(require_type)) {
                         for provide in link_map.keys() {
                             if require_map.contains_key(provide) {
-                                warnings.push(bconcat!(
-                                    "The package ",
-                                    provide,
-                                    " in ",
-                                    require_type,
-                                    " is also listed in ",
-                                    link_type,
-                                    " which satisfies the requirement. Remove it from ",
-                                    link_type,
-                                    " if you wish to install it."
-                                ));
+                                warnings.push(bformat!("The package {provide} in {require_type} is also listed in {link_type} which satisfies the requirement. Remove it from {link_type} if you wish to install it."));
                             }
                         }
                     }
@@ -236,7 +207,7 @@ impl ConfigValidator {
             if let PhpMixed::String(version_str) = version
                 && preg_is_match(php_regex!(r"{#}"), version_str)
             {
-                warnings.push(bconcat!("The package \"", package, "\" is pointing to a commit-ref, this is bad practice and can cause unforeseen issues."));
+                warnings.push(bformat!("The package \"{package}\" is pointing to a commit-ref, this is bad practice and can cause unforeseen issues."));
             }
         }
 
@@ -251,11 +222,7 @@ impl ConfigValidator {
         };
         for (script_name, _) in &scripts_descriptions {
             if !scripts.contains_key(script_name) {
-                warnings.push(bconcat!(
-                    "Description for non-existent script \"",
-                    script_name,
-                    "\" found in \"scripts-descriptions\""
-                ));
+                warnings.push(bformat!("Description for non-existent script \"{script_name}\" found in \"scripts-descriptions\""));
             }
         }
 
@@ -266,10 +233,8 @@ impl ConfigValidator {
         };
         for (script_name, _) in &script_aliases {
             if !scripts.contains_key(script_name) {
-                warnings.push(bconcat!(
-                    "Aliases for non-existent script \"",
-                    script_name,
-                    "\" found in \"scripts-aliases\""
+                warnings.push(bformat!(
+                    "Aliases for non-existent script \"{script_name}\" found in \"scripts-aliases\""
                 ));
             }
         }

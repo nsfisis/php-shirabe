@@ -10,7 +10,7 @@
 
 use bstr::{BStr, BString, ByteSlice};
 use shirabe::json::{JsonFile, JsonValidationException};
-use shirabe_php_shim::{Catch as _, bconcat, json_decode_obj, php_str};
+use shirabe_php_shim::{Catch as _, bformat, json_decode_obj, php_str};
 
 const NAME_PATTERN: &BStr =
     php_str(r#"^[a-z0-9]([_.-]?[a-z0-9]+)*/[a-z0-9](([_.]|-{1,2})?[a-z0-9]+)*$"#.as_bytes());
@@ -36,18 +36,14 @@ fn check(json: &BStr) -> Vec<BString> {
 
 #[test]
 fn test_name_pattern() {
-    let expected_error = vec![bconcat!(
-        r#"name : "vendor/-pack__age" does not match ""#,
-        NAME_PATTERN,
-        r#"""#
+    let expected_error = vec![bformat!(
+        "name : \"vendor/-pack__age\" does not match \"{NAME_PATTERN}\""
     )];
     let json = BStr::new(r#"{"name": "vendor/-pack__age", "description": "description"}"#);
     assert_eq!(expected_error, check(json));
 
-    let expected_error = vec![bconcat!(
-        r#"name : "Vendor/Package" does not match ""#,
-        NAME_PATTERN,
-        r#"""#
+    let expected_error = vec![bformat!(
+        "name : \"Vendor/Package\" does not match \"{NAME_PATTERN}\""
     )];
     let json = BStr::new(r#"{"name": "Vendor/Package", "description": "description"}"#);
     assert_eq!(expected_error, check(json));
@@ -95,10 +91,8 @@ fn test_version_pattern() {
     ];
 
     for &(version, is_valid) in versions {
-        let json = bconcat!(
-            r#"{"name": "vendor/package", "description": "description", "version": ""#,
-            version,
-            r#""}"#
+        let json = bformat!(
+            "{{\"name\": \"vendor/package\", \"description\": \"description\", \"version\": \"{version}\"}}"
         );
         if is_valid {
             assert!(
@@ -107,12 +101,8 @@ fn test_version_pattern() {
                 version = version.display_lossy()
             );
         } else {
-            let expected_error = vec![bconcat!(
-                r#"version : ""#,
-                version,
-                r#"" does not match ""#,
-                VERSION_PATTERN,
-                r#"""#
+            let expected_error = vec![bformat!(
+                "version : \"{version}\" does not match \"{VERSION_PATTERN}\""
             )];
             assert_eq!(
                 expected_error,
@@ -145,10 +135,8 @@ fn test_require_types() {
 #[test]
 fn test_minimum_stability_values() {
     let enum_error = |value: &BStr| {
-        vec![bconcat!(
-            r#"minimum-stability : ""#,
-            value,
-            r#"" is not one of "dev", "alpha" or 4 other candidates"#
+        vec![bformat!(
+            "minimum-stability : \"{value}\" is not one of \"dev\", \"alpha\" or 4 other candidates"
         )]
     };
 
@@ -168,10 +156,8 @@ fn test_minimum_stability_values() {
     assert_eq!(enum_error(BStr::new("devz")), check(json), "devz");
 
     for stability in ["dev", "alpha", "beta", "rc", "RC", "stable"] {
-        let json = bconcat!(
-            r#"{ "name": "vendor/package", "description": "generic description", "minimum-stability": ""#,
-            stability,
-            r#"" }"#
+        let json = bformat!(
+            "{{ \"name\": \"vendor/package\", \"description\": \"generic description\", \"minimum-stability\": \"{stability}\" }}"
         );
         assert!(
             check(json.as_bstr()).is_empty(),

@@ -25,7 +25,7 @@ use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, PATHINFO_BASENAME, PATHINFO_EXTENSION, PhpMixed,
-    RuntimeException, ToPhpString, UnexpectedValueException, bconcat, chmod, dirname,
+    RuntimeException, ToPhpString, UnexpectedValueException, bformat, chmod, dirname,
     error_message, explode, extension_loaded, file_exists, filesize, get_class, hash, hash_file,
     impl_php_class, is_dir, is_executable, parse_url, path_from_bytes, path_to_bytes, pathinfo,
     realpath, rtrim_chars, spl_object_hash, strlen, strpos, strtr, trim, umask, usleep,
@@ -137,7 +137,7 @@ impl FileDownloader {
         // PHP attaches an onRejected handler to capture the error and drives the promise via
         // httpDownloader->wait() / process->wait(); awaiting the download/install futures
         // surfaces a rejection directly as the Err captured below.
-        let compare_dir = PathBuf::from(path_from_bytes(&bconcat!(target_dir, "_compare")));
+        let compare_dir = PathBuf::from(path_from_bytes(&bformat!("{target_dir}_compare")));
         let result: anyhow::Result<BString> = async {
             if is_dir(&compare_dir) {
                 self.filesystem
@@ -174,10 +174,9 @@ impl FileDownloader {
                 return Err(err);
             }
 
-            return Ok(Some(bconcat!(
-                "Failed to detect changes: [",
+            return Ok(Some(bformat!(
+                "Failed to detect changes: [{}] {}",
                 get_class(&PhpMixed::Null),
-                "] ",
                 error_message(&err)
             )));
         }
@@ -202,10 +201,9 @@ impl FileDownloader {
         target: PackageInterfaceHandle,
         path: &Path,
     ) -> anyhow::Result<Option<PhpMixed>> {
-        self.io.borrow().write_error(bconcat!(
-            "  - ",
-            UpdateOperation::format(initial.clone(), target.clone(), false),
-            install_operation_appendix
+        self.io.borrow().write_error(bformat!(
+            "  - {}{install_operation_appendix}",
+            UpdateOperation::format(initial.clone(), target.clone(), false)
         ));
 
         // PHP: return $this->remove($initial, $path, false)->then(fn () => $this->install($target, $path, false));
@@ -272,15 +270,17 @@ impl FileDownloader {
         };
 
         Ok(PathBuf::from(path_from_bytes(&rtrim_chars(
-            bconcat!(
+            bformat!(
+                "{}/composer/tmp-{}.{extension}",
                 self.config.borrow().get_path("vendor-dir")?,
-                "/composer/tmp-",
                 hash(
                     "md5",
-                    bconcat!(package.to_php_string(), spl_object_hash(&PhpMixed::Null))
-                ),
-                ".",
-                extension,
+                    bformat!(
+                        "{}{}",
+                        package.to_php_string(),
+                        spl_object_hash(&PhpMixed::Null)
+                    )
+                )
             ),
             ".",
         ))))
@@ -363,11 +363,9 @@ impl DownloaderInterface for FileDownloader {
         let cache_key_generator = |package: PackageInterfaceHandle, key: &BStr| -> BString {
             let cache_key = hash("sha1", key);
 
-            bconcat!(
+            bformat!(
+                "{}/{cache_key}.{}",
                 package.get_name(),
-                "/",
-                cache_key,
-                ".",
                 package.get_dist_type().unwrap_or_default()
             )
         };
@@ -408,7 +406,7 @@ impl DownloaderInterface for FileDownloader {
             if let Some(event_dispatcher) = self.event_dispatcher.as_ref() {
                 let pre_file_download_event =
                     std::rc::Rc::new(std::cell::RefCell::new(PreFileDownloadEvent::new(
-                        bconcat!(PluginEvents::PRE_FILE_DOWNLOAD),
+                        bformat!("{}", PluginEvents::PRE_FILE_DOWNLOAD),
                         self.http_downloader.clone(),
                         url.processed.clone(),
                         "package".into(),
@@ -453,12 +451,10 @@ impl DownloaderInterface for FileDownloader {
             if from_cache {
                 if output {
                     self.io.borrow().write_error_with_verbosity(
-                        bconcat!(
-                            "  - Loading <info>",
+                        bformat!(
+                            "  - Loading <info>{}</info> (<comment>{}</comment>) from cache",
                             package.get_name(),
-                            "</info> (<comment>",
-                            package.get_full_pretty_version(true, DisplayMode::SourceRefIfDev),
-                            "</comment>) from cache"
+                            package.get_full_pretty_version(true, DisplayMode::SourceRefIfDev)
                         ),
                         io_interface::VERY_VERBOSE,
                     );
@@ -476,12 +472,10 @@ impl DownloaderInterface for FileDownloader {
                 }
             } else {
                 if output {
-                    self.io.borrow().write_error(bconcat!(
-                        "  - Downloading <info>",
+                    self.io.borrow().write_error(bformat!(
+                        "  - Downloading <info>{}</info> (<comment>{}</comment>)",
                         package.get_name(),
-                        "</info> (<comment>",
-                        package.get_full_pretty_version(true, DisplayMode::SourceRefIfDev),
-                        "</comment>)"
+                        package.get_full_pretty_version(true, DisplayMode::SourceRefIfDev)
                     ));
                 }
 
@@ -577,29 +571,21 @@ impl DownloaderInterface for FileDownloader {
                                 .catch::<TransportException>()
                                 .map_or(0, |te| te.get_code());
                             if self.io.borrow().is_debug() {
-                                self.io.borrow().write_error(bconcat!(
-                                    "    Failed downloading ",
+                                self.io.borrow().write_error(bformat!(
+                                    "    Failed downloading {}: [{}] {code}: {}",
                                     package.get_name(),
-                                    ": [",
                                     get_class(&PhpMixed::Null),
-                                    "] ",
-                                    code,
-                                    ": ",
                                     error_message(&e)
                                 ));
-                                self.io.borrow().write_error(bconcat!(
-                                    "    Trying the next URL for ",
+                                self.io.borrow().write_error(bformat!(
+                                    "    Trying the next URL for {}",
                                     package.get_name()
                                 ));
                             } else {
-                                self.io.borrow().write_error(bconcat!(
-                                    "    Failed downloading ",
+                                self.io.borrow().write_error(bformat!(
+                                    "    Failed downloading {}, trying the next URL ({code}: {})",
                                     package.get_name(),
-                                    ", trying the next URL (",
-                                    code,
-                                    ": ",
-                                    error_message(&e),
-                                    ")"
+                                    error_message(&e)
                                 ));
                             }
 
@@ -616,12 +602,7 @@ impl DownloaderInterface for FileDownloader {
 
             // === $result->then(verify) ===
             if !file_exists(&file_name) {
-                return Err(UnexpectedValueException::new(bconcat!(
-                    url.base,
-                    " could not be saved to ",
-                    file_name,
-                    ", make sure the directory is writable and you have internet connectivity"
-                ))
+                return Err(UnexpectedValueException::new(bformat!("{} could not be saved to {file_name}, make sure the directory is writable and you have internet connectivity", url.base))
                 .into());
             }
 
@@ -630,17 +611,16 @@ impl DownloaderInterface for FileDownloader {
                 && hash_file("sha1", &file_name).as_ref().map(|h| h.as_slice())
                     != Some(checksum.as_bytes())
             {
-                return Err(UnexpectedValueException::new(bconcat!(
-                    "The checksum verification of the file failed (downloaded from ",
-                    url.base,
-                    ")"
+                return Err(UnexpectedValueException::new(bformat!(
+                    "The checksum verification of the file failed (downloaded from {})",
+                    url.base
                 ))
                 .into());
             }
 
             if let Some(event_dispatcher) = self.event_dispatcher.as_ref() {
                 let post_file_download_event = PostFileDownloadEvent::new(
-                    bconcat!(PluginEvents::POST_FILE_DOWNLOAD),
+                    bformat!("{}", PluginEvents::POST_FILE_DOWNLOAD),
                     Some(file_name.clone()),
                     checksum.clone(),
                     url.processed.clone(),
@@ -689,8 +669,8 @@ impl DownloaderInterface for FileDownloader {
             .unwrap_or_default();
         let dirs_to_clean_up: Vec<PathBuf> = vec![
             path.to_path_buf(),
-            PathBuf::from(path_from_bytes(&bconcat!(vendor_dir, "/", first_segment))),
-            PathBuf::from(path_from_bytes(&bconcat!(vendor_dir, "/composer/"))),
+            PathBuf::from(path_from_bytes(&bformat!("{vendor_dir}/{first_segment}"))),
+            PathBuf::from(path_from_bytes(&bformat!("{vendor_dir}/composer/"))),
             PathBuf::from(path_from_bytes(&vendor_dir)),
         ];
 
@@ -725,8 +705,8 @@ impl DownloaderInterface for FileDownloader {
         output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
         if output {
-            self.io.borrow().write_error(bconcat!(
-                "  - ",
+            self.io.borrow().write_error(bformat!(
+                "  - {}",
                 InstallOperation::format(package.clone(), false)
             ));
         }
@@ -744,8 +724,8 @@ impl DownloaderInterface for FileDownloader {
             let normalized_path =
                 self.filesystem
                     .borrow()
-                    .normalize_path(path_from_bytes(&bconcat!(
-                        path,
+                    .normalize_path(path_from_bytes(&bformat!(
+                        "{path}{}",
                         std::path::MAIN_SEPARATOR_STR
                     )));
             strpos(
@@ -759,9 +739,8 @@ impl DownloaderInterface for FileDownloader {
         self.filesystem.borrow_mut().ensure_directory_exists(path)?;
         self.filesystem.borrow_mut().rename(
             self.get_file_name(package.clone(), path)?,
-            path_from_bytes(&bconcat!(
-                path,
-                "/",
+            path_from_bytes(&bformat!(
+                "{path}/{}",
                 self.get_dist_path(package.clone(), PATHINFO_BASENAME)
             )),
         )?;
@@ -769,7 +748,7 @@ impl DownloaderInterface for FileDownloader {
         // Single files can not have a mode set like files in archives
         // so we make sure if the file is a binary that it is executable
         for bin in package.get_binaries() {
-            let bin_path = PathBuf::from(path_from_bytes(&bconcat!(path, "/", bin)));
+            let bin_path = PathBuf::from(path_from_bytes(&bformat!("{path}/{bin}")));
             if file_exists(&bin_path) && !is_executable(&bin_path) {
                 chmod(&bin_path, 0o777 & !umask());
             }
@@ -796,16 +775,15 @@ impl DownloaderInterface for FileDownloader {
         output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
         if output {
-            self.io
-                .borrow()
-                .write_error(bconcat!("  - ", UninstallOperation::format(package, false)));
+            self.io.borrow().write_error(bformat!(
+                "  - {}",
+                UninstallOperation::format(package, false)
+            ));
         }
         let result = Filesystem::remove_directory_async_via(&self.filesystem, path).await?;
         if !result {
-            return Err(RuntimeException::new(bconcat!(
-                "Could not completely delete ",
-                path,
-                ", aborting."
+            return Err(RuntimeException::new(bformat!(
+                "Could not completely delete {path}, aborting."
             ))
             .into());
         }

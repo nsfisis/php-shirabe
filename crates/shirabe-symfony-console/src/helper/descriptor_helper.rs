@@ -9,7 +9,7 @@ use crate::helper::{Helper, HelperInterface, HelperSet};
 use crate::output::OutputInterface;
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
-use shirabe_php_shim::bconcat;
+use shirabe_php_shim::bformat;
 
 /// This class adds helper method to describe objects in various formats.
 #[derive(Default)]
@@ -59,10 +59,8 @@ impl DescriptorHelper {
         let format = options.format.clone();
 
         if !self.descriptors.contains_key(&format) {
-            return Err(InvalidArgumentException::new(bconcat!(
-                "Unsupported format \"",
-                format,
-                "\"."
+            return Err(InvalidArgumentException::new(bformat!(
+                "Unsupported format \"{format}\"."
             ))
             .into());
         }

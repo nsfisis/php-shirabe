@@ -15,7 +15,7 @@ use crate::repository::{
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    CmpOp, LogicException, PhpMixed, array_map, bconcat, display_to_bytes, in_array_strict,
+    CmpOp, LogicException, PhpMixed, array_map, bformat, display_to_bytes, in_array_strict,
     microtime, number_format, preg_is_match, round, sprintf, strpos,
 };
 use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint, MultiConstraint};
@@ -274,7 +274,9 @@ impl PoolBuilder {
 
                     let mut package_and_aliases: Vec<(i64, BasePackageHandle)> = Vec::new();
                     package_and_aliases.push((i, package.clone()));
-                    if let Some(aliases) = self.alias_map.get(bconcat!(package.ptr_id()).as_bytes())
+                    if let Some(aliases) = self
+                        .alias_map
+                        .get(bformat!("{}", package.ptr_id()).as_bytes())
                     {
                         for (idx, alias) in aliases {
                             package_and_aliases.push((*idx, alias.clone().into()));
@@ -308,7 +310,7 @@ impl PoolBuilder {
         if let Some(event_dispatcher) = self.event_dispatcher.clone() {
             let pre_pool_create_event =
                 std::rc::Rc::new(std::cell::RefCell::new(PrePoolCreateEvent::new(
-                    bconcat!(PluginEvents::PRE_POOL_CREATE),
+                    bformat!("{}", PluginEvents::PRE_POOL_CREATE),
                     repositories.clone(),
                     std::mem::replace(request, Request::new(None)),
                     self.acceptable_stabilities.clone(),
@@ -624,7 +626,7 @@ impl PoolBuilder {
 
         if let Some(alias) = package.as_alias() {
             self.alias_map
-                .entry(bconcat!(alias.get_alias_of().ptr_id()))
+                .entry(bformat!("{}", alias.get_alias_of().ptr_id()))
                 .or_default()
                 .insert(index, alias);
         }
@@ -683,7 +685,7 @@ impl PoolBuilder {
             self.index_counter += 1;
             self.packages.insert(new_index, alias_handle.clone().into());
             self.alias_map
-                .entry(bconcat!(alias_handle.get_alias_of().ptr_id()))
+                .entry(bformat!("{}", alias_handle.get_alias_of().ptr_id()))
                 .or_default()
                 .insert(new_index, alias_handle);
         }
@@ -715,7 +717,7 @@ impl PoolBuilder {
                         for root_require in &skipped_root_requires {
                             if !self.update_allow_warned.contains_key(root_require) {
                                 self.update_allow_warned.insert(root_require.clone(), true);
-                                self.io.write_error(bconcat!("<warning>Dependency ", root_require, " is also a root requirement. Package has not been listed as an update argument, so keeping locked at old version. Use --with-all-dependencies (-W) to include root dependencies.</warning>"));
+                                self.io.write_error(bformat!("<warning>Dependency {root_require} is also a root requirement. Package has not been listed as an update argument, so keeping locked at old version. Use --with-all-dependencies (-W) to include root dependencies.</warning>"));
                             }
                         }
                     }
@@ -752,7 +754,7 @@ impl PoolBuilder {
                         for root_require in &skipped_root_requires {
                             if !self.update_allow_warned.contains_key(root_require) {
                                 self.update_allow_warned.insert(root_require.clone(), true);
-                                self.io.write_error(bconcat!("<warning>Dependency ", root_require, " is also a root requirement. Package has not been listed as an update argument, so keeping locked at old version. Use --with-all-dependencies (-W) to include root dependencies.</warning>"));
+                                self.io.write_error(bformat!("<warning>Dependency {root_require} is also a root requirement. Package has not been listed as an update argument, so keeping locked at old version. Use --with-all-dependencies (-W) to include root dependencies.</warning>"));
                             }
                         }
                     }
@@ -782,7 +784,7 @@ impl PoolBuilder {
             return array_map(
                 |package: &PackageInterfaceHandle| -> BString {
                     if name_owned != package.get_name() {
-                        bconcat!(package.get_name(), " (via replace of ", name_owned, ")")
+                        bformat!("{} (via replace of {name_owned})", package.get_name())
                     } else {
                         package.get_name()
                     }
@@ -798,11 +800,9 @@ impl PoolBuilder {
             for (_k, link) in package_or_replacer.get_replaces().iter() {
                 if root_requires.contains_key(link.get_target()) {
                     if name != package_or_replacer.get_name() {
-                        matches.push(bconcat!(
-                            package_or_replacer.get_name(),
-                            " (via replace of ",
-                            name,
-                            ")"
+                        matches.push(bformat!(
+                            "{} (via replace of {name})",
+                            package_or_replacer.get_name()
                         ));
                     } else {
                         matches.push(BString::from(&package_or_replacer.get_name()[..]));
@@ -861,18 +861,12 @@ impl PoolBuilder {
                 }
             }
             if matched_platform_package {
-                self.io.write_error(bconcat!("<warning>Pattern \"", pattern, "\" listed for update matches platform packages, but these cannot be updated by Shirabe.</warning>"));
+                self.io.write_error(bformat!("<warning>Pattern \"{pattern}\" listed for update matches platform packages, but these cannot be updated by Shirabe.</warning>"));
             } else if strpos(pattern, "*").is_some() {
-                self.io.write_error(bconcat!(
-                    "<warning>Pattern \"",
-                    pattern,
-                    "\" listed for update does not match any locked packages.</warning>"
-                ));
+                self.io.write_error(bformat!("<warning>Pattern \"{pattern}\" listed for update does not match any locked packages.</warning>"));
             } else {
-                self.io.write_error(bconcat!(
-                    "<warning>Package \"",
-                    pattern,
-                    "\" listed for update is not locked.</warning>"
+                self.io.write_error(bformat!(
+                    "<warning>Package \"{pattern}\" listed for update is not locked.</warning>"
                 ));
             }
         }
@@ -1066,7 +1060,7 @@ impl PoolBuilder {
             name_map.shift_remove(&package.get_version());
         }
         self.packages.shift_remove(&index);
-        let object_hash = bconcat!(package.ptr_id());
+        let object_hash = bformat!("{}", package.ptr_id());
         if let Some(aliases) = self.alias_map.shift_remove(bstr::B(&object_hash)) {
             for (alias_index, alias_package) in &aliases {
                 if repo_index >= 0
@@ -1110,15 +1104,7 @@ impl PoolBuilder {
             io_interface::VERY_VERBOSE,
         );
         self.io.write_with_verbosity(
-            bconcat!(
-                "<info>Found ",
-                number_format(total, 0, ".", ","),
-                " package versions referenced in your dependency graph. ",
-                number_format(filtered, 0, ".", ","),
-                " (",
-                display_to_bytes(round(100.0 / total * filtered, 0)),
-                "%) were optimized away.</info>"
-            ),
+            bformat!("<info>Found {} package versions referenced in your dependency graph. {} ({}%) were optimized away.</info>", number_format(total, 0, ".", ","), number_format(filtered, 0, ".", ","), display_to_bytes(round(100.0 / total * filtered, 0))),
             io_interface::VERY_VERBOSE,
         );
 
@@ -1161,15 +1147,7 @@ impl PoolBuilder {
             io_interface::VERY_VERBOSE,
         );
         self.io.write_with_verbosity(
-            bconcat!(
-                "<info>Found ",
-                number_format(total, 0, ".", ","),
-                " package versions referenced in your dependency graph. ",
-                number_format(filtered, 0, ".", ","),
-                " (",
-                display_to_bytes(round(100.0 / total * filtered, 0)),
-                "%) were filtered away.</info>"
-            ),
+            bformat!("<info>Found {} package versions referenced in your dependency graph. {} ({}%) were filtered away.</info>", number_format(total, 0, ".", ","), number_format(filtered, 0, ".", ","), display_to_bytes(round(100.0 / total * filtered, 0))),
             io_interface::VERY_VERBOSE,
         );
 

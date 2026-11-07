@@ -11,7 +11,7 @@ use crate::repository::VcsRepository;
 use crate::util::{Filesystem, Perforce, PerforceInterface, ProcessExecutor};
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpMixed, bconcat, impl_php_class, strpos, substr};
+use shirabe_php_shim::{PhpMixed, bformat, impl_php_class, strpos, substr};
 use std::path::Path;
 
 #[derive(Debug)]
@@ -122,9 +122,10 @@ impl VcsDownloader for PerforceDownloader {
         let label =
             self.get_label_from_source_reference(source_ref.clone().unwrap_or_default().as_bstr());
 
-        self.inner
-            .io
-            .write_error(bconcat!("Cloning ", source_ref.clone().unwrap_or_default()));
+        self.inner.io.write_error(bformat!(
+            "Cloning {}",
+            source_ref.clone().unwrap_or_default()
+        ));
         self.init_perforce(package, path, url.to_owned());
         {
             let mut perforce = self.perforce.borrow_mut();

@@ -2,7 +2,7 @@
 
 use crate::constraint::{AnyConstraint, Bound, MatchAllConstraint};
 use bstr::BString;
-use shirabe_php_shim::{CmpOp, PhpDisplay, ToPhpString, bconcat, implode};
+use shirabe_php_shim::{CmpOp, PhpDisplay, ToPhpString, bformat, implode};
 use std::sync::OnceLock;
 
 #[derive(Debug, Clone)]
@@ -214,7 +214,7 @@ impl MultiConstraint {
                     return "false".into();
                 }
             } else {
-                parts.push(bconcat!("(", code, ")"));
+                parts.push(bformat!("({code})"));
             }
         }
 
@@ -246,7 +246,7 @@ impl MultiConstraint {
         self.string.get_or_init(|| {
             let parts: Vec<BString> = self.constraints.iter().map(|c| c.to_php_string()).collect();
             let sep = if self.conjunctive { " " } else { " || " };
-            bconcat!("[", implode(sep, &parts), "]")
+            bformat!("[{}]", implode(sep, &parts))
         })
     }
 

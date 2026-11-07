@@ -41,7 +41,7 @@ use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_rpc::{PhpThrow, PluginValue, RustMethodDispatcher, ToWire};
 use shirabe_php_shim::{
-    AnyThrowable, bconcat, display_to_bytes, error_chain_message, path_to_bytes,
+    AnyThrowable, bformat, display_to_bytes, error_chain_message, path_to_bytes,
 };
 
 /// Looks a class up in every Rust-side `ClassLoader` on the autoload stack, in stack order — the
@@ -84,7 +84,7 @@ impl RustMethodDispatcher for PluginRpcDispatcher {
                 let input_line = arg::<BString>(method_name, &args, 1)?;
                 return match run_worker_reverse_command(name.as_ref(), input_line.as_ref()) {
                     Ok(code) => Ok(code.to_wire()),
-                    Err(e) => Err(PhpThrow::runtime(bconcat!(error_chain_message(&e)))),
+                    Err(e) => Err(PhpThrow::runtime(bformat!("{}", error_chain_message(&e)))),
                 };
             }
             if method_name == "__shirabe_construct" {
@@ -96,10 +96,8 @@ impl RustMethodDispatcher for PluginRpcDispatcher {
             if let Some(answer) = dispatch_job_service_method(method_name, &args) {
                 return answer;
             }
-            return Err(PhpThrow::runtime(bconcat!(
-                "unknown runtime service method `",
-                method_name,
-                "`"
+            return Err(PhpThrow::runtime(bformat!(
+                "unknown runtime service method `{method_name}`"
             )));
         }
 
@@ -154,7 +152,7 @@ pub(crate) fn dispatch_r_table_method(
     if method_name == "__shirabe_clone" {
         return match entity {
             Some(entity) => clone_entity(&entity),
-            None => Err(PhpThrow::runtime(bconcat!("unknown Rust handle ", rhandle))),
+            None => Err(PhpThrow::runtime(bformat!("unknown Rust handle {rhandle}"))),
         };
     }
     if matches!(
@@ -163,7 +161,7 @@ pub(crate) fn dispatch_r_table_method(
     ) {
         return match entity {
             Some(entity) => dispatch_property_access(&entity, method_name, args),
-            None => Err(PhpThrow::runtime(bconcat!("unknown Rust handle ", rhandle))),
+            None => Err(PhpThrow::runtime(bformat!("unknown Rust handle {rhandle}"))),
         };
     }
     match entity {
@@ -208,7 +206,7 @@ pub(crate) fn dispatch_r_table_method(
         Some(RustEntity::Event(event)) => {
             dispatch_event_method(&mut *event.borrow_mut(), method_name, args)
         }
-        None => Err(PhpThrow::runtime(bconcat!("unknown Rust handle ", rhandle))),
+        None => Err(PhpThrow::runtime(bformat!("unknown Rust handle {rhandle}"))),
     }
 }
 
@@ -226,8 +224,8 @@ pub(crate) fn construct_entity(args: &[PluginValue]) -> Result<PluginValue, PhpT
             (class, &Vec::new())
         }
         other => {
-            return Err(PhpThrow::runtime(bconcat!(
-                "__shirabe_construct expects a class name and an argument list, got ",
+            return Err(PhpThrow::runtime(bformat!(
+                "__shirabe_construct expects a class name and an argument list, got {}",
                 display_to_bytes(format_args!("{other:?}"))
             )));
         }
@@ -252,7 +250,7 @@ pub(crate) fn construct_entity(args: &[PluginValue]) -> Result<PluginValue, PhpT
     let alias_package_arg = |position: usize| -> Result<AliasPackageHandle, PhpThrow> {
         package_arg(position)?
             .as_alias()
-            .ok_or_else(|| PhpThrow::runtime(bconcat!(class_name, " expects an AliasPackage")))
+            .ok_or_else(|| PhpThrow::runtime(bformat!("{class_name} expects an AliasPackage")))
     };
     let package = match class.as_slice() {
         b"Composer\\Package\\Package" => {
@@ -267,7 +265,7 @@ pub(crate) fn construct_entity(args: &[PluginValue]) -> Result<PluginValue, PhpT
         // an alias has no Rust representation, so its narrowing is an explicit error too.
         b"Composer\\Package\\AliasPackage" => {
             let alias_of = package_arg(0)?.as_package().ok_or_else(|| {
-                PhpThrow::runtime(bconcat!(class_name, " expects a real Package to alias"))
+                PhpThrow::runtime(bformat!("{class_name} expects a real Package to alias"))
             })?;
             AnyPackage::AliasPackage(
                 AliasPackage::new(alias_of, string_arg(1)?, string_arg(2)?)
@@ -276,9 +274,8 @@ pub(crate) fn construct_entity(args: &[PluginValue]) -> Result<PluginValue, PhpT
         }
         b"Composer\\Package\\CompleteAliasPackage" => {
             let alias_of = package_arg(0)?.as_complete_package().ok_or_else(|| {
-                PhpThrow::runtime(bconcat!(
-                    class_name,
-                    " expects a real CompletePackage to alias"
+                PhpThrow::runtime(bformat!(
+                    "{class_name} expects a real CompletePackage to alias"
                 ))
             })?;
             AnyPackage::CompleteAliasPackage(
@@ -289,7 +286,7 @@ pub(crate) fn construct_entity(args: &[PluginValue]) -> Result<PluginValue, PhpT
         }
         b"Composer\\Package\\RootAliasPackage" => {
             let alias_of = package_arg(0)?.as_root_package().ok_or_else(|| {
-                PhpThrow::runtime(bconcat!(class_name, " expects a real RootPackage to alias"))
+                PhpThrow::runtime(bformat!("{class_name} expects a real RootPackage to alias"))
             })?;
             AnyPackage::RootAliasPackage(
                 RootAliasPackage::new(alias_of, string_arg(1)?, string_arg(2)?).map_err(
@@ -383,10 +380,8 @@ pub(crate) fn construct_entity(args: &[PluginValue]) -> Result<PluginValue, PhpT
             // TODO(plugin): an OutputFormatterInterface is a Symfony object the plugin builds in
             // its own process, and no proxy carries one to the Rust side.
             if !matches!(ctor_args.get(2), None | Some(PluginValue::Null)) {
-                return Err(PhpThrow::runtime(bconcat!(
-                    "Shirabe does not support passing an output formatter to ",
-                    class_name,
-                    " inside the plugin process yet"
+                return Err(PhpThrow::runtime(bformat!(
+                    "Shirabe does not support passing an output formatter to {class_name} inside the plugin process yet"
                 )));
             }
             let io = BufferIO::new(
@@ -409,10 +404,8 @@ pub(crate) fn construct_entity(args: &[PluginValue]) -> Result<PluginValue, PhpT
         // plugin-built instance means for the Rust-side graph, which is why none of them is
         // answered generically here.
         _ => {
-            return Err(PhpThrow::runtime(bconcat!(
-                "Shirabe does not support constructing ",
-                class_name,
-                " inside the plugin process yet"
+            return Err(PhpThrow::runtime(bformat!(
+                "Shirabe does not support constructing {class_name} inside the plugin process yet"
             )));
         }
     };
@@ -500,10 +493,8 @@ fn dispatch_property_access(
     // TODO(plugin): the instance properties the proxied classes expose are widened on demand,
     // driven by these explicit errors from real plugins. Each one has to decide how the state
     // the real class keeps in that property is served from the Rust-side entity.
-    Err(PhpThrow::runtime(bconcat!(
-        "the property `",
-        property,
-        "` is not available over RPC yet"
+    Err(PhpThrow::runtime(bformat!(
+        "the property `{property}` is not available over RPC yet"
     )))
 }
 
@@ -522,14 +513,13 @@ pub(crate) fn call_static_entity(args: &[PluginValue]) -> Result<PluginValue, Ph
             None | Some(PluginValue::Array(_)),
         ) => (class, method, Vec::new()),
         other => {
-            return Err(PhpThrow::runtime(bconcat!(
-                "__shirabe_call_static expects a class name, a method name and an argument list, \
-                 got ",
+            return Err(PhpThrow::runtime(bformat!(
+                "__shirabe_call_static expects a class name, a method name and an argument list, got {}",
                 display_to_bytes(format_args!("{other:?}"))
             )));
         }
     };
-    let name = bconcat!(class, "::", method);
+    let name = bformat!("{class}::{method}");
     let string_arg = |position: usize| arg::<BString>(name.as_bstr(), &call_args, position);
     match (class.as_slice(), method.as_slice()) {
         (b"Composer\\Util\\Filesystem", b"isLocalPath") => {
@@ -561,10 +551,8 @@ pub(crate) fn call_static_entity(args: &[PluginValue]) -> Result<PluginValue, Ph
             };
             Ok(PluginValue::string(ProcessExecutor::escape(&argument)))
         }
-        _ => Err(PhpThrow::runtime(bconcat!(
-            "the static method ",
-            name,
-            " is not available over RPC yet"
+        _ => Err(PhpThrow::runtime(bformat!(
+            "the static method {name} is not available over RPC yet"
         ))),
     }
 }
@@ -572,12 +560,10 @@ pub(crate) fn call_static_entity(args: &[PluginValue]) -> Result<PluginValue, Ph
 /// The failure of a method of a proxied class the Rust side does not serve. `class` names the
 /// class the way the message reads, such as "repository" or "IO".
 pub(crate) fn unavailable_method(class: impl AsRef<[u8]>, method: impl AsRef<[u8]>) -> PhpThrow {
-    PhpThrow::runtime(bconcat!(
-        "the ",
+    PhpThrow::runtime(bformat!(
+        "the {} method `{}` is not available over RPC yet",
         class.as_ref(),
-        " method `",
-        method.as_ref(),
-        "` is not available over RPC yet"
+        method.as_ref()
     ))
 }
 
@@ -588,7 +574,11 @@ pub(crate) fn unavailable_method(class: impl AsRef<[u8]>, method: impl AsRef<[u8
 pub(crate) fn error_throw(context: impl AsRef<[u8]>, error: &anyhow::Error) -> PhpThrow {
     match AnyThrowable::of(error) {
         Some(exception) => exception_into_throw(exception, error),
-        None => PhpThrow::runtime(bconcat!(context.as_ref(), ": ", error_chain_message(error))),
+        None => PhpThrow::runtime(bformat!(
+            "{}: {}",
+            context.as_ref(),
+            error_chain_message(error)
+        )),
     }
 }
 

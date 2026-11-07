@@ -11,7 +11,7 @@ use shirabe::package::{
     PackageInterfaceHandle,
 };
 use shirabe::repository::{PlatformRepository, RepositorySetInterface};
-use shirabe_php_shim::{PhpMixed, bconcat};
+use shirabe_php_shim::{PhpMixed, bformat};
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_symfony_console::output::output_interface;
 
@@ -68,11 +68,11 @@ fn assert_same(
 fn require_link(package_name: &BStr, target: &BStr, pretty_constraint: &BStr) -> Link {
     let parser = VersionParser::new();
     Link::new(
-        bconcat!(package_name),
-        bconcat!(target),
+        bformat!("{package_name}"),
+        bformat!("{target}"),
         parser.parse_constraints(pretty_constraint).unwrap(),
         Some(Link::TYPE_REQUIRE.to_owned()),
-        Some(bconcat!(pretty_constraint)),
+        Some(bformat!("{pretty_constraint}")),
     )
 }
 
@@ -670,7 +670,7 @@ fn test_false_returned_on_no_packages() {
 #[test]
 fn test_find_recommended_require_version() {
     let php = shirabe_php_rpc::get_php_version().unwrap();
-    let php_version = bconcat!(php.major, ".", php.minor, ".", php.release);
+    let php_version = bformat!("{}.{}.{}", php.major, php.minor, php.release);
     // real version, expected recommendation, [branch-alias], [pkg name]
     let cases: Vec<(BString, &BStr, Option<&BStr>, &BStr)> = vec![
         (
@@ -862,7 +862,7 @@ fn test_find_recommended_require_version() {
         let mut version_selector = VersionSelector::new(into_seam(repository_set), None).unwrap();
 
         let package = PackageHandle::new(
-            bconcat!(package_name),
+            bformat!("{package_name}"),
             version_parser.normalize(pretty_version, None).unwrap(),
             pretty_version.clone(),
         );
@@ -871,7 +871,7 @@ fn test_find_recommended_require_version() {
             let mut alias_map: IndexMap<BString, PhpMixed> = IndexMap::new();
             alias_map.insert(
                 pretty_version.as_bstr().into(),
-                PhpMixed::string(bconcat!(branch_alias)),
+                PhpMixed::string(bformat!("{branch_alias}")),
             );
             let mut extra: IndexMap<BString, PhpMixed> = IndexMap::new();
             extra.insert("branch-alias".into(), PhpMixed::Array(alias_map));

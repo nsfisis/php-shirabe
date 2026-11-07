@@ -13,7 +13,7 @@ use crate::util::{CommandLine, ProcessExecutor};
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_rpc::{FromWire, PhpThrow, PluginValue, ToWire, wire};
-use shirabe_php_shim::{Catch as _, LogicException, bconcat, path_from_bytes};
+use shirabe_php_shim::{Catch as _, LogicException, bformat, path_from_bytes};
 
 /// Serves the `ProcessExecutor` proxy stub, whether the executor behind it belongs to the object
 /// graph or was built by plugin code writing `new ProcessExecutor(...)`. Both run their children in
@@ -25,7 +25,7 @@ pub(crate) fn dispatch_process_executor_method(
     args: &[PluginValue],
     out_params: &mut IndexMap<u32, PluginValue>,
 ) -> Result<PluginValue, PhpThrow> {
-    let failed = |error: anyhow::Error| error_throw(bconcat!(method_name, " failed"), &error);
+    let failed = |error: anyhow::Error| error_throw(bformat!("{method_name} failed"), &error);
     let cwd_arg = |position: usize| -> Result<Option<std::path::PathBuf>, PhpThrow> {
         match args.get(position) {
             None | Some(PluginValue::Null) => Ok(None),

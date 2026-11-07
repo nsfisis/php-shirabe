@@ -10,7 +10,7 @@ use crate::repository::PlatformRepository;
 use bstr::{B, BString};
 use indexmap::{IndexMap, IndexSet};
 use shirabe_php_shim::{
-    PhpMixed, array_filter, array_intersect, array_keys, array_pop, array_unshift, bconcat, strcmp,
+    PhpMixed, array_filter, array_intersect, array_keys, array_pop, array_unshift, bformat, strcmp,
     uasort, uasort_map,
 };
 
@@ -84,7 +84,7 @@ impl Transaction {
                     .push(package.clone());
             }
             self.result_package_map
-                .insert(bconcat!(package.ptr_id()), package);
+                .insert(bformat!("{}", package.ptr_id()), package);
         }
 
         uasort_map(&mut self.result_package_map, package_sort);
@@ -105,7 +105,7 @@ impl Transaction {
         let mut remove_alias_map: IndexMap<BString, AliasPackageHandle> = IndexMap::new();
         for package in &self.present_packages {
             if let Some(alias) = package.as_alias() {
-                let key = bconcat!(package.get_name(), "::", package.get_version());
+                let key = bformat!("{}::{}", package.get_name(), package.get_version());
                 present_alias_map.insert(key.clone());
                 remove_alias_map.insert(key, alias);
             } else {
@@ -124,12 +124,12 @@ impl Transaction {
         while !stack.is_empty() {
             let package = array_pop(&mut stack).unwrap();
 
-            if processed.contains_key(bconcat!(package.ptr_id()).as_slice()) {
+            if processed.contains_key(bformat!("{}", package.ptr_id()).as_slice()) {
                 continue;
             }
 
-            if !visited.contains_key(bconcat!(package.ptr_id()).as_slice()) {
-                visited.insert(bconcat!(package.ptr_id()), true);
+            if !visited.contains_key(bformat!("{}", package.ptr_id()).as_slice()) {
+                visited.insert(bformat!("{}", package.ptr_id()), true);
 
                 stack.push(package.clone());
                 if let Some(alias) = package.as_alias() {
@@ -143,11 +143,11 @@ impl Transaction {
                         }
                     }
                 }
-            } else if !processed.contains_key(bconcat!(package.ptr_id()).as_slice()) {
-                processed.insert(bconcat!(package.ptr_id()), true);
+            } else if !processed.contains_key(bformat!("{}", package.ptr_id()).as_slice()) {
+                processed.insert(bformat!("{}", package.ptr_id()), true);
 
                 if let Some(alias) = package.as_alias() {
-                    let alias_key = bconcat!(package.get_name(), "::", package.get_version());
+                    let alias_key = bformat!("{}::{}", package.get_name(), package.get_version());
                     if present_alias_map.contains(&alias_key) {
                         remove_alias_map.shift_remove(&alias_key);
                     } else {
@@ -227,8 +227,8 @@ impl Transaction {
 
                 for require in possible_requires {
                     // PHP: if ($require !== $package) — strict reference inequality
-                    if bconcat!(require.ptr_id()) != bconcat!(package.ptr_id()) {
-                        roots.shift_remove(bconcat!(require.ptr_id()).as_slice());
+                    if bformat!("{}", require.ptr_id()) != bformat!("{}", package.ptr_id()) {
+                        roots.shift_remove(bformat!("{}", require.ptr_id()).as_slice());
                     }
                 }
             }

@@ -16,14 +16,14 @@ use shirabe::util::r#loop::Loop;
 use shirabe::util::{Filesystem, FilesystemMock, HttpDownloader, HttpDownloaderMockHandler};
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, PhpMixed, RuntimeException, UnexpectedValueException,
-    bconcat, error_message, path_to_bytes,
+    bformat, error_message, path_to_bytes,
 };
 use shirabe_semver::VersionParser;
 
 /// ref: TestCase::getPackage (default class CompletePackage)
 fn get_package(name: &BStr, version: &BStr) -> PackageInterfaceHandle {
     let norm_version = VersionParser.normalize(version, None).unwrap();
-    CompletePackageHandle::new(bconcat!(name), norm_version, bconcat!(version)).into()
+    CompletePackageHandle::new(bformat!("{name}"), norm_version, bformat!("{version}")).into()
 }
 
 /// ref: TestCase::getConfig

@@ -2,7 +2,7 @@
 
 use bstr::{BStr, BString};
 use shirabe_php_shim::{
-    bconcat, hash, php_regex, preg_is_match, preg_match, preg_replace, str_replace_array,
+    bformat, hash, php_regex, preg_is_match, preg_match, preg_replace, str_replace_array,
     trim_chars,
 };
 
@@ -60,21 +60,19 @@ impl ComposerMirror {
             ),
             url,
         ) {
-            bconcat!(
-                "gh-",
+            bformat!(
+                "gh-{}/{}",
                 gh_matches.get(1).unwrap_or_default(),
-                "/",
-                gh_matches.get(2).unwrap_or_default(),
+                gh_matches.get(2).unwrap_or_default()
             )
         } else if let Some(bb_matches) = preg_match(
             php_regex!(r"#^https://bitbucket\.org/([^/]+)/(.+?)(?:\.git)?/?$#"),
             url,
         ) {
-            bconcat!(
-                "bb-",
+            bformat!(
+                "bb-{}/{}",
                 bb_matches.get(1).unwrap_or_default(),
-                "/",
-                bb_matches.get(2).unwrap_or_default(),
+                bb_matches.get(2).unwrap_or_default()
             )
         } else {
             preg_replace(php_regex!(r"{[^a-z0-9_.-]}i"), "-", trim_chars(url, "/"))

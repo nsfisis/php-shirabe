@@ -12,7 +12,7 @@ use crate::plugin::PluginManager;
 use crate::repository::RepositoryManagerInterface;
 use crate::util::r#loop::Loop;
 use bstr::{BStr, BString};
-use shirabe_php_shim::{bconcat, php_regex, php_str, preg_is_match};
+use shirabe_php_shim::{bformat, php_regex, php_str, preg_is_match};
 
 /// The Composer version this port tracks. Kept as-is so `Composer::VERSION`, the `composer`
 /// platform package and the HTTP User-Agent keep reporting a value plugins and servers can
@@ -54,7 +54,7 @@ pub fn get_version() -> BString {
         return BString::from(SOURCE_VERSION);
     }
     if !BRANCH_ALIAS_VERSION.is_empty() && preg_is_match(php_regex!("{^[a-f0-9]{40}$}"), VERSION) {
-        return bconcat!(BRANCH_ALIAS_VERSION, "+", VERSION);
+        return bformat!("{BRANCH_ALIAS_VERSION}+{VERSION}");
     }
     BString::from(VERSION)
 }

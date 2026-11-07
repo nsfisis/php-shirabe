@@ -8,7 +8,7 @@ use crate::util::{Filesystem, Platform};
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    Catch as _, PhpMixed, RuntimeException, ToPhpString, bconcat, bin2hex, file_exists, is_dir,
+    Catch as _, PhpMixed, RuntimeException, ToPhpString, bformat, bin2hex, file_exists, is_dir,
     path_from_bytes, path_to_bytes, random_bytes, realpath,
 };
 use shirabe_symfony_finder::Finder;
@@ -62,8 +62,8 @@ pub trait ArchiveDownloader {
         output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
         if output {
-            self.inner().io.borrow().write_error(bconcat!(
-                "  - ",
+            self.inner().io.borrow().write_error(bformat!(
+                "  - {}{}",
                 InstallOperation::format(package.clone(), false),
                 self.get_install_operation_appendix(package.clone(), path)
             ));
@@ -86,8 +86,8 @@ pub trait ArchiveDownloader {
                 .inner()
                 .filesystem
                 .borrow()
-                .normalize_path(path_from_bytes(&bconcat!(
-                    path,
+                .normalize_path(path_from_bytes(&bformat!(
+                    "{path}{}",
                     std::path::MAIN_SEPARATOR_STR
                 ))),
         )) {
@@ -98,9 +98,8 @@ pub trait ArchiveDownloader {
         }
 
         let temporary_dir = loop {
-            let candidate = PathBuf::from(path_from_bytes(&bconcat!(
-                vendor_dir,
-                "/composer/",
+            let candidate = PathBuf::from(path_from_bytes(&bformat!(
+                "{vendor_dir}/composer/{}",
                 bin2hex(random_bytes(4))
             )));
             if !is_dir(&candidate) {
@@ -269,13 +268,7 @@ fn rename_recursively(
         );
         if is_dir(&target) {
             if !is_dir(file) {
-                return Err(RuntimeException::new(bconcat!(
-                    "Installing ",
-                    package.to_php_string(),
-                    " would lead to overwriting the ",
-                    target,
-                    " directory with a file from the package, invalid operation."
-                ))
+                return Err(RuntimeException::new(bformat!("Installing {} would lead to overwriting the {target} directory with a file from the package, invalid operation.", package.to_php_string()))
                 .into());
             }
             rename_recursively(filesystem, package.clone(), file, &target)?;

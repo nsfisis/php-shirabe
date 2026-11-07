@@ -6,7 +6,7 @@ use indexmap::IndexMap;
 use shirabe::package::archiver::ArchivableFilesFinder;
 use shirabe::util::Filesystem;
 use shirabe_php_shim::{
-    PhpMixed, ZipArchive, bconcat, dirname, file_put_contents, path_from_bytes, path_to_bytes,
+    PhpMixed, ZipArchive, bformat, dirname, file_put_contents, path_from_bytes, path_to_bytes,
     preg_quote, preg_replace,
 };
 use shirabe_symfony_process::Process;
@@ -91,10 +91,9 @@ fn get_archivable_files(set_up: &SetUp, finder: ArchivableFilesFinder) -> Vec<BS
         if !file.is_dir() {
             let real_path = file.canonicalize().unwrap();
             files.push(preg_replace(
-                bconcat!(
-                    "#^",
-                    preg_quote(path_to_bytes(&set_up.sources), Some(b'#')),
-                    "#"
+                bformat!(
+                    "#^{}#",
+                    preg_quote(path_to_bytes(&set_up.sources), Some(b'#'))
                 ),
                 "",
                 path_to_bytes(&set_up.fs.normalize_path(&real_path)),
@@ -201,10 +200,9 @@ fn get_archived_files(set_up: &SetUp, command: &BStr) -> Vec<BString> {
     let mut archive = ZipArchive::new();
     archive.open(&zip_path, 0).unwrap();
 
-    let prefix = bconcat!(
-        "#^phar://",
-        preg_quote(path_to_bytes(&set_up.sources), Some(b'#')),
-        "/archive\\.zip/archive#"
+    let prefix = bformat!(
+        "#^phar://{}/archive\\.zip/archive#",
+        preg_quote(path_to_bytes(&set_up.sources), Some(b'#'))
     );
     let mut files: Vec<BString> = vec![];
     for index in 0..archive.count() {
@@ -212,7 +210,7 @@ fn get_archived_files(set_up: &SetUp, command: &BStr) -> Vec<BString> {
         if name.ends_with(b"/") {
             continue;
         }
-        let virtual_path = bconcat!("phar://", &set_up.sources, "/archive.zip/", &name);
+        let virtual_path = bformat!("phar://{}/archive.zip/{name}", &set_up.sources);
         files.push(preg_replace(
             &prefix,
             "",

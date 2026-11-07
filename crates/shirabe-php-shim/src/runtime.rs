@@ -1,4 +1,4 @@
-use crate::{PhpMixed, PhpResource, bconcat, php_str};
+use crate::{PhpMixed, PhpResource, bformat, php_str};
 use bstr::{BStr, BString, ByteSlice};
 use shirabe_php_src::standard::versioning::php_version_compare;
 
@@ -270,16 +270,13 @@ pub fn php_uname(mode: impl AsRef<[u8]>) -> BString {
         b"m" => field(utsname.machine()),
         // "a" is the default and any other mode falls back to it: every field in the order
         // sysname, nodename, release, version, machine.
-        _ => bconcat!(
+        _ => bformat!(
+            "{} {} {} {} {}",
             field(utsname.sysname()),
-            " ",
             field(utsname.nodename()),
-            " ",
             field(utsname.release()),
-            " ",
             field(utsname.version()),
-            " ",
-            field(utsname.machine()),
+            field(utsname.machine())
         ),
     }
 }

@@ -12,7 +12,7 @@ use crate::util::{Filesystem, Git as GitUtil, Platform, ProcessExecutor, Url};
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    CmpOp, PhpMixed, RuntimeException, array_map, basename, bconcat, dirname, impl_php_class,
+    CmpOp, PhpMixed, RuntimeException, array_map, basename, bformat, dirname, impl_php_class,
     implode, is_dir, path_from_bytes, path_to_bytes, php_regex, preg_is_match, preg_match,
     preg_match_all, preg_quote, preg_replace, preg_split, realpath, rtrim_chars, strlen, strpos,
     substr, trim, version_compare,
@@ -79,10 +79,9 @@ impl GitDownloader {
             .execute(&command, &mut output, Some(&path))?
             != 0
         {
-            return Err(RuntimeException::new(bconcat!(
-                "Failed to execute ",
+            return Err(RuntimeException::new(bformat!(
+                "Failed to execute {}\n\n{}",
                 implode(" ", &command),
-                "\n\n",
                 self.inner.process.borrow().get_error_output()
             ))
             .into());
@@ -96,7 +95,7 @@ impl GitDownloader {
         let head_ref = BString::from(head_match.get(1).unwrap_or_default());
 
         let candidate_branches: Vec<BString> = preg_match_all(
-            bconcat!("{^", preg_quote(&head_ref, None), " refs/heads/(.+)$}mi"),
+            bformat!("{{^{} refs/heads/(.+)$}}mi", preg_quote(&head_ref, None)),
             &refs,
         )
         .map(|branch_match| {
@@ -124,10 +123,9 @@ impl GitDownloader {
             // try to find matching branch names in remote repos
             for candidate in &candidate_branches {
                 let matches: Vec<BString> = preg_match_all(
-                    bconcat!(
-                        "{^[a-f0-9]+ refs/remotes/((?:[^/]+)/",
-                        preg_quote(candidate, None),
-                        ")$}mi"
+                    bformat!(
+                        "{{^[a-f0-9]+ refs/remotes/((?:[^/]+)/{})$}}mi",
+                        preg_quote(candidate, None)
                     ),
                     &refs,
                 )
@@ -151,10 +149,8 @@ impl GitDownloader {
             // this is bad as we have no reference point to do a diff so we just bail listing
             // the branch as being unpushed
             if remote_branches.is_empty() {
-                unpushed_changes = Some(bconcat!(
-                    "Branch ",
-                    branch,
-                    " could not be found on any remote and appears to be unpushed"
+                unpushed_changes = Some(bformat!(
+                    "Branch {branch} could not be found on any remote and appears to be unpushed"
                 ));
                 branch_not_found_error = true;
             } else {
@@ -168,7 +164,7 @@ impl GitDownloader {
                         "git".into(),
                         "diff".into(),
                         "--name-status".into(),
-                        bconcat!(remote_branch, "...", branch),
+                        bformat!("{remote_branch}...{branch}"),
                         "--".into(),
                     ];
                     let mut output = BString::default();
@@ -178,10 +174,9 @@ impl GitDownloader {
                         Some(&path),
                     )? != 0
                     {
-                        return Err(RuntimeException::new(bconcat!(
-                            "Failed to execute ",
+                        return Err(RuntimeException::new(bformat!(
+                            "Failed to execute {}\n\n{}",
                             implode(" ", &command),
-                            "\n\n",
                             self.inner.process.borrow().get_error_output()
                         ))
                         .into());
@@ -228,10 +223,9 @@ impl GitDownloader {
                     .execute(&command, &mut output, Some(&path))?
                     != 0
                 {
-                    return Err(RuntimeException::new(bconcat!(
-                        "Failed to execute ",
+                    return Err(RuntimeException::new(bformat!(
+                        "Failed to execute {}\n\n{}",
                         implode(" ", &command),
-                        "\n\n",
                         self.inner.process.borrow().get_error_output()
                     ))
                     .into());
@@ -308,7 +302,7 @@ impl GitDownloader {
         if !preg_is_match(php_regex!(r"{^[a-f0-9]{40}$}"), reference)
             && branches.is_some()
             && preg_is_match(
-                bconcat!("{^\\s+composer/", preg_quote(reference, None), "$}m"),
+                bformat!("{{^\\s+composer/{}$}}m", preg_quote(reference, None)),
                 branches.as_deref().map(Vec::as_slice).unwrap_or_default(),
             )
         {
@@ -317,14 +311,14 @@ impl GitDownloader {
             command1.extend(vec![
                 "-B".into(),
                 branch.clone(),
-                bconcat!("composer/", reference),
+                bformat!("composer/{reference}"),
                 "--".into(),
             ]);
             let command2: Vec<BString> = vec![
                 "git".into(),
                 "reset".into(),
                 "--hard".into(),
-                bconcat!("composer/", reference),
+                bformat!("composer/{reference}"),
                 "--".into(),
             ];
 
@@ -355,15 +349,15 @@ impl GitDownloader {
             // add 'v' in front of the branch if it was stripped when generating the pretty name
             if branches.is_some()
                 && !preg_is_match(
-                    bconcat!("{^\\s+composer/", preg_quote(&branch, None), "$}m"),
+                    bformat!("{{^\\s+composer/{}$}}m", preg_quote(&branch, None)),
                     branches.as_deref().map(Vec::as_slice).unwrap_or_default(),
                 )
                 && preg_is_match(
-                    bconcat!("{^\\s+composer/v", preg_quote(&branch, None), "$}m"),
+                    bformat!("{{^\\s+composer/v{}$}}m", preg_quote(&branch, None)),
                     branches.as_deref().map(Vec::as_slice).unwrap_or_default(),
                 )
             {
-                branch = bconcat!("v", branch);
+                branch = bformat!("v{branch}");
             }
 
             let command: Vec<BString> =
@@ -373,7 +367,7 @@ impl GitDownloader {
             fallback_command.extend(vec![
                 "-B".into(),
                 branch.clone(),
-                bconcat!("composer/", branch),
+                bformat!("composer/{branch}"),
                 "--".into(),
             ]);
             let reset_command: Vec<BString> = vec![
@@ -453,33 +447,26 @@ impl GitDownloader {
 
         // reference was not found (prints "fatal: reference is not a tree: $ref")
         if strpos(self.inner.process.borrow().get_error_output(), reference).is_some() {
-            self.inner.io.write_error(bconcat!(
-                "    <warning>",
-                reference,
-                " is gone (history was rewritten?)</warning>"
+            self.inner.io.write_error(bformat!(
+                "    <warning>{reference} is gone (history was rewritten?)</warning>"
             ));
-            exception_extra = bconcat!(
-                "\nIt looks like the commit hash is not available in the repository, maybe ",
+            exception_extra = bformat!(
+                "\nIt looks like the commit hash is not available in the repository, maybe {}? Run \"shirabe update {}\" to resolve this.",
                 if package.is_dev() {
                     "the commit was removed from the branch"
                 } else {
                     "the tag was recreated"
                 },
-                "? Run \"shirabe update ",
-                package.get_pretty_name(),
-                "\" to resolve this.",
+                package.get_pretty_name()
             );
         }
 
-        let command = bconcat!(implode(" ", &command1), " && ", implode(" ", &command2));
+        let command = bformat!("{} && {}", implode(" ", &command1), implode(" ", &command2));
 
         Err(RuntimeException::new(
-            Url::sanitize(bconcat!(
-                "Failed to execute ",
-                command,
-                "\n\n",
-                self.inner.process.borrow().get_error_output(),
-                exception_extra,
+            Url::sanitize(bformat!(
+                "Failed to execute {command}\n\n{}{exception_extra}",
+                self.inner.process.borrow().get_error_output()
             ))
             .to_owned(),
         )
@@ -506,10 +493,9 @@ impl GitDownloader {
     fn set_push_url(&self, path: &Path, url: &BStr) -> anyhow::Result<()> {
         // set push url for github projects
         if let Some(match_) = preg_match(
-            bconcat!(
-                "{^(?:https?|git)://",
-                GitUtil::get_github_domains_regex(&self.inner.config.borrow())?,
-                "/([^/]+)/([^/]+?)(?:\\.git)?$}"
+            bformat!(
+                "{{^(?:https?|git)://{}/([^/]+)/([^/]+?)(?:\\.git)?$}}",
+                GitUtil::get_github_domains_regex(&self.inner.config.borrow())?
             ),
             url,
         ) {
@@ -517,9 +503,9 @@ impl GitDownloader {
             let m1 = match_.get(1).unwrap_or_default();
             let m2 = match_.get(2).unwrap_or_default();
             let m3 = match_.get(3).unwrap_or_default();
-            let mut push_url = bconcat!("git@", m1, ":", m2, "/", m3, ".git");
+            let mut push_url = bformat!("git@{m1}:{m2}/{m3}.git");
             if !protocols.iter().any(|protocol| protocol == "ssh") {
-                push_url = bconcat!("https://", m1, "/", m2, "/", m3, ".git");
+                push_url = bformat!("https://{m1}/{m2}/{m3}.git");
             }
             let cmd: Vec<BString> = vec![
                 "git".into(),
@@ -550,7 +536,7 @@ impl GitDownloader {
         )? != 0
         {
             return Err(
-                RuntimeException::new(bconcat!("Could not reset changes\n\n:", output)).into(),
+                RuntimeException::new(bformat!("Could not reset changes\n\n:{output}")).into(),
             );
         }
         let mut output = BString::default();
@@ -561,7 +547,7 @@ impl GitDownloader {
         )? != 0
         {
             return Err(
-                RuntimeException::new(bconcat!("Could not reset changes\n\n:", output)).into(),
+                RuntimeException::new(bformat!("Could not reset changes\n\n:{output}")).into(),
             );
         }
 
@@ -582,7 +568,7 @@ impl GitDownloader {
         )? != 0
         {
             return Err(
-                RuntimeException::new(bconcat!("Could not stash changes\n\n:", output)).into(),
+                RuntimeException::new(bformat!("Could not stash changes\n\n:{output}")).into(),
             );
         }
 
@@ -602,7 +588,7 @@ impl GitDownloader {
             Some(&path),
         )? != 0
         {
-            return Err(RuntimeException::new(bconcat!("Could not view diff\n\n:", output)).into());
+            return Err(RuntimeException::new(bformat!("Could not view diff\n\n:{output}")).into());
         }
 
         self.inner.io.write_error(&output);
@@ -628,10 +614,10 @@ impl GitDownloader {
             }
 
             path = rtrim_chars(
-                bconcat!(
+                bformat!(
+                    "{}/{}",
                     realpath(path_from_bytes(&base_path)).unwrap_or_default(),
-                    "/",
-                    implode("/", &removed),
+                    implode("/", &removed)
                 ),
                 "/",
             );
@@ -669,10 +655,8 @@ impl GitDownloader {
         path: &Path,
     ) -> anyhow::Result<()> {
         if self.get_local_changes(package, path).await?.is_some() {
-            return Err(RuntimeException::new(bconcat!(
-                "Source directory ",
-                path,
-                " has uncommitted changes."
+            return Err(RuntimeException::new(bformat!(
+                "Source directory {path} has uncommitted changes."
             ))
             .into());
         }
@@ -717,10 +701,9 @@ impl ChangeReportInterface for GitDownloader {
             .execute(&command, &mut output, Some(path))?
             != 0
         {
-            return Err(RuntimeException::new(bconcat!(
-                "Failed to execute ",
+            return Err(RuntimeException::new(bformat!(
+                "Failed to execute {}\n\n{}",
                 implode(" ", &command),
-                "\n\n",
                 self.inner.process.borrow().get_error_output()
             ))
             .into());
@@ -781,15 +764,14 @@ impl VcsDownloader for GitDownloader {
 
         GitUtil::clean_env(&self.inner.process);
 
-        let cache_path = PathBuf::from(path_from_bytes(&bconcat!(
+        let cache_path = PathBuf::from(path_from_bytes(&bformat!(
+            "{}/{}/",
             self.inner
                 .config
                 .borrow()
                 .get_path("cache-vcs-dir")?
                 .as_bstr(),
-            "/",
-            preg_replace(r"{[^a-z0-9.]}i", "-", Url::sanitize(url)),
-            "/",
+            preg_replace(r"{[^a-z0-9.]}i", "-", Url::sanitize(url))
         )));
         let git_version = GitUtil::get_version(&self.inner.process)?;
 
@@ -805,15 +787,13 @@ impl VcsDownloader for GitDownloader {
             )
             && Cache::is_usable(&cache_path)
         {
-            self.inner.io.write_error(bconcat!(
-                "  - Syncing <info>",
+            self.inner.io.write_error(bformat!(
+                "  - Syncing <info>{}</info> (<comment>{}</comment>) into cache",
                 package.get_name(),
-                "</info> (<comment>",
-                package.get_full_pretty_version(true, DisplayMode::SourceRefIfDev),
-                "</comment>) into cache"
+                package.get_full_pretty_version(true, DisplayMode::SourceRefIfDev)
             ));
             self.inner.io.write_error_with_verbosity(
-                bconcat!("    Cloning to cache at ", cache_path),
+                bformat!("    Cloning to cache at {cache_path}"),
                 io_interface::DEBUG,
             );
             let r#ref = package.get_source_reference().unwrap_or_default();
@@ -848,15 +828,14 @@ impl VcsDownloader for GitDownloader {
     ) -> anyhow::Result<Option<PhpMixed>> {
         GitUtil::clean_env(&self.inner.process);
         let path = self.normalize_path(path);
-        let cache_path = bconcat!(
+        let cache_path = bformat!(
+            "{}/{}/",
             self.inner
                 .config
                 .borrow()
                 .get_path("cache-vcs-dir")?
                 .as_bstr(),
-            "/",
-            preg_replace(r"{[^a-z0-9.]}i", "-", Url::sanitize(url)),
-            "/",
+            preg_replace(r"{[^a-z0-9.]}i", "-", Url::sanitize(url))
         );
         let r#ref = package.get_source_reference().unwrap_or_default();
 
@@ -870,10 +849,9 @@ impl VcsDownloader for GitDownloader {
             .copied()
             .unwrap_or(false);
         if has_cached {
-            msg = bconcat!(
-                "Cloning ",
-                self.get_short_hash(r#ref.as_bstr()),
-                " from cache"
+            msg = bformat!(
+                "Cloning {} from cache",
+                self.get_short_hash(r#ref.as_bstr())
             );
 
             let mut clone_flags: Vec<BString> = vec![
@@ -920,7 +898,7 @@ impl VcsDownloader for GitDownloader {
                 ],
             ];
         } else {
-            msg = bconcat!("Cloning ", self.get_short_hash(r#ref.as_bstr()));
+            msg = bformat!("Cloning {}", self.get_short_hash(r#ref.as_bstr()));
             commands = vec![
                 vec![
                     "git".into(),
@@ -957,11 +935,7 @@ impl VcsDownloader for GitDownloader {
                 ],
             ];
             if Platform::get_env("COMPOSER_DISABLE_NETWORK").is_some() {
-                return Err(RuntimeException::new(bconcat!(
-                    "The required git reference for ",
-                    package.get_name(),
-                    " is not in cache and network is disabled, aborting"
-                ))
+                return Err(RuntimeException::new(bformat!("The required git reference for {} is not in cache and network is disabled, aborting", package.get_name()))
                 .into());
             }
         }
@@ -1002,23 +976,18 @@ impl VcsDownloader for GitDownloader {
         GitUtil::clean_env(&self.inner.process);
         let path = self.normalize_path(path);
         if !self.has_metadata_repository(&path) {
-            return Err(RuntimeException::new(bconcat!(
-                "The .git directory is missing from ",
-                path,
-                ", see https://getcomposer.org/commit-deps for more information"
-            ))
+            return Err(RuntimeException::new(bformat!("The .git directory is missing from {path}, see https://getcomposer.org/commit-deps for more information"))
             .into());
         }
 
-        let cache_path = bconcat!(
+        let cache_path = bformat!(
+            "{}/{}/",
             self.inner
                 .config
                 .borrow()
                 .get_path("cache-vcs-dir")?
                 .as_bstr(),
-            "/",
-            preg_replace(r"{[^a-z0-9.]}i", "-", Url::sanitize(url)),
-            "/",
+            preg_replace(r"{[^a-z0-9.]}i", "-", Url::sanitize(url))
         );
         let r#ref = target.get_source_reference().unwrap_or_default();
 
@@ -1032,21 +1001,16 @@ impl VcsDownloader for GitDownloader {
             .copied()
             .unwrap_or(false);
         if has_cached {
-            msg = bconcat!(
-                "Checking out ",
-                self.get_short_hash(r#ref.as_bstr()),
-                " from cache"
+            msg = bformat!(
+                "Checking out {} from cache",
+                self.get_short_hash(r#ref.as_bstr())
             );
             remote_url = cache_path;
         } else {
-            msg = bconcat!("Checking out ", self.get_short_hash(r#ref.as_bstr()));
+            msg = bformat!("Checking out {}", self.get_short_hash(r#ref.as_bstr()));
             remote_url = "%url%".into();
             if Platform::get_env("COMPOSER_DISABLE_NETWORK").is_some() {
-                return Err(RuntimeException::new(bconcat!(
-                    "The required git reference for ",
-                    target.get_name(),
-                    " is not in cache and network is disabled, aborting"
-                ))
+                return Err(RuntimeException::new(bformat!("The required git reference for {} is not in cache and network is disabled, aborting", target.get_name()))
                 .into());
             }
         }
@@ -1060,7 +1024,7 @@ impl VcsDownloader for GitDownloader {
                 "rev-parse".into(),
                 "--quiet".into(),
                 "--verify".into(),
-                bconcat!(r#ref, "^{commit}"),
+                bformat!("{}^{{commit}}", r#ref),
             ],
             &mut output,
             Some(&path),
@@ -1152,11 +1116,8 @@ impl VcsDownloader for GitDownloader {
             && (self.inner.io.is_interactive()
                 || self.inner.config.borrow().get_discard_changes()? != DiscardChanges::Bool(true))
         {
-            return Err(RuntimeException::new(bconcat!(
-                "Source directory ",
-                path,
-                " has unpushed changes on the current branch: \n",
-                unpushed
+            return Err(RuntimeException::new(bformat!(
+                "Source directory {path} has unpushed changes on the current branch: \n{unpushed}"
             ))
             .into());
         }
@@ -1185,23 +1146,21 @@ impl VcsDownloader for GitDownloader {
         }
 
         let changes: Vec<BString> = array_map(
-            |elem: &BString| bconcat!("    ", elem),
+            |elem: &BString| bformat!("    {elem}"),
             &preg_split(php_regex!(r"{\s*\r?\n\s*}"), &changes),
         );
-        self.inner.io.write_error(bconcat!(
-            "    <error>",
-            package.get_pretty_name(),
-            " has modified files:</error>"
+        self.inner.io.write_error(bformat!(
+            "    <error>{} has modified files:</error>",
+            package.get_pretty_name()
         ));
         let slice_end = 10_usize.min(changes.len());
         self.inner
             .io
             .write_error(implode("\n", &changes[..slice_end]));
         if (changes.len() as i64) > 10 {
-            self.inner.io.write_error(bconcat!(
-                "    <info>",
-                changes.len() as i64 - 10,
-                " more files modified, choose \"v\" to view the full list</info>"
+            self.inner.io.write_error(bformat!(
+                "    <info>{} more files modified, choose \"v\" to view the full list</info>",
+                changes.len() as i64 - 10
             ));
         }
 
@@ -1210,10 +1169,9 @@ impl VcsDownloader for GitDownloader {
                 .inner
                 .io
                 .ask(
-                    bconcat!(
-                        "    <info>Discard changes [y,n,v,",
-                        if update { "s," } else { "" },
-                        "?]?</info> "
+                    bformat!(
+                        "    <info>Discard changes [y,n,v,{}?]?</info> ",
+                        if update { "s," } else { "" }
                     ),
                     InputValue::from("?"),
                 )?
@@ -1254,14 +1212,13 @@ impl VcsDownloader for GitDownloader {
                 self.inner.io.write_error(implode(
                     "\n",
                     &[
-                        bconcat!(
-                            "    y - discard changes and apply the ",
+                        bformat!(
+                            "    y - discard changes and apply the {}",
                             if update { "update" } else { "uninstall" }
                         ),
-                        bconcat!(
-                            "    n - abort the ",
-                            if update { "update" } else { "uninstall" },
-                            " and let you manually clean things up"
+                        bformat!(
+                            "    n - abort the {} and let you manually clean things up",
+                            if update { "update" } else { "uninstall" }
                         ),
                         BString::from("    v - view modified files"),
                         BString::from("    d - view local modifications (diff)"),
@@ -1300,8 +1257,8 @@ impl VcsDownloader for GitDownloader {
                 Some(&path),
             )? != 0
             {
-                return Err(RuntimeException::new(bconcat!(
-                    "Failed to apply stashed changes:\n\n",
+                return Err(RuntimeException::new(bformat!(
+                    "Failed to apply stashed changes:\n\n{}",
                     self.inner.process.borrow().get_error_output()
                 ))
                 .into());
@@ -1323,7 +1280,7 @@ impl VcsDownloader for GitDownloader {
         let path = self.normalize_path(path);
         let mut args: Vec<BString> = vec![
             "--format=%h - %an: %s".into(),
-            bconcat!(from_reference, "..", to_reference),
+            bformat!("{from_reference}..{to_reference}"),
         ];
         args.extend(GitUtil::get_no_show_signature_flags(&self.inner.process)?);
         let command = GitUtil::build_rev_list_command(&self.inner.process, args)?;
@@ -1336,10 +1293,9 @@ impl VcsDownloader for GitDownloader {
             .execute(&command, &mut output, Some(&path))?
             != 0
         {
-            return Err(RuntimeException::new(bconcat!(
-                "Failed to execute ",
+            return Err(RuntimeException::new(bformat!(
+                "Failed to execute {}\n\n{}",
                 implode(" ", &command),
-                "\n\n",
                 self.inner.process.borrow().get_error_output()
             ))
             .into());
@@ -1351,7 +1307,7 @@ impl VcsDownloader for GitDownloader {
     fn has_metadata_repository(&self, path: &Path) -> bool {
         let path = self.normalize_path(path);
 
-        is_dir(path_from_bytes(&bconcat!(path, "/.git")))
+        is_dir(path_from_bytes(&bformat!("{path}/.git")))
     }
 }
 

@@ -26,7 +26,7 @@ use shirabe::script::{Event as ScriptEvent, ScriptEvents};
 use shirabe::util::{MockHandler, Platform, ProcessExecutor};
 use shirabe_class_map_generator::class_map::ClassMap;
 use shirabe_php_shim::{
-    Catch as _, PHP_EOL, PhpMixed, RuntimeException, bconcat, error_message, getenv, path_to_bytes,
+    Catch as _, PHP_EOL, PhpMixed, RuntimeException, bformat, error_message, getenv, path_to_bytes,
     var_export_str,
 };
 use shirabe_symfony_console::output::output_interface;
@@ -116,7 +116,7 @@ fn load_php_listener_class() {
             composer_test_dir().join("EventDispatcher/EventDispatcherTest.php"),
         ] {
             let path = path_to_bytes(&file);
-            php_eval(bconcat!("require ", var_export_str(path, true), ";"));
+            php_eval(bformat!("require {};", var_export_str(path, true)));
         }
     });
 }
@@ -259,17 +259,8 @@ fn test_dispatcher_can_execute_composer_script_groups() {
         )
         .unwrap();
 
-    let expected = bconcat!(
-        "> root: @group",
-        PHP_EOL,
-        "> group: echo -n foo",
-        PHP_EOL,
-        "> group: @subgroup",
-        PHP_EOL,
-        "> subgroup: echo -n baz",
-        PHP_EOL,
-        "> group: echo -n bar",
-        PHP_EOL
+    let expected = bformat!(
+        "> root: @group{PHP_EOL}> group: echo -n foo{PHP_EOL}> group: @subgroup{PHP_EOL}> subgroup: echo -n baz{PHP_EOL}> group: echo -n bar{PHP_EOL}"
     );
     assert_eq!(expected, io.borrow().get_output());
 }
@@ -280,8 +271,8 @@ fn test_recursion_in_scripts_names() {
     let _tear_down = TearDown;
     ensure_php_binary();
     let (process, _process_guard) = get_process_executor_mock(
-        vec![cmd(bconcat!(
-            "echo Hello ",
+        vec![cmd(bformat!(
+            "echo Hello {}",
             ProcessExecutor::escape("World")
         ))],
         true,
@@ -315,12 +306,9 @@ fn test_recursion_in_scripts_names() {
         )
         .unwrap();
 
-    let expected = bconcat!(
-        "> helloWorld: @hello World",
-        PHP_EOL,
-        "> hello: echo Hello ",
-        ProcessExecutor::escape("World"),
-        PHP_EOL,
+    let expected = bformat!(
+        "> helloWorld: @hello World{PHP_EOL}> hello: echo Hello {}{PHP_EOL}",
+        ProcessExecutor::escape("World")
     );
     assert_eq!(expected, io.borrow().get_output());
 }
@@ -726,24 +714,8 @@ fn test_dispatcher_remove_listener() {
     dispatcher.dispatch(Some("ev1".into()), None).unwrap();
     dispatcher.dispatch(Some("ev2".into()), None).unwrap();
 
-    let mut expected = bconcat!(
-        "> ev1: Composer\\Test\\EventDispatcher\\EventDispatcherTest->someMethod",
-        PHP_EOL,
-        "\
-         > ev1: Composer\\Test\\EventDispatcher\\EventDispatcherTest->someMethod2",
-        PHP_EOL,
-        "\
-         > ev1: Composer\\Test\\EventDispatcher\\EventDispatcherTest->someMethod",
-        PHP_EOL,
-        "\
-         > ev1: Composer\\Test\\EventDispatcher\\EventDispatcherTest::someMethod",
-        PHP_EOL,
-        "\
-         > ev2: Composer\\Test\\EventDispatcher\\EventDispatcherTest::someMethod",
-        PHP_EOL,
-        "\
-         > ev2: Composer\\Test\\EventDispatcher\\EventDispatcherTest->someMethod",
-        PHP_EOL
+    let mut expected = bformat!(
+        "> ev1: Composer\\Test\\EventDispatcher\\EventDispatcherTest->someMethod{PHP_EOL}> ev1: Composer\\Test\\EventDispatcher\\EventDispatcherTest->someMethod2{PHP_EOL}> ev1: Composer\\Test\\EventDispatcher\\EventDispatcherTest->someMethod{PHP_EOL}> ev1: Composer\\Test\\EventDispatcher\\EventDispatcherTest::someMethod{PHP_EOL}> ev2: Composer\\Test\\EventDispatcher\\EventDispatcherTest::someMethod{PHP_EOL}> ev2: Composer\\Test\\EventDispatcher\\EventDispatcherTest->someMethod{PHP_EOL}"
     );
     assert_eq!(expected, io.borrow().get_output());
 
@@ -751,13 +723,8 @@ fn test_dispatcher_remove_listener() {
     dispatcher.dispatch(Some("ev1".into()), None).unwrap();
     dispatcher.dispatch(Some("ev2".into()), None).unwrap();
 
-    expected = bconcat!(
-        expected,
-        "> ev1: Composer\\Test\\EventDispatcher\\EventDispatcherTest::someMethod",
-        PHP_EOL,
-        "\
-         > ev2: Composer\\Test\\EventDispatcher\\EventDispatcherTest::someMethod",
-        PHP_EOL
+    expected = bformat!(
+        "{expected}> ev1: Composer\\Test\\EventDispatcher\\EventDispatcherTest::someMethod{PHP_EOL}> ev2: Composer\\Test\\EventDispatcher\\EventDispatcherTest::someMethod{PHP_EOL}"
     );
     assert_eq!(expected, io.borrow().get_output());
 }
@@ -799,13 +766,8 @@ fn test_dispatcher_can_execute_cli_and_php_in_same_event_script_stack() {
         )
         .unwrap();
 
-    let expected = bconcat!(
-        "> post-install-cmd: echo -n foo",
-        PHP_EOL,
-        "> post-install-cmd: Composer\\Test\\EventDispatcher\\EventDispatcherTest::someMethod",
-        PHP_EOL,
-        "> post-install-cmd: echo -n bar",
-        PHP_EOL
+    let expected = bformat!(
+        "> post-install-cmd: echo -n foo{PHP_EOL}> post-install-cmd: Composer\\Test\\EventDispatcher\\EventDispatcherTest::someMethod{PHP_EOL}> post-install-cmd: echo -n bar{PHP_EOL}"
     );
     assert_eq!(expected, io.borrow().get_output());
 }
@@ -842,11 +804,8 @@ fn test_dispatcher_can_put_env() {
         )
         .unwrap();
 
-    let expected = bconcat!(
-        "> post-install-cmd: @putenv ABC=123",
-        PHP_EOL,
-        "> post-install-cmd: Composer\\Test\\EventDispatcher\\EventDispatcherTest::getTestEnv",
-        PHP_EOL
+    let expected = bformat!(
+        "> post-install-cmd: @putenv ABC=123{PHP_EOL}> post-install-cmd: Composer\\Test\\EventDispatcher\\EventDispatcherTest::getTestEnv{PHP_EOL}"
     );
     assert_eq!(expected, io.borrow().get_output());
 }
@@ -924,19 +883,18 @@ fn test_dispatcher_support_for_additional_args() {
         .__get_php_exec_command()
         .unwrap();
 
-    let args = bconcat!(
+    let args = bformat!(
+        "{} {} {}",
         ProcessExecutor::escape("ARG"),
-        " ",
         ProcessExecutor::escape("ARG2"),
-        " ",
-        ProcessExecutor::escape("--arg"),
+        ProcessExecutor::escape("--arg")
     );
 
     let (process, _process_guard) = get_process_executor_mock(
         vec![
             cmd("echo -n foo"),
-            cmd(bconcat!(php_cmd, " foo.php ", args, " then the rest")),
-            cmd(bconcat!("echo -n bar ", args)),
+            cmd(bformat!("{php_cmd} foo.php {args} then the rest")),
+            cmd(bformat!("echo -n bar {args}")),
         ],
         true,
         MockHandler::default(),
@@ -962,16 +920,8 @@ fn test_dispatcher_support_for_additional_args() {
         )
         .unwrap();
 
-    let expected = bconcat!(
-        "> post-install-cmd: echo -n foo",
-        PHP_EOL,
-        "> post-install-cmd: @php foo.php ",
-        args,
-        " then the rest",
-        PHP_EOL,
-        "> post-install-cmd: echo -n bar ",
-        args,
-        PHP_EOL,
+    let expected = bformat!(
+        "> post-install-cmd: echo -n foo{PHP_EOL}> post-install-cmd: @php foo.php {args} then the rest{PHP_EOL}> post-install-cmd: echo -n bar {args}{PHP_EOL}"
     );
     assert_eq!(expected, io.borrow().get_output());
 }
@@ -1016,7 +966,7 @@ fn test_dispatcher_outputs_command() {
     // ref: $io->expects($this->once())->method('writeRaw')->with('foo'.PHP_EOL, false)
     assert_eq!(
         io.borrow().write_raw_calls(),
-        vec![(bconcat!("foo", PHP_EOL), false)]
+        vec![(bformat!("foo{PHP_EOL}"), false)]
     );
 }
 
@@ -1046,11 +996,8 @@ fn test_dispatcher_outputs_error_on_failed_command() {
     let e = result.expect_err("expected ScriptExecutionException");
     assert!(error_message(&e).contains_str("Error Output: "), "got: {e}");
 
-    let expected = bconcat!(
-        "> exit 1",
-        PHP_EOL,
-        "Script exit 1 handling the post-install-cmd event returned with error code 1",
-        PHP_EOL
+    let expected = bformat!(
+        "> exit 1{PHP_EOL}Script exit 1 handling the post-install-cmd event returned with error code 1{PHP_EOL}"
     );
     assert_eq!(expected, io.borrow().get_output());
 }
@@ -1068,8 +1015,8 @@ fn test_dispatcher_runs_composer_scripts_through_the_running_binary() {
 
     let (process, _process_guard) = get_process_executor_mock(
         vec![
-            cmd(bconcat!(binary, " install --no-dev")),
-            cmd(bconcat!(binary, " update")),
+            cmd(bformat!("{binary} install --no-dev")),
+            cmd(bformat!("{binary} update")),
         ],
         true,
         MockHandler::default(),
@@ -1098,11 +1045,8 @@ fn test_dispatcher_runs_composer_scripts_through_the_running_binary() {
         )
         .unwrap();
 
-    let expected = bconcat!(
-        "> post-install-cmd: @composer install --no-dev",
-        PHP_EOL,
-        "> post-install-cmd: composer update",
-        PHP_EOL
+    let expected = bformat!(
+        "> post-install-cmd: @composer install --no-dev{PHP_EOL}> post-install-cmd: composer update{PHP_EOL}"
     );
     assert_eq!(expected, io.borrow().get_output());
 }

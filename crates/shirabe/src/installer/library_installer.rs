@@ -11,7 +11,7 @@ use crate::repository::InstalledRepositoryInterfaceHandle;
 use crate::util::{Filesystem, Platform};
 use bstr::{BStr, BString, ByteSlice};
 use shirabe_php_shim::{
-    InvalidArgumentException, LogicException, PhpMixed, ToPhpString, bconcat, dirname, is_dir,
+    InvalidArgumentException, LogicException, PhpMixed, ToPhpString, bformat, dirname, is_dir,
     is_link, path_from_bytes, path_to_bytes, preg_quote, preg_replace, realpath, rmdir,
     rtrim_chars, str_replace, strpos,
 };
@@ -113,10 +113,9 @@ impl LibraryInstaller {
             && !target_dir.is_empty()
         {
             return PathBuf::from(path_from_bytes(&preg_replace(
-                bconcat!(
-                    "{/*",
-                    str_replace("/", "/+", preg_quote(&target_dir, None)),
-                    "/?$}"
+                bformat!(
+                    "{{/*{}/?$}}",
+                    str_replace("/", "/+", preg_quote(&target_dir, None))
                 ),
                 "",
                 path_to_bytes(&install_path),
@@ -196,7 +195,7 @@ impl LibraryInstaller {
         assert!(
             self.download_manager.is_some(),
             "{}",
-            LogicException::new(bconcat!("LibraryInstaller", " should be initialized with a fully loaded Composer instance to be able to install/... packages"))
+            LogicException::new(bformat!("LibraryInstaller should be initialized with a fully loaded Composer instance to be able to install/... packages"))
             .get_message().display_lossy()
         );
 
@@ -327,8 +326,8 @@ impl InstallerInterface for LibraryInstaller {
         target: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
         if !repo.borrow_mut().has_package(initial.clone())? {
-            return Err(InvalidArgumentException::new(bconcat!(
-                "Package is not installed: ",
+            return Err(InvalidArgumentException::new(bformat!(
+                "Package is not installed: {}",
                 initial.to_php_string()
             ))
             .into());
@@ -360,8 +359,8 @@ impl InstallerInterface for LibraryInstaller {
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
         if !repo.borrow_mut().has_package(package.clone())? {
-            return Err(InvalidArgumentException::new(bconcat!(
-                "Package is not installed: ",
+            return Err(InvalidArgumentException::new(bformat!(
+                "Package is not installed: {}",
                 package.to_php_string()
             ))
             .into());
@@ -394,19 +393,20 @@ impl InstallerInterface for LibraryInstaller {
         self.initialize_vendor_dir();
 
         let vendor_dir = self.vendor_dir.borrow();
-        let base_path = bconcat!(
+        let base_path = bformat!(
+            "{}{}",
             if !vendor_dir.as_os_str().is_empty() {
-                bconcat!(vendor_dir.as_path(), "/")
+                bformat!("{}/", vendor_dir.as_path())
             } else {
                 BString::default()
             },
-            package.get_pretty_name(),
+            package.get_pretty_name()
         );
         let target_dir = package.get_target_dir();
 
         let install_path = if let Some(target_dir) = target_dir {
             if !target_dir.is_empty() {
-                bconcat!(base_path, "/", target_dir)
+                bformat!("{base_path}/{target_dir}")
             } else {
                 base_path
             }

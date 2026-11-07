@@ -5,7 +5,7 @@ use crate::file_list::FileList;
 use crate::php_file_parser::PhpFileParser;
 use bstr::{BStr, BString, ByteSlice};
 use shirabe_php_shim::{
-    InvalidArgumentException, LogicException, PATHINFO_EXTENSION, RuntimeException, bconcat,
+    InvalidArgumentException, LogicException, PATHINFO_EXTENSION, RuntimeException, bformat,
     explode, getcwd, implode, is_dir, is_file, path_from_bytes, path_to_bytes, pathinfo, php_regex,
     preg_is_match, preg_match, preg_quote, preg_replace, preg_replace_callback, realpath,
     str_replace, stream_get_wrappers, strlen, strpos, strrpos, strtr, substr,
@@ -28,7 +28,7 @@ impl ClassMapGenerator {
             .iter()
             .map(|w| preg_quote(w, None))
             .collect();
-        let stream_wrappers_regex = bconcat!("{^(?:", implode("|", &wrappers), ")://}");
+        let stream_wrappers_regex = bformat!("{{^(?:{})://}}", implode("|", &wrappers));
 
         ClassMapGenerator {
             extensions,
@@ -103,8 +103,8 @@ impl ClassMapGenerator {
         let files: Vec<BString> = if is_file(fs_path) {
             vec![BString::from(path)]
         } else if is_dir(fs_path) || strpos(path, "*").is_some() {
-            let ext_pattern = bconcat!(
-                "/\\.(?:",
+            let ext_pattern = bformat!(
+                "/\\.(?:{})$/",
                 implode(
                     "|",
                     &self
@@ -112,8 +112,7 @@ impl ClassMapGenerator {
                         .iter()
                         .map(|e| preg_quote(e, None))
                         .collect::<Vec<_>>()
-                ),
-                ")$/"
+                )
             );
             Finder::create()
                 .files()
@@ -125,11 +124,7 @@ impl ClassMapGenerator {
                 .map(|file| BString::from(path_to_bytes(&file)))
                 .collect()
         } else {
-            return Err(RuntimeException::new(bconcat!(
-                "Could not scan for classes inside \"",
-                path,
-                "\" which does not appear to be a file nor a folder"
-            ))
+            return Err(RuntimeException::new(bformat!("Could not scan for classes inside \"{path}\" which does not appear to be a file nor a folder"))
             .into());
         };
 
@@ -156,7 +151,7 @@ impl ClassMapGenerator {
 
             let is_stream_wrapper_path = preg_is_match(&self.stream_wrappers_regex, &file_path);
             if !Self::is_absolute_path(&file_path) && !is_stream_wrapper_path {
-                file_path = bconcat!(cwd, "/", file_path);
+                file_path = bformat!("{cwd}/{file_path}");
                 file_path = Self::normalize_path(&file_path);
             } else {
                 // Regex pattern compatibility:
@@ -171,7 +166,7 @@ impl ClassMapGenerator {
 
             if file_path.is_empty() {
                 preparation_error =
-                    Some(LogicException::new(bconcat!("Got an empty $filePath for ", file)).into());
+                    Some(LogicException::new(bformat!("Got an empty $filePath for {file}")).into());
                 break;
             }
 
@@ -182,10 +177,8 @@ impl ClassMapGenerator {
                     Some(p) => BString::from(path_to_bytes(&p)),
                     None => {
                         preparation_error = Some(
-                            RuntimeException::new(bconcat!(
-                                "realpath of ",
-                                file_path,
-                                " failed to resolve, got false"
+                            RuntimeException::new(bformat!(
+                                "realpath of {file_path} failed to resolve, got false"
                             ))
                             .into(),
                         );
@@ -395,31 +388,19 @@ impl ClassMapGenerator {
             let cwd = realpath(&cwd_path);
             let cwd = Self::normalize_path(path_to_bytes(&cwd.unwrap_or(cwd_path)));
             let short_path = preg_replace(
-                bconcat!("{^", preg_quote(&cwd, None), "}"),
+                bformat!("{{^{}}}", preg_quote(&cwd, None)),
                 ".",
                 Self::normalize_path(file_path),
             );
             let short_base_path = preg_replace(
-                bconcat!("{^", preg_quote(&cwd, None), "}"),
+                bformat!("{{^{}}}", preg_quote(&cwd, None)),
                 ".",
                 Self::normalize_path(base_path),
             );
 
             for class in rejected_classes {
                 self.class_map.add_psr_violation(
-                    bconcat!(
-                        "Class ",
-                        class,
-                        " located in ",
-                        short_path,
-                        " does not comply with ",
-                        namespace_type,
-                        " autoloading standard (rule: ",
-                        base_namespace,
-                        " => ",
-                        short_base_path,
-                        "). Skipping."
-                    ),
+                    bformat!("Class {class} located in {short_path} does not comply with {namespace_type} autoloading standard (rule: {base_namespace} => {short_base_path}). Skipping."),
                     class.clone(),
                     file_path,
                 );
@@ -485,7 +466,7 @@ impl ClassMapGenerator {
         )
         .expect("the replacement callback cannot fail");
 
-        bconcat!(prefix, absolute, bstr::join("/", &parts))
+        bformat!("{prefix}{absolute}{}", bstr::join("/", &parts))
     }
 
     fn get_cwd() -> anyhow::Result<PathBuf> {

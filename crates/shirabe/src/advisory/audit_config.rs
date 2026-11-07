@@ -5,7 +5,7 @@ use crate::config::Config;
 use bstr::{B, BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    InvalidArgumentException, PhpMixed, TypeError, bconcat, canonical_int_key, get_debug_type,
+    InvalidArgumentException, PhpMixed, TypeError, bformat, canonical_int_key, get_debug_type,
 };
 
 #[derive(Debug, Clone)]
@@ -107,13 +107,7 @@ impl AuditConfig {
                         .map(BString::from);
 
                     if !["audit", "block", "all"].iter().any(|a| apply == *a) {
-                        return Err(InvalidArgumentException::new(bconcat!(
-                            "Invalid 'apply' value for '",
-                            key,
-                            "': ",
-                            apply,
-                            ". Expected 'audit', 'block', or 'all'."
-                        ))
+                        return Err(InvalidArgumentException::new(bformat!("Invalid 'apply' value for '{key}': {apply}. Expected 'audit', 'block', or 'all'."))
                         .into());
                     }
 
@@ -171,11 +165,7 @@ impl AuditConfig {
             None | Some(PhpMixed::Null) => BString::from(Auditor::ABANDONED_FAIL),
             Some(PhpMixed::String(abandoned)) => abandoned.clone(),
             Some(other) => {
-                return Err(TypeError::new(bconcat!(
-                    "Composer\\Advisory\\AuditConfig::__construct(): Argument #3 ($auditAbandoned) must be of type string, ",
-                    get_debug_type(other),
-                    " given"
-                ))
+                return Err(TypeError::new(bformat!("Composer\\Advisory\\AuditConfig::__construct(): Argument #3 ($auditAbandoned) must be of type string, {} given", get_debug_type(other)))
                 .into());
             }
         };

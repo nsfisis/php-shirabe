@@ -7,7 +7,7 @@ use crate::repository::InstalledRepositoryInterfaceHandle;
 use crate::util::Filesystem;
 use bstr::{BStr, BString};
 use shirabe_php_shim::{
-    InvalidArgumentException, PhpMixed, bconcat, path_from_bytes, path_to_bytes, rtrim_chars, strtr,
+    InvalidArgumentException, PhpMixed, bformat, path_from_bytes, path_to_bytes, rtrim_chars, strtr,
 };
 use std::path::{Path, PathBuf};
 
@@ -24,9 +24,9 @@ impl ProjectInstaller {
         dm: std::rc::Rc<std::cell::RefCell<dyn DownloadManagerInterface>>,
         fs: std::rc::Rc<std::cell::RefCell<Filesystem>>,
     ) -> Self {
-        let install_path = PathBuf::from(path_from_bytes(&bconcat!(
-            rtrim_chars(strtr(path_to_bytes(install_path), "\\", "/"), "/"),
-            "/"
+        let install_path = PathBuf::from(path_from_bytes(&bformat!(
+            "{}/",
+            rtrim_chars(strtr(path_to_bytes(install_path), "\\", "/"), "/")
         )));
         Self {
             install_path,
@@ -57,10 +57,8 @@ impl InstallerInterface for ProjectInstaller {
     ) -> anyhow::Result<Option<PhpMixed>> {
         let install_path = &self.install_path;
         if install_path.exists() && !self.filesystem.borrow().is_dir_empty(install_path) {
-            return Err(InvalidArgumentException::new(bconcat!(
-                "Project directory ",
-                install_path,
-                " is not empty."
+            return Err(InvalidArgumentException::new(bformat!(
+                "Project directory {install_path} is not empty."
             ))
             .into());
         }

@@ -10,7 +10,7 @@ use crate::event_dispatcher::EventFlags;
 use crate::util::Platform;
 use bstr::{BStr, BString, ByteSlice};
 use shirabe_php_shim::{
-    InvalidArgumentException, PhpMixed, ToPhpString, bconcat, impl_php_class, is_string, php_regex,
+    InvalidArgumentException, PhpMixed, ToPhpString, bformat, impl_php_class, is_string, php_regex,
     preg_replace_with_limit_and_count,
 };
 use shirabe_symfony_console::command::Command;
@@ -34,9 +34,8 @@ impl ScriptAliasCommand {
         description: Option<BString>,
         aliases: Vec<BString>,
     ) -> anyhow::Result<Self> {
-        let description = description.unwrap_or_else(|| {
-            bconcat!("Runs the ", script, " script as defined in composer.json")
-        });
+        let description = description
+            .unwrap_or_else(|| bformat!("Runs the {script} script as defined in composer.json"));
 
         for alias in &aliases {
             if !is_string(&PhpMixed::string(alias.clone())) {

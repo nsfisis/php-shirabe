@@ -15,7 +15,7 @@ use crate::util::{PackageInfo, PackageSorter};
 use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    RuntimeException, UnexpectedValueException, bconcat, impl_php_class, implode, json_bytes,
+    RuntimeException, UnexpectedValueException, bformat, impl_php_class, implode, json_bytes,
 };
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::formatter::OutputFormatter;
@@ -202,17 +202,15 @@ impl Command for LicensesCommand {
                 } else {
                     implode(", ", &root_licenses)
                 };
-                io.write(bconcat!(
-                    "Name: <comment>",
-                    root.get_pretty_name(),
-                    "</comment>"
+                io.write(bformat!(
+                    "Name: <comment>{}</comment>",
+                    root.get_pretty_name()
                 ));
-                io.write(bconcat!(
-                    "Version: <comment>",
-                    root.get_full_pretty_version(true, DisplayMode::SourceRefIfDev),
-                    "</comment>"
+                io.write(bformat!(
+                    "Version: <comment>{}</comment>",
+                    root.get_full_pretty_version(true, DisplayMode::SourceRefIfDev)
                 ));
-                io.write(bconcat!("Licenses: <comment>", licenses_str, "</comment>"));
+                io.write(bformat!("Licenses: <comment>{licenses_str}</comment>"));
                 io.write("Dependencies:");
                 io.write("");
 
@@ -222,12 +220,10 @@ impl Command for LicensesCommand {
                 for package in &packages {
                     let link = PackageInfo::get_view_source_or_homepage_url(package.clone());
                     let name = if let Some(link) = link {
-                        bconcat!(
-                            "<href=",
+                        bformat!(
+                            "<href={}>{}</>",
                             OutputFormatter::escape(&link)?,
-                            ">",
-                            package.get_pretty_name(),
-                            "</>"
+                            package.get_pretty_name()
                         )
                     } else {
                         package.get_pretty_name()
@@ -304,7 +300,7 @@ impl Command for LicensesCommand {
                 let rows: Vec<Row> = entries
                     .iter()
                     .map(|(license, count)| {
-                        Row::Cells(vec![license.clone().into(), bconcat!(count).into()])
+                        Row::Cells(vec![license.clone().into(), bformat!("{count}").into()])
                     })
                     .collect();
 
@@ -315,10 +311,8 @@ impl Command for LicensesCommand {
                 )?;
             }
             _ => {
-                return Err(RuntimeException::new(bconcat!(
-                    "Unsupported format \"",
-                    format,
-                    "\".  See help for supported formats."
+                return Err(RuntimeException::new(bformat!(
+                    "Unsupported format \"{format}\".  See help for supported formats."
                 ))
                 .into());
             }

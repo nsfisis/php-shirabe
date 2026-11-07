@@ -8,7 +8,7 @@ use bstr::{BStr, BString, ByteSlice};
 use chrono::{DateTime, Utc};
 use indexmap::{IndexMap, IndexSet};
 use shirabe_php_shim::{
-    E_USER_DEPRECATED, LogicException, PhpDisplay, PhpMixed, PregMatches, bconcat, ltrim_chars,
+    E_USER_DEPRECATED, LogicException, PhpDisplay, PhpMixed, PregMatches, bformat, ltrim_chars,
     php_regex, preg_is_match, preg_replace, preg_replace_callback, strpos, strtolower,
     trigger_error,
 };
@@ -427,9 +427,9 @@ impl Package {
                 preg_replace_callback(
                     php_regex!("{(/|sha=)[a-f0-9]{40}(/|$)}i"),
                     |m: &PregMatches| -> anyhow::Result<BString> {
-                        Ok(bconcat!(
+                        Ok(bformat!(
+                            "{}{reference}{}",
                             m.get(1).unwrap_or_default(),
-                            reference,
                             m.get(2).unwrap_or_default()
                         ))
                     },
@@ -527,10 +527,8 @@ impl Package {
         source: &BStr,
     ) -> IndexMap<BString, Link> {
         trigger_error(
-            bconcat!(
-                "Package::",
-                source,
-                " must be called with a map of lowercased package name => Link object, got a indexed array, this is deprecated and you should fix your usage."
+            bformat!(
+                "Package::{source} must be called with a map of lowercased package name => Link object, got a indexed array, this is deprecated and you should fix your usage."
             ),
             E_USER_DEPRECATED,
         );
@@ -740,13 +738,13 @@ impl PackageInterface for Package {
         self.binaries.clone()
     }
     fn get_unique_name(&self) -> BString {
-        bconcat!(self.get_name(), "-", self.get_version())
+        bformat!("{}-{}", self.get_name(), self.get_version())
     }
     fn get_notification_url(&self) -> Option<BString> {
         self.notification_url.clone()
     }
     fn get_pretty_string(&self) -> BString {
-        bconcat!(self.get_pretty_name(), " ", self.get_pretty_version())
+        bformat!("{} {}", self.get_pretty_name(), self.get_pretty_version())
     }
     fn is_default_branch(&self) -> bool {
         self.is_default_branch

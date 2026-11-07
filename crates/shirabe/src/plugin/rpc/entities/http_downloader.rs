@@ -11,7 +11,7 @@ use crate::plugin::rpc::jobs::{
 use crate::util::{HttpDownloader, HttpDownloaderJob, StreamContextOptions};
 use bstr::{BStr, BString, ByteSlice};
 use shirabe_php_rpc::{PhpThrow, PluginValue, ToWire};
-use shirabe_php_shim::{bconcat, path_from_bytes};
+use shirabe_php_shim::{bformat, path_from_bytes};
 
 /// Serves the `HttpDownloader` proxy stub, whether the downloader behind it belongs to the object
 /// graph or was built by plugin code writing `new HttpDownloader(...)`. Both run their requests
@@ -64,7 +64,7 @@ pub(crate) fn dispatch_http_downloader_method(
                 StreamContextOptions::new(),
             )?;
             let failed =
-                |error: anyhow::Error| error_throw(bconcat!(method_name, " failed"), &error);
+                |error: anyhow::Error| error_throw(bformat!("{method_name} failed"), &error);
             let started = std::rc::Rc::new(std::cell::Cell::new(false));
             // PHP raises the empty-url check and the async gate out of `add()`/`addCopy()`
             // itself, before the promise exists; only a failed request becomes a rejection.
@@ -96,7 +96,7 @@ pub(crate) fn dispatch_http_downloader_method(
                             future
                                 .await
                                 .map(|response| response_to_wire(&response))
-                                .map_err(|error| error_throw(bconcat!(method, " failed"), &error))
+                                .map_err(|error| error_throw(bformat!("{method} failed"), &error))
                         }),
                     ))
                 }

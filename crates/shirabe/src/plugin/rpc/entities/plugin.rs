@@ -4,7 +4,7 @@ use crate::plugin::PluginInterface;
 use crate::plugin::rpc::dispatch::{error_throw, unavailable_method};
 use bstr::{BStr, ByteSlice};
 use shirabe_php_rpc::{PhpThrow, PluginValue, ToWire};
-use shirabe_php_shim::bconcat;
+use shirabe_php_shim::bformat;
 
 pub(crate) fn dispatch_plugin_method(
     plugin: &std::rc::Rc<std::cell::RefCell<dyn PluginInterface>>,
@@ -14,10 +14,9 @@ pub(crate) fn dispatch_plugin_method(
         b"getCapabilities" => {
             let plugin = plugin.borrow();
             let capable = plugin.as_capable().ok_or_else(|| {
-                PhpThrow::runtime(bconcat!(
-                    "plugin ",
-                    plugin.get_class_name(),
-                    " does not implement Capable"
+                PhpThrow::runtime(bformat!(
+                    "plugin {} does not implement Capable",
+                    plugin.get_class_name()
                 ))
             })?;
             let capabilities = capable

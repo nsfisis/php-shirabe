@@ -7,7 +7,7 @@ use crate::test_case::{
 use bstr::{BStr, BString, ByteSlice};
 use serial_test::serial;
 use shirabe::package::{Link, PackageInterfaceHandle};
-use shirabe_php_shim::{bconcat, error_message, trim};
+use shirabe_php_shim::{bformat, error_message, trim};
 use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint, MultiConstraint};
 use shirabe_symfony_console::input::{InputValue, ParameterName};
 
@@ -151,11 +151,8 @@ fn test_exception_when_it_could_not_found_the_package() {
         let err = app_tester
             .run(input, RunOptions::default())
             .expect_err("expected InvalidArgumentException");
-        let expected = bconcat!(
-            "Could not find package \"",
-            package_to_be_inspected,
-            "\" in your project"
-        );
+        let expected =
+            bformat!("Could not find package \"{package_to_be_inspected}\" in your project");
         assert!(
             error_message(&err).contains_str(&expected),
             "expected error to contain {:?}, got: {:?}",
@@ -221,11 +218,8 @@ fn test_exception_when_package_was_not_found_in_project() {
         let err = app_tester
             .run(input, RunOptions::default())
             .expect_err("expected InvalidArgumentException");
-        let expected = bconcat!(
-            "Could not find package \"",
-            package_to_be_inspected,
-            "\" in your project"
-        );
+        let expected =
+            bformat!("Could not find package \"{package_to_be_inspected}\" in your project");
         assert!(
             error_message(&err).contains_str(&expected),
             "expected error to contain {:?}, got: {:?}",

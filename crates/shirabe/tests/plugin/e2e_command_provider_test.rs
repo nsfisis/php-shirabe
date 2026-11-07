@@ -9,7 +9,7 @@
 use crate::e2e_extension_installer_test::{copy_dir, upstream_composer_bin};
 use crate::php_worker::lock_php_worker;
 use bstr::{BStr, BString, ByteSlice};
-use shirabe_php_shim::{bconcat, os_str_from_bytes};
+use shirabe_php_shim::{bformat, os_str_from_bytes};
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use tempfile::TempDir;
@@ -98,7 +98,7 @@ fn test_command_provider_execution_matches_upstream_composer() {
         );
 
         let observed = work.path().join("project/observed.txt");
-        let observed_arg = bconcat!("--out=", observed);
+        let observed_arg = bformat!("--out={observed}");
         let greet = run_command(
             work.path(),
             program,

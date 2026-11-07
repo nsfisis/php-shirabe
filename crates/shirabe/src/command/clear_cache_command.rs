@@ -10,7 +10,7 @@ use crate::delegate_base_command_trait_impls_to_inner;
 use crate::factory::Factory;
 use crate::io::IOInterfaceWrite;
 use bstr::BStr;
-use shirabe_php_shim::{bconcat, impl_php_class, path_from_bytes, realpath};
+use shirabe_php_shim::{bformat, impl_php_class, path_from_bytes, realpath};
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::{InputInterface, InputInterfaceByName};
 use shirabe_symfony_console::output::OutputInterface;
@@ -110,12 +110,8 @@ impl Command for ClearCacheCommand {
             let cache_path = match realpath(&cache_path) {
                 Some(path) => path,
                 None => {
-                    io.write_error(bconcat!(
-                        "<info>Cache directory does not exist (",
-                        key,
-                        "): ",
-                        cache_path,
-                        "</info>"
+                    io.write_error(bformat!(
+                        "<info>Cache directory does not exist ({key}): {cache_path}</info>"
                     ));
                     continue;
                 }
@@ -123,23 +119,15 @@ impl Command for ClearCacheCommand {
             let mut cache = Cache::new(io.clone(), &cache_path, None, None, false);
             cache.set_read_only(config.get_bool("cache-read-only"));
             if !cache.is_enabled() {
-                io.write_error(bconcat!(
-                    "<info>Cache is not enabled (",
-                    key,
-                    "): ",
-                    cache_path,
-                    "</info>"
+                io.write_error(bformat!(
+                    "<info>Cache is not enabled ({key}): {cache_path}</info>"
                 ));
                 continue;
             }
 
             if gc {
-                io.write_error(bconcat!(
-                    "<info>Garbage-collecting cache (",
-                    key,
-                    "): ",
-                    cache_path,
-                    "</info>"
+                io.write_error(bformat!(
+                    "<info>Garbage-collecting cache ({key}): {cache_path}</info>"
                 ));
                 if key == "cache-files-dir" {
                     cache.gc(
@@ -155,12 +143,8 @@ impl Command for ClearCacheCommand {
                     cache.gc_vcs_cache(config.get_cache_ttl());
                 }
             } else {
-                io.write_error(bconcat!(
-                    "<info>Clearing cache (",
-                    key,
-                    "): ",
-                    cache_path,
-                    "</info>"
+                io.write_error(bformat!(
+                    "<info>Clearing cache ({key}): {cache_path}</info>"
                 ));
                 cache.clear();
             }

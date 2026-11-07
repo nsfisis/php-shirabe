@@ -4,7 +4,7 @@ use crate::helper::{DebugFormatterHelper, Helper, HelperInterface, HelperSet};
 use crate::output::{ConsoleOutput, ConsoleOutputInterface, OutputInterface, output_interface};
 use bstr::{BStr, BString};
 use shirabe_php_shim::{
-    AsAny, InvalidArgumentException, PhpMixed, bconcat, spl_object_hash, str_replace,
+    AsAny, InvalidArgumentException, PhpMixed, bformat, spl_object_hash, str_replace,
 };
 use shirabe_symfony_process::Process;
 use shirabe_symfony_process::exception::ProcessFailedException;
@@ -120,7 +120,7 @@ impl ProcessHelper {
             .enumerate()
             .filter_map(|(i, element)| match element {
                 ProcessHelperCmdElement::String(s) => {
-                    Some((bconcat!(i), PhpMixed::string(s.clone())))
+                    Some((bformat!("{i}"), PhpMixed::string(s.clone())))
                 }
                 ProcessHelperCmdElement::Process(_) => None,
             })
@@ -140,12 +140,12 @@ impl ProcessHelper {
             let message = if process.is_successful() {
                 BString::from("Command ran successfully")
             } else {
-                bconcat!(
+                bformat!(
+                    "{} Command did not run successfully",
                     process
                         .get_exit_code()
-                        .map(|code| bconcat!(code))
-                        .unwrap_or_default(),
-                    " Command did not run successfully"
+                        .map(|code| bformat!("{code}"))
+                        .unwrap_or_default()
                 )
             };
             let stopped = Self::formatter_stop(
@@ -163,7 +163,7 @@ impl ProcessHelper {
             && let Some(error) = error
         {
             output.borrow().writeln(
-                &[bconcat!("<error>", Self::escape_string(error), "</error>")],
+                &[bformat!("<error>{}</error>", Self::escape_string(error))],
                 output_interface::OUTPUT_NORMAL,
             );
         }

@@ -6,10 +6,10 @@ use crate::package::{BasePackageHandle, Link};
 use crate::repository::{
     LockArrayRepository, PlatformRepository, ProviderInfo, RepositoryInterfaceHandle, RepositorySet,
 };
-use bstr::{B, BStr, BString, ByteSlice, ByteVec};
+use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    CmpOp, LogicException, PhpMixed, ToPhpString, bconcat, extension_loaded, implode,
+    CmpOp, LogicException, PhpMixed, ToPhpString, bformat, bwrite, extension_loaded, implode,
     loosely_compare, php_regex, preg_is_match, preg_match, preg_replace, spl_object_hash, sprintf,
     str_replace, stripos, strpos, strtolower, substr, substr_count, version_compare,
 };
@@ -102,7 +102,7 @@ impl Problem {
                     package_name.as_ref(),
                     constraint,
                 )?;
-                return Ok(bconcat!("\n    ", implode("", &[missing.0, missing.1])));
+                return Ok(bformat!("\n    {}", implode("", &[missing.0, missing.1])));
             }
         }
 
@@ -150,7 +150,7 @@ impl Problem {
                     rule::ReasonData::Link(link) => link.get_pretty_string(source.clone()),
                     _ => BString::default(),
                 };
-                bconcat!(source.get_unique_name(), "//", link_pretty)
+                bformat!("{}//{link_pretty}", source.get_unique_name())
             }
             rule::RULE_PACKAGE_SAME_NAME
             | rule::RULE_PACKAGE_ALIAS
@@ -164,7 +164,7 @@ impl Problem {
                 &rule
                     .get_literals()
                     .iter()
-                    .map(|l| bconcat!(l))
+                    .map(|l| bformat!("{l}"))
                     .collect::<Vec<_>>(),
             ),
             _ => {
@@ -240,9 +240,9 @@ impl Problem {
                     .or_default()
                     .insert(version_key, m2.clone());
                 let source_package = rule_ref.get_source_package(pool).unwrap();
-                for (version, pretty_version) in pool
-                    .get_removed_versions_by_package(bconcat!(source_package.ptr_id()).as_bstr())
-                {
+                for (version, pretty_version) in pool.get_removed_versions_by_package(
+                    bformat!("{}", source_package.ptr_id()).as_bstr(),
+                ) {
                     templates
                         .get_mut(&template)
                         .unwrap()
@@ -304,7 +304,7 @@ impl Problem {
                             &message_var,
                             &[
                                 PhpMixed::string(package.clone()),
-                                PhpMixed::string(bconcat!("[", implode(", ", &versions_list), "]")),
+                                PhpMixed::string(bformat!("[{}]", implode(", ", &versions_list))),
                             ],
                         ));
                     } else {
@@ -313,7 +313,7 @@ impl Problem {
                             message,
                             &[
                                 PhpMixed::string(package.clone()),
-                                PhpMixed::string(bconcat!(" ", first)),
+                                PhpMixed::string(bformat!(" {first}")),
                             ],
                         ));
                     }
@@ -323,11 +323,9 @@ impl Problem {
             }
         }
 
-        Ok(bconcat!(
-            "\n",
-            indent,
-            "- ",
-            implode(bconcat!("\n", indent, "- "), &result)
+        Ok(bformat!(
+            "\n{indent}- {}",
+            implode(bformat!("\n{indent}- "), &result)
         ))
     }
 
@@ -383,11 +381,9 @@ impl Problem {
                     shirabe_php_rpc::get_php_version()?.version.as_ref(),
                 )?;
 
-                let msg = bconcat!(
-                    "- Root composer.json requires ",
-                    package_name,
-                    Self::constraint_to_text(constraint),
-                    " but "
+                let msg = bformat!(
+                    "- Root composer.json requires {package_name}{} but ",
+                    Self::constraint_to_text(constraint)
                 );
 
                 if package_name == "hhvm" && !pool.what_provides(package_name, None).is_empty() {
@@ -409,24 +405,17 @@ impl Problem {
                 if version.is_none() {
                     return Ok((
                         msg,
-                        bconcat!(
-                            "the ",
-                            package_name,
-                            " package is disabled by your platform config. Enable it again with \"shirabe config platform.",
-                            package_name,
-                            " --unset\"."
+                        bformat!(
+                            "the {package_name} package is disabled by your platform config. Enable it again with \"shirabe config platform.{package_name} --unset\"."
                         ),
                     ));
                 }
 
                 return Ok((
                     msg,
-                    bconcat!(
-                        "your ",
-                        package_name,
-                        " version (",
-                        version.unwrap(),
-                        ") does not satisfy that requirement."
+                    bformat!(
+                        "your {package_name} version ({}) does not satisfy that requirement.",
+                        version.unwrap()
                     ),
                 ));
             }
@@ -436,22 +425,17 @@ impl Problem {
                 if strpos(package_name, " ").is_some() {
                     return Ok((
                         BString::from("- "),
-                        bconcat!(
-                            "PHP extension ",
-                            package_name,
-                            " should be required as ",
-                            str_replace(" ", "-", package_name),
-                            "."
+                        bformat!(
+                            "PHP extension {package_name} should be required as {}.",
+                            str_replace(" ", "-", package_name)
                         ),
                     ));
                 }
 
                 let ext = substr(package_name, 4, None);
-                let msg = bconcat!(
-                    "- Root composer.json requires PHP extension ",
-                    package_name,
-                    Self::constraint_to_text(constraint),
-                    " but "
+                let msg = bformat!(
+                    "- Root composer.json requires PHP extension {package_name}{} but ",
+                    Self::constraint_to_text(constraint)
                 );
 
                 let runtime_version = shirabe_php_rpc::phpversion(&ext)?;
@@ -468,9 +452,8 @@ impl Problem {
                     let providers_str_opt =
                         Self::get_providers_list(repository_set, package_name, 5)?;
                     let providers_str = match providers_str_opt {
-                        Some(ps) => bconcat!(
-                            "\n\n      Alternatively you can require one of these packages that provide the extension (or parts of it):\n      <warning>Keep in mind that the suggestions are automated and may not be valid or safe to use</warning>\n",
-                            ps
+                        Some(ps) => bformat!(
+                            "\n\n      Alternatively you can require one of these packages that provide the extension (or parts of it):\n      <warning>Keep in mind that the suggestions are automated and may not be valid or safe to use</warning>\n{ps}"
                         ),
                         None => BString::default(),
                     };
@@ -478,35 +461,23 @@ impl Problem {
                     if extension_loaded(&ext) {
                         return Ok((
                             msg,
-                            bconcat!(
-                                "the ",
-                                package_name,
-                                " package is disabled by your platform config. Enable it again with \"shirabe config platform.",
-                                package_name,
-                                " --unset\".",
-                                providers_str
+                            bformat!(
+                                "the {package_name} package is disabled by your platform config. Enable it again with \"shirabe config platform.{package_name} --unset\".{providers_str}"
                             ),
                         ));
                     }
 
                     return Ok((
                         msg,
-                        bconcat!(
-                            "it is missing from your system. Install or enable PHP's ",
-                            ext,
-                            " extension.",
-                            providers_str
+                        bformat!(
+                            "it is missing from your system. Install or enable PHP's {ext} extension.{providers_str}"
                         ),
                     ));
                 }
 
                 return Ok((
                     msg,
-                    bconcat!(
-                        "it has the wrong version installed (",
-                        version.unwrap(),
-                        ")."
-                    ),
+                    bformat!("it has the wrong version installed ({}).", version.unwrap()),
                 ));
             }
 
@@ -520,11 +491,9 @@ impl Problem {
                     };
 
                     return Ok((
-                        bconcat!(
-                            "- Root composer.json requires linked library ",
-                            package_name,
-                            Self::constraint_to_text(constraint),
-                            " but "
+                        bformat!(
+                            "- Root composer.json requires linked library {package_name}{} but ",
+                            Self::constraint_to_text(constraint)
                         ),
                         BString::from(error),
                     ));
@@ -532,23 +501,19 @@ impl Problem {
 
                 let providers_str_opt = Self::get_providers_list(repository_set, package_name, 5)?;
                 let providers_str = match providers_str_opt {
-                    Some(ps) => bconcat!(
-                        "\n\n      Alternatively you can require one of these packages that provide the library (or parts of it):\n      <warning>Keep in mind that the suggestions are automated and may not be valid or safe to use</warning>\n",
-                        ps
+                    Some(ps) => bformat!(
+                        "\n\n      Alternatively you can require one of these packages that provide the library (or parts of it):\n      <warning>Keep in mind that the suggestions are automated and may not be valid or safe to use</warning>\n{ps}"
                     ),
                     None => BString::default(),
                 };
 
                 return Ok((
-                    bconcat!(
-                        "- Root composer.json requires linked library ",
-                        package_name,
-                        Self::constraint_to_text(constraint),
-                        " but "
+                    bformat!(
+                        "- Root composer.json requires linked library {package_name}{} but ",
+                        Self::constraint_to_text(constraint)
                     ),
-                    bconcat!(
-                        "it has the wrong version installed or is missing from your system, make sure to load the extension providing it.",
-                        providers_str
+                    bformat!(
+                        "it has the wrong version installed or is missing from your system, make sure to load the extension providing it.{providers_str}"
                     ),
                 ));
             }
@@ -561,11 +526,10 @@ impl Problem {
                 if pool.is_unacceptable_fixed_or_locked_package(package.clone()) {
                     return Ok((
                         BString::from("- "),
-                        bconcat!(
+                        bformat!(
+                            "{} is fixed to {} (lock file version) by a partial update but that version is rejected by your minimum-stability. Make sure you list it as an argument for the update command.",
                             package.get_pretty_name(),
-                            " is fixed to ",
-                            package.get_pretty_version(),
-                            " (lock file version) by a partial update but that version is rejected by your minimum-stability. Make sure you list it as an argument for the update command."
+                            package.get_pretty_version()
                         ),
                     ));
                 }
@@ -608,14 +572,12 @@ impl Problem {
             )?;
             if !packages.is_empty() {
                 return Ok((
-                    bconcat!(
-                        "- Root composer.json requires ",
-                        package_name,
-                        Self::constraint_to_text(constraint),
-                        ", "
+                    bformat!(
+                        "- Root composer.json requires {package_name}{}, ",
+                        Self::constraint_to_text(constraint)
                     ),
-                    bconcat!(
-                        "found ",
+                    bformat!(
+                        "found {}. The # character in branch names is replaced by a + character. Make sure to require it as \"{}\".",
                         Self::get_package_list(
                             &packages,
                             is_verbose,
@@ -623,9 +585,7 @@ impl Problem {
                             constraint,
                             false
                         ),
-                        ". The # character in branch names is replaced by a + character. Make sure to require it as \"",
-                        str_replace("#", "+", c.get_pretty_string()),
-                        "\"."
+                        str_replace("#", "+", c.get_pretty_string())
                     ),
                 ));
             }
@@ -646,14 +606,12 @@ impl Problem {
                     .collect();
                 if filtered.is_empty() {
                     return Ok((
-                        bconcat!(
-                            "- Root composer.json requires ",
-                            package_name,
-                            Self::constraint_to_text(constraint),
-                            ", "
+                        bformat!(
+                            "- Root composer.json requires {package_name}{}, ",
+                            Self::constraint_to_text(constraint)
                         ),
-                        bconcat!(
-                            "found ",
+                        bformat!(
+                            "found {} but {} with your root composer.json require ({}).",
                             Self::get_package_list(
                                 &packages,
                                 is_verbose,
@@ -661,15 +619,12 @@ impl Problem {
                                 constraint,
                                 false
                             ),
-                            " but ",
                             if Self::has_multiple_names(&packages) {
                                 "these conflict"
                             } else {
                                 "it conflicts"
                             },
-                            " with your root composer.json require (",
-                            root_reqs[package_name].get_pretty_string(),
-                            ")."
+                            root_reqs[package_name].get_pretty_string()
                         ),
                     ));
                 }
@@ -688,14 +643,12 @@ impl Problem {
                         .collect();
                     if filtered.is_empty() {
                         return Ok((
-                            bconcat!(
-                                "- Root composer.json requires ",
-                                name,
-                                Self::constraint_to_text(constraint),
-                                ", "
+                            bformat!(
+                                "- Root composer.json requires {name}{}, ",
+                                Self::constraint_to_text(constraint)
                             ),
-                            bconcat!(
-                                "found ",
+                            bformat!(
+                                "found {} but {} with your temporary update constraint ({name}:{}).",
                                 Self::get_package_list(
                                     &packages,
                                     is_verbose,
@@ -703,17 +656,12 @@ impl Problem {
                                     constraint,
                                     false
                                 ),
-                                " but ",
                                 if Self::has_multiple_names(&packages) {
                                     "these conflict"
                                 } else {
                                     "it conflicts"
                                 },
-                                " with your temporary update constraint (",
-                                name,
-                                ":",
-                                temp_reqs[&name].get_pretty_string(),
-                                ")."
+                                temp_reqs[&name].get_pretty_string()
                             ),
                         ));
                     }
@@ -732,14 +680,12 @@ impl Problem {
                     .collect();
                 if filtered.is_empty() {
                     return Ok((
-                        bconcat!(
-                            "- Root composer.json requires ",
-                            package_name,
-                            Self::constraint_to_text(constraint),
-                            ", "
+                        bformat!(
+                            "- Root composer.json requires {package_name}{}, ",
+                            Self::constraint_to_text(constraint)
                         ),
-                        bconcat!(
-                            "found ",
+                        bformat!(
+                            "found {} but the package is fixed to {} (lock file version) by a partial update and that version does not match. Make sure you list it as an argument for the update command.",
                             Self::get_package_list(
                                 &packages,
                                 is_verbose,
@@ -747,9 +693,7 @@ impl Problem {
                                 constraint,
                                 false
                             ),
-                            " but the package is fixed to ",
-                            lp.get_pretty_version(),
-                            " (lock file version) by a partial update and that version does not match. Make sure you list it as an argument for the update command."
+                            lp.get_pretty_version()
                         ),
                     ));
                 }
@@ -765,44 +709,38 @@ impl Problem {
 
             if non_locked_packages.is_empty() {
                 return Ok((
-                    bconcat!(
-                        "- Root composer.json requires ",
-                        package_name,
-                        Self::constraint_to_text(constraint),
-                        ", "
+                    bformat!(
+                        "- Root composer.json requires {package_name}{}, ",
+                        Self::constraint_to_text(constraint)
                     ),
-                    bconcat!(
-                        "found ",
+                    bformat!(
+                        "found {} in the lock file but not in remote repositories, make sure you avoid updating this package to keep the one from the lock file.",
                         Self::get_package_list(
                             &packages,
                             is_verbose,
                             Some(pool),
                             constraint,
                             false
-                        ),
-                        " in the lock file but not in remote repositories, make sure you avoid updating this package to keep the one from the lock file."
+                        )
                     ),
                 ));
             }
 
             if pool.is_abandoned_removed_package_version(package_name, constraint) {
                 return Ok((
-                    bconcat!(
-                        "- Root composer.json requires ",
-                        package_name,
-                        Self::constraint_to_text(constraint),
-                        ", "
+                    bformat!(
+                        "- Root composer.json requires {package_name}{}, ",
+                        Self::constraint_to_text(constraint)
                     ),
-                    bconcat!(
-                        "found ",
+                    bformat!(
+                        "found {} but these were not loaded, because they are abandoned and you configured \"block-abandoned\" to true in your \"audit\" config.",
                         Self::get_package_list(
                             &packages,
                             is_verbose,
                             Some(pool),
                             constraint,
                             false
-                        ),
-                        " but these were not loaded, because they are abandoned and you configured \"block-abandoned\" to true in your \"audit\" config."
+                        )
                     ),
                 ));
             }
@@ -824,27 +762,20 @@ impl Problem {
                             if let Some(link) = link
                                 && !link.is_empty()
                             {
-                                return bconcat!(
-                                    "<href=",
+                                return bformat!(
+                                    "<href={}>{advisory_id}</>",
                                     OutputFormatter::escape(link)
-                                        .expect("OutputFormatter::escape does not fail"),
-                                    ">",
-                                    advisory_id,
-                                    "</>"
+                                        .expect("OutputFormatter::escape does not fail")
                                 );
                             }
 
                             if advisory_id.starts_with(b"PKSA-") {
-                                return bconcat!(
-                                    "<href=",
-                                    OutputFormatter::escape(bconcat!(
-                                        "https://packagist.org/security-advisories/",
-                                        advisory_id
+                                return bformat!(
+                                    "<href={}>{advisory_id}</>",
+                                    OutputFormatter::escape(bformat!(
+                                        "https://packagist.org/security-advisories/{advisory_id}"
                                     ))
-                                    .expect("OutputFormatter::escape does not fail"),
-                                    ">",
-                                    advisory_id,
-                                    "</>"
+                                    .expect("OutputFormatter::escape does not fail")
                                 );
                             }
 
@@ -859,16 +790,12 @@ impl Problem {
                         .into_iter()
                         .map(|advisory_id| {
                             if advisory_id.starts_with(b"PKSA-") {
-                                return bconcat!(
-                                    "<href=",
-                                    OutputFormatter::escape(bconcat!(
-                                        "https://packagist.org/security-advisories/",
-                                        advisory_id
+                                return bformat!(
+                                    "<href={}>{advisory_id}</>",
+                                    OutputFormatter::escape(bformat!(
+                                        "https://packagist.org/security-advisories/{advisory_id}"
                                     ))
-                                    .expect("OutputFormatter::escape does not fail"),
-                                    ">",
-                                    advisory_id,
-                                    "</>"
+                                    .expect("OutputFormatter::escape does not fail")
                                 );
                             }
 
@@ -878,14 +805,12 @@ impl Problem {
                 };
 
                 return Ok((
-                    bconcat!(
-                        "- Root composer.json requires ",
-                        package_name,
-                        Self::constraint_to_text(constraint),
-                        ", "
+                    bformat!(
+                        "- Root composer.json requires {package_name}{}, ",
+                        Self::constraint_to_text(constraint)
                     ),
-                    bconcat!(
-                        "found ",
+                    bformat!(
+                        "found {} but these were not loaded, because they are affected by security advisories (\"{}\"). Go to https://packagist.org/security-advisories/ to find advisory details. To ignore the advisories, add them to the audit \"ignore\" config. To turn the feature off entirely, you can set \"block-insecure\" to false in your \"audit\" config.",
                         Self::get_package_list(
                             &packages,
                             is_verbose,
@@ -893,30 +818,24 @@ impl Problem {
                             constraint,
                             false
                         ),
-                        " but these were not loaded, because they are affected by security advisories (\"",
-                        implode("\", \"", &advisories_list),
-                        "\"). Go to https://packagist.org/security-advisories/ to find advisory details. To ignore the advisories, add them to the audit \"ignore\" config. To turn the feature off entirely, you can set \"block-insecure\" to false in your \"audit\" config."
+                        implode("\", \"", &advisories_list)
                     ),
                 ));
             }
 
             return Ok((
-                bconcat!(
-                    "- Root composer.json requires ",
-                    package_name,
-                    Self::constraint_to_text(constraint),
-                    ", "
+                bformat!(
+                    "- Root composer.json requires {package_name}{}, ",
+                    Self::constraint_to_text(constraint)
                 ),
-                bconcat!(
-                    "found ",
+                bformat!(
+                    "found {} but these were not loaded, likely because {} with another require.",
                     Self::get_package_list(&packages, is_verbose, Some(pool), constraint, false),
-                    " but these were not loaded, likely because ",
                     if Self::has_multiple_names(&packages) {
                         "they conflict"
                     } else {
                         "it conflicts"
-                    },
-                    " with another require."
+                    }
                 ),
             ));
         }
@@ -947,22 +866,18 @@ impl Problem {
             }
 
             return Ok((
-                bconcat!(
-                    "- Root composer.json requires ",
-                    package_name,
-                    Self::constraint_to_text(constraint),
-                    ", "
+                bformat!(
+                    "- Root composer.json requires {package_name}{}, ",
+                    Self::constraint_to_text(constraint)
                 ),
-                bconcat!(
-                    "found ",
+                bformat!(
+                    "found {} but {} not match your minimum-stability.",
                     Self::get_package_list(&packages, is_verbose, Some(pool), constraint, false),
-                    " but ",
                     if Self::has_multiple_names(&packages) {
                         "these do"
                     } else {
                         "it does"
-                    },
-                    " not match your minimum-stability."
+                    }
                 ),
             ));
         }
@@ -1002,10 +917,9 @@ impl Problem {
                         candidate.get_version().as_slice(),
                         b"dev-default" | b"dev-main"
                     ) {
-                        suffix = bconcat!(
-                            " Perhaps dev-master was renamed to ",
-                            candidate.get_pretty_version(),
-                            "?"
+                        suffix = bformat!(
+                            " Perhaps dev-master was renamed to {}?",
+                            candidate.get_pretty_version()
                         );
                         break;
                     }
@@ -1024,23 +938,18 @@ impl Problem {
             }
 
             return Ok((
-                bconcat!(
-                    "- Root composer.json requires ",
-                    package_name,
-                    Self::constraint_to_text(constraint),
-                    ", "
+                bformat!(
+                    "- Root composer.json requires {package_name}{}, ",
+                    Self::constraint_to_text(constraint)
                 ),
-                bconcat!(
-                    "found ",
+                bformat!(
+                    "found {} but {} not match the constraint.{suffix}",
                     Self::get_package_list(&packages, is_verbose, Some(pool), constraint, false),
-                    " but ",
                     if Self::has_multiple_names(&packages) {
                         "these do"
                     } else {
                         "it does"
-                    },
-                    " not match the constraint.",
-                    suffix
+                    }
                 ),
             ));
         }
@@ -1049,11 +958,9 @@ impl Problem {
             let illegal_chars = preg_replace(php_regex!(r"{[A-Za-z0-9_./-]+}"), "", package_name);
 
             return Ok((
-                bconcat!("- Root composer.json requires ", package_name, ", it "),
-                bconcat!(
-                    "could not be found, it looks like its name is invalid, \"",
-                    illegal_chars,
-                    "\" is not allowed in package names."
+                bformat!("- Root composer.json requires {package_name}, it "),
+                bformat!(
+                    "could not be found, it looks like its name is invalid, \"{illegal_chars}\" is not allowed in package names."
                 ),
             ));
         }
@@ -1061,24 +968,18 @@ impl Problem {
         let providers_str = Self::get_providers_list(repository_set, package_name, 15)?;
         if let Some(ps) = providers_str {
             return Ok((
-                bconcat!(
-                    "- Root composer.json requires ",
-                    package_name,
-                    Self::constraint_to_text(constraint),
-                    ", it "
+                bformat!(
+                    "- Root composer.json requires {package_name}{}, it ",
+                    Self::constraint_to_text(constraint)
                 ),
-                bconcat!(
-                    "could not be found in any version, but the following packages provide it:\n",
-                    ps,
-                    "      Consider requiring one of these to satisfy the ",
-                    package_name,
-                    " requirement."
+                bformat!(
+                    "could not be found in any version, but the following packages provide it:\n{ps}      Consider requiring one of these to satisfy the {package_name} requirement."
                 ),
             ));
         }
 
         Ok((
-            bconcat!("- Root composer.json requires ", package_name, ", it "),
+            bformat!("- Root composer.json requires {package_name}, it "),
             BString::from(
                 "could not be found in any version, there may be a typo in the package name.",
             ),
@@ -1108,17 +1009,13 @@ impl Problem {
                 });
             entry.name = package.get_pretty_name();
             let alias_suffix = if let Some(alias) = package.as_alias() {
-                bconcat!(
-                    " (alias of ",
-                    alias.get_alias_of().get_pretty_version(),
-                    ")"
-                )
+                bformat!(" (alias of {})", alias.get_alias_of().get_pretty_version())
             } else {
                 BString::default()
             };
             entry.versions.insert(
                 package.get_version(),
-                bconcat!(package.get_pretty_version(), alias_suffix),
+                bformat!("{}{alias_suffix}", package.get_pretty_version()),
             );
             if let Some(pool) = pool
                 && let Some(constraint) = constraint
@@ -1133,7 +1030,7 @@ impl Problem {
                 && use_removed_version_group
             {
                 for (version, pretty_version) in
-                    pool.get_removed_versions_by_package(bconcat!(package.ptr_id()).as_bstr())
+                    pool.get_removed_versions_by_package(bformat!("{}", package.ptr_id()).as_bstr())
                 {
                     entry.versions.insert(version, pretty_version);
                 }
@@ -1178,11 +1075,10 @@ impl Problem {
             } else {
                 package.versions.values().cloned().collect()
             };
-            prepared_strings.push(bconcat!(
+            prepared_strings.push(bformat!(
+                "{}[{}]",
                 package.name,
-                "[",
-                implode(", ", &version_list),
-                "]"
+                implode(", ", &version_list)
             ));
         }
 
@@ -1218,11 +1114,10 @@ impl Problem {
                 let replaces: Vec<Link> = selected.get_replaces().values().cloned().collect();
                 for link in provides.iter().chain(replaces.iter()) {
                     if link.get_target() == package_name {
-                        return Ok(Some(bconcat!(
+                        return Ok(Some(bformat!(
+                            "{} {}d by {}",
                             link.get_pretty_constraint()?,
-                            " ",
                             substr(link.get_description(), 0, Some(-1)),
-                            "d by ",
                             selected.get_pretty_string()
                         )));
                     }
@@ -1239,7 +1134,7 @@ impl Problem {
                     .as_complete()
                     .and_then(|c| c.get_description())
                     .unwrap_or_default();
-                version = bconcat!(version, "; ", str_replace("Package ", "", &description));
+                version = bformat!("{version}; {}", str_replace("Package ", "", &description));
             }
             return Ok(Some(version));
         }
@@ -1331,14 +1226,12 @@ impl Problem {
             let top_package = higher_repo_packages.first().unwrap();
             if top_package.as_root().is_some() {
                 return Ok((
-                    bconcat!(
-                        "- Root composer.json requires ",
-                        package_name,
-                        Self::constraint_to_text(constraint),
-                        ", it is "
+                    bformat!(
+                        "- Root composer.json requires {package_name}{}, it is ",
+                        Self::constraint_to_text(constraint)
                     ),
-                    bconcat!(
-                        "satisfiable by ",
+                    bformat!(
+                        "satisfiable by {} from {} but {} {} is the root package and cannot be modified. See https://getcomposer.org/dep-on-root for details and assistance.",
                         Self::get_package_list(
                             &next_repo_packages,
                             is_verbose,
@@ -1346,13 +1239,9 @@ impl Problem {
                             constraint,
                             false
                         ),
-                        " from ",
                         next_repo.get_repo_name()?,
-                        " but ",
                         top_package.get_pretty_name(),
-                        " ",
-                        top_package.get_pretty_version(),
-                        " is the root package and cannot be modified. See https://getcomposer.org/dep-on-root for details and assistance."
+                        top_package.get_pretty_version()
                     ),
                 ));
             }
@@ -1361,18 +1250,15 @@ impl Problem {
         if next_repo.is::<LockArrayRepository>() {
             let singular = higher_repo_packages.len() == 1;
 
-            let mut suggestion = bconcat!(
-                "Make sure you either fix the ",
-                reason,
-                " or avoid updating this package to keep the one present in the lock file (",
+            let mut suggestion = bformat!(
+                "Make sure you either fix the {reason} or avoid updating this package to keep the one present in the lock file ({}).",
                 Self::get_package_list(
                     &next_repo_packages,
                     is_verbose,
                     Some(pool),
                     constraint,
                     false
-                ),
-                ")."
+                )
             );
             // symlinked path repos cannot be locked so do not suggest keeping it locked
             if next_repo_packages[0].get_dist_type() == Some(BString::from("path")) {
@@ -1380,23 +1266,19 @@ impl Problem {
                 if !transport_options.contains_key(B("symlink"))
                     || transport_options[B("symlink")].as_bool() != Some(false)
                 {
-                    suggestion = bconcat!(
-                        "Make sure you fix the ",
-                        reason,
-                        " as packages installed from symlinked path repos are updated even in partial updates and the one from the lock file can thus not be used."
+                    suggestion = bformat!(
+                        "Make sure you fix the {reason} as packages installed from symlinked path repos are updated even in partial updates and the one from the lock file can thus not be used."
                     );
                 }
             }
 
             return Ok((
-                bconcat!(
-                    "- Root composer.json requires ",
-                    package_name,
-                    Self::constraint_to_text(constraint),
-                    ", "
+                bformat!(
+                    "- Root composer.json requires {package_name}{}, ",
+                    Self::constraint_to_text(constraint)
                 ),
-                bconcat!(
-                    "found ",
+                bformat!(
+                    "found {} but {} not match your {reason} and {} therefore not installable. {suggestion}",
                     Self::get_package_list(
                         higher_repo_packages,
                         is_verbose,
@@ -1404,27 +1286,19 @@ impl Problem {
                         constraint,
                         false
                     ),
-                    " but ",
                     if singular { "it does" } else { "these do" },
-                    " not match your ",
-                    reason,
-                    " and ",
-                    if singular { "is" } else { "are" },
-                    " therefore not installable. ",
-                    suggestion
+                    if singular { "is" } else { "are" }
                 ),
             ));
         }
 
         Ok((
-            bconcat!(
-                "- Root composer.json requires ",
-                package_name,
-                Self::constraint_to_text(constraint),
-                ", it is "
+            bformat!(
+                "- Root composer.json requires {package_name}{}, it is ",
+                Self::constraint_to_text(constraint)
             ),
-            bconcat!(
-                "satisfiable by ",
+            bformat!(
+                "satisfiable by {} from {} but {} from {} has higher repository priority. The packages from the higher priority repository do not match your {reason} and are therefore not installable. That repository is canonical so the lower priority repo's packages are not installable. See https://getcomposer.org/repoprio for details and assistance.",
                 Self::get_package_list(
                     &next_repo_packages,
                     is_verbose,
@@ -1432,9 +1306,7 @@ impl Problem {
                     constraint,
                     false
                 ),
-                " from ",
                 next_repo.get_repo_name()?,
-                " but ",
                 Self::get_package_list(
                     higher_repo_packages,
                     is_verbose,
@@ -1442,16 +1314,12 @@ impl Problem {
                     constraint,
                     false
                 ),
-                " from ",
                 higher_repo_packages
                     .first()
                     .and_then(|p| p.get_repository())
                     .map(|r| r.get_repo_name())
                     .transpose()?
-                    .unwrap_or_default(),
-                " has higher repository priority. The packages from the higher priority repository do not match your ",
-                reason,
-                " and are therefore not installable. That repository is canonical so the lower priority repo's packages are not installable. See https://getcomposer.org/repoprio for details and assistance."
+                    .unwrap_or_default()
             ),
         ))
     }
@@ -1464,38 +1332,31 @@ impl Problem {
             && !c.get_version().starts_with(b"dev-")
         {
             if !preg_is_match(php_regex!(r"{^\d+(?:\.\d+)*$}"), c.get_pretty_string()) {
-                return bconcat!(" ", c.get_pretty_string(), " (exact version match)");
+                return bformat!(" {} (exact version match)", c.get_pretty_string());
             }
 
             let mut versions = vec![c.get_pretty_string()];
             let mut i = 3 - substr_count(&versions[0], ".");
             while i > 0 {
                 let last = versions.last().unwrap().clone();
-                versions.push(bconcat!(last, ".0"));
+                versions.push(bformat!("{last}.0"));
                 i -= 1;
             }
 
             let last = versions.last().unwrap().clone();
             let detail = if versions.len() > 1 {
-                bconcat!(
-                    (implode(", ", &versions[..versions.len() - 1])),
-                    " or ",
-                    last
+                bformat!(
+                    "{} or {last}",
+                    (implode(", ", &versions[..versions.len() - 1]))
                 )
             } else {
                 versions[0].clone()
             };
-            return bconcat!(
-                " ",
-                c.get_pretty_string(),
-                " (exact version match: ",
-                detail,
-                ")"
-            );
+            return bformat!(" {} (exact version match: {detail})", c.get_pretty_string());
         }
 
         match constraint {
-            Some(c) => bconcat!(" ", c.get_pretty_string()),
+            Some(c) => bformat!(" {}", c.get_pretty_string()),
             None => BString::default(),
         }
     }
@@ -1524,21 +1385,21 @@ impl Problem {
                     .map(|p| {
                         let description = match &p.description {
                             Some(d) if !d.is_empty() => {
-                                bconcat!(" ", substr(d, 0, Some(100)))
+                                bformat!(" {}", substr(d, 0, Some(100)))
                             }
                             _ => BString::default(),
                         };
 
-                        bconcat!("      - ", p.name, description, "\n")
+                        bformat!("      - {}{description}\n", p.name)
                     })
                     .collect::<Vec<_>>(),
             );
             if provider_count > max_providers + 1 {
-                providers_str.push_str(bconcat!(
-                    "      ... and ",
-                    provider_count - max_providers,
-                    " more.\n"
-                ));
+                bwrite!(
+                    providers_str,
+                    "      ... and {} more.\n",
+                    provider_count - max_providers
+                );
             }
 
             return Ok(Some(providers_str));

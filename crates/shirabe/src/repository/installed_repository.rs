@@ -9,7 +9,7 @@ use crate::repository::{
 };
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe_php_shim::{array_merge_map, bconcat, implode, strtolower};
+use shirabe_php_shim::{array_merge_map, bformat, implode, strtolower};
 use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint, SimpleConstraint};
 
 pub enum NeedleInput {
@@ -259,7 +259,7 @@ impl InstalledRepository {
                         )?;
                         let description = platform_pkg
                             .as_ref()
-                            .map(|p| bconcat!("but ", p.get_pretty_version(), " is installed"))
+                            .map(|p| bformat!("but {} is installed", p.get_pretty_version()))
                             .unwrap_or_else(|| BString::from("but it is missing"));
                         results.push(DependentsEntry(
                             package.clone(),
@@ -268,7 +268,7 @@ impl InstalledRepository {
                                 bstr::BString::from(link.get_target()),
                                 MatchAllConstraint::new(None).into(),
                                 Some(Link::TYPE_REQUIRE.to_owned()),
-                                Some(bconcat!(link.get_pretty_constraint()?, " ", description)),
+                                Some(bformat!("{} {description}", link.get_pretty_constraint()?)),
                             ),
                             None,
                         ));
@@ -338,10 +338,9 @@ impl InstalledRepository {
                                         bstr::BString::from(link.get_target()),
                                         MatchAllConstraint::new(None).into(),
                                         Some(Link::TYPE_DOES_NOT_REQUIRE.to_owned()),
-                                        Some(bconcat!(
-                                            "but ",
-                                            pkg.get_pretty_version(),
-                                            " is installed"
+                                        Some(bformat!(
+                                            "but {} is installed",
+                                            pkg.get_pretty_version()
                                         )),
                                     ),
                                     None,
@@ -394,7 +393,7 @@ impl RepositoryInterface for InstalledRepository {
             .iter()
             .map(|repo| repo.get_repo_name())
             .collect::<anyhow::Result<_>>()?;
-        Ok(bconcat!("installed repo (", implode(", ", &names), ")"))
+        Ok(bformat!("installed repo ({})", implode(", ", &names)))
     }
 
     fn has_package(&mut self, package: PackageInterfaceHandle) -> anyhow::Result<bool> {

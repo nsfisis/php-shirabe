@@ -3,7 +3,7 @@
 use crate::php_file_cleaner::PhpFileCleaner;
 use bstr::{BStr, BString, ByteSlice, ByteVec};
 use shirabe_php_shim::{
-    PHP_EOL, RuntimeException, bconcat, display_to_bytes, file_exists, file_get_contents, is_file,
+    PHP_EOL, RuntimeException, bformat, display_to_bytes, file_exists, file_get_contents, is_file,
     is_readable, ltrim_chars, path_from_bytes, php_strip_whitespace, preg_match_all,
     str_replace_array, strrpos, strtolower, substr, trim,
 };
@@ -22,34 +22,23 @@ impl PhpFileParser {
             stripped => {
                 let mut message: BString;
                 if !file_exists(fs_path) {
-                    message = bconcat!(
-                        "File at \"",
-                        path,
-                        "\" does not exist, check your classmap definitions"
+                    message = bformat!(
+                        "File at \"{path}\" does not exist, check your classmap definitions"
                     );
                 } else if !Self::is_readable(fs_path) {
-                    message = bconcat!(
-                        "File at \"",
-                        path,
-                        "\" is not readable, check its permissions"
-                    );
+                    message = bformat!("File at \"{path}\" is not readable, check its permissions");
                 } else if trim(file_get_contents(fs_path).unwrap_or_default()).is_empty() {
                     // The input file was really empty and thus contains no classes
                     return Ok(vec![]);
                 } else {
-                    message = bconcat!(
-                        "File at \"",
-                        path,
-                        "\" could not be parsed as PHP, it may be binary or corrupted"
+                    message = bformat!(
+                        "File at \"{path}\" could not be parsed as PHP, it may be binary or corrupted"
                     );
                 }
 
                 if let Err(error) = stripped {
-                    message = bconcat!(
-                        message,
-                        PHP_EOL,
-                        "The following message may be helpful:",
-                        PHP_EOL,
+                    message = bformat!(
+                        "{message}{PHP_EOL}The following message may be helpful:{PHP_EOL}{}",
                         display_to_bytes(error)
                     );
                 }
@@ -59,7 +48,7 @@ impl PhpFileParser {
         };
 
         // return early if there is no chance of matching anything in this file
-        let pattern = bconcat!("{\\b(?:class|interface|trait", extra_types, ")\\s}i");
+        let pattern = bformat!("{{\\b(?:class|interface|trait{extra_types})\\s}}i");
         let max_matches = preg_match_all(&pattern, &contents).count();
         if max_matches == 0 {
             return Ok(vec![]);
@@ -77,15 +66,8 @@ impl PhpFileParser {
         // identifier characters (reproducing `\b`) and the four operator characters. The consumed
         // separator lands in match group 0 only; the named groups are unaffected. The PCRE
         // possessive quantifiers (`++`, `*+`) are performance-only and become plain `+`/`*`.
-        let pattern2 = bconcat!(
-            r"{
-            (?:
-                 (?:^|[^\\$:>a-zA-Z0-9_\x7f-\xff])(?P<type>class|interface|trait",
-            extra_types,
-            r") \s+ (?P<name>[a-zA-Z_\x7f-\xff:][a-zA-Z0-9_\x7f-\xff:\-]*)
-               | (?:^|[^\\$:>a-zA-Z0-9_\x7f-\xff])(?P<ns>namespace) (?P<nsname>\s+[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*(?:\s*\\\s*[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*)*)? \s* [\{;]
-            )
-        }ix"
+        let pattern2 = bformat!(
+            "{{\n            (?:\n                 (?:^|[^\\\\$:>a-zA-Z0-9_\\x7f-\\xff])(?P<type>class|interface|trait{extra_types}) \\s+ (?P<name>[a-zA-Z_\\x7f-\\xff:][a-zA-Z0-9_\\x7f-\\xff:\\-]*)\n               | (?:^|[^\\\\$:>a-zA-Z0-9_\\x7f-\\xff])(?P<ns>namespace) (?P<nsname>\\s+[a-zA-Z_\\x7f-\\xff][a-zA-Z0-9_\\x7f-\\xff]*(?:\\s*\\\\\\s*[a-zA-Z_\\x7f-\\xff][a-zA-Z0-9_\\x7f-\\xff]*)*)? \\s* [\\{{;]\n            )\n        }}ix"
         );
         let matches = preg_match_all(&pattern2, &contents);
 
@@ -113,8 +95,8 @@ impl PhpFileParser {
 
                 let name: BString = if let Some(stripped) = name.strip_prefix(b":") {
                     // This is an XHP class, https://github.com/facebook/xhp
-                    bconcat!(
-                        "xhp",
+                    bformat!(
+                        "xhp{}",
                         str_replace_array(&["-", ":"], &["_", "__"], stripped)
                     )
                 } else if strtolower(r#match.name("type").unwrap_or_default()) == "enum" {
@@ -135,7 +117,7 @@ impl PhpFileParser {
                     BString::from(name)
                 };
 
-                let class_name = ltrim_chars(bconcat!(namespace, name), "\\");
+                let class_name = ltrim_chars(bformat!("{namespace}{name}"), "\\");
                 classes.push(class_name);
             }
         }

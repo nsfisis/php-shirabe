@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/Package/Archiver/BaseExcludeFilter.php sha1:16a9cbcc09a710ac828d7dd91d2b1812411fdb9d
 
 use bstr::{BStr, BString, ByteSlice};
-use shirabe_php_shim::{bconcat, ltrim_chars, preg_is_match, trim, trim_chars};
+use shirabe_php_shim::{bformat, ltrim_chars, preg_is_match, trim, trim_chars};
 use shirabe_symfony_finder::Glob;
 use std::path::{Path, PathBuf};
 
@@ -68,7 +68,7 @@ impl BaseExcludeFilterBase {
         // body by to_regex_dir_boundary instead of being appended here.
         let rule_regex = Glob::to_regex_dir_boundary(&rule, true, true);
 
-        (bconcat!("{", pattern, rule_regex, "}"), negate, false)
+        (bformat!("{{{pattern}{rule_regex}}}"), negate, false)
     }
 }
 

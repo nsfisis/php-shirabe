@@ -9,7 +9,7 @@ use crate::helper::Helper;
 use crate::input::{InputArgument, InputDefinition, InputOption};
 use crate::output::{OUTPUT_NORMAL, OUTPUT_RAW, OutputInterface};
 use bstr::{BString, ByteSlice};
-use shirabe_php_shim::{bconcat, implode, preg_replace, str_repeat, str_replace, var_export};
+use shirabe_php_shim::{bformat, implode, preg_replace, str_repeat, str_replace, var_export};
 
 /// Markdown descriptor.
 #[derive(Debug, Default)]
@@ -44,29 +44,23 @@ impl MarkdownDescriptor {
             BString::from("<none>")
         };
         self.write(
-            bconcat!(
-                "#### `",
-                name,
-                "`\n\n",
+            bformat!(
+                "#### `{name}`\n\n{}* Is required: {}\n* Is array: {}\n* Default: `{}`",
                 if !argument.get_description().is_empty() {
-                    bconcat!(
-                        preg_replace("/\\s*[\\r\\n]\\s*/", "\n", argument.get_description()),
-                        "\n\n"
+                    bformat!(
+                        "{}\n\n",
+                        preg_replace("/\\s*[\\r\\n]\\s*/", "\n", argument.get_description())
                     )
                 } else {
                     BString::default()
                 },
-                "* Is required: ",
                 if argument.is_required() { "yes" } else { "no" },
-                "\n* Is array: ",
                 if argument.is_array() { "yes" } else { "no" },
-                "\n* Default: `",
                 str_replace(
                     "\n",
                     "",
                     var_export(&argument.get_default().to_php_mixed(), true),
-                ),
-                "`",
+                )
             ),
             true,
         );
@@ -78,47 +72,28 @@ impl MarkdownDescriptor {
         option: &InputOption,
         _options: DescriptorOptions,
     ) -> anyhow::Result<()> {
-        let mut name = bconcat!("--", option.get_name());
+        let mut name = bformat!("--{}", option.get_name());
         if option.is_negatable() {
-            name = bconcat!(name, "|--no-", option.get_name());
+            name = bformat!("{name}|--no-{}", option.get_name());
         }
         if let Some(shortcut) = option.get_shortcut() {
-            name = bconcat!(name, "|-", str_replace("|", "|-", shortcut));
+            name = bformat!("{name}|-{}", str_replace("|", "|-", shortcut));
         }
 
         self.write(
-            bconcat!(
-                "#### `",
-                name,
-                "`\n\n",
-                if !option.get_description().is_empty() {
-                    bconcat!(
-                        preg_replace("/\\s*[\\r\\n]\\s*/", "\n", option.get_description()),
-                        "\n\n"
-                    )
+            bformat!("#### `{name}`\n\n{}* Accept value: {}\n* Is value required: {}\n* Is multiple: {}\n* Is negatable: {}\n* Default: `{}`", if !option.get_description().is_empty() {
+                    bformat!("{}\n\n", preg_replace("/\\s*[\\r\\n]\\s*/", "\n", option.get_description()))
                 } else {
                     BString::default()
-                },
-                "* Accept value: ",
-                if option.accept_value() { "yes" } else { "no" },
-                "\n* Is value required: ",
-                if option.is_value_required() {
+                }, if option.accept_value() { "yes" } else { "no" }, if option.is_value_required() {
                     "yes"
                 } else {
                     "no"
-                },
-                "\n* Is multiple: ",
-                if option.is_array() { "yes" } else { "no" },
-                "\n* Is negatable: ",
-                if option.is_negatable() { "yes" } else { "no" },
-                "\n* Default: `",
-                str_replace(
+                }, if option.is_array() { "yes" } else { "no" }, if option.is_negatable() { "yes" } else { "no" }, str_replace(
                     "\n",
                     "",
                     var_export(&option.get_default().to_php_mixed(), true),
-                ),
-                "`",
-            ),
+                )),
             true,
         );
         Ok(())
@@ -161,27 +136,24 @@ impl MarkdownDescriptor {
     ) -> anyhow::Result<()> {
         if options.short {
             self.write(
-                bconcat!(
-                    "`",
+                bformat!(
+                    "`{}`\n{}\n\n{}### Usage\n\n{}",
                     command.get_name().unwrap_or_default(),
-                    "`\n",
                     str_repeat(
                         "-",
                         (Helper::width(command.get_name().unwrap_or_default()) + 2) as usize
                     ),
-                    "\n\n",
                     if !command.get_description().is_empty() {
-                        bconcat!(command.get_description(), "\n\n")
+                        bformat!("{}\n\n", command.get_description())
                     } else {
                         BString::default()
                     },
-                    "### Usage\n\n",
                     command
                         .get_aliases()
                         .iter()
                         .fold(BString::default(), |carry, usage| {
-                            bconcat!(carry, "* `", usage, "`\n")
-                        }),
+                            bformat!("{carry}* `{usage}`\n")
+                        })
                 ),
                 true,
             );
@@ -195,24 +167,21 @@ impl MarkdownDescriptor {
         usages.extend(command.get_aliases());
         usages.extend(command.get_usages());
         self.write(
-            bconcat!(
-                "`",
+            bformat!(
+                "`{}`\n{}\n\n{}### Usage\n\n{}",
                 command.get_name().unwrap_or_default(),
-                "`\n",
                 str_repeat(
                     "-",
                     (Helper::width(command.get_name().unwrap_or_default()) + 2) as usize
                 ),
-                "\n\n",
                 if !command.get_description().is_empty() {
-                    bconcat!(command.get_description(), "\n\n")
+                    bformat!("{}\n\n", command.get_description())
                 } else {
                     BString::default()
                 },
-                "### Usage\n\n",
                 usages.iter().fold(BString::default(), |carry, usage| {
-                    bconcat!(carry, "* `", usage, "`\n")
-                }),
+                    bformat!("{carry}* `{usage}`\n")
+                })
             ),
             true,
         );
@@ -241,14 +210,17 @@ impl MarkdownDescriptor {
         let title = self.get_application_title(&*application.borrow());
 
         self.write(
-            bconcat!(title, "\n", str_repeat("=", Helper::width(&title) as usize)),
+            bformat!(
+                "{title}\n{}",
+                str_repeat("=", Helper::width(&title) as usize)
+            ),
             true,
         );
 
         for namespace in description.get_namespaces()?.values() {
             if ApplicationDescription::GLOBAL_NAMESPACE != namespace.id {
                 self.write("\n\n", true);
-                self.write(bconcat!("**", namespace.id, ":**"), true);
+                self.write(bformat!("**{}:**", namespace.id), true);
             }
 
             self.write("\n\n", true);
@@ -259,10 +231,8 @@ impl MarkdownDescriptor {
                         .commands
                         .iter()
                         .map(|command_name| {
-                            Ok(bconcat!(
-                                "* [`",
-                                command_name,
-                                "`](#",
+                            Ok(bformat!(
+                                "* [`{command_name}`](#{})",
                                 str_replace(
                                     ":",
                                     "",
@@ -271,8 +241,7 @@ impl MarkdownDescriptor {
                                         .borrow()
                                         .get_name()
                                         .unwrap_or_default(),
-                                ),
-                                ")",
+                                )
                             ))
                         })
                         .collect::<anyhow::Result<Vec<BString>>>()?,
@@ -293,7 +262,7 @@ impl MarkdownDescriptor {
     fn get_application_title(&self, application: &dyn Application) -> BString {
         if "UNKNOWN" != application.get_name() {
             if "UNKNOWN" != application.get_version() {
-                return bconcat!(application.get_name(), " ", application.get_version());
+                return bformat!("{} {}", application.get_name(), application.get_version());
             }
 
             return application.get_name();

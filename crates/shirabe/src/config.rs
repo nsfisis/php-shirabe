@@ -2,7 +2,7 @@
 
 use shirabe_php_shim::{
     E_USER_DEPRECATED, Error, PhpMixed, PregMatches, RuntimeException, ToPhpString, TypeError,
-    array_key_exists, array_merge, array_search_mixed, array_unique, bconcat, canonical_int_key,
+    array_key_exists, array_merge, array_search_mixed, array_unique, bformat, canonical_int_key,
     empty, filter_var_url, get_debug_type, implode, in_array_loose, in_array_strict, intval,
     is_array, is_numeric_string, is_string, loose_eq, parse_url, php_regex, php_str, preg_is_match,
     preg_match, preg_replace_callback, rtrim_chars, strtolower, strtoupper, strtr, substr,
@@ -136,7 +136,7 @@ impl Config {
         audit.insert("ignore".into(), PhpMixed::Array(IndexMap::new()));
         audit.insert(
             "abandoned".into(),
-            PhpMixed::string(bconcat!(Auditor::ABANDONED_FAIL)),
+            PhpMixed::string(bformat!("{}", Auditor::ABANDONED_FAIL)),
         );
         c.insert("audit".into(), PhpMixed::Array(audit));
         c.insert("notify-on-install".into(), PhpMixed::Bool(true));
@@ -282,7 +282,7 @@ impl Config {
         for (config_key, config_value) in &repositories_clone {
             this.set_source_of_config_value(
                 config_value,
-                &bconcat!("repositories.", config_key),
+                &bformat!("repositories.{config_key}"),
                 Self::SOURCE_DEFAULT,
             );
         }
@@ -413,7 +413,7 @@ impl Config {
                             self.config.insert(key.clone(), PhpMixed::Array(m));
                             self.source_of_config_value
                                 .borrow_mut()
-                                .insert(bconcat!(key, "*"), source.into());
+                                .insert(bformat!("{key}*"), source.into());
                         }
                         let cur = self.config.get(key).cloned().unwrap_or(PhpMixed::Null);
                         self.config
@@ -487,7 +487,7 @@ impl Config {
                 PhpMixed::List(items) => items
                     .iter()
                     .enumerate()
-                    .map(|(i, v)| (bconcat!(i), v.clone()))
+                    .map(|(i, v)| (bformat!("{i}"), v.clone()))
                     .collect(),
                 _ => IndexMap::new(),
             };
@@ -547,7 +547,7 @@ impl Config {
                         // appending to numeric-keyed map
                         let next_idx = self.repositories.len();
                         self.repositories
-                            .insert(bconcat!(next_idx), repository.clone());
+                            .insert(bformat!("{next_idx}"), repository.clone());
                     }
                     let found_key = array_search_mixed(
                         repository,
@@ -558,23 +558,23 @@ impl Config {
                     .unwrap_or_default();
                     self.set_source_of_config_value(
                         repository,
-                        &bconcat!("repositories.", found_key),
+                        &bformat!("repositories.{found_key}"),
                         source,
                     );
                 } else if name == "packagist" {
                     // BC support for default "packagist" named repo
                     self.repositories
-                        .insert(bconcat!(name, ".org"), repository.clone());
+                        .insert(bformat!("{name}.org"), repository.clone());
                     self.set_source_of_config_value(
                         repository,
-                        &bconcat!("repositories.", name, ".org"),
+                        &bformat!("repositories.{name}.org"),
                         source,
                     );
                 } else {
                     self.repositories.insert(name.clone(), repository.clone());
                     self.set_source_of_config_value(
                         repository,
-                        &bconcat!("repositories.", name),
+                        &bformat!("repositories.{name}"),
                         source,
                     );
                 }
@@ -635,7 +635,7 @@ impl Config {
             b"github-protocols" => {
                 let protos = self.github_protocols()?;
                 Ok(
-                    if protos.keys().enumerate().all(|(i, k)| *k == bconcat!(i)) {
+                    if protos.keys().enumerate().all(|(i, k)| *k == bformat!("{i}")) {
                         PhpMixed::List(protos.into_values().collect())
                     } else {
                         PhpMixed::Array(protos)
@@ -688,7 +688,7 @@ impl Config {
             key.as_bstr()
         );
         // convert foo-bar to COMPOSER_FOO_BAR and check if it exists since it overrides the local config
-        let env = bconcat!("COMPOSER_", strtoupper(strtr(key, "-", "_")));
+        let env = bformat!("COMPOSER_{}", strtoupper(strtr(key, "-", "_")));
 
         let val = self.get_composer_env(&env);
         let raw_val = match val {
@@ -756,11 +756,7 @@ impl Config {
     pub fn get_process_timeout(&self) -> anyhow::Result<i64> {
         match self.process_timeout() {
             PhpMixed::Int(timeout) => Ok(timeout),
-            other => Err(TypeError::new(bconcat!(
-                "Composer\\Util\\ProcessExecutor::setTimeout(): Argument #1 ($timeout) must be of type int, ",
-                get_debug_type(&other),
-                " given"
-            ))
+            other => Err(TypeError::new(bformat!("Composer\\Util\\ProcessExecutor::setTimeout(): Argument #1 ($timeout) must be of type int, {} given", get_debug_type(&other)))
             .into()),
         }
     }
@@ -773,7 +769,7 @@ impl Config {
             // booleans with env var support
             b"cache-read-only" | b"htaccess-protect" => {
                 // convert foo-bar to COMPOSER_FOO_BAR and check if it exists since it overrides the local config
-                let env = bconcat!("COMPOSER_", strtoupper(strtr(key, "-", "_")));
+                let env = bformat!("COMPOSER_{}", strtoupper(strtr(key, "-", "_")));
 
                 match self.get_composer_env(&env) {
                     None => self.raw_value(key),
@@ -815,11 +811,8 @@ impl Config {
             php_regex!(r"/^\s*([0-9.]+)\s*(?:([kmg])(?:i?b)?)?\s*$/i"),
             &raw,
         ) else {
-            return Err(RuntimeException::new(bconcat!(
-                "Could not parse the value of '",
-                key,
-                "': ",
-                raw
+            return Err(RuntimeException::new(bformat!(
+                "Could not parse the value of '{key}': {raw}"
             ))
             .into());
         };
@@ -863,11 +856,7 @@ impl Config {
     fn get_home_with_flags(&self, flags: i64) -> anyhow::Result<BString> {
         let v = self.raw_value(b"home");
         let Some(home) = v.as_string() else {
-            return Err(TypeError::new(bconcat!(
-                "Composer\\Util\\Platform::expandPath(): Argument #1 ($path) must be of type string, ",
-                get_debug_type(&v),
-                " given"
-            ))
+            return Err(TypeError::new(bformat!("Composer\\Util\\Platform::expandPath(): Argument #1 ($path) must be of type string, {} given", get_debug_type(&v)))
             .into());
         };
         let processed = self.process(PhpMixed::string(Platform::expand_path(home)), flags)?;
@@ -889,10 +878,9 @@ impl Config {
                 PhpMixed::string(BString::from("symlink")),
             ],
         ) {
-            return Err(RuntimeException::new(bconcat!(
-                "Invalid value for 'bin-compat': ",
-                value.to_php_string(),
-                ". Expected auto, full or proxy"
+            return Err(RuntimeException::new(bformat!(
+                "Invalid value for 'bin-compat': {}. Expected auto, full or proxy",
+                value.to_php_string()
             ))
             .into());
         }
@@ -912,11 +900,7 @@ impl Config {
         let value = self.bin_compat()?;
         match value {
             PhpMixed::String(value) => Ok(value),
-            other => Err(TypeError::new(bconcat!(
-                "Composer\\Installer\\BinaryInstaller::__construct(): Argument #3 ($binCompat) must be of type string, ",
-                get_debug_type(&other),
-                " given"
-            ))
+            other => Err(TypeError::new(bformat!("Composer\\Installer\\BinaryInstaller::__construct(): Argument #3 ($binCompat) must be of type string, {} given", get_debug_type(&other)))
             .into()),
         }
     }
@@ -924,11 +908,7 @@ impl Config {
     pub fn get_discard_changes(&self) -> anyhow::Result<DiscardChanges> {
         if let Some(env) = self.get_composer_env("COMPOSER_DISCARD_CHANGES") {
             if !matches!(env.as_slice(), b"stash" | b"true" | b"false" | b"1" | b"0") {
-                return Err(RuntimeException::new(bconcat!(
-                    "Invalid value for COMPOSER_DISCARD_CHANGES: ",
-                    env,
-                    ". Expected 1, 0, true, false or stash"
-                ))
+                return Err(RuntimeException::new(bformat!("Invalid value for COMPOSER_DISCARD_CHANGES: {env}. Expected 1, 0, true, false or stash"))
                 .into());
             }
             if env == "stash" {
@@ -944,10 +924,9 @@ impl Config {
         match self.raw_value(b"discard-changes") {
             PhpMixed::Bool(value) => Ok(DiscardChanges::Bool(value)),
             PhpMixed::String(s) if s == "stash" => Ok(DiscardChanges::Stash),
-            other => Err(RuntimeException::new(bconcat!(
-                "Invalid value for 'discard-changes': ",
-                other.to_php_string(),
-                ". Expected true, false or stash"
+            other => Err(RuntimeException::new(bformat!(
+                "Invalid value for 'discard-changes': {}. Expected true, false or stash",
+                other.to_php_string()
             ))
             .into()),
         }
@@ -958,14 +937,13 @@ impl Config {
             PhpMixed::List(list) => list
                 .into_iter()
                 .enumerate()
-                .map(|(i, v)| (bconcat!(i), v))
+                .map(|(i, v)| (bformat!("{i}"), v))
                 .collect(),
             PhpMixed::Array(map) => map,
             other => {
-                return Err(TypeError::new(bconcat!(
-                    "array_search(): Argument #2 ($haystack) must be of type array, ",
-                    get_debug_type(&other),
-                    " given"
+                return Err(TypeError::new(bformat!(
+                    "array_search(): Argument #2 ($haystack) must be of type array, {} given",
+                    get_debug_type(&other)
                 ))
                 .into());
             }
@@ -1002,11 +980,7 @@ impl Config {
         match self.get_with_flags("autoloader-suffix", 0)? {
             PhpMixed::Null => Ok(None),
             PhpMixed::String(suffix) => Ok(Some(suffix)),
-            other => Err(TypeError::new(bconcat!(
-                "Composer\\Autoload\\AutoloadGenerator::getAutoloadFile(): Argument #2 ($suffix) must be of type string, ",
-                get_debug_type(&other),
-                " given"
-            ))
+            other => Err(TypeError::new(bformat!("Composer\\Autoload\\AutoloadGenerator::getAutoloadFile(): Argument #2 ($suffix) must be of type string, {} given", get_debug_type(&other)))
             .into()),
         }
     }
@@ -1015,15 +989,11 @@ impl Config {
         let mut result = self.raw_value(b"audit");
         if let Some(abandoned_env) = self.get_composer_env("COMPOSER_AUDIT_ABANDONED") {
             if !Auditor::ABANDONEDS.iter().any(|c| abandoned_env == *c) {
-                let valid_choices: Vec<BString> =
-                    Auditor::ABANDONEDS.iter().map(|s| bconcat!(s)).collect();
-                return Err(RuntimeException::new(bconcat!(
-                    "Invalid value for COMPOSER_AUDIT_ABANDONED: ",
-                    abandoned_env,
-                    ". Expected one of ",
-                    implode(", ", &valid_choices),
-                    "."
-                ))
+                let valid_choices: Vec<BString> = Auditor::ABANDONEDS
+                    .iter()
+                    .map(|s| bformat!("{s}"))
+                    .collect();
+                return Err(RuntimeException::new(bformat!("Invalid value for COMPOSER_AUDIT_ABANDONED: {abandoned_env}. Expected one of {}.", implode(", ", &valid_choices)))
                 .into());
             }
             Self::audit_map(&mut result)?
@@ -1032,11 +1002,7 @@ impl Config {
 
         if let Some(env) = self.get_composer_env("COMPOSER_SECURITY_BLOCKING_ABANDONED") {
             if !matches!(env.as_slice(), b"0" | b"1") {
-                return Err(RuntimeException::new(bconcat!(
-                    "Invalid value for COMPOSER_SECURITY_BLOCKING_ABANDONED: ",
-                    env,
-                    ". Expected 0 or 1."
-                ))
+                return Err(RuntimeException::new(bformat!("Invalid value for COMPOSER_SECURITY_BLOCKING_ABANDONED: {env}. Expected 0 or 1."))
                 .into());
             }
             Self::audit_map(&mut result)?
@@ -1055,7 +1021,7 @@ impl Config {
                     std::mem::take(list)
                         .into_iter()
                         .enumerate()
-                        .map(|(i, v)| (bconcat!(i), v))
+                        .map(|(i, v)| (bformat!("{i}"), v))
                         .collect(),
                 )
             }
@@ -1095,14 +1061,11 @@ impl Config {
     // TODO(error-model): PHP raises the consumer's own error instead, a TypeError or the
     // ErrorException that Composer's error handler makes of a warning, with its own message.
     fn type_error(key: &[u8], expected: impl AsRef<[u8]>, value: &PhpMixed) -> anyhow::Error {
-        TypeError::new(bconcat!(
-            "The value of config.",
+        TypeError::new(bformat!(
+            "The value of config.{} must be of type {}, {} given",
             key.as_bstr(),
-            " must be of type ",
             expected.as_ref().as_bstr(),
-            ", ",
-            get_debug_type(value),
-            " given"
+            get_debug_type(value)
         ))
         .into()
     }
@@ -1255,7 +1218,7 @@ impl Config {
             PhpMixed::List(list) => Ok(list
                 .into_iter()
                 .enumerate()
-                .map(|(i, v)| (bconcat!(i), v))
+                .map(|(i, v)| (bformat!("{i}"), v))
                 .collect()),
             other => Err(Self::type_error(key, "array", &other)),
         }
@@ -1268,7 +1231,7 @@ impl Config {
             PhpMixed::List(list) => PreferredInstall::PerPackage(
                 list.into_iter()
                     .enumerate()
-                    .map(|(i, v)| (bconcat!(i), v))
+                    .map(|(i, v)| (bformat!("{i}"), v))
                     .collect(),
             ),
             other => PreferredInstall::Other(other),
@@ -1374,7 +1337,7 @@ impl Config {
                 _ => vec![],
             };
             for (key, value) in map {
-                self.set_source_of_config_value(&value, &bconcat!(path, ".", key), source);
+                self.set_source_of_config_value(&value, &bformat!("{path}.{key}"), source);
             }
         }
     }
@@ -1422,7 +1385,7 @@ impl Config {
         }
 
         match &self.base_dir {
-            Some(base) => bconcat!(base, "/", path),
+            Some(base) => bformat!("{base}/{path}"),
             None => path.into(),
         }
     }
@@ -1478,18 +1441,14 @@ impl Config {
                     }
 
                     return Err(TransportException::new(
-                        bconcat!("Your configuration does not allow connections to ", url, ". See https://getcomposer.org/doc/06-config.md#secure-svn-domains for details."),
+                        bformat!("Your configuration does not allow connections to {url}. See https://getcomposer.org/doc/06-config.md#secure-svn-domains for details."),
                         0,
                     )
                     .into());
                 }
 
                 return Err(TransportException::new(
-                    bconcat!(
-                        "Your configuration does not allow connections to ",
-                        url,
-                        ". See https://getcomposer.org/doc/06-config.md#secure-http for details."
-                    ),
+                    bformat!("Your configuration does not allow connections to {url}. See https://getcomposer.org/doc/06-config.md#secure-http for details."),
                     0,
                 )
                 .into());
@@ -1498,16 +1457,10 @@ impl Config {
                 && let Some(ref hostname) = hostname
             {
                 if !self.warned_hosts.contains_key(hostname) {
-                    io.write_error(bconcat!(
-                        "<warning>Warning: Accessing ",
-                        hostname,
-                        " over ",
-                        scheme
+                    io.write_error(bformat!("<warning>Warning: Accessing {hostname} over {} which is an insecure protocol.</warning>", scheme
                             .as_ref()
                             .map_or(B(""), |scheme| scheme.as_slice())
-                            .as_bstr(),
-                        " which is an insecure protocol.</warning>"
-                    ));
+                            .as_bstr()));
                 }
                 self.warned_hosts.insert(hostname.clone(), true);
             }
@@ -1537,17 +1490,13 @@ impl Config {
             {
                 warning = match warning {
                     None => Some(BString::from("verify_peer_name")),
-                    Some(w) => Some(bconcat!(w, " and verify_peer_name")),
+                    Some(w) => Some(bformat!("{w} and verify_peer_name")),
                 };
             }
 
             if let Some(w) = warning {
-                io.write_error(bconcat!(
-                    "<warning>Warning: Accessing ",
-                    hostname,
-                    " with ",
-                    w,
-                    " disabled.</warning>"
+                io.write_error(bformat!(
+                    "<warning>Warning: Accessing {hostname} with {w} disabled.</warning>"
                 ));
                 self.ssl_verify_warned_hosts.insert(hostname.clone(), true);
             }

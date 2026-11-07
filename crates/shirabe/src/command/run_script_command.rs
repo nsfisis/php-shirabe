@@ -12,7 +12,7 @@ use crate::script::{Event as ScriptEvent, ScriptEvents};
 use crate::util::{Platform, ProcessExecutor};
 use bstr::{BStr, BString};
 use shirabe_php_shim::{
-    Catch as _, InvalidArgumentException, RuntimeException, bconcat, impl_php_class, str_replace,
+    Catch as _, InvalidArgumentException, RuntimeException, bformat, impl_php_class, str_replace,
     strtoupper, utf8_text,
 };
 use shirabe_symfony_console::command::Command;
@@ -73,7 +73,7 @@ impl RunScriptCommand {
         io.write_error("<info>scripts:</info>");
         let table: Vec<Vec<BString>> = scripts
             .iter()
-            .map(|(name, desc)| vec![bconcat!("  ", name), desc.clone()])
+            .map(|(name, desc)| vec![bformat!("  {name}"), desc.clone()])
             .collect();
 
         self.render_table(table, output)?;
@@ -260,10 +260,8 @@ impl Command for RunScriptCommand {
         if !self.script_events.iter().any(|event| script == *event) {
             let const_name = str_replace("-", "_", strtoupper(&script));
             if ScriptEvents::is_defined(&const_name) {
-                return Err(InvalidArgumentException::new(bconcat!(
-                    "Script \"",
-                    script,
-                    "\" cannot be run with this command"
+                return Err(InvalidArgumentException::new(bformat!(
+                    "Script \"{script}\" cannot be run with this command"
                 ))
                 .into());
             }
@@ -291,10 +289,8 @@ impl Command for RunScriptCommand {
         );
         let has_listeners = dispatcher.borrow_mut().has_event_listeners(&event);
         if !has_listeners {
-            return Err(InvalidArgumentException::new(bconcat!(
-                "Script \"",
-                script,
-                "\" is not defined in this package"
+            return Err(InvalidArgumentException::new(bformat!(
+                "Script \"{script}\" is not defined in this package"
             ))
             .into());
         }

@@ -9,7 +9,7 @@ use crate::{Cursor, Terminal};
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    AsAny, PHP_EOL, PhpMixed, PregMatches, STR_PAD_LEFT, ToPhpString, bconcat, explode, microtime,
+    AsAny, PHP_EOL, PhpMixed, PregMatches, STR_PAD_LEFT, ToPhpString, bformat, explode, microtime,
     php_str, preg_replace_callback, round, rtrim_chars, sprintf, str_pad, str_repeat, substr_count,
     time,
 };
@@ -424,7 +424,7 @@ impl ProgressBar {
         self.format = None;
         self.max = max.max(0);
         self.step_width = if self.max != 0 {
-            Helper::width(bconcat!(self.max))
+            Helper::width(bformat!("{}", self.max))
         } else {
             4
         };
@@ -488,7 +488,7 @@ impl ProgressBar {
     }
 
     fn set_real_format(&mut self, format: &BStr) {
-        let format_nomax = bconcat!(format, "_nomax");
+        let format_nomax = bformat!("{format}_nomax");
         // try to use the _nomax variant if available
         if self.max == 0 && Self::get_format_definition(format_nomax.as_ref()).is_some() {
             self.format = Self::get_format_definition(format_nomax.as_ref());
@@ -546,7 +546,7 @@ impl ProgressBar {
                 }
             }
         } else if self.step > 0 {
-            message = bconcat!(PHP_EOL, message);
+            message = bformat!("{PHP_EOL}{message}");
         }
 
         self.previous_message = Some(original_message);
@@ -677,7 +677,7 @@ impl ProgressBar {
                 |bar: &ProgressBar,
                  _output: &std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>| {
                     Ok(Ok(PhpMixed::string(str_pad(
-                        bconcat!(bar.get_progress()),
+                        bformat!("{}", bar.get_progress()),
                         bar.get_step_width() as usize,
                         " ",
                         STR_PAD_LEFT,
@@ -805,7 +805,7 @@ impl ProgressBar {
             };
 
             if let Some(modifier) = matches.get(2) {
-                return Ok(sprintf(bconcat!("%", modifier), &[text]));
+                return Ok(sprintf(bformat!("%{modifier}"), &[text]));
             }
 
             // PHP implicitly casts the formatter result to string here.

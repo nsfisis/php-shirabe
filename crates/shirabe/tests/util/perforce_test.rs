@@ -7,7 +7,7 @@ use indexmap::IndexMap;
 use serial_test::serial;
 use shirabe::io::{IOInterface, NullIO};
 use shirabe::util::{Filesystem, MockHandler, Perforce, ProcessExecutor};
-use shirabe_php_shim::{PHP_EOL, PhpMixed, bconcat, path_from_bytes, path_to_bytes, php_str};
+use shirabe_php_shim::{PHP_EOL, PhpMixed, bformat, path_from_bytes, path_to_bytes, php_str};
 use shirabe_symfony_console::input::InputValue;
 
 const TEST_DEPOT: &BStr = php_str(b"depot");
@@ -19,12 +19,12 @@ const TEST_PATH: &BStr = php_str(b"path");
 
 fn get_test_repo_config() -> IndexMap<BString, PhpMixed> {
     let mut config = IndexMap::new();
-    config.insert("depot".into(), PhpMixed::string(bconcat!(TEST_DEPOT)));
-    config.insert("branch".into(), PhpMixed::string(bconcat!(TEST_BRANCH)));
-    config.insert("p4user".into(), PhpMixed::string(bconcat!(TEST_P4USER)));
+    config.insert("depot".into(), PhpMixed::string(bformat!("{TEST_DEPOT}")));
+    config.insert("branch".into(), PhpMixed::string(bformat!("{TEST_BRANCH}")));
+    config.insert("p4user".into(), PhpMixed::string(bformat!("{TEST_P4USER}")));
     config.insert(
         "unique_perforce_client_name".into(),
-        PhpMixed::string(bconcat!(TEST_CLIENT_NAME)),
+        PhpMixed::string(bformat!("{TEST_CLIENT_NAME}")),
     );
     config
 }
@@ -184,7 +184,7 @@ fn test_query_p4_user_with_user_set_in_p4_variables_with_windows_os() {
         vec![cmd_full(
             "p4 set",
             0,
-            bconcat!("P4USER=TEST_P4VARIABLE_USER", PHP_EOL).to_owned(),
+            bformat!("P4USER=TEST_P4VARIABLE_USER{PHP_EOL}").to_owned(),
             "",
         )],
         true,
@@ -208,7 +208,7 @@ fn test_query_p4_user_with_user_set_in_p4_variables_not_windows_os() {
         vec![cmd_full(
             "echo $P4USER",
             0,
-            bconcat!("TEST_P4VARIABLE_USER", PHP_EOL).to_owned(),
+            bformat!("TEST_P4VARIABLE_USER{PHP_EOL}").to_owned(),
             "",
         )],
         true,
@@ -244,7 +244,10 @@ fn test_query_p4_user_queries_for_user() {
 
 #[test]
 fn test_query_p4_user_stores_response_to_query_for_user_with_windows() {
-    let expected_command = bconcat!("p4 set P4USER=", ProcessExecutor::escape("TEST_QUERY_USER"));
+    let expected_command = bformat!(
+        "p4 set P4USER={}",
+        ProcessExecutor::escape("TEST_QUERY_USER")
+    );
     let (process, _guard) = get_process_executor_mock(
         vec![cmd("p4 set"), cmd(expected_command.as_bstr())],
         true,
@@ -262,7 +265,10 @@ fn test_query_p4_user_stores_response_to_query_for_user_with_windows() {
 
 #[test]
 fn test_query_p4_user_stores_response_to_query_for_user_without_windows() {
-    let expected_command = bconcat!("export P4USER=", ProcessExecutor::escape("TEST_QUERY_USER"));
+    let expected_command = bformat!(
+        "export P4USER={}",
+        ProcessExecutor::escape("TEST_QUERY_USER")
+    );
     let (process, _guard) = get_process_executor_mock(
         vec![cmd("echo $P4USER"), cmd(expected_command.as_bstr())],
         true,
@@ -280,7 +286,10 @@ fn test_query_p4_user_stores_response_to_query_for_user_without_windows() {
 
 #[test]
 fn test_query_p4_user_escapes_injection_on_windows() {
-    let expected_command = bconcat!("p4 set P4USER=", ProcessExecutor::escape("foo && calc.exe"));
+    let expected_command = bformat!(
+        "p4 set P4USER={}",
+        ProcessExecutor::escape("foo && calc.exe")
+    );
     let (process, _guard) = get_process_executor_mock(
         vec![cmd("p4 set"), cmd(expected_command.as_bstr())],
         true,
@@ -298,7 +307,7 @@ fn test_query_p4_user_escapes_injection_on_windows() {
 
 #[test]
 fn test_query_p4_user_escapes_injection_on_unix() {
-    let expected_command = bconcat!("export P4USER=", ProcessExecutor::escape("foo; id"));
+    let expected_command = bformat!("export P4USER={}", ProcessExecutor::escape("foo; id"));
     let (process, _guard) = get_process_executor_mock(
         vec![cmd("echo $P4USER"), cmd(expected_command.as_bstr())],
         true,
@@ -346,7 +355,7 @@ fn test_query_p4_password_with_password_set_in_p4_variables_with_windows_os() {
         vec![cmd_full(
             "p4 set",
             0,
-            bconcat!("P4PASSWD=TEST_P4VARIABLE_PASSWORD", PHP_EOL).to_owned(),
+            bformat!("P4PASSWD=TEST_P4VARIABLE_PASSWORD{PHP_EOL}").to_owned(),
             "",
         )],
         true,
@@ -366,7 +375,7 @@ fn test_query_p4_password_with_password_set_in_p4_variables_not_windows_os() {
         vec![cmd_full(
             "echo $P4PASSWD",
             0,
-            bconcat!("TEST_P4VARIABLE_PASSWORD", PHP_EOL).to_owned(),
+            bformat!("TEST_P4VARIABLE_PASSWORD{PHP_EOL}").to_owned(),
             "",
         )],
         true,
@@ -426,7 +435,7 @@ fn test_get_branches_with_stream() {
                     "//depot/...",
                 ],
                 0,
-                bconcat!("Stream //depot/branch mainline none 'branch'", PHP_EOL).to_owned(),
+                bformat!("Stream //depot/branch mainline none 'branch'{PHP_EOL}").to_owned(),
                 "",
             ),
             cmd_full(
@@ -491,12 +500,7 @@ fn test_get_tags_without_stream() {
                 "labels",
             ],
             0,
-            bconcat!(
-                "Label 0.0.1 2013/07/31 'First Label!'",
-                PHP_EOL,
-                "Label 0.0.2 2013/08/01 'Second Label!'",
-                PHP_EOL
-            )
+            bformat!("Label 0.0.1 2013/07/31 'First Label!'{PHP_EOL}Label 0.0.2 2013/08/01 'Second Label!'{PHP_EOL}")
             .to_owned(),
             "",
         )],
@@ -527,12 +531,7 @@ fn test_get_tags_with_stream() {
                 "labels",
             ],
             0,
-            bconcat!(
-                "Label 0.0.1 2013/07/31 'First Label!'",
-                PHP_EOL,
-                "Label 0.0.2 2013/08/01 'Second Label!'",
-                PHP_EOL
-            )
+            bformat!("Label 0.0.1 2013/07/31 'First Label!'{PHP_EOL}Label 0.0.2 2013/08/01 'Second Label!'{PHP_EOL}")
             .to_owned(),
             "",
         )],

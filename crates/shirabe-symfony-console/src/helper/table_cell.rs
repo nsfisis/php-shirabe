@@ -4,7 +4,7 @@ use crate::exception::InvalidArgumentException;
 use crate::helper::TableCellStyle;
 use bstr::{B, BString};
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpDisplay, bconcat, implode};
+use shirabe_php_shim::{PhpDisplay, bformat, implode};
 
 /// A `TableCell` option value: an integer span, a `TableCellStyle`, or null.
 #[derive(Debug, Clone)]
@@ -36,10 +36,9 @@ impl TableCell {
             .filter(|key| !this_options.contains_key(*key))
             .collect();
         if !diff.is_empty() {
-            return Err(InvalidArgumentException::new(bconcat!(
-                "The TableCell does not support the following options: '",
-                implode("', '", &diff),
-                "'."
+            return Err(InvalidArgumentException::new(bformat!(
+                "The TableCell does not support the following options: '{}'.",
+                implode("', '", &diff)
             )));
         }
 

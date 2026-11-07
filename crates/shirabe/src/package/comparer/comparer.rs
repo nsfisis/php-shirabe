@@ -3,7 +3,7 @@
 use crate::util::Platform;
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe_php_shim::{bconcat, chdir, hash_file, implode, path_from_bytes, path_to_bytes, trim};
+use shirabe_php_shim::{bformat, chdir, hash_file, implode, path_from_bytes, path_to_bytes, trim};
 use std::path::PathBuf;
 
 #[derive(Debug)]
@@ -44,7 +44,7 @@ impl Comparer {
         if explicated {
             for (section_key, item_section) in changed.iter_mut() {
                 for item in item_section.iter_mut() {
-                    *item = bconcat!(&*item, " (", section_key, ")");
+                    *item = bformat!("{} ({section_key})", &*item);
                 }
             }
         }
@@ -60,7 +60,7 @@ impl Comparer {
         let mut strings: Vec<BString> = vec![];
         for item_section in changed.values() {
             for item in item_section {
-                strings.push(bconcat!(item, "\r\n"));
+                strings.push(bformat!("{item}\r\n"));
             }
         }
 
@@ -94,13 +94,13 @@ impl Comparer {
                         self.changed
                             .entry(BString::from("changed"))
                             .or_default()
-                            .push(bconcat!(dir, "/", file));
+                            .push(bformat!("{dir}/{file}"));
                     }
                 } else {
                     self.changed
                         .entry(BString::from("removed"))
                         .or_default()
-                        .push(bconcat!(dir, "/", file));
+                        .push(bformat!("{dir}/{file}"));
                 }
             }
         }
@@ -110,7 +110,7 @@ impl Comparer {
                     self.changed
                         .entry(BString::from("added"))
                         .or_default()
-                        .push(bconcat!(dir, "/", file));
+                        .push(bformat!("{dir}/{file}"));
                 }
             }
         }
@@ -126,7 +126,7 @@ impl Comparer {
                 if file == "." || file == ".." {
                     continue;
                 }
-                let path = bconcat!(dir, "/", file);
+                let path = bformat!("{dir}/{file}");
                 if path_from_bytes(&path).is_symlink() {
                     let link_target = std::fs::read_link(path_from_bytes(&path))
                         .ok()

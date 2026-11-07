@@ -20,7 +20,7 @@ use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, DATE_RFC3339, LogicException, PhpMixed, RuntimeException, ToPhpString,
-    array_intersect, array_keys, array_map, array_merge, bconcat, display_to_bytes, empty,
+    array_intersect, array_keys, array_map, array_merge, bformat, display_to_bytes, empty,
     file_get_contents, filemtime, hash, in_array_loose, intval, is_int, ksort, php_regex,
     preg_is_match, preg_match, realpath, strcmp, strtolower, touch_with_mtime, trim, usort,
 };
@@ -477,7 +477,7 @@ impl Locker {
                 ) {
                     alias.insert(
                         "version".into(),
-                        PhpMixed::string(bconcat!(VersionParser::DEFAULT_BRANCH_ALIAS)),
+                        PhpMixed::string(bformat!("{}", VersionParser::DEFAULT_BRANCH_ALIAS)),
                     );
                 }
                 alias
@@ -496,7 +496,7 @@ impl Locker {
                     BString::from("Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies"),
                 ),
                 PhpMixed::string(
-                    bconcat!("This file is @", "gener", "ated automatically"),
+                    bformat!("This file is @generated automatically"),
                 ),
             ]),
         );
@@ -563,7 +563,7 @@ impl Locker {
         }
         lock.insert(
             "plugin-api-version".into(),
-            PhpMixed::string(bconcat!(plugin_interface::PLUGIN_API_VERSION)),
+            PhpMixed::string(bformat!("{}", plugin_interface::PLUGIN_API_VERSION)),
         );
 
         let lock = self.fixup_json_data_type(lock);
@@ -629,10 +629,9 @@ impl Locker {
         let contents = match file_get_contents(composer_json.get_path()) {
             Ok(s) => s,
             Err(_) => {
-                return Err(RuntimeException::new(bconcat!(
-                    "Unable to read ",
-                    composer_json.get_path(),
-                    " contents to update the lock file hash."
+                return Err(RuntimeException::new(bformat!(
+                    "Unable to read {} contents to update the lock file hash.",
+                    composer_json.get_path()
                 ))
                 .into());
             }
@@ -680,7 +679,7 @@ impl Locker {
                 .unwrap_or(false);
             if should_replace {
                 // PHP: new \stdClass() — empty JSON object
-                lock_data.insert(bconcat!(key), PhpMixed::Object(IndexMap::new()));
+                lock_data.insert(bformat!("{key}"), PhpMixed::Object(IndexMap::new()));
             }
         }
 
@@ -706,10 +705,9 @@ impl Locker {
             let version = package.get_pretty_version();
 
             if name.is_empty() || version.is_empty() {
-                return Err(LogicException::new(bconcat!(
-                    "Package \"",
-                    package.to_php_string(),
-                    "\" has no version or name and can not be locked"
+                return Err(LogicException::new(bformat!(
+                    "Package \"{}\" has no version or name and can not be locked",
+                    package.to_php_string()
                 ))
                 .into());
             }
@@ -924,13 +922,10 @@ impl Locker {
                                 };
                                 for provider_link in provider_links.values() {
                                     if provider_link.get_target() == link.get_target() {
-                                        description = bconcat!(
-                                            verb,
-                                            " as ",
+                                        description = bformat!(
+                                            "{verb} as {} by {} {}",
                                             provider_link.get_pretty_constraint()?,
-                                            " by ",
                                             provider.get_pretty_name(),
-                                            " ",
                                             provider.get_pretty_version()
                                         );
                                         break 'outer;
@@ -938,24 +933,12 @@ impl Locker {
                                 }
                             }
                         }
-                        missing_requirement_info.push(bconcat!(
-                            "- ",
-                            set.description,
-                            " package \"",
-                            link.get_target(),
-                            "\" is in the lock file as \"",
-                            description,
-                            "\" but that does not satisfy your constraint \"",
-                            link.get_pretty_constraint()?,
-                            "\"."
-                        ));
+                        missing_requirement_info.push(bformat!("- {} package \"{}\" is in the lock file as \"{description}\" but that does not satisfy your constraint \"{}\".", set.description, link.get_target(), link.get_pretty_constraint()?));
                     } else {
-                        missing_requirement_info.push(bconcat!(
-                            "- ",
+                        missing_requirement_info.push(bformat!(
+                            "- {} package \"{}\" is not present in the lock file.",
                             set.description,
-                            " package \"",
-                            link.get_target(),
-                            "\" is not present in the lock file."
+                            link.get_target()
                         ));
                     }
                     missing_requirements = true;

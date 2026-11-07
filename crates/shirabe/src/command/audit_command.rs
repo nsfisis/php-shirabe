@@ -12,7 +12,7 @@ use crate::package::PackageInterfaceHandle;
 use crate::repository::{InstalledRepository, RepositoryInterface, RepositorySet, RepositoryUtils};
 use bstr::BString;
 use shirabe_php_shim::{
-    InvalidArgumentException, PhpMixed, UnexpectedValueException, bconcat, impl_php_class, implode,
+    InvalidArgumentException, PhpMixed, UnexpectedValueException, bformat, impl_php_class, implode,
     in_array_strict,
 };
 use shirabe_symfony_console::command::Command;
@@ -227,20 +227,19 @@ impl Command for AuditCommand {
                 abandoned.clone().unwrap(),
                 &Auditor::ABANDONEDS
                     .iter()
-                    .map(|s| PhpMixed::string(bconcat!(s)))
+                    .map(|s| PhpMixed::string(bformat!("{s}")))
                     .collect::<Vec<_>>(),
             )
         {
-            return Err(InvalidArgumentException::new(bconcat!(
-                "--abandoned must be one of ",
+            return Err(InvalidArgumentException::new(bformat!(
+                "--abandoned must be one of {}.",
                 implode(
                     ", ",
                     &Auditor::ABANDONEDS
                         .iter()
-                        .map(|s| bconcat!(s))
+                        .map(|s| bformat!("{s}"))
                         .collect::<Vec<_>>()
-                ),
-                "."
+                )
             ))
             .into());
         }

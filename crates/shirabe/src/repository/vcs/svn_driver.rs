@@ -11,7 +11,7 @@ use bstr::{B, BStr, BString, ByteSlice};
 use chrono::{DateTime, FixedOffset, Utc};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    Catch as _, PhpMixed, RuntimeException, bconcat, date_create, error_message, intval,
+    Catch as _, PhpMixed, RuntimeException, bformat, date_create, error_message, intval,
     path_from_bytes, php_regex, preg_is_match, preg_match, preg_replace, rtrim_chars, stripos,
     strrpos, strtr, substr, trim, trim_chars,
 };
@@ -78,26 +78,26 @@ impl SvnDriver {
             self.cache_credentials = v.to_bool();
         }
         if let Some(PhpMixed::String(v)) = self.inner.repo_config.get(B("package-path")).cloned() {
-            self.package_path = bconcat!("/", trim_chars(&v, "/"));
+            self.package_path = bformat!("/{}", trim_chars(&v, "/"));
         }
 
         if let Some(pos) = strrpos(
             &self.inner.url,
-            bconcat!("/", self.trunk_path.clone().unwrap_or_default()),
+            bformat!("/{}", self.trunk_path.clone().unwrap_or_default()),
         ) {
             self.base_url = BString::from(&substr(&self.inner.url, 0, Some(pos as i64))[..]);
         }
 
         self.inner.cache = Some(Cache::new(
             self.inner.io.clone(),
-            path_from_bytes(&bconcat!(
+            path_from_bytes(&bformat!(
+                "{}/{}",
                 self.inner
                     .config
                     .borrow()
                     .get_path("cache-repo-dir")?
                     .as_bstr(),
-                "/",
-                preg_replace(r"{[^a-z0-9.]}i", "-", Url::sanitize(&self.base_url)),
+                preg_replace(r"{[^a-z0-9.]}i", "-", Url::sanitize(&self.base_url))
             )),
             None,
             None,
@@ -150,7 +150,7 @@ impl SvnDriver {
                     .inner
                     .cache
                     .as_mut()
-                    .and_then(|c| c.read(&bconcat!(identifier, ".json")))
+                    .and_then(|c| c.read(&bformat!("{identifier}.json")))
             {
                 // old cache files had '' stored instead of null due to af3783b5f40bae32a23e353eaf0a00c9b8ce82e2, so we make sure here that we always return null or array
                 // and fix outdated invalid cache files
@@ -160,7 +160,7 @@ impl SvnDriver {
                         .cache
                         .as_mut()
                         .unwrap()
-                        .write(&bconcat!(identifier, ".json"), &res)?;
+                        .write(&bformat!("{identifier}.json"), &res)?;
                 }
 
                 let parsed = JsonFile::parse_json(Some(&res), None)?;
@@ -217,7 +217,7 @@ impl SvnDriver {
                     .cache
                     .as_mut()
                     .unwrap()
-                    .write(&bconcat!(identifier, ".json"), &encoded)?;
+                    .write(&bformat!("{identifier}.json"), &encoded)?;
             }
 
             self.inner
@@ -239,7 +239,7 @@ impl SvnDriver {
         file: &BStr,
         identifier: &BStr,
     ) -> anyhow::Result<Option<BString>> {
-        let identifier = bconcat!("/", trim_chars(identifier, "/"), "/");
+        let identifier = bformat!("/{}/", trim_chars(identifier, "/"));
 
         let (path, rev) = if let Some(m) = preg_match(php_regex!(r"{^(.+?)(@\d+)?/$}"), &identifier)
             && let Some(rev) = m.get(2)
@@ -254,7 +254,7 @@ impl SvnDriver {
 
         let output: BString = match self.execute(
             vec![BString::from("svn"), BString::from("cat")],
-            bstr::BStr::new(&bconcat!(self.base_url, path, rev)),
+            bstr::BStr::new(&bformat!("{}{path}{rev}", self.base_url)),
         ) {
             Ok(o) => o,
             Err(e) => {
@@ -275,7 +275,7 @@ impl SvnDriver {
         &mut self,
         identifier: &BStr,
     ) -> anyhow::Result<Option<DateTime<FixedOffset>>> {
-        let identifier = bconcat!("/", trim_chars(identifier, "/"), "/");
+        let identifier = bformat!("/{}/", trim_chars(identifier, "/"));
 
         let (path, rev) = if let Some(m) = preg_match(php_regex!(r"{^(.+?)(@\d+)?/$}"), &identifier)
             && let Some(rev) = m.get(2)
@@ -290,7 +290,7 @@ impl SvnDriver {
 
         let output = self.execute(
             vec![BString::from("svn"), BString::from("info")],
-            bstr::BStr::new(&bconcat!(self.base_url, path, rev)),
+            bstr::BStr::new(&bformat!("{}{path}{rev}", self.base_url)),
         )?;
         for line in self.inner.process.borrow().split_lines(&output) {
             if !line.is_empty()
@@ -318,7 +318,7 @@ impl SvnDriver {
                         BString::from("ls"),
                         BString::from("--verbose"),
                     ],
-                    bstr::BStr::new(&bconcat!(self.base_url, "/", self.tags_path)),
+                    bstr::BStr::new(&bformat!("{}/{}", self.base_url, self.tags_path)),
                 )?;
                 if !output.is_empty() {
                     let mut last_rev: i64 = 0;
@@ -334,7 +334,7 @@ impl SvnDriver {
                                 last_rev = rev;
                             } else {
                                 let identifier = self.build_identifier(
-                                    bconcat!("/", self.tags_path, "/", path).as_bstr(),
+                                    bformat!("/{}/{path}", self.tags_path).as_bstr(),
                                     std::cmp::max(last_rev, rev),
                                 );
                                 tags.insert(rtrim_chars(&path, "/"), identifier);
@@ -355,9 +355,9 @@ impl SvnDriver {
             let mut branches: IndexMap<BString, BString> = IndexMap::new();
 
             let trunk_parent = if let Some(trunk_path) = self.trunk_path.as_ref() {
-                bconcat!(self.base_url, "/", trunk_path)
+                bformat!("{}/{trunk_path}", self.base_url)
             } else {
-                bconcat!(self.base_url, "/")
+                bformat!("{}/", self.base_url)
             };
 
             let output = self.execute(
@@ -378,7 +378,7 @@ impl SvnDriver {
                         let path = BString::from(m.get(2).unwrap_or_default());
                         if path == "./" {
                             let identifier = self.build_identifier(
-                                bconcat!("/", self.trunk_path.clone().unwrap_or_default())
+                                bformat!("/{}", self.trunk_path.clone().unwrap_or_default())
                                     .as_bstr(),
                                 rev,
                             );
@@ -399,7 +399,7 @@ impl SvnDriver {
                         BString::from("ls"),
                         BString::from("--verbose"),
                     ],
-                    bstr::BStr::new(&bconcat!(self.base_url, "/", self.branches_path)),
+                    bstr::BStr::new(&bformat!("{}/{}", self.base_url, self.branches_path)),
                 )?;
                 if !output.is_empty() {
                     let mut last_rev: i64 = 0;
@@ -415,7 +415,7 @@ impl SvnDriver {
                                 last_rev = rev;
                             } else {
                                 let identifier = self.build_identifier(
-                                    bconcat!("/", self.branches_path, "/", path).as_bstr(),
+                                    bformat!("/{}/{path}", self.branches_path).as_bstr(),
                                     std::cmp::max(last_rev, rev),
                                 );
                                 branches.insert(rtrim_chars(&path, "/"), identifier);
@@ -487,7 +487,7 @@ impl SvnDriver {
     fn normalize_url(url: &BStr) -> BString {
         let fs = Filesystem::new(None);
         if fs.is_absolute_path(path_from_bytes(url)) {
-            return bconcat!("file://", strtr(url, "\\", "/"));
+            return bformat!("file://{}", strtr(url, "\\", "/"));
         }
 
         bstr::BString::from(url)
@@ -518,19 +518,13 @@ impl SvnDriver {
             Ok(o) => Ok(o),
             Err(e) => {
                 if self.util.as_mut().unwrap().binary_version()?.is_none() {
-                    return Err(RuntimeException::new(bconcat!(
-                        "Failed to load ",
-                        self.inner.url,
-                        ", svn was not found, check that it is installed and in your PATH env.\n\n",
-                        self.inner.process.borrow().get_error_output()
-                    ))
+                    return Err(RuntimeException::new(bformat!("Failed to load {}, svn was not found, check that it is installed and in your PATH env.\n\n{}", self.inner.url, self.inner.process.borrow().get_error_output()))
                     .into());
                 }
 
-                Err(RuntimeException::new(bconcat!(
-                    "Repository ",
+                Err(RuntimeException::new(bformat!(
+                    "Repository {} could not be processed, {}",
                     self.inner.url,
-                    " could not be processed, ",
                     error_message(&e)
                 ))
                 .into())
@@ -540,11 +534,10 @@ impl SvnDriver {
 
     /// Build the identifier respecting "package-path" config option
     fn build_identifier(&self, base_dir: &BStr, revision: i64) -> BString {
-        bconcat!(
+        bformat!(
+            "{}{}/@{revision}",
             rtrim_chars(base_dir, "/"),
-            self.package_path,
-            "/@",
-            revision
+            self.package_path
         )
     }
 }

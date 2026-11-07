@@ -3,7 +3,7 @@
 use crate::dependency_resolver::operation::SolverOperation;
 use crate::package::{DisplayMode, PackageInterfaceHandle};
 use bstr::{BStr, BString};
-use shirabe_php_shim::{PhpDisplay, bconcat, php_str};
+use shirabe_php_shim::{PhpDisplay, bformat, php_str};
 
 #[derive(Debug, Clone)]
 pub struct InstallOperation {
@@ -24,13 +24,11 @@ impl InstallOperation {
     }
 
     pub fn format(package: PackageInterfaceHandle, lock: bool) -> bstr::BString {
-        bconcat!(
+        bformat!(
+            "{}<info>{}</info> (<comment>{}</comment>)",
             if lock { "Locking " } else { "Installing " },
-            "<info>",
             package.get_pretty_name(),
-            "</info> (<comment>",
-            package.get_full_pretty_version(true, DisplayMode::SourceRefIfDev),
-            "</comment>)"
+            package.get_full_pretty_version(true, DisplayMode::SourceRefIfDev)
         )
     }
 }

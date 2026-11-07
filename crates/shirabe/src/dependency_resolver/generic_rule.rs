@@ -2,7 +2,7 @@
 
 use crate::dependency_resolver::{ReasonData, Rule, RuleBase};
 use bstr::BString;
-use shirabe_php_shim::{PhpDisplay, RuntimeException, bconcat, hash_raw, implode};
+use shirabe_php_shim::{PhpDisplay, RuntimeException, bformat, hash_raw, implode};
 
 #[derive(Debug)]
 pub struct GenericRule {
@@ -35,13 +35,13 @@ impl GenericRule {
             &self
                 .literals
                 .iter()
-                .map(|l| bconcat!(l))
+                .map(|l| bformat!("{l}"))
                 .collect::<Vec<_>>(),
         );
         let binary = hash_raw("xxh3", &joined);
         match binary.get(..4) {
             Some(chunk) => Ok(i32::from_ne_bytes(chunk.try_into().unwrap()) as i64),
-            None => Err(RuntimeException::new(bconcat!("Failed unpacking: ", joined)).into()),
+            None => Err(RuntimeException::new(bformat!("Failed unpacking: {joined}")).into()),
         }
     }
 

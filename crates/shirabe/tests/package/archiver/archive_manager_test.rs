@@ -10,7 +10,7 @@ use shirabe::package::{CompletePackageHandle, CompletePackageInterfaceHandle};
 use shirabe::util::r#loop::Loop;
 use shirabe::util::{ProcessExecutor, StreamContextOptions};
 use shirabe_php_shim::{
-    Catch as _, PhpMixed, RuntimeException, bconcat, file_exists, file_put_contents,
+    Catch as _, PhpMixed, RuntimeException, bformat, file_exists, file_put_contents,
     path_from_bytes, path_to_bytes, realpath, sys_get_temp_dir, unlink,
 };
 use shirabe_symfony_process::Process;
@@ -87,7 +87,7 @@ impl TestCase {
     ) -> std::path::PathBuf {
         let package_name = self.manager.get_package_filename(package).unwrap();
         self.target_dir
-            .join(path_from_bytes(&bconcat!(package_name, ".", format)))
+            .join(path_from_bytes(&bformat!("{package_name}.{format}")))
     }
 
     // ref: ArchiveManagerTest::setupGitRepo.
@@ -218,7 +218,7 @@ fn test_archive_custom_file_name() {
 
     let target = test_case
         .target_dir
-        .join(path_from_bytes(&bconcat!(file_name, ".tar")));
+        .join(path_from_bytes(&bformat!("{file_name}.tar")));
 
     assert!(file_exists(&target));
 

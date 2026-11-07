@@ -7,7 +7,7 @@ use crate::plugin::php_call::PhpCall;
 use crate::plugin::proxy::php_is_a;
 use bstr::{BStr, BString, ByteSlice};
 use shirabe_php_rpc::{FromWire, PhpObjHandle, PluginValue};
-use shirabe_php_shim::{PhpClass, PhpMixed, RuntimeException, ToPhpString, bconcat};
+use shirabe_php_shim::{PhpClass, PhpMixed, RuntimeException, ToPhpString, bformat};
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::{InputInterface, InputValue};
 use shirabe_symfony_console::output::OutputInterface;
@@ -197,11 +197,7 @@ impl Command for PhpCommandProxy {
         let context = CONSOLE_APP_CONTEXT
             .with(|slot| slot.borrow().clone())
             .ok_or_else(|| -> anyhow::Error {
-                RuntimeException::new(bconcat!(
-                    "cannot run plugin-provided command ",
-                    self.handle.class(),
-                    ": no worker-side console application context was published"
-                ))
+                RuntimeException::new(bformat!("cannot run plugin-provided command {}: no worker-side console application context was published", self.handle.class()))
                 .into()
             })?;
         let app = context.booted_app()?;
@@ -219,11 +215,7 @@ impl Command for PhpCommandProxy {
     ) -> anyhow::Result<i64> {
         // `run` above never reaches this template hook; a direct call would bypass the
         // worker-side binding, so it stays an explicit error.
-        Err(RuntimeException::new(bconcat!(
-            "plugin-provided command ",
-            self.handle.class(),
-            " executes in the PHP worker through run(); execute() must not be called directly"
-        ))
+        Err(RuntimeException::new(bformat!("plugin-provided command {} executes in the PHP worker through run(); execute() must not be called directly", self.handle.class()))
         .into())
     }
 

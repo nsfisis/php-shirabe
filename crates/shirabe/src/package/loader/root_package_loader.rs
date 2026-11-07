@@ -12,7 +12,7 @@ use crate::util::{Platform, ProcessExecutor};
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    E_USER_DEPRECATED, PhpMixed, RuntimeException, UnexpectedValueException, bconcat, implode,
+    E_USER_DEPRECATED, PhpMixed, RuntimeException, UnexpectedValueException, bformat, implode,
     php_regex, preg_is_match, preg_match, preg_replace, preg_split, strtolower, trigger_error,
     trim,
 };
@@ -75,7 +75,7 @@ impl RootPackageLoader {
             config[B("name")].as_string().unwrap_or_default(),
             false,
         ) {
-            return Err(RuntimeException::new(bconcat!("Your package name ", err)).into());
+            return Err(RuntimeException::new(bformat!("Your package name {err}")).into());
         }
 
         let mut auto_versioned = false;
@@ -111,7 +111,7 @@ impl RootPackageLoader {
                         .and_then(|v| v.as_string())
                         .unwrap_or_default();
                     if name != "__root__" && package_type != "project" {
-                        io.warning(bconcat!("Shirabe could not detect the root package (", name, ") version, defaulting to '1.0.0'. See https://getcomposer.org/root-version"), &[]);
+                        io.warning(bformat!("Shirabe could not detect the root package ({name}) version, defaulting to '1.0.0'. See https://getcomposer.org/root-version"), &[]);
                     }
                 }
                 config.insert("version".into(), PhpMixed::string(BString::from("1.0.0")));
@@ -191,7 +191,7 @@ impl RootPackageLoader {
 
                 let package_name = config[B("name")].as_string().unwrap_or_default();
                 if links.contains_key(package_name) {
-                    return Err(RuntimeException::new(bconcat!("Root package '", package_name, "' cannot require itself in its composer.json\nDid you accidentally name your root package after an external package?")).into());
+                    return Err(RuntimeException::new(bformat!("Root package '{package_name}' cannot require itself in its composer.json\nDid you accidentally name your root package after an external package?")).into());
                 }
             }
         }
@@ -204,7 +204,7 @@ impl RootPackageLoader {
                     if let Some(err) =
                         ValidatingArrayLoader::has_package_naming_error(link_name.as_bstr(), true)
                     {
-                        return Err(RuntimeException::new(bconcat!(link_type, ".", err)).into());
+                        return Err(RuntimeException::new(bformat!("{link_type}.{err}")).into());
                     }
                 }
             }
@@ -274,7 +274,7 @@ impl RootPackageLoader {
                 return {
                     panic!(
                         "{}",
-                        UnexpectedValueException::new(bconcat!("Invalid alias definition in \"", req_name, "\": \"", req_version, "\". Aliases should be in the form \"exact-version as other-exact-version\"."))
+                        UnexpectedValueException::new(bformat!("Invalid alias definition in \"{req_name}\": \"{req_version}\". Aliases should be in the form \"exact-version as other-exact-version\"."))
                         .get_message().display_lossy()
                     )
                 };
@@ -304,7 +304,7 @@ impl RootPackageLoader {
             }
 
             let stability_names: Vec<&BStr> = stabilities.keys().copied().collect();
-            let pattern = bconcat!("{^[^@]*?@(", implode("|", &stability_names), ")$}i");
+            let pattern = bformat!("{{^[^@]*?@({})$}}i", implode("|", &stability_names));
 
             let mut matched = false;
             for constraint in &constraints {

@@ -2,7 +2,7 @@
 
 use crate::package::archiver::{BaseExcludeFilter, BaseExcludeFilterBase};
 use bstr::{BStr, BString, ByteSlice};
-use shirabe_php_shim::{bconcat, file, file_exists, path_from_bytes, php_regex, preg_split};
+use shirabe_php_shim::{bformat, file, file_exists, path_from_bytes, php_regex, preg_split};
 use std::path::{Path, PathBuf};
 
 pub struct GitExcludeFilter {
@@ -12,7 +12,7 @@ pub struct GitExcludeFilter {
 impl GitExcludeFilter {
     pub fn new(source_path: impl Into<PathBuf>) -> Self {
         let source_path = source_path.into();
-        let gitattributes_path = bconcat!(&source_path, "/.gitattributes");
+        let gitattributes_path = bformat!("{source_path}/.gitattributes");
         let inner = BaseExcludeFilterBase::new(source_path);
         let mut filter = Self { inner };
 
@@ -44,7 +44,7 @@ impl GitExcludeFilter {
 
         if parts.len() == 2 && parts[1] == "-export-ignore" {
             return Some(BaseExcludeFilterBase::generate_pattern(
-                bconcat!("!", &parts[0]).as_bstr(),
+                bformat!("!{}", &parts[0]).as_bstr(),
             ));
         }
 

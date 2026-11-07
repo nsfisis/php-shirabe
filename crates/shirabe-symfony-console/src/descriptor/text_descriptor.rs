@@ -11,7 +11,7 @@ use crate::input::{InputArgument, InputDefinition, InputOption};
 use crate::output::OutputInterface;
 use bstr::{BString, ByteSlice};
 use shirabe_php_shim::{
-    JSON_UNESCAPED_SLASHES, JSON_UNESCAPED_UNICODE, PhpMixed, STR_PAD_RIGHT, bconcat, count,
+    JSON_UNESCAPED_SLASHES, JSON_UNESCAPED_UNICODE, PhpMixed, STR_PAD_RIGHT, bformat, count,
     implode, json_encode_ex, preg_replace, str_pad, str_repeat, str_replace, strip_tags, strlen,
 };
 
@@ -40,10 +40,9 @@ impl TextDescriptor {
             && (!matches!(default_value, PhpMixed::List(_) | PhpMixed::Array(_))
                 || count(&default_value) != 0)
         {
-            bconcat!(
-                "<comment> [default: ",
-                self.format_default_value(&default_value)?,
-                "]</comment>"
+            bformat!(
+                "<comment> [default: {}]</comment>",
+                self.format_default_value(&default_value)?
             )
         } else {
             BString::default()
@@ -55,18 +54,15 @@ impl TextDescriptor {
         let spacing_width = total_width - strlen(argument.get_name());
 
         self.write_text(
-            bconcat!(
-                "  <info>",
+            bformat!(
+                "  <info>{}</info>  {}{}{default}",
                 argument.get_name(),
-                "</info>  ",
                 str_repeat(" ", spacing_width as usize),
-                // + 4 = 2 spaces before <info>, 2 spaces after </info>
                 preg_replace(
                     "/\\s*[\\r\\n]\\s*/",
-                    bconcat!("\n", str_repeat(" ", (total_width + 4) as usize)),
+                    bformat!("\n{}", str_repeat(" ", (total_width + 4) as usize)),
                     argument.get_description(),
-                ),
-                default,
+                )
             ),
             &options,
         );
@@ -84,10 +80,9 @@ impl TextDescriptor {
             && (!matches!(default_value, PhpMixed::List(_) | PhpMixed::Array(_))
                 || count(&default_value) != 0)
         {
-            bconcat!(
-                "<comment> [default: ",
-                self.format_default_value(&default_value)?,
-                "]</comment>"
+            bformat!(
+                "<comment> [default: {}]</comment>",
+                self.format_default_value(&default_value)?
             )
         } else {
             BString::default()
@@ -95,48 +90,45 @@ impl TextDescriptor {
 
         let mut value = BString::default();
         if option.accept_value() {
-            value = bconcat!("=", option.get_name().to_ascii_uppercase());
+            value = bformat!("={}", option.get_name().to_ascii_uppercase());
 
             if option.is_value_optional() {
-                value = bconcat!("[", value, "]");
+                value = bformat!("[{value}]");
             }
         }
 
         let total_width = options
             .total_width
             .unwrap_or_else(|| self.calculate_total_width_for_options(&[option]));
-        let synopsis = bconcat!(
+        let synopsis = bformat!(
+            "{}{}",
             match option.get_shortcut() {
-                Some(shortcut) => bconcat!("-", shortcut, ", "),
+                Some(shortcut) => bformat!("-{shortcut}, "),
                 None => BString::from("    "),
             },
             if option.is_negatable() {
-                bconcat!("--", option.get_name(), "|--no-", option.get_name())
+                bformat!("--{}|--no-{}", option.get_name(), option.get_name())
             } else {
-                bconcat!("--", option.get_name(), value)
-            },
+                bformat!("--{}{value}", option.get_name())
+            }
         );
 
         let spacing_width = total_width - Helper::width(&synopsis);
 
         self.write_text(
-            bconcat!(
-                "  <info>",
-                synopsis,
-                "</info>  ",
+            bformat!(
+                "  <info>{synopsis}</info>  {}{}{default}{}",
                 str_repeat(" ", spacing_width as usize),
-                // + 4 = 2 spaces before <info>, 2 spaces after </info>
                 preg_replace(
                     "/\\s*[\\r\\n]\\s*/",
-                    bconcat!("\n", str_repeat(" ", (total_width + 4) as usize)),
+                    bformat!("\n{}", str_repeat(" ", (total_width + 4) as usize)),
                     option.get_description(),
                 ),
-                default,
                 if option.is_array() {
                     "<comment> (multiple values allowed)</comment>"
                 } else {
                     ""
-                },
+                }
             ),
             &options,
         );
@@ -215,7 +207,7 @@ impl TextDescriptor {
         if !description.is_empty() {
             self.write_text("<comment>Description:</comment>", &options);
             self.write_text("\n", &DescriptorOptions::default());
-            self.write_text(bconcat!("  ", description), &DescriptorOptions::default());
+            self.write_text(bformat!("  {description}"), &DescriptorOptions::default());
             self.write_text("\n\n", &DescriptorOptions::default());
         }
 
@@ -225,7 +217,7 @@ impl TextDescriptor {
         usages.extend(command.get_usages());
         for usage in usages {
             self.write_text("\n", &DescriptorOptions::default());
-            self.write_text(bconcat!("  ", OutputFormatter::escape(&usage)?), &options);
+            self.write_text(bformat!("  {}", OutputFormatter::escape(&usage)?), &options);
         }
         self.write_text("\n", &DescriptorOptions::default());
 
@@ -241,7 +233,7 @@ impl TextDescriptor {
             self.write_text("\n", &DescriptorOptions::default());
             self.write_text("<comment>Help:</comment>", &options);
             self.write_text("\n", &DescriptorOptions::default());
-            self.write_text(bconcat!("  ", str_replace("\n", "\n  ", &help)), &options);
+            self.write_text(bformat!("  {}", str_replace("\n", "\n  ", &help)), &options);
             self.write_text("\n", &DescriptorOptions::default());
         }
         Ok(())
@@ -269,15 +261,15 @@ impl TextDescriptor {
             for command in &command_list {
                 let command = command.borrow();
                 self.write_text(
-                    bconcat!(
+                    bformat!(
+                        "{} {}",
                         str_pad(
                             command.get_name().unwrap_or_default(),
                             width as usize,
                             " ",
                             STR_PAD_RIGHT,
                         ),
-                        " ",
-                        command.get_description(),
+                        command.get_description()
                     ),
                     &options,
                 );
@@ -286,7 +278,7 @@ impl TextDescriptor {
         } else {
             let help = application.borrow().get_help();
             if !help.is_empty() {
-                self.write_text(bconcat!(help, "\n\n"), &options);
+                self.write_text(bformat!("{help}\n\n"), &options);
             }
 
             self.write_text("<comment>Usage:</comment>\n", &options);
@@ -332,11 +324,7 @@ impl TextDescriptor {
 
             if let Some(ref described_namespace) = described_namespace {
                 self.write_text(
-                    bconcat!(
-                        "<comment>Available commands for the \"",
-                        described_namespace,
-                        "\" namespace:</comment>",
-                    ),
+                    bformat!("<comment>Available commands for the \"{described_namespace}\" namespace:</comment>"),
                     &options,
                 );
             } else {
@@ -361,7 +349,7 @@ impl TextDescriptor {
                     && ApplicationDescription::GLOBAL_NAMESPACE != namespace_id
                 {
                     self.write_text("\n", &DescriptorOptions::default());
-                    self.write_text(bconcat!(" <comment>", namespace_id, "</comment>"), &options);
+                    self.write_text(bformat!(" <comment>{namespace_id}</comment>"), &options);
                 }
 
                 for name in ns_commands {
@@ -375,13 +363,10 @@ impl TextDescriptor {
                         BString::default()
                     };
                     self.write_text(
-                        bconcat!(
-                            "  <info>",
-                            name,
-                            "</info>",
+                        bformat!(
+                            "  <info>{name}</info>{}{command_aliases}{}",
                             str_repeat(" ", spacing_width as usize),
-                            command_aliases,
-                            command.get_description(),
+                            command.get_description()
                         ),
                         &options,
                     );
@@ -412,7 +397,7 @@ impl TextDescriptor {
         let aliases = command.get_aliases();
 
         if !aliases.is_empty() {
-            text = bconcat!("[", implode("|", &aliases), "] ");
+            text = bformat!("[{}] ", implode("|", &aliases));
         }
 
         text

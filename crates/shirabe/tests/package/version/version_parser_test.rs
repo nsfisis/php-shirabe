@@ -3,16 +3,16 @@
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe::package::version::VersionParser;
-use shirabe_php_shim::bconcat;
+use shirabe_php_shim::bformat;
 
 fn pairs(items: &[&BStr]) -> Vec<BString> {
-    items.iter().map(|s| bconcat!(s)).collect()
+    items.iter().map(|s| bformat!("{s}")).collect()
 }
 
 fn entry(fields: &[(&BStr, &BStr)]) -> IndexMap<BString, BString> {
     fields
         .iter()
-        .map(|(k, v)| (bconcat!(k), bconcat!(v)))
+        .map(|(k, v)| (bformat!("{k}"), bformat!("{v}")))
         .collect()
 }
 

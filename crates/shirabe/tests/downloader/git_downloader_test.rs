@@ -14,7 +14,7 @@ use shirabe::downloader::{GitDownloader, VcsDownloader};
 use shirabe::io::{IOInterface, io_interface};
 use shirabe::package::{CompletePackageHandle, Mirror, PackageInterfaceHandle};
 use shirabe::util::{Filesystem, FilesystemMock, Git as GitUtil, ProcessExecutor};
-use shirabe_php_shim::{PhpMixed, bconcat, error_message, path_from_bytes, path_to_bytes};
+use shirabe_php_shim::{PhpMixed, bformat, error_message, path_from_bytes, path_to_bytes};
 use shirabe_semver::VersionParser;
 use tempfile::TempDir;
 
@@ -66,11 +66,14 @@ fn get_package(
     source_url: Option<&BStr>,
 ) -> PackageInterfaceHandle {
     let norm_version = VersionParser.normalize(pretty_version, None).unwrap();
-    let package =
-        CompletePackageHandle::new(bconcat!(name), norm_version, bconcat!(pretty_version));
+    let package = CompletePackageHandle::new(
+        bformat!("{name}"),
+        norm_version,
+        bformat!("{pretty_version}"),
+    );
     package.__set_source_type(Some(BString::from("git")));
-    package.set_source_reference(source_reference.map(|s| bconcat!(s)));
-    package.set_source_url(source_url.map(|s| bconcat!(s)));
+    package.set_source_reference(source_reference.map(|s| bformat!("{s}")));
+    package.set_source_url(source_url.map(|s| bformat!("{s}")));
     package.into()
 }
 
@@ -159,7 +162,7 @@ fn test_download() {
         Some(url),
     );
 
-    let expected_path = bconcat!(working_dir.path().join("composerPath"));
+    let expected_path = bformat!("{}", working_dir.path().join("composerPath"));
 
     let (process, _guard) = get_process_executor_mock(
         vec![
@@ -277,14 +280,14 @@ fn test_download_with_cache() {
             }
         })
         .collect();
-    let cache_path = bconcat!(cache_vcs_dir, "/", sanitized, "/");
+    let cache_path = bformat!("{cache_vcs_dir}/{sanitized}/");
 
     let mut filesystem = Filesystem::new(None);
     filesystem
         .remove_directory(path_from_bytes(&cache_path))
         .unwrap();
 
-    let expected_path = bconcat!(working_dir.path().join("composerPath"));
+    let expected_path = bformat!("{}", working_dir.path().join("composerPath"));
 
     let cache_path_for_callback = cache_path.clone();
     let mut clone_mirror = cmd(vec![
@@ -423,7 +426,7 @@ fn test_download_uses_various_protocols_and_sets_push_url_for_github() {
         preferred: true,
     }]));
 
-    let expected_path = bconcat!(working_dir.path().join("composerPath"));
+    let expected_path = bformat!("{}", working_dir.path().join("composerPath"));
 
     let (process, _guard) = get_process_executor_mock(
         vec![
@@ -563,7 +566,7 @@ fn test_download_and_set_push_url_use_custom_various_protocols_for_github() {
             Some(BStr::new("https://github.com/composer/composer")),
         );
 
-        let expected_path = bconcat!(working_dir.path().join("composerPath"));
+        let expected_path = bformat!("{}", working_dir.path().join("composerPath"));
 
         let (process, _guard) = get_process_executor_mock(
             vec![
@@ -625,7 +628,7 @@ fn test_download_and_set_push_url_use_custom_various_protocols_for_github() {
             PhpMixed::List(
                 protocols
                     .iter()
-                    .map(|p| PhpMixed::string(bconcat!(p)))
+                    .map(|p| PhpMixed::string(bformat!("{p}")))
                     .collect(),
             ),
         );
@@ -679,7 +682,7 @@ fn test_download_throws_runtime_exception_if_git_command_fails() {
         Some(url),
     );
 
-    let expected_path = bconcat!(working_dir.path().join("composerPath"));
+    let expected_path = bformat!("{}", working_dir.path().join("composerPath"));
 
     let (process, _guard) = get_process_executor_mock(
         vec![cmd_full(
@@ -727,11 +730,8 @@ fn test_download_throws_runtime_exception_if_git_command_fails() {
     });
 
     let e = result.expect_err("failed git clone should throw");
-    assert!(error_message(&e).contains_str(bconcat!(
-        "Failed to execute git clone --no-checkout -- ",
-        url,
-        " ",
-        expected_path
+    assert!(error_message(&e).contains_str(bformat!(
+        "Failed to execute git clone --no-checkout -- {url} {expected_path}"
     )));
 }
 
@@ -1235,7 +1235,7 @@ fn test_downgrade_shows_appropriate_message() {
         Some(BStr::new("/foo/bar")),
     );
     old_package.set_source_mirrors(Some(vec![Mirror {
-        url: bconcat!(url),
+        url: bformat!("{url}"),
         preferred: false,
     }]));
     let new_package = get_package(
@@ -1317,7 +1317,7 @@ fn test_not_using_downgrading_with_references() {
     old_package.set_source_reference(Some(BString::from("ref")));
     old_package.set_source_url(Some(BString::from("/foo/bar")));
     old_package.set_source_mirrors(Some(vec![Mirror {
-        url: bconcat!(url),
+        url: bformat!("{url}"),
         preferred: false,
     }]));
     let old_package: PackageInterfaceHandle = old_package.into();
@@ -1329,7 +1329,7 @@ fn test_not_using_downgrading_with_references() {
     );
     new_package.__set_source_type(Some(BString::from("git")));
     new_package.set_source_reference(Some(BString::from("ref")));
-    new_package.set_source_url(Some(bconcat!(url)));
+    new_package.set_source_url(Some(bformat!("{url}")));
     let new_package: PackageInterfaceHandle = new_package.into();
 
     let (process, _guard) = get_process_executor_mock(vec![], false, Default::default());

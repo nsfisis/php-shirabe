@@ -5,7 +5,7 @@ use crate::util::NoProxyPattern;
 use crate::util::http::{ProxyItem, RequestProxy};
 use bstr::{BStr, BString};
 use shirabe_php_shim::{
-    PHP_SERVER, bconcat, error_message, parse_url, path_from_bytes, strtolower, strtoupper,
+    PHP_SERVER, bformat, error_message, parse_url, path_from_bytes, strtolower, strtoupper,
 };
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -78,7 +78,7 @@ impl ProxyManager {
         let request_url = request_url.as_ref();
         if let Some(ref error) = self.error {
             return Err(Box::new(TransportException::new(
-                bconcat!("Unable to use a proxy: ", error),
+                bformat!("Unable to use a proxy: {error}"),
                 0,
             )));
         }

@@ -4,7 +4,7 @@ use crate::util::{Platform, ProcessExecutor};
 use bstr::{BString, ByteVec};
 use shirabe_php_shim::{
     CHILD_FIRST, InvalidArgumentException, LogicException, PhpMixed, PregMatches, RuntimeException,
-    SELF_FIRST, SKIP_DOTS, array_pop, basename, bconcat, chdir, clearstatcache,
+    SELF_FIRST, SKIP_DOTS, array_pop, basename, bformat, chdir, clearstatcache,
     clearstatcache_with_realpath_cache_and_filename, copy, dirname, display_to_bytes, explode,
     fclose, feof, file_exists, file_get_contents, file_put_contents, fileatime, filemtime,
     filesize, fopen, fread, fwrite, implode, is_dir, is_file, is_link, is_readable, lstat, mkdir,
@@ -226,11 +226,7 @@ impl Filesystem {
             php_regex!("{^(?:[a-z]:)?[/\\\\]+$}i"),
             path_to_bytes(directory),
         ) {
-            return Err(RuntimeException::new(bconcat!(
-                "Aborting an attempted deletion of ",
-                directory,
-                ", this was probably not intended, if it is a real use case please report it."
-            ))
+            return Err(RuntimeException::new(bformat!("Aborting an attempted deletion of {directory}, this was probably not intended, if it is a real use case please report it."))
             .into());
         }
 
@@ -282,9 +278,8 @@ impl Filesystem {
         let directory = directory.as_ref();
         if !is_dir(directory) {
             if file_exists(directory) {
-                return Err(RuntimeException::new(bconcat!(
-                    directory,
-                    " exists and is not a directory."
+                return Err(RuntimeException::new(bformat!(
+                    "{directory} exists and is not a directory."
                 ))
                 .into());
             }
@@ -292,19 +287,16 @@ impl Filesystem {
             if is_link(directory)
                 && let Err(last_error) = self.unlink_implementation(directory)
             {
-                return Err(RuntimeException::new(bconcat!(
-                    "Could not delete symbolic link ",
-                    directory,
-                    ": ",
+                return Err(RuntimeException::new(bformat!(
+                    "Could not delete symbolic link {directory}: {}",
                     display_to_bytes(&last_error)
                 ))
                 .into());
             }
 
             if let Err(last_error) = mkdir(directory, 0o777, true) {
-                let e = RuntimeException::new(bconcat!(
-                    directory,
-                    " does not exist and could not be created: ",
+                let e = RuntimeException::new(bformat!(
+                    "{directory} does not exist and could not be created: {}",
                     display_to_bytes(&last_error)
                 ));
 
@@ -338,12 +330,8 @@ impl Filesystem {
             }
 
             if let Err(last_error) = unlinked {
-                let mut message = bconcat!(
-                    "Could not delete ",
-                    path,
-                    ": ",
-                    display_to_bytes(&last_error)
-                );
+                let mut message =
+                    bformat!("Could not delete {path}: {}", display_to_bytes(&last_error));
                 if Platform::is_windows() {
                     message.push_str("\nThis can be due to an antivirus or the Windows Search Indexer locking the file while they are analyzed");
                 }
@@ -367,12 +355,8 @@ impl Filesystem {
             }
 
             if let Err(last_error) = deleted {
-                let mut message = bconcat!(
-                    "Could not delete ",
-                    path,
-                    ": ",
-                    display_to_bytes(&last_error)
-                );
+                let mut message =
+                    bformat!("Could not delete {path}: {}", display_to_bytes(&last_error));
                 if Platform::is_windows() {
                     message.push_str("\nThis can be due to an antivirus or the Windows Search Indexer locking the file while they are analyzed");
                 }
@@ -537,12 +521,8 @@ impl Filesystem {
     ) -> anyhow::Result<PathBuf> {
         let (from, to) = (from.as_ref(), to.as_ref());
         if !self.is_absolute_path(from) || !self.is_absolute_path(to) {
-            return Err(InvalidArgumentException::new(bconcat!(
-                "$from (",
-                from,
-                ") and $to (",
-                to,
-                ") must be absolute paths."
+            return Err(InvalidArgumentException::new(bformat!(
+                "$from ({from}) and $to ({to}) must be absolute paths."
             ))
             .into());
         }
@@ -551,15 +531,15 @@ impl Filesystem {
         let to = BString::from(path_to_bytes(&self.normalize_path(to)));
 
         if directories {
-            from = bconcat!(rtrim_chars(&from, "/"), "/dummy_file");
+            from = bformat!("{}/dummy_file", rtrim_chars(&from, "/"));
         }
 
         if dirname(&from) == dirname(&to) {
-            return Ok(path_from_bytes(&bconcat!("./", basename(&to))).to_path_buf());
+            return Ok(path_from_bytes(&bformat!("./{}", basename(&to))).to_path_buf());
         }
 
         let mut common_path = to.clone();
-        while strpos(bconcat!(from, "/"), bconcat!(common_path, "/")) != Some(0)
+        while strpos(bformat!("{from}/"), bformat!("{common_path}/")) != Some(0)
             && "/" != common_path
             && !preg_is_match(php_regex!("{^[A-Z]:/?$}i"), &common_path)
         {
@@ -571,7 +551,7 @@ impl Filesystem {
             return Ok(path_from_bytes(&to).to_path_buf());
         }
 
-        common_path = bconcat!(rtrim_chars(&common_path, "/"), "/");
+        common_path = bformat!("{}/", rtrim_chars(&common_path, "/"));
         let source_path_depth = substr_count(substr(&from, strlen(&common_path), None), "/");
         let common_path_code = str_repeat("../", source_path_depth as usize);
 
@@ -580,7 +560,10 @@ impl Filesystem {
             return Ok(path_from_bytes(&to).to_path_buf());
         }
 
-        let result = bconcat!(common_path_code, substr(&to, strlen(&common_path), None));
+        let result = bformat!(
+            "{common_path_code}{}",
+            substr(&to, strlen(&common_path), None)
+        );
         if strlen(&result) == 0 {
             return Ok(PathBuf::from("./"));
         }
@@ -599,12 +582,8 @@ impl Filesystem {
     ) -> anyhow::Result<BString> {
         let (from, to) = (from.as_ref(), to.as_ref());
         if !self.is_absolute_path(from) || !self.is_absolute_path(to) {
-            return Err(InvalidArgumentException::new(bconcat!(
-                "$from (",
-                from,
-                ") and $to (",
-                to,
-                ") must be absolute paths."
+            return Err(InvalidArgumentException::new(bformat!(
+                "$from ({from}) and $to ({to}) must be absolute paths."
             ))
             .into());
         }
@@ -617,7 +596,7 @@ impl Filesystem {
         }
 
         let mut common_path = to.clone();
-        while strpos(bconcat!(from, "/"), bconcat!(common_path, "/")) != Some(0)
+        while strpos(bformat!("{from}/"), bformat!("{common_path}/")) != Some(0)
             && "/" != common_path
             && !preg_is_match(php_regex!("{^[A-Z]:/?$}i"), &common_path)
             && "." != common_path
@@ -630,10 +609,10 @@ impl Filesystem {
             return Ok(var_export(&PhpMixed::string(to), true));
         }
 
-        common_path = bconcat!(rtrim_chars(&common_path, "/"), "/");
-        if to.starts_with(&bconcat!(from, "/")) {
-            return Ok(bconcat!(
-                "__DIR__ . ",
+        common_path = bformat!("{}/", rtrim_chars(&common_path, "/"));
+        if to.starts_with(&bformat!("{from}/")) {
+            return Ok(bformat!(
+                "__DIR__ . {}",
                 var_export(&PhpMixed::string(substr(&to, strlen(&from), None)), true)
             ));
         }
@@ -647,26 +626,25 @@ impl Filesystem {
         }
 
         let common_path_code = if static_code {
-            bconcat!(
-                "__DIR__ . '",
-                str_repeat("/..", source_path_depth as usize),
-                "'"
+            bformat!(
+                "__DIR__ . '{}'",
+                str_repeat("/..", source_path_depth as usize)
             )
         } else {
-            bconcat!(
+            bformat!(
+                "{}__DIR__{}",
                 str_repeat("dirname(", source_path_depth as usize),
-                "__DIR__",
                 str_repeat(")", source_path_depth as usize)
             )
         };
         let rel_target = substr(&to, strlen(&common_path), None);
 
-        Ok(bconcat!(
-            common_path_code,
+        Ok(bformat!(
+            "{common_path_code}{}",
             if strlen(&rel_target) > 0 {
-                bconcat!(
-                    ".",
-                    var_export(&PhpMixed::string(bconcat!("/", rel_target)), true)
+                bformat!(
+                    ".{}",
+                    var_export(&PhpMixed::string(bformat!("/{rel_target}")), true)
                 )
             } else {
                 BString::default()
@@ -687,7 +665,7 @@ impl Filesystem {
     pub fn size(&self, path: impl AsRef<Path>) -> anyhow::Result<i64> {
         let path = path.as_ref();
         if !file_exists(path) {
-            return Err(RuntimeException::new(bconcat!(path, " does not exist.")).into());
+            return Err(RuntimeException::new(bformat!("{path} does not exist.")).into());
         }
         if is_dir(path) {
             return self.directory_size(path);
@@ -752,7 +730,7 @@ impl Filesystem {
         )
         .expect("the replacement callback cannot fail");
 
-        path_from_bytes(&bconcat!(prefix, absolute, implode("/", &parts))).to_path_buf()
+        path_from_bytes(&bformat!("{prefix}{absolute}{}", implode("/", &parts))).to_path_buf()
     }
 
     /// Remove trailing slashes if present to avoid issues with symlinks
@@ -924,20 +902,14 @@ impl Filesystem {
     ) -> anyhow::Result<()> {
         let (target, junction) = (target.as_ref(), junction.as_ref());
         if !Platform::is_windows() {
-            return Err(LogicException::new(bconcat!(
-                "Function ",
-                "Composer\\Util\\Filesystem",
-                " is not available on non-Windows platform"
+            return Err(LogicException::new(bformat!(
+                "Function Composer\\Util\\Filesystem is not available on non-Windows platform"
             ))
             .into());
         }
         if !is_dir(target) {
             return Err(IOException::new(
-                bconcat!(
-                    "Cannot junction to \"",
-                    target,
-                    "\" as it is not a directory."
-                ),
+                bformat!("Cannot junction to \"{target}\" as it is not a directory."),
                 0,
                 None,
                 Some(target.to_path_buf()),
@@ -959,13 +931,7 @@ impl Filesystem {
         let mut output = BString::default();
         if self.get_process().execute(&cmd, &mut output, None)? != 0 {
             return Err(IOException::new(
-                bconcat!(
-                    "Failed to create junction to \"",
-                    target,
-                    "\" at \"",
-                    junction,
-                    "\"."
-                ),
+                bformat!("Failed to create junction to \"{target}\" at \"{junction}\"."),
                 0,
                 None,
                 Some(target.to_path_buf()),
@@ -1029,10 +995,7 @@ impl Filesystem {
         .to_path_buf();
         if !self.is_junction(&junction) {
             return Err(IOException::new(
-                bconcat!(
-                    junction,
-                    " is not a junction and thus cannot be removed as one"
-                ),
+                bformat!("{junction} is not a junction and thus cannot be removed as one"),
                 0,
                 None,
                 None,
@@ -1068,10 +1031,8 @@ impl Filesystem {
             let source_handle = match fopen(source, "r") {
                 Ok(source_handle) => source_handle,
                 Err(_) => {
-                    return Err(RuntimeException::new(bconcat!(
-                        "Could not open \"",
-                        source,
-                        "\" for reading."
+                    return Err(RuntimeException::new(bformat!(
+                        "Could not open \"{source}\" for reading."
                     ))
                     .into());
                 }
@@ -1079,10 +1040,8 @@ impl Filesystem {
             let target_handle = match fopen(target, "w+") {
                 Ok(target_handle) => target_handle,
                 Err(_) => {
-                    return Err(RuntimeException::new(bconcat!(
-                        "Could not open \"",
-                        target,
-                        "\" for writing."
+                    return Err(RuntimeException::new(bformat!(
+                        "Could not open \"{target}\" for writing."
                     ))
                     .into());
                 }

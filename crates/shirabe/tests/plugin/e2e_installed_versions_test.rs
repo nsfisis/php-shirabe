@@ -9,7 +9,7 @@
 use crate::e2e_extension_installer_test::{copy_dir, upstream_composer_bin};
 use crate::php_worker::lock_php_worker;
 use bstr::{BStr, BString};
-use shirabe_php_shim::{bconcat, os_str_from_bytes};
+use shirabe_php_shim::{bformat, os_str_from_bytes};
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use tempfile::TempDir;
@@ -43,7 +43,7 @@ fn run_probe(program: &BStr, prefix_args: &[&OsStr]) -> Run {
         .unwrap();
     Run {
         exit_code: output.status.code().unwrap_or(-1),
-        output: bconcat!(&output.stdout, &output.stderr),
+        output: bformat!("{}{}", &output.stdout, &output.stderr),
         trace: BString::from(
             std::fs::read(project.join("installed-versions-trace.txt")).unwrap_or_default(),
         ),

@@ -5,7 +5,7 @@ use indexmap::IndexMap;
 use shirabe::config::Config;
 use shirabe::io::{BufferIO, IOInterface, IOInterfaceImmutable, IOInterfaceMutable, io_interface};
 use shirabe::util::Platform;
-use shirabe_php_shim::{PHP_EOL, bconcat, php_regex, preg_is_match, preg_quote, preg_split};
+use shirabe_php_shim::{PHP_EOL, bformat, php_regex, preg_is_match, preg_quote, preg_split};
 use shirabe_symfony_console::input::InputValue;
 use shirabe_symfony_console::output::output_interface;
 use std::collections::VecDeque;
@@ -159,11 +159,11 @@ impl IOMock {
 
                 let (pattern, label) = match expect {
                     Expectation::Ask { ask, .. } => {
-                        (bconcat!("{^", preg_quote(ask, None), "$}"), ask.clone())
+                        (bformat!("{{^{}$}}", preg_quote(ask, None)), ask.clone())
                     }
                     Expectation::Text { text, regex: true } => (text.clone(), text.clone()),
                     Expectation::Text { text, regex: false } => {
-                        (bconcat!("{^", preg_quote(text, None), "$}"), text.clone())
+                        (bformat!("{{^{}$}}", preg_quote(text, None)), text.clone())
                     }
                     Expectation::Auth { .. } => unreachable!("handled above"),
                 };
@@ -364,7 +364,10 @@ impl shirabe::io::BaseIO for IOMock {
 }
 
 fn with_eol(question: &bstr::BStr) -> bstr::BString {
-    bconcat!(question.trim_end_with(|c| c == '\r' || c == '\n'), PHP_EOL)
+    bformat!(
+        "{}{PHP_EOL}",
+        question.trim_end_with(|c| c == '\r' || c == '\n')
+    )
 }
 
 pub struct IOMockGuard(std::rc::Rc<std::cell::RefCell<IOMock>>);

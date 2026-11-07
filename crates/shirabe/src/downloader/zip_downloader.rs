@@ -13,7 +13,7 @@ use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, CmpOp, ErrorException, PhpMixed, RuntimeException, UnexpectedValueException,
-    ZipArchive, bconcat, bin2hex, error_message, file_exists, file_get_contents, filesize,
+    ZipArchive, bformat, bin2hex, error_message, file_exists, file_get_contents, filesize,
     hash_file, impl_php_class, implode, is_file, json_encode, path_to_bytes, php_regex, preg_match,
     random_int, rtrim, str_replace, strlen, substr, version_compare,
 };
@@ -122,15 +122,7 @@ impl ZipDownloader {
             {
                 let m1 = m.get(1).unwrap_or_default();
                 if version_compare(m1, "21.01", CmpOp::Lt) {
-                    self.inner.io.borrow().write_error(bconcat!(
-                        "    <warning>Unzipping using ",
-                        executable,
-                        " ",
-                        m1,
-                        " may result in incorrect file permissions. Install ",
-                        executable,
-                        " 21.01+ or unzip to ensure you get correct permissions.</warning>"
-                    ));
+                    self.inner.io.borrow().write_error(bformat!("    <warning>Unzipping using {executable} {m1} may result in incorrect file permissions. Install {executable} 21.01+ or unzip to ensure you get correct permissions.</warning>"));
                 }
             }
         }
@@ -149,32 +141,23 @@ impl ZipDownloader {
                         .borrow()
                         .contains_key(package.get_name().as_bstr())
                     {
-                        return Err(RuntimeException::new(bconcat!(
-                            "Failed to extract ",
-                            package.get_name(),
-                            " as the installation was aborted by another package operation."
-                        ))
+                        return Err(RuntimeException::new(bformat!("Failed to extract {} as the installation was aborted by another package operation.", package.get_name()))
                         .into());
                     }
 
                     let output = process.get_error_output()?;
-                    let output =
-                        str_replace(bconcat!(", ", file, ".zip or ", file, ".ZIP"), "", &output);
+                    let output = str_replace(bformat!(", {file}.zip or {file}.ZIP"), "", &output);
 
                     return self
                         .try_fallback(
-                            RuntimeException::new(bconcat!(
-                                "Failed to extract ",
+                            RuntimeException::new(bformat!(
+                                "Failed to extract {}: ({}) {}\n\n{output}",
                                 package.get_name(),
-                                ": (",
                                 process
                                     .get_exit_code()
-                                    .map(|c| bconcat!(c))
+                                    .map(|c| bformat!("{c}"))
                                     .unwrap_or_default(),
-                                ") ",
-                                implode(" ", &command),
-                                "\n\n",
-                                output
+                                implode(" ", &command)
                             ))
                             .into(),
                             file,
@@ -204,24 +187,20 @@ impl ZipDownloader {
         }
 
         if !is_file(file) {
-            self.inner.io.borrow().write_error(bconcat!(
-                "    <warning>",
-                error_message(&process_error),
-                "</warning>"
+            self.inner.io.borrow().write_error(bformat!(
+                "    <warning>{}</warning>",
+                error_message(&process_error)
             ));
             self.inner.io.borrow().write_error("    <warning>This most likely is due to a custom installer plugin not handling the returned Promise from the downloader</warning>");
             self.inner.io.borrow().write_error("    <warning>See https://github.com/composer/installers/commit/5006d0c28730ade233a8f42ec31ac68fb1c5c9bb for an example fix</warning>");
         } else {
-            self.inner.io.borrow().write_error(bconcat!(
-                "    <warning>",
-                error_message(&process_error),
-                "</warning>"
+            self.inner.io.borrow().write_error(bformat!(
+                "    <warning>{}</warning>",
+                error_message(&process_error)
             ));
             self.inner.io.borrow().write_error("    The archive may contain identical file names with different capitalization (which fails on case insensitive filesystems)");
-            self.inner.io.borrow().write_error(bconcat!(
-                "    Unzip with ",
-                executable,
-                " command failed, falling back to ZipArchive class"
+            self.inner.io.borrow().write_error(bformat!(
+                "    Unzip with {executable} command failed, falling back to ZipArchive class"
             ));
 
             // additional debug data to try to figure out GH actions issues https://github.com/composer/composer/issues/11148
@@ -229,24 +208,24 @@ impl ZipDownloader {
                 && Platform::get_env("COMPOSER_TESTS_ARE_RUNNING").is_none()
             {
                 self.inner.io.borrow().write_error("    <warning>Additional debug info, please report to https://github.com/composer/composer/issues/11148 if you see this:</warning>");
-                self.inner.io.borrow().write_error(bconcat!(
-                    "File size: ",
-                    filesize(file).map(|s| bconcat!(s)).unwrap_or_default()
+                self.inner.io.borrow().write_error(bformat!(
+                    "File size: {}",
+                    filesize(file).map(|s| bformat!("{s}")).unwrap_or_default()
                 ));
-                self.inner.io.borrow().write_error(bconcat!(
-                    "File SHA1: ",
+                self.inner.io.borrow().write_error(bformat!(
+                    "File SHA1: {}",
                     hash_file("sha1", file).unwrap_or_default()
                 ));
-                self.inner.io.borrow().write_error(bconcat!(
-                    "First 100 bytes (hex): ",
+                self.inner.io.borrow().write_error(bformat!(
+                    "First 100 bytes (hex): {}",
                     bin2hex(substr(
                         file_get_contents(file).unwrap_or_default(),
                         0,
                         Some(100)
                     ))
                 ));
-                self.inner.io.borrow().write_error(bconcat!(
-                    "Last 100 bytes (hex): ",
+                self.inner.io.borrow().write_error(bformat!(
+                    "Last 100 bytes (hex): {}",
                     bin2hex(substr(
                         file_get_contents(file).unwrap_or_default(),
                         -100,
@@ -254,8 +233,8 @@ impl ZipDownloader {
                     ))
                 ));
                 if strlen(package.get_dist_url().unwrap_or_default()) > 0 {
-                    self.inner.io.borrow().write_error(bconcat!(
-                        "Origin URL: ",
+                    self.inner.io.borrow().write_error(bformat!(
+                        "Origin URL: {}",
                         self.inner.process_url(
                             package.clone(),
                             package.get_dist_url().unwrap_or_default()
@@ -270,8 +249,8 @@ impl ZipDownloader {
                             None => PhpMixed::List(vec![]),
                         }
                     };
-                    self.inner.io.borrow().write_error(bconcat!(
-                        "Response Headers: ",
+                    self.inner.io.borrow().write_error(bformat!(
+                        "Response Headers: {}",
                         json_encode(&headers).unwrap_or_default()
                     ));
                 }
@@ -330,11 +309,7 @@ impl ZipDownloader {
                             && total_size > archive_sz * 100
                             && total_size > 50 * 1024 * 1024
                         {
-                            return Err(RuntimeException::new(bconcat!(
-                                "Invalid zip file for \"",
-                                package.get_name(),
-                                "\" with compression ratio >99% (possible zip bomb)"
-                            ))
+                            return Err(RuntimeException::new(bformat!("Invalid zip file for \"{}\" with compression ratio >99% (possible zip bomb)", package.get_name()))
                             .into());
                         }
                     }
@@ -346,15 +321,11 @@ impl ZipDownloader {
                         return Ok(None);
                     }
 
-                    Err(RuntimeException::new(bconcat!(
-                        "There was an error extracting the ZIP file for \"",
-                        package.get_name(),
-                        "\", it is either corrupted or using an invalid format."
-                    ))
+                    Err(RuntimeException::new(bformat!("There was an error extracting the ZIP file for \"{}\", it is either corrupted or using an invalid format.", package.get_name()))
                     .into())
                 }
                 Err(code) => Err(UnexpectedValueException::with_code(
-                    rtrim(bconcat!(self.get_error_message(code, file), "\n")),
+                    rtrim(bformat!("{}\n", self.get_error_message(code, file))),
                     code,
                 )
                 .into()),
@@ -363,7 +334,7 @@ impl ZipDownloader {
 
         result.map_err(|e| {
             if let Some(err) = e.catch::<ErrorException>() {
-                let message = bconcat!("The archive for \"", package.get_name(), "\" may contain identical file names with different capitalization (which fails on case insensitive filesystems): ", err.get_message());
+                let message = bformat!("The archive for \"{}\" may contain identical file names with different capitalization (which fails on case insensitive filesystems): {}", package.get_name(), err.get_message());
                 RuntimeException::with_code_and_previous(message, 0, Some(std::sync::Arc::new(e)))
                     .into()
             } else {
@@ -374,26 +345,17 @@ impl ZipDownloader {
 
     pub fn get_error_message(&self, retval: i64, file: &std::path::Path) -> BString {
         match retval {
-            ZipArchive::ER_EXISTS => bconcat!("File '", file, "' already exists."),
-            ZipArchive::ER_INCONS => bconcat!("Zip archive '", file, "' is inconsistent."),
-            ZipArchive::ER_INVAL => bconcat!("Invalid argument (", file, ")"),
-            ZipArchive::ER_MEMORY => bconcat!("Malloc failure (", file, ")"),
-            ZipArchive::ER_NOENT => bconcat!("No such zip file: '", file, "'"),
-            ZipArchive::ER_NOZIP => bconcat!("'", file, "' is not a zip archive."),
-            ZipArchive::ER_OPEN => bconcat!("Can't open zip file: ", file),
-            ZipArchive::ER_READ => bconcat!("Zip read error (", file, ")"),
-            ZipArchive::ER_SEEK => bconcat!("Zip seek error (", file, ")"),
-            -1 => bconcat!(
-                "'",
-                file,
-                "' is a corrupted zip archive (0 bytes), try again."
-            ),
-            _ => bconcat!(
-                "'",
-                file,
-                "' is not a valid zip archive, got error code: ",
-                retval
-            ),
+            ZipArchive::ER_EXISTS => bformat!("File '{file}' already exists."),
+            ZipArchive::ER_INCONS => bformat!("Zip archive '{file}' is inconsistent."),
+            ZipArchive::ER_INVAL => bformat!("Invalid argument ({file})"),
+            ZipArchive::ER_MEMORY => bformat!("Malloc failure ({file})"),
+            ZipArchive::ER_NOENT => bformat!("No such zip file: '{file}'"),
+            ZipArchive::ER_NOZIP => bformat!("'{file}' is not a zip archive."),
+            ZipArchive::ER_OPEN => bformat!("Can't open zip file: {file}"),
+            ZipArchive::ER_READ => bformat!("Zip read error ({file})"),
+            ZipArchive::ER_SEEK => bformat!("Zip seek error ({file})"),
+            -1 => bformat!("'{file}' is a corrupted zip archive (0 bytes), try again."),
+            _ => bformat!("'{file}' is not a valid zip archive, got error code: {retval}"),
         }
     }
 

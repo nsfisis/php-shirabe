@@ -2,7 +2,7 @@
 
 use bstr::BString;
 use indexmap::IndexMap;
-use shirabe_php_shim::{bconcat, strtolower};
+use shirabe_php_shim::{bformat, strtolower};
 
 // PHP reads the resource files from `dirname(__DIR__) . '/res'` at runtime via
 // file_get_contents. Composer's res directory ships with the vendored package; embed it at compile
@@ -74,11 +74,7 @@ impl SpdxLicenses {
         Some(LicenseMetadata {
             name: name.clone(),
             is_osi_approved: *is_osi_approved,
-            url: bconcat!(
-                "https://spdx.org/licenses/",
-                identifier,
-                ".html#licenseText"
-            ),
+            url: bformat!("https://spdx.org/licenses/{identifier}.html#licenseText"),
             is_deprecated_license_id: *is_deprecated_license_id,
         })
     }

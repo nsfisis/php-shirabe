@@ -15,7 +15,7 @@ use bstr::{BStr, BString};
 use indexmap::{IndexMap, indexmap};
 use shirabe::io::{ConsoleIO, IOInterfaceImmutable, IOInterfaceMutable, IOInterfaceWrite};
 use shirabe_php_shim::{
-    PhpResource, bconcat, fwrite_resource, php_fopen_resource, rewind, str_repeat,
+    PhpResource, bformat, fwrite_resource, php_fopen_resource, rewind, str_repeat,
 };
 use shirabe_symfony_console::helper::QuestionHelper;
 use shirabe_symfony_console::input::{
@@ -172,16 +172,12 @@ fn test_overwrite() {
     console_io.overwrite("something longer than initial (<info>34</info>)");
 
     let bs = |n: usize| str_repeat("\u{08}", n);
-    let expected = bconcat!(
-        "something (strlen = 23)",
-        "\n",
+    let expected = bformat!(
+        "something (strlen = 23)\n{}shorter (12){}{}{}something longer than initial (34)\n",
         bs(23),
-        "shorter (12)",
         str_repeat(" ", 11),
         bs(11),
-        bs(12),
-        "something longer than initial (34)",
-        "\n"
+        bs(12)
     );
     assert_eq!(expected, buffered.borrow().fetch());
 }

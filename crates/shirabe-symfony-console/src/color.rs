@@ -3,7 +3,7 @@
 use crate::exception::InvalidArgumentException;
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe_php_shim::{bconcat, getenv, implode, php_str, round, strlen, substr, utf8_text};
+use shirabe_php_shim::{bformat, getenv, implode, php_str, round, strlen, substr, utf8_text};
 
 const COLORS: [(&BStr, i64); 9] = [
     (php_str(b"black"), 0),
@@ -80,18 +80,15 @@ impl Color {
         for option in options {
             let available = available_options_get(option);
             if available.is_none() {
-                return Err(InvalidArgumentException::new(bconcat!(
-                    "Invalid option specified: \"",
-                    option,
-                    "\". Expected one of (",
+                return Err(InvalidArgumentException::new(bformat!(
+                    "Invalid option specified: \"{option}\". Expected one of ({}).",
                     implode(
                         ", ",
                         &AVAILABLE_OPTIONS
                             .iter()
                             .map(|(k, _)| *k)
                             .collect::<Vec<_>>()
-                    ),
-                    ")."
+                    )
                 )));
             }
 
@@ -102,7 +99,7 @@ impl Color {
     }
 
     pub fn apply(&self, text: &BStr) -> BString {
-        bconcat!(self.set(), text, self.unset())
+        bformat!("{}{text}{}", self.set(), self.unset())
     }
 
     pub fn set(&self) -> BString {
@@ -114,13 +111,13 @@ impl Color {
             set_codes.push(self.background.clone());
         }
         for option in self.options.values() {
-            set_codes.push(bconcat!(option.0));
+            set_codes.push(bformat!("{}", option.0));
         }
         if set_codes.is_empty() {
             return BString::default();
         }
 
-        bconcat!("\u{1b}[", implode(";", &set_codes), "m")
+        bformat!("\u{1b}[{}m", implode(";", &set_codes))
     }
 
     pub fn unset(&self) -> BString {
@@ -132,13 +129,13 @@ impl Color {
             unset_codes.push(BString::from("49"));
         }
         for option in self.options.values() {
-            unset_codes.push(bconcat!(option.1));
+            unset_codes.push(bformat!("{}", option.1));
         }
         if unset_codes.is_empty() {
             return BString::default();
         }
 
-        bconcat!("\u{1b}[", implode(";", &unset_codes), "m")
+        bformat!("\u{1b}[{}m", implode(";", &unset_codes))
     }
 
     fn parse_color(color: &BStr, background: bool) -> Result<BString, InvalidArgumentException> {
@@ -155,10 +152,8 @@ impl Color {
             }
 
             if strlen(&color) != 6 {
-                return Err(InvalidArgumentException::new(bconcat!(
-                    "Invalid \"",
-                    color,
-                    "\" color."
+                return Err(InvalidArgumentException::new(bformat!(
+                    "Invalid \"{color}\" color."
                 )));
             }
 
@@ -166,35 +161,31 @@ impl Color {
             // notice; such a color is rejected here instead.
             let Some(hex_color) = utf8_text(&color).and_then(|c| i64::from_str_radix(c, 16).ok())
             else {
-                return Err(InvalidArgumentException::new(bconcat!(
-                    "Invalid \"",
-                    color,
-                    "\" color."
+                return Err(InvalidArgumentException::new(bformat!(
+                    "Invalid \"{color}\" color."
                 )));
             };
 
-            return Ok(bconcat!(
+            return Ok(bformat!(
+                "{}{}",
                 if background { "4" } else { "3" },
                 Self::convert_hex_color_to_ansi(hex_color)
             ));
         }
 
         if let Some(code) = colors_get(color) {
-            return Ok(bconcat!(if background { "4" } else { "3" }, code));
+            return Ok(bformat!("{}{code}", if background { "4" } else { "3" }));
         }
 
         if let Some(code) = bright_colors_get(color) {
-            return Ok(bconcat!(if background { "10" } else { "9" }, code));
+            return Ok(bformat!("{}{code}", if background { "10" } else { "9" }));
         }
 
         let mut available: Vec<&BStr> = COLORS.iter().map(|(k, _)| *k).collect();
         available.extend(BRIGHT_COLORS.iter().map(|(k, _)| *k));
-        Err(InvalidArgumentException::new(bconcat!(
-            "Invalid \"",
-            color,
-            "\" color; expected one of (",
-            implode(", ", &available),
-            ")."
+        Err(InvalidArgumentException::new(bformat!(
+            "Invalid \"{color}\" color; expected one of ({}).",
+            implode(", ", &available)
         )))
     }
 
@@ -205,10 +196,10 @@ impl Color {
 
         // see https://github.com/termstandard/colors/ for more information about true color support
         if getenv("COLORTERM").as_deref() != Some(std::ffi::OsStr::new("truecolor")) {
-            return bconcat!(Self::degrade_hex_color_to_ansi(r, g, b));
+            return bformat!("{}", Self::degrade_hex_color_to_ansi(r, g, b));
         }
 
-        bconcat!("8;2;", r, ";", g, ";", b)
+        bformat!("8;2;{r};{g};{b}")
     }
 
     fn degrade_hex_color_to_ansi(r: i64, g: i64, b: i64) -> i64 {

@@ -12,7 +12,7 @@ use shirabe::package::{CompletePackageHandle, PackageInterfaceHandle};
 use shirabe::repository::{InstalledArrayRepository, InstalledRepositoryInterfaceHandle};
 use shirabe::util::HttpDownloader;
 use shirabe::util::r#loop::Loop;
-use shirabe_php_shim::{PhpMixed, bconcat};
+use shirabe_php_shim::{PhpMixed, bformat};
 use shirabe_semver::VersionParser;
 
 /// ref: setUp(): the PHP loop/io mocks are never exercised by these tests (the loop has its
@@ -262,8 +262,9 @@ impl BinaryPresenceInterface for BinaryInstaller {
 /// type set via `__set_type` (PackageInterfaceHandle does not expose the setter).
 fn typed_package(name: &BStr, version: &BStr, r#type: &BStr) -> PackageInterfaceHandle {
     let norm_version = VersionParser.normalize(version, None).unwrap();
-    let handle = CompletePackageHandle::new(bconcat!(name), norm_version, bconcat!(version));
-    handle.__set_type(bconcat!(r#type));
+    let handle =
+        CompletePackageHandle::new(bformat!("{name}"), norm_version, bformat!("{version}"));
+    handle.__set_type(bformat!("{}", r#type));
     handle.into()
 }
 

@@ -11,7 +11,7 @@ use crate::util::{Filesystem, Hg as HgUtils, ProcessExecutor};
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpMixed, RuntimeException, bconcat, impl_php_class, implode, path_from_bytes, path_to_bytes,
+    PhpMixed, RuntimeException, bformat, impl_php_class, implode, path_from_bytes, path_to_bytes,
     realpath, trim,
 };
 use std::path::Path;
@@ -111,10 +111,9 @@ impl VcsDownloader for HgDownloader {
             realpath(path).as_deref(),
         )? != 0
         {
-            return Err(RuntimeException::new(bconcat!(
-                "Failed to execute ",
+            return Err(RuntimeException::new(bformat!(
+                "Failed to execute {}\n\n{}",
                 implode(" ", &command),
-                "\n\n",
                 self.inner.process.borrow().get_error_output()
             ))
             .into());
@@ -137,17 +136,13 @@ impl VcsDownloader for HgDownloader {
         );
 
         let ref_ = target.get_source_reference().unwrap_or_default();
-        self.inner.io.write_error(bconcat!(
-            " Updating to ",
+        self.inner.io.write_error(bformat!(
+            " Updating to {}",
             target.get_source_reference().unwrap_or_default()
         ));
 
         if !self.has_metadata_repository(path) {
-            return Err(RuntimeException::new(bconcat!(
-                "The .hg directory is missing from ",
-                path,
-                ", see https://getcomposer.org/commit-deps for more information"
-            ))
+            return Err(RuntimeException::new(bformat!("The .hg directory is missing from {path}, see https://getcomposer.org/commit-deps for more information"))
             .into());
         }
 
@@ -173,7 +168,7 @@ impl VcsDownloader for HgDownloader {
             "hg".into(),
             "log".into(),
             "-r".into(),
-            bconcat!(from_reference, ":", to_reference),
+            bformat!("{from_reference}:{to_reference}"),
             "--style".into(),
             "compact".into(),
         ];
@@ -185,10 +180,9 @@ impl VcsDownloader for HgDownloader {
             realpath(path).as_deref(),
         )? != 0
         {
-            return Err(RuntimeException::new(bconcat!(
-                "Failed to execute ",
+            return Err(RuntimeException::new(bformat!(
+                "Failed to execute {}\n\n{}",
                 implode(" ", &command),
-                "\n\n",
                 self.inner.process.borrow().get_error_output()
             ))
             .into());
@@ -198,7 +192,7 @@ impl VcsDownloader for HgDownloader {
     }
 
     fn has_metadata_repository(&self, path: &Path) -> bool {
-        path_from_bytes(&bconcat!(path, "/.hg")).is_dir()
+        path_from_bytes(&bformat!("{path}/.hg")).is_dir()
     }
 }
 
@@ -209,7 +203,7 @@ impl ChangeReportInterface for HgDownloader {
         _package: PackageInterfaceHandle,
         path: &Path,
     ) -> anyhow::Result<Option<bstr::BString>> {
-        if !path_from_bytes(&bconcat!(path, "/.hg")).is_dir() {
+        if !path_from_bytes(&bformat!("{path}/.hg")).is_dir() {
             return Ok(None);
         }
 

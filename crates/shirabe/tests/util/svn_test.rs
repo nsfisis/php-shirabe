@@ -5,18 +5,27 @@ use indexmap::IndexMap;
 use shirabe::config::Config;
 use shirabe::io::{IOInterface, NullIO};
 use shirabe::util::Svn;
-use shirabe_php_shim::{PhpMixed, bconcat};
+use shirabe_php_shim::{PhpMixed, bformat};
 
 fn map(pairs: Vec<(&BStr, PhpMixed)>) -> IndexMap<BString, PhpMixed> {
-    pairs.into_iter().map(|(k, v)| (bconcat!(k), v)).collect()
+    pairs
+        .into_iter()
+        .map(|(k, v)| (bformat!("{k}"), v))
+        .collect()
 }
 
 /// Builds a `['config' => ['http-basic' => [host => ['username' => .., 'password' => ..]]]]`
 /// map for `Config::merge`.
 fn http_basic_config(host: &BStr, username: &BStr, password: &BStr) -> IndexMap<BString, PhpMixed> {
     let creds = map(vec![
-        (BStr::new("username"), PhpMixed::string(bconcat!(username))),
-        (BStr::new("password"), PhpMixed::string(bconcat!(password))),
+        (
+            BStr::new("username"),
+            PhpMixed::string(bformat!("{username}")),
+        ),
+        (
+            BStr::new("password"),
+            PhpMixed::string(bformat!("{password}")),
+        ),
     ]);
     let http_basic = map(vec![(host, PhpMixed::Array(creds))]);
     let config = map(vec![(BStr::new("http-basic"), PhpMixed::Array(http_basic))]);
@@ -56,7 +65,7 @@ fn test_credentials() {
         let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(true, None)));
         let mut svn = Svn::new(url.into(), io, config, None);
 
-        let expect: Vec<BString> = expect.iter().map(|s| bconcat!(s)).collect();
+        let expect: Vec<BString> = expect.iter().map(|s| bformat!("{s}")).collect();
         assert_eq!(expect, svn.__get_credential_args().unwrap());
     }
 }

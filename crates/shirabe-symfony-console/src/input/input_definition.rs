@@ -4,7 +4,7 @@ use crate::exception::{InvalidArgumentException, LogicException};
 use crate::input::{InputArgument, InputOption, InputValue};
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpDisplay, ToPhpString, bconcat, implode};
+use shirabe_php_shim::{PhpDisplay, ToPhpString, bformat, implode};
 
 /// A InputDefinition represents a set of valid command line arguments and options.
 ///
@@ -109,21 +109,18 @@ impl InputDefinition {
         let argument = std::rc::Rc::new(argument);
 
         if self.arguments.contains_key(argument.get_name()) {
-            return Err(LogicException::new(bconcat!(
-                "An argument with name \"",
-                argument.get_name(),
-                "\" already exists."
+            return Err(LogicException::new(bformat!(
+                "An argument with name \"{}\" already exists.",
+                argument.get_name()
             ))
             .into());
         }
 
         if let Some(last_array_argument) = &self.last_array_argument {
-            return Err(LogicException::new(bconcat!(
-                "Cannot add a required argument \"",
+            return Err(LogicException::new(bformat!(
+                "Cannot add a required argument \"{}\" after an array argument \"{}\".",
                 argument.get_name(),
-                "\" after an array argument \"",
-                last_array_argument.get_name(),
-                "\"."
+                last_array_argument.get_name()
             ))
             .into());
         }
@@ -131,12 +128,10 @@ impl InputDefinition {
         if argument.is_required()
             && let Some(last_optional_argument) = &self.last_optional_argument
         {
-            return Err(LogicException::new(bconcat!(
-                "Cannot add a required argument \"",
+            return Err(LogicException::new(bformat!(
+                "Cannot add a required argument \"{}\" after an optional one \"{}\".",
                 argument.get_name(),
-                "\" after an optional one \"",
-                last_optional_argument.get_name(),
-                "\"."
+                last_optional_argument.get_name()
             ))
             .into());
         }
@@ -160,10 +155,9 @@ impl InputDefinition {
     /// Returns an InputArgument by name or by position.
     pub fn get_argument(&self, name: &ArgumentName) -> anyhow::Result<std::rc::Rc<InputArgument>> {
         if !self.has_argument(name) {
-            return Err(InvalidArgumentException::new(bconcat!(
-                "The \"",
-                name.to_php_string(),
-                "\" argument does not exist."
+            return Err(InvalidArgumentException::new(bformat!(
+                "The \"{}\" argument does not exist.",
+                name.to_php_string()
             ))
             .into());
         }
@@ -246,18 +240,16 @@ impl InputDefinition {
         if let Some(existing) = self.options.get(option.get_name())
             && !option.equals(existing)
         {
-            return Err(LogicException::new(bconcat!(
-                "An option named \"",
-                option.get_name(),
-                "\" already exists."
+            return Err(LogicException::new(bformat!(
+                "An option named \"{}\" already exists.",
+                option.get_name()
             ))
             .into());
         }
         if self.negations.contains_key(option.get_name()) {
-            return Err(LogicException::new(bconcat!(
-                "An option named \"",
-                option.get_name(),
-                "\" already exists."
+            return Err(LogicException::new(bformat!(
+                "An option named \"{}\" already exists.",
+                option.get_name()
             ))
             .into());
         }
@@ -267,10 +259,9 @@ impl InputDefinition {
                 if let Some(existing_name) = self.shortcuts.get(BStr::new(shortcut))
                     && !option.equals(&self.options[existing_name])
                 {
-                    return Err(LogicException::new(bconcat!(
-                        "An option with shortcut \"",
-                        shortcut.as_bstr(),
-                        "\" already exists."
+                    return Err(LogicException::new(bformat!(
+                        "An option with shortcut \"{}\" already exists.",
+                        shortcut.as_bstr()
                     ))
                     .into());
                 }
@@ -287,12 +278,10 @@ impl InputDefinition {
         }
 
         if option.is_negatable() {
-            let negated_name = bconcat!("no-", option.get_name());
+            let negated_name = bformat!("no-{}", option.get_name());
             if self.options.contains_key(&negated_name) {
-                return Err(LogicException::new(bconcat!(
-                    "An option named \"",
-                    negated_name,
-                    "\" already exists."
+                return Err(LogicException::new(bformat!(
+                    "An option named \"{negated_name}\" already exists."
                 ))
                 .into());
             }
@@ -307,10 +296,8 @@ impl InputDefinition {
     pub fn get_option(&self, name: impl AsRef<[u8]>) -> anyhow::Result<std::rc::Rc<InputOption>> {
         let name = BStr::new(name.as_ref());
         if !self.has_option(name) {
-            return Err(InvalidArgumentException::new(bconcat!(
-                "The \"--",
-                name,
-                "\" option does not exist."
+            return Err(InvalidArgumentException::new(bformat!(
+                "The \"--{name}\" option does not exist."
             ))
             .into());
         }
@@ -365,10 +352,8 @@ impl InputDefinition {
     pub fn shortcut_to_name(&self, shortcut: impl AsRef<[u8]>) -> anyhow::Result<BString> {
         let shortcut = BStr::new(shortcut.as_ref());
         match self.shortcuts.get(shortcut) {
-            None => Err(InvalidArgumentException::new(bconcat!(
-                "The \"-",
-                shortcut,
-                "\" option does not exist."
+            None => Err(InvalidArgumentException::new(bformat!(
+                "The \"-{shortcut}\" option does not exist."
             ))
             .into()),
             Some(name) => Ok(name.clone()),
@@ -379,10 +364,8 @@ impl InputDefinition {
     pub fn negation_to_name(&self, negation: impl AsRef<[u8]>) -> anyhow::Result<BString> {
         let negation = BStr::new(negation.as_ref());
         match self.negations.get(negation) {
-            None => Err(InvalidArgumentException::new(bconcat!(
-                "The \"--",
-                negation,
-                "\" option does not exist."
+            None => Err(InvalidArgumentException::new(bformat!(
+                "The \"--{negation}\" option does not exist."
             ))
             .into()),
             Some(name) => Ok(name.clone()),
@@ -399,31 +382,26 @@ impl InputDefinition {
             for option in self.get_options().values() {
                 let mut value = BString::default();
                 if option.accept_value() {
-                    value = bconcat!(
-                        " ",
+                    value = bformat!(
+                        " {}{}{}",
                         if option.is_value_optional() { "[" } else { "" },
                         option.get_name().to_ascii_uppercase(),
-                        if option.is_value_optional() { "]" } else { "" },
+                        if option.is_value_optional() { "]" } else { "" }
                     );
                 }
 
                 let shortcut = match option.get_shortcut() {
-                    Some(shortcut) => bconcat!("-", shortcut, "|"),
+                    Some(shortcut) => bformat!("-{shortcut}|"),
                     None => BString::default(),
                 };
                 let negation = if option.is_negatable() {
-                    bconcat!("|--no-", option.get_name())
+                    bformat!("|--no-{}", option.get_name())
                 } else {
                     BString::default()
                 };
-                elements.push(bconcat!(
-                    "[",
-                    shortcut,
-                    "--",
-                    option.get_name(),
-                    value,
-                    negation,
-                    "]",
+                elements.push(bformat!(
+                    "[{shortcut}--{}{value}{negation}]",
+                    option.get_name()
                 ));
             }
         }
@@ -434,20 +412,20 @@ impl InputDefinition {
 
         let mut tail = BString::default();
         for argument in self.get_arguments().values() {
-            let mut element = bconcat!("<", argument.get_name(), ">");
+            let mut element = bformat!("<{}>", argument.get_name());
             if argument.is_array() {
                 element.extend_from_slice(b"...");
             }
 
             if !argument.is_required() {
-                element = bconcat!("[", element);
+                element = bformat!("[{element}");
                 tail.push(b']');
             }
 
             elements.push(element);
         }
 
-        bconcat!(implode(" ", &elements), tail)
+        bformat!("{}{tail}", implode(" ", &elements))
     }
 }
 

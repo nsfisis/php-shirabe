@@ -4,7 +4,7 @@ use crate::test_case::{RunOptions, TearDown, get_application_tester, init_temp_c
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use serial_test::serial;
-use shirabe_php_shim::{PHP_BINARY, PhpMixed, bconcat, error_message};
+use shirabe_php_shim::{PHP_BINARY, PhpMixed, bformat, error_message};
 use shirabe_symfony_console::input::{InputValue, ParameterName};
 use shirabe_symfony_process::Process;
 
@@ -27,7 +27,7 @@ fn set_up_with_phar() -> (TearDown, BString) {
     )
     .unwrap();
 
-    (tear_down, bconcat!(phar))
+    (tear_down, bformat!("{phar}"))
 }
 
 /// ref: SelfUpdateCommandTest::channelOptions
@@ -158,7 +158,7 @@ fn test_update_to_different_channel() {
                 PHP_BINARY.to_owned(),
                 phar,
                 BString::from("self-update"),
-                bconcat!(option),
+                bformat!("{option}"),
             ],
             None,
             None,

@@ -7,7 +7,7 @@ use crate::value::{self, PluginValue};
 use crate::wire::{FromWire, protocol_value};
 use bstr::BString;
 use indexmap::IndexMap;
-use shirabe_php_shim::{bconcat, utf8_text};
+use shirabe_php_shim::{bformat, utf8_text};
 use std::io::{Read as _, Write as _};
 use std::os::unix::net::UnixStream;
 
@@ -155,7 +155,7 @@ impl Frame {
                 PluginValue::Array(
                     out_params
                         .iter()
-                        .map(|(pos, v)| (bconcat!(pos), v.clone()))
+                        .map(|(pos, v)| (bformat!("{pos}"), v.clone()))
                         .collect(),
                 ),
             ],

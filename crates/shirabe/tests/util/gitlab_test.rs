@@ -7,7 +7,7 @@ use bstr::BStr;
 use shirabe::config::{Config, ConfigSourceInterface};
 use shirabe::io::{IOInterface, io_interface};
 use shirabe::util::{GitLab, HttpDownloaderMockHandler};
-use shirabe_php_shim::{PhpMixed, bconcat, error_message, php_str};
+use shirabe_php_shim::{PhpMixed, bformat, error_message, php_str};
 
 const USERNAME: &BStr = php_str(b"username");
 const PASSWORD: &BStr = php_str(b"password");
@@ -82,16 +82,12 @@ fn test_username_password_authentication_flow() {
         )
         .unwrap();
 
-    let body = bconcat!(
-        "{\"access_token\": \"",
-        TOKEN,
-        "\", \"refresh_token\": \"",
-        REFRESHTOKEN,
-        "\", \"token_type\": \"bearer\", \"expires_in\": 7200, \"created_at\": 0}"
+    let body = bformat!(
+        "{{\"access_token\": \"{TOKEN}\", \"refresh_token\": \"{REFRESHTOKEN}\", \"token_type\": \"bearer\", \"expires_in\": 7200, \"created_at\": 0}}"
     );
     let (http_downloader, _http_guard) = get_http_downloader_mock(
         vec![expect_full(
-            bconcat!("http://", ORIGIN, "/oauth/token"),
+            bformat!("http://{ORIGIN}/oauth/token"),
             None,
             200,
             body,

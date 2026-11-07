@@ -2,7 +2,7 @@
 
 use crate::Process;
 use crate::exception::{InvalidArgumentException, RuntimeException};
-use shirabe_php_shim::{bconcat, impl_php_exception};
+use shirabe_php_shim::{bformat, bwrite, impl_php_exception};
 
 #[derive(Debug)]
 pub struct ProcessFailedException {
@@ -19,26 +19,23 @@ impl ProcessFailedException {
             .into());
         }
 
-        let mut error = bconcat!(
-            "The command \"",
+        let mut error = bformat!(
+            "The command \"{}\" failed.\n\nExit Code: {}({})\n\nWorking directory: {}",
             process.get_command_line(),
-            "\" failed.\n\nExit Code: ",
             process
                 .get_exit_code()
-                .map(|c| bconcat!(c))
+                .map(|c| bformat!("{c}"))
                 .unwrap_or_default(),
-            "(",
             process.get_exit_code_text().unwrap_or_default(),
-            ")\n\nWorking directory: ",
-            process.get_working_directory().unwrap_or_default(),
+            process.get_working_directory().unwrap_or_default()
         );
 
-        error.extend_from_slice(&bconcat!(
-            "\n\nOutput:\n================\n",
+        bwrite!(
+            error,
+            "\n\nOutput:\n================\n{}\n\nError Output:\n================\n{}",
             process.get_output()?,
-            "\n\nError Output:\n================\n",
-            process.get_error_output()?,
-        ));
+            process.get_error_output()?
+        );
 
         Ok(Self {
             inner: RuntimeException::new(error),

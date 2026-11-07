@@ -11,7 +11,7 @@ use crate::util::{Filesystem, ProcessExecutor};
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpMixed, RuntimeException, bconcat, impl_php_class, implode, path_from_bytes, php_regex,
+    PhpMixed, RuntimeException, bformat, impl_php_class, implode, path_from_bytes, php_regex,
     preg_is_match, preg_split, realpath, trim,
 };
 use std::path::{Path, PathBuf};
@@ -48,10 +48,9 @@ impl FossilDownloader {
             .execute(&command, output, cwd)?
             != 0
         {
-            return Err(RuntimeException::new(bconcat!(
-                "Failed to execute ",
+            return Err(RuntimeException::new(bformat!(
+                "Failed to execute {}\n\n{}",
                 implode(" ", &command),
-                "\n\n",
                 self.inner.process.borrow().get_error_output()
             ))
             .into());
@@ -103,11 +102,11 @@ impl VcsDownloader for FossilDownloader {
             &indexmap::IndexMap::new(),
         )?;
 
-        let repo_file = bconcat!(path, ".fossil");
+        let repo_file = bformat!("{path}.fossil");
         let real_path: Option<PathBuf> = realpath(path);
 
-        self.inner.io.write_error(bconcat!(
-            "Cloning ",
+        self.inner.io.write_error(bformat!(
+            "Cloning {}",
             package.get_source_reference().unwrap_or_default()
         ));
 
@@ -161,17 +160,13 @@ impl VcsDownloader for FossilDownloader {
             &indexmap::IndexMap::new(),
         )?;
 
-        self.inner.io.write_error(bconcat!(
-            " Updating to ",
+        self.inner.io.write_error(bformat!(
+            " Updating to {}",
             target.get_source_reference().unwrap_or_default()
         ));
 
         if !self.has_metadata_repository(path) {
-            return Err(RuntimeException::new(bconcat!(
-                "The .fslckout file is missing from ",
-                path,
-                ", see https://getcomposer.org/commit-deps for more information"
-            ))
+            return Err(RuntimeException::new(bformat!("The .fslckout file is missing from {path}, see https://getcomposer.org/commit-deps for more information"))
             .into());
         }
 
@@ -221,7 +216,7 @@ impl VcsDownloader for FossilDownloader {
         )?;
 
         let mut log = BString::default();
-        let match_pattern = bconcat!("/\\d\\d:\\d\\d:\\d\\d\\s+\\[", to_reference, "\\]/");
+        let match_pattern = bformat!("/\\d\\d:\\d\\d:\\d\\d\\s+\\[{to_reference}\\]/");
 
         let trimmed = trim(&output);
         let lines: Vec<BString> = if trimmed.is_empty() {
@@ -241,8 +236,8 @@ impl VcsDownloader for FossilDownloader {
     }
 
     fn has_metadata_repository(&self, path: &Path) -> bool {
-        path_from_bytes(&bconcat!(path, "/.fslckout")).is_file()
-            || path_from_bytes(&bconcat!(path, "/_FOSSIL_")).is_file()
+        path_from_bytes(&bformat!("{path}/.fslckout")).is_file()
+            || path_from_bytes(&bformat!("{path}/_FOSSIL_")).is_file()
     }
 }
 

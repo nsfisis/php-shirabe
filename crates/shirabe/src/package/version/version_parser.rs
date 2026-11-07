@@ -4,7 +4,7 @@ use crate::repository::PlatformRepository;
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    bconcat, explode_with_limit, php_regex, php_str, preg_is_match, preg_replace, strpos, trim,
+    bformat, explode_with_limit, php_regex, php_str, preg_is_match, preg_replace, strpos, trim,
 };
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::{Semver, VersionParser as SemverVersionParser};
@@ -68,7 +68,7 @@ impl VersionParser {
                 )
                 && !PlatformRepository::is_platform_package(&pairs[i + 1])
             {
-                pair = bconcat!(pair, " ", pairs[i + 1]);
+                pair = bformat!("{pair} {}", pairs[i + 1]);
                 i += 1;
             }
             if strpos(&pair, " ").is_some_and(|pos| pos > 0) {
