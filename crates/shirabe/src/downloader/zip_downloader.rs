@@ -1,9 +1,15 @@
 //! ref: composer/src/Composer/Downloader/ZipDownloader.php sha1:c0dad9a7265a79790e7da5a524fe7292a114ce69
 
-use crate::downloader::{ArchiveDownloader, ChangeReportInterface, FileDownloader};
-use crate::io::IOInterfaceWrite;
+use crate::cache::Cache;
+use crate::config::Config;
+use crate::downloader::file_downloader::RESPONSE_HEADERS;
+use crate::downloader::{
+    ArchiveDownloader, ChangeReportInterface, DownloaderInterface, FileDownloader,
+};
+use crate::event_dispatcher::EventDispatcher;
+use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::package::PackageInterfaceHandle;
-use crate::util::Platform;
+use crate::util::{Filesystem, HttpDownloader, Platform, ProcessExecutor};
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
@@ -29,15 +35,13 @@ impl_php_class!(ZipDownloader, r"Composer\Downloader\ZipDownloader");
 
 impl ZipDownloader {
     pub fn new(
-        io: std::rc::Rc<std::cell::RefCell<dyn crate::io::IOInterface>>,
-        config: std::rc::Rc<std::cell::RefCell<crate::config::Config>>,
-        http_downloader: std::rc::Rc<std::cell::RefCell<crate::util::HttpDownloader>>,
-        event_dispatcher: Option<
-            std::rc::Rc<std::cell::RefCell<crate::event_dispatcher::EventDispatcher>>,
-        >,
-        cache: Option<std::rc::Rc<std::cell::RefCell<crate::cache::Cache>>>,
-        filesystem: std::rc::Rc<std::cell::RefCell<crate::util::Filesystem>>,
-        process: std::rc::Rc<std::cell::RefCell<crate::util::ProcessExecutor>>,
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
+        event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
+        cache: Option<std::rc::Rc<std::cell::RefCell<Cache>>>,
+        filesystem: std::rc::Rc<std::cell::RefCell<Filesystem>>,
+        process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     ) -> anyhow::Result<Self> {
         Ok(Self {
             inner: FileDownloader::new(
@@ -259,9 +263,7 @@ impl ZipDownloader {
                         )?
                     ));
                     let headers = {
-                        let response_headers = crate::downloader::file_downloader::RESPONSE_HEADERS
-                            .lock()
-                            .unwrap();
+                        let response_headers = RESPONSE_HEADERS.lock().unwrap();
                         match response_headers.get(package.get_name().as_bstr()) {
                             Some(list) => PhpMixed::List(
                                 list.iter().map(|s| PhpMixed::string(s.clone())).collect(),
@@ -444,12 +446,12 @@ impl ChangeReportInterface for ZipDownloader {
 }
 
 #[async_trait::async_trait(?Send)]
-impl crate::downloader::DownloaderInterface for ZipDownloader {
+impl DownloaderInterface for ZipDownloader {
     fn get_installation_source(&self) -> BString {
         self.inner.get_installation_source()
     }
 
-    fn as_change_report_interface(&self) -> Option<&dyn crate::downloader::ChangeReportInterface> {
+    fn as_change_report_interface(&self) -> Option<&dyn ChangeReportInterface> {
         Some(self)
     }
 

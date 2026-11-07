@@ -85,7 +85,7 @@ impl DownloaderInterface for TarDownloader {
         self.inner.get_installation_source()
     }
 
-    fn as_change_report_interface(&self) -> Option<&dyn crate::downloader::ChangeReportInterface> {
+    fn as_change_report_interface(&self) -> Option<&dyn ChangeReportInterface> {
         Some(self)
     }
 

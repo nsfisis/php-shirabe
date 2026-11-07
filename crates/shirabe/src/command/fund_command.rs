@@ -1,11 +1,13 @@
 //! ref: composer/src/Composer/Command/FundCommand.php sha1:0de174fed688fc40fbd2886d33bd5c16513fe73d
 
-use crate::command::base_command::base_command_initialize;
+use crate::command::base_command::{base_command_complete, base_command_initialize};
 use crate::command::{BaseCommand, BaseCommandData};
+use crate::composer::composer_full;
 use crate::console::input::{InputOption, SuggestedValues};
+use crate::delegate_base_command_trait_impls_to_inner;
 use crate::io::IOInterfaceWrite;
 use crate::json::JsonFile;
-use crate::package::base_package::{self};
+use crate::package::{CompletePackageInterfaceHandle, base_package};
 use crate::repository::{CompositeRepository, RepositoryInterface};
 use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
@@ -56,7 +58,7 @@ impl FundCommand {
 
     fn insert_funding_data(
         fundings: &mut IndexMap<BString, IndexMap<BString, Vec<BString>>>,
-        package: &crate::package::CompletePackageInterfaceHandle,
+        package: &CompletePackageInterfaceHandle,
     ) -> anyhow::Result<()> {
         let pretty_name = package.get_pretty_name();
         let (vendor, package_name) = match pretty_name.find("/") {
@@ -121,7 +123,7 @@ impl Command for FundCommand {
         _output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
         let composer = self.require_composer(None, None)?;
-        let composer = crate::composer::composer_full(&composer);
+        let composer = composer_full(&composer);
 
         let repository_manager = composer.get_repository_manager().clone();
         let repository_manager = repository_manager.borrow();
@@ -254,16 +256,16 @@ impl Command for FundCommand {
         input: &shirabe_symfony_console::completion::CompletionInput,
         suggestions: &mut shirabe_symfony_console::completion::CompletionSuggestions,
     ) -> anyhow::Result<()> {
-        crate::command::base_command::base_command_complete(self, input, suggestions)
+        base_command_complete(self, input, suggestions)
     }
 
     shirabe_symfony_console::delegate_command_trait_impls_to_inner!(base_command_data);
 }
 
 impl BaseCommand for FundCommand {
-    fn base_command_data(&self) -> &crate::command::BaseCommandData {
+    fn base_command_data(&self) -> &BaseCommandData {
         &self.base_command_data
     }
 
-    crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
+    delegate_base_command_trait_impls_to_inner!(base_command_data);
 }

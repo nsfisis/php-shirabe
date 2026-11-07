@@ -3,12 +3,16 @@
 use crate::composer;
 use crate::package::version::VersionParser;
 use crate::package::{
-    CompletePackage, CompletePackageHandle, CompletePackageInterface,
-    CompletePackageInterfaceHandle, Link, PackageInterface, PackageInterfaceHandle,
+    AnyPackage, BasePackageHandle, CompletePackage, CompletePackageHandle,
+    CompletePackageInterface, CompletePackageInterfaceHandle, Link, PackageInterface,
+    PackageInterfaceHandle,
 };
 use crate::platform::{HhvmDetector, HhvmDetectorInterface, Version};
 use crate::plugin::plugin_interface::{self};
-use crate::repository::{ArrayRepository, RepositoryInterface};
+use crate::repository::{
+    ArrayRepository, FindPackageConstraint, LoadPackagesResult, ProviderInfo, RepositoryInterface,
+    RepositoryInterfaceWeakHandle, SEARCH_VENDOR, SearchResult,
+};
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_rpc::PlatformInfo;
@@ -1364,10 +1368,9 @@ impl PlatformRepository {
             // PHP: $this->findPackage() reaches ArrayRepository::findPackage, whose
             // getPackages() call late-binds to PlatformRepository::initialize.
             self.ensure_initialized()?;
-            let overrider = self.inner.find_package(
-                name.as_bstr(),
-                crate::repository::FindPackageConstraint::String("*".into()),
-            )?;
+            let overrider = self
+                .inner
+                .find_package(name.as_bstr(), FindPackageConstraint::String("*".into()))?;
             let actual_text = if let Some(ref ov) = overrider {
                 if package.get_version() == ov.get_version() {
                     BString::from("same as actual")
@@ -1470,7 +1473,7 @@ impl PlatformRepository {
         // it. Disabled packages are always plain CompletePackage objects, so reach the
         // concrete Package through the shared Rc.
         match &mut *package.as_rc().borrow_mut() {
-            crate::package::AnyPackage::CompletePackage(p) => p.inner.set_extra(extra),
+            AnyPackage::CompletePackage(p) => p.inner.set_extra(extra),
             _ => unreachable!("disabled platform package must be a concrete CompletePackage"),
         }
 
@@ -1643,9 +1646,9 @@ impl PlatformRepository {
         query: BString,
         mode: i64,
         r#type: Option<BString>,
-    ) -> anyhow::Result<Vec<crate::repository::SearchResult>> {
+    ) -> anyhow::Result<Vec<SearchResult>> {
         // suppress vendor search as there are no vendors to match in platform packages
-        if mode == crate::repository::SEARCH_VENDOR {
+        if mode == SEARCH_VENDOR {
             return Ok(Vec::new());
         }
 
@@ -1658,7 +1661,7 @@ impl PlatformRepository {
     }
 }
 
-impl crate::repository::RepositoryInterface for PlatformRepository {
+impl RepositoryInterface for PlatformRepository {
     // PHP's ArrayRepository::count()/hasPackage() call $this->initialize(), which
     // virtual-dispatches to PlatformRepository::initialize(); the guard restores that.
     fn count(&mut self) -> anyhow::Result<usize> {
@@ -1674,8 +1677,8 @@ impl crate::repository::RepositoryInterface for PlatformRepository {
     fn find_package(
         &mut self,
         name: &BStr,
-        constraint: crate::repository::FindPackageConstraint,
-    ) -> anyhow::Result<Option<crate::package::BasePackageHandle>> {
+        constraint: FindPackageConstraint,
+    ) -> anyhow::Result<Option<BasePackageHandle>> {
         self.ensure_initialized()?;
         self.inner.find_package(name, constraint)
     }
@@ -1683,13 +1686,13 @@ impl crate::repository::RepositoryInterface for PlatformRepository {
     fn find_packages(
         &mut self,
         name: &BStr,
-        constraint: Option<crate::repository::FindPackageConstraint>,
-    ) -> anyhow::Result<Vec<crate::package::BasePackageHandle>> {
+        constraint: Option<FindPackageConstraint>,
+    ) -> anyhow::Result<Vec<BasePackageHandle>> {
         self.ensure_initialized()?;
         self.inner.find_packages(name, constraint)
     }
 
-    fn get_packages(&mut self) -> anyhow::Result<Vec<crate::package::BasePackageHandle>> {
+    fn get_packages(&mut self) -> anyhow::Result<Vec<BasePackageHandle>> {
         self.ensure_initialized()?;
         self.inner.get_packages()
     }
@@ -1699,11 +1702,8 @@ impl crate::repository::RepositoryInterface for PlatformRepository {
         package_name_map: IndexMap<BString, Option<shirabe_semver::constraint::AnyConstraint>>,
         acceptable_stabilities: IndexMap<BString, i64>,
         stability_flags: IndexMap<BString, i64>,
-        already_loaded: IndexMap<
-            BString,
-            IndexMap<BString, crate::package::PackageInterfaceHandle>,
-        >,
-    ) -> anyhow::Result<crate::repository::LoadPackagesResult> {
+        already_loaded: IndexMap<BString, IndexMap<BString, PackageInterfaceHandle>>,
+    ) -> anyhow::Result<LoadPackagesResult> {
         self.ensure_initialized()?;
         self.inner.load_packages(
             package_name_map,
@@ -1718,14 +1718,14 @@ impl crate::repository::RepositoryInterface for PlatformRepository {
         query: BString,
         mode: i64,
         r#type: Option<BString>,
-    ) -> anyhow::Result<Vec<crate::repository::SearchResult>> {
+    ) -> anyhow::Result<Vec<SearchResult>> {
         PlatformRepository::search(self, query, mode, r#type)
     }
 
     fn get_providers(
         &mut self,
         package_name: BString,
-    ) -> anyhow::Result<IndexMap<BString, crate::repository::ProviderInfo>> {
+    ) -> anyhow::Result<IndexMap<BString, ProviderInfo>> {
         self.ensure_initialized()?;
         self.inner.get_providers(package_name)
     }
@@ -1738,7 +1738,7 @@ impl crate::repository::RepositoryInterface for PlatformRepository {
         self
     }
 
-    fn set_self_handle(&self, weak: crate::repository::RepositoryInterfaceWeakHandle) {
+    fn set_self_handle(&self, weak: RepositoryInterfaceWeakHandle) {
         self.inner.set_self_handle(weak);
     }
 }

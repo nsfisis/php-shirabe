@@ -65,7 +65,7 @@ impl ArtifactRepository {
     /// For testing only: drives `initialize` (scanning the lookup directory) and returns the
     /// packages collected by the inner `ArrayRepository`, mirroring the polymorphic
     /// `RepositoryInterface::getPackages` dispatch in PHP.
-    pub fn __get_packages(&mut self) -> anyhow::Result<Vec<crate::package::BasePackageHandle>> {
+    pub fn __get_packages(&mut self) -> anyhow::Result<Vec<BasePackageHandle>> {
         self.initialize()?;
         use crate::repository::RepositoryInterface;
         self.inner.get_packages()
@@ -155,7 +155,7 @@ impl ArtifactRepository {
     fn get_composer_information(
         &self,
         file: &Path,
-    ) -> anyhow::Result<Option<crate::package::PackageInterfaceHandle>> {
+    ) -> anyhow::Result<Option<PackageInterfaceHandle>> {
         let mut json: Option<BString> = None;
         let pathname = path_to_bytes(file).as_bstr();
         let file_extension = pathinfo(pathname, PATHINFO_EXTENSION);

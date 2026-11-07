@@ -1,4 +1,4 @@
-use crate::PhpMixed;
+use crate::{PhpMixed, PhpResource, bconcat, php_str};
 use bstr::{BStr, BString, ByteSlice};
 use shirabe_php_src::standard::versioning::php_version_compare;
 
@@ -10,9 +10,9 @@ pub const E_USER_NOTICE: i64 = 1024;
 pub const E_DEPRECATED: i64 = 8192;
 pub const E_USER_DEPRECATED: i64 = 16384;
 
-pub const PHP_BINARY: &BStr = crate::php_str(b"");
+pub const PHP_BINARY: &BStr = php_str(b"");
 
-pub const PHP_OS: &BStr = crate::php_str(match std::env::consts::OS.as_bytes() {
+pub const PHP_OS: &BStr = php_str(match std::env::consts::OS.as_bytes() {
     b"linux" => b"Linux",
     b"macos" => b"Darwin",
     b"windows" => b"WINNT",
@@ -276,7 +276,7 @@ pub fn php_uname(mode: impl AsRef<[u8]>) -> BString {
         b"m" => field(utsname.machine()),
         // "a" is the default and any other mode falls back to it: every field in the order
         // sysname, nodename, release, version, machine.
-        _ => crate::bconcat!(
+        _ => bconcat!(
             field(utsname.sysname()),
             " ",
             field(utsname.nodename()),
@@ -331,7 +331,7 @@ pub fn ini_set(_varname: impl AsRef<[u8]>, _value: impl AsRef<[u8]>) -> Option<B
     todo!()
 }
 
-pub fn sapi_windows_vt100_support(_resource: &crate::PhpResource) -> bool {
+pub fn sapi_windows_vt100_support(_resource: &PhpResource) -> bool {
     // TODO(windows): Windows-only SAPI function; not defined on the non-Windows target this build
     // models (function_exists reports it absent).
     todo!()

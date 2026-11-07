@@ -2,6 +2,7 @@
 
 use crate::command::{Command, CommandData};
 use crate::completion::{CompletionInput, CompletionSuggestions, StringOrSuggestion};
+use crate::delegate_command_trait_impls_to_inner;
 use crate::input::{InputArgument, InputInterface, InputInterfaceByName, InputOption, InputValue};
 use crate::output::{OutputInterface, output_interface};
 use bstr::{BStr, BString};
@@ -282,5 +283,5 @@ impl Command for DumpCompletionCommand {
         self.complete_impl(input, suggestions)
     }
 
-    crate::delegate_command_trait_impls_to_inner!(inner);
+    delegate_command_trait_impls_to_inner!(inner);
 }

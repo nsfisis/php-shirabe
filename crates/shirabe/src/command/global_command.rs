@@ -4,6 +4,7 @@ use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData};
 use crate::console::Application;
 use crate::console::input::InputArgument;
+use crate::delegate_base_command_trait_impls_to_inner;
 use crate::factory::Factory;
 use crate::io::IOInterfaceWrite;
 use crate::util::{Filesystem, Platform};
@@ -252,11 +253,11 @@ impl Command for GlobalCommand {
 }
 
 impl BaseCommand for GlobalCommand {
-    fn base_command_data(&self) -> &crate::command::BaseCommandData {
+    fn base_command_data(&self) -> &BaseCommandData {
         &self.base_command_data
     }
 
-    crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
+    delegate_base_command_trait_impls_to_inner!(base_command_data);
 
     fn is_proxy_command(&self) -> bool {
         true

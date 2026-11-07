@@ -1,6 +1,9 @@
 //! ref: composer/vendor/symfony/console/Completion/CompletionInput.php sha1:10f8872f338f08bf6c7c4bf8e03d9eddd2db542b
 
-use crate::input::{ArgvInput, InputDefinition, InputOption, InputValue};
+use crate::input::{
+    ArgumentName, ArgvInput, InputDefinition, InputInterface, InputOption, InputValue,
+    StreamableInputInterface,
+};
 use bstr::{BStr, BString, ByteSlice};
 use shirabe_php_shim::{
     explode_with_limit, ltrim2, php_regex, php_str, preg_match_all, rtrim, substr, trim2,
@@ -167,7 +170,7 @@ impl CompletionInput {
                     .inner
                     .inner
                     .definition
-                    .get_argument(&crate::input::ArgumentName::of(&argument_name))
+                    .get_argument(&ArgumentName::of(&argument_name))
                     .unwrap()
                     .is_array()
             {
@@ -307,8 +310,8 @@ impl CompletionInput {
 /// PHP: `CompletionInput extends ArgvInput` — the inherited `InputInterface` surface,
 /// forwarded to the embedded `ArgvInput`. `bind` dispatches to the specialized
 /// `CompletionInput::bind` above, matching PHP's virtual dispatch.
-impl crate::input::InputInterface for CompletionInput {
-    fn dup(&self) -> std::rc::Rc<std::cell::RefCell<dyn crate::input::InputInterface>> {
+impl InputInterface for CompletionInput {
+    fn dup(&self) -> std::rc::Rc<std::cell::RefCell<dyn InputInterface>> {
         std::rc::Rc::new(std::cell::RefCell::new(self.clone()))
     }
 
@@ -321,7 +324,7 @@ impl crate::input::InputInterface for CompletionInput {
     }
 
     fn has_parameter_option_bytes(&self, values: &[&BStr], only_params: bool) -> bool {
-        crate::input::InputInterface::has_parameter_option_bytes(&self.inner, values, only_params)
+        InputInterface::has_parameter_option_bytes(&self.inner, values, only_params)
     }
 
     fn get_parameter_option_bytes(
@@ -330,12 +333,7 @@ impl crate::input::InputInterface for CompletionInput {
         default: InputValue,
         only_params: bool,
     ) -> InputValue {
-        crate::input::InputInterface::get_parameter_option_bytes(
-            &self.inner,
-            values,
-            default,
-            only_params,
-        )
+        InputInterface::get_parameter_option_bytes(&self.inner, values, default, only_params)
     }
 
     fn bind(&mut self, definition: &InputDefinition) -> anyhow::Result<()> {
@@ -343,54 +341,54 @@ impl crate::input::InputInterface for CompletionInput {
     }
 
     fn validate(&mut self) -> anyhow::Result<()> {
-        crate::input::InputInterface::validate(&mut self.inner)
+        InputInterface::validate(&mut self.inner)
     }
 
     fn get_arguments(&self) -> indexmap::IndexMap<BString, InputValue> {
-        crate::input::InputInterface::get_arguments(&self.inner)
+        InputInterface::get_arguments(&self.inner)
     }
 
     fn get_argument_bytes(&self, name: &BStr) -> anyhow::Result<InputValue> {
-        crate::input::InputInterface::get_argument_bytes(&self.inner, name)
+        InputInterface::get_argument_bytes(&self.inner, name)
     }
 
     fn set_argument_bytes(&mut self, name: &BStr, value: InputValue) -> anyhow::Result<()> {
-        crate::input::InputInterface::set_argument_bytes(&mut self.inner, name, value)
+        InputInterface::set_argument_bytes(&mut self.inner, name, value)
     }
 
     fn has_argument_bytes(&self, name: &BStr) -> bool {
-        crate::input::InputInterface::has_argument_bytes(&self.inner, name)
+        InputInterface::has_argument_bytes(&self.inner, name)
     }
 
     fn get_options(&self) -> indexmap::IndexMap<BString, InputValue> {
-        crate::input::InputInterface::get_options(&self.inner)
+        InputInterface::get_options(&self.inner)
     }
 
     fn get_option_bytes(&self, name: &BStr) -> anyhow::Result<InputValue> {
-        crate::input::InputInterface::get_option_bytes(&self.inner, name)
+        InputInterface::get_option_bytes(&self.inner, name)
     }
 
     fn set_option_bytes(&mut self, name: &BStr, value: InputValue) -> anyhow::Result<()> {
-        crate::input::InputInterface::set_option_bytes(&mut self.inner, name, value)
+        InputInterface::set_option_bytes(&mut self.inner, name, value)
     }
 
     fn has_option_bytes(&self, name: &BStr) -> bool {
-        crate::input::InputInterface::has_option_bytes(&self.inner, name)
+        InputInterface::has_option_bytes(&self.inner, name)
     }
 
     fn is_interactive(&self) -> bool {
-        crate::input::InputInterface::is_interactive(&self.inner)
+        InputInterface::is_interactive(&self.inner)
     }
 
     fn set_interactive(&mut self, interactive: bool) {
-        crate::input::InputInterface::set_interactive(&mut self.inner, interactive)
+        InputInterface::set_interactive(&mut self.inner, interactive)
     }
 
-    fn as_streamable(&self) -> Option<&dyn crate::input::StreamableInputInterface> {
-        crate::input::InputInterface::as_streamable(&self.inner)
+    fn as_streamable(&self) -> Option<&dyn StreamableInputInterface> {
+        InputInterface::as_streamable(&self.inner)
     }
 
-    fn as_streamable_mut(&mut self) -> Option<&mut dyn crate::input::StreamableInputInterface> {
-        crate::input::InputInterface::as_streamable_mut(&mut self.inner)
+    fn as_streamable_mut(&mut self) -> Option<&mut dyn StreamableInputInterface> {
+        InputInterface::as_streamable_mut(&mut self.inner)
     }
 }

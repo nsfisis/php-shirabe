@@ -14,8 +14,11 @@ use crate::downloader::{
 };
 use crate::event_dispatcher::{Event, EventDispatcher};
 use crate::exception::NoSslException;
-use crate::installer::{BinaryInstaller, InstallationManager};
-use crate::io::{IOInterface, IOInterfaceWrite};
+use crate::installer::{
+    BinaryInstaller, BinaryInstallerInterface, InstallationManager, InstallationManagerInterface,
+    LibraryInstaller, MetapackageInstaller, PluginInstaller,
+};
+use crate::io::{DEBUG, IOInterface, IOInterfaceWrite, NORMAL};
 use crate::json::{JsonFile, JsonValidationException};
 use crate::package::archiver::{ArchiveManager, PharArchiver, ZipArchiver};
 use crate::package::loader::RootPackageLoader;
@@ -23,7 +26,9 @@ use crate::package::version::{VersionGuesser, VersionParser};
 use crate::package::{Locker, RootPackageInterfaceHandle};
 use crate::plugin::{PluginEvents, PluginManager};
 use crate::repository::{
-    FilesystemRepository, InstalledFilesystemRepository, RepositoryFactory, RepositoryManager,
+    FilesystemRepository, InstalledArrayRepository, InstalledFilesystemRepository,
+    InstalledRepositoryInterfaceHandle, RepositoryFactory, RepositoryInterfaceHandle,
+    RepositoryManager,
 };
 use crate::util::r#loop::Loop;
 use crate::util::{Filesystem, HttpDownloader, Platform, ProcessExecutor, StreamContextOptions};
@@ -238,7 +243,7 @@ impl Factory {
                 io_ref.write_error3(
                     bconcat!("Loading config file ", file.get_path()),
                     true,
-                    crate::io::DEBUG,
+                    DEBUG,
                 );
             }
             Self::validate_json_schema(
@@ -288,7 +293,7 @@ impl Factory {
                 io_ref.write_error3(
                     bconcat!("Loading config file ", auth_file.get_path()),
                     true,
-                    crate::io::DEBUG,
+                    DEBUG,
                 );
             }
             Self::validate_json_schema(
@@ -486,7 +491,7 @@ impl Factory {
                     ")"
                 ),
                 true,
-                crate::io::DEBUG,
+                DEBUG,
             );
             config.set_config_source(Box::new(JsonConfigSource::new(
                 std::rc::Rc::new(std::cell::RefCell::new(JsonFile::new(
@@ -509,7 +514,7 @@ impl Factory {
                 io.write_error3(
                     bconcat!("Loading config file ", local_auth_file.get_path()),
                     true,
-                    crate::io::DEBUG,
+                    DEBUG,
                 );
                 Self::validate_json_schema(
                     Some(io.clone()),
@@ -578,7 +583,7 @@ impl Factory {
                         std::rc::Rc::new(std::cell::RefCell::new(Self::create_http_downloader(
                             io.clone(),
                             &config,
-                            crate::util::StreamContextOptions::new(),
+                            StreamContextOptions::new(),
                         )?));
                     let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(
                         Some(io.clone()),
@@ -718,7 +723,7 @@ impl Factory {
                                 io.write_error3(
                                     bconcat!("<warning>", lock_file, " is present but ignored as the \"lock\" config option is disabled.</warning>"),
                                     true,
-                                    crate::io::NORMAL,
+                                    NORMAL,
                                 );
                             }
 
@@ -855,9 +860,7 @@ impl Factory {
             let im = im.expect("set by the successful composer build");
             let local_repository = rm.borrow().get_local_repository();
             self.purge_packages(
-                &crate::repository::InstalledRepositoryInterfaceHandle::from_repository_handle(
-                    &local_repository,
-                ),
+                &InstalledRepositoryInterfaceHandle::from_repository_handle(&local_repository),
                 &im.borrow(),
             )?;
         }
@@ -886,8 +889,8 @@ impl Factory {
     ) {
         // FactoryMock::addLocalRepository installs a bare InstalledArrayRepository instead.
         if self.mock {
-            rm.set_local_repository(crate::repository::RepositoryInterfaceHandle::new(
-                crate::repository::InstalledArrayRepository::new()
+            rm.set_local_repository(RepositoryInterfaceHandle::new(
+                InstalledArrayRepository::new()
                     .expect("InstalledArrayRepository::new should not fail"),
             ));
             return;
@@ -896,7 +899,7 @@ impl Factory {
         let fs = process
             .map(|p| std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(Some(p.clone())))));
 
-        rm.set_local_repository(crate::repository::RepositoryInterfaceHandle::new(
+        rm.set_local_repository(RepositoryInterfaceHandle::new(
             InstalledFilesystemRepository::new(
                 JsonFile::new(
                     path_from_bytes(vendor_dir).join("composer/installed.json"),
@@ -945,7 +948,7 @@ impl Factory {
                 io.write_error3(
                     bconcat!("Failed to initialize global composer: ", error_message(&e)),
                     true,
-                    crate::io::DEBUG,
+                    DEBUG,
                 );
                 None
             }
@@ -1190,7 +1193,7 @@ impl Factory {
 
     fn create_default_installers(
         &self,
-        im: &std::rc::Rc<std::cell::RefCell<dyn crate::installer::InstallationManagerInterface>>,
+        im: &std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>,
         composer: PartialComposerWeakHandle,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         process: Option<&std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,
@@ -1222,18 +1225,17 @@ impl Factory {
         };
 
         // The same BinaryInstaller object is shared by the Library and Plugin installers.
-        let binary_installer: std::rc::Rc<
-            std::cell::RefCell<dyn crate::installer::BinaryInstallerInterface>,
-        > = std::rc::Rc::new(std::cell::RefCell::new(BinaryInstaller::new(
-            io.clone(),
-            bin_dir,
-            bin_compat,
-            Some(fs.clone()),
-            Some(vendor_dir),
-        )));
+        let binary_installer: std::rc::Rc<std::cell::RefCell<dyn BinaryInstallerInterface>> =
+            std::rc::Rc::new(std::cell::RefCell::new(BinaryInstaller::new(
+                io.clone(),
+                bin_dir,
+                bin_compat,
+                Some(fs.clone()),
+                Some(vendor_dir),
+            )));
 
         im.borrow_mut()
-            .add_installer(std::rc::Rc::new(crate::installer::LibraryInstaller::new(
+            .add_installer(std::rc::Rc::new(LibraryInstaller::new(
                 io.clone(),
                 composer.clone(),
                 None,
@@ -1241,21 +1243,20 @@ impl Factory {
                 Some(binary_installer.clone()),
             )?));
         im.borrow_mut()
-            .add_installer(std::rc::Rc::new(crate::installer::PluginInstaller::new(
+            .add_installer(std::rc::Rc::new(PluginInstaller::new(
                 io.clone(),
                 composer,
                 Some(fs),
                 Some(binary_installer),
             )?));
-        im.borrow_mut().add_installer(std::rc::Rc::new(
-            crate::installer::MetapackageInstaller::new(io),
-        ));
+        im.borrow_mut()
+            .add_installer(std::rc::Rc::new(MetapackageInstaller::new(io)));
         Ok(())
     }
 
     fn purge_packages(
         &self,
-        repo: &crate::repository::InstalledRepositoryInterfaceHandle,
+        repo: &InstalledRepositoryInterfaceHandle,
         im: &InstallationManager,
     ) -> anyhow::Result<()> {
         let packages = repo.borrow_mut().get_packages()?;
@@ -1396,7 +1397,7 @@ impl Factory {
                 io.write_error3(
                     "<warning>You are running Shirabe with SSL/TLS protection disabled.</warning>",
                     true,
-                    crate::io::NORMAL,
+                    NORMAL,
                 );
             }
             unsafe { WARNED = true };
@@ -1431,17 +1432,17 @@ impl Factory {
                     io.write3(
                             "<error>Unable to locate a valid CA certificate file. You must set a valid 'cafile' option.</error>",
                             true,
-                            crate::io::NORMAL,
+                            NORMAL,
                         );
                     io.write3(
                             "<error>A valid CA certificate file is required for SSL/TLS protection.</error>",
                             true,
-                            crate::io::NORMAL,
+                            NORMAL,
                         );
                     io.write3(
                             "<error>You can disable this error, at your own risk, by setting the 'disable-tls' option to true.</error>",
                             true,
-                            crate::io::NORMAL,
+                            NORMAL,
                         );
                 }
                 return Err(e);
@@ -1470,11 +1471,7 @@ impl Factory {
         }
 
         if let Some(io_ref) = &io {
-            io_ref.write_error3(
-                "Loading auth config from COMPOSER_AUTH",
-                true,
-                crate::io::DEBUG,
-            );
+            io_ref.write_error3("Loading auth config from COMPOSER_AUTH", true, DEBUG);
         }
         Self::validate_json_schema(
             io,
@@ -1549,7 +1546,7 @@ impl Factory {
                     (implode(bconcat!(PHP_EOL, " - "), jve.get_errors()))
                 );
                 if let Some(io_ref) = io {
-                    io_ref.write_error3(bconcat!("<warning>", msg, "</>"), true, crate::io::NORMAL);
+                    io_ref.write_error3(bconcat!("<warning>", msg, "</>"), true, NORMAL);
                 } else {
                     return Err(UnexpectedValueException::new(msg).into());
                 }

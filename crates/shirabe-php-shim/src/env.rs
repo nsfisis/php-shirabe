@@ -1,5 +1,7 @@
 //! Porting rules for PHP environment variables: see `docs/dev/env-vars-porting.md`.
 
+use crate::ValueError;
+
 pub fn getenv_all() -> std::env::VarsOs {
     std::env::vars_os()
 }
@@ -22,7 +24,7 @@ pub fn getenv<K: AsRef<std::ffi::OsStr>>(key: K) -> Option<std::ffi::OsString> {
 pub unsafe fn putenv(assignment: impl AsRef<std::ffi::OsStr>) -> anyhow::Result<()> {
     let assignment = assignment.as_ref().as_encoded_bytes();
     if assignment.is_empty() || assignment[0] == b'=' {
-        return Err(crate::ValueError::new(
+        return Err(ValueError::new(
             "putenv(): Argument #1 ($assignment) must have a valid syntax",
         )
         .into());

@@ -8,7 +8,8 @@ use crate::plugin::rpc::dispatch::{error_throw, unavailable_method};
 use crate::plugin::rpc::jobs::{
     HTTP_DOWNLOADER_TICK_CAP, dispatch_tick_method, rejected_promise, resolved_promise,
 };
-use crate::util::StreamContextOptions;
+use crate::util::http_downloader::HttpDownloaderJob;
+use crate::util::{HttpDownloader, StreamContextOptions};
 use bstr::{BStr, BString, ByteSlice};
 use shirabe_php_rpc::{PhpThrow, PluginValue, ToWire};
 use shirabe_php_shim::{bconcat, path_from_bytes};
@@ -18,7 +19,7 @@ use shirabe_php_shim::{bconcat, path_from_bytes};
 /// out of the Rust process, which is what keeps the authentication a run collects, the TLS
 /// defaults and the parallel-request budget single-sourced across the boundary.
 pub(crate) fn dispatch_http_downloader_method(
-    downloader: &std::rc::Rc<std::cell::RefCell<crate::util::HttpDownloader>>,
+    downloader: &std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
     method_name: &BStr,
     args: &[PluginValue],
 ) -> Result<PluginValue, PhpThrow> {
@@ -78,13 +79,11 @@ pub(crate) fn dispatch_http_downloader_method(
                 )
                 .map_err(failed)?;
             match job {
-                crate::util::http_downloader::HttpDownloaderJob::Settled(Ok(response)) => {
+                HttpDownloaderJob::Settled(Ok(response)) => {
                     resolved_promise(response_to_wire(&response))
                 }
-                crate::util::http_downloader::HttpDownloaderJob::Settled(Err(error)) => {
-                    rejected_promise(failed(error))
-                }
-                crate::util::http_downloader::HttpDownloaderJob::Pending(future) => {
+                HttpDownloaderJob::Settled(Err(error)) => rejected_promise(failed(error)),
+                HttpDownloaderJob::Pending(future) => {
                     let method = method_name.to_owned();
                     Ok(job_registry::register(
                         JobOwner::http_downloader(downloader),
@@ -92,7 +91,7 @@ pub(crate) fn dispatch_http_downloader_method(
                         started,
                         error_throw(
                             BStr::new(""),
-                            &crate::util::HttpDownloader::canceled(url.as_bstr()).into(),
+                            &HttpDownloader::canceled(url.as_bstr()).into(),
                         ),
                         Box::pin(async move {
                             future

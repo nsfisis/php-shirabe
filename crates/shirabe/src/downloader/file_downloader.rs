@@ -10,9 +10,10 @@ use crate::downloader::{
 };
 use crate::event_dispatcher::EventDispatcher;
 use crate::exception::IrrecoverableDownloadException;
+use crate::io::io_interface::VERY_VERBOSE;
 use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, NullIO, io_interface};
-use crate::package::PackageInterfaceHandle;
 use crate::package::comparer::Comparer;
+use crate::package::{DisplayMode, PackageInterfaceHandle};
 use crate::plugin::{
     FileDownloadContext, PluginEvents, PostFileDownloadEvent, PreFileDownloadEvent,
 };
@@ -99,11 +100,9 @@ impl FileDownloader {
         if let Some(cache) = &this.cache
             && cache.borrow().gc_is_necessary()
         {
-            this.io.borrow().write_error3(
-                "Running cache garbage collection",
-                true,
-                crate::io::io_interface::VERY_VERBOSE,
-            );
+            this.io
+                .borrow()
+                .write_error3("Running cache garbage collection", true, VERY_VERBOSE);
             let ttl = this.config.borrow().get_cache_files_ttl();
             let max_size = this.config.borrow().get_cache_files_maxsize()?;
             cache.borrow_mut().gc(ttl, max_size);
@@ -341,7 +340,7 @@ impl DownloaderInterface for FileDownloader {
         BString::from("dist")
     }
 
-    fn as_change_report_interface(&self) -> Option<&dyn crate::downloader::ChangeReportInterface> {
+    fn as_change_report_interface(&self) -> Option<&dyn ChangeReportInterface> {
         Some(self)
     }
 
@@ -456,10 +455,7 @@ impl DownloaderInterface for FileDownloader {
                             "  - Loading <info>",
                             package.get_name(),
                             "</info> (<comment>",
-                            package.get_full_pretty_version(
-                                true,
-                                crate::package::DisplayMode::SourceRefIfDev
-                            ),
+                            package.get_full_pretty_version(true, DisplayMode::SourceRefIfDev),
                             "</comment>) from cache"
                         ),
                         true,
@@ -483,10 +479,7 @@ impl DownloaderInterface for FileDownloader {
                         "  - Downloading <info>",
                         package.get_name(),
                         "</info> (<comment>",
-                        package.get_full_pretty_version(
-                            true,
-                            crate::package::DisplayMode::SourceRefIfDev
-                        ),
+                        package.get_full_pretty_version(true, DisplayMode::SourceRefIfDev),
                         "</comment>)"
                     ));
                 }

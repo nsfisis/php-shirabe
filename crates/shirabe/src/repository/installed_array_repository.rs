@@ -1,10 +1,11 @@
 //! ref: composer/src/Composer/Repository/InstalledArrayRepository.php sha1:1fa649c567a505c90b3d1aec1b3c25ad9793e443
 
+use crate::installer::InstallationManager;
 use crate::package::{BasePackageHandle, PackageInterfaceHandle};
 use crate::repository::{
     AdvisoryProviderInterface, FindPackageConstraint, InstalledRepositoryInterface,
-    LoadPackagesResult, ProviderInfo, RepositoryInterface, SearchResult, WritableArrayRepository,
-    WritableRepositoryInterface,
+    LoadPackagesResult, ProviderInfo, RepositoryInterface, RepositoryInterfaceWeakHandle,
+    SearchResult, WritableArrayRepository, WritableRepositoryInterface,
 };
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
@@ -46,7 +47,7 @@ impl WritableRepositoryInterface for InstalledArrayRepository {
     fn write(
         &mut self,
         dev_mode: bool,
-        installation_manager: &crate::installer::InstallationManager,
+        installation_manager: &InstallationManager,
     ) -> anyhow::Result<()> {
         self.inner.write(dev_mode, installation_manager)
     }
@@ -148,13 +149,13 @@ impl RepositoryInterface for InstalledArrayRepository {
     }
     fn as_writable_repository_interface_mut(
         &mut self,
-    ) -> Option<&mut dyn crate::repository::WritableRepositoryInterface> {
+    ) -> Option<&mut dyn WritableRepositoryInterface> {
         Some(self)
     }
     fn as_any(&self) -> &dyn std::any::Any {
         self
     }
-    fn set_self_handle(&self, weak: crate::repository::RepositoryInterfaceWeakHandle) {
+    fn set_self_handle(&self, weak: RepositoryInterfaceWeakHandle) {
         self.inner.set_self_handle(weak);
     }
 }

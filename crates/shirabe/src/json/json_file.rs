@@ -3,7 +3,7 @@
 use crate::downloader::TransportException;
 use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface};
 use crate::json::JsonValidationException;
-use crate::util::{Filesystem, HttpDownloader};
+use crate::util::{Filesystem, HttpDownloader, StreamContextOptions};
 use bstr::{BStr, BString, ByteSlice, ByteVec};
 use shirabe_php_shim::{
     Catch as _, Error, InvalidArgumentException, JSON_PRETTY_PRINT, JSON_UNESCAPED_SLASHES,
@@ -128,10 +128,7 @@ impl JsonFile {
             if let Some(http_downloader) = &self.http_downloader {
                 Ok(http_downloader
                     .borrow_mut()
-                    .get(
-                        path_to_bytes(&self.path),
-                        crate::util::StreamContextOptions::new(),
-                    )?
+                    .get(path_to_bytes(&self.path), StreamContextOptions::new())?
                     .get_body()
                     .map(<[u8]>::to_vec))
             } else {

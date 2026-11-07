@@ -1,9 +1,10 @@
 //! ref: composer/src/Composer/Util/GitHub.php sha1:6cba0f9d259e3f70cc889ffbe76d543bd8b4f8e9
 
 use crate::config::Config;
+use crate::downloader::TransportException;
 use crate::factory::Factory;
 use crate::io::{IOInterface, IOInterfaceWrite, io_interface};
-use crate::util::{HttpDownloader, ProcessExecutor};
+use crate::util::{HttpDownloader, ProcessExecutor, StreamContextOptions};
 use bstr::{BStr, BString};
 use shirabe_php_shim::{
     Catch as _, PhpMixed, bconcat, date_local, explode_limit, implode, in_array_loose, intval,
@@ -39,7 +40,7 @@ impl GitHub {
             None => std::rc::Rc::new(std::cell::RefCell::new(Factory::create_http_downloader(
                 io.clone(),
                 &config,
-                crate::util::StreamContextOptions::new(),
+                StreamContextOptions::new(),
             )?)),
         };
         Ok(Self {
@@ -241,7 +242,7 @@ impl GitHub {
             bconcat!(origin_url, "/api/v3/")
         };
 
-        let mut http_options = crate::util::StreamContextOptions::new();
+        let mut http_options = StreamContextOptions::new();
         http_options.set_retry_auth_failure(false);
 
         match self
@@ -252,7 +253,7 @@ impl GitHub {
             Ok(_) => {}
             Err(te) => {
                 let code = te
-                    .catch::<crate::downloader::TransportException>()
+                    .catch::<TransportException>()
                     .map(|t| t.get_code())
                     .unwrap_or(0);
                 if code == 403 || code == 401 {

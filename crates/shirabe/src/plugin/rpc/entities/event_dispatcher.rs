@@ -1,5 +1,6 @@
 //! The methods a `Composer\EventDispatcher\EventDispatcher` entity answers over RPC.
 
+use crate::event_dispatcher::{Event, EventDispatcherInterface};
 use crate::plugin::php_call::PhpCall;
 use crate::plugin::rpc::codec::arg;
 use crate::plugin::rpc::dispatch::unavailable_method;
@@ -36,16 +37,14 @@ pub(crate) fn call_php_callable(
 }
 
 pub(crate) fn dispatch_event_dispatcher_method(
-    dispatcher: &std::rc::Rc<
-        std::cell::RefCell<dyn crate::event_dispatcher::EventDispatcherInterface>,
-    >,
+    dispatcher: &std::rc::Rc<std::cell::RefCell<dyn EventDispatcherInterface>>,
     method_name: &BStr,
     args: &[PluginValue],
 ) -> Result<PluginValue, PhpThrow> {
     match method_name.as_bytes() {
         b"dispatch" => {
             let name = arg::<BString>(method_name, args, 0)?;
-            let probe = crate::event_dispatcher::Event::from_name(name.clone());
+            let probe = Event::from_name(name.clone());
             if dispatcher.borrow_mut().has_event_listeners(&probe) {
                 // TODO(plugin): dispatching a worker-constructed event through the Rust-side
                 // dispatcher needs the event object (and the console input it carries) proxied

@@ -4,7 +4,7 @@ use crate::application::Application;
 use crate::command::Command;
 use crate::descriptor::{DescribableObject, DescriptorInterface, DescriptorOptions};
 use crate::input::{InputArgument, InputDefinition, InputOption};
-use crate::output::OutputInterface;
+use crate::output::{OUTPUT_NORMAL, OUTPUT_RAW, OutputInterface};
 
 pub trait Descriptor: DescriptorInterface {
     fn output(&self) -> std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>;
@@ -47,11 +47,7 @@ pub trait Descriptor: DescriptorInterface {
         self.output().borrow().write(
             &[bstr::BString::from(content.as_ref())],
             false,
-            if decorated {
-                crate::output::OUTPUT_NORMAL
-            } else {
-                crate::output::OUTPUT_RAW
-            },
+            if decorated { OUTPUT_NORMAL } else { OUTPUT_RAW },
         );
     }
 

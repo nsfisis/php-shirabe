@@ -1,6 +1,7 @@
 //! ref: composer/vendor/symfony/console/Output/OutputInterface.php sha1:57e42dae8f9763b26040982213a9232bea9d43ca
 
 use crate::formatter::OutputFormatterInterface;
+use crate::output::ConsoleOutputInterface;
 use bstr::BString;
 use shirabe_php_shim::AsAny;
 
@@ -58,7 +59,7 @@ pub trait OutputInterface: std::fmt::Debug + AsAny {
 
     /// Downcast hook standing in for PHP's `$output instanceof ConsoleOutputInterface`
     /// (cf. `InputInterface::as_streamable`). Only `ConsoleOutput` returns `Some`.
-    fn as_console_output(&self) -> Option<&dyn crate::output::ConsoleOutputInterface> {
+    fn as_console_output(&self) -> Option<&dyn ConsoleOutputInterface> {
         None
     }
 }

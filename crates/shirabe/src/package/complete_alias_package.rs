@@ -2,7 +2,7 @@
 
 use crate::package::handle::delegate_package_interface_to_inner;
 use crate::package::{
-    AliasPackage, CompletePackageHandle, CompletePackageInterface, PackageHandle,
+    AliasPackage, CompletePackageHandle, CompletePackageInterface, PackageHandle, PackageInterface,
 };
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
@@ -149,7 +149,7 @@ impl CompletePackageInterface for CompleteAliasPackage {
         self.alias_of.set_archive_excludes(excludes);
     }
 
-    fn as_package_interface(&self) -> &dyn crate::package::PackageInterface {
+    fn as_package_interface(&self) -> &dyn PackageInterface {
         self
     }
 }

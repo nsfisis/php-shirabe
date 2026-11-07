@@ -5,6 +5,7 @@ use crate::plugin::job_registry;
 use crate::plugin::job_registry::JobOwner;
 use crate::plugin::php_call::PhpCall;
 use crate::plugin::rpc::codec::arg;
+use crate::util::sync_executor::block_on;
 use bstr::{BStr, ByteSlice};
 use shirabe_php_rpc::{PhpThrow, PluginValue};
 use shirabe_php_shim::{bconcat, error_chain_message};
@@ -15,7 +16,7 @@ use shirabe_php_shim::{bconcat, error_chain_message};
 pub(crate) fn poll_once<T>(
     future: &mut std::pin::Pin<Box<dyn std::future::Future<Output = T>>>,
 ) -> std::task::Poll<T> {
-    crate::util::sync_executor::block_on(std::future::poll_fn(|cx| {
+    block_on(std::future::poll_fn(|cx| {
         std::task::Poll::Ready(future.as_mut().poll(cx))
     }))
 }

@@ -2,10 +2,11 @@
 
 use crate::application::Application;
 use crate::completion::{CompletionInput, CompletionSuggestions};
-use crate::exception::InvalidArgumentException;
-use crate::helper::HelperSet;
+use crate::exception::{InvalidArgumentException, LogicException};
+use crate::helper::{HelperInterface, HelperSet};
 use crate::input::{
-    InputArgument, InputDefinition, InputInterface, InputInterfaceByName, InputOption, InputValue,
+    DefinitionItem, InputArgument, InputDefinition, InputInterface, InputInterfaceByName,
+    InputOption, InputValue,
 };
 use crate::output::OutputInterface;
 use bstr::{BStr, BString, ByteSlice};
@@ -209,7 +210,7 @@ impl CommandData {
 /// argument/option instances or an InputDefinition.
 #[derive(Debug)]
 pub enum SetDefinitionArg {
-    Array(Vec<crate::input::DefinitionItem>),
+    Array(Vec<DefinitionItem>),
     Definition(InputDefinition),
 }
 
@@ -475,7 +476,7 @@ pub trait Command: std::fmt::Debug + AsAny + PhpClass {
     fn get_helper(
         &self,
         name: &BStr,
-    ) -> anyhow::Result<std::rc::Rc<std::cell::RefCell<dyn crate::helper::HelperInterface>>>;
+    ) -> anyhow::Result<std::rc::Rc<std::cell::RefCell<dyn HelperInterface>>>;
 
     fn set_code(
         &self,
@@ -754,10 +755,10 @@ impl Command for CommandData {
     fn get_helper(
         &self,
         name: &BStr,
-    ) -> anyhow::Result<std::rc::Rc<std::cell::RefCell<dyn crate::helper::HelperInterface>>> {
+    ) -> anyhow::Result<std::rc::Rc<std::cell::RefCell<dyn HelperInterface>>> {
         let helper_set = match &*self.helper_set.borrow() {
             None => {
-                anyhow::bail!(crate::exception::LogicException::new(bconcat!(
+                anyhow::bail!(LogicException::new(bconcat!(
                     "Cannot retrieve helper \"",
                     name,
                     "\" because there is no HelperSet defined. Did you forget to add your command to the application or to set the application on the command using the setApplication() method? You can also set the HelperSet directly using the setHelperSet() method."
@@ -809,6 +810,7 @@ impl std::fmt::Debug for CommandData {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::exception::{InvalidArgumentException, LogicException};
     use crate::helper::{FormatterHelper, HelperInterface};
     use shirabe_php_shim::Catch;
 
@@ -831,9 +833,7 @@ mod tests {
         command.set_helper_set(HelperSet::new(vec![]));
 
         let error = command.get_helper(BStr::new("foo")).unwrap_err();
-        let exception = error
-            .catch::<crate::exception::InvalidArgumentException>()
-            .unwrap();
+        let exception = error.catch::<InvalidArgumentException>().unwrap();
         assert_eq!(
             exception.get_message(),
             "The helper \"foo\" is not defined."
@@ -845,7 +845,7 @@ mod tests {
         let command = CommandData::new(Some("namespace:name".into()));
 
         let error = command.get_helper(BStr::new("formatter")).unwrap_err();
-        let exception = error.catch::<crate::exception::LogicException>().unwrap();
+        let exception = error.catch::<LogicException>().unwrap();
         assert_eq!(
             exception.get_message(),
             "Cannot retrieve helper \"formatter\" because there is no HelperSet defined. Did you forget to add your command to the application or to set the application on the command using the setApplication() method? You can also set the HelperSet directly using the setHelperSet() method."

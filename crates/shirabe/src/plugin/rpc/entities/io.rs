@@ -1,7 +1,7 @@
 //! The methods a `Composer\IO\IOInterface` entity answers over RPC.
 
-use crate::io::IOInterface;
 use crate::io::buffer_io::BufferIO;
+use crate::io::{IOInterface, NORMAL};
 use crate::plugin::rpc::codec::{arg, arg_or};
 use crate::plugin::rpc::dispatch::{error_throw, unavailable_method};
 use bstr::{BStr, BString, ByteSlice};
@@ -67,6 +67,6 @@ fn decode_write_args(
         _ => arg::<Vec<BString>>(method_name, args, 0)?,
     };
     let newline = arg_or::<bool>(method_name, args, 1, true)?;
-    let verbosity = arg_or::<i64>(method_name, args, 2, crate::io::NORMAL)?;
+    let verbosity = arg_or::<i64>(method_name, args, 2, NORMAL)?;
     Ok((messages, newline, verbosity))
 }

@@ -1,3 +1,4 @@
+use crate::{display_to_bytes, utf8_text};
 use bstr::{BStr, BString};
 
 /// Parse the subset of the strtotime()/date_create() grammar that Composer actually emits.
@@ -47,7 +48,7 @@ where
     chrono::DateTime<Tz>: From<chrono::DateTime<chrono::FixedOffset>>,
 {
     // Every format `parse_to_fixed` accepts is ASCII, so bytes that are not UTF-8 cannot parse.
-    match crate::utf8_text(s.as_ref()).and_then(parse_to_fixed) {
+    match utf8_text(s.as_ref()).and_then(parse_to_fixed) {
         Some(dt) => Ok(dt.into()),
         // PHP `date_create` returns `false` here; the closest faithful signal under chrono's
         // `ParseResult` is a parse error, produced by replaying a deliberately invalid parse.
@@ -84,7 +85,7 @@ pub fn date_format_to_strftime(format: &[u8]) -> &'static str {
 /// silently mis-handling an unsupported expression.
 pub fn strtotime(time: impl AsRef<[u8]>) -> Option<i64> {
     // Every format this accepts is ASCII, so bytes that are not UTF-8 cannot parse.
-    let trimmed = crate::utf8_text(time.as_ref())?.trim_ascii();
+    let trimmed = utf8_text(time.as_ref())?.trim_ascii();
 
     if trimmed.eq_ignore_ascii_case("now") {
         return Some(self::time());
@@ -139,7 +140,7 @@ pub fn date_utc(format: impl AsRef<[u8]>, timestamp: Option<i64>) -> BString {
     let timestamp = timestamp.unwrap_or_else(time);
     let dt = chrono::DateTime::<chrono::Utc>::from_timestamp(timestamp, 0)
         .expect("date() timestamp out of range");
-    crate::display_to_bytes(dt.format(date_format_to_strftime(format.as_ref())))
+    display_to_bytes(dt.format(date_format_to_strftime(format.as_ref())))
 }
 
 /// PHP: `date()`, rendering in the system's local timezone.
@@ -148,7 +149,7 @@ pub fn date_local(format: impl AsRef<[u8]>, timestamp: Option<i64>) -> BString {
     let dt = chrono::DateTime::<chrono::Utc>::from_timestamp(timestamp, 0)
         .expect("date() timestamp out of range");
     let tz = local_timezone();
-    crate::display_to_bytes(
+    display_to_bytes(
         dt.with_timezone(&&tz)
             .format(date_format_to_strftime(format.as_ref())),
     )

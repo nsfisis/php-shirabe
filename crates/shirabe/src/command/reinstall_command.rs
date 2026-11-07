@@ -1,14 +1,17 @@
 //! ref: composer/src/Composer/Command/ReinstallCommand.php sha1:87dab56e3f81a929fe8f8ed8ebdd2d13480e4267
 
-use crate::command::base_command::base_command_initialize;
+use crate::command::base_command::{base_command_complete, base_command_initialize};
 use crate::command::{BaseCommand, BaseCommandData, CompletionTrait};
+use crate::composer::composer_full;
 use crate::console::input::{InputArgument, InputOption};
+use crate::delegate_base_command_trait_impls_to_inner;
 use crate::dependency_resolver::Transaction;
 use crate::dependency_resolver::operation::{AnyOperation, UninstallOperation};
 use crate::event_dispatcher::EventFlags;
 use crate::io::IOInterfaceWrite;
-use crate::package::base_package;
+use crate::package::{PackageInterfaceHandle, base_package};
 use crate::plugin::{CommandEvent, PluginEvents};
+use crate::repository::InstalledRepositoryInterfaceHandle;
 use crate::script::ScriptEvents;
 use crate::util::Platform;
 use bstr::{BStr, BString};
@@ -80,13 +83,13 @@ impl Command for ReinstallCommand {
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
         let composer = self.require_composer(None, None)?;
-        let composer = crate::composer::composer_full(&composer);
+        let composer = composer_full(&composer);
         let io = self.get_io();
 
         let repository_manager = composer.get_repository_manager().clone();
         let repository_manager = repository_manager.borrow();
         let local_repo = repository_manager.get_local_repository();
-        let mut packages_to_reinstall: Vec<crate::package::PackageInterfaceHandle> = vec![];
+        let mut packages_to_reinstall: Vec<PackageInterfaceHandle> = vec![];
         let mut package_names_to_reinstall: Vec<bstr::BString> = vec![];
 
         let type_option = input.borrow().get_option("type")?;
@@ -153,9 +156,8 @@ impl Command for ReinstallCommand {
         }
 
         let present_packages = local_repo.get_packages()?;
-        let result_packages: Vec<crate::package::PackageInterfaceHandle> =
-            present_packages.to_vec();
-        let present_packages: Vec<crate::package::PackageInterfaceHandle> = present_packages
+        let result_packages: Vec<PackageInterfaceHandle> = present_packages.to_vec();
+        let present_packages: Vec<PackageInterfaceHandle> = present_packages
             .into_iter()
             .filter(|package| {
                 !package_names_to_reinstall
@@ -238,9 +240,7 @@ impl Command for ReinstallCommand {
             .into_iter()
             .map(|operation| std::rc::Rc::new(operation.into()))
             .collect();
-        let repo = crate::repository::InstalledRepositoryInterfaceHandle::from_repository_handle(
-            &local_repo,
-        );
+        let repo = InstalledRepositoryInterfaceHandle::from_repository_handle(&local_repo);
         installation_manager
             .borrow()
             .execute(&repo, uninstall_operations, dev_mode, true, false)
@@ -327,16 +327,16 @@ impl Command for ReinstallCommand {
         input: &shirabe_symfony_console::completion::CompletionInput,
         suggestions: &mut shirabe_symfony_console::completion::CompletionSuggestions,
     ) -> anyhow::Result<()> {
-        crate::command::base_command::base_command_complete(self, input, suggestions)
+        base_command_complete(self, input, suggestions)
     }
 
     shirabe_symfony_console::delegate_command_trait_impls_to_inner!(base_command_data);
 }
 
 impl BaseCommand for ReinstallCommand {
-    fn base_command_data(&self) -> &crate::command::BaseCommandData {
+    fn base_command_data(&self) -> &BaseCommandData {
         &self.base_command_data
     }
 
-    crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
+    delegate_base_command_trait_impls_to_inner!(base_command_data);
 }

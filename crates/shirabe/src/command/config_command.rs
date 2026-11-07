@@ -1,9 +1,11 @@
 //! ref: composer/src/Composer/Command/ConfigCommand.php sha1:81de5feaf3b7e975424e4cce2c773869b5283f7b
 
 use crate::advisory::Auditor;
+use crate::command::base_command::base_command_complete;
 use crate::command::{BaseCommand, BaseCommandData, BaseConfigCommand};
 use crate::config::{Config, ConfigSourceInterface, JsonConfigSource};
-use crate::console::input::{InputArgument, InputOption};
+use crate::console::input::{InputArgument, InputOption, SuggestedValues};
+use crate::delegate_base_command_trait_impls_to_inner;
 use crate::factory::Factory;
 use crate::io::{IOInterfaceWrite, io_interface};
 use crate::json::{JsonEncodeOptions, JsonFile};
@@ -307,8 +309,8 @@ impl ConfigCommand {
     }
 
     /// Suggest setting-keys, while taking given options in account.
-    fn suggest_setting_keys(&self) -> crate::console::input::SuggestedValues {
-        crate::console::input::SuggestedValues::Closure(Box::new(|this, input, _suggestions| {
+    fn suggest_setting_keys(&self) -> SuggestedValues {
+        SuggestedValues::Closure(Box::new(|this, input, _suggestions| {
             if input.get_option("list")?.to_bool()
                 || input.get_option("editor")?.to_bool()
                 || input.get_option("auth")?.to_bool()
@@ -503,11 +505,7 @@ impl Command for ConfigCommand {
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<()> {
-        <Self as crate::command::base_config_command::BaseConfigCommand>::initialize(
-            self,
-            input.clone(),
-            output,
-        )?;
+        <Self as BaseConfigCommand>::initialize(self, input.clone(), output)?;
 
         let config = self.config.borrow().as_ref().unwrap().clone();
         let auth_config_file = self.get_auth_config_file(input.clone(), &config.borrow())?;
@@ -1566,18 +1564,18 @@ impl Command for ConfigCommand {
         input: &shirabe_symfony_console::completion::CompletionInput,
         suggestions: &mut shirabe_symfony_console::completion::CompletionSuggestions,
     ) -> anyhow::Result<()> {
-        crate::command::base_command::base_command_complete(self, input, suggestions)
+        base_command_complete(self, input, suggestions)
     }
 
     shirabe_symfony_console::delegate_command_trait_impls_to_inner!(base_command_data);
 }
 
 impl BaseCommand for ConfigCommand {
-    fn base_command_data(&self) -> &crate::command::BaseCommandData {
+    fn base_command_data(&self) -> &BaseCommandData {
         &self.base_command_data
     }
 
-    crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
+    delegate_base_command_trait_impls_to_inner!(base_command_data);
 }
 
 // PHP signature: function ($val): bool / ($val) -> bool/string

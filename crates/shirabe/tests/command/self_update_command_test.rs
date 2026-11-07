@@ -1,6 +1,6 @@
 //! ref: composer/tests/Composer/Test/Command/SelfUpdateCommandTest.php sha1:7fe96bf18edf3e973ff6f47e92deb30c624edca4
 
-use crate::test_case::{RunOptions, get_application_tester, init_temp_composer};
+use crate::test_case::{RunOptions, TearDown, get_application_tester, init_temp_composer};
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use serial_test::serial;
@@ -11,13 +11,13 @@ use shirabe_symfony_process::Process;
 /// ref: SelfUpdateCommandTest::setUp. The `composer-test.phar` copy PHP also performs here lives in
 /// `set_up_with_phar` instead, so the one test that never touches the phar is not blocked by the
 /// missing fixture.
-fn set_up() -> crate::test_case::TearDown {
+fn set_up() -> TearDown {
     init_temp_composer(None, None, None, true)
 }
 
 /// ref: SelfUpdateCommandTest::setUp, including the `composer-test.phar` copy. Returns the tear-down
 /// guard and `$this->phar`.
-fn set_up_with_phar() -> (crate::test_case::TearDown, BString) {
+fn set_up_with_phar() -> (TearDown, BString) {
     let tear_down = set_up();
     let phar = tear_down.working_dir().join("composer.phar");
     std::fs::copy(

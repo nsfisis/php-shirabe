@@ -1,21 +1,23 @@
 //! ref: composer/src/Composer/Command/UpdateCommand.php sha1:9736a7deae25a549c219cfca41b5a8c128047e9b
 
 use crate::advisory::Auditor;
-use crate::command::base_command::base_command_initialize;
-use crate::command::{BaseCommand, BaseCommandData, BumpCommand, CompletionTrait};
-use crate::composer::PartialComposerHandle;
+use crate::command::base_command::{base_command_complete, base_command_initialize};
+use crate::command::{BaseCommand, BaseCommandData, BumpCommand, CompletionTrait, FAILURE};
+use crate::composer::{PartialComposerHandle, composer_full};
 use crate::config::BumpAfterUpdate;
 use crate::console::input::{InputArgument, InputOption, SuggestedValues};
+use crate::delegate_base_command_trait_impls_to_inner;
 use crate::dependency_resolver::request::UpdateAllowTransitiveDeps;
 use crate::installer::Installer;
 use crate::io::{IOInterface, IOInterfaceWrite, io_interface};
-use crate::package::base_package;
 use crate::package::loader::RootPackageLoader;
 use crate::package::version::version_selector::ShowWarnings;
 use crate::package::version::{VersionParser, VersionSelector};
+use crate::package::{PackageInterfaceHandle, base_package};
 use crate::plugin::{CommandEvent, PluginEvents};
 use crate::repository::{
-    CanonicalPackagesTrait, CompositeRepository, PlatformRepository, RepositorySet,
+    CanonicalPackagesTrait, CompositeRepository, PlatformRepository, RepositoryInterfaceHandle,
+    RepositorySet, RootAliasInput,
 };
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
@@ -72,7 +74,7 @@ impl UpdateCommand {
             .into());
         }
 
-        let composer_ref = crate::composer::composer_full(composer);
+        let composer_ref = composer_full(composer);
         let platform_req_filter = self.get_platform_requirement_filter(input);
         let stability_flags = composer_ref.get_package().get_stability_flags();
         let requires = array_merge_map(
@@ -95,7 +97,7 @@ impl UpdateCommand {
             io_interface::NORMAL,
         );
         let mut autocompleter_values: IndexMap<BString, BString> = IndexMap::new();
-        let installed_packages: Vec<crate::package::PackageInterfaceHandle> =
+        let installed_packages: Vec<PackageInterfaceHandle> =
             if composer_ref.get_locker().borrow_mut().is_locked() {
                 let locked_repo = composer_ref
                     .get_locker()
@@ -207,12 +209,12 @@ impl UpdateCommand {
         &self,
         composer: &PartialComposerHandle,
     ) -> anyhow::Result<VersionSelector> {
-        let composer = crate::composer::composer_full(composer);
-        let root_aliases: Vec<crate::repository::RootAliasInput> = composer
+        let composer = composer_full(composer);
+        let root_aliases: Vec<RootAliasInput> = composer
             .get_package()
             .get_aliases()
             .into_iter()
-            .map(|alias| crate::repository::RootAliasInput {
+            .map(|alias| RootAliasInput {
                 package: alias.get(bstr::B("package")).cloned().unwrap_or_default(),
                 version: alias.get(bstr::B("version")).cloned().unwrap_or_default(),
                 alias: alias.get(bstr::B("alias")).cloned().unwrap_or_default(),
@@ -230,7 +232,7 @@ impl UpdateCommand {
             IndexMap::new(),
             IndexMap::new(),
         );
-        let repositories: Vec<crate::repository::RepositoryInterfaceHandle> = composer
+        let repositories: Vec<RepositoryInterfaceHandle> = composer
             .get_repository_manager()
             .borrow()
             .get_repositories()
@@ -238,9 +240,9 @@ impl UpdateCommand {
             .filter(|repository| !repository.is::<PlatformRepository>())
             .cloned()
             .collect();
-        repository_set.add_repository(crate::repository::RepositoryInterfaceHandle::new(
-            CompositeRepository::new(repositories),
-        ))?;
+        repository_set.add_repository(RepositoryInterfaceHandle::new(CompositeRepository::new(
+            repositories,
+        )))?;
 
         VersionSelector::new(
             std::rc::Rc::new(std::cell::RefCell::new(repository_set)),
@@ -287,7 +289,7 @@ impl Command for UpdateCommand {
             InputOption::new("patch-only", None, Some(InputOption::VALUE_NONE), "Only allow patch version updates for currently installed dependencies.", None).unwrap().into(),
             InputOption::new("interactive", Some("i".into()), Some(InputOption::VALUE_NONE), "Interactive interface with autocompletion to select the packages to update.", None).unwrap().into(),
             InputOption::new("root-reqs", None, Some(InputOption::VALUE_NONE), "Restricts the update to your first degree dependencies.", None).unwrap().into(),
-            InputOption::new6("bump-after-update", None, Some(InputOption::VALUE_OPTIONAL), "Runs bump after performing the update.", Some(InputValue::Bool(false)), crate::console::input::SuggestedValues::List(vec![BString::from("dev"), BString::from("no-dev"), BString::from("all")])).unwrap().into(),
+            InputOption::new6("bump-after-update", None, Some(InputOption::VALUE_OPTIONAL), "Runs bump after performing the update.", Some(InputValue::Bool(false)), SuggestedValues::List(vec![BString::from("dev"), BString::from("no-dev"), BString::from("all")])).unwrap().into(),
         ]);
         self.set_help(
             "The <info>update</info> command reads the composer.json file from the\n\
@@ -337,7 +339,7 @@ impl Command for UpdateCommand {
         }
 
         let composer_handle = self.require_composer(None, None)?;
-        let composer = crate::composer::composer_full(&composer_handle);
+        let composer = composer_full(&composer_handle);
 
         // Composer warns here that it runs slower without the curl extension. Shirabe does not use
         // curl for its own downloads, so there is nothing to warn about.
@@ -425,7 +427,7 @@ impl Command for UpdateCommand {
                     "` instead to replace the constraint</info>"
                 ));
 
-                return Ok(crate::command::FAILURE);
+                return Ok(FAILURE);
             }
         }
 
@@ -739,16 +741,16 @@ impl Command for UpdateCommand {
         input: &shirabe_symfony_console::completion::CompletionInput,
         suggestions: &mut shirabe_symfony_console::completion::CompletionSuggestions,
     ) -> anyhow::Result<()> {
-        crate::command::base_command::base_command_complete(self, input, suggestions)
+        base_command_complete(self, input, suggestions)
     }
 
     shirabe_symfony_console::delegate_command_trait_impls_to_inner!(base_command_data);
 }
 
 impl BaseCommand for UpdateCommand {
-    fn base_command_data(&self) -> &crate::command::BaseCommandData {
+    fn base_command_data(&self) -> &BaseCommandData {
         &self.base_command_data
     }
 
-    crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
+    delegate_base_command_trait_impls_to_inner!(base_command_data);
 }

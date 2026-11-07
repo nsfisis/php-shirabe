@@ -7,6 +7,7 @@ mod command;
 mod installer;
 mod plugin;
 
+use crate::event_dispatcher::EventDispatcher;
 pub use capability::*;
 pub use command::*;
 pub use installer::*;
@@ -20,7 +21,7 @@ use shirabe_php_rpc::{PhpObjHandle, PluginValue};
 /// script autoloader active, so a class named by `composer.json` resolves through the Rust-side
 /// [`ClassLoader`]s.
 pub(crate) fn php_class_query(function: &BStr, args: Vec<PluginValue>) -> anyhow::Result<bool> {
-    crate::event_dispatcher::EventDispatcher::ensure_script_autoloader()?;
+    EventDispatcher::ensure_script_autoloader()?;
     PhpCall::Function(function).run(args)
 }
 
@@ -29,7 +30,7 @@ pub(crate) fn new_php_object(
     class: &BStr,
     ctor_args: Vec<PluginValue>,
 ) -> anyhow::Result<PhpObjHandle> {
-    crate::event_dispatcher::EventDispatcher::ensure_script_autoloader()?;
+    EventDispatcher::ensure_script_autoloader()?;
     PhpCall::New(class).run(ctor_args)
 }
 

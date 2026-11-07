@@ -1,9 +1,10 @@
 //! ref: composer/src/Composer/Command/ShowCommand.php sha1:642e86b7272ebdbe29416da4ef521a4e0c3e64dd
 
-use crate::command::base_command::base_command_initialize;
+use crate::command::base_command::{base_command_complete, base_command_initialize};
 use crate::command::{BaseCommand, BaseCommandData, CompletionTrait};
-use crate::composer::PartialComposerHandle;
+use crate::composer::{PartialComposerHandle, composer_full};
 use crate::console::input::{InputArgument, InputOption, SuggestedValues};
+use crate::delegate_base_command_trait_impls_to_inner;
 use crate::dependency_resolver::{DefaultPolicy, PolicyInterface};
 use crate::event_dispatcher::EventFlags;
 use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
@@ -11,7 +12,10 @@ use crate::io::{IOInterfaceImmutable, IOInterfaceWrite};
 use crate::json::JsonFile;
 use crate::package::version::version_selector::ShowWarnings;
 use crate::package::version::{VersionParser, VersionSelector};
-use crate::package::{CompletePackageInterfaceHandle, Link, PackageInterfaceHandle, base_package};
+use crate::package::{
+    CompletePackageInterfaceHandle, DisplayMode, Link, PackageInterfaceHandle,
+    RootPackageInterfaceHandle, base_package,
+};
 use crate::plugin::{CommandEvent, PluginEvents};
 use crate::repository::{
     ComposerRepository, CompositeRepository, FilterRepository, InstalledArrayRepository,
@@ -70,8 +74,8 @@ impl ShowCommand {
     }
 
     /// PHP: protected function suggestPackageBasedOnMode(): \Closure
-    fn suggest_package_based_on_mode(&self) -> crate::console::input::SuggestedValues {
-        crate::console::input::SuggestedValues::Closure(Box::new(|this, input, suggestions| {
+    fn suggest_package_based_on_mode(&self) -> SuggestedValues {
+        SuggestedValues::Closure(Box::new(|this, input, suggestions| {
             if input.get_option("available")?.to_bool() || input.get_option("all")?.to_bool() {
                 return this.suggest_available_package_incl_platform().call(
                     this,
@@ -244,7 +248,7 @@ impl ShowCommand {
             None => return vec![],
             Some(c) => c,
         };
-        let composer = crate::composer::composer_full(&composer_rc);
+        let composer = composer_full(&composer_rc);
 
         let root_package = composer.get_package();
 
@@ -277,7 +281,7 @@ impl ShowCommand {
         name: &BStr,
         version: PhpMixed,
     ) -> anyhow::Result<(
-        Option<crate::package::CompletePackageInterfaceHandle>,
+        Option<CompletePackageInterfaceHandle>,
         IndexMap<BString, BString>,
     )> {
         let name = strtolower(name);
@@ -299,7 +303,7 @@ impl ShowCommand {
         repository_set.allow_installed_repositories(true);
         repository_set.add_repository(repos.clone())?;
 
-        let mut matched_package: Option<crate::package::PackageInterfaceHandle> = None;
+        let mut matched_package: Option<PackageInterfaceHandle> = None;
         let mut versions: IndexMap<BString, BString> = IndexMap::new();
         let mut pool = if PlatformRepository::is_platform_package(&name) {
             repository_set.create_pool_with_all_packages()?
@@ -310,7 +314,7 @@ impl ShowCommand {
         let mut literals: Vec<i64> = Vec::new();
         for package in matches.iter() {
             // avoid showing the 9999999-dev alias if the default branch has no branch-alias set
-            let mut p: crate::package::PackageInterfaceHandle = package.clone();
+            let mut p: PackageInterfaceHandle = package.clone();
             if let Some(alias) = p.as_alias()
                 && p.get_version() == VersionParser::DEFAULT_BRANCH_ALIAS
             {
@@ -1129,8 +1133,8 @@ impl ShowCommand {
         latest_package: PackageInterfaceHandle,
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<BString> {
-        if latest_package.get_full_pretty_version(true, crate::package::DisplayMode::SourceRefIfDev)
-            == package.get_full_pretty_version(true, crate::package::DisplayMode::SourceRefIfDev)
+        if latest_package.get_full_pretty_version(true, DisplayMode::SourceRefIfDev)
+            == package.get_full_pretty_version(true, DisplayMode::SourceRefIfDev)
         {
             return Ok(BString::from("up-to-date"));
         }
@@ -1175,11 +1179,11 @@ impl ShowCommand {
         minor_only: bool,
         patch_only: bool,
         platform_req_filter: std::rc::Rc<dyn PlatformRequirementFilterInterface>,
-    ) -> anyhow::Result<Option<crate::package::PackageInterfaceHandle>> {
+    ) -> anyhow::Result<Option<PackageInterfaceHandle>> {
         // find the latest version allowed in this repo set
         let name = package.get_name();
         let repo_set = self.get_repository_set(composer)?;
-        let composer_ref = crate::composer::composer_full(composer);
+        let composer_ref = composer_full(composer);
         let mut version_selector =
             VersionSelector::new(repo_set, Some(&mut *platform_repo.borrow_mut()))?;
         let mut stability = composer_ref.get_package().get_minimum_stability();
@@ -1289,7 +1293,7 @@ impl ShowCommand {
         &self,
         composer: &PartialComposerHandle,
     ) -> anyhow::Result<std::rc::Rc<std::cell::RefCell<RepositorySet>>> {
-        let composer = crate::composer::composer_full(composer);
+        let composer = composer_full(composer);
         if self.repository_set.borrow().is_none() {
             let mut rs = RepositorySet::new(
                 composer.get_package().get_minimum_stability(),
@@ -1604,7 +1608,7 @@ impl Command for ShowCommand {
         // init repos
         let mut platform_overrides: IndexMap<BString, PhpMixed> = IndexMap::new();
         if let Some(ref composer) = composer {
-            let composer = crate::composer::composer_full(composer);
+            let composer = composer_full(composer);
             platform_overrides = composer.get_config().borrow().get_map("platform")?;
         }
         let platform_repo = PlatformRepositoryHandle::new(PlatformRepository::new(
@@ -1616,7 +1620,7 @@ impl Command for ShowCommand {
         let mut locked_repo: Option<RepositoryInterfaceHandle> = None;
 
         // The single-package $package binding from PHP gets surfaced here.
-        let mut single_package: Option<crate::package::CompletePackageInterfaceHandle> = None;
+        let mut single_package: Option<CompletePackageInterfaceHandle> = None;
         let mut versions_map: IndexMap<BString, BString> = IndexMap::new();
         let installed_repo: RepositoryInterfaceHandle;
         let repos: RepositoryInterfaceHandle;
@@ -1626,9 +1630,7 @@ impl Command for ShowCommand {
             && input.borrow().get_option("locked")?.as_bool() != Some(true)
         {
             let composer = self.require_composer(None, None)?;
-            let package = crate::package::RootPackageInterfaceHandle::dup(
-                composer.borrow_partial().get_package(),
-            );
+            let package = RootPackageInterfaceHandle::dup(composer.borrow_partial().get_package());
             if input.borrow().get_option("name-only")?.as_bool() == Some(true) {
                 self.get_io().write(package.get_name());
 
@@ -1662,7 +1664,7 @@ impl Command for ShowCommand {
         } else if input.borrow().get_option("available")?.as_bool() == Some(true) {
             let mut ir = InstalledRepository::new(vec![platform_repo.clone().into()]);
             if let Some(ref composer) = composer {
-                let composer = crate::composer::composer_full(composer);
+                let composer = composer_full(composer);
                 repos = RepositoryInterfaceHandle::new(CompositeRepository::new(
                     composer
                         .get_repository_manager()
@@ -1688,7 +1690,7 @@ impl Command for ShowCommand {
                 installed_repo = RepositoryInterfaceHandle::new(ir);
             }
         } else if input.borrow().get_option("all")?.as_bool() == Some(true) && composer.is_some() {
-            let composer_ref = crate::composer::composer_full(composer.as_ref().unwrap());
+            let composer_ref = composer_full(composer.as_ref().unwrap());
             let local_repo = composer_ref
                 .get_repository_manager()
                 .borrow()
@@ -1745,7 +1747,7 @@ impl Command for ShowCommand {
             repos = RepositoryInterfaceHandle::new(CompositeRepository::new(composite_input));
         } else if input.borrow().get_option("locked")?.as_bool() == Some(true) {
             if composer.is_none()
-                || !crate::composer::composer_full(composer.as_ref().unwrap())
+                || !composer_full(composer.as_ref().unwrap())
                     .get_locker()
                     .borrow_mut()
                     .is_locked()
@@ -1753,17 +1755,14 @@ impl Command for ShowCommand {
                 return Err(UnexpectedValueException::new(BString::from("A valid composer.json and composer.lock files is required to run this command with --locked"))
                 .into());
             }
-            let composer_ref = crate::composer::composer_full(composer.as_ref().unwrap());
+            let composer_ref = composer_full(composer.as_ref().unwrap());
             let locker_rc = composer_ref.get_locker().clone();
             let mut locker = locker_rc.borrow_mut();
             let lr = locker.get_locked_repository(
                 input.borrow().get_option("no-dev")?.as_bool() != Some(true),
             )?;
             if input.borrow().get_option("self")?.as_bool() == Some(true) {
-                lr.add_package(
-                    crate::package::RootPackageInterfaceHandle::dup(composer_ref.get_package())
-                        .into(),
-                )?;
+                lr.add_package(RootPackageInterfaceHandle::dup(composer_ref.get_package()).into())?;
             }
             let lr_handle: RepositoryInterfaceHandle = lr.into();
             locked_repo = Some(lr_handle.clone());
@@ -1777,12 +1776,12 @@ impl Command for ShowCommand {
             let _guard_from_existing;
             let composer_local = match composer.as_ref() {
                 Some(c) => {
-                    _guard_from_existing = crate::composer::composer_full(c);
+                    _guard_from_existing = composer_full(c);
                     &*_guard_from_existing
                 }
                 None => {
                     composer_local_owned = self.require_composer(None, None)?;
-                    _guard_from_existing = crate::composer::composer_full(&composer_local_owned);
+                    _guard_from_existing = composer_full(&composer_local_owned);
                     &*_guard_from_existing
                 }
             };
@@ -1791,9 +1790,7 @@ impl Command for ShowCommand {
             let root_repo: RepositoryInterfaceHandle =
                 if input.borrow().get_option("self")?.as_bool() == Some(true) {
                     RepositoryInterfaceHandle::new(RootPackageRepository::new(
-                        crate::package::RootPackageInterfaceHandle::dup(
-                            composer_local.get_package(),
-                        ),
+                        RootPackageInterfaceHandle::dup(composer_local.get_package()),
                     ))
                 } else {
                     RepositoryInterfaceHandle::new(InstalledArrayRepository::new()?)
@@ -1810,10 +1807,8 @@ impl Command for ShowCommand {
                     false,
                     Vec::new(),
                 );
-                let cloned: Vec<crate::package::PackageInterfaceHandle> = packages
-                    .iter()
-                    .map(crate::package::PackageInterfaceHandle::dup)
-                    .collect();
+                let cloned: Vec<PackageInterfaceHandle> =
+                    packages.iter().map(PackageInterfaceHandle::dup).collect();
                 let new_repo = RepositoryInterfaceHandle::new(InstalledRepository::new(vec![
                     root_repo,
                     RepositoryInterfaceHandle::new(InstalledArrayRepository::new_with_packages(
@@ -1850,7 +1845,7 @@ impl Command for ShowCommand {
         }
 
         if let Some(ref composer) = composer {
-            let composer = crate::composer::composer_full(composer);
+            let composer = composer_full(composer);
             let command_event = CommandEvent::new6(
                 PluginEvents::COMMAND,
                 "show",
@@ -1971,7 +1966,7 @@ impl Command for ShowCommand {
                 return Ok(exit_code);
             }
 
-            let mut latest_package: Option<crate::package::PackageInterfaceHandle> = None;
+            let mut latest_package: Option<PackageInterfaceHandle> = None;
             if input.borrow().get_option("latest")?.as_bool() == Some(true) {
                 latest_package = self.find_latest_package(
                     package.clone().into(),
@@ -2001,9 +1996,8 @@ impl Command for ShowCommand {
                 && latest_package
                     .as_ref()
                     .unwrap()
-                    .get_full_pretty_version(true, crate::package::DisplayMode::SourceRefIfDev)
-                    != package
-                        .get_full_pretty_version(true, crate::package::DisplayMode::SourceRefIfDev)
+                    .get_full_pretty_version(true, DisplayMode::SourceRefIfDev)
+                    != package.get_full_pretty_version(true, DisplayMode::SourceRefIfDev)
                 && (latest_package
                     .as_ref()
                     .unwrap()
@@ -2156,7 +2150,7 @@ impl Command for ShowCommand {
                         ),
                     };
                     if need_replace {
-                        let mut p: crate::package::PackageInterfaceHandle = package.clone();
+                        let mut p: PackageInterfaceHandle = package.clone();
                         while let Some(alias) = p.as_alias() {
                             p = alias.get_alias_of().into();
                         }
@@ -2210,8 +2204,7 @@ impl Command for ShowCommand {
             BStr::new("{^(?:%s)$}iD"),
         );
         let indent = BStr::new(if show_all_types { "  " } else { "" });
-        let mut latest_packages: IndexMap<BString, crate::package::PackageInterfaceHandle> =
-            IndexMap::new();
+        let mut latest_packages: IndexMap<BString, PackageInterfaceHandle> = IndexMap::new();
         let mut exit_code: i64 = 0;
         let mut view_data: IndexMap<BString, Vec<PackageViewData>> = IndexMap::new();
         let mut view_meta_data: IndexMap<BString, ViewMetaData> = IndexMap::new();
@@ -2294,13 +2287,10 @@ impl Command for ShowCommand {
 
                         // Determine if Composer is checking outdated dependencies and if current package should trigger non-default exit code
                         let mut package_is_up_to_date = if let Some(latest) = latest_package {
-                            latest.get_full_pretty_version(
-                                true,
-                                crate::package::DisplayMode::SourceRefIfDev,
-                            ) == package.get_full_pretty_version(
-                                true,
-                                crate::package::DisplayMode::SourceRefIfDev,
-                            ) && latest.as_complete().is_none_or(|c| !c.is_abandoned())
+                            latest.get_full_pretty_version(true, DisplayMode::SourceRefIfDev)
+                                == package
+                                    .get_full_pretty_version(true, DisplayMode::SourceRefIfDev)
+                                && latest.as_complete().is_none_or(|c| !c.is_abandoned())
                         } else {
                             false
                         };
@@ -2340,10 +2330,8 @@ impl Command for ShowCommand {
                         }
                         name_length = name_length.max(package_view_data.name.len());
                         if write_version {
-                            let mut version_str = package.get_full_pretty_version(
-                                true,
-                                crate::package::DisplayMode::SourceRefIfDev,
-                            );
+                            let mut version_str =
+                                package.get_full_pretty_version(true, DisplayMode::SourceRefIfDev);
                             if format == "text" {
                                 version_str = ltrim2(&version_str, "v");
                             }
@@ -2370,10 +2358,8 @@ impl Command for ShowCommand {
                             }
                         }
                         if write_latest && let Some(latest) = latest_package {
-                            let mut latest_version_str = latest.get_full_pretty_version(
-                                true,
-                                crate::package::DisplayMode::SourceRefIfDev,
-                            );
+                            let mut latest_version_str =
+                                latest.get_full_pretty_version(true, DisplayMode::SourceRefIfDev);
                             if format == "text" {
                                 latest_version_str = ltrim2(&latest_version_str, "v");
                             }
@@ -2628,23 +2614,23 @@ impl Command for ShowCommand {
         input: &shirabe_symfony_console::completion::CompletionInput,
         suggestions: &mut shirabe_symfony_console::completion::CompletionSuggestions,
     ) -> anyhow::Result<()> {
-        crate::command::base_command::base_command_complete(self, input, suggestions)
+        base_command_complete(self, input, suggestions)
     }
 
     shirabe_symfony_console::delegate_command_trait_impls_to_inner!(base_command_data);
 }
 
 impl BaseCommand for ShowCommand {
-    fn base_command_data(&self) -> &crate::command::BaseCommandData {
+    fn base_command_data(&self) -> &BaseCommandData {
         &self.base_command_data
     }
 
-    crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
+    delegate_base_command_trait_impls_to_inner!(base_command_data);
 }
 
 #[derive(Debug)]
 pub enum PackageOrName {
-    Pkg(crate::package::PackageInterfaceHandle),
+    Pkg(PackageInterfaceHandle),
     Name(BString),
 }
 

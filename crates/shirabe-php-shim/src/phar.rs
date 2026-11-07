@@ -4,7 +4,12 @@
 // TODO(php-semantics): this differs from PHP's `Phar` and `PharData` in details. Its compatibility
 // needs to be investigated against the C sources of PHP's `ext/phar`.
 
-use crate::{UnexpectedValueException, path_from_bytes, path_to_bytes, rtrim2, trim2};
+use crate::hash::calculate_hash;
+use crate::zip::start_directory;
+use crate::{
+    Exception, UnexpectedValueException, bconcat, display_to_bytes, file_exists,
+    impl_php_exception, os_str_from_bytes, path_from_bytes, path_to_bytes, rtrim2, trim2,
+};
 use bstr::{BStr, BString, ByteSlice};
 use std::io::{Read as _, Write as _};
 
@@ -43,7 +48,7 @@ fn entry_content<'a>(
             let invalid_entry = |e: &dyn std::fmt::Display| {
                 corruption_error(
                     archive_path,
-                    crate::bconcat!("invalid zip entry: ", crate::display_to_bytes(e)),
+                    bconcat!("invalid zip entry: ", display_to_bytes(e)),
                 )
             };
             let mut zip = zip.borrow_mut();
@@ -71,7 +76,7 @@ struct PharEntry {
 
 fn corruption_error(path: &std::path::Path, detail: impl AsRef<[u8]>) -> anyhow::Error {
     let detail = detail.as_ref();
-    UnexpectedValueException::new(crate::bconcat!(
+    UnexpectedValueException::new(bconcat!(
         "internal corruption of phar \"",
         path,
         "\" (",
@@ -101,7 +106,7 @@ fn read_archive_entries(
     let bytes = std::fs::read(path).map_err(|e| {
         corruption_error(
             path,
-            crate::bconcat!("unable to open archive: ", crate::display_to_bytes(e)),
+            bconcat!("unable to open archive: ", display_to_bytes(e)),
         )
     })?;
     let bytes = if bytes.starts_with(&[0x1f, 0x8b]) {
@@ -109,10 +114,7 @@ fn read_archive_entries(
         flate2::read::MultiGzDecoder::new(&bytes[..])
             .read_to_end(&mut out)
             .map_err(|e| {
-                corruption_error(
-                    path,
-                    crate::bconcat!("invalid gzip data: ", crate::display_to_bytes(e)),
-                )
+                corruption_error(path, bconcat!("invalid gzip data: ", display_to_bytes(e)))
             })?;
         out
     } else if bytes.starts_with(b"BZh") {
@@ -120,10 +122,7 @@ fn read_archive_entries(
         bzip2::read::MultiBzDecoder::new(&bytes[..])
             .read_to_end(&mut out)
             .map_err(|e| {
-                corruption_error(
-                    path,
-                    crate::bconcat!("invalid bzip2 data: ", crate::display_to_bytes(e)),
-                )
+                corruption_error(path, bconcat!("invalid bzip2 data: ", display_to_bytes(e)))
             })?;
         out
     } else {
@@ -132,18 +131,12 @@ fn read_archive_entries(
 
     if bytes.starts_with(b"PK") {
         let mut zip = zip::ZipArchive::new(std::io::Cursor::new(bytes)).map_err(|e| {
-            corruption_error(
-                path,
-                crate::bconcat!("invalid zip data: ", crate::display_to_bytes(e)),
-            )
+            corruption_error(path, bconcat!("invalid zip data: ", display_to_bytes(e)))
         })?;
         let mut entries = Vec::new();
         for i in 0..zip.len() {
             let file = zip.by_index_raw(i).map_err(|e| {
-                corruption_error(
-                    path,
-                    crate::bconcat!("invalid zip entry: ", crate::display_to_bytes(e)),
-                )
+                corruption_error(path, bconcat!("invalid zip entry: ", display_to_bytes(e)))
             })?;
             let localname = rtrim2(file.name_raw(), "/");
             if file.is_dir() {
@@ -172,17 +165,12 @@ fn read_archive_entries(
     let len = bytes.len();
     let mut archive = tar::Archive::new(std::io::Cursor::new(bytes));
     let mut entries = Vec::new();
-    for entry in archive.entries().map_err(|e| {
-        corruption_error(
-            path,
-            crate::bconcat!("invalid tar data: ", crate::display_to_bytes(e)),
-        )
-    })? {
+    for entry in archive
+        .entries()
+        .map_err(|e| corruption_error(path, bconcat!("invalid tar data: ", display_to_bytes(e))))?
+    {
         let mut entry = entry.map_err(|e| {
-            corruption_error(
-                path,
-                crate::bconcat!("invalid tar entry: ", crate::display_to_bytes(e)),
-            )
+            corruption_error(path, bconcat!("invalid tar entry: ", display_to_bytes(e)))
         })?;
         let entry_type = entry.header().entry_type();
         // The pax interchange headers (typeflags x and g) are silently ignored, like phar does.
@@ -203,10 +191,7 @@ fn read_archive_entries(
             // The data of a sparse file is not stored contiguously, so it is read out here.
             let mut content = Vec::new();
             entry.read_to_end(&mut content).map_err(|e| {
-                corruption_error(
-                    path,
-                    crate::bconcat!("invalid tar entry: ", crate::display_to_bytes(e)),
-                )
+                corruption_error(path, bconcat!("invalid tar entry: ", display_to_bytes(e)))
             })?;
             entries.push(PharEntry {
                 localname,
@@ -241,7 +226,7 @@ fn read_archive_entries(
 /// (`out.tar` + `.gz` = `out.tar.gz`).
 fn sibling_with_suffix(path: &std::path::Path, suffix: &BStr) -> std::path::PathBuf {
     let mut name = path.to_path_buf().into_os_string();
-    name.push(crate::os_str_from_bytes(suffix));
+    name.push(os_str_from_bytes(suffix));
     std::path::PathBuf::from(name)
 }
 
@@ -260,7 +245,7 @@ fn extract_entries(
     overwrite: bool,
 ) -> anyhow::Result<()> {
     let extract_error = |detail: BString| {
-        PharException::new(crate::bconcat!(
+        PharException::new(bconcat!(
             "Extracting from phar \"",
             archive_path,
             "\" failed: ",
@@ -276,14 +261,14 @@ fn extract_entries(
                 .any(|entry| entry.localname == *file.as_bytes())
         })
     {
-        return Err(extract_error(crate::bconcat!(
+        return Err(extract_error(bconcat!(
             "\"",
             missing,
             "\" is not in the phar"
         )));
     }
 
-    std::fs::create_dir_all(directory).map_err(|e| extract_error(crate::display_to_bytes(e)))?;
+    std::fs::create_dir_all(directory).map_err(|e| extract_error(display_to_bytes(e)))?;
     for entry in entries {
         if let Some(files) = files
             && !files
@@ -298,7 +283,7 @@ fn extract_entries(
                 .components()
                 .any(|c| matches!(c, std::path::Component::ParentDir))
         {
-            return Err(extract_error(crate::bconcat!(
+            return Err(extract_error(bconcat!(
                 "path \"",
                 entry.localname,
                 "\" is invalid"
@@ -307,37 +292,31 @@ fn extract_entries(
         let dest = directory.join(rel);
         match &entry.data {
             PharEntryData::Dir => {
-                std::fs::create_dir_all(&dest)
-                    .map_err(|e| extract_error(crate::display_to_bytes(e)))?;
+                std::fs::create_dir_all(&dest).map_err(|e| extract_error(display_to_bytes(e)))?;
             }
             PharEntryData::Memory(_) | PharEntryData::TarRange(_) | PharEntryData::ZipIndex(_) => {
                 if !overwrite && dest.exists() {
-                    return Err(extract_error(crate::bconcat!(
-                        "\"",
-                        dest,
-                        "\" already exists"
-                    )));
+                    return Err(extract_error(bconcat!("\"", dest, "\" already exists")));
                 }
                 if let Some(parent) = dest.parent() {
                     std::fs::create_dir_all(parent)
-                        .map_err(|e| extract_error(crate::display_to_bytes(e)))?;
+                        .map_err(|e| extract_error(display_to_bytes(e)))?;
                 }
                 let content = entry_content(archive_path, source, &entry.data)?;
-                std::fs::write(&dest, content)
-                    .map_err(|e| extract_error(crate::display_to_bytes(e)))?;
+                std::fs::write(&dest, content).map_err(|e| extract_error(display_to_bytes(e)))?;
             }
             PharEntryData::Disk(src) => {
                 if let Some(parent) = dest.parent() {
                     std::fs::create_dir_all(parent)
-                        .map_err(|e| extract_error(crate::display_to_bytes(e)))?;
+                        .map_err(|e| extract_error(display_to_bytes(e)))?;
                 }
-                std::fs::copy(src, &dest).map_err(|e| extract_error(crate::display_to_bytes(e)))?;
+                std::fs::copy(src, &dest).map_err(|e| extract_error(display_to_bytes(e)))?;
             }
         }
         if let Some(mode) = entry.mode {
             use std::os::unix::fs::PermissionsExt;
             std::fs::set_permissions(&dest, std::fs::Permissions::from_mode(mode & 0o7777))
-                .map_err(|e| extract_error(crate::display_to_bytes(e)))?;
+                .map_err(|e| extract_error(display_to_bytes(e)))?;
         }
     }
     Ok(())
@@ -419,7 +398,7 @@ fn verify_phar_signature(path: &std::path::Path, bytes: &[u8]) -> anyhow::Result
         return Err(broken());
     }
     let sig_start = n - 8 - sig_len;
-    if crate::hash::calculate_hash(algo, &bytes[..sig_start]) != bytes[sig_start..n - 8] {
+    if calculate_hash(algo, &bytes[..sig_start]) != bytes[sig_start..n - 8] {
         return Err(corruption_error(
             path,
             BStr::new("phar has a broken signature"),
@@ -455,16 +434,12 @@ fn find_halt_compiler_token(blob: &[u8], token: &[u8]) -> Option<usize> {
 
 fn parse_native_phar(path: &std::path::Path) -> anyhow::Result<Vec<PharEntry>> {
     let bytes = std::fs::read(path).map_err(|e| {
-        corruption_error(
-            path,
-            crate::bconcat!("unable to open phar: ", crate::display_to_bytes(e)),
-        )
+        corruption_error(path, bconcat!("unable to open phar: ", display_to_bytes(e)))
     })?;
 
     let halt = halt_compiler_token();
-    let halt_pos = find_halt_compiler_token(&bytes, &halt).ok_or_else(|| {
-        corruption_error(path, crate::bconcat!(halt.as_bstr(), " not found in stub"))
-    })?;
+    let halt_pos = find_halt_compiler_token(&bytes, &halt)
+        .ok_or_else(|| corruption_error(path, bconcat!(halt.as_bstr(), " not found in stub")))?;
     let mut offset = halt_pos + halt.len();
     for close_tag in [&b" ?>"[..], &b"\n?>"[..]] {
         if bytes[offset..].starts_with(close_tag) {
@@ -552,7 +527,7 @@ fn parse_native_phar(path: &std::path::Path) -> anyhow::Result<Vec<PharEntry>> {
                 .map_err(|e| {
                     corruption_error(
                         path,
-                        crate::bconcat!("invalid deflate data: ", crate::display_to_bytes(e)),
+                        bconcat!("invalid deflate data: ", display_to_bytes(e)),
                     )
                 })?;
             out
@@ -561,10 +536,7 @@ fn parse_native_phar(path: &std::path::Path) -> anyhow::Result<Vec<PharEntry>> {
             bzip2::read::BzDecoder::new(data)
                 .read_to_end(&mut out)
                 .map_err(|e| {
-                    corruption_error(
-                        path,
-                        crate::bconcat!("invalid bzip2 data: ", crate::display_to_bytes(e)),
-                    )
+                    corruption_error(path, bconcat!("invalid bzip2 data: ", display_to_bytes(e)))
                 })?;
             out
         } else {
@@ -623,19 +595,19 @@ impl Phar {
 
 #[derive(Debug)]
 pub struct PharException {
-    inner: crate::Exception,
+    inner: Exception,
 }
 
 impl PharException {
     #[track_caller]
     pub fn new(message: impl Into<BString>) -> Self {
         Self {
-            inner: crate::Exception::new(message),
+            inner: Exception::new(message),
         }
     }
 }
 
-crate::impl_php_exception!(PharException, inner, r"PharException");
+impl_php_exception!(PharException, inner, r"PharException");
 
 #[derive(Debug)]
 pub struct PharFileInfo {
@@ -686,7 +658,7 @@ impl PharData {
     }
 
     fn open(path: std::path::PathBuf, format: Option<i64>) -> anyhow::Result<Self> {
-        if crate::file_exists(&path) {
+        if file_exists(&path) {
             let (entries, source, detected_format) = read_archive_entries(&path)?;
             return Ok(Self {
                 path,
@@ -701,7 +673,7 @@ impl PharData {
             None => false,
         };
         if !parent_exists {
-            return Err(UnexpectedValueException::new(crate::bconcat!(
+            return Err(UnexpectedValueException::new(bconcat!(
                 "Cannot create phar '",
                 path,
                 "', file extension (or combination) not recognised or the directory does not exist"
@@ -737,7 +709,7 @@ impl PharData {
                 return Some(self.file_info(entry.localname.clone(), entry.data.clone()));
             }
         }
-        let prefix = crate::bconcat!(&key, "/");
+        let prefix = bconcat!(&key, "/");
         if entries
             .iter()
             .any(|e| e.localname.starts_with(prefix.as_slice()))
@@ -825,7 +797,7 @@ impl PharData {
                 let localname = BString::from(path_to_bytes(
                     file.strip_prefix(base_directory)
                         .map_err(|_| -> anyhow::Error {
-                            UnexpectedValueException::new(crate::bconcat!(
+                            UnexpectedValueException::new(bconcat!(
                                 "Iterator returned a path \"",
                                 file,
                                 "\" that is not in the base directory \"",
@@ -856,11 +828,11 @@ impl PharData {
         );
         let tar_bytes = self.build_tar_bytes()?;
         let write_error = |e: std::io::Error| -> anyhow::Error {
-            PharException::new(crate::bconcat!(
+            PharException::new(bconcat!(
                 "Unable to compress phar archive \"",
                 self.path,
                 "\": ",
-                crate::display_to_bytes(e)
+                display_to_bytes(e)
             ))
             .into()
         };
@@ -900,11 +872,11 @@ impl PharData {
         }
         let bytes = self.build_tar_bytes()?;
         std::fs::write(&self.path, bytes).map_err(|e| {
-            PharException::new(crate::bconcat!(
+            PharException::new(bconcat!(
                 "Unable to write phar archive \"",
                 self.path,
                 "\": ",
-                crate::display_to_bytes(e)
+                display_to_bytes(e)
             ))
             .into()
         })
@@ -912,11 +884,11 @@ impl PharData {
 
     fn build_tar_bytes(&self) -> anyhow::Result<Vec<u8>> {
         let write_error = |e: std::io::Error| {
-            PharException::new(crate::bconcat!(
+            PharException::new(bconcat!(
                 "Unable to write phar archive \"",
                 self.path,
                 "\": ",
-                crate::display_to_bytes(e)
+                display_to_bytes(e)
             ))
             .into()
         };
@@ -983,7 +955,7 @@ impl PharData {
 
     fn write_zip(&self) -> anyhow::Result<()> {
         let write_error = |e: BString| -> anyhow::Error {
-            PharException::new(crate::bconcat!(
+            PharException::new(bconcat!(
                 "Unable to write phar archive \"",
                 self.path,
                 "\": ",
@@ -991,8 +963,8 @@ impl PharData {
             ))
             .into()
         };
-        let file = std::fs::File::create(&self.path)
-            .map_err(|e| write_error(crate::display_to_bytes(e)))?;
+        let file =
+            std::fs::File::create(&self.path).map_err(|e| write_error(display_to_bytes(e)))?;
         let mut writer = zip::ZipWriter::new(file);
         for entry in self.entries.borrow().iter() {
             let options = zip::write::SimpleFileOptions::default()
@@ -1001,19 +973,19 @@ impl PharData {
             match &entry.data {
                 PharEntryData::Disk(source) => {
                     use std::os::unix::fs::PermissionsExt;
-                    let metadata = std::fs::metadata(source)
-                        .map_err(|e| write_error(crate::display_to_bytes(e)))?;
+                    let metadata =
+                        std::fs::metadata(source).map_err(|e| write_error(display_to_bytes(e)))?;
                     writer
                         .start_file_with_options(
                             options
                                 .name(localname)
                                 .unix_permissions(metadata.permissions().mode() & 0o7777),
                         )
-                        .map_err(|e| write_error(crate::display_to_bytes(e)))?;
+                        .map_err(|e| write_error(display_to_bytes(e)))?;
                     let mut file = std::fs::File::open(source)
-                        .map_err(|e| write_error(crate::display_to_bytes(e)))?;
+                        .map_err(|e| write_error(display_to_bytes(e)))?;
                     std::io::copy(&mut file, &mut writer)
-                        .map_err(|e| write_error(crate::display_to_bytes(e)))?;
+                        .map_err(|e| write_error(display_to_bytes(e)))?;
                 }
                 PharEntryData::Memory(_)
                 | PharEntryData::TarRange(_)
@@ -1025,24 +997,24 @@ impl PharData {
                     };
                     writer
                         .start_file_with_options(options.name(localname))
-                        .map_err(|e| write_error(crate::display_to_bytes(e)))?;
+                        .map_err(|e| write_error(display_to_bytes(e)))?;
                     writer
                         .write_all(&content)
-                        .map_err(|e| write_error(crate::display_to_bytes(e)))?;
+                        .map_err(|e| write_error(display_to_bytes(e)))?;
                 }
                 PharEntryData::Dir => {
-                    crate::zip::start_directory(
+                    start_directory(
                         &mut writer,
                         localname,
                         options.external_attributes(0o040755 << 16),
                     )
-                    .map_err(|e| write_error(crate::display_to_bytes(e)))?;
+                    .map_err(|e| write_error(display_to_bytes(e)))?;
                 }
             }
         }
         writer
             .finish()
-            .map_err(|e| write_error(crate::display_to_bytes(e)))?;
+            .map_err(|e| write_error(display_to_bytes(e)))?;
         Ok(())
     }
 }
@@ -1050,7 +1022,8 @@ impl PharData {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Catch as _;
+    use crate::hash::calculate_hash;
+    use crate::{Catch as _, error_message, path_from_bytes};
 
     #[test]
     fn tar_entry_name_keeps_bytes_that_are_not_valid_utf8() {
@@ -1119,7 +1092,7 @@ mod tests {
     }
 
     fn write_file(dir: &std::path::Path, name: &BStr, content: &[u8]) -> std::path::PathBuf {
-        let path = dir.join(crate::path_from_bytes(name));
+        let path = dir.join(path_from_bytes(name));
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
         std::fs::write(&path, content).unwrap();
         path
@@ -1259,7 +1232,7 @@ mod tests {
         bytes.extend_from_slice(&manifest);
         bytes.extend_from_slice(&stored.0);
         bytes.extend_from_slice(&deflated);
-        let signature = crate::hash::calculate_hash("sha1", &bytes);
+        let signature = calculate_hash("sha1", &bytes);
         if tampered {
             let content_start = bytes.len() - stored.0.len() - deflated.len();
             bytes[content_start] ^= 0xFF;
@@ -1329,7 +1302,7 @@ mod tests {
             .extract_to(&out, Some(&[BStr::new("dir/absent.txt")]), true)
             .unwrap_err();
         assert!(
-            crate::error_message(&error).contains_str("\"dir/absent.txt\" is not in the phar"),
+            error_message(&error).contains_str("\"dir/absent.txt\" is not in the phar"),
             "unexpected error: {error}"
         );
     }

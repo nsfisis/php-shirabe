@@ -32,7 +32,7 @@ pub use suggested_packages_reporter::*;
 
 use crate::advisory::{AuditConfig, Auditor};
 use crate::autoload::AutoloadGeneratorInterface;
-use crate::composer::PartialComposerHandle;
+use crate::composer::{PartialComposerHandle, composer_full};
 use crate::config::Config;
 use crate::console::GithubActionError;
 use crate::dependency_resolver::operation::AnyOperation;
@@ -51,13 +51,14 @@ use crate::package::dumper::ArrayDumper;
 use crate::package::loader::{ArrayLoader, LoaderInterface};
 use crate::package::version::VersionParser;
 use crate::package::{
-    AliasPackageHandle, CompleteAliasPackageHandle, Link, LockerInterface, PackageInterfaceHandle,
-    RootPackageInterfaceHandle, base_package,
+    AliasPackageHandle, CompleteAliasPackageHandle, DisplayMode, Link, LockerInterface,
+    PackageInterfaceHandle, RootPackageInterfaceHandle, base_package,
 };
 use crate::repository::{
     ArrayRepository, CanonicalPackagesTrait, CompositeRepository, InstalledArrayRepository,
-    InstalledRepository, PlatformRepository, PlatformRepositoryHandle, RepositoryInterface,
-    RepositoryManagerInterface, RepositorySet, RootPackageRepository,
+    InstalledRepository, InstalledRepositoryInterfaceHandle, LockArrayRepositoryHandle,
+    PlatformRepository, PlatformRepositoryHandle, RepositoryInterface, RepositoryInterfaceHandle,
+    RepositoryManagerInterface, RepositorySet, RootAliasInput, RootPackageRepository,
 };
 use crate::script::ScriptEvents;
 use crate::util::Platform;
@@ -114,7 +115,7 @@ pub struct Installer {
     update_allow_transitive_dependencies: UpdateAllowTransitiveDeps,
     suggested_packages_reporter: std::rc::Rc<std::cell::RefCell<SuggestedPackagesReporter>>,
     platform_requirement_filter: std::rc::Rc<dyn PlatformRequirementFilterInterface>,
-    additional_fixed_repository: Option<crate::repository::RepositoryInterfaceHandle>,
+    additional_fixed_repository: Option<RepositoryInterfaceHandle>,
     temporary_constraints: IndexMap<BString, AnyConstraint>,
 }
 
@@ -303,7 +304,7 @@ impl Installer {
         }
 
         if self.update {
-            let locked_repository_handle: crate::repository::RepositoryInterfaceHandle = self
+            let locked_repository_handle: RepositoryInterfaceHandle = self
                 .locker
                 .borrow_mut()
                 .get_locked_repository(self.dev_mode)?
@@ -311,7 +312,7 @@ impl Installer {
             let mut installed_repo = InstalledRepository::new(vec![
                 locked_repository_handle,
                 self.create_platform_repo(false)?.into(),
-                crate::repository::RepositoryInterfaceHandle::new(RootPackageRepository::new(
+                RepositoryInterfaceHandle::new(RootPackageRepository::new(
                     RootPackageInterfaceHandle::dup(&self.package),
                 )),
             ]);
@@ -527,27 +528,26 @@ impl Installer {
     #[tracing::instrument(skip_all)]
     async fn do_update(
         &mut self,
-        local_repo: crate::repository::RepositoryInterfaceHandle,
+        local_repo: RepositoryInterfaceHandle,
         do_install: bool,
     ) -> anyhow::Result<i64> {
         let platform_repo = self.create_platform_repo(true)?;
         let aliases = self.get_root_aliases(true);
 
-        let mut locked_repository: Option<crate::repository::LockArrayRepositoryHandle> = None;
+        let mut locked_repository: Option<LockArrayRepositoryHandle> = None;
 
-        let try_load_locked = || -> anyhow::Result<
-            Result<Option<crate::repository::LockArrayRepositoryHandle>, anyhow::Error>,
-        > {
-            if self.locker.borrow_mut().is_locked() {
-                match self.locker.borrow_mut().get_locked_repository(true) {
-                    Ok(r) => Ok(Ok(Some(r))),
-                    Err(e) if e.is_instanceof::<ParsingException>() => Ok(Err(e)),
-                    Err(e) => Err(e),
+        let try_load_locked =
+            || -> anyhow::Result<Result<Option<LockArrayRepositoryHandle>, anyhow::Error>> {
+                if self.locker.borrow_mut().is_locked() {
+                    match self.locker.borrow_mut().get_locked_repository(true) {
+                        Ok(r) => Ok(Ok(Some(r))),
+                        Err(e) if e.is_instanceof::<ParsingException>() => Ok(Err(e)),
+                        Err(e) => Err(e),
+                    }
+                } else {
+                    Ok(Ok(None))
                 }
-            } else {
-                Ok(Ok(None))
-            }
-        };
+            };
 
         match try_load_locked()? {
             Ok(r) => locked_repository = r,
@@ -727,10 +727,8 @@ impl Installer {
                     install_names.push(bconcat!(
                         io.get_package().get_pretty_name(),
                         ":",
-                        io.get_package().get_full_pretty_version(
-                            true,
-                            crate::package::DisplayMode::SourceRefIfDev
-                        )
+                        io.get_package()
+                            .get_full_pretty_version(true, DisplayMode::SourceRefIfDev)
                     ));
                 } else if let AnyOperation::Update(uo) = &**operation {
                     // when mirrors/metadata from a package gets updated we do not want to list it as an
@@ -747,10 +745,8 @@ impl Installer {
                     update_names.push(bconcat!(
                         uo.get_target_package().get_pretty_name(),
                         ":",
-                        uo.get_target_package().get_full_pretty_version(
-                            true,
-                            crate::package::DisplayMode::SourceRefIfDev
-                        )
+                        uo.get_target_package()
+                            .get_full_pretty_version(true, DisplayMode::SourceRefIfDev)
                     ));
                 } else if let AnyOperation::Uninstall(uo) = &**operation {
                     uninstalls.push(operation.clone());
@@ -884,7 +880,7 @@ impl Installer {
         platform_repo: &PlatformRepositoryHandle,
         aliases: &[IndexMap<BString, BString>],
         policy: std::rc::Rc<dyn PolicyInterface>,
-        locked_repository: Option<&crate::repository::LockArrayRepositoryHandle>,
+        locked_repository: Option<&LockArrayRepositoryHandle>,
     ) -> anyhow::Result<i64> {
         if self.package.get_dev_requires().is_empty() {
             return Ok(0);
@@ -902,9 +898,7 @@ impl Installer {
         }
 
         let mut repository_set = self.create_repository_set(true, platform_repo, aliases, None)?;
-        repository_set.add_repository(crate::repository::RepositoryInterfaceHandle::new(
-            result_repo,
-        ))?;
+        repository_set.add_repository(RepositoryInterfaceHandle::new(result_repo))?;
 
         let mut request =
             self.create_request(self.fixed_root_package.clone(), platform_repo, None)?;
@@ -964,7 +958,7 @@ impl Installer {
     /// Whether the function is called as part of an update command or independently
     async fn do_install(
         &mut self,
-        local_repo: crate::repository::RepositoryInterfaceHandle,
+        local_repo: RepositoryInterfaceHandle,
         already_solved: bool,
     ) -> anyhow::Result<i64> {
         if self.config.borrow().get_bool("lock") {
@@ -1160,14 +1154,14 @@ impl Installer {
                     io.get_package().get_pretty_name(),
                     ":",
                     io.get_package()
-                        .get_full_pretty_version(true, crate::package::DisplayMode::SourceRefIfDev)
+                        .get_full_pretty_version(true, DisplayMode::SourceRefIfDev)
                 ));
             } else if let AnyOperation::Update(uo) = &**operation {
                 updates.push(bconcat!(
                     uo.get_target_package().get_pretty_name(),
                     ":",
                     uo.get_target_package()
-                        .get_full_pretty_version(true, crate::package::DisplayMode::SourceRefIfDev)
+                        .get_full_pretty_version(true, DisplayMode::SourceRefIfDev)
                 ));
             } else if let AnyOperation::Uninstall(uo) = &**operation {
                 uninstalls.push(uo.get_package().get_pretty_name());
@@ -1220,9 +1214,7 @@ impl Installer {
             self.installation_manager
                 .borrow()
                 .execute(
-                    &crate::repository::InstalledRepositoryInterfaceHandle::from_repository_handle(
-                        &local_repo,
-                    ),
+                    &InstalledRepositoryInterfaceHandle::from_repository_handle(&local_repo),
                     local_repo_transaction.get_operations().clone(),
                     self.dev_mode,
                     self.run_scripts,
@@ -1368,9 +1360,9 @@ impl Installer {
             .expect("parse_stability returns a known stability"),
         );
 
-        let root_aliases_input: Vec<crate::repository::RootAliasInput> = root_aliases
+        let root_aliases_input: Vec<RootAliasInput> = root_aliases
             .iter()
-            .map(|alias| crate::repository::RootAliasInput {
+            .map(|alias| RootAliasInput {
                 package: alias.get(bstr::B("package")).cloned().unwrap_or_default(),
                 version: alias.get(bstr::B("version")).cloned().unwrap_or_default(),
                 alias: alias.get(bstr::B("alias")).cloned().unwrap_or_default(),
@@ -1388,14 +1380,14 @@ impl Installer {
             root_requires,
             self.temporary_constraints.clone(),
         );
-        repository_set.add_repository(crate::repository::RepositoryInterfaceHandle::new(
+        repository_set.add_repository(RepositoryInterfaceHandle::new(
             RootPackageRepository::new(self.fixed_root_package.clone()),
         ))?;
         repository_set.add_repository(platform_repo.clone().into())?;
         if let Some(ref additional_fixed_repository) = self.additional_fixed_repository {
             // allow using installed repos if needed to avoid warnings about installed repositories being used in the RepositorySet
             // see https://github.com/composer/composer/pull/9574
-            let additional_fixed_repositories: Vec<crate::repository::RepositoryInterfaceHandle> = {
+            let additional_fixed_repositories: Vec<RepositoryInterfaceHandle> = {
                 let repo_ref = additional_fixed_repository.borrow();
                 if let Some(composite) = repo_ref.as_any().downcast_ref::<CompositeRepository>() {
                     composite.get_repositories().clone()
@@ -1420,7 +1412,7 @@ impl Installer {
     fn create_policy(
         &mut self,
         for_update: bool,
-        locked_repo: Option<&crate::repository::LockArrayRepositoryHandle>,
+        locked_repo: Option<&LockArrayRepositoryHandle>,
     ) -> anyhow::Result<std::rc::Rc<dyn PolicyInterface>> {
         let mut prefer_stable: Option<bool> = None;
         let mut prefer_lowest: Option<bool> = None;
@@ -1475,7 +1467,7 @@ impl Installer {
         &self,
         root_package: RootPackageInterfaceHandle,
         platform_repo: &PlatformRepositoryHandle,
-        locked_repository: Option<&crate::repository::LockArrayRepositoryHandle>,
+        locked_repository: Option<&LockArrayRepositoryHandle>,
     ) -> anyhow::Result<Request> {
         let mut request = Request::new(locked_repository.cloned());
 
@@ -1518,7 +1510,7 @@ impl Installer {
     fn require_packages_for_update(
         &mut self,
         request: &mut Request,
-        locked_repository: Option<&crate::repository::LockArrayRepositoryHandle>,
+        locked_repository: Option<&LockArrayRepositoryHandle>,
         include_dev_requires: bool,
     ) -> anyhow::Result<()> {
         // if we're updating mirrors we want to keep exactly the same versions installed which are in the lock file, but we want current remote metadata
@@ -1628,7 +1620,7 @@ impl Installer {
                 packages.insert(key, new_alias_package);
             }
         }
-        rm.set_local_repository(crate::repository::RepositoryInterfaceHandle::new(
+        rm.set_local_repository(RepositoryInterfaceHandle::new(
             InstalledArrayRepository::new_with_packages(packages.into_values().collect())
                 .expect("InstalledArrayRepository::new_with_packages should not fail"),
         ));
@@ -1689,7 +1681,7 @@ impl Installer {
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         composer: &PartialComposerHandle,
     ) -> Self {
-        let composer = crate::composer::composer_full(composer);
+        let composer = composer_full(composer);
         Self::new(
             io,
             composer.get_config(),
@@ -1719,7 +1711,7 @@ impl Installer {
 
     pub fn set_additional_fixed_repository(
         &mut self,
-        additional_fixed_repository: crate::repository::RepositoryInterfaceHandle,
+        additional_fixed_repository: RepositoryInterfaceHandle,
     ) -> &mut Self {
         self.additional_fixed_repository = Some(additional_fixed_repository);
 

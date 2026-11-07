@@ -1,7 +1,9 @@
 //! ref: composer/vendor/symfony/console/Style/SymfonyStyle.php sha1:7f214d121b04636b9508de280456273d709bab8b
 
 use crate::formatter::{OutputFormatter, OutputFormatterInterface};
-use crate::helper::{Cell, Helper, QuestionHelperInterface, Row, SymfonyQuestionHelper, Table};
+use crate::helper::{
+    Cell, Helper, QuestionHelperInterface, Row, StyleName, SymfonyQuestionHelper, Table,
+};
 use crate::input::{InputInterface, InputValue};
 use crate::output::{
     ConsoleOutput, ConsoleOutputInterface, OUTPUT_NORMAL, OutputInterface, TrimmedBufferOutput,
@@ -128,7 +130,7 @@ impl SymfonyStyle {
         style.set_cell_header_format("<info>%s</info>".into());
 
         let mut table = Table::new(output);
-        let _ = table.set_style(crate::helper::StyleName::Style(style));
+        let _ = table.set_style(StyleName::Style(style));
         table
     }
 

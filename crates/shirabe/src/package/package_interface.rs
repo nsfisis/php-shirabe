@@ -1,6 +1,6 @@
 //! ref: composer/src/Composer/Package/PackageInterface.php sha1:d56f829ff52eb38dbcfbcad930264bbe37838898
 
-use crate::package::{Link, Mirror};
+use crate::package::{AliasPackage, CompletePackageInterface, Link, Mirror, RootPackageInterface};
 use crate::repository::RepositoryInterfaceHandle;
 use bstr::{BStr, BString};
 use chrono::{DateTime, Utc};
@@ -139,10 +139,7 @@ pub trait PackageInterface: std::fmt::Debug {
 
     /// Stands in for PHP's `$package->{'get'.ucfirst($linkType)}()`, so `link_type` is one of the
     /// `Link::TYPE_*` values.
-    fn get_links_for_type(
-        &self,
-        link_type: &BStr,
-    ) -> std::rc::Rc<IndexMap<BString, crate::package::Link>> {
+    fn get_links_for_type(&self, link_type: &BStr) -> std::rc::Rc<IndexMap<BString, Link>> {
         use crate::package::Link;
         if link_type == Link::TYPE_REQUIRE {
             self.get_requires()
@@ -226,21 +223,19 @@ pub trait PackageInterface: std::fmt::Debug {
     /// Set dist and source references and update dist URL for ones that contain a reference
     fn set_source_dist_references(&mut self, reference: BString);
 
-    fn as_alias_package(&self) -> Option<&crate::package::AliasPackage> {
+    fn as_alias_package(&self) -> Option<&AliasPackage> {
         None
     }
 
-    fn as_complete_package_interface(
-        &self,
-    ) -> Option<&dyn crate::package::CompletePackageInterface> {
+    fn as_complete_package_interface(&self) -> Option<&dyn CompletePackageInterface> {
         None
     }
 
-    fn as_complete_package(&self) -> Option<&dyn crate::package::CompletePackageInterface> {
+    fn as_complete_package(&self) -> Option<&dyn CompletePackageInterface> {
         None
     }
 
-    fn as_root_package_interface(&self) -> Option<&dyn crate::package::RootPackageInterface> {
+    fn as_root_package_interface(&self) -> Option<&dyn RootPackageInterface> {
         None
     }
 }

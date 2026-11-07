@@ -1,9 +1,12 @@
 //! ref: composer/src/Composer/Command/SuggestsCommand.php sha1:37f0ae467e5cc5dea9675f6d7a18462083f9710e
 
-use crate::command::base_command::base_command_initialize;
+use crate::command::base_command::{base_command_complete, base_command_initialize};
 use crate::command::{BaseCommand, BaseCommandData, CompletionTrait};
+use crate::composer::composer_full;
 use crate::console::input::{InputArgument, InputOption};
+use crate::delegate_base_command_trait_impls_to_inner;
 use crate::installer::SuggestedPackagesReporter;
+use crate::package::{BasePackageHandle, PackageInterfaceHandle, RootPackageInterfaceHandle};
 use crate::repository::{
     InstalledRepository, PlatformRepository, RepositoryInterface, RepositoryInterfaceHandle,
     RootPackageRepository,
@@ -113,11 +116,11 @@ impl Command for SuggestsCommand {
         _output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
         let composer = self.require_composer(None, None)?;
-        let composer = crate::composer::composer_full(&composer);
+        let composer = composer_full(&composer);
 
         let mut installed_repos: Vec<RepositoryInterfaceHandle> =
             vec![RepositoryInterfaceHandle::new(RootPackageRepository::new(
-                crate::package::RootPackageInterfaceHandle::dup(composer.get_package()),
+                RootPackageInterfaceHandle::dup(composer.get_package()),
             ))];
 
         if composer.get_locker().borrow_mut().is_locked() {
@@ -170,8 +173,7 @@ impl Command for SuggestsCommand {
             .map(|value| PhpMixed::string(value.clone()))
             .collect();
         let mut packages = RepositoryInterface::get_packages(&mut installed_repo)?;
-        let root_pkg_as_base: crate::package::BasePackageHandle =
-            composer.get_package().clone().into();
+        let root_pkg_as_base: BasePackageHandle = composer.get_package().clone().into();
         packages.push(root_pkg_as_base);
         for package in &packages {
             if filter.to_bool() && !in_array_loose(package.get_name(), &filter_values) {
@@ -207,7 +209,7 @@ impl Command for SuggestsCommand {
             mode = SuggestedPackagesReporter::MODE_LIST;
         }
 
-        let only_dependents_of: Option<crate::package::PackageInterfaceHandle> =
+        let only_dependents_of: Option<PackageInterfaceHandle> =
             if !filter.to_bool() && !input.borrow().get_option("all")?.as_bool().unwrap_or(false) {
                 Some(composer.get_package().clone().into())
             } else {
@@ -232,16 +234,16 @@ impl Command for SuggestsCommand {
         input: &shirabe_symfony_console::completion::CompletionInput,
         suggestions: &mut shirabe_symfony_console::completion::CompletionSuggestions,
     ) -> anyhow::Result<()> {
-        crate::command::base_command::base_command_complete(self, input, suggestions)
+        base_command_complete(self, input, suggestions)
     }
 
     shirabe_symfony_console::delegate_command_trait_impls_to_inner!(base_command_data);
 }
 
 impl BaseCommand for SuggestsCommand {
-    fn base_command_data(&self) -> &crate::command::BaseCommandData {
+    fn base_command_data(&self) -> &BaseCommandData {
         &self.base_command_data
     }
 
-    crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
+    delegate_base_command_trait_impls_to_inner!(base_command_data);
 }

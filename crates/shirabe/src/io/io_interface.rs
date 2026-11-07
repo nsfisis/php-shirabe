@@ -1,6 +1,7 @@
 //! ref: composer/src/Composer/IO/IOInterface.php sha1:b5ee8ddd2c0eb6b0697a101aa084b2a755d77fd3
 
 use crate::config::Config;
+use crate::io::BaseIO;
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe_symfony_console::input::InputValue;
@@ -246,7 +247,7 @@ pub trait IOInterfaceMutable {
 pub trait IOInterface: IOInterfaceImmutable + IOInterfaceMutable {
     fn as_any(&self) -> &dyn std::any::Any;
 
-    fn as_base_io_mut(&mut self) -> Option<&mut dyn crate::io::BaseIO> {
+    fn as_base_io_mut(&mut self) -> Option<&mut dyn BaseIO> {
         None
     }
 

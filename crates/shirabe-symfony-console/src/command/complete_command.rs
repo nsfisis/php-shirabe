@@ -5,6 +5,7 @@ use crate::completion::{
     BashCompletionOutput, CompletionInput, CompletionOutputInterface, CompletionSuggestions,
     StringOrSuggestion,
 };
+use crate::delegate_command_trait_impls_to_inner;
 use crate::input::{InputInterface, InputInterfaceByName, InputOption, InputValue};
 use crate::output::OutputInterface;
 use bstr::{B, BStr, BString, ByteSlice};
@@ -436,5 +437,5 @@ impl Command for CompleteCommand {
         }
     }
 
-    crate::delegate_command_trait_impls_to_inner!(inner);
+    delegate_command_trait_impls_to_inner!(inner);
 }

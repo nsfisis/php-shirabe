@@ -6,9 +6,9 @@
 
 use crate::config::Config;
 use crate::downloader::{MaxFileSizeExceededException, TransportException};
-use crate::io::{IOInterface, IOInterfaceWrite};
+use crate::io::{DEBUG, IOInterface, IOInterfaceWrite, NORMAL};
 use crate::util::http::ProxyManager;
-use crate::util::{GetResult, StreamContextOptions, Url};
+use crate::util::{GetResult, Platform, StreamContextOptions, Url};
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
@@ -41,7 +41,7 @@ impl LocalFilesystem {
         }
 
         // `parse_url` reads the drive letter of an absolute Windows path as a scheme.
-        crate::util::Platform::is_windows() && scheme.len() == 1
+        Platform::is_windows() && scheme.len() == 1
     }
 
     pub fn copy(
@@ -137,7 +137,7 @@ impl LocalFilesystem {
                 using_proxy
             ),
             true,
-            crate::io::DEBUG,
+            DEBUG,
         );
 
         if !preg_is_match(
@@ -156,7 +156,7 @@ impl LocalFilesystem {
             self.io.write_error3(
                 "Downloading (<comment>connecting...</comment>)",
                 false,
-                crate::io::NORMAL,
+                NORMAL,
             );
         }
 
@@ -199,7 +199,7 @@ impl LocalFilesystem {
                 ),
                 false,
                 None,
-                crate::io::NORMAL,
+                NORMAL,
             );
         }
 

@@ -1,6 +1,6 @@
 //! ref: composer/src/Composer/Plugin/PreCommandRunEvent.php sha1:0d6e0f6ec661b502b6461814365548d5e52fb136
 
-use crate::event_dispatcher::{Event, EventFlags};
+use crate::event_dispatcher::{Event, EventFlags, delegate_event_interface_to_inner};
 use bstr::BString;
 use shirabe_symfony_console::input::InputInterface;
 
@@ -38,4 +38,4 @@ impl PreCommandRunEvent {
     }
 }
 
-crate::event_dispatcher::delegate_event_interface_to_inner!(PreCommandRunEvent, inner);
+delegate_event_interface_to_inner!(PreCommandRunEvent, inner);

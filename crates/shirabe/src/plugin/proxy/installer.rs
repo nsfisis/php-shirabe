@@ -1,5 +1,6 @@
 //! `InstallerInterface` adapter for an installer entity living in the PHP child process.
 
+use crate::installer::InstallerInterface;
 use crate::package::PackageInterfaceHandle;
 use crate::plugin::job_registry;
 use crate::plugin::php_call::PhpCall;
@@ -64,7 +65,7 @@ impl PhpInstallerProxy {
 }
 
 #[async_trait::async_trait(?Send)]
-impl crate::installer::InstallerInterface for PhpInstallerProxy {
+impl InstallerInterface for PhpInstallerProxy {
     fn supports(&self, package_type: &bstr::BStr) -> anyhow::Result<bool> {
         self.call(
             BStr::new("supports"),
@@ -179,20 +180,18 @@ thread_local! {
     /// the entity. `removeInstaller` arrives carrying the same entity, and the manager compares
     /// installers by identity, so the adapter it was given has to be found again rather than
     /// rebuilt.
-    static PHP_INSTALLER_PROXIES: std::cell::RefCell<IndexMap<PhpObjHandle, std::rc::Rc<dyn crate::installer::InstallerInterface>>> =
+    static PHP_INSTALLER_PROXIES: std::cell::RefCell<IndexMap<PhpObjHandle, std::rc::Rc<dyn InstallerInterface>>> =
         std::cell::RefCell::new(IndexMap::new());
 }
 
 /// The adapter for an installer entity, building it on first sight.
-pub(crate) fn php_installer_proxy(
-    handle: PhpObjHandle,
-) -> std::rc::Rc<dyn crate::installer::InstallerInterface> {
+pub(crate) fn php_installer_proxy(handle: PhpObjHandle) -> std::rc::Rc<dyn InstallerInterface> {
     PHP_INSTALLER_PROXIES.with(|proxies| {
         let mut proxies = proxies.borrow_mut();
         if let Some(existing) = proxies.get(&handle) {
             return existing.clone();
         }
-        let proxy: std::rc::Rc<dyn crate::installer::InstallerInterface> =
+        let proxy: std::rc::Rc<dyn InstallerInterface> =
             std::rc::Rc::new(PhpInstallerProxy::new(handle.clone()));
         proxies.insert(handle, proxy.clone());
         proxy

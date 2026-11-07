@@ -286,13 +286,11 @@ impl VcsCapableDownloaderInterface for FossilDownloader {
 
 #[async_trait::async_trait(?Send)]
 impl DownloaderInterface for FossilDownloader {
-    fn as_change_report_interface(&self) -> Option<&dyn crate::downloader::ChangeReportInterface> {
+    fn as_change_report_interface(&self) -> Option<&dyn ChangeReportInterface> {
         Some(self)
     }
 
-    fn as_vcs_capable_downloader_interface(
-        &self,
-    ) -> Option<&dyn crate::downloader::VcsCapableDownloaderInterface> {
+    fn as_vcs_capable_downloader_interface(&self) -> Option<&dyn VcsCapableDownloaderInterface> {
         Some(self)
     }
 

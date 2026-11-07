@@ -1,6 +1,7 @@
 //! ref: composer/src/Composer/Util/ProcessExecutor.php sha1:1852637f6e0380d92e650c6305e11f6c8cbc43ae
 
 use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface};
+use crate::plugin::job_registry::{JobOwner, record_internal_job};
 use crate::signal::SignalSubscription;
 use crate::util::{GitHub, Platform};
 use bstr::{BStr, BString, ByteSlice};
@@ -591,10 +592,10 @@ impl ProcessExecutor {
     where
         C: IntoExecCommand,
     {
-        let owner = crate::plugin::job_registry::JobOwner::of_process_executor(self);
+        let owner = JobOwner::of_process_executor(self);
         let job = self.execute_async_job(command, cwd, None);
         Box::pin(async move {
-            let _recorded = crate::plugin::job_registry::record_internal_job(owner, None);
+            let _recorded = record_internal_job(owner, None);
             job.await
         })
     }

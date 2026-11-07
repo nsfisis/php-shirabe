@@ -1,16 +1,19 @@
 //! ref: composer/src/Composer/Command/RemoveCommand.php sha1:6fc635adbb71d96ddf7e00e7a1373b7d0045bccb
 
 use crate::advisory::Auditor;
-use crate::command::base_command::base_command_initialize;
+use crate::command::base_command::{base_command_complete, base_command_initialize};
 use crate::command::{BaseCommand, BaseCommandData, CompletionTrait};
+use crate::composer::composer_full;
 use crate::config::{ConfigSourceInterface, JsonConfigSource};
 use crate::console::input::{InputArgument, InputOption, SuggestedValues};
+use crate::delegate_base_command_trait_impls_to_inner;
 use crate::dependency_resolver::UpdateAllowTransitiveDeps;
 use crate::factory::Factory;
 use crate::installer::Installer;
 use crate::io::{IOInterfaceImmutable, IOInterfaceWrite};
 use crate::json::JsonFile;
 use crate::package::base_package;
+use crate::plugin::{CommandEvent, PluginEvents};
 use crate::repository::RepositoryInterface;
 use bstr::{B, BStr, BString, ByteSlice, ByteVec};
 use indexmap::IndexMap;
@@ -216,7 +219,7 @@ impl Command for RemoveCommand {
             .unwrap_or(false)
         {
             let composer = self.require_composer(None, None)?;
-            let composer = crate::composer::composer_full(&composer);
+            let composer = composer_full(&composer);
             {
                 let locker = composer.get_locker().clone();
                 let mut locker = locker.borrow_mut();
@@ -489,7 +492,7 @@ impl Command for RemoveCommand {
 
         // TODO(plugin): deactivate installed plugins
         if let Some(composer_opt) = self.try_composer(None, None) {
-            let composer_opt = crate::composer::composer_full(&composer_opt);
+            let composer_opt = composer_full(&composer_opt);
             composer_opt
                 .get_plugin_manager()
                 .borrow_mut()
@@ -498,7 +501,7 @@ impl Command for RemoveCommand {
 
         self.reset_composer();
         let composer_handle = self.require_composer(None, None)?;
-        let composer = crate::composer::composer_full(&composer_handle);
+        let composer = composer_full(&composer_handle);
 
         if dry_run {
             let root_package = composer.get_package();
@@ -523,12 +526,8 @@ impl Command for RemoveCommand {
                 .set_dev_requires(links.shift_remove(B("require-dev")).unwrap_or_default())?;
         }
 
-        let command_event = crate::plugin::CommandEvent::new(
-            crate::plugin::PluginEvents::COMMAND,
-            "remove",
-            input.clone(),
-            output,
-        );
+        let command_event =
+            CommandEvent::new(PluginEvents::COMMAND, "remove", input.clone(), output);
         let command_event_name = command_event.get_name().to_owned();
         composer.get_event_dispatcher().borrow_mut().dispatch(
             Some(command_event_name.as_ref()),
@@ -738,16 +737,16 @@ impl Command for RemoveCommand {
         input: &shirabe_symfony_console::completion::CompletionInput,
         suggestions: &mut shirabe_symfony_console::completion::CompletionSuggestions,
     ) -> anyhow::Result<()> {
-        crate::command::base_command::base_command_complete(self, input, suggestions)
+        base_command_complete(self, input, suggestions)
     }
 
     shirabe_symfony_console::delegate_command_trait_impls_to_inner!(base_command_data);
 }
 
 impl BaseCommand for RemoveCommand {
-    fn base_command_data(&self) -> &crate::command::BaseCommandData {
+    fn base_command_data(&self) -> &BaseCommandData {
         &self.base_command_data
     }
 
-    crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
+    delegate_base_command_trait_impls_to_inner!(base_command_data);
 }

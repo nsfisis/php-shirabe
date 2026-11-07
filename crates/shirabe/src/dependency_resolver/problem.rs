@@ -4,7 +4,9 @@ use crate::dependency_resolver::rule::{self, Rule};
 use crate::dependency_resolver::{Pool, Request};
 use crate::package::version::VersionParser;
 use crate::package::{BasePackageHandle, Link};
-use crate::repository::{LockArrayRepository, PlatformRepository, RepositorySet};
+use crate::repository::{
+    LockArrayRepository, PlatformRepository, ProviderInfo, RepositoryInterfaceHandle, RepositorySet,
+};
 use bstr::{B, BStr, BString, ByteSlice, ByteVec};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
@@ -1309,7 +1311,7 @@ impl Problem {
         constraint: Option<&AnyConstraint>,
     ) -> anyhow::Result<(BString, BString)> {
         let mut next_repo_packages: Vec<BasePackageHandle> = Vec::new();
-        let mut next_repo: Option<crate::repository::RepositoryInterfaceHandle> = None;
+        let mut next_repo: Option<RepositoryInterfaceHandle> = None;
         for package in all_repos_packages {
             let pkg_repo = package.get_repository();
             let same_repo = match (&next_repo, &pkg_repo) {
@@ -1507,8 +1509,7 @@ impl Problem {
         let providers = repository_set.get_providers(package_name)?;
         if !providers.is_empty() {
             let provider_count = providers.len() as i64;
-            let slice: Vec<crate::repository::ProviderInfo> = if provider_count > max_providers + 1
-            {
+            let slice: Vec<ProviderInfo> = if provider_count > max_providers + 1 {
                 providers
                     .values()
                     .take(max_providers as usize)

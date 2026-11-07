@@ -1,7 +1,7 @@
 //! ref: composer/tests/Composer/Test/Util/AuthHelperTest.php sha1:dc54c7cef1a7b2728b4a8071c7e3f4192216749e
 
 use crate::config_stub::ConfigStubBuilder;
-use crate::io_mock::{Expectation, IOMock, get_io_mock};
+use crate::io_mock::{Expectation, IOMock, IOMockGuard, get_io_mock};
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe::config::ConfigSourceInterface;
@@ -16,7 +16,7 @@ struct Fixture {
     io: std::rc::Rc<std::cell::RefCell<IOMock>>,
     config: std::rc::Rc<std::cell::RefCell<shirabe::config::Config>>,
     auth_helper: AuthHelper,
-    _guard: crate::io_mock::IOMockGuard,
+    _guard: IOMockGuard,
 }
 
 fn set_up_with_config(config: std::rc::Rc<std::cell::RefCell<shirabe::config::Config>>) -> Fixture {

@@ -6,6 +6,7 @@ use crate::downloader::TransportException;
 use crate::exception::IrrecoverableDownloadException;
 use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite};
 use crate::package::version::VersionParser;
+use crate::plugin::job_registry::{JobOwner, record_internal_job};
 use crate::util::http::{NativeHttpDownloader, Response};
 use crate::util::{
     GetResult, HttpOptions, LocalFilesystem, Platform, RemoteFilesystem, Silencer, SslOptions,
@@ -238,10 +239,7 @@ impl HttpDownloader {
             .await;
         }
         let (abort_handle, abort_registration) = futures::future::AbortHandle::new_pair();
-        let _recorded = crate::plugin::job_registry::record_internal_job(
-            crate::plugin::job_registry::JobOwner::of_http_downloader(self),
-            Some(abort_handle),
-        );
+        let _recorded = record_internal_job(JobOwner::of_http_downloader(self), Some(abort_handle));
         let request = Self::download_with_native(
             self.semaphore.clone(),
             self.native.clone().unwrap(),

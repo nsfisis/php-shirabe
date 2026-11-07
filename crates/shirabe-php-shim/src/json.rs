@@ -1,4 +1,4 @@
-use crate::PhpMixed;
+use crate::{PhpJson, PhpMixed, str_replace, utf8_text};
 use bstr::BString;
 use indexmap::IndexMap;
 use serde::de::{DeserializeSeed, MapAccess, SeqAccess, Visitor};
@@ -35,8 +35,7 @@ pub fn json_encode_ex<T: serde::Serialize + ?Sized>(
     // they are absent.
     // TODO(php-semantics): other flags (e.g. JSON_HEX_*, JSON_THROW_ON_ERROR) are not handled yet; add
     // them when a call site needs them.
-    let value =
-        crate::PhpJson::with_invalid_utf8_ignore(value, flags & JSON_INVALID_UTF8_IGNORE != 0);
+    let value = PhpJson::with_invalid_utf8_ignore(value, flags & JSON_INVALID_UTF8_IGNORE != 0);
     let mut s = if flags & JSON_PRETTY_PRINT != 0 {
         // PHP's JSON_PRETTY_PRINT uses a 4-space indent.
         let mut buf = Vec::new();
@@ -49,12 +48,12 @@ pub fn json_encode_ex<T: serde::Serialize + ?Sized>(
     };
 
     if flags & JSON_UNESCAPED_SLASHES == 0 {
-        s = crate::str_replace("/", "\\/", &s);
+        s = str_replace("/", "\\/", &s);
     }
 
     if flags & JSON_UNESCAPED_UNICODE == 0 {
         let mut out = Vec::with_capacity(s.len());
-        for c in crate::utf8_text(&s)
+        for c in utf8_text(&s)
             .expect("serde_json writes valid UTF-8")
             .chars()
         {

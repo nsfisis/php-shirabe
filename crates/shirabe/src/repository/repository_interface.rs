@@ -1,7 +1,10 @@
 //! ref: composer/src/Composer/Repository/RepositoryInterface.php sha1:1e40e4834d2f03a4a5d4e2402429de63596c6d12
 
 use crate::package::{BasePackageHandle, PackageInterfaceHandle};
-use crate::repository::AdvisoryProviderInterface;
+use crate::repository::{
+    AdvisoryProviderInterface, InstalledRepositoryInterface, RepositoryInterfaceWeakHandle,
+    WritableRepositoryInterface,
+};
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe_semver::constraint::AnyConstraint;
@@ -109,19 +112,19 @@ pub trait RepositoryInterface: std::fmt::Debug {
 
     fn as_installed_repository_interface(
         &self,
-    ) -> Option<&(dyn crate::repository::InstalledRepositoryInterface + 'static)> {
+    ) -> Option<&(dyn InstalledRepositoryInterface + 'static)> {
         None
     }
 
     fn as_installed_repository_interface_mut(
         &mut self,
-    ) -> Option<&mut (dyn crate::repository::InstalledRepositoryInterface + 'static)> {
+    ) -> Option<&mut (dyn InstalledRepositoryInterface + 'static)> {
         None
     }
 
     fn as_writable_repository_interface_mut(
         &mut self,
-    ) -> Option<&mut dyn crate::repository::WritableRepositoryInterface> {
+    ) -> Option<&mut dyn WritableRepositoryInterface> {
         None
     }
 
@@ -132,7 +135,7 @@ pub trait RepositoryInterface: std::fmt::Debug {
     /// wrapped in a [`RepositoryInterfaceHandle`](crate::repository::RepositoryInterfaceHandle).
     /// Wrapper repositories forward the same weak (the outermost handle) to their inner
     /// `ArrayRepository`.
-    fn set_self_handle(&self, weak: crate::repository::RepositoryInterfaceWeakHandle) {
+    fn set_self_handle(&self, weak: RepositoryInterfaceWeakHandle) {
         let _ = weak;
     }
 }

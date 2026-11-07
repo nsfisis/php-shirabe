@@ -1,8 +1,10 @@
 //! ref: composer/src/Composer/Command/SearchCommand.php sha1:d7a378817f3a2321c5ca4564477de847bb902f13
 
-use crate::command::base_command::base_command_initialize;
+use crate::command::base_command::{base_command_complete, base_command_initialize};
 use crate::command::{BaseCommand, BaseCommandData};
+use crate::composer::composer_full;
 use crate::console::input::{InputArgument, InputOption, SuggestedValues};
+use crate::delegate_base_command_trait_impls_to_inner;
 use crate::io::IOInterfaceWrite;
 use crate::json::JsonFile;
 use crate::plugin::{CommandEvent, PluginEvents};
@@ -163,7 +165,7 @@ impl Command for SearchCommand {
         } else {
             self.create_composer_instance(input.clone(), io.clone(), None, false, None)?
         };
-        let composer_ref = crate::composer::composer_full(&composer);
+        let composer_ref = composer_full(&composer);
         let local_repo = composer_ref
             .get_repository_manager()
             .borrow()
@@ -318,16 +320,16 @@ impl Command for SearchCommand {
         input: &shirabe_symfony_console::completion::CompletionInput,
         suggestions: &mut shirabe_symfony_console::completion::CompletionSuggestions,
     ) -> anyhow::Result<()> {
-        crate::command::base_command::base_command_complete(self, input, suggestions)
+        base_command_complete(self, input, suggestions)
     }
 
     shirabe_symfony_console::delegate_command_trait_impls_to_inner!(base_command_data);
 }
 
 impl BaseCommand for SearchCommand {
-    fn base_command_data(&self) -> &crate::command::BaseCommandData {
+    fn base_command_data(&self) -> &BaseCommandData {
         &self.base_command_data
     }
 
-    crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
+    delegate_base_command_trait_impls_to_inner!(base_command_data);
 }

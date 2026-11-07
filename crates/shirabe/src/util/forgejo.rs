@@ -3,7 +3,7 @@
 use crate::config::Config;
 use crate::downloader::TransportException;
 use crate::io::{IOInterface, IOInterfaceWrite, io_interface};
-use crate::util::HttpDownloader;
+use crate::util::{HttpDownloader, StreamContextOptions};
 use bstr::{BStr, BString};
 use shirabe_php_shim::{Catch as _, PhpMixed, bconcat, trim};
 use shirabe_symfony_console::input::InputValue;
@@ -118,7 +118,7 @@ impl Forgejo {
         match self.http_downloader.borrow_mut().get(
             bconcat!("https://", origin_url, "/api/v1/version"),
             {
-                let mut options = crate::util::StreamContextOptions::new();
+                let mut options = StreamContextOptions::new();
                 options.set_retry_auth_failure(false);
                 options
             },
@@ -126,7 +126,7 @@ impl Forgejo {
             Ok(_) => {}
             Err(e) => {
                 let code = e
-                    .catch::<crate::downloader::TransportException>()
+                    .catch::<TransportException>()
                     .map(|te| te.get_code())
                     .unwrap_or(0);
                 if [403, 401, 404].contains(&code) {

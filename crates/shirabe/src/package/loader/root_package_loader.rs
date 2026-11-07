@@ -4,7 +4,9 @@ use crate::config::Config;
 use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::package::loader::{ArrayLoader, LoaderInterface, ValidatingArrayLoader};
 use crate::package::version::{VersionGuesser, VersionGuesserInterface, VersionParser};
-use crate::package::{RootPackage, STABILITIES, SUPPORTED_LINK_TYPES, stability_priority};
+use crate::package::{
+    PackageInterfaceHandle, RootPackage, STABILITIES, SUPPORTED_LINK_TYPES, stability_priority,
+};
 use crate::repository::{RepositoryFactory, RepositoryManager};
 use crate::util::{Platform, ProcessExecutor};
 use bstr::{B, BStr, BString, ByteSlice};
@@ -57,7 +59,7 @@ impl RootPackageLoader {
         config: IndexMap<BString, PhpMixed>,
         class: &BStr,
         cwd: Option<&std::path::Path>,
-    ) -> anyhow::Result<crate::package::PackageInterfaceHandle> {
+    ) -> anyhow::Result<PackageInterfaceHandle> {
         if class != "Composer\\Package\\RootPackage" {
             trigger_error(
                 "The $class arg is deprecated, please reach out to Composer maintainers ASAP if you still need this.",

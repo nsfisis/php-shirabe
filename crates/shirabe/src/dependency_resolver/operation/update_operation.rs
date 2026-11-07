@@ -1,8 +1,8 @@
 //! ref: composer/src/Composer/DependencyResolver/Operation/UpdateOperation.php sha1:d33dcbc88300ebce4dfbf514f8ae0799d9d210b9
 
 use crate::dependency_resolver::operation::SolverOperation;
-use crate::package::PackageInterfaceHandle;
 use crate::package::version::VersionParser;
+use crate::package::{DisplayMode, PackageInterfaceHandle};
 use bstr::BStr;
 use shirabe_php_shim::{bconcat, php_str};
 
@@ -41,25 +41,21 @@ impl UpdateOperation {
         target_package: PackageInterfaceHandle,
         lock: bool,
     ) -> bstr::BString {
-        let mut from_version = initial_package
-            .get_full_pretty_version(true, crate::package::DisplayMode::SourceRefIfDev);
-        let mut to_version = target_package
-            .get_full_pretty_version(true, crate::package::DisplayMode::SourceRefIfDev);
+        let mut from_version =
+            initial_package.get_full_pretty_version(true, DisplayMode::SourceRefIfDev);
+        let mut to_version =
+            target_package.get_full_pretty_version(true, DisplayMode::SourceRefIfDev);
 
         if from_version == to_version
             && initial_package.get_source_reference() != target_package.get_source_reference()
         {
-            from_version = initial_package
-                .get_full_pretty_version(true, crate::package::DisplayMode::SourceRef);
-            to_version = target_package
-                .get_full_pretty_version(true, crate::package::DisplayMode::SourceRef);
+            from_version = initial_package.get_full_pretty_version(true, DisplayMode::SourceRef);
+            to_version = target_package.get_full_pretty_version(true, DisplayMode::SourceRef);
         } else if from_version == to_version
             && initial_package.get_dist_reference() != target_package.get_dist_reference()
         {
-            from_version =
-                initial_package.get_full_pretty_version(true, crate::package::DisplayMode::DistRef);
-            to_version =
-                target_package.get_full_pretty_version(true, crate::package::DisplayMode::DistRef);
+            from_version = initial_package.get_full_pretty_version(true, DisplayMode::DistRef);
+            to_version = target_package.get_full_pretty_version(true, DisplayMode::DistRef);
         }
 
         let action_name = if VersionParser::is_upgrade(

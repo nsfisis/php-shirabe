@@ -1,20 +1,24 @@
 //! ref: composer/src/Composer/Command/RequireCommand.php sha1:a02d20cec157fdeaea438599245710b76345bb8e
 
 use crate::advisory::Auditor;
-use crate::command::base_command::base_command_initialize;
+use crate::command::base_command::{base_command_complete, base_command_initialize};
 use crate::command::{BaseCommand, BaseCommandData, CompletionTrait, PackageDiscoveryTrait};
+use crate::composer::composer_full;
 use crate::console::input::{InputArgument, InputOption, SuggestedValues};
+use crate::delegate_base_command_trait_impls_to_inner;
 use crate::dependency_resolver::UpdateAllowTransitiveDeps;
+use crate::event_dispatcher::Callable;
 use crate::factory::Factory;
 use crate::installer::{Installer, InstallerEvents};
 use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface};
 use crate::json::{JsonFile, JsonManipulator};
-use crate::package::base_package;
 use crate::package::loader::{ArrayLoader, RootPackageLoader};
 use crate::package::version::{VersionParser, VersionSelector};
+use crate::package::{CompletePackageInterfaceHandle, Link, PackageInterfaceHandle, base_package};
 use crate::plugin::{CommandEvent, PluginEvents};
 use crate::repository::{
-    CompositeRepository, PlatformRepository, PlatformRepositoryHandle, RepositorySet,
+    CompositeRepository, FindPackageConstraint, PlatformRepository, PlatformRepositoryHandle,
+    RepositoryInterfaceHandle, RepositorySet,
 };
 use crate::signal::SignalSubscription;
 use crate::util::{Filesystem, PackageSorter};
@@ -47,7 +51,7 @@ pub struct RequireCommand {
     /// contents before modification if the lock file exists
     lock_backup: std::cell::RefCell<Option<Vec<u8>>>,
     dependency_resolution_completed: std::rc::Rc<std::cell::Cell<bool>>,
-    repos: std::cell::RefCell<Option<crate::repository::RepositoryInterfaceHandle>>,
+    repos: std::cell::RefCell<Option<RepositoryInterfaceHandle>>,
     repository_sets:
         std::cell::RefCell<IndexMap<BString, std::rc::Rc<std::cell::RefCell<RepositorySet>>>>,
 }
@@ -165,7 +169,7 @@ impl RequireCommand {
         // Update packages
         self.reset_composer()?;
         let composer_handle = self.require_composer(None, None)?;
-        let composer = crate::composer::composer_full(&composer_handle);
+        let composer = composer_full(&composer_handle);
 
         self.dependency_resolution_completed.set(false);
         // PHP: $composer->getEventDispatcher()->addListener(InstallerEvents::PRE_OPERATIONS_EXEC,
@@ -173,7 +177,7 @@ impl RequireCommand {
         let dependency_resolution_completed = self.dependency_resolution_completed.clone();
         composer.get_event_dispatcher().borrow_mut().add_listener(
             InstallerEvents::PRE_OPERATIONS_EXEC,
-            crate::event_dispatcher::Callable::Closure(std::rc::Rc::new(move |_event| {
+            Callable::Closure(std::rc::Rc::new(move |_event| {
                 dependency_resolution_completed.set(true);
                 PhpMixed::Null
             })),
@@ -187,8 +191,7 @@ impl RequireCommand {
             .unwrap_or(false)
         {
             let root_package = composer.get_package();
-            let mut links: IndexMap<BString, IndexMap<BString, crate::package::Link>> =
-                IndexMap::new();
+            let mut links: IndexMap<BString, IndexMap<BString, Link>> = IndexMap::new();
             links.insert(
                 BString::from("require"),
                 (*root_package.get_requires()).clone(),
@@ -447,7 +450,7 @@ impl RequireCommand {
         fixed: bool,
     ) -> anyhow::Result<i64> {
         let composer = self.require_composer(None, None)?;
-        let composer = crate::composer::composer_full(&composer);
+        let composer = composer_full(&composer);
         let locker_is_locked = composer.get_locker().borrow_mut().is_locked();
         let mut requirements: IndexMap<BString, BString> = IndexMap::new();
         let mut version_selector = VersionSelector::new(
@@ -461,7 +464,7 @@ impl RequireCommand {
             ))),
             None,
         )?;
-        let repo: crate::repository::RepositoryInterfaceHandle = if locker_is_locked {
+        let repo: RepositoryInterfaceHandle = if locker_is_locked {
             composer
                 .get_locker()
                 .borrow_mut()
@@ -476,7 +479,7 @@ impl RequireCommand {
         for package_name in requirements_to_update {
             let mut package = repo.find_package(
                 bstr::BStr::new(package_name),
-                crate::repository::FindPackageConstraint::String(BString::from("*")),
+                FindPackageConstraint::String(BString::from("*")),
             )?;
             while let Some(alias) = package.as_ref().and_then(|p| p.as_alias()) {
                 package = Some(alias.get_alias_of().into());
@@ -681,9 +684,7 @@ impl RequireCommand {
 }
 
 impl PackageDiscoveryTrait for RequireCommand {
-    fn get_repos_mut(
-        &self,
-    ) -> std::cell::RefMut<'_, Option<crate::repository::RepositoryInterfaceHandle>> {
+    fn get_repos_mut(&self) -> std::cell::RefMut<'_, Option<RepositoryInterfaceHandle>> {
         self.repos.borrow_mut()
     }
 
@@ -851,7 +852,7 @@ impl Command for RequireCommand {
         }
 
         let composer = self.require_composer(None, None)?;
-        let composer = crate::composer::composer_full(&composer);
+        let composer = composer_full(&composer);
         let repository_manager = composer.get_repository_manager().clone();
         let repository_manager = repository_manager.borrow();
         let repos = repository_manager.get_repositories();
@@ -864,14 +865,13 @@ impl Command for RequireCommand {
             None,
             None,
         )?);
-        let mut combined: Vec<crate::repository::RepositoryInterfaceHandle> =
-            vec![platform_repo.clone().into()];
+        let mut combined: Vec<RepositoryInterfaceHandle> = vec![platform_repo.clone().into()];
         for repo in repos {
             combined.push(repo.clone());
         }
-        *self.get_repos_mut() = Some(crate::repository::RepositoryInterfaceHandle::new(
-            CompositeRepository::new(combined),
-        ));
+        *self.get_repos_mut() = Some(RepositoryInterfaceHandle::new(CompositeRepository::new(
+            combined,
+        )));
 
         let preferred_stability = if composer.get_package().get_prefer_stable() {
             BString::from("stable")
@@ -948,14 +948,14 @@ impl Command for RequireCommand {
                     continue;
                 }
 
-                let found_packages: Vec<crate::package::PackageInterfaceHandle> = self
+                let found_packages: Vec<PackageInterfaceHandle> = self
                     .get_repos()
                     .find_packages(bstr::BStr::new(name), None)?
                     .into_iter()
                     .collect();
-                let pkg: Option<crate::package::PackageInterfaceHandle> =
+                let pkg: Option<PackageInterfaceHandle> =
                     PackageSorter::get_most_current_version(found_packages);
-                let pkg_as_complete: Option<crate::package::CompletePackageInterfaceHandle> =
+                let pkg_as_complete: Option<CompletePackageInterfaceHandle> =
                     pkg.as_ref().and_then(|p| p.as_complete());
                 if let Some(pkg_complete) = pkg_as_complete {
                     let lowered: Vec<BString> = pkg_complete
@@ -1254,16 +1254,16 @@ impl Command for RequireCommand {
         input: &shirabe_symfony_console::completion::CompletionInput,
         suggestions: &mut shirabe_symfony_console::completion::CompletionSuggestions,
     ) -> anyhow::Result<()> {
-        crate::command::base_command::base_command_complete(self, input, suggestions)
+        base_command_complete(self, input, suggestions)
     }
 
     shirabe_symfony_console::delegate_command_trait_impls_to_inner!(base_command_data);
 }
 
 impl BaseCommand for RequireCommand {
-    fn base_command_data(&self) -> &crate::command::BaseCommandData {
+    fn base_command_data(&self) -> &BaseCommandData {
         &self.base_command_data
     }
 
-    crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
+    delegate_base_command_trait_impls_to_inner!(base_command_data);
 }

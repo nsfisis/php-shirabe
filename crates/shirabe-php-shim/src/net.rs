@@ -1,3 +1,4 @@
+use crate::{display_to_bytes, getenv, os_str_from_bytes, trim, utf8_text};
 use bstr::BString;
 use std::net::{IpAddr, SocketAddr, ToSocketAddrs};
 
@@ -6,10 +7,10 @@ pub fn gethostname() -> std::ffi::OsString {
     // same value via /proc; fall back to the HOSTNAME env var, then to "localhost".
     std::fs::read("/proc/sys/kernel/hostname")
         .ok()
-        .map(crate::trim)
+        .map(trim)
         .filter(|s| !s.is_empty())
-        .map(|s| crate::os_str_from_bytes(&s).to_os_string())
-        .or_else(|| crate::getenv("HOSTNAME").filter(|s| !s.is_empty()))
+        .map(|s| os_str_from_bytes(&s).to_os_string())
+        .or_else(|| getenv("HOSTNAME").filter(|s| !s.is_empty()))
         .unwrap_or_else(|| "localhost".into())
 }
 
@@ -19,13 +20,13 @@ pub fn gethostname() -> std::ffi::OsString {
 pub fn gethostbyname(hostname: impl AsRef<[u8]>) -> BString {
     let hostname = hostname.as_ref();
     // A host name that is not UTF-8 resolves to nothing.
-    let Some(text) = crate::utf8_text(hostname) else {
+    let Some(text) = utf8_text(hostname) else {
         return BString::from(hostname);
     };
     match (text, 0u16).to_socket_addrs() {
         Ok(addrs) => addrs
             .filter_map(|addr| match addr {
-                SocketAddr::V4(v4) => Some(crate::display_to_bytes(v4.ip())),
+                SocketAddr::V4(v4) => Some(display_to_bytes(v4.ip())),
                 SocketAddr::V6(_) => None,
             })
             .next()
@@ -36,7 +37,7 @@ pub fn gethostbyname(hostname: impl AsRef<[u8]>) -> BString {
 
 pub fn inet_pton(host: impl AsRef<[u8]>) -> Option<Vec<u8>> {
     // Every address PHP accepts is ASCII.
-    match crate::utf8_text(host.as_ref())?.parse::<IpAddr>() {
+    match utf8_text(host.as_ref())?.parse::<IpAddr>() {
         Ok(IpAddr::V4(v4)) => Some(v4.octets().to_vec()),
         Ok(IpAddr::V6(v6)) => Some(v6.octets().to_vec()),
         Err(_) => None,

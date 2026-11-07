@@ -8,7 +8,7 @@ use crate::json::JsonFile;
 use crate::repository::{
     FilesystemRepository, RepositoryInterfaceHandle, RepositoryManager, RepositoryManagerInterface,
 };
-use crate::util::{HttpDownloader, ProcessExecutor};
+use crate::util::{HttpDownloader, ProcessExecutor, StreamContextOptions};
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
@@ -41,7 +41,7 @@ impl RepositoryFactory {
                     Factory::create_http_downloader(
                         io.clone(),
                         config,
-                        crate::util::StreamContextOptions::new(),
+                        StreamContextOptions::new(),
                     )?,
                 ))),
                 Some(io.clone()),
@@ -153,11 +153,7 @@ impl RepositoryFactory {
                 io.clone(),
                 &config,
                 Some(std::rc::Rc::new(std::cell::RefCell::new(
-                    Factory::create_http_downloader(
-                        io,
-                        &config,
-                        crate::util::StreamContextOptions::new(),
-                    )?,
+                    Factory::create_http_downloader(io, &config, StreamContextOptions::new())?,
                 ))),
                 None,
                 None,
@@ -182,7 +178,7 @@ impl RepositoryFactory {
             None => std::rc::Rc::new(std::cell::RefCell::new(Factory::create_http_downloader(
                 io.clone(),
                 config,
-                crate::util::StreamContextOptions::new(),
+                StreamContextOptions::new(),
             )?)),
         };
         let process = match process {

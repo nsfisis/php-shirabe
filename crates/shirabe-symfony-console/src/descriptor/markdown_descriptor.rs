@@ -7,7 +7,7 @@ use crate::descriptor::{
 };
 use crate::helper::Helper;
 use crate::input::{InputArgument, InputDefinition, InputOption};
-use crate::output::OutputInterface;
+use crate::output::{OUTPUT_NORMAL, OUTPUT_RAW, OutputInterface};
 use bstr::{BString, ByteSlice};
 use shirabe_php_shim::{bconcat, implode, preg_replace, str_repeat, str_replace, var_export};
 
@@ -330,11 +330,7 @@ impl Descriptor for MarkdownDescriptor {
         self.output().borrow().write(
             &[bstr::BString::from(content.as_ref())],
             false,
-            if decorated {
-                crate::output::OUTPUT_NORMAL
-            } else {
-                crate::output::OUTPUT_RAW
-            },
+            if decorated { OUTPUT_NORMAL } else { OUTPUT_RAW },
         );
     }
 

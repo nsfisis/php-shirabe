@@ -1,14 +1,17 @@
 //! ref: composer/src/Composer/Command/BaseDependencyCommand.php sha1:b457d7e058eb7787327ee2571c72636c58fe09ac
 
 use crate::command::BaseCommand;
+use crate::composer::composer_full;
 use crate::io::{IOInterfaceImmutable, IOInterfaceWrite};
 use crate::package::version::VersionParser;
-use crate::package::{Package, RootPackage};
+use crate::package::{
+    Package, PackageHandle, PackageInterfaceHandle, RootPackage, RootPackageInterfaceHandle,
+};
 use crate::plugin::{CommandEvent, PluginEvents};
 use crate::repository::{
     CompositeRepository, DependentsEntry, FindPackageConstraint, InstalledArrayRepository,
     InstalledRepository, NeedleInput, PlatformRepository, RepositoryFactory, RepositoryInterface,
-    RootPackageRepository,
+    RepositoryInterfaceHandle, RootPackageRepository,
 };
 use crate::util::PackageInfo;
 use bstr::{B, BStr, BString, ByteSlice};
@@ -55,14 +58,11 @@ pub trait BaseDependencyCommand: BaseCommand {
             Some(command_event_name.as_ref()),
             Some(std::rc::Rc::new(std::cell::RefCell::new(command_event))),
         )?;
-        let composer = crate::composer::composer_full(&composer);
+        let composer = composer_full(&composer);
 
-        let mut repos: Vec<crate::repository::RepositoryInterfaceHandle> =
-            vec![crate::repository::RepositoryInterfaceHandle::new(
-                RootPackageRepository::new(crate::package::RootPackageInterfaceHandle::dup(
-                    composer.get_package(),
-                )),
-            )];
+        let mut repos: Vec<RepositoryInterfaceHandle> = vec![RepositoryInterfaceHandle::new(
+            RootPackageRepository::new(RootPackageInterfaceHandle::dup(composer.get_package())),
+        )];
 
         if input
             .borrow()
@@ -86,9 +86,12 @@ pub trait BaseDependencyCommand: BaseCommand {
                 .into_iter()
                 .map(|(k, v)| (k, PhpMixed::string(v)))
                 .collect();
-            repos.push(crate::repository::RepositoryInterfaceHandle::new(
-                PlatformRepository::new(vec![], platform_overrides, None, None)?,
-            ));
+            repos.push(RepositoryInterfaceHandle::new(PlatformRepository::new(
+                vec![],
+                platform_overrides,
+                None,
+                None,
+            )?));
         } else {
             let repository_manager = composer.get_repository_manager().clone();
             let repository_manager = repository_manager.borrow();
@@ -114,9 +117,12 @@ pub trait BaseDependencyCommand: BaseCommand {
                 .get_map_or_empty("platform")?
                 .into_iter()
                 .collect();
-            repos.push(crate::repository::RepositoryInterfaceHandle::new(
-                PlatformRepository::new(vec![], platform_overrides, None, None)?,
-            ));
+            repos.push(RepositoryInterfaceHandle::new(PlatformRepository::new(
+                vec![],
+                platform_overrides,
+                None,
+                None,
+            )?));
         }
 
         let mut installed_repo = InstalledRepository::new(repos);
@@ -171,13 +177,11 @@ pub trait BaseDependencyCommand: BaseCommand {
                     BStr::new(&needle),
                     FindPackageConstraint::String(text_constraint.clone()),
                 )? {
-                    installed_repo.add_repository(
-                        crate::repository::RepositoryInterfaceHandle::new(
-                            InstalledArrayRepository::new_with_packages(vec![
-                                crate::package::PackageInterfaceHandle::dup(&r#match),
-                            ])?,
-                        ),
-                    );
+                    installed_repo.add_repository(RepositoryInterfaceHandle::new(
+                        InstalledArrayRepository::new_with_packages(vec![
+                            PackageInterfaceHandle::dup(&r#match),
+                        ])?,
+                    ));
                 } else if PlatformRepository::is_platform_package(&needle) {
                     let parser = VersionParser::new();
                     let platform_constraint = parser.parse_constraints(&text_constraint)?;
@@ -186,14 +190,11 @@ pub trait BaseDependencyCommand: BaseCommand {
                         let version = BString::from(lower_bound.get_version());
                         let temp_platform_pkg =
                             Package::new(needle.clone(), version.clone(), version);
-                        installed_repo.add_repository(
-                            crate::repository::RepositoryInterfaceHandle::new(
-                                InstalledArrayRepository::new_with_packages(vec![
-                                    crate::package::PackageHandle::from_package(temp_platform_pkg)
-                                        .into(),
-                                ])?,
-                            ),
-                        );
+                        installed_repo.add_repository(RepositoryInterfaceHandle::new(
+                            InstalledArrayRepository::new_with_packages(vec![
+                                PackageHandle::from_package(temp_platform_pkg).into(),
+                            ])?,
+                        ));
                     }
                 } else {
                     self.get_io().write_error(bconcat!(

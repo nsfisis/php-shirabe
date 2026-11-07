@@ -1,4 +1,8 @@
-use crate::{ChildPipe, PhpMixed, PhpResource, StreamBacking, StreamState, os_str_from_bytes};
+use crate::fs::fopen;
+use crate::{
+    ChildPipe, PhpMixed, PhpResource, StreamBacking, StreamState, bconcat, os_str_from_bytes,
+    path_from_bytes,
+};
 use bstr::{BString, ByteSlice};
 use indexmap::IndexMap;
 pub use shirabe_php_src::standard::exec::escapeshellcmd;
@@ -150,8 +154,7 @@ pub fn proc_open(
     let _ = options;
 
     let mut cmd = std::process::Command::new("/bin/sh");
-    cmd.arg("-c")
-        .arg(crate::os_str_from_bytes(command.as_ref()));
+    cmd.arg("-c").arg(os_str_from_bytes(command.as_ref()));
 
     if let Some(cwd) = cwd {
         cmd.current_dir(cwd);
@@ -162,8 +165,8 @@ pub fn proc_open(
         cmd.env_clear();
         for pair in env {
             match pair.split_once_str("=") {
-                Some((k, v)) => cmd.env(crate::os_str_from_bytes(k), crate::os_str_from_bytes(v)),
-                None => cmd.env(crate::os_str_from_bytes(pair), ""),
+                Some((k, v)) => cmd.env(os_str_from_bytes(k), os_str_from_bytes(v)),
+                None => cmd.env(os_str_from_bytes(pair), ""),
             };
         }
     }
@@ -201,7 +204,7 @@ pub fn proc_open(
                                 !child_reads,
                                 child_reads,
                                 mode.clone(),
-                                crate::bconcat!("pipe:fd", fd),
+                                bconcat!("pipe:fd", fd),
                             ),
                         ))),
                     );
@@ -209,8 +212,8 @@ pub fn proc_open(
                 Descriptor::File(path, mode) => {
                     extra_fds.push((
                         fd as std::os::fd::RawFd,
-                        std::os::fd::OwnedFd::from(resource_to_file(&crate::fs::fopen(
-                            crate::path_from_bytes(path),
+                        std::os::fd::OwnedFd::from(resource_to_file(&fopen(
+                            path_from_bytes(path),
                             mode,
                         )?)?),
                     ));
@@ -231,9 +234,9 @@ pub fn proc_open(
                 pipe_modes.push((fd, mode.clone()));
                 std::process::Stdio::piped()
             }
-            Descriptor::File(path, mode) => std::process::Stdio::from(resource_to_file(
-                &crate::fs::fopen(crate::path_from_bytes(path), mode)?,
-            )?),
+            Descriptor::File(path, mode) => {
+                std::process::Stdio::from(resource_to_file(&fopen(path_from_bytes(path), mode)?)?)
+            }
             Descriptor::Resource(resource) => {
                 std::process::Stdio::from(resource_to_file(resource)?)
             }
@@ -296,7 +299,7 @@ pub fn proc_open(
                 readable,
                 writable,
                 mode,
-                crate::bconcat!("pipe:fd", fd),
+                bconcat!("pipe:fd", fd),
             ))));
         pipes.insert(fd, resource);
     }
@@ -469,6 +472,7 @@ mod tests {
     use super::*;
     use crate::fs::{fclose, fwrite};
     use crate::stream::stream_get_contents;
+    use crate::{bconcat, path_from_bytes, path_to_bytes};
 
     #[test]
     fn proc_open_reads_stdout_and_reports_status() {
@@ -621,19 +625,19 @@ mod tests {
 
     #[test]
     fn proc_open_redirects_stdout_to_file() {
-        let path = std::env::temp_dir().join(crate::path_from_bytes(&crate::bconcat!(
+        let path = std::env::temp_dir().join(path_from_bytes(&bconcat!(
             "shirabe_proc_open_",
             std::process::id(),
             ".txt"
         )));
-        let path_str = crate::path_to_bytes(&path);
+        let path_str = path_to_bytes(&path);
 
         let mut pipes = IndexMap::new();
         let process = proc_open(
             "echo filetest",
             &[
                 Descriptor::Inherit,
-                Descriptor::File(crate::bconcat!(path_str), BString::from("w")),
+                Descriptor::File(bconcat!(path_str), BString::from("w")),
                 Descriptor::Inherit,
             ],
             &mut pipes,

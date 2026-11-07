@@ -1,8 +1,10 @@
 //! ref: composer/src/Composer/Command/ScriptAliasCommand.php sha1:098a85149d8bc3d10182f2f82fad53aaa7c67eb4
 
-use crate::command::base_command::base_command_initialize;
+use crate::command::base_command::{base_command_complete, base_command_initialize};
 use crate::command::{BaseCommand, BaseCommandData};
+use crate::composer::composer_full;
 use crate::console::input::{InputArgument, InputOption};
+use crate::delegate_base_command_trait_impls_to_inner;
 use crate::event_dispatcher::EventFlags;
 use crate::util::Platform;
 use bstr::{BStr, BString, ByteSlice};
@@ -106,9 +108,7 @@ impl Command for ScriptAliasCommand {
         _output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
         let composer = self.require_composer(None, None)?;
-        let dispatcher = crate::composer::composer_full(&composer)
-            .get_event_dispatcher()
-            .clone();
+        let dispatcher = composer_full(&composer).get_event_dispatcher().clone();
 
         let args = input.borrow().get_arguments();
 
@@ -157,16 +157,16 @@ impl Command for ScriptAliasCommand {
         input: &shirabe_symfony_console::completion::CompletionInput,
         suggestions: &mut shirabe_symfony_console::completion::CompletionSuggestions,
     ) -> anyhow::Result<()> {
-        crate::command::base_command::base_command_complete(self, input, suggestions)
+        base_command_complete(self, input, suggestions)
     }
 
     shirabe_symfony_console::delegate_command_trait_impls_to_inner!(base_command_data);
 }
 
 impl BaseCommand for ScriptAliasCommand {
-    fn base_command_data(&self) -> &crate::command::BaseCommandData {
+    fn base_command_data(&self) -> &BaseCommandData {
         &self.base_command_data
     }
 
-    crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
+    delegate_base_command_trait_impls_to_inner!(base_command_data);
 }

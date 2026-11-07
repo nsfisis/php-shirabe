@@ -3,9 +3,9 @@
 use crate::cache::Cache;
 use crate::config::Config;
 use crate::downloader::TransportException;
-use crate::io::{IOInterface, IOInterfaceWrite};
-use crate::repository::vcs::VcsDriverBase;
-use crate::util::{Filesystem, Hg as HgUtils, Url};
+use crate::io::{IOInterface, IOInterfaceWrite, NORMAL};
+use crate::repository::vcs::{VcsDriverBase, VcsDriverInterface};
+use crate::util::{Filesystem, Hg as HgUtils, HttpDownloader, ProcessExecutor, Url};
 use bstr::{BStr, BString, ByteSlice};
 use chrono::{DateTime, FixedOffset, Utc};
 use indexmap::IndexMap;
@@ -28,8 +28,8 @@ impl HgDriver {
         repo_config: IndexMap<BString, PhpMixed>,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
-        http_downloader: std::rc::Rc<std::cell::RefCell<crate::util::HttpDownloader>>,
-        process: std::rc::Rc<std::cell::RefCell<crate::util::ProcessExecutor>>,
+        http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
+        process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     ) -> Self {
         Self {
             inner: VcsDriverBase::new(repo_config, io, config, http_downloader, process),
@@ -112,7 +112,7 @@ impl HgDriver {
                             ")</error>"
                         ),
                         true,
-                        crate::io::NORMAL,
+                        NORMAL,
                     );
                 }
             } else {
@@ -336,7 +336,7 @@ impl HgDriver {
                 return Ok(false);
             }
 
-            let process = crate::util::ProcessExecutor::new(Some(io.clone()));
+            let process = ProcessExecutor::new(Some(io.clone()));
             let mut output = BString::default();
             if process.execute(
                 ["hg", "summary"].map(|s| bconcat!(s)).as_ref(),
@@ -352,7 +352,7 @@ impl HgDriver {
             return Ok(false);
         }
 
-        let process = crate::util::ProcessExecutor::new(Some(io));
+        let process = ProcessExecutor::new(Some(io));
         let mut ignored = BString::default();
         let exit = process.execute(
             &[
@@ -386,7 +386,7 @@ impl HgDriver {
     }
 }
 
-impl crate::repository::vcs::VcsDriverInterface for HgDriver {
+impl VcsDriverInterface for HgDriver {
     fn initialize(&mut self) -> anyhow::Result<()> {
         HgDriver::initialize(self)
     }

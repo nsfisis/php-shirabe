@@ -1,14 +1,16 @@
 //! ref: composer/src/Composer/Command/BumpCommand.php sha1:9779ca6e6334d1c464f8bec6258eb38439cd65ac
 
-use crate::command::base_command::base_command_initialize;
+use crate::command::base_command::{base_command_complete, base_command_initialize};
 use crate::command::{BaseCommand, BaseCommandData, CompletionTrait};
+use crate::composer::composer_full;
 use crate::console::input::{InputArgument, InputOption};
+use crate::delegate_base_command_trait_impls_to_inner;
 use crate::factory::Factory;
 use crate::io::{IOInterface, IOInterfaceWrite, io_interface};
 use crate::json::{JsonFile, JsonManipulator};
 use crate::package::base_package;
 use crate::package::version::VersionBumper;
-use crate::repository::PlatformRepository;
+use crate::repository::{FindPackageConstraint, PlatformRepository, RepositoryInterfaceHandle};
 use crate::util::Filesystem;
 use bstr::{B, BStr, BString};
 use shirabe_php_shim::{
@@ -91,10 +93,10 @@ impl BumpCommand {
         }
 
         let composer = self.require_composer(None, None)?;
-        let composer = crate::composer::composer_full(&composer);
+        let composer = composer_full(&composer);
         let has_lock_file_disabled = !composer.get_config().borrow().has("lock")
             || composer.get_config().borrow().get_bool("lock");
-        let repo: crate::repository::RepositoryInterfaceHandle = if !has_lock_file_disabled {
+        let repo: RepositoryInterfaceHandle = if !has_lock_file_disabled {
             composer
                 .get_locker()
                 .borrow_mut()
@@ -194,7 +196,7 @@ impl BumpCommand {
 
                 let package_opt = repo.find_package(
                     bstr::BStr::new(pkg_name),
-                    crate::repository::FindPackageConstraint::String(BString::from("*")),
+                    FindPackageConstraint::String(BString::from("*")),
                 )?;
                 let mut package = match package_opt {
                     None => continue,
@@ -438,16 +440,16 @@ impl Command for BumpCommand {
         input: &shirabe_symfony_console::completion::CompletionInput,
         suggestions: &mut shirabe_symfony_console::completion::CompletionSuggestions,
     ) -> anyhow::Result<()> {
-        crate::command::base_command::base_command_complete(self, input, suggestions)
+        base_command_complete(self, input, suggestions)
     }
 
     shirabe_symfony_console::delegate_command_trait_impls_to_inner!(base_command_data);
 }
 
 impl BaseCommand for BumpCommand {
-    fn base_command_data(&self) -> &crate::command::BaseCommandData {
+    fn base_command_data(&self) -> &BaseCommandData {
         &self.base_command_data
     }
 
-    crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
+    delegate_base_command_trait_impls_to_inner!(base_command_data);
 }

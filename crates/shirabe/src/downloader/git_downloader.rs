@@ -3,11 +3,11 @@
 use crate::cache::Cache;
 use crate::config::{Config, DiscardChanges};
 use crate::downloader::{
-    ChangeReportInterface, DvcsDownloaderInterface, VcsCapableDownloaderInterface, VcsDownloader,
-    VcsDownloaderBase,
+    ChangeReportInterface, DownloaderInterface, DvcsDownloaderInterface,
+    VcsCapableDownloaderInterface, VcsDownloader, VcsDownloaderBase,
 };
 use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface};
-use crate::package::PackageInterfaceHandle;
+use crate::package::{DisplayMode, PackageInterfaceHandle};
 use crate::util::{Filesystem, Git as GitUtil, Platform, ProcessExecutor, Url};
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
@@ -816,8 +816,7 @@ impl VcsDownloader for GitDownloader {
                     "  - Syncing <info>",
                     package.get_name(),
                     "</info> (<comment>",
-                    package
-                        .get_full_pretty_version(true, crate::package::DisplayMode::SourceRefIfDev),
+                    package.get_full_pretty_version(true, DisplayMode::SourceRefIfDev),
                     "</comment>) into cache"
                 ),
                 true,
@@ -1162,8 +1161,7 @@ impl VcsDownloader for GitDownloader {
         let unpushed = self.get_unpushed_changes(package.clone(), &path)?;
         if let Some(unpushed) = unpushed.as_ref()
             && (self.inner.io.is_interactive()
-                || self.inner.config.borrow().get_discard_changes()?
-                    != crate::config::DiscardChanges::Bool(true))
+                || self.inner.config.borrow().get_discard_changes()? != DiscardChanges::Bool(true))
         {
             return Err(RuntimeException::new(bconcat!(
                 "Source directory ",
@@ -1391,24 +1389,20 @@ impl VcsDownloader for GitDownloader {
 }
 
 #[async_trait::async_trait(?Send)]
-impl crate::downloader::DownloaderInterface for GitDownloader {
+impl DownloaderInterface for GitDownloader {
     fn get_installation_source(&self) -> BString {
         <Self as VcsDownloader>::get_installation_source(self)
     }
 
-    fn as_dvcs_downloader_interface(
-        &self,
-    ) -> Option<&dyn crate::downloader::DvcsDownloaderInterface> {
+    fn as_dvcs_downloader_interface(&self) -> Option<&dyn DvcsDownloaderInterface> {
         Some(self)
     }
 
-    fn as_change_report_interface(&self) -> Option<&dyn crate::downloader::ChangeReportInterface> {
+    fn as_change_report_interface(&self) -> Option<&dyn ChangeReportInterface> {
         Some(self)
     }
 
-    fn as_vcs_capable_downloader_interface(
-        &self,
-    ) -> Option<&dyn crate::downloader::VcsCapableDownloaderInterface> {
+    fn as_vcs_capable_downloader_interface(&self) -> Option<&dyn VcsCapableDownloaderInterface> {
         Some(self)
     }
 

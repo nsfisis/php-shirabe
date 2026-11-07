@@ -1,11 +1,13 @@
 //! ref: composer/src/Composer/Command/HomeCommand.php sha1:5061876538d1ca2bacd748bf99b98c2333ee55fd
 
-use crate::command::base_command::base_command_initialize;
+use crate::command::base_command::{base_command_complete, base_command_initialize};
 use crate::command::{BaseCommand, BaseCommandData, CompletionTrait};
+use crate::composer::composer_full;
 use crate::console::input::{InputArgument, InputOption};
+use crate::delegate_base_command_trait_impls_to_inner;
 use crate::io::IOInterfaceWrite;
-use crate::package::CompletePackageInterfaceHandle;
-use crate::repository::{RepositoryFactory, RootPackageRepository};
+use crate::package::{CompletePackageInterfaceHandle, RootPackageInterfaceHandle};
+use crate::repository::{RepositoryFactory, RepositoryInterfaceHandle, RootPackageRepository};
 use crate::util::{Platform, ProcessExecutor};
 use bstr::{BStr, BString};
 use shirabe_php_shim::{bconcat, filter_var_url, impl_php_class};
@@ -105,19 +107,15 @@ impl HomeCommand {
         }
     }
 
-    fn initialize_repos(
-        &self,
-    ) -> anyhow::Result<Vec<crate::repository::RepositoryInterfaceHandle>> {
+    fn initialize_repos(&self) -> anyhow::Result<Vec<RepositoryInterfaceHandle>> {
         let composer = self.try_composer(None, None);
 
         if let Some(composer) = composer {
-            let composer = crate::composer::composer_full(&composer);
-            let mut repos: Vec<crate::repository::RepositoryInterfaceHandle> = vec![];
-            repos.push(crate::repository::RepositoryInterfaceHandle::new(
-                RootPackageRepository::new(crate::package::RootPackageInterfaceHandle::dup(
-                    composer.get_package(),
-                )),
-            ));
+            let composer = composer_full(&composer);
+            let mut repos: Vec<RepositoryInterfaceHandle> = vec![];
+            repos.push(RepositoryInterfaceHandle::new(RootPackageRepository::new(
+                RootPackageInterfaceHandle::dup(composer.get_package()),
+            )));
             let repository_manager = composer.get_repository_manager();
             let repository_manager = repository_manager.borrow();
             repos.push(repository_manager.get_local_repository());
@@ -199,7 +197,7 @@ impl Command for HomeCommand {
         let packages = if packages.is_empty() {
             io.write_error("No package specified, opening homepage for the root package");
             let composer_rc = self.require_composer(None, None)?;
-            let composer_ref = crate::composer::composer_full(&composer_rc);
+            let composer_ref = composer_full(&composer_rc);
             vec![composer_ref.get_package().get_name()]
         } else {
             packages
@@ -274,16 +272,16 @@ impl Command for HomeCommand {
         input: &shirabe_symfony_console::completion::CompletionInput,
         suggestions: &mut shirabe_symfony_console::completion::CompletionSuggestions,
     ) -> anyhow::Result<()> {
-        crate::command::base_command::base_command_complete(self, input, suggestions)
+        base_command_complete(self, input, suggestions)
     }
 
     shirabe_symfony_console::delegate_command_trait_impls_to_inner!(base_command_data);
 }
 
 impl BaseCommand for HomeCommand {
-    fn base_command_data(&self) -> &crate::command::BaseCommandData {
+    fn base_command_data(&self) -> &BaseCommandData {
         &self.base_command_data
     }
 
-    crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
+    delegate_base_command_trait_impls_to_inner!(base_command_data);
 }

@@ -1,8 +1,9 @@
 //! ref: composer/src/Composer/Command/SelfUpdateCommand.php sha1:3f12bb7d55ca3264807f5239c06b02dba7842fd2
 
-use crate::command::base_command::base_command_initialize;
+use crate::command::base_command::{base_command_complete, base_command_initialize};
 use crate::command::{BaseCommand, BaseCommandData};
 use crate::console::input::{InputArgument, InputOption};
+use crate::delegate_base_command_trait_impls_to_inner;
 use crate::io::{IOInterfaceWrite, io_interface};
 use shirabe_php_shim::impl_php_class;
 use shirabe_symfony_console::command::Command;
@@ -98,18 +99,18 @@ impl Command for SelfUpdateCommand {
         input: &shirabe_symfony_console::completion::CompletionInput,
         suggestions: &mut shirabe_symfony_console::completion::CompletionSuggestions,
     ) -> anyhow::Result<()> {
-        crate::command::base_command::base_command_complete(self, input, suggestions)
+        base_command_complete(self, input, suggestions)
     }
 
     shirabe_symfony_console::delegate_command_trait_impls_to_inner!(base_command_data);
 }
 
 impl BaseCommand for SelfUpdateCommand {
-    fn base_command_data(&self) -> &crate::command::BaseCommandData {
+    fn base_command_data(&self) -> &BaseCommandData {
         &self.base_command_data
     }
 
-    crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
+    delegate_base_command_trait_impls_to_inner!(base_command_data);
 
     fn is_self_update_command(&self) -> bool {
         true

@@ -1,4 +1,7 @@
-use crate::{PhpMixed, bconcat};
+use crate::{
+    PhpMixed, TypeError, bconcat, display_to_bytes, get_debug_type, intval, php_to_string,
+    utf8_text,
+};
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 pub use shirabe_php_src::standard::string::{addcslashes, strip_tags, stripcslashes};
@@ -358,12 +361,12 @@ pub fn implode(glue: impl AsRef<[u8]>, pieces: &[impl AsRef<[u8]>]) -> BString {
 /// anything else fails as PHP's type check does.
 pub fn implode_mixed(glue: impl AsRef<[u8]>, pieces: &PhpMixed) -> anyhow::Result<BString> {
     let pieces: Vec<BString> = match pieces {
-        PhpMixed::List(list) => list.iter().map(crate::php_to_string).collect(),
-        PhpMixed::Array(map) => map.values().map(crate::php_to_string).collect(),
+        PhpMixed::List(list) => list.iter().map(php_to_string).collect(),
+        PhpMixed::Array(map) => map.values().map(php_to_string).collect(),
         other => {
-            return Err(crate::TypeError::new(bconcat!(
+            return Err(TypeError::new(bconcat!(
                 "implode(): Argument #2 ($array) must be of type ?array, ",
-                crate::get_debug_type(other),
+                get_debug_type(other),
                 " given"
             ))
             .into());
@@ -843,31 +846,31 @@ pub fn sprintf(format: impl AsRef<[u8]>, args: &[PhpMixed]) -> BString {
         let arg = arg.cloned().unwrap_or(PhpMixed::Null);
 
         let (core, numeric): (BString, bool) = match spec {
-            b'd' => (sprintf_signed_int(crate::intval(&arg), plus, space), true),
-            b'u' => (crate::bconcat!(crate::intval(&arg) as u64), true),
+            b'd' => (sprintf_signed_int(intval(&arg), plus, space), true),
+            b'u' => (bconcat!(intval(&arg) as u64), true),
             b'b' => (
-                crate::display_to_bytes(format_args!("{:b}", crate::intval(&arg) as u64)),
+                display_to_bytes(format_args!("{:b}", intval(&arg) as u64)),
                 true,
             ),
             b'o' => (
-                crate::display_to_bytes(format_args!("{:o}", crate::intval(&arg) as u64)),
+                display_to_bytes(format_args!("{:o}", intval(&arg) as u64)),
                 true,
             ),
             b'x' => (
-                crate::display_to_bytes(format_args!("{:x}", crate::intval(&arg) as u64)),
+                display_to_bytes(format_args!("{:x}", intval(&arg) as u64)),
                 true,
             ),
             b'X' => (
-                crate::display_to_bytes(format_args!("{:X}", crate::intval(&arg) as u64)),
+                display_to_bytes(format_args!("{:X}", intval(&arg) as u64)),
                 true,
             ),
-            b'c' => (BString::from(vec![crate::intval(&arg) as u8]), false),
+            b'c' => (BString::from(vec![intval(&arg) as u8]), false),
             b'f' | b'F' => (
                 sprintf_float(php_to_float(&arg), precision.unwrap_or(6), plus, space),
                 true,
             ),
             b's' => {
-                let mut s = crate::php_to_string(&arg);
+                let mut s = php_to_string(&arg);
                 if let Some(p) = precision.filter(|&p| p < s.len()) {
                     s.truncate(p);
                 }
@@ -889,9 +892,9 @@ fn sprintf_signed_int(n: i64, plus: bool, space: bool) -> BString {
     if n < 0 {
         bconcat!(n)
     } else if plus {
-        crate::bconcat!("+", n)
+        bconcat!("+", n)
     } else if space {
-        crate::bconcat!(" ", n)
+        bconcat!(" ", n)
     } else {
         bconcat!(n)
     }
@@ -899,13 +902,13 @@ fn sprintf_signed_int(n: i64, plus: bool, space: bool) -> BString {
 
 fn sprintf_float(v: f64, precision: usize, plus: bool, space: bool) -> BString {
     let negative = v.is_sign_negative() && !v.is_nan();
-    let magnitude = crate::display_to_bytes(format_args!("{:.*}", precision, v.abs()));
+    let magnitude = display_to_bytes(format_args!("{:.*}", precision, v.abs()));
     if negative {
-        crate::bconcat!("-", magnitude)
+        bconcat!("-", magnitude)
     } else if plus {
-        crate::bconcat!("+", magnitude)
+        bconcat!("+", magnitude)
     } else if space {
-        crate::bconcat!(" ", magnitude)
+        bconcat!(" ", magnitude)
     } else {
         magnitude
     }
@@ -981,7 +984,7 @@ fn php_to_float(v: &PhpMixed) -> f64 {
                 }
             }
             // The numeric prefix is ASCII.
-            crate::utf8_text(&bytes[..end])
+            utf8_text(&bytes[..end])
                 .expect("the numeric prefix is ASCII")
                 .parse::<f64>()
                 .unwrap_or(0.0)
@@ -1196,7 +1199,7 @@ pub fn number_format(
     // to a whole number before formatting to avoid the round-half-to-even of `{:.*}`.
     let factor = 10f64.powi(decimals as i32);
     let scaled = (magnitude * factor).round();
-    let mut digits = crate::display_to_bytes(format_args!("{:.0}", scaled));
+    let mut digits = display_to_bytes(format_args!("{:.0}", scaled));
     while digits.len() <= decimals {
         digits.insert(0, b'0');
     }

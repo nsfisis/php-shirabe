@@ -9,9 +9,11 @@ use crate::io::{IOInterface, IOInterfaceWrite, io_interface};
 use crate::package::PackageInterfaceHandle;
 use crate::package::version::version_selector::ShowWarnings;
 use crate::package::version::{VersionParser, VersionSelector};
+use crate::repository::repository_interface::SEARCH_FULLTEXT;
 use crate::repository::{
-    CompositeRepository, PlatformRepository, PlatformRepositoryHandle, RepositoryFactory,
-    RepositoryInterface, RepositorySet, SearchResult,
+    AbandonedInfo, CompositeRepository, FindPackageConstraint, PlatformRepository,
+    PlatformRepositoryHandle, ProviderInfo, RepositoryFactory, RepositoryInterface,
+    RepositoryInterfaceHandle, RepositorySet, SearchResult,
 };
 use crate::util::Filesystem;
 use bstr::{B, BStr, BString, ByteSlice};
@@ -29,21 +31,18 @@ use shirabe_symfony_console::{
 };
 
 pub trait PackageDiscoveryTrait: BaseCommand {
-    fn get_repos_mut(
-        &self,
-    ) -> std::cell::RefMut<'_, Option<crate::repository::RepositoryInterfaceHandle>>;
+    fn get_repos_mut(&self) -> std::cell::RefMut<'_, Option<RepositoryInterfaceHandle>>;
     fn get_repository_sets_mut(
         &self,
     ) -> std::cell::RefMut<'_, IndexMap<BString, std::rc::Rc<std::cell::RefCell<RepositorySet>>>>;
 
-    fn get_repos(&self) -> crate::repository::RepositoryInterfaceHandle {
+    fn get_repos(&self) -> RepositoryInterfaceHandle {
         if self.get_repos_mut().is_none() {
             // PHP: array_merge([new PlatformRepository], RepositoryFactory::defaultReposWithDefaultManager($this->getIO()))
-            let mut repos: Vec<crate::repository::RepositoryInterfaceHandle> =
-                vec![crate::repository::RepositoryInterfaceHandle::new(
-                    PlatformRepository::new(vec![], IndexMap::new(), None, None)
-                        .expect("PlatformRepository::new should not fail"),
-                )];
+            let mut repos: Vec<RepositoryInterfaceHandle> = vec![RepositoryInterfaceHandle::new(
+                PlatformRepository::new(vec![], IndexMap::new(), None, None)
+                    .expect("PlatformRepository::new should not fail"),
+            )];
             let io_owned: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = self.get_io();
             for (_, repo) in RepositoryFactory::default_repos_with_default_manager(io_owned)
                 .unwrap()
@@ -51,9 +50,9 @@ pub trait PackageDiscoveryTrait: BaseCommand {
             {
                 repos.push(repo);
             }
-            *self.get_repos_mut() = Some(crate::repository::RepositoryInterfaceHandle::new(
-                CompositeRepository::new(repos),
-            ));
+            *self.get_repos_mut() = Some(RepositoryInterfaceHandle::new(CompositeRepository::new(
+                repos,
+            )));
         }
 
         self.get_repos_mut().as_ref().unwrap().clone()
@@ -228,11 +227,9 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                 Some(s) => BString::from(s),
                 None => break,
             };
-            let mut matches: Vec<SearchResult> = self.get_repos().search(
-                package.clone(),
-                crate::repository::repository_interface::SEARCH_FULLTEXT,
-                None,
-            )?;
+            let mut matches: Vec<SearchResult> =
+                self.get_repos()
+                    .search(package.clone(), SEARCH_FULLTEXT, None)?;
 
             if !matches.is_empty() {
                 // Remove existing packages from search results.
@@ -256,7 +253,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
 
                 // no match, prompt which to pick
                 if !exact_match {
-                    let providers: IndexMap<BString, crate::repository::ProviderInfo> =
+                    let providers: IndexMap<BString, ProviderInfo> =
                         self.get_repos().get_providers(package.clone())?;
                     if !providers.is_empty() {
                         // PHP: array_unshift($matches, ['name' => $package, 'description' => '']);
@@ -276,10 +273,10 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                         let mut abandoned = BString::default();
                         if let Some(ai) = &found_package.abandoned {
                             let replacement = match ai {
-                                crate::repository::AbandonedInfo::Replacement(r) => {
+                                AbandonedInfo::Replacement(r) => {
                                     bconcat!("Use ", r, " instead")
                                 }
-                                crate::repository::AbandonedInfo::Abandoned => {
+                                AbandonedInfo::Abandoned => {
                                     BString::from("No replacement was suggested")
                                 }
                             };
@@ -730,7 +727,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
             if installed_repo
                 .find_package(
                     result.name.as_bstr(),
-                    crate::repository::FindPackageConstraint::String(BString::from("*")),
+                    FindPackageConstraint::String(BString::from("*")),
                 )?
                 .is_some()
             {
@@ -762,7 +759,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
             }
             let platform_pkg = platform_repo.find_package(
                 link.get_target().as_bstr(),
-                crate::repository::FindPackageConstraint::String(BString::from("*")),
+                FindPackageConstraint::String(BString::from("*")),
             )?;
             let platform_pkg = match platform_pkg {
                 None => {

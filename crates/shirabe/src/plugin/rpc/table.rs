@@ -3,10 +3,16 @@
 
 use crate::autoload::AutoloadGeneratorInterface;
 use crate::composer::ComposerHandle;
+use crate::config::Config;
 use crate::dependency_resolver::AnyTransaction;
 use crate::dependency_resolver::operation::AnyOperation;
+use crate::downloader::DownloadManagerInterface;
+use crate::event_dispatcher::{EventDispatcherInterface, EventInterface};
 use crate::installer::InstallationManagerInterface;
 use crate::io::IOInterface;
+use crate::io::buffer_io::BufferIO;
+use crate::io::console_io::ConsoleIO;
+use crate::io::null_io::NullIO;
 use crate::package::PackageInterfaceHandle;
 use crate::package::handle::AnyPackage;
 use crate::package::locker::LockerInterface;
@@ -16,6 +22,7 @@ use crate::repository::{
     InstalledArrayRepository, InstalledFilesystemRepository, LockArrayRepository,
     RepositoryInterfaceHandle, RepositoryManagerInterface,
 };
+use crate::util::{Filesystem, HttpDownloader, ProcessExecutor};
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_rpc::{FromWire, PhpThrow, PluginValue, RustObjHandle, ToWire, wire};
@@ -26,28 +33,24 @@ use shirabe_php_shim::{bconcat, php_str};
 pub(crate) enum RustEntity {
     Composer(ComposerHandle),
     AutoloadGenerator(std::rc::Rc<std::cell::RefCell<dyn AutoloadGeneratorInterface>>),
-    Config(std::rc::Rc<std::cell::RefCell<crate::config::Config>>),
-    DownloadManager(
-        std::rc::Rc<std::cell::RefCell<dyn crate::downloader::DownloadManagerInterface>>,
-    ),
-    Filesystem(std::rc::Rc<std::cell::RefCell<crate::util::Filesystem>>),
+    Config(std::rc::Rc<std::cell::RefCell<Config>>),
+    DownloadManager(std::rc::Rc<std::cell::RefCell<dyn DownloadManagerInterface>>),
+    Filesystem(std::rc::Rc<std::cell::RefCell<Filesystem>>),
     Io(std::rc::Rc<std::cell::RefCell<dyn IOInterface>>),
     InstallationManager(std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>),
     Locker(std::rc::Rc<std::cell::RefCell<dyn LockerInterface>>),
     RepositoryManager(std::rc::Rc<std::cell::RefCell<dyn RepositoryManagerInterface>>),
     Repository(RepositoryInterfaceHandle),
     Package(std::rc::Rc<std::cell::RefCell<AnyPackage>>),
-    EventDispatcher(
-        std::rc::Rc<std::cell::RefCell<dyn crate::event_dispatcher::EventDispatcherInterface>>,
-    ),
+    EventDispatcher(std::rc::Rc<std::cell::RefCell<dyn EventDispatcherInterface>>),
     Operation(std::rc::Rc<AnyOperation>),
     Transaction(std::rc::Rc<AnyTransaction>),
     Plugin(std::rc::Rc<std::cell::RefCell<dyn PluginInterface>>),
-    ProcessExecutor(std::rc::Rc<std::cell::RefCell<crate::util::ProcessExecutor>>),
-    HttpDownloader(std::rc::Rc<std::cell::RefCell<crate::util::HttpDownloader>>),
+    ProcessExecutor(std::rc::Rc<std::cell::RefCell<ProcessExecutor>>),
+    HttpDownloader(std::rc::Rc<std::cell::RefCell<HttpDownloader>>),
     /// A child a `ProcessExecutor` job ran to its exit, behind a `Shirabe\RustProcessStub`.
     Process(std::rc::Rc<std::cell::RefCell<shirabe_symfony_process::Process>>),
-    Event(std::rc::Rc<std::cell::RefCell<dyn crate::event_dispatcher::EventInterface>>),
+    Event(std::rc::Rc<std::cell::RefCell<dyn EventInterface>>),
 }
 
 /// The pointer identity backing R-table interning: the same shared instance must always cross
@@ -145,9 +148,7 @@ pub(crate) fn register_io_entity(io: &std::rc::Rc<std::cell::RefCell<dyn IOInter
 }
 
 /// Wire value handing a Rust-side `Config` to the child, interned in the R table.
-pub(crate) fn config_handle_value(
-    config: &std::rc::Rc<std::cell::RefCell<crate::config::Config>>,
-) -> PluginValue {
+pub(crate) fn config_handle_value(config: &std::rc::Rc<std::cell::RefCell<Config>>) -> PluginValue {
     let rhandle = register_entity(RustEntity::Config(config.clone()));
     rust_handle_value(rhandle, "Composer\\Config")
 }
@@ -265,17 +266,11 @@ pub(crate) fn io_stub_class(
 ) -> anyhow::Result<&'static BStr> {
     let borrowed = io.borrow();
     let any = borrowed.as_any();
-    if any
-        .downcast_ref::<crate::io::buffer_io::BufferIO>()
-        .is_some()
-    {
+    if any.downcast_ref::<BufferIO>().is_some() {
         Ok(BStr::new("Composer\\IO\\BufferIO"))
-    } else if any
-        .downcast_ref::<crate::io::console_io::ConsoleIO>()
-        .is_some()
-    {
+    } else if any.downcast_ref::<ConsoleIO>().is_some() {
         Ok(BStr::new("Composer\\IO\\ConsoleIO"))
-    } else if any.downcast_ref::<crate::io::null_io::NullIO>().is_some() {
+    } else if any.downcast_ref::<NullIO>().is_some() {
         Ok(BStr::new("Composer\\IO\\NullIO"))
     } else {
         // TODO(plugin): only IO implementations with a generated proxy stub can cross the
@@ -394,7 +389,7 @@ impl FromRustEntity for std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
     }
 }
 
-impl FromRustEntity for std::rc::Rc<std::cell::RefCell<crate::config::Config>> {
+impl FromRustEntity for std::rc::Rc<std::cell::RefCell<Config>> {
     const EXPECTED: &'static [u8] = b"a Config";
 
     fn from_entity(entity: RustEntity) -> Option<Self> {
@@ -427,7 +422,7 @@ impl FromRustEntity for std::rc::Rc<std::cell::RefCell<dyn LockerInterface>> {
     }
 }
 
-impl FromRustEntity for std::rc::Rc<std::cell::RefCell<crate::util::ProcessExecutor>> {
+impl FromRustEntity for std::rc::Rc<std::cell::RefCell<ProcessExecutor>> {
     const EXPECTED: &'static [u8] = b"a ProcessExecutor";
 
     fn from_entity(entity: RustEntity) -> Option<Self> {

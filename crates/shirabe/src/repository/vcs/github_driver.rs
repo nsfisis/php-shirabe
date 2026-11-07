@@ -5,9 +5,9 @@ use crate::config::Config;
 use crate::downloader::TransportException;
 use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface};
 use crate::json::{JsonEncodeOptions, JsonFile};
-use crate::repository::vcs::{GitDriver, VcsDriverBase};
-use crate::util::GitHub;
+use crate::repository::vcs::{GitDriver, VcsDriverBase, VcsDriverInterface};
 use crate::util::http::Response;
+use crate::util::{GitHub, HttpDownloader, ProcessExecutor, StreamContextOptions};
 use bstr::{B, BStr, BString, ByteSlice};
 use chrono::{DateTime, FixedOffset};
 use indexmap::IndexMap;
@@ -42,8 +42,8 @@ impl GitHubDriver {
         repo_config: IndexMap<BString, PhpMixed>,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
-        http_downloader: std::rc::Rc<std::cell::RefCell<crate::util::HttpDownloader>>,
-        process: std::rc::Rc<std::cell::RefCell<crate::util::ProcessExecutor>>,
+        http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
+        process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     ) -> Self {
         Self {
             inner: VcsDriverBase::new(repo_config, io, config, http_downloader, process),
@@ -431,7 +431,7 @@ impl GitHubDriver {
                 "/.github/contents/FUNDING.yml"
             ),
         ] {
-            let mut options = crate::util::StreamContextOptions::new();
+            let mut options = StreamContextOptions::new();
             options.set_retry_auth_failure(false);
             let response = self
                 .inner
@@ -1293,7 +1293,7 @@ impl GitHubDriver {
     }
 }
 
-impl crate::repository::vcs::VcsDriverInterface for GitHubDriver {
+impl VcsDriverInterface for GitHubDriver {
     fn initialize(&mut self) -> anyhow::Result<()> {
         GitHubDriver::initialize(self)
     }

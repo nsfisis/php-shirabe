@@ -2,7 +2,7 @@
 
 use crate::composer::ComposerWeakHandle;
 use crate::dependency_resolver::AnyTransaction;
-use crate::event_dispatcher::{Event, EventFlags};
+use crate::event_dispatcher::{Event, EventFlags, delegate_event_interface_to_inner};
 use crate::io::IOInterface;
 use bstr::BString;
 
@@ -57,4 +57,4 @@ impl InstallerEvent {
     }
 }
 
-crate::event_dispatcher::delegate_event_interface_to_inner!(InstallerEvent, inner);
+delegate_event_interface_to_inner!(InstallerEvent, inner);

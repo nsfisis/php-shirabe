@@ -1,8 +1,12 @@
 //! ref: composer/src/Composer/Command/DependsCommand.php sha1:ef866385da112c0e53ce15edb1616d96952d6d55
 
-use crate::command::base_command::base_command_initialize;
-use crate::command::{BaseCommand, BaseCommandData, BaseDependencyCommand, CompletionTrait};
+use crate::command::base_command::{base_command_complete, base_command_initialize};
+use crate::command::{
+    ARGUMENT_PACKAGE, BaseCommand, BaseCommandData, BaseDependencyCommand, CompletionTrait,
+    OPTION_RECURSIVE, OPTION_TREE,
+};
 use crate::console::input::{InputArgument, InputOption};
+use crate::delegate_base_command_trait_impls_to_inner;
 use bstr::BString;
 use shirabe_php_shim::impl_php_class;
 use shirabe_symfony_console::command::Command;
@@ -55,7 +59,7 @@ impl Command for DependsCommand {
         self.set_description("Shows which packages cause the given package to be installed".into());
         self.set_definition(&[
             InputArgument::new5(
-                crate::command::ARGUMENT_PACKAGE,
+                ARGUMENT_PACKAGE,
                 Some(InputArgument::REQUIRED),
                 "Package to inspect",
                 None,
@@ -64,7 +68,7 @@ impl Command for DependsCommand {
             .unwrap()
             .into(),
             InputOption::new(
-                crate::command::OPTION_RECURSIVE,
+                OPTION_RECURSIVE,
                 Some("r".into()),
                 Some(InputOption::VALUE_NONE),
                 "Recursively resolves up to the root package",
@@ -73,7 +77,7 @@ impl Command for DependsCommand {
             .unwrap()
             .into(),
             InputOption::new(
-                crate::command::OPTION_TREE,
+                OPTION_TREE,
                 Some("t".into()),
                 Some(InputOption::VALUE_NONE),
                 "Prints the results as a nested tree",
@@ -121,16 +125,16 @@ impl Command for DependsCommand {
         input: &shirabe_symfony_console::completion::CompletionInput,
         suggestions: &mut shirabe_symfony_console::completion::CompletionSuggestions,
     ) -> anyhow::Result<()> {
-        crate::command::base_command::base_command_complete(self, input, suggestions)
+        base_command_complete(self, input, suggestions)
     }
 
     shirabe_symfony_console::delegate_command_trait_impls_to_inner!(base_command_data);
 }
 
 impl BaseCommand for DependsCommand {
-    fn base_command_data(&self) -> &crate::command::BaseCommandData {
+    fn base_command_data(&self) -> &BaseCommandData {
         &self.base_command_data
     }
 
-    crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
+    delegate_base_command_trait_impls_to_inner!(base_command_data);
 }

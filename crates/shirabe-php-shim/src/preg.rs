@@ -17,6 +17,7 @@
 //!
 //! See docs/dev/regex-porting.md for the regex porting rules.
 
+use crate::{PcreException, bconcat, utf8_text};
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use std::sync::{Arc, LazyLock, Mutex};
@@ -97,14 +98,14 @@ pub fn pcre_check_utf8_subject(
     function: impl AsRef<[u8]>,
     pattern: impl AsRef<[u8]>,
     subject: impl AsRef<[u8]>,
-) -> Result<(), crate::PcreException> {
+) -> Result<(), PcreException> {
     const PREG_BAD_UTF8_ERROR: i64 = 4;
     if subject.as_ref().is_utf8() {
         return Ok(());
     }
 
-    Err(crate::PcreException::with_code_and_previous(
-        crate::bconcat!(
+    Err(PcreException::with_code_and_previous(
+        bconcat!(
             function.as_ref(),
             "(): failed executing \"",
             pattern.as_ref(),
@@ -501,7 +502,7 @@ impl PregPattern for &str {
 #[expect(clippy::disallowed_types, reason = "regex takes a text pattern")]
 #[expect(clippy::disallowed_macros, reason = "regex takes a text pattern")]
 fn byte_pattern_source(pattern: &[u8]) -> std::borrow::Cow<'_, str> {
-    if let Some(text) = crate::utf8_text(pattern) {
+    if let Some(text) = utf8_text(pattern) {
         return std::borrow::Cow::Borrowed(text);
     }
     let mut out = String::with_capacity(pattern.len() * 2);
@@ -637,6 +638,7 @@ fn php_replacement_group(bytes: &[u8]) -> (usize, usize) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::bconcat;
 
     #[test]
     fn preg_quote_keeps_bytes_that_are_not_utf8() {
@@ -645,14 +647,14 @@ mod tests {
 
     #[test]
     fn a_quoted_byte_that_is_not_utf8_matches_itself() {
-        let pattern = crate::bconcat!("/^", preg_quote(b"a.\xff", None), "$/");
+        let pattern = bconcat!("/^", preg_quote(b"a.\xff", None), "$/");
         assert!(preg_is_match(&pattern, b"a.\xff"));
         assert!(!preg_is_match(&pattern, b"a.\xfe"));
     }
 
     #[test]
     fn a_quoted_nul_matches_itself() {
-        let pattern = crate::bconcat!("/^", preg_quote(b"a\0b", None), "$/");
+        let pattern = bconcat!("/^", preg_quote(b"a\0b", None), "$/");
         assert!(preg_is_match(&pattern, b"a\0b"));
         assert!(preg_is_match("/^a\\0b$/", b"a\0b"));
         assert!(preg_is_match("/^\\012$/", b"\n"));

@@ -1,7 +1,7 @@
 // TODO(php-semantics): this differs from PHP's `ZipArchive` in details. Its compatibility needs to
 // be investigated against the C sources of PHP's `ext/zip`.
 
-use crate::{ErrorException, StreamBacking, StreamState};
+use crate::{ErrorException, PhpResource, StreamBacking, StreamState, bconcat};
 use bstr::{BStr, BString};
 use zip::read::{ExtractOptions, SymlinkExtractAction};
 use zip::result::ZipResult;
@@ -204,7 +204,7 @@ impl ZipArchive {
         self.get_from_index(index)
     }
 
-    pub fn get_stream(&self, name: impl AsRef<[u8]>) -> Option<crate::PhpResource> {
+    pub fn get_stream(&self, name: impl AsRef<[u8]>) -> Option<PhpResource> {
         let name = name.as_ref();
         let index = self.locate_name(name)?;
         let mut state = self.state.borrow_mut();
@@ -214,13 +214,13 @@ impl ZipArchive {
         let mut file = archive.by_index(index as usize).ok()?;
         let mut buf = Vec::new();
         std::io::Read::read_to_end(&mut file, &mut buf).ok()?;
-        Some(crate::PhpResource::Stream(std::rc::Rc::new(
+        Some(PhpResource::Stream(std::rc::Rc::new(
             std::cell::RefCell::new(StreamState::new(
                 StreamBacking::Memory(std::io::Cursor::new(buf)),
                 true,
                 false,
                 BString::from("r"),
-                crate::bconcat!("zip://", name),
+                bconcat!("zip://", name),
             )),
         )))
     }

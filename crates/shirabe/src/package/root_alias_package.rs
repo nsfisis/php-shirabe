@@ -2,8 +2,8 @@
 
 use crate::package::handle::delegate_package_interface_to_inner;
 use crate::package::{
-    CompleteAliasPackage, CompletePackageHandle, CompletePackageInterface, Link, RootPackageHandle,
-    RootPackageInterface,
+    CompleteAliasPackage, CompletePackageHandle, CompletePackageInterface, Link, PackageInterface,
+    RootPackageHandle, RootPackageInterface,
 };
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
@@ -161,7 +161,7 @@ impl RootPackageInterface for RootAliasPackage {
         self.alias_of.set_extra(extra);
     }
 
-    fn as_package_interface(&self) -> &dyn crate::package::PackageInterface {
+    fn as_package_interface(&self) -> &dyn PackageInterface {
         self
     }
 }
@@ -267,7 +267,7 @@ impl CompletePackageInterface for RootAliasPackage {
         self.inner.set_archive_excludes(excludes);
     }
 
-    fn as_package_interface(&self) -> &dyn crate::package::PackageInterface {
+    fn as_package_interface(&self) -> &dyn PackageInterface {
         self
     }
 }

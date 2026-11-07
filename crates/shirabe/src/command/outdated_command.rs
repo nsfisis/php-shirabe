@@ -1,8 +1,10 @@
 //! ref: composer/src/Composer/Command/OutdatedCommand.php sha1:35c29722d782b5b6f5452752135fba0b4ff93832
 
-use crate::command::base_command::base_command_initialize;
+use crate::command::base_command::{base_command_complete, base_command_initialize};
 use crate::command::{BaseCommand, BaseCommandData, CompletionTrait};
+use crate::console::application::Application;
 use crate::console::input::{InputArgument, InputOption, SuggestedValues};
+use crate::delegate_base_command_trait_impls_to_inner;
 use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::impl_php_class;
@@ -225,7 +227,7 @@ impl Command for OutdatedCommand {
             let application = application.borrow();
             application
                 .as_any()
-                .downcast_ref::<crate::console::application::Application>()
+                .downcast_ref::<Application>()
                 .expect("shirabe always installs its own Application")
                 .shared()
         };
@@ -246,14 +248,14 @@ impl Command for OutdatedCommand {
         input: &shirabe_symfony_console::completion::CompletionInput,
         suggestions: &mut shirabe_symfony_console::completion::CompletionSuggestions,
     ) -> anyhow::Result<()> {
-        crate::command::base_command::base_command_complete(self, input, suggestions)
+        base_command_complete(self, input, suggestions)
     }
 
     shirabe_symfony_console::delegate_command_trait_impls_to_inner!(base_command_data);
 }
 
 impl BaseCommand for OutdatedCommand {
-    fn base_command_data(&self) -> &crate::command::BaseCommandData {
+    fn base_command_data(&self) -> &BaseCommandData {
         &self.base_command_data
     }
 
@@ -261,5 +263,5 @@ impl BaseCommand for OutdatedCommand {
         true
     }
 
-    crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
+    delegate_base_command_trait_impls_to_inner!(base_command_data);
 }

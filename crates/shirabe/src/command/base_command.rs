@@ -5,8 +5,8 @@ use crate::advisory::{AuditConfig, Auditor};
 use crate::composer::PartialComposerHandle;
 use crate::config::Config;
 use crate::console::Application;
-use crate::console::input::InputDefinitionItem;
-use crate::factory::Factory;
+use crate::console::input::{InputArgument, InputDefinitionItem, InputOption};
+use crate::factory::{DisablePlugins, Factory, LocalConfigInput};
 use crate::filter::platform_requirement_filter::{
     PlatformRequirementFilterFactory, PlatformRequirementFilterInterface,
 };
@@ -44,12 +44,8 @@ pub struct BaseCommandData {
     /// `$definition->getArgument($name) instanceof Composer\Console\Input\InputArgument`; in
     /// this port `set_definition` converts the entries to the Symfony types for storage, so
     /// the Composer-typedness is tracked by name in these side maps instead.
-    composer_arguments: std::cell::RefCell<
-        IndexMap<bstr::BString, std::rc::Rc<crate::console::input::InputArgument>>,
-    >,
-    composer_options: std::cell::RefCell<
-        IndexMap<bstr::BString, std::rc::Rc<crate::console::input::InputOption>>,
-    >,
+    composer_arguments: std::cell::RefCell<IndexMap<bstr::BString, std::rc::Rc<InputArgument>>>,
+    composer_options: std::cell::RefCell<IndexMap<bstr::BString, std::rc::Rc<InputOption>>>,
 }
 
 impl BaseCommandData {
@@ -408,11 +404,11 @@ impl BaseCommand for BaseCommandData {
             apply_application_defaults(self.get_application(), disable_plugins, disable_scripts);
 
         let disable_plugins_kind = if disable_plugins {
-            crate::factory::DisablePlugins::All
+            DisablePlugins::All
         } else {
-            crate::factory::DisablePlugins::None
+            DisablePlugins::None
         };
-        let config = config.map(crate::factory::LocalConfigInput::Data);
+        let config = config.map(LocalConfigInput::Data);
         Factory::create(io, config, disable_plugins_kind, disable_scripts).map(|c| c.upcast())
     }
 
@@ -818,9 +814,9 @@ pub fn base_command_initialize(
     let io = cmd.get_io();
 
     let disable_plugins_kind = if disable_plugins {
-        crate::factory::DisablePlugins::All
+        DisablePlugins::All
     } else {
-        crate::factory::DisablePlugins::None
+        DisablePlugins::None
     };
     let composer = if composer.is_none() {
         Factory::create_global(io.clone(), disable_plugins_kind, disable_scripts)?

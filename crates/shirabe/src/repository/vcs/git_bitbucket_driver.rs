@@ -6,8 +6,8 @@ use crate::downloader::TransportException;
 use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface};
 use crate::json::{JsonEncodeOptions, JsonFile};
 use crate::repository::vcs::{GitDriver, VcsDriverBase, VcsDriverInterface};
-use crate::util::Bitbucket;
 use crate::util::http::Response;
+use crate::util::{Bitbucket, HttpDownloader, ProcessExecutor};
 use bstr::{B, BStr, BString, ByteSlice};
 use chrono::{DateTime, FixedOffset};
 use indexmap::IndexMap;
@@ -42,8 +42,8 @@ impl GitBitbucketDriver {
         repo_config: IndexMap<BString, PhpMixed>,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
-        http_downloader: std::rc::Rc<std::cell::RefCell<crate::util::HttpDownloader>>,
-        process: std::rc::Rc<std::cell::RefCell<crate::util::ProcessExecutor>>,
+        http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
+        process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     ) -> Self {
         Self {
             inner: VcsDriverBase::new(repo_config, io, config, http_downloader, process),
@@ -818,7 +818,7 @@ impl GitBitbucketDriver {
     }
 }
 
-impl crate::repository::vcs::VcsDriverInterface for GitBitbucketDriver {
+impl VcsDriverInterface for GitBitbucketDriver {
     fn initialize(&mut self) -> anyhow::Result<()> {
         GitBitbucketDriver::initialize(self)
     }

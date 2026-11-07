@@ -4,8 +4,8 @@ use crate::cache::Cache;
 use crate::config::Config;
 use crate::downloader::TransportException;
 use crate::io::{IOInterface, IOInterfaceWrite, io_interface};
-use crate::repository::vcs::VcsDriverBase;
-use crate::util::{Filesystem, Git as GitUtil, ProcessExecutor, Url};
+use crate::repository::vcs::{VcsDriverBase, VcsDriverInterface};
+use crate::util::{Filesystem, Git as GitUtil, HttpDownloader, ProcessExecutor, Url};
 use bstr::{BStr, BString, ByteSlice};
 use chrono::{DateTime, FixedOffset, TimeZone, Utc};
 use indexmap::IndexMap;
@@ -29,7 +29,7 @@ impl GitDriver {
         repo_config: IndexMap<BString, PhpMixed>,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
-        http_downloader: std::rc::Rc<std::cell::RefCell<crate::util::HttpDownloader>>,
+        http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
         process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     ) -> Self {
         Self {
@@ -465,7 +465,7 @@ impl GitDriver {
     }
 }
 
-impl crate::repository::vcs::VcsDriverInterface for GitDriver {
+impl VcsDriverInterface for GitDriver {
     fn initialize(&mut self) -> anyhow::Result<()> {
         GitDriver::initialize(self)
     }

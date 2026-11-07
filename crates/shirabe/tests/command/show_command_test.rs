@@ -1,8 +1,8 @@
 //! ref: composer/tests/Composer/Test/Command/ShowCommandTest.php sha1:449252e87e8f4cba0646a963d493bcc161b4b9cd
 
 use crate::test_case::{
-    RunOptions, get_application_tester, get_complete_package, get_package, get_version_constraint,
-    init_temp_composer,
+    RunOptions, TearDown, get_application_tester, get_complete_package, get_package,
+    get_version_constraint, init_temp_composer,
 };
 use bstr::{BStr, BString, ByteSlice};
 use serial_test::serial;
@@ -1628,7 +1628,7 @@ fn package_with_every_link_type() -> PackageInterfaceHandle {
     pkg.into()
 }
 
-fn init_temp_composer_with_linked_package() -> crate::test_case::TearDown {
+fn init_temp_composer_with_linked_package() -> TearDown {
     let tear_down = init_temp_composer(
         Some(&serde_json::json!({
             "require": {"vendor/package": "1.0.0"},

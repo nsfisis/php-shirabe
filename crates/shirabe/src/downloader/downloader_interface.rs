@@ -1,5 +1,8 @@
 //! ref: composer/src/Composer/Downloader/DownloaderInterface.php sha1:ff1543a20f529978e3ab0539c09ed7ce90a93f70
 
+use crate::downloader::{
+    ChangeReportInterface, DvcsDownloaderInterface, VcsCapableDownloaderInterface,
+};
 use crate::package::PackageInterfaceHandle;
 use bstr::{BStr, BString};
 use shirabe_php_shim::{PhpClass, PhpMixed};
@@ -81,19 +84,15 @@ pub trait DownloaderInterface: std::fmt::Debug + PhpClass {
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>>;
 
-    fn as_change_report_interface(&self) -> Option<&dyn crate::downloader::ChangeReportInterface> {
+    fn as_change_report_interface(&self) -> Option<&dyn ChangeReportInterface> {
         None
     }
 
-    fn as_vcs_capable_downloader_interface(
-        &self,
-    ) -> Option<&dyn crate::downloader::VcsCapableDownloaderInterface> {
+    fn as_vcs_capable_downloader_interface(&self) -> Option<&dyn VcsCapableDownloaderInterface> {
         None
     }
 
-    fn as_dvcs_downloader_interface(
-        &self,
-    ) -> Option<&dyn crate::downloader::DvcsDownloaderInterface> {
+    fn as_dvcs_downloader_interface(&self) -> Option<&dyn DvcsDownloaderInterface> {
         None
     }
 }

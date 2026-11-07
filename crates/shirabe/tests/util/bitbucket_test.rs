@@ -1,8 +1,8 @@
 //! ref: composer/tests/Composer/Test/Util/BitbucketTest.php sha1:589c26ee28f1b7defe5cab32058ec11e320676e6
 
 use crate::config_stub::ConfigStubBuilder;
-use crate::http_downloader_mock::{expect_full, get_http_downloader_mock};
-use crate::io_mock::{Expectation, IOMock, get_io_mock};
+use crate::http_downloader_mock::{HttpDownloaderMockGuard, expect_full, get_http_downloader_mock};
+use crate::io_mock::{Expectation, IOMock, IOMockGuard, get_io_mock};
 use crate::process_executor_mock::get_process_executor_mock;
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
@@ -73,8 +73,8 @@ struct Fixture {
     http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
     time: i64,
     bitbucket: Bitbucket,
-    _io_guard: crate::io_mock::IOMockGuard,
-    _http_guard: crate::http_downloader_mock::HttpDownloaderMockGuard,
+    _io_guard: IOMockGuard,
+    _http_guard: HttpDownloaderMockGuard,
 }
 
 fn set_up_with_config_and_http(

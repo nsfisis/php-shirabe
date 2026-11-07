@@ -2,7 +2,7 @@
 
 use crate::config::Config;
 use crate::io::{IOInterface, IOInterfaceWrite};
-use crate::util::HttpDownloader;
+use crate::util::{HttpDownloader, StreamContextOptions};
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
@@ -169,7 +169,7 @@ impl Versions {
                     .borrow_mut()
                     .get(
                         bconcat!(protocol, "://getcomposer.org/versions"),
-                        crate::util::StreamContextOptions::new(),
+                        StreamContextOptions::new(),
                     )?
                     .decode_json()?,
             );

@@ -5,7 +5,8 @@ use crate::io::{IOInterface, NullIO};
 use crate::package::version::VersionParser;
 use crate::repository::vcs::HgDriver;
 use crate::util::{
-    Git as GitUtil, HttpDownloader, Platform, ProcessExecutor, Svn as SvnUtil, sync_executor,
+    Git as GitUtil, HttpDownloader, Platform, ProcessExecutor, StreamContextOptions,
+    Svn as SvnUtil, sync_executor,
 };
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
@@ -386,14 +387,14 @@ impl VersionGuesser {
             // re-use the HgDriver to fetch branches (this properly includes bookmarks)
             let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
             repo_config.insert("url".into(), PhpMixed::string(path_to_bytes(path)));
-            let io: std::rc::Rc<std::cell::RefCell<dyn crate::io::IOInterface>> =
+            let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
                 std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
-            let http_io: std::rc::Rc<std::cell::RefCell<dyn crate::io::IOInterface>> =
+            let http_io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
                 std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
             let http_downloader = std::rc::Rc::new(std::cell::RefCell::new(HttpDownloader::new(
                 http_io,
                 self.config.clone(),
-                crate::util::StreamContextOptions::new(),
+                StreamContextOptions::new(),
                 false,
             )?));
             let mut driver = HgDriver::new(

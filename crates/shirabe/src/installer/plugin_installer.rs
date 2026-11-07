@@ -1,7 +1,9 @@
 //! ref: composer/src/Composer/Installer/PluginInstaller.php sha1:77e05a27feeecd7efccc141118bb09016989b8bb
 
 use crate::composer::PartialComposerWeakHandle;
-use crate::installer::{BinaryPresenceInterface, InstallerInterface, LibraryInstaller};
+use crate::installer::{
+    BinaryInstallerInterface, BinaryPresenceInterface, InstallerInterface, LibraryInstaller,
+};
 use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::package::PackageInterfaceHandle;
 use crate::plugin::PluginManager;
@@ -20,9 +22,7 @@ impl PluginInstaller {
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         composer: PartialComposerWeakHandle,
         fs: Option<std::rc::Rc<std::cell::RefCell<Filesystem>>>,
-        binary_installer: Option<
-            std::rc::Rc<std::cell::RefCell<dyn crate::installer::BinaryInstallerInterface>>,
-        >,
+        binary_installer: Option<std::rc::Rc<std::cell::RefCell<dyn BinaryInstallerInterface>>>,
     ) -> anyhow::Result<Self> {
         Ok(Self {
             inner: LibraryInstaller::new(

@@ -6,6 +6,8 @@
 
 use crate::plugin::php_call::PhpCall;
 use crate::plugin::throwable_bridge::throw_into_error;
+use crate::util::sync_executor::block_on;
+use crate::util::{HttpDownloader, ProcessExecutor};
 use bstr::BStr;
 use indexmap::IndexMap;
 use shirabe_php_rpc::{PhpThrow, PluginValue};
@@ -18,27 +20,27 @@ pub(crate) struct JobOwner(usize);
 
 impl JobOwner {
     pub(crate) fn http_downloader(
-        downloader: &std::rc::Rc<std::cell::RefCell<crate::util::HttpDownloader>>,
+        downloader: &std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
     ) -> Self {
         Self(downloader.as_ptr() as usize)
     }
 
     /// The same key as [`JobOwner::http_downloader`], for code that only has the downloader the
     /// shared cell holds.
-    pub(crate) fn of_http_downloader(downloader: &crate::util::HttpDownloader) -> Self {
-        Self(downloader as *const crate::util::HttpDownloader as usize)
+    pub(crate) fn of_http_downloader(downloader: &HttpDownloader) -> Self {
+        Self(downloader as *const HttpDownloader as usize)
     }
 
     pub(crate) fn process_executor(
-        process: &std::rc::Rc<std::cell::RefCell<crate::util::ProcessExecutor>>,
+        process: &std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     ) -> Self {
         Self(process.as_ptr() as usize)
     }
 
     /// The same key as [`JobOwner::process_executor`], for code that only has the executor the
     /// shared cell holds.
-    pub(crate) fn of_process_executor(process: &crate::util::ProcessExecutor) -> Self {
-        Self(process as *const crate::util::ProcessExecutor as usize)
+    pub(crate) fn of_process_executor(process: &ProcessExecutor) -> Self {
+        Self(process as *const ProcessExecutor as usize)
     }
 }
 
@@ -245,7 +247,7 @@ pub(crate) fn tick(
         let pass = begin_pass();
         let mut failure = None;
         let mut woken = false;
-        crate::util::sync_executor::block_on(async {
+        block_on(async {
             let advanced = std::future::poll_fn(|cx| match poll_jobs(&[owner], cx) {
                 Err(throw) => {
                     failure = Some(throw);

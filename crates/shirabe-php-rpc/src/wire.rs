@@ -7,7 +7,7 @@
 //! payload only Shirabe's own worker code writes) turns that failure into a panic instead.
 
 use crate::value::PluginValue;
-use crate::{PhpObjHandle, PhpThrow, RustObjHandle};
+use crate::{PhpObjHandle, PhpObject, PhpThrow, RustObjHandle};
 use bstr::{BStr, BString, ByteSlice};
 use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
 use indexmap::IndexMap;
@@ -404,7 +404,7 @@ const TIMEZONE_UTC: &BStr = php_str(b"UTC");
 /// `\DateTimeImmutable`.
 impl ToWire for DateTime<Utc> {
     fn to_wire(self) -> PluginValue {
-        let mut object = crate::PhpObject::new(DATE_TIME_IMMUTABLE_CLASS);
+        let mut object = PhpObject::new(DATE_TIME_IMMUTABLE_CLASS);
         object.set_public(
             "date",
             PluginValue::string(display_to_bytes(self.format(DATE_FORMAT))),

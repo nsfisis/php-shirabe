@@ -4,7 +4,7 @@
 
 use crate::async_runtime::run;
 use crate::php_worker::lock_php_worker;
-use crate::plugin_installer_test::{new_installer, set_up};
+use crate::plugin_installer_test::{SetUp, new_installer, set_up};
 use bstr::BStr;
 use shirabe::installer::InstallerInterface;
 use shirabe::package::PackageInterfaceHandle;
@@ -24,14 +24,14 @@ fn subscriber_fixture_package() -> PackageInterfaceHandle {
 
 /// Installs the subscriber fixture plugin: activate runs in the PHP child and
 /// `addSubscriber` registers its listeners with the event dispatcher.
-fn install_subscriber_plugin(set_up: &crate::plugin_installer_test::SetUp) {
+fn install_subscriber_plugin(set_up: &SetUp) {
     let installer = new_installer(set_up);
     set_up.pm.borrow_mut().load_installed_plugins().unwrap();
     run(installer.install(&set_up.repository, subscriber_fixture_package())).unwrap();
     assert_eq!("activate subscriber-v1\n", set_up.io.borrow().get_output());
 }
 
-fn dispatch(set_up: &crate::plugin_installer_test::SetUp, event_name: &BStr) -> i64 {
+fn dispatch(set_up: &SetUp, event_name: &BStr) -> i64 {
     let dispatcher = set_up.composer.borrow().get_event_dispatcher();
     let result = dispatcher.borrow_mut().dispatch(Some(event_name), None);
     result.unwrap()

@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/Plugin/PrePoolCreateEvent.php sha1:57583afaa336d40050e18d93fedbaf6ed2726d1b
 
 use crate::dependency_resolver::Request;
-use crate::event_dispatcher::{Event, EventFlags};
+use crate::event_dispatcher::{Event, EventFlags, delegate_event_interface_to_inner};
 use crate::package::BasePackageHandle;
 use crate::repository::RepositoryInterfaceHandle;
 use bstr::BString;
@@ -106,4 +106,4 @@ impl PrePoolCreateEvent {
     }
 }
 
-crate::event_dispatcher::delegate_event_interface_to_inner!(PrePoolCreateEvent, inner);
+delegate_event_interface_to_inner!(PrePoolCreateEvent, inner);

@@ -7,6 +7,7 @@
 //! built on first use, so a run that never needs it never spawns the worker.
 
 use crate::config::Config;
+use crate::event_dispatcher::EventDispatcher;
 use crate::io::IOInterface;
 use crate::plugin::php_call::PhpCall;
 use crate::plugin::rpc::table::{config_handle_value, io_handle_value};
@@ -139,7 +140,7 @@ impl RemoteFilesystem {
             return Ok(entity);
         }
 
-        crate::event_dispatcher::EventDispatcher::ensure_composer_php_runtime(|| {
+        EventDispatcher::ensure_composer_php_runtime(|| {
             let cache_dir = self.config.borrow().get_path("cache-dir")?;
             Ok(path_from_bytes(&cache_dir).to_path_buf())
         })?;

@@ -1,12 +1,15 @@
 //! The methods a `Composer\Downloader\DownloadManager` entity answers over RPC.
 
 use crate::composer::ComposerHandle;
+use crate::downloader::DownloadManagerInterface;
+use crate::exception::IrrecoverableDownloadException;
 use crate::package::PackageInterfaceHandle;
 use crate::plugin::job_registry;
 use crate::plugin::job_registry::JobOwner;
 use crate::plugin::rpc::codec::arg;
 use crate::plugin::rpc::dispatch::{error_throw, unavailable_method};
 use crate::plugin::rpc::table::{R_TABLE, RustEntity};
+use crate::util::HttpDownloader;
 use bstr::{BStr, BString, ByteSlice};
 use shirabe_php_rpc::{PhpThrow, PluginValue, ToWire};
 use shirabe_php_shim::{PhpMixed, bconcat, path_from_bytes};
@@ -15,7 +18,7 @@ use shirabe_php_shim::{PhpMixed, bconcat, path_from_bytes};
 /// `PromiseInterface` return, Rust an `async fn`. Each call registers its future as a job and
 /// answers with the job's pending promise.
 pub(crate) fn dispatch_download_manager_method(
-    dm: &std::rc::Rc<std::cell::RefCell<dyn crate::downloader::DownloadManagerInterface>>,
+    dm: &std::rc::Rc<std::cell::RefCell<dyn DownloadManagerInterface>>,
     method_name: &BStr,
     args: &[PluginValue],
 ) -> Result<PluginValue, PhpThrow> {
@@ -112,7 +115,7 @@ pub(crate) fn dispatch_download_manager_method(
         // chain and rejects with that job's own exception; the root is not known here.
         error_throw(
             BStr::new(""),
-            &crate::exception::IrrecoverableDownloadException::new(bconcat!(
+            &IrrecoverableDownloadException::new(bconcat!(
                 "DownloadManager::",
                 method_name,
                 "() canceled"
@@ -132,8 +135,8 @@ pub(crate) fn dispatch_download_manager_method(
 /// The HttpDownloader of the object graph `dm` belongs to: the one the Loop of its Composer
 /// instance drives.
 fn graph_http_downloader(
-    dm: &std::rc::Rc<std::cell::RefCell<dyn crate::downloader::DownloadManagerInterface>>,
-) -> Result<std::rc::Rc<std::cell::RefCell<crate::util::HttpDownloader>>, PhpThrow> {
+    dm: &std::rc::Rc<std::cell::RefCell<dyn DownloadManagerInterface>>,
+) -> Result<std::rc::Rc<std::cell::RefCell<HttpDownloader>>, PhpThrow> {
     let composers: Vec<ComposerHandle> = R_TABLE.with(|table| {
         table
             .borrow()

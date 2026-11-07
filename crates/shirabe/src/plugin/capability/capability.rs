@@ -1,5 +1,6 @@
 //! ref: composer/src/Composer/Plugin/Capability/Capability.php sha1:bd10fce988e656db9373e45b72aca5feaa748265
 
+use crate::plugin::PhpCapabilityProxy;
 use crate::plugin::capability::CommandProvider;
 
 /// Marker interface for Plugin capabilities. Every new Capability which is added to the
@@ -14,7 +15,7 @@ pub trait Capability {
 
     /// For testing only: recovers the PHP-backed proxy so tests can read capability properties
     /// the way PHPUnit asserts `$capability->args`.
-    fn __as_php_capability_proxy(&self) -> Option<&crate::plugin::PhpCapabilityProxy> {
+    fn __as_php_capability_proxy(&self) -> Option<&PhpCapabilityProxy> {
         None
     }
 }

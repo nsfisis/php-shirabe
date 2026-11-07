@@ -1,5 +1,6 @@
 //! ref: composer/src/Composer/DependencyResolver/LockTransaction.php sha1:8a0928374d9cc3e593bfede005a4802e880b9203
 
+use crate::dependency_resolver::operation::AnyOperation;
 use crate::dependency_resolver::{Decisions, Pool, Transaction};
 use crate::package::PackageInterfaceHandle;
 use bstr::{BString, ByteSlice};
@@ -244,9 +245,7 @@ impl LockTransaction {
         used_aliases
     }
 
-    pub fn get_operations(
-        &self,
-    ) -> &Vec<std::rc::Rc<crate::dependency_resolver::operation::AnyOperation>> {
+    pub fn get_operations(&self) -> &Vec<std::rc::Rc<AnyOperation>> {
         self.inner.get_operations()
     }
 }

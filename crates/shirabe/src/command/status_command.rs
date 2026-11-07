@@ -1,8 +1,10 @@
 //! ref: composer/src/Composer/Command/StatusCommand.php sha1:f06fd28e83aa8c1d61b61f3962a15f413cfd75af
 
-use crate::command::base_command::base_command_initialize;
+use crate::command::base_command::{base_command_complete, base_command_initialize};
 use crate::command::{BaseCommand, BaseCommandData};
+use crate::composer::composer_full;
 use crate::console::input::InputOption;
+use crate::delegate_base_command_trait_impls_to_inner;
 use crate::event_dispatcher::EventFlags;
 use crate::io::{IOInterfaceImmutable, IOInterfaceWrite};
 use crate::package::dumper::ArrayDumper;
@@ -58,7 +60,7 @@ impl StatusCommand {
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
     ) -> anyhow::Result<i64> {
         let composer = self.require_composer(None, None)?;
-        let composer = crate::composer::composer_full(&composer);
+        let composer = composer_full(&composer);
         let io = self.get_io().clone();
 
         let mut errors: IndexMap<BString, BString> = IndexMap::new();
@@ -326,7 +328,7 @@ impl Command for StatusCommand {
     ) -> anyhow::Result<i64> {
         let composer_rc = self.require_composer(None, None)?;
         {
-            let composer = crate::composer::composer_full(&composer_rc);
+            let composer = composer_full(&composer_rc);
 
             let command_event =
                 CommandEvent::new(PluginEvents::COMMAND, "status", input.clone(), output);
@@ -350,7 +352,7 @@ impl Command for StatusCommand {
         let exit_code = self.do_execute(input).await?;
 
         {
-            let composer = crate::composer::composer_full(&composer_rc);
+            let composer = composer_full(&composer_rc);
             composer
                 .get_event_dispatcher()
                 .borrow_mut()
@@ -378,16 +380,16 @@ impl Command for StatusCommand {
         input: &shirabe_symfony_console::completion::CompletionInput,
         suggestions: &mut shirabe_symfony_console::completion::CompletionSuggestions,
     ) -> anyhow::Result<()> {
-        crate::command::base_command::base_command_complete(self, input, suggestions)
+        base_command_complete(self, input, suggestions)
     }
 
     shirabe_symfony_console::delegate_command_trait_impls_to_inner!(base_command_data);
 }
 
 impl BaseCommand for StatusCommand {
-    fn base_command_data(&self) -> &crate::command::BaseCommandData {
+    fn base_command_data(&self) -> &BaseCommandData {
         &self.base_command_data
     }
 
-    crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
+    delegate_base_command_trait_impls_to_inner!(base_command_data);
 }

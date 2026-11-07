@@ -1,3 +1,4 @@
+use crate::command::BaseCommand;
 use bstr::{BString, ByteSlice};
 pub mod input_argument;
 pub mod input_option;
@@ -16,7 +17,7 @@ use shirabe_symfony_console::completion::{
 /// `this` at call time instead.
 pub type SuggestedValuesClosure = Box<
     dyn Fn(
-        &dyn crate::command::BaseCommand,
+        &dyn BaseCommand,
         &CompletionInput,
         &mut CompletionSuggestions,
     ) -> anyhow::Result<Vec<BString>>,
@@ -51,7 +52,7 @@ impl SuggestedValues {
     /// The shared body of the `InputArgument::complete` / `InputOption::complete` backport.
     fn complete(
         &self,
-        this: &dyn crate::command::BaseCommand,
+        this: &dyn BaseCommand,
         input: &CompletionInput,
         suggestions: &mut CompletionSuggestions,
     ) -> anyhow::Result<()> {
@@ -73,7 +74,7 @@ impl SuggestedValues {
     /// on a List is a programming error (PHP would fatal on `$array()`).
     pub fn call(
         &self,
-        this: &dyn crate::command::BaseCommand,
+        this: &dyn BaseCommand,
         input: &CompletionInput,
         suggestions: &mut CompletionSuggestions,
     ) -> anyhow::Result<Vec<BString>> {

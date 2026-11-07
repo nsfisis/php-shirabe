@@ -1,14 +1,16 @@
 //! ref: composer/src/Composer/Command/InitCommand.php sha1:a93b652d60d0065d28b054d23ed093664106d9cb
 
-use crate::command::base_command::base_command_initialize;
+use crate::command::base_command::{base_command_complete, base_command_initialize};
 use crate::command::{BaseCommand, BaseCommandData, CompletionTrait, PackageDiscoveryTrait};
 use crate::console::input::InputOption;
+use crate::delegate_base_command_trait_impls_to_inner;
 use crate::factory::Factory;
 use crate::io::{IOInterfaceWrite, io_interface};
 use crate::json::{JsonFile, JsonValidationException};
 use crate::package::base_package::{self};
 use crate::repository::{
     CompositeRepository, PlatformRepository, PlatformRepositoryHandle, RepositoryFactory,
+    RepositoryInterfaceHandle, RepositorySet,
 };
 use crate::util::{Filesystem, ProcessExecutor};
 use bstr::{B, BStr, BString, ByteSlice};
@@ -36,27 +38,22 @@ pub struct InitCommand {
     base_command_data: BaseCommandData,
 
     git_config: std::cell::RefCell<Option<IndexMap<BString, BString>>>,
-    repos: std::cell::RefCell<Option<crate::repository::RepositoryInterfaceHandle>>,
-    repository_sets: std::cell::RefCell<
-        IndexMap<BString, std::rc::Rc<std::cell::RefCell<crate::repository::RepositorySet>>>,
-    >,
+    repos: std::cell::RefCell<Option<RepositoryInterfaceHandle>>,
+    repository_sets:
+        std::cell::RefCell<IndexMap<BString, std::rc::Rc<std::cell::RefCell<RepositorySet>>>>,
 }
 
 impl_php_class!(InitCommand, r"Composer\Command\InitCommand");
 
 impl PackageDiscoveryTrait for InitCommand {
-    fn get_repos_mut(
-        &self,
-    ) -> std::cell::RefMut<'_, Option<crate::repository::RepositoryInterfaceHandle>> {
+    fn get_repos_mut(&self) -> std::cell::RefMut<'_, Option<RepositoryInterfaceHandle>> {
         self.repos.borrow_mut()
     }
 
     fn get_repository_sets_mut(
         &self,
-    ) -> std::cell::RefMut<
-        '_,
-        IndexMap<BString, std::rc::Rc<std::cell::RefCell<crate::repository::RepositorySet>>>,
-    > {
+    ) -> std::cell::RefMut<'_, IndexMap<BString, std::rc::Rc<std::cell::RefCell<RepositorySet>>>>
+    {
         self.repository_sets.borrow_mut()
     }
 }
@@ -809,10 +806,13 @@ impl Command for InitCommand {
                 let mut repo_manager =
                     RepositoryFactory::manager(io.clone(), &config, None, None, None)?;
 
-                let mut repos: Vec<crate::repository::RepositoryInterfaceHandle> =
-                    vec![crate::repository::RepositoryInterfaceHandle::new(
-                        PlatformRepository::new(vec![], IndexMap::new(), None, None)?,
-                    )];
+                let mut repos: Vec<RepositoryInterfaceHandle> =
+                    vec![RepositoryInterfaceHandle::new(PlatformRepository::new(
+                        vec![],
+                        IndexMap::new(),
+                        None,
+                        None,
+                    )?)];
                 let mut create_default_packagist_repo = true;
                 for repo in &repositories {
                     let repo_config =
@@ -855,7 +855,7 @@ impl Command for InitCommand {
                     )?);
                 }
 
-                *self.get_repos_mut() = Some(crate::repository::RepositoryInterfaceHandle::new(
+                *self.get_repos_mut() = Some(RepositoryInterfaceHandle::new(
                     CompositeRepository::new(repos),
                 ));
                 // unset($repos, $config, $repositories);
@@ -1225,16 +1225,16 @@ impl Command for InitCommand {
         input: &shirabe_symfony_console::completion::CompletionInput,
         suggestions: &mut shirabe_symfony_console::completion::CompletionSuggestions,
     ) -> anyhow::Result<()> {
-        crate::command::base_command::base_command_complete(self, input, suggestions)
+        base_command_complete(self, input, suggestions)
     }
 
     shirabe_symfony_console::delegate_command_trait_impls_to_inner!(base_command_data);
 }
 
 impl BaseCommand for InitCommand {
-    fn base_command_data(&self) -> &crate::command::BaseCommandData {
+    fn base_command_data(&self) -> &BaseCommandData {
         &self.base_command_data
     }
 
-    crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
+    delegate_base_command_trait_impls_to_inner!(base_command_data);
 }

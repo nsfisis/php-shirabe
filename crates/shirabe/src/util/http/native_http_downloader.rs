@@ -22,11 +22,11 @@
 
 use crate::config::Config;
 use crate::downloader::{MaxFileSizeExceededException, TransportException};
-use crate::io::{IOInterface, IOInterfaceWrite};
+use crate::io::{DEBUG, IOInterface, IOInterfaceWrite, NORMAL};
 use crate::util::http::{NativeHttpResponse, ProxyManager, Response};
 use crate::util::{
     AuthHelper, HttpDownloader, HttpOptions, Platform, PromptAuthResult, StoreAuth,
-    StreamContextOptions, Url,
+    StreamContextFactory, StreamContextOptions, Url,
 };
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
@@ -226,7 +226,7 @@ impl NativeHttpDownloader {
         self.io.write_error3(
             bconcat!("Downloading ", Url::sanitize(url), using_proxy, if_modified),
             true,
-            crate::io::DEBUG,
+            DEBUG,
         );
 
         let mut current_url = url.to_owned();
@@ -240,7 +240,7 @@ impl NativeHttpDownloader {
                 current_url.as_bstr(),
             )?;
             let send_options =
-                crate::util::StreamContextFactory::init_options(&current_url, send_options, true)??;
+                StreamContextFactory::init_options(&current_url, send_options, true)??;
 
             let request = Self::curl_request_options(&send_options)?;
             let send_result = self
@@ -298,7 +298,7 @@ impl NativeHttpDownloader {
                     self.io.write_error3(
                         "<warning>A connection timeout was encountered. If you intend to run Composer without connecting to the internet, run the command again prefixed with COMPOSER_DISABLE_NETWORK=1 to make Composer run in offline mode.</warning>",
                         true,
-                        crate::io::NORMAL,
+                        NORMAL,
                     );
                 }
 
@@ -327,7 +327,7 @@ impl NativeHttpDownloader {
                             " due to connection error"
                         ),
                         true,
-                        crate::io::DEBUG,
+                        DEBUG,
                     );
                     if let Some(filename) = filename {
                         unlink_silent(Self::temp_file(filename));
@@ -369,7 +369,7 @@ impl NativeHttpDownloader {
         self.io.write_error3(
             bconcat!("[", status_code, "] ", Url::sanitize(url)),
             true,
-            crate::io::DEBUG,
+            DEBUG,
         );
 
         // Output JSON warnings (PHP HttpDownloader::outputWarnings) for >= 300 JSON bodies.
@@ -470,7 +470,7 @@ impl NativeHttpDownloader {
                         status_code
                     ),
                     true,
-                    crate::io::DEBUG,
+                    DEBUG,
                 );
                 attributes.insert("retries".into(), PhpMixed::Int(retries + 1));
                 if let Some(filename) = filename {
@@ -748,7 +748,7 @@ impl NativeHttpDownloader {
                     Url::sanitize(target_url.clone())
                 ),
                 true,
-                crate::io::DEBUG,
+                DEBUG,
             );
 
             return Ok(Ok(target_url));

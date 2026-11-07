@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/DependencyResolver/Operation/InstallOperation.php sha1:d31107e28df4ef1adfa315b011fe7826d98c722a
 
 use crate::dependency_resolver::operation::SolverOperation;
-use crate::package::PackageInterfaceHandle;
+use crate::package::{DisplayMode, PackageInterfaceHandle};
 use bstr::BStr;
 use shirabe_php_shim::{bconcat, php_str};
 
@@ -29,7 +29,7 @@ impl InstallOperation {
             "<info>",
             package.get_pretty_name(),
             "</info> (<comment>",
-            package.get_full_pretty_version(true, crate::package::DisplayMode::SourceRefIfDev),
+            package.get_full_pretty_version(true, DisplayMode::SourceRefIfDev),
             "</comment>)"
         )
     }

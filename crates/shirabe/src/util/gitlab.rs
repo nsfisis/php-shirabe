@@ -38,7 +38,7 @@ impl GitLab {
             None => std::rc::Rc::new(std::cell::RefCell::new(Factory::create_http_downloader(
                 io.clone(),
                 &config,
-                crate::util::StreamContextOptions::new(),
+                StreamContextOptions::new(),
             )?)),
         };
         Ok(Self {

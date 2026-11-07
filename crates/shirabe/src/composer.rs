@@ -247,63 +247,58 @@ impl Composer {
         self.partial.get_package()
     }
 
-    pub fn set_config(&mut self, config: std::rc::Rc<std::cell::RefCell<crate::config::Config>>) {
+    pub fn set_config(&mut self, config: std::rc::Rc<std::cell::RefCell<Config>>) {
         self.partial.set_config(config);
     }
 
-    pub fn get_config(&self) -> std::rc::Rc<std::cell::RefCell<crate::config::Config>> {
+    pub fn get_config(&self) -> std::rc::Rc<std::cell::RefCell<Config>> {
         self.partial.get_config()
     }
 
-    pub fn set_loop(&mut self, r#loop: std::rc::Rc<std::cell::RefCell<crate::util::r#loop::Loop>>) {
+    pub fn set_loop(&mut self, r#loop: std::rc::Rc<std::cell::RefCell<Loop>>) {
         self.partial.set_loop(r#loop);
     }
 
-    pub fn get_loop(&self) -> std::rc::Rc<std::cell::RefCell<crate::util::r#loop::Loop>> {
+    pub fn get_loop(&self) -> std::rc::Rc<std::cell::RefCell<Loop>> {
         self.partial.get_loop()
     }
 
     pub fn set_repository_manager(
         &mut self,
-        manager: std::rc::Rc<std::cell::RefCell<dyn crate::repository::RepositoryManagerInterface>>,
+        manager: std::rc::Rc<std::cell::RefCell<dyn RepositoryManagerInterface>>,
     ) {
         self.partial.set_repository_manager(manager);
     }
 
     pub fn get_repository_manager(
         &self,
-    ) -> std::rc::Rc<std::cell::RefCell<dyn crate::repository::RepositoryManagerInterface>> {
+    ) -> std::rc::Rc<std::cell::RefCell<dyn RepositoryManagerInterface>> {
         self.partial.get_repository_manager()
     }
 
     pub fn set_installation_manager(
         &mut self,
-        manager: std::rc::Rc<
-            std::cell::RefCell<dyn crate::installer::InstallationManagerInterface>,
-        >,
+        manager: std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>,
     ) {
         self.partial.set_installation_manager(manager);
     }
 
     pub fn get_installation_manager(
         &self,
-    ) -> std::rc::Rc<std::cell::RefCell<dyn crate::installer::InstallationManagerInterface>> {
+    ) -> std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>> {
         self.partial.get_installation_manager()
     }
 
     pub fn set_event_dispatcher(
         &mut self,
-        dispatcher: std::rc::Rc<
-            std::cell::RefCell<dyn crate::event_dispatcher::EventDispatcherInterface>,
-        >,
+        dispatcher: std::rc::Rc<std::cell::RefCell<dyn EventDispatcherInterface>>,
     ) {
         self.partial.set_event_dispatcher(dispatcher);
     }
 
     pub fn get_event_dispatcher(
         &self,
-    ) -> std::rc::Rc<std::cell::RefCell<dyn crate::event_dispatcher::EventDispatcherInterface>>
-    {
+    ) -> std::rc::Rc<std::cell::RefCell<dyn EventDispatcherInterface>> {
         self.partial.get_event_dispatcher()
     }
 
@@ -381,28 +376,28 @@ impl PartialOrFullComposer {
         }
     }
 
-    pub fn set_config(&mut self, config: std::rc::Rc<std::cell::RefCell<crate::config::Config>>) {
+    pub fn set_config(&mut self, config: std::rc::Rc<std::cell::RefCell<Config>>) {
         match self {
             Self::Full(full) => full.set_config(config),
             Self::Partial(partial) => partial.set_config(config),
         }
     }
 
-    pub fn get_config(&self) -> std::rc::Rc<std::cell::RefCell<crate::config::Config>> {
+    pub fn get_config(&self) -> std::rc::Rc<std::cell::RefCell<Config>> {
         match self {
             Self::Full(full) => full.get_config(),
             Self::Partial(partial) => partial.get_config(),
         }
     }
 
-    pub fn set_loop(&mut self, r#loop: std::rc::Rc<std::cell::RefCell<crate::util::r#loop::Loop>>) {
+    pub fn set_loop(&mut self, r#loop: std::rc::Rc<std::cell::RefCell<Loop>>) {
         match self {
             Self::Full(full) => full.set_loop(r#loop),
             Self::Partial(partial) => partial.set_loop(r#loop),
         }
     }
 
-    pub fn get_loop(&self) -> std::rc::Rc<std::cell::RefCell<crate::util::r#loop::Loop>> {
+    pub fn get_loop(&self) -> std::rc::Rc<std::cell::RefCell<Loop>> {
         match self {
             Self::Full(full) => full.get_loop(),
             Self::Partial(partial) => partial.get_loop(),
@@ -411,7 +406,7 @@ impl PartialOrFullComposer {
 
     pub fn set_repository_manager(
         &mut self,
-        manager: std::rc::Rc<std::cell::RefCell<dyn crate::repository::RepositoryManagerInterface>>,
+        manager: std::rc::Rc<std::cell::RefCell<dyn RepositoryManagerInterface>>,
     ) {
         match self {
             Self::Full(full) => full.set_repository_manager(manager),
@@ -421,7 +416,7 @@ impl PartialOrFullComposer {
 
     pub fn get_repository_manager(
         &self,
-    ) -> std::rc::Rc<std::cell::RefCell<dyn crate::repository::RepositoryManagerInterface>> {
+    ) -> std::rc::Rc<std::cell::RefCell<dyn RepositoryManagerInterface>> {
         match self {
             Self::Full(full) => full.get_repository_manager(),
             Self::Partial(partial) => partial.get_repository_manager(),
@@ -430,9 +425,7 @@ impl PartialOrFullComposer {
 
     pub fn set_installation_manager(
         &mut self,
-        manager: std::rc::Rc<
-            std::cell::RefCell<dyn crate::installer::InstallationManagerInterface>,
-        >,
+        manager: std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>,
     ) {
         match self {
             Self::Full(full) => full.set_installation_manager(manager),
@@ -442,7 +435,7 @@ impl PartialOrFullComposer {
 
     pub fn get_installation_manager(
         &self,
-    ) -> std::rc::Rc<std::cell::RefCell<dyn crate::installer::InstallationManagerInterface>> {
+    ) -> std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>> {
         match self {
             Self::Full(full) => full.get_installation_manager(),
             Self::Partial(partial) => partial.get_installation_manager(),
@@ -451,9 +444,7 @@ impl PartialOrFullComposer {
 
     pub fn set_event_dispatcher(
         &mut self,
-        dispatcher: std::rc::Rc<
-            std::cell::RefCell<dyn crate::event_dispatcher::EventDispatcherInterface>,
-        >,
+        dispatcher: std::rc::Rc<std::cell::RefCell<dyn EventDispatcherInterface>>,
     ) {
         match self {
             Self::Full(full) => full.set_event_dispatcher(dispatcher),
@@ -463,8 +454,7 @@ impl PartialOrFullComposer {
 
     pub fn get_event_dispatcher(
         &self,
-    ) -> std::rc::Rc<std::cell::RefCell<dyn crate::event_dispatcher::EventDispatcherInterface>>
-    {
+    ) -> std::rc::Rc<std::cell::RefCell<dyn EventDispatcherInterface>> {
         match self {
             Self::Full(full) => full.get_event_dispatcher(),
             Self::Partial(partial) => partial.get_event_dispatcher(),

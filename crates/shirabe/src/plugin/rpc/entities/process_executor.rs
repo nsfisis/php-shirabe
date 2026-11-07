@@ -9,6 +9,8 @@ use crate::plugin::rpc::jobs::{
     PROCESS_EXECUTOR_TICK_CAP, dispatch_tick_method, poll_once, rejected_promise,
 };
 use crate::plugin::rpc::table::{RustEntity, register_entity, rust_handle_value};
+use crate::util::ProcessExecutor;
+use crate::util::process_executor::CommandLine;
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_rpc::{FromWire, PhpThrow, PluginValue, ToWire, wire};
@@ -19,7 +21,7 @@ use shirabe_php_shim::{Catch as _, LogicException, bconcat, path_from_bytes};
 /// the Rust process, which is what keeps the timeout, the executable path cache and the job budget
 /// single-sourced across the boundary instead of forking a copy per world.
 pub(crate) fn dispatch_process_executor_method(
-    process: &std::rc::Rc<std::cell::RefCell<crate::util::ProcessExecutor>>,
+    process: &std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     method_name: &BStr,
     args: &[PluginValue],
     out_params: &mut IndexMap<u32, PluginValue>,
@@ -41,11 +43,7 @@ pub(crate) fn dispatch_process_executor_method(
             let Some(output) = args.get(1) else {
                 return process
                     .borrow()
-                    .execute(
-                        command,
-                        crate::util::ProcessExecutor::FORWARD_OUTPUT,
-                        cwd.as_deref(),
-                    )
+                    .execute(command, ProcessExecutor::FORWARD_OUTPUT, cwd.as_deref())
                     .map(|code| code.to_wire())
                     .map_err(failed);
             };
@@ -178,15 +176,11 @@ fn exec_command_arg(
     method: &BStr,
     args: &[PluginValue],
     position: usize,
-) -> Result<crate::util::process_executor::CommandLine, PhpThrow> {
+) -> Result<CommandLine, PhpThrow> {
     let value = args.get(position).unwrap_or(&wire::NULL);
     match value {
-        PluginValue::String(bytes) => Ok(crate::util::process_executor::CommandLine::Shell(
-            bytes.clone(),
-        )),
-        PluginValue::List(_) => {
-            Vec::<BString>::from_wire(value).map(crate::util::process_executor::CommandLine::Args)
-        }
+        PluginValue::String(bytes) => Ok(CommandLine::Shell(bytes.clone())),
+        PluginValue::List(_) => Vec::<BString>::from_wire(value).map(CommandLine::Args),
         other => Err(wire::unexpected("a command string or argument list", other)),
     }
     .map_err(|throw| arg_throw(method, position, throw))
@@ -195,6 +189,7 @@ fn exec_command_arg(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::util::process_executor::CommandLine;
 
     #[test]
     fn a_process_command_keeps_its_bytes() {
@@ -207,7 +202,7 @@ mod tests {
         )
         .unwrap()
         {
-            crate::util::process_executor::CommandLine::Shell(command) => {
+            CommandLine::Shell(command) => {
                 assert_eq!(bytes, command)
             }
             other => panic!("expected a shell command, got {other:?}"),

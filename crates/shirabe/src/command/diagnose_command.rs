@@ -1,9 +1,9 @@
 //! ref: composer/src/Composer/Command/DiagnoseCommand.php sha1:fc82ca5045451163f82c40d1acbc3a9c1feb0a38
 
 use crate::advisory::Auditor;
-use crate::command::base_command::base_command_initialize;
+use crate::command::base_command::{base_command_complete, base_command_initialize};
 use crate::command::{BaseCommand, BaseCommandData};
-use crate::composer;
+use crate::composer::composer_full;
 use crate::config::Config;
 use crate::downloader::TransportException;
 use crate::event_dispatcher::EventFlags;
@@ -11,14 +11,19 @@ use crate::factory::Factory;
 use crate::io::{BufferIO, IOInterface, IOInterfaceWrite, NullIO};
 use crate::json::{JsonFile, JsonValidationException};
 use crate::package::version::VersionParser;
-use crate::package::{LockerInterface, RootPackage};
+use crate::package::{LockerInterface, RootPackage, RootPackageHandle};
 use crate::plugin::{CommandEvent, PluginEvents};
 use crate::repository::{
-    ComposerRepository, FilesystemRepository, PlatformRepository, RepositorySet,
+    ComposerRepository, FilesystemRepository, FindPackageConstraint, PlatformRepository,
+    RepositoryInterface, RepositoryInterfaceHandle, RepositorySet,
 };
 use crate::self_update::{Keys, Versions};
 use crate::util::http::{ProxyManager, RequestProxy};
-use crate::util::{ConfigValidator, Git, HttpDownloader, IniHelper, Platform, ProcessExecutor};
+use crate::util::{
+    ConfigValidator, Git, HttpDownloader, IniHelper, Platform, ProcessExecutor,
+    StreamContextOptions,
+};
+use crate::{composer, delegate_base_command_trait_impls_to_inner};
 use bstr::{B, BStr, BString, ByteSlice, ByteVec};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
@@ -209,7 +214,7 @@ impl DiagnoseCommand {
             .borrow_mut()
             .get(
                 bconcat!(proto, "://repo.packagist.org/packages.json"),
-                crate::util::StreamContextOptions::new(),
+                StreamContextOptions::new(),
             ) {
             Ok(_) => {}
             Err(e) => {
@@ -271,7 +276,7 @@ impl DiagnoseCommand {
             .as_ref()
             .unwrap()
             .borrow_mut()
-            .get(url, crate::util::StreamContextOptions::new())
+            .get(url, StreamContextOptions::new())
         {
             Ok(_) => {}
             Err(e) => {
@@ -338,7 +343,7 @@ impl DiagnoseCommand {
                 .borrow_mut()
                 .get(
                     bconcat!(protocol, "://repo.packagist.org/packages.json"),
-                    crate::util::StreamContextOptions::new(),
+                    StreamContextOptions::new(),
                 )?
                 .decode_json()?;
             if let Some(provider_includes) =
@@ -373,7 +378,7 @@ impl DiagnoseCommand {
                     .borrow_mut()
                     .get(
                         bconcat!(protocol, "://repo.packagist.org/", path),
-                        crate::util::StreamContextOptions::new(),
+                        StreamContextOptions::new(),
                     )?;
                 let provider = response.get_body().unwrap_or_default().to_vec();
 
@@ -417,7 +422,7 @@ impl DiagnoseCommand {
             bconcat!("https://", domain, "/api/v3/")
         };
 
-        let mut opts = crate::util::StreamContextOptions::new();
+        let mut opts = StreamContextOptions::new();
         opts.set_retry_auth_failure(false);
 
         match self
@@ -484,7 +489,7 @@ impl DiagnoseCommand {
         } else {
             bconcat!("https://", domain, "/api/rate_limit")
         };
-        let mut opts = crate::util::StreamContextOptions::new();
+        let mut opts = StreamContextOptions::new();
         opts.set_retry_auth_failure(false);
         let data = self
             .http_downloader
@@ -667,7 +672,7 @@ impl DiagnoseCommand {
                 normalized_version,
                 version,
             );
-            packages.push(crate::package::RootPackageHandle::from_root_package(root_pkg).into());
+            packages.push(RootPackageHandle::from_root_package(root_pkg).into());
         }
         let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
         repo_config.insert("type".into(), PhpMixed::string(BString::from("composer")));
@@ -675,14 +680,13 @@ impl DiagnoseCommand {
             "url".into(),
             PhpMixed::string(BString::from("https://packagist.org")),
         );
-        let composer_repo_as_repo =
-            crate::repository::RepositoryInterfaceHandle::new(ComposerRepository::new(
-                repo_config,
-                std::rc::Rc::new(std::cell::RefCell::new(NullIO::new())),
-                &config.borrow(),
-                self.http_downloader.borrow().clone().unwrap(),
-                None,
-            )?);
+        let composer_repo_as_repo = RepositoryInterfaceHandle::new(ComposerRepository::new(
+            repo_config,
+            std::rc::Rc::new(std::cell::RefCell::new(NullIO::new())),
+            &config.borrow(),
+            self.http_downloader.borrow().clone().unwrap(),
+            None,
+        )?);
         repo_set.add_repository(composer_repo_as_repo)?;
 
         let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
@@ -1238,7 +1242,7 @@ impl Command for DiagnoseCommand {
 
         let config: std::rc::Rc<std::cell::RefCell<Config>>;
         if let Some(ref mut c) = composer {
-            let c = crate::composer::composer_full(c);
+            let c = composer_full(c);
             config = c.get_config();
 
             let command_event = CommandEvent::new6(
@@ -1287,11 +1291,7 @@ impl Command for DiagnoseCommand {
         );
 
         *self.http_downloader.borrow_mut() = Some(std::rc::Rc::new(std::cell::RefCell::new(
-            Factory::create_http_downloader(
-                io.clone(),
-                &config,
-                crate::util::StreamContextOptions::new(),
-            )?,
+            Factory::create_http_downloader(io.clone(), &config, StreamContextOptions::new())?,
         )));
 
         // TODO(distribution): PHP tests `__FILE__`, which starts with `phar:` when Composer runs
@@ -1324,10 +1324,10 @@ impl Command for DiagnoseCommand {
             platform_overrides.into_iter().collect();
         let mut platform_repo =
             PlatformRepository::new(vec![], platform_overrides_unboxed, None, None).unwrap();
-        let php_pkg = <PlatformRepository as crate::repository::RepositoryInterface>::find_package(
+        let php_pkg = <PlatformRepository as RepositoryInterface>::find_package(
             &mut platform_repo,
             bstr::BStr::new("php"),
-            crate::repository::FindPackageConstraint::String(BString::from("*")),
+            FindPackageConstraint::String(BString::from("*")),
         )?
         .unwrap();
         let mut php_version = php_pkg.get_pretty_version();
@@ -1403,7 +1403,7 @@ impl Command for DiagnoseCommand {
             }));
 
         if let Some(ref mut c) = composer {
-            let c = crate::composer::composer_full(c);
+            let c = composer_full(c);
             io.write(bconcat!(
                 "Active plugins: ",
                 implode(
@@ -1568,16 +1568,16 @@ impl Command for DiagnoseCommand {
         input: &shirabe_symfony_console::completion::CompletionInput,
         suggestions: &mut shirabe_symfony_console::completion::CompletionSuggestions,
     ) -> anyhow::Result<()> {
-        crate::command::base_command::base_command_complete(self, input, suggestions)
+        base_command_complete(self, input, suggestions)
     }
 
     shirabe_symfony_console::delegate_command_trait_impls_to_inner!(base_command_data);
 }
 
 impl BaseCommand for DiagnoseCommand {
-    fn base_command_data(&self) -> &crate::command::BaseCommandData {
+    fn base_command_data(&self) -> &BaseCommandData {
         &self.base_command_data
     }
 
-    crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
+    delegate_base_command_trait_impls_to_inner!(base_command_data);
 }

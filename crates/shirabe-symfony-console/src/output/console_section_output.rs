@@ -2,7 +2,7 @@
 
 use crate::formatter::OutputFormatterInterface;
 use crate::helper::Helper;
-use crate::output::{DoWrite, OutputInterface, StreamOutput};
+use crate::output::{DoWrite, OUTPUT_NORMAL, OutputInterface, StreamOutput};
 use crate::terminal::Terminal;
 use bstr::{BStr, BString, ByteSlice};
 use shirabe_php_shim::{
@@ -81,7 +81,7 @@ impl ConsoleSectionOutput {
     /// Overwrites the previous output with a new message.
     pub fn overwrite(&self, message: &[BString]) {
         self.clear(None);
-        self.writeln(message, crate::output::OUTPUT_NORMAL);
+        self.writeln(message, OUTPUT_NORMAL);
     }
 
     pub fn get_content(&self) -> BString {

@@ -18,7 +18,7 @@ pub struct WritableArrayRepository {
 }
 
 impl WritableArrayRepository {
-    pub fn new(packages: Vec<crate::package::PackageInterfaceHandle>) -> anyhow::Result<Self> {
+    pub fn new(packages: Vec<PackageInterfaceHandle>) -> anyhow::Result<Self> {
         Ok(Self {
             inner: ArrayRepository::new(packages)?,
             dev_package_names: std::cell::RefCell::new(Vec::new()),
@@ -65,10 +65,7 @@ impl WritableArrayRepository {
         self.inner.is_initialized()
     }
 
-    pub fn add_package(
-        &self,
-        package: crate::package::PackageInterfaceHandle,
-    ) -> anyhow::Result<()> {
+    pub fn add_package(&self, package: PackageInterfaceHandle) -> anyhow::Result<()> {
         self.inner.add_package(package)
     }
 
@@ -76,10 +73,7 @@ impl WritableArrayRepository {
         self.inner.set_self_handle(weak);
     }
 
-    pub fn remove_package(
-        &mut self,
-        package: crate::package::PackageInterfaceHandle,
-    ) -> anyhow::Result<()> {
+    pub fn remove_package(&mut self, package: PackageInterfaceHandle) -> anyhow::Result<()> {
         self.inner.remove_package(package);
         Ok(())
     }
@@ -90,12 +84,11 @@ impl WritableArrayRepository {
     }
 
     /// Get unique packages (at most one package of each name), with aliases resolved and removed.
-    pub fn get_canonical_packages(&self) -> Vec<crate::package::PackageInterfaceHandle> {
+    pub fn get_canonical_packages(&self) -> Vec<PackageInterfaceHandle> {
         let packages = self.inner.get_packages_internal();
 
         // get at most one package of each name, preferring non-aliased ones
-        let mut packages_by_name: IndexMap<BString, crate::package::PackageInterfaceHandle> =
-            IndexMap::new();
+        let mut packages_by_name: IndexMap<BString, PackageInterfaceHandle> = IndexMap::new();
         for package in packages {
             let name = BString::from(&package.get_name()[..]);
             let prefer_replace = packages_by_name
@@ -119,7 +112,7 @@ impl WritableArrayRepository {
         canonical_packages
     }
 
-    pub fn get_packages(&mut self) -> anyhow::Result<Vec<crate::package::BasePackageHandle>> {
+    pub fn get_packages(&mut self) -> anyhow::Result<Vec<BasePackageHandle>> {
         self.inner.get_packages()
     }
 

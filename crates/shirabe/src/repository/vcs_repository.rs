@@ -256,7 +256,7 @@ impl VcsRepository {
     /// tags/branches and load each package) and returns the packages collected by the inner
     /// `ArrayRepository`, mirroring the polymorphic `RepositoryInterface::getPackages` dispatch
     /// in PHP where `VcsRepository` inherits `getPackages` from `ArrayRepository`.
-    pub fn __get_packages(&mut self) -> anyhow::Result<Vec<crate::package::BasePackageHandle>> {
+    pub fn __get_packages(&mut self) -> anyhow::Result<Vec<BasePackageHandle>> {
         self.initialize()?;
         use crate::repository::RepositoryInterface;
         self.inner.get_packages()
@@ -523,7 +523,7 @@ impl VcsRepository {
                     });
                 if let Some(existing_package) = self.inner.find_package_internal(
                     tag_package_name.as_bstr(),
-                    crate::repository::FindPackageConstraint::Constraint(
+                    FindPackageConstraint::Constraint(
                         SimpleConstraint::new("=", BString::from(&version_normalized[..]), None)
                             .into(),
                     ),
@@ -1015,7 +1015,7 @@ impl VcsRepository {
             );
             if let Some(existing_package) = self.inner.find_package_internal(
                 name.as_bstr(),
-                crate::repository::FindPackageConstraint::Constraint(
+                FindPackageConstraint::Constraint(
                     SimpleConstraint::new("=", BString::from(&version_normalized[..]), None).into(),
                 ),
             )? {
@@ -1135,5 +1135,5 @@ impl RepositoryInterface for VcsRepository {
 enum CachedPackageResult {
     None,
     Missing,
-    Package(crate::package::PackageInterfaceHandle),
+    Package(PackageInterfaceHandle),
 }

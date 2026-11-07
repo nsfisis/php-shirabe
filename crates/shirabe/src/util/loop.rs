@@ -161,6 +161,8 @@ mod tests {
     use super::*;
     use crate::config::Config;
     use crate::io::{IOInterface, NullIO};
+    use crate::util::StreamContextOptions;
+    use crate::util::sync_executor::block_on;
     use shirabe_symfony_console::output::BufferedOutput;
 
     #[test]
@@ -169,8 +171,7 @@ mod tests {
             std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
         let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(false, None)));
         let http_downloader = std::rc::Rc::new(std::cell::RefCell::new(
-            HttpDownloader::new(io, config, crate::util::StreamContextOptions::new(), true)
-                .unwrap(),
+            HttpDownloader::new(io, config, StreamContextOptions::new(), true).unwrap(),
         ));
         let process_executor =
             std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(None)));
@@ -193,7 +194,7 @@ mod tests {
             })
             .collect();
 
-        crate::util::sync_executor::block_on(r#loop.wait(promises, Some(&mut progress))).unwrap();
+        block_on(r#loop.wait(promises, Some(&mut progress))).unwrap();
 
         assert_eq!(2, progress.get_max_steps());
         let rendered = output.borrow().fetch();

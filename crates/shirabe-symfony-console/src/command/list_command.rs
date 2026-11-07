@@ -2,6 +2,7 @@
 
 use crate::command::{Command, CommandData, SetDefinitionArg};
 use crate::completion::{CompletionInput, CompletionSuggestions, StringOrSuggestion};
+use crate::delegate_command_trait_impls_to_inner;
 use crate::descriptor::{ApplicationDescription, DescribableObject, DescriptorOptions};
 use crate::helper::DescriptorHelper;
 use crate::input::{
@@ -174,5 +175,5 @@ impl Command for ListCommand {
         self.complete_impl(input, suggestions)
     }
 
-    crate::delegate_command_trait_impls_to_inner!(inner);
+    delegate_command_trait_impls_to_inner!(inner);
 }

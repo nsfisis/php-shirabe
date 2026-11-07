@@ -1,10 +1,12 @@
 //! ref: composer/src/Composer/Command/ExecCommand.php sha1:b51c35ccde1a66c0df3e8136b27be5ae67016cc0
 
-use crate::command::base_command::base_command_initialize;
+use crate::command::base_command::{base_command_complete, base_command_initialize};
 use crate::command::{BaseCommand, BaseCommandData};
+use crate::composer::composer_full;
 use crate::console::Application;
-use crate::console::input::{InputArgument, InputOption};
-use crate::event_dispatcher::EventFlags;
+use crate::console::input::{InputArgument, InputOption, SuggestedValues};
+use crate::delegate_base_command_trait_impls_to_inner;
+use crate::event_dispatcher::{Callable, EventFlags};
 use crate::io::IOInterfaceWrite;
 use bstr::BString;
 use shirabe_php_shim::{
@@ -40,7 +42,7 @@ impl ExecCommand {
 
     fn get_binaries(&self, for_display: bool) -> anyhow::Result<Vec<BString>> {
         let composer = self.require_composer(None, None)?;
-        let composer_ref = crate::composer::composer_full(&composer);
+        let composer_ref = composer_full(&composer);
         let bin_dir = composer_ref.get_config().borrow().get_path("bin-dir")?;
         let bins = glob(bconcat!(bin_dir, "/*"));
         let local_bins_raw = composer_ref.get_package().get_binaries();
@@ -82,7 +84,7 @@ impl Command for ExecCommand {
             Some(InputArgument::OPTIONAL),
             "The binary to run, e.g. phpunit",
             None,
-            crate::console::input::SuggestedValues::Closure(Box::new(|this, _input, _suggestions| {
+            SuggestedValues::Closure(Box::new(|this, _input, _suggestions| {
                 let this = this
                     .as_any()
                     .downcast_ref::<ExecCommand>()
@@ -167,7 +169,7 @@ impl Command for ExecCommand {
         {
             let bins = self.get_binaries(true)?;
             if bins.is_empty() {
-                let bin_dir = crate::composer::composer_full(&composer)
+                let bin_dir = composer_full(&composer)
                     .get_config()
                     .borrow()
                     .get_path("bin-dir")?;
@@ -196,14 +198,10 @@ impl Command for ExecCommand {
                 .unwrap_or_default(),
         );
 
-        let dispatcher = crate::composer::composer_full(&composer)
-            .get_event_dispatcher()
-            .clone();
-        dispatcher.borrow_mut().add_listener(
-            "__exec_command".into(),
-            crate::event_dispatcher::Callable::String(binary),
-            0,
-        );
+        let dispatcher = composer_full(&composer).get_event_dispatcher().clone();
+        dispatcher
+            .borrow_mut()
+            .add_listener("__exec_command".into(), Callable::String(binary), 0);
 
         let initial_working_directory = self.get_application().and_then(|application| {
             let application = application.borrow();
@@ -254,16 +252,16 @@ impl Command for ExecCommand {
         input: &shirabe_symfony_console::completion::CompletionInput,
         suggestions: &mut shirabe_symfony_console::completion::CompletionSuggestions,
     ) -> anyhow::Result<()> {
-        crate::command::base_command::base_command_complete(self, input, suggestions)
+        base_command_complete(self, input, suggestions)
     }
 
     shirabe_symfony_console::delegate_command_trait_impls_to_inner!(base_command_data);
 }
 
 impl BaseCommand for ExecCommand {
-    fn base_command_data(&self) -> &crate::command::BaseCommandData {
+    fn base_command_data(&self) -> &BaseCommandData {
         &self.base_command_data
     }
 
-    crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
+    delegate_base_command_trait_impls_to_inner!(base_command_data);
 }

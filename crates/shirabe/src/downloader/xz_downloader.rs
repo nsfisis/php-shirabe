@@ -2,7 +2,9 @@
 
 use crate::cache::Cache;
 use crate::config::Config;
-use crate::downloader::{ArchiveDownloader, ChangeReportInterface, FileDownloader};
+use crate::downloader::{
+    ArchiveDownloader, ChangeReportInterface, DownloaderInterface, FileDownloader,
+};
 use crate::event_dispatcher::EventDispatcher;
 use crate::io::IOInterface;
 use crate::package::PackageInterfaceHandle;
@@ -103,12 +105,12 @@ impl ChangeReportInterface for XzDownloader {
 }
 
 #[async_trait::async_trait(?Send)]
-impl crate::downloader::DownloaderInterface for XzDownloader {
+impl DownloaderInterface for XzDownloader {
     fn get_installation_source(&self) -> BString {
         self.inner.get_installation_source()
     }
 
-    fn as_change_report_interface(&self) -> Option<&dyn crate::downloader::ChangeReportInterface> {
+    fn as_change_report_interface(&self) -> Option<&dyn ChangeReportInterface> {
         Some(self)
     }
 

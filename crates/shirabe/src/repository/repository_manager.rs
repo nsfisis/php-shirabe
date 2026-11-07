@@ -4,7 +4,10 @@ use crate::config::Config;
 use crate::event_dispatcher::EventDispatcher;
 use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::package::PackageInterfaceHandle;
-use crate::repository::{FilterRepository, RepositoryInterfaceHandle};
+use crate::repository::{
+    ArtifactRepository, ComposerRepository, FilterRepository, FindPackageConstraint,
+    PackageRepository, PathRepository, RepositoryInterfaceHandle, VcsRepository,
+};
 use crate::util::{HttpDownloader, ProcessExecutor};
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
@@ -56,10 +59,9 @@ impl RepositoryManager {
         constraint: &AnyConstraint,
     ) -> anyhow::Result<Option<PackageInterfaceHandle>> {
         for repository in &self.repositories {
-            if let Some(package) = repository.find_package(
-                name,
-                crate::repository::FindPackageConstraint::Constraint(constraint.clone()),
-            )? {
+            if let Some(package) = repository
+                .find_package(name, FindPackageConstraint::Constraint(constraint.clone()))?
+            {
                 return Ok(Some(package));
             }
         }
@@ -75,9 +77,7 @@ impl RepositoryManager {
         for repository in self.get_repositories() {
             for p in repository.find_packages(
                 name,
-                Some(crate::repository::FindPackageConstraint::Constraint(
-                    constraint.clone(),
-                )),
+                Some(FindPackageConstraint::Constraint(constraint.clone())),
             )? {
                 packages.push(p);
             }
@@ -160,20 +160,20 @@ impl RepositoryManager {
         // $this->eventDispatcher, $this->process)`. Rust cannot instantiate by string class name, so
         // dispatch over the classes registered in `createDefaultRepositoryManager`.
         match class.as_bytes() {
-            b"Composer\\Repository\\ComposerRepository" => Ok(RepositoryInterfaceHandle::new(
-                crate::repository::ComposerRepository::new(
+            b"Composer\\Repository\\ComposerRepository" => {
+                Ok(RepositoryInterfaceHandle::new(ComposerRepository::new(
                     config,
                     self.io.clone(),
                     &self.config.borrow(),
                     self.http_downloader.clone(),
                     self.event_dispatcher.clone(),
-                )?,
-            )),
+                )?))
+            }
             b"Composer\\Repository\\PackageRepository" => Ok(RepositoryInterfaceHandle::new(
-                crate::repository::PackageRepository::new(config),
+                PackageRepository::new(config),
             )),
-            b"Composer\\Repository\\VcsRepository" => Ok(RepositoryInterfaceHandle::new(
-                crate::repository::VcsRepository::new(
+            b"Composer\\Repository\\VcsRepository" => {
+                Ok(RepositoryInterfaceHandle::new(VcsRepository::new(
                     config,
                     self.io.clone(),
                     self.config.clone(),
@@ -182,21 +182,21 @@ impl RepositoryManager {
                     Some(self.process.clone()),
                     None,
                     None,
-                )?,
-            )),
+                )?))
+            }
             b"Composer\\Repository\\ArtifactRepository" => Ok(RepositoryInterfaceHandle::new(
-                crate::repository::ArtifactRepository::new(config, self.io.clone())?,
+                ArtifactRepository::new(config, self.io.clone())?,
             )),
-            b"Composer\\Repository\\PathRepository" => Ok(RepositoryInterfaceHandle::new(
-                crate::repository::PathRepository::new(
+            b"Composer\\Repository\\PathRepository" => {
+                Ok(RepositoryInterfaceHandle::new(PathRepository::new(
                     config,
                     self.io.clone(),
                     self.config.clone(),
                     Some(self.http_downloader.clone()),
                     self.event_dispatcher.clone(),
                     Some(self.process.clone()),
-                )?,
-            )),
+                )?))
+            }
             // TODO(plugin): `setRepositoryClass` lets a plugin register a repository class of
             // its own, which needs a Rust-side counterpart before it can be built here.
             _ => Err(RuntimeException::new(bconcat!(

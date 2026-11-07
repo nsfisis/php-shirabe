@@ -1,6 +1,7 @@
 //! `Command` adapter for a command entity living in the PHP child process.
 
-use crate::command::BaseCommand;
+use crate::command::{BaseCommand, BaseCommandData};
+use crate::delegate_base_command_trait_impls_to_inner;
 use crate::plugin::console_bridge::{CONSOLE_APP_CONTEXT, PENDING_COMMAND_HANDLES};
 use crate::plugin::php_call::PhpCall;
 use crate::plugin::proxy::php_is_a;
@@ -57,7 +58,7 @@ shirabe_php_rpc::wire_record! {
 /// command forwards the whole input line to the worker-side console application.
 #[derive(Debug)]
 pub struct PhpCommandProxy {
-    base_command_data: crate::command::BaseCommandData,
+    base_command_data: BaseCommandData,
     handle: PhpObjHandle,
     proxy_command: bool,
 }
@@ -80,7 +81,7 @@ impl PhpCommandProxy {
     }
 
     fn build(handle: PhpObjHandle, proxy_command: bool) -> anyhow::Result<Self> {
-        let data = crate::command::BaseCommandData::new(None);
+        let data = BaseCommandData::new(None);
         let name: Option<BString> = Self::call_metadata_getter(&handle, BStr::new("getName"))?;
         if let Some(name) = name {
             Command::set_name(&data, name.as_bstr())?;
@@ -103,10 +104,7 @@ impl PhpCommandProxy {
 
     /// Mirrors the command's input definition (plus help text and extra usages) into the
     /// Rust-side command state, so `help`/`list` render it without touching the worker.
-    fn read_back_definition(
-        handle: &PhpObjHandle,
-        data: &crate::command::BaseCommandData,
-    ) -> anyhow::Result<()> {
+    fn read_back_definition(handle: &PhpObjHandle, data: &BaseCommandData) -> anyhow::Result<()> {
         use shirabe_symfony_console::input::{
             DefinitionItem, InputArgument, InputDefinition, InputOption,
         };
@@ -237,11 +235,11 @@ impl Command for PhpCommandProxy {
 }
 
 impl BaseCommand for PhpCommandProxy {
-    fn base_command_data(&self) -> &crate::command::BaseCommandData {
+    fn base_command_data(&self) -> &BaseCommandData {
         &self.base_command_data
     }
 
-    crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
+    delegate_base_command_trait_impls_to_inner!(base_command_data);
 }
 
 impl PhpClass for PhpCommandProxy {

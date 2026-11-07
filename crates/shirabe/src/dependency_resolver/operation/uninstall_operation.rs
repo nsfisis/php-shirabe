@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/DependencyResolver/Operation/UninstallOperation.php sha1:19d2137e34a47ec48e5332263060009eba3e894e
 
 use crate::dependency_resolver::operation::SolverOperation;
-use crate::package::PackageInterfaceHandle;
+use crate::package::{DisplayMode, PackageInterfaceHandle};
 use bstr::BStr;
 use shirabe_php_shim::{bconcat, php_str};
 
@@ -28,7 +28,7 @@ impl UninstallOperation {
             "Removing <info>",
             package.get_pretty_name(),
             "</info> (<comment>",
-            package.get_full_pretty_version(true, crate::package::DisplayMode::SourceRefIfDev),
+            package.get_full_pretty_version(true, DisplayMode::SourceRefIfDev),
             "</comment>)"
         )
     }

@@ -1,6 +1,6 @@
 //! Argument decoding for the entity methods, and the wire forms of the value types they exchange.
 
-use crate::package::DisplayMode;
+use crate::package::{DisplayMode, Link, Mirror};
 use crate::plugin::php_plugin_value::{link_from_wire, link_to_wire};
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
@@ -40,7 +40,7 @@ pub(crate) fn arg_throw(method: &BStr, position: usize, throw: PhpThrow) -> PhpT
     }
 }
 
-impl FromWire for crate::package::Link {
+impl FromWire for Link {
     fn from_wire(value: &PluginValue) -> Result<Self, PhpThrow> {
         link_from_wire(value)
     }
@@ -50,25 +50,25 @@ impl FromWire for crate::package::Link {
 ///
 /// TODO(plugin): links have no entity to intern against, so two calls of the same getter answer
 /// with distinct child-side objects where upstream returns the identical one.
-impl ToWire for crate::package::Link {
+impl ToWire for Link {
     fn to_wire(self) -> PluginValue {
         link_to_wire(&self)
     }
 }
 
 /// `array{url: string, preferred: bool}` as PHP shapes it.
-impl FromWire for crate::package::Mirror {
+impl FromWire for Mirror {
     fn from_wire(value: &PluginValue) -> Result<Self, PhpThrow> {
         let row = IndexMap::<BString, PluginValue>::from_wire(value)?;
         let field = |key: &[u8]| row.get(key).unwrap_or(&wire::NULL);
-        Ok(crate::package::Mirror {
+        Ok(Mirror {
             url: BString::from_wire(field(b"url"))?,
             preferred: Option::<bool>::from_wire(field(b"preferred"))?.unwrap_or(false),
         })
     }
 }
 
-impl ToWire for crate::package::Mirror {
+impl ToWire for Mirror {
     fn to_wire(self) -> PluginValue {
         PluginValue::Array(IndexMap::from([
             ("url".into(), PluginValue::string(self.url)),

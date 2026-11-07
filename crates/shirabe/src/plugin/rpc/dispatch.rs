@@ -2,11 +2,20 @@
 //! answers (construction, clone, property access), and the routing to each class's methods.
 
 use crate::autoload::ClassLoader;
-use crate::dependency_resolver::operation::AnyOperation;
+use crate::config::Config;
+use crate::console::application::run_worker_reverse_command;
+use crate::dependency_resolver::operation::{
+    AnyOperation, InstallOperation, MarkAliasInstalledOperation, MarkAliasUninstalledOperation,
+    UninstallOperation, UpdateOperation,
+};
 use crate::event_dispatcher::event_dispatcher::dispatch_event_method;
 use crate::io::IOInterface;
-use crate::package::PackageInterfaceHandle;
+use crate::io::buffer_io::BufferIO;
 use crate::package::handle::AnyPackage;
+use crate::package::{
+    AliasPackage, AliasPackageHandle, CompleteAliasPackage, CompletePackage, Locker, Package,
+    PackageInterfaceHandle, RootAliasPackage,
+};
 use crate::plugin::job_registry;
 use crate::plugin::rpc::codec::{arg, arg_or};
 use crate::plugin::rpc::entities::autoload_generator::dispatch_autoload_generator_method;
@@ -29,6 +38,7 @@ use crate::plugin::rpc::entities::repository_manager::dispatch_repository_manage
 use crate::plugin::rpc::entities::transaction::dispatch_transaction_method;
 use crate::plugin::rpc::table::{R_TABLE, RustEntity, entity_arg, register_entity};
 use crate::plugin::throwable_bridge::exception_into_throw;
+use crate::util::{Filesystem, HttpDownloader, ProcessExecutor, StreamContextOptions};
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_rpc::{PhpThrow, PluginValue, RustMethodDispatcher, ToWire};
@@ -74,10 +84,7 @@ impl RustMethodDispatcher for PluginRpcDispatcher {
             if method_name == "__shirabe_run_rust_command" {
                 let name = arg::<BString>(method_name, &args, 0)?;
                 let input_line = arg::<BString>(method_name, &args, 1)?;
-                return match crate::console::application::run_worker_reverse_command(
-                    name.as_ref(),
-                    input_line.as_ref(),
-                ) {
+                return match run_worker_reverse_command(name.as_ref(), input_line.as_ref()) {
                     Ok(code) => Ok(code.to_wire()),
                     Err(e) => Err(PhpThrow::runtime(bconcat!(error_chain_message(&e)))),
                 };
@@ -237,30 +244,27 @@ pub(crate) fn construct_entity(args: &[PluginValue]) -> Result<PluginValue, PhpT
         )
     };
     let process_executor_arg = |position: usize| {
-        entity_arg::<std::rc::Rc<std::cell::RefCell<crate::util::ProcessExecutor>>>(
+        entity_arg::<std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>(
             class_name, ctor_args, position,
         )
     };
     let config_arg = |position: usize| {
-        entity_arg::<std::rc::Rc<std::cell::RefCell<crate::config::Config>>>(
-            class_name, ctor_args, position,
-        )
+        entity_arg::<std::rc::Rc<std::cell::RefCell<Config>>>(class_name, ctor_args, position)
     };
-    let alias_package_arg =
-        |position: usize| -> Result<crate::package::AliasPackageHandle, PhpThrow> {
-            package_arg(position)?
-                .as_alias()
-                .ok_or_else(|| PhpThrow::runtime(bconcat!(class_name, " expects an AliasPackage")))
-        };
+    let alias_package_arg = |position: usize| -> Result<AliasPackageHandle, PhpThrow> {
+        package_arg(position)?
+            .as_alias()
+            .ok_or_else(|| PhpThrow::runtime(bconcat!(class_name, " expects an AliasPackage")))
+    };
     let package = match class.as_slice() {
-        b"Composer\\Package\\Package" => AnyPackage::Package(crate::package::Package::new(
+        b"Composer\\Package\\Package" => {
+            AnyPackage::Package(Package::new(string_arg(0)?, string_arg(1)?, string_arg(2)?))
+        }
+        b"Composer\\Package\\CompletePackage" => AnyPackage::CompletePackage(CompletePackage::new(
             string_arg(0)?,
             string_arg(1)?,
             string_arg(2)?,
         )),
-        b"Composer\\Package\\CompletePackage" => AnyPackage::CompletePackage(
-            crate::package::CompletePackage::new(string_arg(0)?, string_arg(1)?, string_arg(2)?),
-        ),
         // The alias target has to be a package that already lives on the Rust side; an alias of
         // an alias has no Rust representation, so its narrowing is an explicit error too.
         b"Composer\\Package\\AliasPackage" => {
@@ -268,7 +272,7 @@ pub(crate) fn construct_entity(args: &[PluginValue]) -> Result<PluginValue, PhpT
                 PhpThrow::runtime(bconcat!(class_name, " expects a real Package to alias"))
             })?;
             AnyPackage::AliasPackage(
-                crate::package::AliasPackage::new(alias_of, string_arg(1)?, string_arg(2)?)
+                AliasPackage::new(alias_of, string_arg(1)?, string_arg(2)?)
                     .map_err(|error| error_throw(b"AliasPackage construction failed", &error))?,
             )
         }
@@ -280,10 +284,9 @@ pub(crate) fn construct_entity(args: &[PluginValue]) -> Result<PluginValue, PhpT
                 ))
             })?;
             AnyPackage::CompleteAliasPackage(
-                crate::package::CompleteAliasPackage::new(alias_of, string_arg(1)?, string_arg(2)?)
-                    .map_err(|error| {
-                        error_throw(b"CompleteAliasPackage construction failed", &error)
-                    })?,
+                CompleteAliasPackage::new(alias_of, string_arg(1)?, string_arg(2)?).map_err(
+                    |error| error_throw(b"CompleteAliasPackage construction failed", &error),
+                )?,
             )
         }
         b"Composer\\Package\\RootAliasPackage" => {
@@ -291,48 +294,40 @@ pub(crate) fn construct_entity(args: &[PluginValue]) -> Result<PluginValue, PhpT
                 PhpThrow::runtime(bconcat!(class_name, " expects a real RootPackage to alias"))
             })?;
             AnyPackage::RootAliasPackage(
-                crate::package::RootAliasPackage::new(alias_of, string_arg(1)?, string_arg(2)?)
-                    .map_err(|error| {
-                        error_throw(b"RootAliasPackage construction failed", &error)
-                    })?,
+                RootAliasPackage::new(alias_of, string_arg(1)?, string_arg(2)?).map_err(
+                    |error| error_throw(b"RootAliasPackage construction failed", &error),
+                )?,
             )
         }
         // A solver operation carries no state beyond the packages it names, so a plugin-built
         // one is a complete instance rather than a second view on a Rust-side service.
         b"Composer\\DependencyResolver\\Operation\\InstallOperation" => {
             return Ok(operation_construction_result(AnyOperation::Install(
-                crate::dependency_resolver::operation::InstallOperation::new(package_arg(0)?),
+                InstallOperation::new(package_arg(0)?),
             )));
         }
         b"Composer\\DependencyResolver\\Operation\\UpdateOperation" => {
             return Ok(operation_construction_result(AnyOperation::Update(
-                crate::dependency_resolver::operation::UpdateOperation::new(
-                    package_arg(0)?,
-                    package_arg(1)?,
-                ),
+                UpdateOperation::new(package_arg(0)?, package_arg(1)?),
             )));
         }
         b"Composer\\DependencyResolver\\Operation\\UninstallOperation" => {
             return Ok(operation_construction_result(AnyOperation::Uninstall(
-                crate::dependency_resolver::operation::UninstallOperation::new(package_arg(0)?),
+                UninstallOperation::new(package_arg(0)?),
             )));
         }
         b"Composer\\DependencyResolver\\Operation\\MarkAliasInstalledOperation" => {
             return Ok(operation_construction_result(
-                AnyOperation::MarkAliasInstalled(
-                    crate::dependency_resolver::operation::MarkAliasInstalledOperation::new(
-                        alias_package_arg(0)?,
-                    ),
-                ),
+                AnyOperation::MarkAliasInstalled(MarkAliasInstalledOperation::new(
+                    alias_package_arg(0)?,
+                )),
             ));
         }
         b"Composer\\DependencyResolver\\Operation\\MarkAliasUninstalledOperation" => {
             return Ok(operation_construction_result(
-                AnyOperation::MarkAliasUninstalled(
-                    crate::dependency_resolver::operation::MarkAliasUninstalledOperation::new(
-                        alias_package_arg(0)?,
-                    ),
-                ),
+                AnyOperation::MarkAliasUninstalled(MarkAliasUninstalledOperation::new(
+                    alias_package_arg(0)?,
+                )),
             ));
         }
         // A Filesystem shares no state with the object graph beyond the process executor it
@@ -344,7 +339,7 @@ pub(crate) fn construct_entity(args: &[PluginValue]) -> Result<PluginValue, PhpT
                 _ => Some(process_executor_arg(0)?),
             };
             let rhandle = register_entity(RustEntity::Filesystem(std::rc::Rc::new(
-                std::cell::RefCell::new(crate::util::Filesystem::new(executor)),
+                std::cell::RefCell::new(Filesystem::new(executor)),
             )));
             return Ok(construction_result(rhandle));
         }
@@ -357,7 +352,7 @@ pub(crate) fn construct_entity(args: &[PluginValue]) -> Result<PluginValue, PhpT
                 _ => Some(io_arg(0)?),
             };
             let rhandle = register_entity(RustEntity::ProcessExecutor(std::rc::Rc::new(
-                std::cell::RefCell::new(crate::util::ProcessExecutor::new(io)),
+                std::cell::RefCell::new(ProcessExecutor::new(io)),
             )));
             return Ok(construction_result(rhandle));
         }
@@ -367,14 +362,14 @@ pub(crate) fn construct_entity(args: &[PluginValue]) -> Result<PluginValue, PhpT
         b"Composer\\Util\\HttpDownloader" => {
             let rhandle = register_entity(RustEntity::HttpDownloader(std::rc::Rc::new(
                 std::cell::RefCell::new(
-                    crate::util::HttpDownloader::new(
+                    HttpDownloader::new(
                         io_arg(0)?,
                         config_arg(1)?,
-                        arg_or::<crate::util::StreamContextOptions>(
+                        arg_or::<StreamContextOptions>(
                             class_name,
                             ctor_args,
                             2,
-                            crate::util::StreamContextOptions::new(),
+                            StreamContextOptions::new(),
                         )?,
                         arg_or::<bool>(class_name, ctor_args, 3, false)?,
                     )
@@ -396,7 +391,7 @@ pub(crate) fn construct_entity(args: &[PluginValue]) -> Result<PluginValue, PhpT
                     " inside the plugin process yet"
                 )));
             }
-            let io = crate::io::buffer_io::BufferIO::new(
+            let io = BufferIO::new(
                 arg_or::<BString>(class_name, ctor_args, 0, BString::default())?,
                 arg_or::<i64>(
                     class_name,
@@ -540,21 +535,21 @@ pub(crate) fn call_static_entity(args: &[PluginValue]) -> Result<PluginValue, Ph
     let string_arg = |position: usize| arg::<BString>(name.as_bstr(), &call_args, position);
     match (class.as_slice(), method.as_slice()) {
         (b"Composer\\Util\\Filesystem", b"isLocalPath") => {
-            Ok(crate::util::Filesystem::is_local_path(&string_arg(0)?).to_wire())
+            Ok(Filesystem::is_local_path(&string_arg(0)?).to_wire())
         }
         (b"Composer\\Util\\Filesystem", b"getPlatformPath") => Ok(PluginValue::string(
-            path_to_bytes(&crate::util::Filesystem::get_platform_path(&string_arg(0)?)),
+            path_to_bytes(&Filesystem::get_platform_path(&string_arg(0)?)),
         )),
         (b"Composer\\Package\\Locker", b"getContentHash") => {
-            crate::package::Locker::get_content_hash(string_arg(0)?)
+            Locker::get_content_hash(string_arg(0)?)
                 .map(PluginValue::string)
                 .map_err(|error| error_throw(b"getContentHash failed", &error))
         }
         (b"Composer\\Util\\ProcessExecutor", b"getTimeout") => {
-            Ok(crate::util::ProcessExecutor::get_timeout().to_wire())
+            Ok(ProcessExecutor::get_timeout().to_wire())
         }
         (b"Composer\\Util\\ProcessExecutor", b"setTimeout") => {
-            crate::util::ProcessExecutor::set_timeout(arg::<i64>(name.as_bstr(), &call_args, 0)?);
+            ProcessExecutor::set_timeout(arg::<i64>(name.as_bstr(), &call_args, 0)?);
             Ok(PluginValue::Null)
         }
         // `escape(string|false|null $argument)` casts its argument to string first, which turns
@@ -566,9 +561,7 @@ pub(crate) fn call_static_entity(args: &[PluginValue]) -> Result<PluginValue, Ph
                 }
                 _ => string_arg(0)?,
             };
-            Ok(PluginValue::string(crate::util::ProcessExecutor::escape(
-                &argument,
-            )))
+            Ok(PluginValue::string(ProcessExecutor::escape(&argument)))
         }
         _ => Err(PhpThrow::runtime(bconcat!(
             "the static method ",

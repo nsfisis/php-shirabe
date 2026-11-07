@@ -1,4 +1,7 @@
-use crate::{PhpMixed, bconcat, canonical_int_key, php_to_string};
+use crate::var::{is_numeric_string, to_bool};
+use crate::{
+    PhpMixed, bconcat, canonical_int_key, display_to_bytes, php_to_string, strnatcasecmp, utf8_text,
+};
 use bstr::{B, BString};
 use indexmap::IndexMap;
 
@@ -67,14 +70,14 @@ pub fn array_merge(array1: PhpMixed, array2: PhpMixed) -> PhpMixed {
         match array {
             PhpMixed::List(items) => {
                 for value in items {
-                    result.insert(crate::bconcat!(next_int), value);
+                    result.insert(bconcat!(next_int), value);
                     next_int += 1;
                 }
             }
             PhpMixed::Array(map) => {
                 for (key, value) in map {
                     if canonical_int_key(&key).is_some() {
-                        result.insert(crate::bconcat!(next_int), value);
+                        result.insert(bconcat!(next_int), value);
                         next_int += 1;
                         continue;
                     }
@@ -109,7 +112,7 @@ where
     for array in [array1, array2] {
         for (key, value) in array {
             if canonical_int_key(key.as_ref()).is_some() {
-                result.insert(crate::bconcat!(next_int).into(), value);
+                result.insert(bconcat!(next_int).into(), value);
                 next_int += 1;
                 continue;
             }
@@ -561,8 +564,8 @@ pub fn in_array_loose<'a>(
 
 /// PHP numeric-string-aware conversion to a number, used by loose comparison.
 fn loose_to_number(s: &[u8]) -> Option<f64> {
-    if crate::var::is_numeric_string(s) {
-        crate::utf8_text(s)?.trim().parse::<f64>().ok()
+    if is_numeric_string(s) {
+        utf8_text(s)?.trim().parse::<f64>().ok()
     } else {
         None
     }
@@ -571,7 +574,7 @@ fn loose_to_number(s: &[u8]) -> Option<f64> {
 fn loose_num_to_string(value: &PhpMixed) -> BString {
     match value {
         PhpMixed::Int(i) => bconcat!(i),
-        PhpMixed::Float(f) => crate::display_to_bytes(f),
+        PhpMixed::Float(f) => display_to_bytes(f),
         _ => BString::default(),
     }
 }
@@ -590,10 +593,10 @@ pub fn loose_eq(a: &PhpMixed, b: &PhpMixed) -> bool {
     match (a, b) {
         (Null, Null) => true,
         // null compares loosely against the "empty"/false-y value of the other type.
-        (Null, other) | (other, Null) => !crate::var::to_bool(other),
+        (Null, other) | (other, Null) => !to_bool(other),
         // If either operand is a bool, both are converted to bool.
-        (Bool(x), other) => *x == crate::var::to_bool(other),
-        (other, Bool(y)) => crate::var::to_bool(other) == *y,
+        (Bool(x), other) => *x == to_bool(other),
+        (other, Bool(y)) => to_bool(other) == *y,
         (Int(x), Int(y)) => x == y,
         (Int(_) | Float(_), Int(_) | Float(_)) => loose_num_value(a) == loose_num_value(b),
         (String(x), String(y)) => match (loose_to_number(x), loose_to_number(y)) {
@@ -688,7 +691,7 @@ where
 }
 
 pub fn sort_natural_flag_case<T: AsRef<[u8]>>(values: &mut [T]) {
-    values.sort_by(|a, b| crate::strnatcasecmp(a, b).cmp(&0));
+    values.sort_by(|a, b| strnatcasecmp(a, b).cmp(&0));
 }
 
 pub fn count(value: &PhpMixed) -> usize {

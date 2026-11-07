@@ -2,6 +2,8 @@
 //! these are not. Composer does not rely on that property, so a
 //! non-cryptographic PRNG is sufficient here.
 
+use crate::display_to_bytes;
+
 pub fn random_int<T: RandomInt>(range: impl std::ops::RangeBounds<T>) -> T {
     T::random_int(range)
 }
@@ -18,7 +20,7 @@ pub fn random_bytes(len: usize) -> Vec<u8> {
 /// collide. The output does not follow the format of `uniqid()`.
 pub fn uniqid(prefix: impl AsRef<[u8]>) -> bstr::BString {
     let mut id = bstr::BString::from(prefix.as_ref());
-    id.extend_from_slice(&crate::display_to_bytes(format_args!(
+    id.extend_from_slice(&display_to_bytes(format_args!(
         "{:016x}",
         fastrand::u64(..)
     )));

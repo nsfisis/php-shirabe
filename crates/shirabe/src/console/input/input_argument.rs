@@ -1,5 +1,6 @@
 //! ref: composer/src/Composer/Console/Input/InputArgument.php sha1:993f8727432412f8d9c389ae316a7890d4867ad7
 
+use crate::command::BaseCommand;
 use crate::console::input::SuggestedValues;
 use shirabe_symfony_console::completion::{CompletionInput, CompletionSuggestions};
 use shirabe_symfony_console::input::{InputArgument as BaseInputArgument, InputValue};
@@ -56,7 +57,7 @@ impl InputArgument {
     /// completion (see [`SuggestedValues`]).
     pub fn complete(
         &self,
-        this: &dyn crate::command::BaseCommand,
+        this: &dyn BaseCommand,
         input: &CompletionInput,
         suggestions: &mut CompletionSuggestions,
     ) -> anyhow::Result<()> {

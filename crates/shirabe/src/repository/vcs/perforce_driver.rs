@@ -3,9 +3,9 @@
 use crate::cache::Cache;
 use crate::config::Config;
 use crate::io::IOInterface;
-use crate::repository::vcs::VcsDriverBase;
+use crate::repository::vcs::{VcsDriverBase, VcsDriverInterface};
 use crate::util::http::Response;
-use crate::util::{Perforce, PerforceInterface, ProcessExecutor};
+use crate::util::{HttpDownloader, Perforce, PerforceInterface, ProcessExecutor};
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
@@ -26,8 +26,8 @@ impl PerforceDriver {
         repo_config: IndexMap<BString, PhpMixed>,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
-        http_downloader: std::rc::Rc<std::cell::RefCell<crate::util::HttpDownloader>>,
-        process: std::rc::Rc<std::cell::RefCell<crate::util::ProcessExecutor>>,
+        http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
+        process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     ) -> Self {
         Self {
             inner: VcsDriverBase::new(repo_config, io, config, http_downloader, process),
@@ -227,7 +227,7 @@ impl PerforceDriver {
     }
 }
 
-impl crate::repository::vcs::VcsDriverInterface for PerforceDriver {
+impl VcsDriverInterface for PerforceDriver {
     fn initialize(&mut self) -> anyhow::Result<()> {
         PerforceDriver::initialize(self)
     }

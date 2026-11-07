@@ -1,11 +1,15 @@
 //! The methods a `Composer\Package\PackageInterface` entity answers over RPC.
 
+use crate::package::base_package::STABILITY_STABLE;
 use crate::package::handle::AnyPackage;
-use crate::package::{DisplayMode, PackageInterfaceHandle};
+use crate::package::{
+    AliasPackage, CompletePackageInterface, DisplayMode, Link, Mirror, Package,
+    PackageInterfaceHandle, RootPackageInterface, stability_priority,
+};
 use crate::plugin::rpc::codec::{arg, arg_or};
 use crate::plugin::rpc::dispatch::{error_throw, unavailable_method};
 use crate::plugin::rpc::table::{package_handle_value, repository_handle_value};
-use crate::repository::RepositoryInterfaceHandle;
+use crate::repository::{PlatformRepository, RepositoryInterfaceHandle};
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_rpc::{PhpThrow, PluginValue, ToWire};
@@ -65,7 +69,7 @@ fn package_method_unavailable(method_name: &BStr, receiver: &[u8]) -> PhpThrow {
 fn base_package_mut<'a>(
     package: &'a mut AnyPackage,
     method_name: &BStr,
-) -> Result<&'a mut crate::package::Package, PhpThrow> {
+) -> Result<&'a mut Package, PhpThrow> {
     package
         .as_package_mut()
         .ok_or_else(|| package_method_unavailable(method_name, b"an alias package"))
@@ -74,7 +78,7 @@ fn base_package_mut<'a>(
 fn complete_package_mut<'a>(
     package: &'a mut AnyPackage,
     method_name: &BStr,
-) -> Result<&'a mut dyn crate::package::CompletePackageInterface, PhpThrow> {
+) -> Result<&'a mut dyn CompletePackageInterface, PhpThrow> {
     package
         .as_complete_package_interface_mut()
         .ok_or_else(|| package_method_unavailable(method_name, b"this package"))
@@ -83,7 +87,7 @@ fn complete_package_mut<'a>(
 fn root_package_mut<'a>(
     package: &'a mut AnyPackage,
     method_name: &BStr,
-) -> Result<&'a mut dyn crate::package::RootPackageInterface, PhpThrow> {
+) -> Result<&'a mut dyn RootPackageInterface, PhpThrow> {
     package
         .as_root_package_interface_mut()
         .ok_or_else(|| package_method_unavailable(method_name, b"this package"))
@@ -105,8 +109,8 @@ fn set_on_root_or_base_package<T>(
     package: &mut AnyPackage,
     method_name: &BStr,
     value: T,
-    root: impl FnOnce(&mut dyn crate::package::RootPackageInterface, T) -> anyhow::Result<()>,
-    base: impl FnOnce(&mut crate::package::Package, T),
+    root: impl FnOnce(&mut dyn RootPackageInterface, T) -> anyhow::Result<()>,
+    base: impl FnOnce(&mut Package, T),
 ) -> Result<(), PhpThrow> {
     if package.is_root() {
         root(
@@ -127,8 +131,7 @@ pub(crate) fn dispatch_package_method(
     method_name: &BStr,
     args: &[PluginValue],
 ) -> Result<PluginValue, PhpThrow> {
-    let links_arg =
-        || arg_or::<IndexMap<BString, crate::package::Link>>(method_name, args, 0, IndexMap::new());
+    let links_arg = || arg_or::<IndexMap<BString, Link>>(method_name, args, 0, IndexMap::new());
     match method_name.as_bytes() {
         b"setId" => {
             let id = arg::<i64>(method_name, args, 0)?;
@@ -186,14 +189,14 @@ pub(crate) fn dispatch_package_method(
                 .set_source_dist_references(value);
         }
         b"setSourceMirrors" => {
-            let mirrors = arg::<Option<Vec<crate::package::Mirror>>>(method_name, args, 0)?;
+            let mirrors = arg::<Option<Vec<Mirror>>>(method_name, args, 0)?;
             package
                 .borrow_mut()
                 .as_package_interface_mut()
                 .set_source_mirrors(mirrors);
         }
         b"setDistMirrors" => {
-            let mirrors = arg::<Option<Vec<crate::package::Mirror>>>(method_name, args, 0)?;
+            let mirrors = arg::<Option<Vec<Mirror>>>(method_name, args, 0)?;
             package
                 .borrow_mut()
                 .as_package_interface_mut()
@@ -449,7 +452,7 @@ pub(crate) fn dispatch_package_method(
 fn alias_package<'a>(
     package: &'a AnyPackage,
     method_name: &BStr,
-) -> Result<&'a crate::package::AliasPackage, PhpThrow> {
+) -> Result<&'a AliasPackage, PhpThrow> {
     package
         .as_alias_package()
         .ok_or_else(|| package_method_unavailable(method_name, b"this package"))
@@ -527,10 +530,10 @@ fn dispatch_package_getter(
         // computed from the interface here, as `VersionSelector` already does for the second.
         b"isPlatform" => Ok(package
             .get_repository()
-            .is_some_and(|repository| repository.is::<crate::repository::PlatformRepository>())
+            .is_some_and(|repository| repository.is::<PlatformRepository>())
             .to_wire()),
-        b"getStabilityPriority" => Ok(crate::package::stability_priority(package.get_stability())
-            .unwrap_or(crate::package::base_package::STABILITY_STABLE)
+        b"getStabilityPriority" => Ok(stability_priority(package.get_stability())
+            .unwrap_or(STABILITY_STABLE)
             .to_wire()),
         b"getTransportOptions" => Ok(package.get_transport_options().to_wire()),
         b"getReleaseDate" => Ok(package.get_release_date().to_wire()),

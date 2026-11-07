@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/DependencyResolver/Operation/MarkAliasUninstalledOperation.php sha1:54996c301f9f9ccf77d193bb4b79764dca745aba
 
 use crate::dependency_resolver::operation::SolverOperation;
-use crate::package::AliasPackageHandle;
+use crate::package::{AliasPackageHandle, DisplayMode};
 use bstr::BStr;
 use shirabe_php_shim::{bconcat, php_str};
 
@@ -25,13 +25,13 @@ impl MarkAliasUninstalledOperation {
             self.package.get_pretty_name(),
             "</info> (<comment>",
             self.package
-                .get_full_pretty_version(true, crate::package::DisplayMode::SourceRefIfDev),
+                .get_full_pretty_version(true, DisplayMode::SourceRefIfDev),
             "</comment>) as uninstalled, alias of <info>",
             self.package.get_alias_of().get_pretty_name(),
             "</info> (<comment>",
             self.package
                 .get_alias_of()
-                .get_full_pretty_version(true, crate::package::DisplayMode::SourceRefIfDev),
+                .get_full_pretty_version(true, DisplayMode::SourceRefIfDev),
             "</comment>)"
         )
     }

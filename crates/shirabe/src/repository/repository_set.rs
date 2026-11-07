@@ -7,13 +7,15 @@ use crate::dependency_resolver::{
 use crate::downloader::TransportException;
 use crate::event_dispatcher::EventDispatcherInterface;
 use crate::io::{IOInterface, NullIO};
+use crate::package::base_package::stability_priority;
 use crate::package::version::StabilityFilter;
 use crate::package::{
     AliasPackageHandle, BasePackageHandle, CompleteAliasPackageHandle, PackageInterfaceHandle,
+    STABILITIES,
 };
 use crate::repository::{
     CompositeRepository, FindPackageConstraint, InstalledRepository, LockArrayRepositoryHandle,
-    PlatformRepository, RepositoryInterfaceHandle,
+    PlatformRepository, ProviderInfo, RepositoryInterfaceHandle,
 };
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
@@ -79,9 +81,8 @@ impl RepositorySet {
 
         let mut acceptable_stabilities: IndexMap<BString, i64> = IndexMap::new();
         // PHP: foreach (BasePackage::STABILITIES as $stability => $value)
-        let stabilities = crate::package::STABILITIES.clone();
-        let min_value =
-            crate::package::base_package::stability_priority(minimum_stability).unwrap_or(0);
+        let stabilities = STABILITIES.clone();
+        let min_value = stability_priority(minimum_stability).unwrap_or(0);
         for (stability, value) in stabilities.iter() {
             if *value <= min_value {
                 acceptable_stabilities.insert(bstr::BString::from(*stability), *value);
@@ -175,7 +176,7 @@ impl RepositorySet {
                 name_map.insert(bstr::BString::from(name), constraint.clone());
                 let acceptable = if ignore_stability {
                     // PHP: BasePackage::STABILITIES
-                    crate::package::STABILITIES
+                    STABILITIES
                         .iter()
                         .map(|(k, v)| (BString::from(*k), *v))
                         .collect()
@@ -373,8 +374,8 @@ impl RepositorySet {
     pub fn get_providers(
         &self,
         package_name: &BStr,
-    ) -> anyhow::Result<IndexMap<BString, crate::repository::ProviderInfo>> {
-        let mut providers: IndexMap<BString, crate::repository::ProviderInfo> = IndexMap::new();
+    ) -> anyhow::Result<IndexMap<BString, ProviderInfo>> {
+        let mut providers: IndexMap<BString, ProviderInfo> = IndexMap::new();
         for repository in &self.repositories {
             let repo_providers = repository.get_providers(bstr::BString::from(package_name))?;
             if !repo_providers.is_empty() {

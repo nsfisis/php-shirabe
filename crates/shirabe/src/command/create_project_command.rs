@@ -1,10 +1,12 @@
 //! ref: composer/src/Composer/Command/CreateProjectCommand.php sha1:028857d3493a517f6883959aeb89cea1068f369a
 
 use crate::advisory::Auditor;
-use crate::command::base_command::base_command_initialize;
+use crate::command::base_command::{base_command_complete, base_command_initialize};
 use crate::command::{BaseCommand, BaseCommandData, CompletionTrait};
+use crate::composer::composer_full;
 use crate::config::{Config, ConfigSourceInterface, JsonConfigSource};
 use crate::console::input::{InputArgument, InputOption, SuggestedValues};
+use crate::delegate_base_command_trait_impls_to_inner;
 use crate::dependency_resolver::operation::InstallOperation;
 use crate::event_dispatcher::EventFlags;
 use crate::factory::Factory;
@@ -13,15 +15,15 @@ use crate::filter::platform_requirement_filter::{
     PlatformRequirementFilterInterface,
 };
 use crate::installer::{Installer, ProjectInstaller, SuggestedPackagesReporter};
-use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite};
+use crate::io::{DEBUG, IOInterface, IOInterfaceImmutable, IOInterfaceWrite};
 use crate::json::JsonFile;
 use crate::package::version::version_selector::ShowWarnings;
 use crate::package::version::{VersionParser, VersionSelector};
-use crate::package::{STABILITIES, SUPPORTED_LINK_TYPES};
+use crate::package::{DisplayMode, STABILITIES, SUPPORTED_LINK_TYPES, stability_priority};
 use crate::plugin::PluginBlockedException;
 use crate::repository::{
-    CompositeRepository, InstalledArrayRepository, PlatformRepository, RepositoryFactory,
-    RepositorySet,
+    CompositeRepository, InstalledArrayRepository, InstalledRepositoryInterfaceHandle,
+    PlatformRepository, RepositoryFactory, RepositoryInterfaceHandle, RepositorySet,
 };
 use crate::script::ScriptEvents;
 use crate::signal::SignalSubscription;
@@ -162,14 +164,13 @@ impl CreateProjectCommand {
             && add_repository
         {
             for (index, repo) in repos.iter().enumerate() {
-                let config = crate::composer::composer_full(&composer_handle).get_config();
+                let config = composer_full(&composer_handle).get_config();
                 let repo_config =
                     RepositoryFactory::config_from_string(io.clone(), &config, repo, true)?;
-                let composer_json_repositories_config =
-                    crate::composer::composer_full(&composer_handle)
-                        .get_config()
-                        .borrow()
-                        .get_repositories();
+                let composer_json_repositories_config = composer_full(&composer_handle)
+                    .get_config()
+                    .borrow()
+                    .get_repositories();
                 let name = RepositoryFactory::generate_repository_name(
                     &PhpMixed::Int(index as i64),
                     &repo_config,
@@ -222,7 +223,7 @@ impl CreateProjectCommand {
             }
         }
 
-        let composer = crate::composer::composer_full(&composer_handle);
+        let composer = composer_full(&composer_handle);
 
         let process = composer
             .get_loop()
@@ -528,7 +529,7 @@ impl CreateProjectCommand {
         let stability =
             VersionParser::normalize_stability(stability.unwrap_or_default()).unwrap_or_default();
 
-        if crate::package::stability_priority(&stability).is_none() {
+        if stability_priority(&stability).is_none() {
             return Err(InvalidArgumentException::new(bconcat!(
                 "Invalid stability provided (",
                 stability,
@@ -545,7 +546,7 @@ impl CreateProjectCommand {
             disable_plugins,
             Some(disable_scripts),
         )?;
-        let composer = crate::composer::composer_full(&composer_handle);
+        let composer = composer_full(&composer_handle);
         let config = composer.get_config();
         // set the base dir here again on the new config instance, as otherwise in case the vendor dir is defined in an env var for example it would still override the value set above by $config->all()
         config
@@ -605,7 +606,7 @@ impl CreateProjectCommand {
                 )?);
             }
         } else {
-            repository_set.add_repository(crate::repository::RepositoryInterfaceHandle::new(
+            repository_set.add_repository(RepositoryInterfaceHandle::new(
                 CompositeRepository::new(
                     RepositoryFactory::default_repos(
                         Some(io.clone()),
@@ -681,7 +682,7 @@ impl CreateProjectCommand {
             io.write_error3(
                 bconcat!("Received ", signals.last_signal().as_str(), ", aborting"),
                 true,
-                crate::io::DEBUG,
+                DEBUG,
             );
             let mut fs = Filesystem::new(None);
             fs.remove_directory(
@@ -704,7 +705,7 @@ impl CreateProjectCommand {
             "<info>Installing ",
             package.get_name(),
             " (",
-            package.get_full_pretty_version(false, crate::package::DisplayMode::SourceRefIfDev),
+            package.get_full_pretty_version(false, DisplayMode::SourceRefIfDev),
             ")</info>"
         ));
 
@@ -727,9 +728,8 @@ impl CreateProjectCommand {
             im.set_output_progress(!no_progress);
             im.add_installer(std::rc::Rc::new(project_installer));
         }
-        let installed_repo = crate::repository::InstalledRepositoryInterfaceHandle::new(
-            InstalledArrayRepository::new()?,
-        );
+        let installed_repo =
+            InstalledRepositoryInterfaceHandle::new(InstalledArrayRepository::new()?);
         let executed = installation_manager
             .borrow()
             .execute(
@@ -981,16 +981,16 @@ impl Command for CreateProjectCommand {
         input: &shirabe_symfony_console::completion::CompletionInput,
         suggestions: &mut shirabe_symfony_console::completion::CompletionSuggestions,
     ) -> anyhow::Result<()> {
-        crate::command::base_command::base_command_complete(self, input, suggestions)
+        base_command_complete(self, input, suggestions)
     }
 
     shirabe_symfony_console::delegate_command_trait_impls_to_inner!(base_command_data);
 }
 
 impl BaseCommand for CreateProjectCommand {
-    fn base_command_data(&self) -> &crate::command::BaseCommandData {
+    fn base_command_data(&self) -> &BaseCommandData {
         &self.base_command_data
     }
 
-    crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
+    delegate_base_command_trait_impls_to_inner!(base_command_data);
 }

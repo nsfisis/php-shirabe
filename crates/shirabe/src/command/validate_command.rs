@@ -1,8 +1,10 @@
 //! ref: composer/src/Composer/Command/ValidateCommand.php sha1:4eb6eacebeea00753a769b0f558d22007698dcf9
 
-use crate::command::base_command::base_command_initialize;
+use crate::command::base_command::{base_command_complete, base_command_initialize};
 use crate::command::{BaseCommand, BaseCommandData};
+use crate::composer::composer_full;
 use crate::console::input::{InputArgument, InputOption};
+use crate::delegate_base_command_trait_impls_to_inner;
 use crate::factory::Factory;
 use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::package::loader::ValidatingArrayLoader;
@@ -291,7 +293,7 @@ impl Command for ValidateCommand {
         let mut lock_errors: Vec<BString> = vec![];
         let composer =
             self.create_composer_instance(input.clone(), io.clone(), None, false, None)?;
-        let composer = crate::composer::composer_full(&composer);
+        let composer = composer_full(&composer);
         let check_lock = (check_lock && composer.get_config().borrow().get_bool("lock"))
             || input
                 .borrow()
@@ -403,16 +405,16 @@ impl Command for ValidateCommand {
         input: &shirabe_symfony_console::completion::CompletionInput,
         suggestions: &mut shirabe_symfony_console::completion::CompletionSuggestions,
     ) -> anyhow::Result<()> {
-        crate::command::base_command::base_command_complete(self, input, suggestions)
+        base_command_complete(self, input, suggestions)
     }
 
     shirabe_symfony_console::delegate_command_trait_impls_to_inner!(base_command_data);
 }
 
 impl BaseCommand for ValidateCommand {
-    fn base_command_data(&self) -> &crate::command::BaseCommandData {
+    fn base_command_data(&self) -> &BaseCommandData {
         &self.base_command_data
     }
 
-    crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
+    delegate_base_command_trait_impls_to_inner!(base_command_data);
 }

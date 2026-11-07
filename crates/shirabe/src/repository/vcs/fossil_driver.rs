@@ -4,8 +4,8 @@ use crate::cache::Cache;
 use crate::config::Config;
 use crate::downloader::TransportException;
 use crate::io::{IOInterface, IOInterfaceWrite, io_interface};
-use crate::repository::vcs::VcsDriverBase;
-use crate::util::{Filesystem, ProcessExecutor};
+use crate::repository::vcs::{VcsDriverBase, VcsDriverInterface};
+use crate::util::{Filesystem, HttpDownloader, ProcessExecutor};
 use bstr::{BStr, BString, ByteSlice};
 use chrono::{DateTime, FixedOffset, Utc};
 use indexmap::IndexMap;
@@ -29,8 +29,8 @@ impl FossilDriver {
         repo_config: IndexMap<BString, PhpMixed>,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
-        http_downloader: std::rc::Rc<std::cell::RefCell<crate::util::HttpDownloader>>,
-        process: std::rc::Rc<std::cell::RefCell<crate::util::ProcessExecutor>>,
+        http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
+        process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     ) -> Self {
         Self {
             inner: VcsDriverBase::new(repo_config, io, config, http_downloader, process),
@@ -387,7 +387,7 @@ impl FossilDriver {
     }
 }
 
-impl crate::repository::vcs::VcsDriverInterface for FossilDriver {
+impl VcsDriverInterface for FossilDriver {
     fn initialize(&mut self) -> anyhow::Result<()> {
         FossilDriver::initialize(self)
     }

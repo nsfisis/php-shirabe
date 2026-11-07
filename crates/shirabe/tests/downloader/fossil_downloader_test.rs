@@ -3,7 +3,7 @@
 use crate::async_runtime::run;
 use crate::config_stub::ConfigStubBuilder;
 use crate::io_stub::IOStub;
-use crate::process_executor_mock::get_process_executor_mock;
+use crate::process_executor_mock::{cmd, get_process_executor_mock};
 use bstr::{BStr, BString, ByteSlice};
 use shirabe::config::Config;
 use shirabe::downloader::VcsDownloader;
@@ -117,21 +117,21 @@ fn test_install() {
     let repo_file = bconcat!(working_dir_str, ".fossil");
     let (process, _guard) = get_process_executor_mock(
         vec![
-            crate::process_executor_mock::cmd(vec![
+            cmd(vec![
                 BStr::new("fossil"),
                 BStr::new("clone"),
                 BStr::new("--"),
                 BStr::new("http://fossil.kd2.org/kd2fw/"),
                 repo_file.as_bstr(),
             ]),
-            crate::process_executor_mock::cmd(vec![
+            cmd(vec![
                 BStr::new("fossil"),
                 BStr::new("open"),
                 BStr::new("--nested"),
                 BStr::new("--"),
                 repo_file.as_bstr(),
             ]),
-            crate::process_executor_mock::cmd(vec!["fossil", "update", "--", "trunk"]),
+            cmd(vec!["fossil", "update", "--", "trunk"]),
         ],
         true,
         Default::default(),
@@ -202,9 +202,9 @@ fn test_update() {
 
     let (process, _guard) = get_process_executor_mock(
         vec![
-            crate::process_executor_mock::cmd(vec!["fossil", "changes"]),
-            crate::process_executor_mock::cmd(vec!["fossil", "pull"]),
-            crate::process_executor_mock::cmd(vec!["fossil", "up", "--", "trunk"]),
+            cmd(vec!["fossil", "changes"]),
+            cmd(vec!["fossil", "pull"]),
+            cmd(vec!["fossil", "up", "--", "trunk"]),
         ],
         true,
         Default::default(),
@@ -254,7 +254,7 @@ fn test_remove() {
     let package = get_package(None, None);
 
     let (process, _guard) = get_process_executor_mock(
-        vec![crate::process_executor_mock::cmd(vec!["fossil", "changes"])],
+        vec![cmd(vec!["fossil", "changes"])],
         true,
         Default::default(),
     );

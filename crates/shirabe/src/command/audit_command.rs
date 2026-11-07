@@ -1,11 +1,13 @@
 //! ref: composer/src/Composer/Command/AuditCommand.php sha1:ed9c53214d1d9aebbcad611727136e499abab821
 
 use crate::advisory::{AuditConfig, Auditor};
-use crate::command::base_command::base_command_initialize;
+use crate::command::base_command::{base_command_complete, base_command_initialize};
 use crate::command::{BaseCommand, BaseCommandData};
-use crate::composer::PartialComposerHandle;
+use crate::composer::{PartialComposerHandle, composer_full};
 use crate::console::input::{InputOption, SuggestedValues};
+use crate::delegate_base_command_trait_impls_to_inner;
 use crate::io::IOInterfaceWrite;
+use crate::package::PackageInterfaceHandle;
 use crate::repository::{InstalledRepository, RepositoryInterface, RepositorySet, RepositoryUtils};
 use bstr::BString;
 use shirabe_php_shim::{
@@ -44,8 +46,8 @@ impl AuditCommand {
         &self,
         composer: &PartialComposerHandle,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
-    ) -> anyhow::Result<Vec<crate::package::PackageInterfaceHandle>> {
-        let composer = crate::composer::composer_full(composer);
+    ) -> anyhow::Result<Vec<PackageInterfaceHandle>> {
+        let composer = composer_full(composer);
         if input
             .borrow()
             .get_option("locked")?
@@ -190,7 +192,7 @@ impl Command for AuditCommand {
             return Ok(0);
         }
 
-        let composer = crate::composer::composer_full(&composer);
+        let composer = composer_full(&composer);
         let auditor = Auditor;
         let mut repo_set = RepositorySet::new(
             "stable",
@@ -290,16 +292,16 @@ impl Command for AuditCommand {
         input: &shirabe_symfony_console::completion::CompletionInput,
         suggestions: &mut shirabe_symfony_console::completion::CompletionSuggestions,
     ) -> anyhow::Result<()> {
-        crate::command::base_command::base_command_complete(self, input, suggestions)
+        base_command_complete(self, input, suggestions)
     }
 
     shirabe_symfony_console::delegate_command_trait_impls_to_inner!(base_command_data);
 }
 
 impl BaseCommand for AuditCommand {
-    fn base_command_data(&self) -> &crate::command::BaseCommandData {
+    fn base_command_data(&self) -> &BaseCommandData {
         &self.base_command_data
     }
 
-    crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
+    delegate_base_command_trait_impls_to_inner!(base_command_data);
 }

@@ -1,9 +1,11 @@
 //! ref: composer/src/Composer/Command/InstallCommand.php sha1:f259b576a55a58e2be6884e9e4c3bcd97ceec5a2
 
 use crate::advisory::Auditor;
-use crate::command::base_command::base_command_initialize;
+use crate::command::base_command::{base_command_complete, base_command_initialize};
 use crate::command::{BaseCommand, BaseCommandData, CompletionTrait};
+use crate::composer::composer_full;
 use crate::console::input::{InputArgument, InputOption, SuggestedValues};
+use crate::delegate_base_command_trait_impls_to_inner;
 use crate::installer::Installer;
 use crate::io::IOInterfaceWrite;
 use crate::plugin::{CommandEvent, PluginEvents};
@@ -129,7 +131,7 @@ impl Command for InstallCommand {
         }
 
         let composer_handle = self.require_composer(None, None)?;
-        let composer = crate::composer::composer_full(&composer_handle);
+        let composer = composer_full(&composer_handle);
 
         // Composer warns here that it runs slower without the curl extension when there is no lock
         // file. Shirabe does not use curl for its own downloads, so there is nothing to warn about.
@@ -262,16 +264,16 @@ impl Command for InstallCommand {
         input: &shirabe_symfony_console::completion::CompletionInput,
         suggestions: &mut shirabe_symfony_console::completion::CompletionSuggestions,
     ) -> anyhow::Result<()> {
-        crate::command::base_command::base_command_complete(self, input, suggestions)
+        base_command_complete(self, input, suggestions)
     }
 
     shirabe_symfony_console::delegate_command_trait_impls_to_inner!(base_command_data);
 }
 
 impl BaseCommand for InstallCommand {
-    fn base_command_data(&self) -> &crate::command::BaseCommandData {
+    fn base_command_data(&self) -> &BaseCommandData {
         &self.base_command_data
     }
 
-    crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
+    delegate_base_command_trait_impls_to_inner!(base_command_data);
 }

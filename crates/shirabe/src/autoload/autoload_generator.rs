@@ -13,6 +13,7 @@ use crate::installer::InstallationManagerInterface;
 use crate::io::{IOInterface, IOInterfaceWrite, NullIO};
 use crate::json::JsonFile;
 use crate::package::{LockerInterface, PackageInterfaceHandle, RootPackageInterfaceHandle};
+use crate::repository::RepositoryInterfaceHandle;
 use crate::script::ScriptEvents;
 use crate::util::{Filesystem, PackageSorter, Platform};
 use bstr::{B, BStr, BString, ByteSlice};
@@ -108,7 +109,7 @@ impl AutoloadGenerator {
     pub fn dump(
         &self,
         config: &Config,
-        local_repo: crate::repository::RepositoryInterfaceHandle,
+        local_repo: RepositoryInterfaceHandle,
         root_package: RootPackageInterfaceHandle,
         installation_manager: std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>,
         target_dir: &BStr,
@@ -2097,7 +2098,7 @@ pub trait AutoloadGeneratorInterface: std::fmt::Debug {
     fn dump(
         &self,
         config: &Config,
-        local_repo: crate::repository::RepositoryInterfaceHandle,
+        local_repo: RepositoryInterfaceHandle,
         root_package: RootPackageInterfaceHandle,
         installation_manager: std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>,
         target_dir: &BStr,
@@ -2157,7 +2158,7 @@ impl AutoloadGeneratorInterface for AutoloadGenerator {
     fn dump(
         &self,
         config: &Config,
-        local_repo: crate::repository::RepositoryInterfaceHandle,
+        local_repo: RepositoryInterfaceHandle,
         root_package: RootPackageInterfaceHandle,
         installation_manager: std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>,
         target_dir: &BStr,

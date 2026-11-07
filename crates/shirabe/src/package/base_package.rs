@@ -1,6 +1,6 @@
 //! ref: composer/src/Composer/Package/BasePackage.php sha1:a9d85c796bc6f6bddfda2d83848bee03e9a97f1c
 
-use crate::package::{DisplayMode, Link, PackageInterface};
+use crate::package::{AliasPackage, DisplayMode, Link, PackageInterface};
 use crate::repository::{PlatformRepository, RepositoryInterfaceHandle};
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
@@ -86,7 +86,7 @@ pub trait BasePackage: PackageInterface {
     fn set_repository_box(&mut self, repository: RepositoryInterfaceHandle);
     fn take_repository(&mut self) -> Option<RepositoryInterfaceHandle>;
 
-    fn as_alias_package_mut(&mut self) -> Option<&mut crate::package::AliasPackage> {
+    fn as_alias_package_mut(&mut self) -> Option<&mut AliasPackage> {
         None
     }
 

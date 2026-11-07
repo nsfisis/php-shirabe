@@ -9,7 +9,8 @@ use crate::package::{BasePackageHandle, PackageInterfaceHandle, RootPackageInter
 use crate::plugin::php_call::PhpCall;
 use crate::repository::{
     FindPackageConstraint, InvalidRepositoryException, LoadPackagesResult, PlatformRepository,
-    ProviderInfo, RepositoryInterface, SearchResult, WritableArrayRepository,
+    ProviderInfo, RepositoryInterface, RepositoryInterfaceWeakHandle, SearchResult,
+    WritableArrayRepository,
 };
 use crate::util::{Filesystem, Platform};
 use bstr::{B, BStr, BString, ByteSlice};
@@ -70,7 +71,7 @@ impl FilesystemRepository {
         self.dev_mode.get()
     }
 
-    pub fn set_self_handle(&self, weak: crate::repository::RepositoryInterfaceWeakHandle) {
+    pub fn set_self_handle(&self, weak: RepositoryInterfaceWeakHandle) {
         self.inner.set_self_handle(weak);
     }
 
@@ -848,7 +849,7 @@ impl RepositoryInterface for FilesystemRepository {
         self
     }
 
-    fn set_self_handle(&self, weak: crate::repository::RepositoryInterfaceWeakHandle) {
+    fn set_self_handle(&self, weak: RepositoryInterfaceWeakHandle) {
         self.inner.set_self_handle(weak);
     }
 }

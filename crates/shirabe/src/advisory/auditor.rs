@@ -1,6 +1,7 @@
 //! ref: composer/src/Composer/Advisory/Auditor.php sha1:e2575416d104b436981565df0389ffe67cad9f4f
 
 use crate::advisory::{AnySecurityAdvisory, SecurityAdvisory};
+use crate::io::buffer_io::BufferIO;
 use crate::io::{ConsoleIO, IOInterface, IOInterfaceWrite};
 use crate::json::JsonFile;
 use crate::package::{CompletePackageInterfaceHandle, PackageInterfaceHandle, base_package};
@@ -443,7 +444,7 @@ impl Auditor {
                 let io_as_console = io_ref.as_any().downcast_ref::<ConsoleIO>().or_else(|| {
                     io_ref
                         .as_any()
-                        .downcast_ref::<crate::io::buffer_io::BufferIO>()
+                        .downcast_ref::<BufferIO>()
                         .map(|buffer_io| &buffer_io.inner)
                 });
                 if io_as_console.is_none() {
@@ -614,7 +615,7 @@ impl Auditor {
         let io_as_console = io_ref.as_any().downcast_ref::<ConsoleIO>().or_else(|| {
             io_ref
                 .as_any()
-                .downcast_ref::<crate::io::buffer_io::BufferIO>()
+                .downcast_ref::<BufferIO>()
                 .map(|buffer_io| &buffer_io.inner)
         });
         if io_as_console.is_none() {

@@ -1,7 +1,7 @@
 //! ref: composer/tests/Composer/Test/Downloader/FileDownloaderTest.php sha1:09f792b7ead57d2b7a5fa9dc5d80e0335e34b7fb
 
 use crate::async_runtime::run;
-use crate::http_downloader_mock::get_http_downloader_mock;
+use crate::http_downloader_mock::{HttpDownloaderMockGuard, get_http_downloader_mock};
 use crate::io_mock::{Expectation, get_io_mock};
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
@@ -52,7 +52,7 @@ fn get_downloader(
 ) -> (
     FileDownloader,
     std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
-    crate::http_downloader_mock::HttpDownloaderMockGuard,
+    HttpDownloaderMockGuard,
 ) {
     let io = io.unwrap_or_else(|| std::rc::Rc::new(std::cell::RefCell::new(NullIO::new())));
     let config = config

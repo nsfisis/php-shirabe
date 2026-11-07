@@ -4,6 +4,7 @@
 //! `#[path = "../common/test_case.rs"] mod test_case;`.
 #![allow(dead_code)]
 
+use crate::bootstrap::bootstrap;
 use bstr::BString;
 use indexmap::IndexMap;
 use shirabe::config::Config;
@@ -324,7 +325,7 @@ pub fn create_composer_lock(
 
 /// ref: TestCase::getApplicationTester
 pub fn get_application_tester() -> ApplicationTester {
-    crate::bootstrap::bootstrap();
+    bootstrap();
 
     let application = ApplicationHandle::new("Shirabe", "").unwrap();
     application.set_catch_exceptions(false);

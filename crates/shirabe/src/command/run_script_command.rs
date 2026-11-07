@@ -1,8 +1,10 @@
 //! ref: composer/src/Composer/Command/RunScriptCommand.php sha1:fd39fdf758c5f1fd032eefcb82e4ce49beba2882
 
-use crate::command::base_command::base_command_initialize;
+use crate::command::base_command::{base_command_complete, base_command_initialize};
 use crate::command::{BaseCommand, BaseCommandData};
-use crate::console::input::{InputArgument, InputOption};
+use crate::composer::composer_full;
+use crate::console::input::{InputArgument, InputOption, SuggestedValues};
+use crate::delegate_base_command_trait_impls_to_inner;
 use crate::event_dispatcher::EventFlags;
 use crate::io::IOInterfaceWrite;
 use crate::script::{Event as ScriptEvent, ScriptEvents};
@@ -80,9 +82,7 @@ impl RunScriptCommand {
 
     fn get_scripts(&self) -> anyhow::Result<Vec<(BString, BString)>> {
         let composer = self.require_composer(None, None)?;
-        let scripts = crate::composer::composer_full(&composer)
-            .get_package()
-            .get_scripts();
+        let scripts = composer_full(&composer).get_package().get_scripts();
         drop(composer);
         if scripts.is_empty() {
             return Ok(vec![]);
@@ -121,20 +121,18 @@ impl Command for RunScriptCommand {
                 Some(InputArgument::OPTIONAL),
                 "Script name to run.",
                 None,
-                crate::console::input::SuggestedValues::Closure(Box::new(
-                    |this, _input, _suggestions| {
-                        let this = this
-                            .as_any()
-                            .downcast_ref::<RunScriptCommand>()
-                            .expect("the script suggestions are bound to RunScriptCommand");
-                        // PHP: array_map(fn ($script) => $script['name'], $this->getScripts())
-                        Ok(this
-                            .get_scripts()?
-                            .into_iter()
-                            .map(|(name, _description)| name)
-                            .collect())
-                    },
-                )),
+                SuggestedValues::Closure(Box::new(|this, _input, _suggestions| {
+                    let this = this
+                        .as_any()
+                        .downcast_ref::<RunScriptCommand>()
+                        .expect("the script suggestions are bound to RunScriptCommand");
+                    // PHP: array_map(fn ($script) => $script['name'], $this->getScripts())
+                    Ok(this
+                        .get_scripts()?
+                        .into_iter()
+                        .map(|(name, _description)| name)
+                        .collect())
+                })),
             )
             .unwrap()
             .into(),
@@ -271,9 +269,7 @@ impl Command for RunScriptCommand {
         }
 
         let composer = self.require_composer(None, None)?;
-        let dispatcher = crate::composer::composer_full(&composer)
-            .get_event_dispatcher()
-            .clone();
+        let dispatcher = composer_full(&composer).get_event_dispatcher().clone();
         let dev_mode = input.borrow().get_option("dev")?.as_bool().unwrap_or(false)
             || !input
                 .borrow()
@@ -345,16 +341,16 @@ impl Command for RunScriptCommand {
         input: &shirabe_symfony_console::completion::CompletionInput,
         suggestions: &mut shirabe_symfony_console::completion::CompletionSuggestions,
     ) -> anyhow::Result<()> {
-        crate::command::base_command::base_command_complete(self, input, suggestions)
+        base_command_complete(self, input, suggestions)
     }
 
     shirabe_symfony_console::delegate_command_trait_impls_to_inner!(base_command_data);
 }
 
 impl BaseCommand for RunScriptCommand {
-    fn base_command_data(&self) -> &crate::command::BaseCommandData {
+    fn base_command_data(&self) -> &BaseCommandData {
         &self.base_command_data
     }
 
-    crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
+    delegate_base_command_trait_impls_to_inner!(base_command_data);
 }

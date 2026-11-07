@@ -2,7 +2,8 @@
 
 use crate::package::{BasePackageHandle, PackageInterfaceHandle, RootPackageInterfaceHandle};
 use crate::repository::{
-    ArrayRepository, ProviderInfo, RepositoryInterface, RepositoryInterfaceWeakHandle, SearchResult,
+    ArrayRepository, FindPackageConstraint, LoadPackagesResult, ProviderInfo, RepositoryInterface,
+    RepositoryInterfaceWeakHandle, SearchResult,
 };
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
@@ -36,7 +37,7 @@ impl RepositoryInterface for RootPackageRepository {
     fn find_package(
         &mut self,
         name: &BStr,
-        constraint: crate::repository::FindPackageConstraint,
+        constraint: FindPackageConstraint,
     ) -> anyhow::Result<Option<BasePackageHandle>> {
         self.inner.find_package(name, constraint)
     }
@@ -44,7 +45,7 @@ impl RepositoryInterface for RootPackageRepository {
     fn find_packages(
         &mut self,
         name: &BStr,
-        constraint: Option<crate::repository::FindPackageConstraint>,
+        constraint: Option<FindPackageConstraint>,
     ) -> anyhow::Result<Vec<BasePackageHandle>> {
         self.inner.find_packages(name, constraint)
     }
@@ -59,7 +60,7 @@ impl RepositoryInterface for RootPackageRepository {
         acceptable_stabilities: IndexMap<BString, i64>,
         stability_flags: IndexMap<BString, i64>,
         already_loaded: IndexMap<BString, IndexMap<BString, PackageInterfaceHandle>>,
-    ) -> anyhow::Result<crate::repository::LoadPackagesResult> {
+    ) -> anyhow::Result<LoadPackagesResult> {
         self.inner.load_packages(
             package_name_map,
             acceptable_stabilities,

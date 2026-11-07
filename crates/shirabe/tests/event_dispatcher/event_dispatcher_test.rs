@@ -1,6 +1,7 @@
 //! ref: composer/tests/Composer/Test/EventDispatcher/EventDispatcherTest.php sha1:a442e982a12ea580c37cef848e294882192c65f5
 
 use crate::io_mock::{Expectation, get_io_mock};
+use crate::io_stub::IOStub;
 use crate::php_worker::{load_composer_php_runtime, php_eval, php_single_quote};
 use crate::process_executor_mock::{ProcessExecutorMockGuard, cmd, get_process_executor_mock};
 use bstr::{BStr, BString, ByteSlice};
@@ -982,7 +983,7 @@ fn test_dispatcher_outputs_command() {
     let _tear_down = TearDown;
 
     let composer = create_composer_instance();
-    let io = std::rc::Rc::new(std::cell::RefCell::new(crate::io_stub::IOStub::new()));
+    let io = std::rc::Rc::new(std::cell::RefCell::new(IOStub::new()));
     let io_dyn: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io.clone();
     let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
         io_dyn.clone(),

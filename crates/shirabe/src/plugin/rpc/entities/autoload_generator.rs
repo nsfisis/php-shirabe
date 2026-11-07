@@ -1,6 +1,7 @@
 //! The methods a `Composer\Autoload\AutoloadGenerator` entity answers over RPC.
 
 use crate::autoload::{AutoloadGeneratorInterface, ClassLoader};
+use crate::config::Config;
 use crate::filter::platform_requirement_filter::PlatformRequirementFilterFactory;
 use crate::installer::InstallationManagerInterface;
 use crate::package::locker::LockerInterface;
@@ -50,11 +51,8 @@ pub(crate) fn dispatch_autoload_generator_method(
             generator.borrow().set_platform_requirement_filter(filter);
         }
         b"dump" => {
-            let config = entity_arg::<std::rc::Rc<std::cell::RefCell<crate::config::Config>>>(
-                method_name,
-                args,
-                0,
-            )?;
+            let config =
+                entity_arg::<std::rc::Rc<std::cell::RefCell<Config>>>(method_name, args, 0)?;
             let local_repo = arg::<RepositoryInterfaceHandle>(method_name, args, 1)?;
             let root_package = root_package_arg(method_name, args, 2)?;
             let installation_manager = entity_arg::<

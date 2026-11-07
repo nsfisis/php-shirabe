@@ -1,6 +1,6 @@
 //! ref: composer/src/Composer/Plugin/PreFileDownloadEvent.php sha1:5d144f4864b2e2e881588411b82f74bad32b6cd6
 
-use crate::event_dispatcher::{Event, EventFlags};
+use crate::event_dispatcher::{Event, EventFlags, delegate_event_interface_to_inner};
 use crate::package::PackageInterfaceHandle;
 use crate::util::{HttpDownloader, StreamContextOptions};
 use bstr::{BStr, BString, ByteSlice};
@@ -88,4 +88,4 @@ impl PreFileDownloadEvent {
     }
 }
 
-crate::event_dispatcher::delegate_event_interface_to_inner!(PreFileDownloadEvent, inner);
+delegate_event_interface_to_inner!(PreFileDownloadEvent, inner);

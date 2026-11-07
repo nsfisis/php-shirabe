@@ -1,7 +1,7 @@
 //! ref: composer/vendor/symfony/console/Helper/TableSeparator.php sha1:743a39854683ad7fc65e45572ec83d3ea9dc67da
 
 use crate::exception::InvalidArgumentException;
-use crate::helper::{TableCell, TableCellOption};
+use crate::helper::{TableCell, TableCellOption, TableCellStyle};
 use bstr::BString;
 use indexmap::IndexMap;
 
@@ -31,7 +31,7 @@ impl TableSeparator {
         self.inner.get_rowspan()
     }
 
-    pub fn get_style(&self) -> Option<std::rc::Rc<crate::helper::TableCellStyle>> {
+    pub fn get_style(&self) -> Option<std::rc::Rc<TableCellStyle>> {
         self.inner.get_style()
     }
 }

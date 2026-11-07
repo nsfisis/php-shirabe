@@ -1,8 +1,9 @@
 //! ref: composer/src/Composer/Command/CompletionTrait.php sha1:a5a5253b1db61b7a579b086b08465e5cecda21ae
 
 use crate::command::BaseCommand;
+use crate::composer::composer_full;
 use crate::console::input::SuggestedValues;
-use crate::package::base_package;
+use crate::package::{RootPackageInterfaceHandle, base_package};
 use crate::repository::repository_interface::{SEARCH_NAME, SEARCH_VENDOR, SearchResult};
 use crate::repository::{
     CompositeRepository, InstalledRepository, PlatformRepository, RepositoryInterface,
@@ -31,7 +32,7 @@ pub trait CompletionTrait: BaseCommand {
     fn suggest_root_requirement(&self) -> SuggestedValues {
         SuggestedValues::Closure(Box::new(|this, _input, _suggestions| {
             let composer = this.require_composer(None, None)?;
-            let composer = crate::composer::composer_full(&composer);
+            let composer = composer_full(&composer);
 
             let package = composer.get_package();
             let mut names: Vec<BString> = package.get_requires().keys().cloned().collect();
@@ -48,12 +49,12 @@ pub trait CompletionTrait: BaseCommand {
     ) -> SuggestedValues {
         SuggestedValues::Closure(Box::new(move |this, input, _suggestions| {
             let composer = this.require_composer(None, None)?;
-            let composer = crate::composer::composer_full(&composer);
+            let composer = composer_full(&composer);
             let mut installed_repos: Vec<RepositoryInterfaceHandle> = vec![];
 
             if include_root_package {
                 installed_repos.push(RepositoryInterfaceHandle::new(RootPackageRepository::new(
-                    crate::package::RootPackageInterfaceHandle::dup(composer.get_package()),
+                    RootPackageInterfaceHandle::dup(composer.get_package()),
                 )));
             }
 
@@ -134,12 +135,12 @@ pub trait CompletionTrait: BaseCommand {
     fn suggest_installed_package_types(&self, include_root_package: bool) -> SuggestedValues {
         SuggestedValues::Closure(Box::new(move |this, _input, _suggestions| {
             let composer = this.require_composer(None, None)?;
-            let composer = crate::composer::composer_full(&composer);
+            let composer = composer_full(&composer);
             let mut installed_repos: Vec<RepositoryInterfaceHandle> = vec![];
 
             if include_root_package {
                 installed_repos.push(RepositoryInterfaceHandle::new(RootPackageRepository::new(
-                    crate::package::RootPackageInterfaceHandle::dup(composer.get_package()),
+                    RootPackageInterfaceHandle::dup(composer.get_package()),
                 )));
             }
 
@@ -180,7 +181,7 @@ pub trait CompletionTrait: BaseCommand {
             }
 
             let composer = this.require_composer(None, None)?;
-            let composer = crate::composer::composer_full(&composer);
+            let composer = composer_full(&composer);
             let repository_manager = composer.get_repository_manager();
             let repository_manager = repository_manager.borrow();
             let mut repos = CompositeRepository::new(repository_manager.get_repositories().clone());
@@ -271,7 +272,7 @@ pub trait CompletionTrait: BaseCommand {
     fn suggest_platform_package(&self) -> SuggestedValues {
         SuggestedValues::Closure(Box::new(|this, input, _suggestions| {
             let composer = this.require_composer(None, None)?;
-            let composer = crate::composer::composer_full(&composer);
+            let composer = composer_full(&composer);
             let overrides = composer.get_config().borrow().get_map("platform")?;
             let mut repos = PlatformRepository::new(vec![], overrides, None, None)?;
 

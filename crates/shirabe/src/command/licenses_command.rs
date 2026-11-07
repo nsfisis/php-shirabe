@@ -1,10 +1,13 @@
 //! ref: composer/src/Composer/Command/LicensesCommand.php sha1:daf0ea7245bbc82d223618fb711d1e17468c3706
 
-use crate::command::base_command::base_command_initialize;
+use crate::command::base_command::{base_command_complete, base_command_initialize};
 use crate::command::{BaseCommand, BaseCommandData};
+use crate::composer::composer_full;
 use crate::console::input::{InputOption, SuggestedValues};
+use crate::delegate_base_command_trait_impls_to_inner;
 use crate::io::IOInterfaceWrite;
 use crate::json::JsonFile;
+use crate::package::{DisplayMode, PackageInterfaceHandle};
 use crate::plugin::{CommandEvent, PluginEvents};
 use crate::repository::{RepositoryInterface, RepositoryUtils};
 use crate::util::{PackageInfo, PackageSorter};
@@ -136,7 +139,7 @@ impl Command for LicensesCommand {
             Some(std::rc::Rc::new(std::cell::RefCell::new(command_event))),
         )?;
 
-        let composer = crate::composer::composer_full(&composer_handle);
+        let composer = composer_full(&composer_handle);
         let root = composer.get_package();
 
         let packages = if input
@@ -179,7 +182,7 @@ impl Command for LicensesCommand {
             }
         };
 
-        let packages: Vec<crate::package::PackageInterfaceHandle> = packages.into_iter().collect();
+        let packages: Vec<PackageInterfaceHandle> = packages.into_iter().collect();
         let packages = PackageSorter::sort_packages_alphabetically(packages);
         let io = self.get_io();
 
@@ -205,7 +208,7 @@ impl Command for LicensesCommand {
                 ));
                 io.write(bconcat!(
                     "Version: <comment>",
-                    root.get_full_pretty_version(true, crate::package::DisplayMode::SourceRefIfDev),
+                    root.get_full_pretty_version(true, DisplayMode::SourceRefIfDev),
                     "</comment>"
                 ));
                 io.write(bconcat!("Licenses: <comment>", licenses_str, "</comment>"));
@@ -241,10 +244,9 @@ impl Command for LicensesCommand {
                     table.add_row(
                         vec![
                             Cell::from(name),
-                            Cell::from(package.get_full_pretty_version(
-                                true,
-                                crate::package::DisplayMode::SourceRefIfDev,
-                            )),
+                            Cell::from(
+                                package.get_full_pretty_version(true, DisplayMode::SourceRefIfDev),
+                            ),
                             Cell::from(licenses_str),
                         ]
                         .into(),
@@ -264,10 +266,8 @@ impl Command for LicensesCommand {
                         (
                             package.get_pretty_name(),
                             DependencyLicenseJson {
-                                version: package.get_full_pretty_version(
-                                    true,
-                                    crate::package::DisplayMode::SourceRefIfDev,
-                                ),
+                                version: package
+                                    .get_full_pretty_version(true, DisplayMode::SourceRefIfDev),
                                 license,
                             },
                         )
@@ -276,8 +276,7 @@ impl Command for LicensesCommand {
 
                 io.write(&JsonFile::encode(&LicensesJson {
                     name: root.get_pretty_name(),
-                    version: root
-                        .get_full_pretty_version(true, crate::package::DisplayMode::SourceRefIfDev),
+                    version: root.get_full_pretty_version(true, DisplayMode::SourceRefIfDev),
                     license: root.get_license(),
                     dependencies,
                 })?);
@@ -340,16 +339,16 @@ impl Command for LicensesCommand {
         input: &shirabe_symfony_console::completion::CompletionInput,
         suggestions: &mut shirabe_symfony_console::completion::CompletionSuggestions,
     ) -> anyhow::Result<()> {
-        crate::command::base_command::base_command_complete(self, input, suggestions)
+        base_command_complete(self, input, suggestions)
     }
 
     shirabe_symfony_console::delegate_command_trait_impls_to_inner!(base_command_data);
 }
 
 impl BaseCommand for LicensesCommand {
-    fn base_command_data(&self) -> &crate::command::BaseCommandData {
+    fn base_command_data(&self) -> &BaseCommandData {
         &self.base_command_data
     }
 
-    crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
+    delegate_base_command_trait_impls_to_inner!(base_command_data);
 }

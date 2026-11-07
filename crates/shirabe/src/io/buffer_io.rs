@@ -1,6 +1,7 @@
 //! ref: composer/src/Composer/IO/BufferIO.php sha1:92cbd3ce7909bd23e07b2d280a5f49ad5ea099bb
 
-use crate::io::ConsoleIO;
+use crate::config::Config;
+use crate::io::{BaseIO, ConsoleIO, IOInterface, IOInterfaceImmutable, IOInterfaceMutable};
 use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
@@ -135,7 +136,7 @@ impl BufferIO {
     }
 }
 
-impl crate::io::IOInterfaceImmutable for BufferIO {
+impl IOInterfaceImmutable for BufferIO {
     fn is_interactive(&self) -> bool {
         self.inner.is_interactive()
     }
@@ -228,16 +229,16 @@ impl crate::io::IOInterfaceImmutable for BufferIO {
         &self,
     ) -> indexmap::IndexMap<bstr::BString, indexmap::IndexMap<bstr::BString, Option<bstr::BString>>>
     {
-        self.inner.get_authentications()
+        IOInterfaceImmutable::get_authentications(&self.inner)
     }
     fn has_authentication(&self, repository_name: &bstr::BStr) -> bool {
-        self.inner.has_authentication(repository_name)
+        IOInterfaceImmutable::has_authentication(&self.inner, repository_name)
     }
     fn get_authentication(
         &self,
         repository_name: &bstr::BStr,
     ) -> indexmap::IndexMap<bstr::BString, Option<bstr::BString>> {
-        self.inner.get_authentication(repository_name)
+        IOInterfaceImmutable::get_authentication(&self.inner, repository_name)
     }
     fn error_bytes(&self, message: &bstr::BStr, context: &[(&bstr::BStr, &bstr::BStr)]) {
         self.inner.error_bytes(message, context)
@@ -252,27 +253,26 @@ impl crate::io::IOInterfaceImmutable for BufferIO {
     }
 }
 
-impl crate::io::IOInterfaceMutable for BufferIO {
+impl IOInterfaceMutable for BufferIO {
     fn set_authentication(
         &mut self,
         repository_name: bstr::BString,
         username: bstr::BString,
         password: Option<bstr::BString>,
     ) {
-        self.inner
-            .set_authentication(repository_name, username, password)
+        IOInterfaceMutable::set_authentication(&mut self.inner, repository_name, username, password)
     }
-    fn load_configuration(&mut self, config: &mut crate::config::Config) -> anyhow::Result<()> {
-        self.inner.load_configuration(config)
+    fn load_configuration(&mut self, config: &mut Config) -> anyhow::Result<()> {
+        IOInterfaceMutable::load_configuration(&mut self.inner, config)
     }
 }
 
-impl crate::io::IOInterface for BufferIO {
+impl IOInterface for BufferIO {
     fn as_any(&self) -> &dyn std::any::Any {
         self
     }
 
-    fn as_base_io_mut(&mut self) -> Option<&mut dyn crate::io::BaseIO> {
+    fn as_base_io_mut(&mut self) -> Option<&mut dyn BaseIO> {
         Some(self)
     }
 
@@ -281,7 +281,7 @@ impl crate::io::IOInterface for BufferIO {
     }
 }
 
-impl crate::io::BaseIO for BufferIO {
+impl BaseIO for BufferIO {
     fn authentications(
         &self,
     ) -> &indexmap::IndexMap<bstr::BString, indexmap::IndexMap<bstr::BString, Option<bstr::BString>>>

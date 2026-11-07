@@ -7,6 +7,7 @@ use crate::dependency_resolver::operation::{
 use crate::downloader::FileDownloader;
 use crate::event_dispatcher::EventDispatcher;
 use crate::installer::{InstallerInterface, PackageEvents};
+use crate::io::buffer_io::BufferIO;
 use crate::io::{ConsoleIO, IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface};
 use crate::package::PackageInterfaceHandle;
 use crate::repository::{InstalledRepositoryInterface, InstalledRepositoryInterfaceHandle};
@@ -796,7 +797,7 @@ impl InstallationManager {
         let package = operation.get_package();
 
         if !repo.has_package(package.clone().into())? {
-            repo.add_package(crate::package::PackageInterfaceHandle::dup(&package.into()));
+            repo.add_package(PackageInterfaceHandle::dup(&package.into()));
         }
 
         Ok(())
@@ -961,7 +962,7 @@ impl InstallationManager {
                 .or_else(|| {
                     io_ref
                         .as_any()
-                        .downcast_ref::<crate::io::buffer_io::BufferIO>()
+                        .downcast_ref::<BufferIO>()
                         .map(|buffer_io| &buffer_io.inner)
                 })
                 .map(|console_io| console_io.get_progress_bar(0));

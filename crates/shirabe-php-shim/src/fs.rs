@@ -1,11 +1,11 @@
 use crate::{
-    PhpResource, StreamBacking, StreamState, UnexpectedValueException, path_from_bytes,
-    path_to_bytes,
+    PhpResource, RuntimeException, StreamBacking, StreamState, UnexpectedValueException, bconcat,
+    path_from_bytes, path_to_bytes, php_str, utf8_text,
 };
 use bstr::{BStr, BString, ByteSlice};
 use std::io::{Read as _, Write as _};
 
-pub const PHP_EOL: &BStr = crate::php_str(b"\n");
+pub const PHP_EOL: &BStr = php_str(b"\n");
 
 pub const FILE_APPEND: i64 = 8;
 
@@ -62,7 +62,7 @@ pub fn filesystem_iterator(
     );
     let base = path.as_ref();
     let rd = std::fs::read_dir(base).map_err(|_| {
-        UnexpectedValueException::new(crate::bconcat!(
+        UnexpectedValueException::new(bconcat!(
             "FilesystemIterator::__construct(",
             base,
             "): Failed to open directory"
@@ -206,7 +206,7 @@ impl RecursiveIteratorFileInfo {
     pub fn get_size(&self) -> anyhow::Result<i64> {
         match filesize(&self.path) {
             Some(size) => Ok(size),
-            None => Err(crate::RuntimeException::new(crate::bconcat!(
+            None => Err(RuntimeException::new(bconcat!(
                 "SplFileInfo::getSize(): stat failed for ",
                 self.path
             ))
@@ -228,7 +228,7 @@ pub fn recursive_directory_iterator(
 ) -> Result<RecursiveDirectoryIterator, UnexpectedValueException> {
     let root = path.as_ref().to_path_buf();
     if !root.is_dir() {
-        return Err(UnexpectedValueException::new(crate::bconcat!(
+        return Err(UnexpectedValueException::new(bconcat!(
             "RecursiveDirectoryIterator::__construct(",
             root,
             "): Failed to open directory"
@@ -295,7 +295,7 @@ pub fn directory_iterator(
 ) -> Result<Vec<DirectoryIteratorEntry>, UnexpectedValueException> {
     let base = path.as_ref();
     let rd = std::fs::read_dir(base).map_err(|_| {
-        UnexpectedValueException::new(crate::bconcat!(
+        UnexpectedValueException::new(bconcat!(
             "DirectoryIterator::__construct(",
             base,
             "): Failed to open directory"
@@ -324,7 +324,7 @@ pub fn fopen(
 ) -> Result<PhpResource, std::io::Error> {
     let mode = BStr::new(mode.as_ref());
     let path = file.as_ref();
-    let file = crate::path_to_bytes(path);
+    let file = path_to_bytes(path);
     match file {
         b"php://output" | b"php://stdout" => return Ok(PhpResource::Stdout),
         b"php://stderr" => return Ok(PhpResource::Stderr),
@@ -962,7 +962,7 @@ pub fn umask() -> u32 {
     // Linux exposes the current umask via /proc/self/status, which reads it without disturbing it.
     let from_proc = std::fs::read("/proc/self/status").ok().and_then(|status| {
         status.split(|b| *b == b'\n').find_map(|line| {
-            let value = crate::utf8_text(line.strip_prefix(b"Umask:")?)?;
+            let value = utf8_text(line.strip_prefix(b"Umask:")?)?;
             u32::from_str_radix(value.trim(), 8).ok()
         })
     });
@@ -1209,9 +1209,9 @@ fn glob_join(base: &[u8], seg: &[u8]) -> BString {
     if base.is_empty() {
         BString::from(seg)
     } else if base == b"/" {
-        crate::bconcat!("/", seg)
+        bconcat!("/", seg)
     } else {
-        crate::bconcat!(base, "/", seg)
+        bconcat!(base, "/", seg)
     }
 }
 
@@ -1343,7 +1343,7 @@ fn glob_expand_braces(pattern: &[u8]) -> Vec<BString> {
     let inner = &pattern[open + 1..close];
     let mut result = Vec::new();
     for alt in glob_split_top_commas(inner) {
-        let combined = crate::bconcat!(prefix, alt, suffix);
+        let combined = bconcat!(prefix, alt, suffix);
         result.extend(glob_expand_braces(&combined));
     }
     result
@@ -1371,6 +1371,7 @@ fn glob_split_top_commas(inner: &[u8]) -> Vec<&[u8]> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::stream_get_contents;
 
     #[test]
     fn reads_return_raw_bytes() {
@@ -1387,7 +1388,7 @@ mod tests {
 
         rewind(&stream);
         assert_eq!(
-            crate::stream_get_contents(&stream),
+            stream_get_contents(&stream),
             Some(b"\xff\xfe\n\xc3\xa9\x80".to_vec())
         );
     }

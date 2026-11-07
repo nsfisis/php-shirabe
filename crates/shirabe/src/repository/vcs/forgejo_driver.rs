@@ -5,9 +5,9 @@ use crate::config::Config;
 use crate::downloader::TransportException;
 use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface};
 use crate::json::{JsonEncodeOptions, JsonFile};
-use crate::repository::vcs::{GitDriver, VcsDriverBase};
+use crate::repository::vcs::{GitDriver, VcsDriverBase, VcsDriverInterface};
 use crate::util::http::Response;
-use crate::util::{Forgejo, ForgejoRepositoryData, ForgejoUrl};
+use crate::util::{Forgejo, ForgejoRepositoryData, ForgejoUrl, HttpDownloader, ProcessExecutor};
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
@@ -31,8 +31,8 @@ impl ForgejoDriver {
         repo_config: IndexMap<BString, PhpMixed>,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
-        http_downloader: std::rc::Rc<std::cell::RefCell<crate::util::HttpDownloader>>,
-        process: std::rc::Rc<std::cell::RefCell<crate::util::ProcessExecutor>>,
+        http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
+        process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     ) -> Self {
         Self {
             inner: VcsDriverBase::new(repo_config, io, config, http_downloader, process),
@@ -634,7 +634,7 @@ impl ForgejoDriver {
     }
 }
 
-impl crate::repository::vcs::VcsDriverInterface for ForgejoDriver {
+impl VcsDriverInterface for ForgejoDriver {
     fn initialize(&mut self) -> anyhow::Result<()> {
         ForgejoDriver::initialize(self)
     }

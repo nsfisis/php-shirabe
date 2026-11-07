@@ -4,7 +4,7 @@ use crate::cursor::Cursor;
 use crate::exception::LogicException;
 use crate::helper::Helper;
 use crate::output::{
-    ConsoleOutputInterface, ConsoleSectionOutput, OutputInterface, output_interface,
+    ConsoleOutput, ConsoleOutputInterface, ConsoleSectionOutput, OutputInterface, output_interface,
 };
 use crate::terminal::Terminal;
 use bstr::{BStr, BString};
@@ -78,7 +78,7 @@ impl ProgressBar {
         // reduces to a downcast to the concrete type.
         let output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>> = {
             let redirected = AsAny::as_any(&*output.borrow())
-                .downcast_ref::<crate::output::ConsoleOutput>()
+                .downcast_ref::<ConsoleOutput>()
                 .map(|console| console.get_error_output());
             redirected.unwrap_or(output)
         };

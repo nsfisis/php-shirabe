@@ -1,11 +1,12 @@
 //! ref: composer/src/Composer/Repository/InstalledFilesystemRepository.php sha1:67c4cff619a86728e1eb35d1d1bac3b96c102163
 
+use crate::installer::InstallationManager;
 use crate::json::JsonFile;
 use crate::package::{BasePackageHandle, PackageInterfaceHandle, RootPackageInterfaceHandle};
 use crate::repository::{
     AdvisoryProviderInterface, FilesystemRepository, FindPackageConstraint,
     InstalledRepositoryInterface, LoadPackagesResult, ProviderInfo, RepositoryInterface,
-    SearchResult, WritableRepositoryInterface,
+    RepositoryInterfaceWeakHandle, SearchResult, WritableRepositoryInterface,
 };
 use crate::util::Filesystem;
 use bstr::{BStr, BString};
@@ -72,7 +73,7 @@ impl WritableRepositoryInterface for InstalledFilesystemRepository {
     fn write(
         &mut self,
         dev_mode: bool,
-        installation_manager: &crate::installer::InstallationManager,
+        installation_manager: &InstallationManager,
     ) -> anyhow::Result<()> {
         // For testing only (ref InstalledFilesystemRepositoryMock::write is a noop).
         if self.mock {
@@ -181,13 +182,13 @@ impl RepositoryInterface for InstalledFilesystemRepository {
     }
     fn as_writable_repository_interface_mut(
         &mut self,
-    ) -> Option<&mut dyn crate::repository::WritableRepositoryInterface> {
+    ) -> Option<&mut dyn WritableRepositoryInterface> {
         Some(self)
     }
     fn as_any(&self) -> &dyn std::any::Any {
         self
     }
-    fn set_self_handle(&self, weak: crate::repository::RepositoryInterfaceWeakHandle) {
+    fn set_self_handle(&self, weak: RepositoryInterfaceWeakHandle) {
         self.inner.set_self_handle(weak);
     }
 }

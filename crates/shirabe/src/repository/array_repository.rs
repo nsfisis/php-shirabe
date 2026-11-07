@@ -7,7 +7,8 @@ use crate::package::{
 };
 use crate::repository::{
     AbandonedInfo, FindPackageConstraint, LoadPackagesResult, ProviderInfo, RepositoryInterface,
-    RepositoryInterfaceHandle, RepositoryInterfaceWeakHandle, SearchResult,
+    RepositoryInterfaceHandle, RepositoryInterfaceWeakHandle, SEARCH_FULLTEXT, SEARCH_VENDOR,
+    SearchResult,
 };
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
@@ -321,7 +322,7 @@ impl RepositoryInterface for ArrayRepository {
         mode: i64,
         r#type: Option<BString>,
     ) -> anyhow::Result<Vec<SearchResult>> {
-        let regex = if mode == crate::repository::SEARCH_FULLTEXT {
+        let regex = if mode == SEARCH_FULLTEXT {
             let parts = preg_split(php_regex!("{\\s+}"), preg_quote(&query, None));
             bconcat!("{(?:", implode("|", &parts), ")}i")
         } else {
@@ -333,7 +334,7 @@ impl RepositoryInterface for ArrayRepository {
         let mut matches: IndexMap<BString, SearchResult> = IndexMap::new();
         for package in self.get_packages_internal() {
             let mut name = BString::from(&package.get_name()[..]);
-            if mode == crate::repository::SEARCH_VENDOR {
+            if mode == SEARCH_VENDOR {
                 // PHP: [$name] = explode('/', $name);
                 name = explode_with_limit("/", &name, 2).swap_remove(0);
             }
@@ -348,7 +349,7 @@ impl RepositoryInterface for ArrayRepository {
 
             let complete = package.as_complete();
 
-            let fulltext_match = mode == crate::repository::SEARCH_FULLTEXT
+            let fulltext_match = mode == SEARCH_FULLTEXT
                 && complete.is_some()
                 && preg_is_match(
                     &regex,
@@ -364,7 +365,7 @@ impl RepositoryInterface for ArrayRepository {
                 );
 
             if preg_is_match(&regex, &name) || fulltext_match {
-                if mode == crate::repository::SEARCH_VENDOR {
+                if mode == SEARCH_VENDOR {
                     matches.insert(
                         name.clone(),
                         SearchResult {

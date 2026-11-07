@@ -2,21 +2,22 @@
 
 use crate::autoload::ClassLoader;
 use crate::composer::{ComposerHandle, ComposerWeakHandle, PartialComposerHandle};
-use crate::config::AllowPlugins;
+use crate::config::{AllowPlugins, Config};
 use crate::event_dispatcher::EventDispatcher;
 use crate::factory::DisablePlugins;
 use crate::installer::InstallerInterface;
-use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite};
+use crate::io::{DEBUG, IOInterface, IOInterfaceImmutable, IOInterfaceWrite};
 use crate::package::version::VersionParser;
 use crate::package::{
-    LockerInterface, PackageInterfaceHandle, RootPackageInterfaceHandle, base_package,
+    BasePackageHandle, LockerInterface, PackageInterfaceHandle, RootPackageInterfaceHandle,
+    base_package,
 };
-use crate::plugin::PluginBlockedException;
 use crate::plugin::capability::Capability;
 use crate::plugin::php_call::PhpCall;
 use crate::plugin::plugin_interface::{self, PluginInterface};
 use crate::plugin::proxy::{PhpCapabilityProxy, PhpCommandProviderProxy, PhpPluginProxy, php_is_a};
-use crate::plugin::rpc::table::plugin_handle_value;
+use crate::plugin::rpc::table::{composer_handle_value, io_handle_value, plugin_handle_value};
+use crate::plugin::{PluginBlockedException, php_installer_proxy};
 use crate::repository::{
     InstalledRepository, RepositoryInterfaceHandle, RepositoryUtils, RootPackageRepository,
 };
@@ -288,7 +289,7 @@ impl PluginManager {
                     "as it is not in config.allow-plugins"
                 ),
                 true,
-                crate::io::DEBUG,
+                DEBUG,
             );
             return Ok(());
         }
@@ -505,12 +506,9 @@ impl PluginManager {
                 let composer = self.composer_full();
                 let handle = self.php_runtime_new_object_with_args(
                     class.as_bstr(),
-                    vec![
-                        crate::plugin::rpc::table::io_handle_value(&self.io)?,
-                        crate::plugin::rpc::table::composer_handle_value(&composer),
-                    ],
+                    vec![io_handle_value(&self.io)?, composer_handle_value(&composer)],
                 )?;
-                let installer = crate::plugin::php_installer_proxy(handle);
+                let installer = php_installer_proxy(handle);
                 composer
                     .borrow()
                     .get_installation_manager()
@@ -735,7 +733,7 @@ impl PluginManager {
                             " as it is not in config.allow-plugins"
                         ),
                         true,
-                        crate::io::DEBUG,
+                        DEBUG,
                     );
                     return Ok(());
                 }
@@ -760,7 +758,7 @@ impl PluginManager {
                 }
             ),
             true,
-            crate::io::DEBUG,
+            DEBUG,
         );
         self.plugins.push(plugin.clone());
         plugin
@@ -794,7 +792,7 @@ impl PluginManager {
         self.io.write_error3(
             bconcat!("Unloading plugin ", plugin.borrow().get_class_name()),
             true,
-            crate::io::DEBUG,
+            DEBUG,
         );
         let removed = self.plugins.remove(index);
         removed
@@ -825,7 +823,7 @@ impl PluginManager {
         self.io.write_error3(
             bconcat!("Uninstalling plugin ", plugin.borrow().get_class_name()),
             true,
-            crate::io::DEBUG,
+            DEBUG,
         );
         plugin
             .borrow_mut()
@@ -857,9 +855,9 @@ impl PluginManager {
         }
 
         let sorted_packages = PackageSorter::sort_packages(packages.to_vec(), weights);
-        let required_packages: Vec<crate::package::BasePackageHandle> = if !is_global_repo {
+        let required_packages: Vec<BasePackageHandle> = if !is_global_repo {
             // PHP: $requiredPackages = RepositoryUtils::filterRequiredPackages($packages, $rootPackage, true);
-            let bucket: Vec<crate::package::BasePackageHandle> = vec![];
+            let bucket: Vec<BasePackageHandle> = vec![];
             RepositoryUtils::filter_required_packages(
                 packages.as_slice(),
                 root_package.unwrap().into(),
@@ -1290,7 +1288,7 @@ impl PluginManager {
                                 config_section.insert("config".into(), PhpMixed::Array(inner));
                                 config
                                     .borrow_mut()
-                                    .merge(&config_section, crate::config::Config::SOURCE_UNKNOWN);
+                                    .merge(&config_section, Config::SOURCE_UNKNOWN);
                             }
                         }
 

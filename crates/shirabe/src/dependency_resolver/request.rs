@@ -171,8 +171,8 @@ impl Request {
     pub fn get_present_map(
         &self,
         package_ids: bool,
-    ) -> anyhow::Result<IndexMap<BString, crate::package::BasePackageHandle>> {
-        let mut present_map: IndexMap<BString, crate::package::BasePackageHandle> = IndexMap::new();
+    ) -> anyhow::Result<IndexMap<BString, BasePackageHandle>> {
+        let mut present_map: IndexMap<BString, BasePackageHandle> = IndexMap::new();
 
         if let Some(ref locked_repository) = self.locked_repository {
             for package in RepositoryInterface::get_packages(&mut *locked_repository.borrow_mut())?

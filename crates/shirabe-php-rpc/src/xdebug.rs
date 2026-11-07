@@ -3,6 +3,7 @@
 //! Keeping Xdebug out of the PHP worker, which is where Composer's restart of itself lands in
 //! this port. See `docs/dev/xdebug.md`.
 
+use crate::xdebug_active;
 use bstr::BStr;
 use shirabe_php_shim::{getenv, os_str_from_bytes, php_str};
 
@@ -21,7 +22,7 @@ pub fn is_xdebug_active() -> anyhow::Result<bool> {
         return Ok(false);
     }
 
-    crate::xdebug_active()
+    xdebug_active()
 }
 
 /// Whether the worker is started with Xdebug switched off, which is this port's stand-in for

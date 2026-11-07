@@ -12,19 +12,28 @@ use crate::command::{
     ValidateCommand,
 };
 use crate::composer;
-use crate::composer::PartialComposerHandle;
+use crate::composer::{ComposerHandle, PartialComposerHandle, composer_full};
 use crate::config::UseParentDir;
 use crate::console::GithubActionError;
 use crate::downloader::TransportException;
 use crate::event_dispatcher::{EventDispatcher, ScriptExecutionException};
 use crate::exception::NoSslException;
-use crate::factory::Factory;
+use crate::factory::{DisablePlugins, Factory};
 use crate::installer::Installer;
 use crate::io::{
     ConsoleIO, IOInterface, IOInterfaceImmutable, IOInterfaceWrite, NullIO, io_interface,
 };
 use crate::json::JsonValidationException;
+use crate::plugin::console_bridge::{
+    RustCommandMetadata, extend_console_application_commands,
+    extend_console_application_rust_command, publish_console_application_context,
+    reset_pending_plugin_command_handles, take_pending_plugin_command_handles,
+};
 use crate::plugin::php_call::PhpCall;
+use crate::plugin::rpc::dispatch::find_file_in_registered_loaders;
+use crate::plugin::rpc::table::{composer_handle_value, io_handle_value};
+use crate::plugin::{PhpCommandProxy, new_php_object, php_class_query};
+use crate::util::sync_executor::block_on;
 use crate::util::{ErrorHandler, Filesystem, HttpDownloader, Platform, Silencer};
 use bstr::{B, BStr, BString, ByteSlice, ByteVec};
 use indexmap::IndexMap;
@@ -344,9 +353,9 @@ impl Application {
                     self.io.clone()
                 };
             let disable_plugins_enum = if disable_plugins {
-                crate::factory::DisablePlugins::All
+                DisablePlugins::All
             } else {
-                crate::factory::DisablePlugins::None
+                DisablePlugins::None
             };
             match Factory::create(io_for_factory, None, disable_plugins_enum, disable_scripts) {
                 Ok(c) => self.composer = Some(c.upcast()),
@@ -528,14 +537,14 @@ impl Application {
     ) -> anyhow::Result<Vec<std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>>> {
         let mut commands: Vec<std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>> = vec![];
 
-        crate::plugin::console_bridge::reset_pending_plugin_command_handles();
+        reset_pending_plugin_command_handles();
 
         let mut composer = self.get_composer(false, Some(false), None)?;
         if composer.is_none() {
             let disable_plugins = if self.disable_plugins_by_default {
-                crate::factory::DisablePlugins::All
+                DisablePlugins::All
             } else {
-                crate::factory::DisablePlugins::None
+                DisablePlugins::None
             };
             composer = Factory::create_global(
                 self.io.clone(),
@@ -550,14 +559,8 @@ impl Application {
                 .expect("Factory::create and Factory::create_global build a full Composer");
             let pm = composer.borrow().get_plugin_manager();
             let mut ctor_args: IndexMap<BString, shirabe_php_rpc::PluginValue> = IndexMap::new();
-            ctor_args.insert(
-                BString::from("composer"),
-                crate::plugin::rpc::table::composer_handle_value(&composer),
-            );
-            ctor_args.insert(
-                BString::from("io"),
-                crate::plugin::rpc::table::io_handle_value(&self.io)?,
-            );
+            ctor_args.insert(BString::from("composer"), composer_handle_value(&composer));
+            ctor_args.insert(BString::from("io"), io_handle_value(&self.io)?);
             let capabilities = pm.borrow().get_plugin_capabilities(
                 BStr::new("Composer\\Plugin\\Capability\\CommandProvider"),
                 ctor_args,
@@ -579,7 +582,7 @@ impl Application {
             if !commands.is_empty() {
                 self.register_worker_console_commands(
                     Some(&composer),
-                    crate::plugin::console_bridge::take_pending_plugin_command_handles(),
+                    take_pending_plugin_command_handles(),
                 )?;
             }
         }
@@ -595,16 +598,16 @@ impl Application {
     /// registered later join it through `ApplicationHandle::register_worker_rust_command`.
     fn register_worker_console_commands(
         &mut self,
-        composer: Option<&crate::composer::ComposerHandle>,
+        composer: Option<&ComposerHandle>,
         handles: Vec<shirabe_php_rpc::PhpObjHandle>,
     ) -> anyhow::Result<()> {
         if self.published_worker_console_context {
-            return crate::plugin::console_bridge::extend_console_application_commands(handles);
+            return extend_console_application_commands(handles);
         }
         self.published_worker_console_context = true;
 
         let mut seen: Vec<*const ()> = Vec::new();
-        let mut rust_commands: Vec<crate::plugin::console_bridge::RustCommandMetadata> = Vec::new();
+        let mut rust_commands: Vec<RustCommandMetadata> = Vec::new();
         for command in self.commands.values() {
             let ptr = std::rc::Rc::as_ptr(command) as *const ();
             if seen.contains(&ptr) {
@@ -613,7 +616,7 @@ impl Application {
             seen.push(ptr);
             rust_commands.push(rust_command_metadata(&*command.borrow()));
         }
-        crate::plugin::console_bridge::publish_console_application_context(
+        publish_console_application_context(
             composer,
             &self.io,
             self.get_initial_working_directory(),
@@ -1866,7 +1869,7 @@ impl ApplicationHandle {
             return Ok(());
         }
         let metadata = rust_command_metadata(&*command.borrow());
-        crate::plugin::console_bridge::extend_console_application_rust_command(metadata)
+        extend_console_application_rust_command(metadata)
     }
 
     pub async fn run(
@@ -2324,7 +2327,7 @@ impl ApplicationHandle {
                                 let composer_opt =
                                     application.borrow_mut().get_composer(false, None, None)?;
                                 if let Some(ref composer_handle) = composer_opt {
-                                    let composer = crate::composer::composer_full(composer_handle);
+                                    let composer = composer_full(composer_handle);
                                     let root_package = composer.get_package();
                                     let generator = composer.get_autoload_generator().clone();
                                     let generator = generator.borrow();
@@ -2366,13 +2369,12 @@ impl ApplicationHandle {
                                 // `Composer\Command\AboutCommand`) is imported as a command by
                                 // PHP but falls through to ScriptAliasCommand here.
                                 let is_command_class = is_string(dummy)
-                                    && crate::plugin::rpc::dispatch::find_file_in_registered_loaders(dummy_str)?
-                                        .is_some()
+                                    && find_file_in_registered_loaders(dummy_str)?.is_some()
                                     && {
                                         EventDispatcher::ensure_composer_php_runtime(|| {
                                             let cache_dir = match composer_opt {
                                                 Some(ref composer_handle) => {
-                                                    crate::composer::composer_full(composer_handle)
+                                                    composer_full(composer_handle)
                                                         .get_config()
                                                         .borrow()
                                                         .get_path("cache-dir")?
@@ -2384,10 +2386,10 @@ impl ApplicationHandle {
                                             };
                                             Ok(path_from_bytes(&cache_dir).to_path_buf())
                                         })?;
-                                        crate::plugin::php_class_query(
+                                        php_class_query(
                                             BStr::new("class_exists"),
                                             vec![shirabe_php_rpc::PluginValue::string(dummy_str)],
-                                        )? && crate::plugin::php_class_query(
+                                        )? && php_class_query(
                                             BStr::new("is_subclass_of"),
                                             vec![
                                                 shirabe_php_rpc::PluginValue::string(dummy_str),
@@ -2400,7 +2402,7 @@ impl ApplicationHandle {
                                     };
                                 let cmd: std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>> =
                                     if is_command_class {
-                                        if crate::plugin::php_class_query(
+                                        if php_class_query(
                                             BStr::new("is_subclass_of"),
                                             vec![
                                                 shirabe_php_rpc::PluginValue::string(dummy_str),
@@ -2413,7 +2415,7 @@ impl ApplicationHandle {
                                             io.write_error(bconcat!("<warning>The script named ", script, " extends SingleCommandApplication which is not compatible with Composer 2.9+, make sure you extend Symfony\\Component\\Console\\Command instead.</warning>"));
                                         }
 
-                                        let handle = crate::plugin::new_php_object(
+                                        let handle = new_php_object(
                                             dummy_str.as_bstr(),
                                             vec![shirabe_php_rpc::PluginValue::string(
                                                 script.clone(),
@@ -2448,16 +2450,13 @@ impl ApplicationHandle {
                                             ])?;
                                         }
 
-                                        let cmd =
-                                            crate::plugin::PhpCommandProxy::new_script_command(
-                                                handle,
-                                            )?;
+                                        let cmd = PhpCommandProxy::new_script_command(handle)?;
                                         application.borrow_mut().register_worker_console_commands(
                                             composer_opt
                                                 .as_ref()
                                                 .and_then(|c| c.as_full())
                                                 .as_ref(),
-                                            crate::plugin::console_bridge::take_pending_plugin_command_handles(),
+                                            take_pending_plugin_command_handles(),
                                         )?;
                                         std::rc::Rc::new(std::cell::RefCell::new(cmd))
                                     } else {
@@ -3026,10 +3025,8 @@ thread_local! {
 }
 
 /// The metadata a worker-side `\Shirabe\RustCommandStub` mirrors of a registered command.
-fn rust_command_metadata(
-    command: &dyn SymfonyCommand,
-) -> crate::plugin::console_bridge::RustCommandMetadata {
-    crate::plugin::console_bridge::RustCommandMetadata {
+fn rust_command_metadata(command: &dyn SymfonyCommand) -> RustCommandMetadata {
+    RustCommandMetadata {
         name: command
             .get_name()
             .expect("a registered command always has a name"),
@@ -3095,5 +3092,5 @@ pub(crate) fn run_worker_reverse_command(name: &BStr, input_line: &BStr) -> anyh
         std::cell::RefCell::new(ConsoleOutput::new(None, None, None)?),
     );
     // The worker's callback is a synchronous RPC request, answered on the thread serving it.
-    crate::util::sync_executor::block_on(command.borrow().run(input, output))
+    block_on(command.borrow().run(input, output))
 }

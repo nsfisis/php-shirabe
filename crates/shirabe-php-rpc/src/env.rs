@@ -9,7 +9,7 @@
 //! TODO(php-runtime): the reverse direction is missing — a write PHP code makes to its own
 //! environment is not reflected back into the Rust-side storages.
 
-use crate::PluginValue;
+use crate::{PluginValue, call_internal_function};
 use bstr::BStr;
 use shirabe_php_shim::{EnvStorageKind, env_mutations_since};
 use std::os::unix::ffi::OsStrExt as _;
@@ -50,8 +50,7 @@ pub(crate) fn flush() -> anyhow::Result<()> {
             ])
         })
         .collect();
-    let outcome =
-        crate::call_internal_function("__shirabe_sync_env", vec![PluginValue::List(mutations)])?;
+    let outcome = call_internal_function("__shirabe_sync_env", vec![PluginValue::List(mutations)])?;
     // The worker only writes the three storages; nothing it does there can throw.
     outcome.unwrap_or_else(|throw| panic!("PHP RPC: __shirabe_sync_env threw: {throw}"));
     *synced = cursor;

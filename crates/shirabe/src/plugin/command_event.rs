@@ -1,6 +1,6 @@
 //! ref: composer/src/Composer/Plugin/CommandEvent.php sha1:49a67f60d60f95d2a6013eee5970f90d4c57b01a
 
-use crate::event_dispatcher::{Event, EventFlags};
+use crate::event_dispatcher::{Event, EventFlags, delegate_event_interface_to_inner};
 use bstr::BString;
 use shirabe_symfony_console::input::InputInterface;
 use shirabe_symfony_console::output::OutputInterface;
@@ -64,4 +64,4 @@ impl CommandEvent {
     }
 }
 
-crate::event_dispatcher::delegate_event_interface_to_inner!(CommandEvent, inner);
+delegate_event_interface_to_inner!(CommandEvent, inner);

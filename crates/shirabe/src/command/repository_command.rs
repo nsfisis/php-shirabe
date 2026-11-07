@@ -1,8 +1,11 @@
 //! ref: composer/src/Composer/Command/RepositoryCommand.php sha1:c02582e37b0040d5cf80534502873f1f61fc16d9
 
+use crate::command::base_command::base_command_complete;
 use crate::command::{BaseCommand, BaseCommandData, BaseConfigCommand};
 use crate::config::{Config, ConfigSourceInterface, JsonConfigSource};
-use crate::console::input::{InputArgument, InputOption};
+use crate::console::input::{InputArgument, InputOption, SuggestedValues};
+use crate::delegate_base_command_trait_impls_to_inner;
+use crate::factory::Factory;
 use crate::io::IOInterfaceWrite;
 use crate::json::JsonFile;
 use bstr::{B, BString, ByteSlice};
@@ -122,8 +125,8 @@ impl RepositoryCommand {
     }
 
     /// PHP: private function suggestTypeForAdd(): \Closure (a static closure — `this` unused)
-    fn suggest_type_for_add(&self) -> crate::console::input::SuggestedValues {
-        crate::console::input::SuggestedValues::Closure(Box::new(|_this, input, _suggestions| {
+    fn suggest_type_for_add(&self) -> SuggestedValues {
+        SuggestedValues::Closure(Box::new(|_this, input, _suggestions| {
             if input.get_argument("action")?.to_php_string() == "add" {
                 return Ok(vec![
                     "composer".into(),
@@ -137,8 +140,8 @@ impl RepositoryCommand {
         }))
     }
 
-    fn suggest_repo_names(&self) -> crate::console::input::SuggestedValues {
-        crate::console::input::SuggestedValues::Closure(Box::new(|this, input, _suggestions| {
+    fn suggest_repo_names(&self) -> SuggestedValues {
+        SuggestedValues::Closure(Box::new(|this, input, _suggestions| {
             let action = input.get_argument("action")?.to_php_string();
             if action == "enable" || action == "disable" {
                 return Ok(vec!["packagist.org".into()]);
@@ -157,7 +160,7 @@ impl RepositoryCommand {
             let input_handle: std::rc::Rc<
                 std::cell::RefCell<dyn shirabe_symfony_console::input::InputInterface>,
             > = std::rc::Rc::new(std::cell::RefCell::new(input.clone()));
-            let config = crate::factory::Factory::create_config(None, None)?;
+            let config = Factory::create_config(None, None)?;
             let config_file = JsonFile::new(
                 this.get_composer_config_file(input_handle, &config)?,
                 None,
@@ -249,7 +252,7 @@ impl Command for RepositoryCommand {
                 Some(InputArgument::OPTIONAL),
                 "Action to perform: list, add, remove, set-url, get-url, enable, disable",
                 Some(InputValue::from("list")),
-                crate::console::input::SuggestedValues::List(vec![
+                SuggestedValues::List(vec![
                     BString::from("list"),
                     BString::from("add"),
                     BString::from("remove"),
@@ -578,9 +581,7 @@ impl Command for RepositoryCommand {
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<()> {
-        <Self as crate::command::base_config_command::BaseConfigCommand>::initialize(
-            self, input, output,
-        )
+        <Self as BaseConfigCommand>::initialize(self, input, output)
     }
 
     fn complete(
@@ -588,18 +589,18 @@ impl Command for RepositoryCommand {
         input: &shirabe_symfony_console::completion::CompletionInput,
         suggestions: &mut shirabe_symfony_console::completion::CompletionSuggestions,
     ) -> anyhow::Result<()> {
-        crate::command::base_command::base_command_complete(self, input, suggestions)
+        base_command_complete(self, input, suggestions)
     }
 
     shirabe_symfony_console::delegate_command_trait_impls_to_inner!(base_command_data);
 }
 
 impl BaseCommand for RepositoryCommand {
-    fn base_command_data(&self) -> &crate::command::BaseCommandData {
+    fn base_command_data(&self) -> &BaseCommandData {
         &self.base_command_data
     }
 
-    crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
+    delegate_base_command_trait_impls_to_inner!(base_command_data);
 }
 
 impl BaseConfigCommand for RepositoryCommand {

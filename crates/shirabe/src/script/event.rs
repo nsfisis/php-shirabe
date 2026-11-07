@@ -1,7 +1,9 @@
 //! ref: composer/src/Composer/Script/Event.php sha1:c8dacd8d044ed5c6cef8cc1d32da2162894f6f3a
 
 use crate::composer::ComposerWeakHandle;
-use crate::event_dispatcher::{Event as BaseEvent, EventFlags, EventInterface};
+use crate::event_dispatcher::{
+    Event as BaseEvent, EventFlags, EventInterface, delegate_event_interface_to_inner,
+};
 use crate::io::IOInterface;
 use bstr::BString;
 
@@ -72,7 +74,7 @@ impl Event {
     }
 }
 
-crate::event_dispatcher::delegate_event_interface_to_inner!(Event, inner);
+delegate_event_interface_to_inner!(Event, inner);
 
 impl EventInterface for OriginatingEvent {
     fn as_any(&self) -> &dyn std::any::Any {

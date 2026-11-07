@@ -15,6 +15,7 @@ use Shirabe\Lint\Linters\NoFormatTrailingComma;
 use Shirabe\Lint\Linters\NoHaltCompilerLiteral;
 use Shirabe\Lint\Linters\NoModRs;
 use Shirabe\Lint\Linters\NoPhpDocTag;
+use Shirabe\Lint\Linters\NoQualifiedCratePath;
 use Shirabe\Lint\Linters\NoQualifiedPhpShimPath;
 use Shirabe\Lint\Linters\NoStdCollectionsMaps;
 use Shirabe\Lint\Linters\NoUseAsAlias;
@@ -60,6 +61,7 @@ $runner = new Runner($rootDir, [
     ]],
     [new NoModRs(), []],
     [new NoPhpDocTag(), []],
+    [new NoQualifiedCratePath(), []],
     [new NoQualifiedPhpShimPath(), [
         // Newtypes named after the shim exception they wrap; the shim type cannot be imported
         // under its own name.

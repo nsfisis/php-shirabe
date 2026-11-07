@@ -9,16 +9,26 @@ use crate::event_dispatcher::{
     SubscribedEventEntry,
 };
 use crate::installer::{BinaryInstaller, InstallerEvent, PackageEvent};
-use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite};
+use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, NORMAL, QUIET, VERBOSE};
 use crate::plugin::php_call::PhpCall;
 use crate::plugin::post_file_download_event::PostFileDownloadEvent;
 use crate::plugin::pre_file_download_event::PreFileDownloadEvent;
 use crate::plugin::pre_pool_create_event::PrePoolCreateEvent;
-use crate::plugin::rpc::dispatch::{PluginRpcDispatcher, error_throw, unavailable_method};
-use crate::plugin::rpc::table::{RustEntity, register_entity, rust_handle_value};
+use crate::plugin::rpc::dispatch::{
+    PluginRpcDispatcher, call_static_entity, construct_entity, dispatch_job_service_method,
+    dispatch_r_table_method, error_throw, find_file_in_registered_loaders, unavailable_method,
+};
+use crate::plugin::rpc::entities::events::{
+    dispatch_post_file_download_event_method, dispatch_pre_file_download_event_method,
+    dispatch_pre_pool_create_event_method,
+};
+use crate::plugin::rpc::table::{
+    RustEntity, io_stub_class, operation_handle_value, register_composer_entity, register_entity,
+    register_io_entity, repository_handle_value, rust_handle_value, transaction_handle_value,
+};
 use crate::plugin::throwable_bridge::throw_into_error;
 use crate::plugin::{CommandEvent, PreCommandRunEvent};
-use crate::repository::InstalledRepositoryInterfaceHandle;
+use crate::repository::{FilesystemRepository, InstalledRepositoryInterfaceHandle};
 use crate::script::Event as ScriptEvent;
 use crate::util::{Platform, ProcessExecutor};
 use bstr::{BStr, BString, ByteSlice};
@@ -310,7 +320,7 @@ impl EventDispatcher {
                     " event"
                 ),
                 true,
-                crate::io::NORMAL,
+                NORMAL,
             );
         }
 
@@ -400,7 +410,7 @@ impl EventDispatcher {
                         method_name,
                     ),
                     true,
-                    crate::io::VERBOSE,
+                    VERBOSE,
                 );
                 let stub_class =
                     Self::event_stub_class(&*event.borrow()).ok_or_else(|| -> anyhow::Error {
@@ -475,7 +485,7 @@ impl EventDispatcher {
                             method_name,
                         ),
                         true,
-                        crate::io::VERBOSE,
+                        VERBOSE,
                     );
                 }
                 // TODO(plugin): actually invoke callable with $event and inspect result
@@ -488,7 +498,7 @@ impl EventDispatcher {
                         self.io.write_error3(
                             bconcat!("> ", formatted_event_name_with_args, ": ", callable_str),
                             true,
-                            crate::io::VERBOSE,
+                            VERBOSE,
                         );
 
                         let mut script: Vec<BString> = explode(" ", substr(callable_str, 1, None));
@@ -543,7 +553,7 @@ impl EventDispatcher {
                                         "</error>"
                                     ),
                                     true,
-                                    crate::io::QUIET,
+                                    QUIET,
                                 );
 
                                 return Err(ScriptExecutionException::new(
@@ -571,7 +581,7 @@ impl EventDispatcher {
                                         "</warning>"
                                     ),
                                     true,
-                                    crate::io::QUIET,
+                                    QUIET,
                                 );
                             }
 
@@ -607,7 +617,7 @@ impl EventDispatcher {
                                                 "</error>"
                                             ),
                                             true,
-                                            crate::io::QUIET,
+                                            QUIET,
                                         );
                                     }
                                     return Err(e);
@@ -636,7 +646,7 @@ impl EventDispatcher {
                                     " script</warning>"
                                 ),
                                 true,
-                                crate::io::QUIET,
+                                QUIET,
                             );
                             continue;
                         }
@@ -653,7 +663,7 @@ impl EventDispatcher {
                                     " script</warning>"
                                 ),
                                 true,
-                                crate::io::QUIET,
+                                QUIET,
                             );
                             continue;
                         }
@@ -676,7 +686,7 @@ impl EventDispatcher {
                                         " event terminated with an exception</error>"
                                     ),
                                     true,
-                                    crate::io::QUIET,
+                                    QUIET,
                                 );
                                 return Err(e);
                             }
@@ -711,7 +721,7 @@ impl EventDispatcher {
                                     " script</warning>"
                                 ),
                                 true,
-                                crate::io::QUIET,
+                                QUIET,
                             );
                             continue;
                         }
@@ -725,7 +735,7 @@ impl EventDispatcher {
                                 PluginValue::Bool(true),
                             ],
                         )? {
-                            self.io.write_error3(bconcat!("<warning>Class ", class_name, " does not extend Symfony\\Component\\Console\\Command\\Command, can not call ", event_name.as_bstr(), " script</warning>"), true, crate::io::QUIET);
+                            self.io.write_error3(bconcat!("<warning>Class ", class_name, " does not extend Symfony\\Component\\Console\\Command\\Command, can not call ", event_name.as_bstr(), " script</warning>"), true, QUIET);
                             continue;
                         }
                         if self.php_runtime_bool(
@@ -742,7 +752,7 @@ impl EventDispatcher {
                                     " to a Command class, use a non-reserved name</warning>"
                                 ),
                                 true,
-                                crate::io::QUIET,
+                                QUIET,
                             );
                             continue;
                         }
@@ -821,7 +831,7 @@ try {
                             PhpCall::Function(BStr::new("__shirabe_eval"))
                                 .run_with(vec![PluginValue::string(snippet)], &mut dispatcher)?;
                         if !result.output.is_empty() {
-                            self.io.write3(&result.output, false, crate::io::NORMAL);
+                            self.io.write3(&result.output, false, NORMAL);
                         }
                         if let Some(throw) = result.throw {
                             if result.caught {
@@ -834,7 +844,7 @@ try {
                                         " event terminated with an exception</error>"
                                     ),
                                     true,
-                                    crate::io::QUIET,
+                                    QUIET,
                                 );
                             }
                             return Err(throw_into_error(PhpThrow::from_wire(throw)));
@@ -872,11 +882,10 @@ try {
                             self.io.write_error3(
                                 bconcat!("> ", event_name.as_bstr(), ": ", exec),
                                 true,
-                                crate::io::NORMAL,
+                                NORMAL,
                             );
                         } else if self.event_needs_to_output(&*event.borrow()) {
-                            self.io
-                                .write_error3(bconcat!("> ", exec), true, crate::io::NORMAL);
+                            self.io.write_error3(bconcat!("> ", exec), true, NORMAL);
                         }
 
                         let possible_local_binaries = self
@@ -998,7 +1007,7 @@ try {
                                     "</error>"
                                 ),
                                 true,
-                                crate::io::QUIET,
+                                QUIET,
                             );
 
                             return Err(ScriptExecutionException::new(
@@ -1108,14 +1117,11 @@ try {
             self.io.write_error3(
                 bconcat!("> ", event_name, ": ", class_name, "::", method_name),
                 true,
-                crate::io::NORMAL,
+                NORMAL,
             );
         } else if self.event_needs_to_output(&*event.borrow()) {
-            self.io.write_error3(
-                bconcat!("> ", class_name, "::", method_name),
-                true,
-                crate::io::NORMAL,
-            );
+            self.io
+                .write_error3(bconcat!("> ", class_name, "::", method_name), true, NORMAL);
         }
 
         let stub_class =
@@ -1340,7 +1346,7 @@ try {
                     "</info> because of COMPOSER_SKIP_SCRIPTS"
                 ),
                 true,
-                crate::io::VERBOSE,
+                VERBOSE,
             );
 
             return Vec::new();
@@ -1535,7 +1541,7 @@ try {
         let autoload = Self::composer_php_runtime_autoload(cache_dir)?;
         PhpCall::Function(BStr::new("__shirabe_require"))
             .run::<PluginValue>(vec![PluginValue::string(autoload)])?;
-        crate::repository::FilesystemRepository::load_pending_installed_versions()
+        FilesystemRepository::load_pending_installed_versions()
     }
 
     /// For testing only: a test that never registers a plugin package still needs the Composer
@@ -1636,7 +1642,7 @@ impl RustMethodDispatcher for ScriptRpcDispatcher {
                         ))));
                     }
                 };
-                let file = crate::plugin::rpc::dispatch::find_file_in_registered_loaders(class)
+                let file = find_file_in_registered_loaders(class)
                     .map_err(|error| error_throw(b"__shirabe_find_file failed", &error))?;
                 return Ok(match file {
                     Some(file) => PluginValue::string(file),
@@ -1644,14 +1650,12 @@ impl RustMethodDispatcher for ScriptRpcDispatcher {
                 });
             }
             if method_name == "__shirabe_construct" {
-                return crate::plugin::rpc::dispatch::construct_entity(&args);
+                return construct_entity(&args);
             }
             if method_name == "__shirabe_call_static" {
-                return crate::plugin::rpc::dispatch::call_static_entity(&args);
+                return call_static_entity(&args);
             }
-            if let Some(answer) =
-                crate::plugin::rpc::dispatch::dispatch_job_service_method(method_name, &args)
-            {
+            if let Some(answer) = dispatch_job_service_method(method_name, &args) {
                 return answer;
             }
             return Err(PhpThrow::runtime(bconcat!(
@@ -1660,12 +1664,7 @@ impl RustMethodDispatcher for ScriptRpcDispatcher {
                 "`"
             )));
         }
-        crate::plugin::rpc::dispatch::dispatch_r_table_method(
-            rhandle,
-            method_name,
-            &args,
-            out_params,
-        )
+        dispatch_r_table_method(rhandle, method_name, &args, out_params)
     }
 }
 
@@ -1720,11 +1719,8 @@ pub(crate) fn dispatch_event_method(
             let composer = composer.ok_or_else(|| {
                 PhpThrow::runtime(BString::from("the Composer instance of this event is gone"))
             })?;
-            let rhandle = crate::plugin::rpc::table::register_composer_entity(&composer);
-            Ok(crate::plugin::rpc::table::rust_handle_value(
-                rhandle,
-                BStr::new("Composer\\Composer"),
-            ))
+            let rhandle = register_composer_entity(&composer);
+            Ok(rust_handle_value(rhandle, BStr::new("Composer\\Composer")))
         }
         b"getIO" => {
             let io = match (
@@ -1741,15 +1737,13 @@ pub(crate) fn dispatch_event_method(
                     )));
                 }
             };
-            let class = crate::plugin::rpc::table::io_stub_class(&io)
-                .map_err(|error| PhpThrow::runtime(error_message(&error)))?;
-            let rhandle = crate::plugin::rpc::table::register_io_entity(&io);
-            Ok(crate::plugin::rpc::table::rust_handle_value(rhandle, class))
+            let class =
+                io_stub_class(&io).map_err(|error| PhpThrow::runtime(error_message(&error)))?;
+            let rhandle = register_io_entity(&io);
+            Ok(rust_handle_value(rhandle, class))
         }
         b"getLocalRepo" => match package_event(event) {
-            Some(event) => crate::plugin::rpc::table::repository_handle_value(
-                &event.get_local_repo().as_repository_handle(),
-            ),
+            Some(event) => repository_handle_value(&event.get_local_repo().as_repository_handle()),
             None => Err(PhpThrow::runtime(BString::from(
                 "getLocalRepo is only available on package events",
             ))),
@@ -1759,7 +1753,7 @@ pub(crate) fn dispatch_event_method(
                 event
                     .get_operations()
                     .iter()
-                    .map(crate::plugin::rpc::table::operation_handle_value)
+                    .map(operation_handle_value)
                     .collect(),
             )),
             None => Err(PhpThrow::runtime(BString::from(
@@ -1767,9 +1761,7 @@ pub(crate) fn dispatch_event_method(
             ))),
         },
         b"getOperation" => match package_event(event) {
-            Some(event) => Ok(crate::plugin::rpc::table::operation_handle_value(
-                event.get_operation(),
-            )),
+            Some(event) => Ok(operation_handle_value(event.get_operation())),
             None => Err(PhpThrow::runtime(BString::from(
                 "getOperation is only available on package events",
             ))),
@@ -1813,9 +1805,7 @@ pub(crate) fn dispatch_event_method(
         },
         b"getTransaction" => match installer_event(event) {
             Some(event) => match event.get_transaction() {
-                Some(transaction) => Ok(crate::plugin::rpc::table::transaction_handle_value(
-                    transaction,
-                )),
+                Some(transaction) => Ok(transaction_handle_value(transaction)),
                 None => Ok(PluginValue::Null),
             },
             None => Err(PhpThrow::runtime(BString::from(
@@ -1824,25 +1814,14 @@ pub(crate) fn dispatch_event_method(
         },
         other => {
             if let Some(event) = event.as_any().downcast_ref::<PostFileDownloadEvent>() {
-                return crate::plugin::rpc::entities::events::dispatch_post_file_download_event_method(
-                    event,
-                    BStr::new(other),
-                );
+                return dispatch_post_file_download_event_method(event, BStr::new(other));
             }
             if let Some(event) = event.as_any_mut().downcast_mut::<PrePoolCreateEvent>() {
-                return crate::plugin::rpc::entities::events::dispatch_pre_pool_create_event_method(
-                    event,
-                    BStr::new(other),
-                    args,
-                );
+                return dispatch_pre_pool_create_event_method(event, BStr::new(other), args);
             }
             match event.as_any_mut().downcast_mut::<PreFileDownloadEvent>() {
                 Some(event) => {
-                    crate::plugin::rpc::entities::events::dispatch_pre_file_download_event_method(
-                        event,
-                        BStr::new(other),
-                        args,
-                    )
+                    dispatch_pre_file_download_event_method(event, BStr::new(other), args)
                 }
                 // TODO(plugin): the rest need full proxying of the object graph an event exposes,
                 // which does not exist yet.

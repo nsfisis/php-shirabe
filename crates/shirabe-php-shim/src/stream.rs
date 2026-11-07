@@ -1,4 +1,5 @@
-use crate::{PhpMixed, PhpResource, StreamBacking};
+use crate::fs::{SEEK_SET, fopen, fseek};
+use crate::{PhpMixed, PhpResource, StreamBacking, path_from_bytes};
 use bstr::{B, BStr, BString};
 use indexmap::IndexMap;
 use std::io::{Read as _, Write as _};
@@ -340,7 +341,7 @@ pub fn stream_select(
 /// first; `max_length < 0` reads until end.
 pub fn stream_get_contents3(stream: &PhpResource, max_length: i64, offset: i64) -> Option<Vec<u8>> {
     if offset >= 0 {
-        crate::fs::fseek(stream, offset, crate::fs::SEEK_SET);
+        fseek(stream, offset, SEEK_SET);
     }
     let max = if max_length < 0 {
         None
@@ -362,7 +363,7 @@ pub fn get_resource_type(resource: &PhpResource) -> BString {
 pub fn php_fopen_resource(path: impl AsRef<[u8]>, mode: impl AsRef<[u8]>) -> PhpResource {
     let path = BStr::new(path.as_ref());
     let mode = BStr::new(mode.as_ref());
-    crate::fs::fopen(crate::path_from_bytes(path), mode)
+    fopen(path_from_bytes(path), mode)
         .unwrap_or_else(|e| panic!("php_fopen_resource failed to open {path:?}: {e}"))
 }
 

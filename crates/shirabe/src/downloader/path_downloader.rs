@@ -3,7 +3,9 @@
 use crate::cache::Cache;
 use crate::config::Config;
 use crate::dependency_resolver::operation::{InstallOperation, UninstallOperation};
-use crate::downloader::{DownloaderInterface, FileDownloader, VcsCapableDownloaderInterface};
+use crate::downloader::{
+    ChangeReportInterface, DownloaderInterface, FileDownloader, VcsCapableDownloaderInterface,
+};
 use crate::event_dispatcher::EventDispatcher;
 use crate::io::{IOInterface, IOInterfaceWrite, io_interface};
 use crate::package::PackageInterfaceHandle;
@@ -184,7 +186,7 @@ impl VcsCapableDownloaderInterface for PathDownloader {
 }
 
 #[async_trait::async_trait(?Send)]
-impl crate::downloader::ChangeReportInterface for PathDownloader {
+impl ChangeReportInterface for PathDownloader {
     async fn get_local_changes(
         &self,
         package: PackageInterfaceHandle,
@@ -200,13 +202,11 @@ impl DownloaderInterface for PathDownloader {
         self.inner.get_installation_source()
     }
 
-    fn as_change_report_interface(&self) -> Option<&dyn crate::downloader::ChangeReportInterface> {
+    fn as_change_report_interface(&self) -> Option<&dyn ChangeReportInterface> {
         Some(self)
     }
 
-    fn as_vcs_capable_downloader_interface(
-        &self,
-    ) -> Option<&dyn crate::downloader::VcsCapableDownloaderInterface> {
+    fn as_vcs_capable_downloader_interface(&self) -> Option<&dyn VcsCapableDownloaderInterface> {
         Some(self)
     }
 

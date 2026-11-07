@@ -1,7 +1,7 @@
 //! ref: composer/vendor/symfony/console/Helper/ProcessHelper.php sha1:fa7a183ca1b817982c97017e48d81084a1c914a9
 
 use crate::helper::{DebugFormatterHelper, Helper, HelperInterface, HelperSet};
-use crate::output::{ConsoleOutputInterface, OutputInterface, output_interface};
+use crate::output::{ConsoleOutput, ConsoleOutputInterface, OutputInterface, output_interface};
 use bstr::{BStr, BString};
 use shirabe_php_shim::{
     AsAny, InvalidArgumentException, PhpMixed, bconcat, spl_object_hash, str_replace,
@@ -48,7 +48,7 @@ impl ProcessHelper {
         // reduces to a downcast to the concrete type.
         let output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>> = {
             let redirected = AsAny::as_any(&*output.borrow())
-                .downcast_ref::<crate::output::ConsoleOutput>()
+                .downcast_ref::<ConsoleOutput>()
                 .map(|console| console.get_error_output());
             redirected.unwrap_or(output)
         };
@@ -210,7 +210,7 @@ impl ProcessHelper {
         // reduces to a downcast to the concrete type.
         let output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>> = {
             let redirected = AsAny::as_any(&*output.borrow())
-                .downcast_ref::<crate::output::ConsoleOutput>()
+                .downcast_ref::<ConsoleOutput>()
                 .map(|console| console.get_error_output());
             redirected.unwrap_or(output)
         };

@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/Package/AliasPackage.php sha1:76dd979737366ab94d582e11a667bbe61e07ba41
 
 use crate::package::version::VersionParser;
-use crate::package::{BasePackage, Link, Mirror, PackageHandle, PackageInterface};
+use crate::package::{BasePackage, DisplayMode, Link, Mirror, PackageHandle, PackageInterface};
 use crate::repository::{RepositoryInterfaceHandle, RepositoryInterfaceWeakHandle};
 use bstr::{BStr, BString, ByteSlice};
 use chrono::{DateTime, Utc};
@@ -376,11 +376,7 @@ impl PackageInterface for AliasPackage {
         self.alias_of.set_source_dist_references(reference);
     }
 
-    fn get_full_pretty_version(
-        &self,
-        truncate: bool,
-        display_mode: crate::package::DisplayMode,
-    ) -> BString {
+    fn get_full_pretty_version(&self, truncate: bool, display_mode: DisplayMode) -> BString {
         BasePackage::get_full_pretty_version(self, truncate, display_mode)
     }
 

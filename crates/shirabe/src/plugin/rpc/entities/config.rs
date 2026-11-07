@@ -1,5 +1,6 @@
 //! The methods a `Composer\Config` entity answers over RPC.
 
+use crate::config::Config;
 use crate::plugin::rpc::codec::{arg, arg_or};
 use crate::plugin::rpc::dispatch::{error_throw, unavailable_method};
 use bstr::{BStr, BString, ByteSlice};
@@ -8,7 +9,7 @@ use shirabe_php_rpc::{PhpThrow, PluginValue, ToWire};
 use shirabe_php_shim::PhpMixed;
 
 pub(crate) fn dispatch_config_method(
-    config: &std::rc::Rc<std::cell::RefCell<crate::config::Config>>,
+    config: &std::rc::Rc<std::cell::RefCell<Config>>,
     method_name: &BStr,
     args: &[PluginValue],
 ) -> Result<PluginValue, PhpThrow> {
@@ -41,12 +42,8 @@ pub(crate) fn dispatch_config_method(
         }
         b"merge" => {
             let values = arg::<IndexMap<BString, PhpMixed>>(method_name, args, 0)?;
-            let source = arg_or::<BString>(
-                method_name,
-                args,
-                1,
-                crate::config::Config::SOURCE_UNKNOWN.to_owned(),
-            )?;
+            let source =
+                arg_or::<BString>(method_name, args, 1, Config::SOURCE_UNKNOWN.to_owned())?;
             config.borrow_mut().merge(&values, &source);
             Ok(PluginValue::Null)
         }

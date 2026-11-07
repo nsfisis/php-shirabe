@@ -9,14 +9,16 @@ use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::json::{JsonEncodeOptions, JsonFile};
 use crate::package::loader::{ArrayLoader, VersionFields};
 use crate::package::version::{StabilityFilter, VersionParser};
-use crate::package::{BasePackageHandle, PackageInterfaceHandle, base_package};
+use crate::package::{BasePackageHandle, Mirror, PackageInterfaceHandle, base_package};
 use crate::plugin::{
     FileDownloadContext, PluginEvents, PostFileDownloadEvent, PreFileDownloadEvent,
 };
 use crate::repository::{
-    ArrayRepository, ConfigurableRepositoryInterface, LoadPackagesResult, PlatformRepository,
+    AbandonedInfo, AdvisoryProviderInterface, ArrayRepository, ConfigurableRepositoryInterface,
+    FindPackageConstraint, LoadPackagesResult, PlatformRepository, ProviderInfo,
     RepositoryInterface, RepositoryInterfaceHandle, RepositoryInterfaceWeakHandle,
-    RepositorySecurityException, SEARCH_FULLTEXT, SEARCH_VENDOR, SecurityAdvisoryResult,
+    RepositorySecurityException, SEARCH_FULLTEXT, SEARCH_VENDOR, SearchResult,
+    SecurityAdvisoryResult,
 };
 use crate::util::http::Response;
 use crate::util::r#loop::Loop;
@@ -906,8 +908,8 @@ impl ComposerRepository {
                     m.insert(
                         "abandoned".into(),
                         match ab {
-                            crate::repository::AbandonedInfo::Replacement(r) => PhpMixed::string(r),
-                            crate::repository::AbandonedInfo::Abandoned => PhpMixed::Bool(true),
+                            AbandonedInfo::Replacement(r) => PhpMixed::string(r),
+                            AbandonedInfo::Abandoned => PhpMixed::Bool(true),
                         },
                     );
                 }
@@ -2668,9 +2670,9 @@ impl ComposerRepository {
                     && let Some(mirrors) =
                         self.source_mirrors.as_ref().and_then(|m| m.get(&src_type))
                 {
-                    let converted: Vec<crate::package::Mirror> = mirrors
+                    let converted: Vec<Mirror> = mirrors
                         .iter()
-                        .map(|m| crate::package::Mirror {
+                        .map(|m| Mirror {
                             url: m.url.clone(),
                             preferred: m.preferred,
                         })
@@ -2678,9 +2680,9 @@ impl ComposerRepository {
                     package.set_source_mirrors(Some(converted));
                 }
                 if let Some(dist_mirrors) = self.dist_mirrors.as_ref() {
-                    let converted: Vec<crate::package::Mirror> = dist_mirrors
+                    let converted: Vec<Mirror> = dist_mirrors
                         .iter()
-                        .map(|m| crate::package::Mirror {
+                        .map(|m| Mirror {
                             url: m.url.clone(),
                             preferred: m.preferred,
                         })
@@ -3363,17 +3365,15 @@ impl RepositoryInterface for ComposerRepository {
     fn find_package(
         &mut self,
         name: &BStr,
-        constraint: crate::repository::FindPackageConstraint,
+        constraint: FindPackageConstraint,
     ) -> anyhow::Result<Option<BasePackageHandle>> {
         // this call initializes loadRootServerFile which is needed for the rest below to work
         let has_providers = self.has_providers()?;
 
         let name = strtolower(name);
         let constraint: AnyConstraint = match constraint {
-            crate::repository::FindPackageConstraint::String(s) => {
-                self.version_parser.parse_constraints(&s)?
-            }
-            crate::repository::FindPackageConstraint::Constraint(c) => c,
+            FindPackageConstraint::String(s) => self.version_parser.parse_constraints(&s)?,
+            FindPackageConstraint::Constraint(c) => c,
         };
 
         if self.lazy_providers_url.is_some() {
@@ -3436,14 +3436,14 @@ impl RepositoryInterface for ComposerRepository {
         }
         self.inner.find_package(
             name.as_bstr(),
-            crate::repository::FindPackageConstraint::Constraint(constraint),
+            FindPackageConstraint::Constraint(constraint),
         )
     }
 
     fn find_packages(
         &mut self,
         name: &BStr,
-        constraint: Option<crate::repository::FindPackageConstraint>,
+        constraint: Option<FindPackageConstraint>,
     ) -> anyhow::Result<Vec<BasePackageHandle>> {
         // this call initializes loadRootServerFile which is needed for the rest below to work
         let has_providers = self.has_providers()?;
@@ -3451,10 +3451,10 @@ impl RepositoryInterface for ComposerRepository {
         let name = strtolower(name);
         let constraint: Option<AnyConstraint> = match constraint {
             None => None,
-            Some(crate::repository::FindPackageConstraint::String(s)) => {
+            Some(FindPackageConstraint::String(s)) => {
                 Some(self.version_parser.parse_constraints(&s)?)
             }
-            Some(crate::repository::FindPackageConstraint::Constraint(c)) => Some(c),
+            Some(FindPackageConstraint::Constraint(c)) => Some(c),
         };
 
         if self.lazy_providers_url.is_some() {
@@ -3513,7 +3513,7 @@ impl RepositoryInterface for ComposerRepository {
         }
         self.inner.find_packages(
             name.as_bstr(),
-            constraint.map(crate::repository::FindPackageConstraint::Constraint),
+            constraint.map(FindPackageConstraint::Constraint),
         )
     }
 
@@ -3542,11 +3542,11 @@ impl RepositoryInterface for ComposerRepository {
         query: BString,
         mode: i64,
         r#type: Option<BString>,
-    ) -> anyhow::Result<Vec<crate::repository::SearchResult>> {
+    ) -> anyhow::Result<Vec<SearchResult>> {
         let raw = ComposerRepository::search(self, query, mode, r#type)?;
         Ok(raw
             .into_iter()
-            .map(|m| crate::repository::SearchResult {
+            .map(|m| SearchResult {
                 name: bstr::BString::from(
                     m.get(B("name"))
                         .and_then(|v| v.as_string())
@@ -3558,10 +3558,8 @@ impl RepositoryInterface for ComposerRepository {
                     .map(bstr::BString::from),
                 abandoned: m.get(B("abandoned")).filter(|v| v.to_bool()).map(|v| {
                     match v.as_string() {
-                        Some(s) => {
-                            crate::repository::AbandonedInfo::Replacement(bstr::BString::from(s))
-                        }
-                        None => crate::repository::AbandonedInfo::Abandoned,
+                        Some(s) => AbandonedInfo::Replacement(bstr::BString::from(s)),
+                        None => AbandonedInfo::Abandoned,
                     }
                 }),
                 url: m
@@ -3575,14 +3573,14 @@ impl RepositoryInterface for ComposerRepository {
     fn get_providers(
         &mut self,
         package_name: BString,
-    ) -> anyhow::Result<IndexMap<BString, crate::repository::ProviderInfo>> {
+    ) -> anyhow::Result<IndexMap<BString, ProviderInfo>> {
         let raw = ComposerRepository::get_providers(self, package_name.as_bstr())?;
         Ok(raw
             .into_iter()
             .map(|(k, m)| {
                 (
                     k,
-                    crate::repository::ProviderInfo {
+                    ProviderInfo {
                         name: bstr::BString::from(
                             m.get(B("name"))
                                 .and_then(|v| v.as_string())
@@ -3607,13 +3605,11 @@ impl RepositoryInterface for ComposerRepository {
         Ok(ComposerRepository::get_repo_name(self))
     }
 
-    fn as_advisory_provider(&self) -> Option<&dyn crate::repository::AdvisoryProviderInterface> {
+    fn as_advisory_provider(&self) -> Option<&dyn AdvisoryProviderInterface> {
         Some(self)
     }
 
-    fn as_advisory_provider_mut(
-        &mut self,
-    ) -> Option<&mut dyn crate::repository::AdvisoryProviderInterface> {
+    fn as_advisory_provider_mut(&mut self) -> Option<&mut dyn AdvisoryProviderInterface> {
         Some(self)
     }
 
@@ -3626,7 +3622,7 @@ impl RepositoryInterface for ComposerRepository {
     }
 }
 
-impl crate::repository::AdvisoryProviderInterface for ComposerRepository {
+impl AdvisoryProviderInterface for ComposerRepository {
     fn has_security_advisories(&mut self) -> anyhow::Result<bool> {
         ComposerRepository::has_security_advisories(self)
     }

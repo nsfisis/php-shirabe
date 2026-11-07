@@ -2,7 +2,7 @@
 
 use crate::formatter::OutputFormatterInterface;
 use crate::helper::ProgressBar;
-use crate::output::{ConsoleOutputInterface, OUTPUT_NORMAL, OutputInterface};
+use crate::output::{ConsoleOutput, ConsoleOutputInterface, OUTPUT_NORMAL, OutputInterface};
 use shirabe_php_shim::{AsAny, PHP_EOL, str_repeat};
 
 /// Decorates output to add console style guide helpers.
@@ -44,7 +44,7 @@ impl OutputStyle {
         // ConsoleOutput is the only OutputInterface implementor that also implements
         // ConsoleOutputInterface, so `instanceof ConsoleOutputInterface` reduces to this downcast.
         AsAny::as_any(&*output.borrow())
-            .downcast_ref::<crate::output::ConsoleOutput>()
+            .downcast_ref::<ConsoleOutput>()
             .is_some()
     }
 
@@ -52,11 +52,9 @@ impl OutputStyle {
     /// borrow of the concrete type serves as the cast result.
     fn as_console_output_interface(
         output: &std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
-    ) -> Option<std::cell::Ref<'_, crate::output::ConsoleOutput>> {
+    ) -> Option<std::cell::Ref<'_, ConsoleOutput>> {
         std::cell::Ref::filter_map(output.borrow(), |output| {
-            output
-                .as_any()
-                .downcast_ref::<crate::output::ConsoleOutput>()
+            output.as_any().downcast_ref::<ConsoleOutput>()
         })
         .ok()
     }

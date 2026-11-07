@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/DependencyResolver/Operation/MarkAliasInstalledOperation.php sha1:52a7354ef1ccc5439bbe76480a311fc4c365b1d7
 
 use crate::dependency_resolver::operation::SolverOperation;
-use crate::package::AliasPackageHandle;
+use crate::package::{AliasPackageHandle, DisplayMode};
 use bstr::BStr;
 use shirabe_php_shim::{bconcat, php_str};
 
@@ -25,13 +25,13 @@ impl MarkAliasInstalledOperation {
             self.package.get_pretty_name(),
             "</info> (<comment>",
             self.package
-                .get_full_pretty_version(true, crate::package::DisplayMode::SourceRefIfDev),
+                .get_full_pretty_version(true, DisplayMode::SourceRefIfDev),
             "</comment>) as installed, alias of <info>",
             self.package.get_alias_of().get_pretty_name(),
             "</info> (<comment>",
             self.package
                 .get_alias_of()
-                .get_full_pretty_version(true, crate::package::DisplayMode::SourceRefIfDev),
+                .get_full_pretty_version(true, DisplayMode::SourceRefIfDev),
             "</comment>)"
         )
     }

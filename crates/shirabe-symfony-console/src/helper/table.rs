@@ -5,7 +5,7 @@ use crate::formatter::{OutputFormatter, WrappableOutputFormatterInterface};
 use crate::helper::{
     Helper, TableCell, TableCellOption, TableCellStyle, TableRows, TableSeparator, TableStyle,
 };
-use crate::output::OutputInterface;
+use crate::output::{OUTPUT_NORMAL, OutputInterface};
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
@@ -553,7 +553,7 @@ impl Table {
                 self.style.get_border_format(),
                 &[PhpMixed::String(markup)],
             )],
-            crate::output::OUTPUT_NORMAL,
+            OUTPUT_NORMAL,
         );
     }
 
@@ -593,9 +593,7 @@ impl Table {
                 BORDER_INSIDE
             }));
         }
-        self.output
-            .borrow()
-            .writeln(&[row_content], crate::output::OUTPUT_NORMAL);
+        self.output.borrow().writeln(&[row_content], OUTPUT_NORMAL);
     }
 
     /// Renders table cell with padding.

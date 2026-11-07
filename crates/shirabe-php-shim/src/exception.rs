@@ -1,4 +1,4 @@
-use crate::PhpClass;
+use crate::{PhpClass, display_to_bytes, impl_php_class};
 use bstr::{BStr, BString, ByteSlice};
 
 /// The fields a PHP `\Throwable` carries: its message and code, and the error it wraps. Ported
@@ -72,7 +72,7 @@ impl std::fmt::Display for ThrowableFields {
     }
 }
 
-crate::impl_php_class!(ThrowableFields, r"Throwable");
+impl_php_class!(ThrowableFields, r"Throwable");
 
 /// A ported PHP exception class, seen as the object PHP `throw`s: its [`ThrowableFields`], its
 /// concrete Rust type, and the instance of its parent class it embeds.
@@ -242,7 +242,7 @@ impl PhpClass for AnyThrowable {
 pub fn error_message(error: &anyhow::Error) -> BString {
     match AnyThrowable::of(error) {
         Some(exception) => exception.get_message().to_owned(),
-        None => crate::display_to_bytes(&**error),
+        None => display_to_bytes(&**error),
     }
 }
 
@@ -256,7 +256,7 @@ pub fn error_chain_message(error: &anyhow::Error) -> BString {
         }
         match cause.downcast_ref::<AnyThrowable>() {
             Some(exception) => message.extend_from_slice(exception.get_message()),
-            None => message.extend_from_slice(&crate::display_to_bytes(cause)),
+            None => message.extend_from_slice(&display_to_bytes(cause)),
         }
     }
     message
@@ -541,7 +541,7 @@ impl ErrorException {
     }
 }
 
-crate::impl_php_exception!(ErrorException, inner, r"ErrorException");
+impl_php_exception!(ErrorException, inner, r"ErrorException");
 
 /// An exception of a PHP class the port has no type for, such as one a plugin declares, rebuilt
 /// from the nearest superclass the port does have one for. It answers to its own class name and
@@ -647,7 +647,7 @@ mod tests {
         }
     }
 
-    crate::impl_php_exception!(Subclass, inner, r"Vendor\Subclass");
+    impl_php_exception!(Subclass, inner, r"Vendor\Subclass");
 
     #[test]
     fn catch_reaches_every_superclass() {

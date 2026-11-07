@@ -1,21 +1,25 @@
 //! ref: composer/src/Composer/Command/ArchiveCommand.php sha1:735beefe6c65976d3dc9179d6d7229436ec617e5
 
-use crate::command::base_command::base_command_initialize;
+use crate::command::base_command::{base_command_complete, base_command_initialize};
 use crate::command::{BaseCommand, BaseCommandData, CompletionTrait};
-use crate::composer::PartialComposerHandle;
+use crate::composer::{PartialComposerHandle, composer_full};
 use crate::config::Config;
 use crate::console::input::{InputArgument, InputOption, SuggestedValues};
+use crate::delegate_base_command_trait_impls_to_inner;
 use crate::event_dispatcher::EventFlags;
 use crate::factory::Factory;
 use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::package::archiver::ArchiveManagerInterface;
 use crate::package::version::version_selector::ShowWarnings;
 use crate::package::version::{VersionParser, VersionSelector};
+use crate::package::{CompletePackageInterfaceHandle, PackageInterfaceHandle};
 use crate::plugin::{CommandEvent, PluginEvents};
-use crate::repository::{CompositeRepository, RepositoryFactory, RepositorySet};
+use crate::repository::{
+    CompositeRepository, RepositoryFactory, RepositoryInterfaceHandle, RepositorySet,
+};
 use crate::script::ScriptEvents;
 use crate::util::r#loop::Loop;
-use crate::util::{Filesystem, Platform, ProcessExecutor};
+use crate::util::{Filesystem, Platform, ProcessExecutor, StreamContextOptions};
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
@@ -125,55 +129,52 @@ impl ArchiveCommand {
             return Ok(return_value);
         }
 
-        let composer_guard = composer.map(crate::composer::composer_full);
+        let composer_guard = composer.map(composer_full);
         let mut owned_archive_manager;
         let composer_archive_manager;
         let mut composer_archive_manager_ref;
-        let archive_manager: &mut dyn ArchiveManagerInterface =
-            if let Some(composer) = &composer_guard {
-                composer_archive_manager = composer.get_archive_manager().clone();
-                composer_archive_manager_ref = composer_archive_manager.borrow_mut();
-                &mut *composer_archive_manager_ref
-            } else {
-                let factory = Factory::default();
-                let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(None)));
-                let http_downloader =
-                    std::rc::Rc::new(std::cell::RefCell::new(Factory::create_http_downloader(
-                        io.clone(),
-                        config,
-                        crate::util::StreamContextOptions::new(),
-                    )?));
-                let download_manager = factory.create_download_manager(
-                    io.clone(),
-                    config,
-                    &http_downloader,
-                    &process,
-                    None,
-                )?;
-                let loop_ = std::rc::Rc::new(std::cell::RefCell::new(Loop::new(
-                    http_downloader,
-                    Some(process),
-                )));
-                owned_archive_manager =
-                    factory.create_archive_manager(&config.borrow(), &download_manager, &loop_)?;
-                &mut owned_archive_manager
-            };
+        let archive_manager: &mut dyn ArchiveManagerInterface = if let Some(composer) =
+            &composer_guard
+        {
+            composer_archive_manager = composer.get_archive_manager().clone();
+            composer_archive_manager_ref = composer_archive_manager.borrow_mut();
+            &mut *composer_archive_manager_ref
+        } else {
+            let factory = Factory::default();
+            let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(None)));
+            let http_downloader = std::rc::Rc::new(std::cell::RefCell::new(
+                Factory::create_http_downloader(io.clone(), config, StreamContextOptions::new())?,
+            ));
+            let download_manager = factory.create_download_manager(
+                io.clone(),
+                config,
+                &http_downloader,
+                &process,
+                None,
+            )?;
+            let loop_ = std::rc::Rc::new(std::cell::RefCell::new(Loop::new(
+                http_downloader,
+                Some(process),
+            )));
+            owned_archive_manager =
+                factory.create_archive_manager(&config.borrow(), &download_manager, &loop_)?;
+            &mut owned_archive_manager
+        };
 
-        let package: crate::package::CompletePackageInterfaceHandle =
-            if let Some(name) = package_name {
-                match self.select_package(
-                    io.clone(),
-                    name.as_bstr(),
-                    version.as_ref().map(|v| v.as_bstr()),
-                )? {
-                    Some(p) => p,
-                    None => return Ok(1),
-                }
-            } else {
-                let rc = self.require_composer(None, None)?;
-                let composer = crate::composer::composer_full(&rc);
-                composer.get_package().clone().into()
-            };
+        let package: CompletePackageInterfaceHandle = if let Some(name) = package_name {
+            match self.select_package(
+                io.clone(),
+                name.as_bstr(),
+                version.as_ref().map(|v| v.as_bstr()),
+            )? {
+                Some(p) => p,
+                None => return Ok(1),
+            }
+        } else {
+            let rc = self.require_composer(None, None)?;
+            let composer = composer_full(&rc);
+            composer.get_package().clone().into()
+        };
 
         io.write_error(bconcat!(
             "<info>Creating the archive into \"",
@@ -210,7 +211,7 @@ impl ArchiveCommand {
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         package_name: &BStr,
         version: Option<&BStr>,
-    ) -> anyhow::Result<Option<crate::package::CompletePackageInterfaceHandle>> {
+    ) -> anyhow::Result<Option<CompletePackageInterfaceHandle>> {
         io.write_error("<info>Searching for the specified package.</info>");
 
         let mut version = version.map(BString::from);
@@ -218,11 +219,11 @@ impl ArchiveCommand {
         let repo;
 
         if let Some(composer) = self.try_composer(None, None) {
-            let composer = crate::composer::composer_full(&composer);
+            let composer = composer_full(&composer);
             let repository_manager = composer.get_repository_manager().clone();
             let repository_manager = repository_manager.borrow();
             let local_repo = repository_manager.get_local_repository();
-            let mut repos: Vec<crate::repository::RepositoryInterfaceHandle> = vec![local_repo];
+            let mut repos: Vec<RepositoryInterfaceHandle> = vec![local_repo];
             repos.extend(repository_manager.get_repositories().iter().cloned());
             repo = CompositeRepository::new(repos);
             min_stability = composer.get_package().get_minimum_stability();
@@ -256,7 +257,7 @@ impl ArchiveCommand {
             IndexMap::new(),
             IndexMap::new(),
         );
-        repo_set.add_repository(crate::repository::RepositoryInterfaceHandle::new(repo))?;
+        repo_set.add_repository(RepositoryInterfaceHandle::new(repo))?;
         let parser = VersionParser::new();
         let constraint: Option<shirabe_semver::constraint::AnyConstraint> = match &version {
             Some(v) => Some(parser.parse_constraints(v)?),
@@ -287,7 +288,7 @@ impl ArchiveCommand {
             io.write_error("<comment>Please use a more specific constraint to pick a different package.</comment>");
             p
         } else if packages.len() == 1 {
-            let p: crate::package::PackageInterfaceHandle = packages.into_iter().next().unwrap();
+            let p: PackageInterfaceHandle = packages.into_iter().next().unwrap();
             io.write_error(bconcat!(
                 "<info>Found an exact match ",
                 p.get_pretty_string(),
@@ -451,16 +452,16 @@ impl Command for ArchiveCommand {
         input: &shirabe_symfony_console::completion::CompletionInput,
         suggestions: &mut shirabe_symfony_console::completion::CompletionSuggestions,
     ) -> anyhow::Result<()> {
-        crate::command::base_command::base_command_complete(self, input, suggestions)
+        base_command_complete(self, input, suggestions)
     }
 
     shirabe_symfony_console::delegate_command_trait_impls_to_inner!(base_command_data);
 }
 
 impl BaseCommand for ArchiveCommand {
-    fn base_command_data(&self) -> &crate::command::BaseCommandData {
+    fn base_command_data(&self) -> &BaseCommandData {
         &self.base_command_data
     }
 
-    crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
+    delegate_base_command_trait_impls_to_inner!(base_command_data);
 }

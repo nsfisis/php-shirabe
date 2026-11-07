@@ -1,6 +1,6 @@
 //! ref: composer/src/Composer/Downloader/SvnDownloader.php sha1:6fddad1ae8a9f25c250ea83feb467a7fb40b1b06
 
-use crate::config::Config;
+use crate::config::{Config, DiscardChanges};
 use crate::downloader::{
     ChangeReportInterface, DownloaderInterface, VcsCapableDownloaderInterface, VcsDownloader,
     VcsDownloaderBase,
@@ -257,9 +257,7 @@ impl VcsDownloader for SvnDownloader {
         }
 
         if !self.inner.io.is_interactive() {
-            if self.inner.config.borrow().get_discard_changes()?
-                == crate::config::DiscardChanges::Bool(true)
-            {
+            if self.inner.config.borrow().get_discard_changes()? == DiscardChanges::Bool(true) {
                 return self.discard_changes(path).await;
             }
 
@@ -483,13 +481,11 @@ impl DownloaderInterface for SvnDownloader {
         <Self as VcsDownloader>::get_installation_source(self)
     }
 
-    fn as_change_report_interface(&self) -> Option<&dyn crate::downloader::ChangeReportInterface> {
+    fn as_change_report_interface(&self) -> Option<&dyn ChangeReportInterface> {
         Some(self)
     }
 
-    fn as_vcs_capable_downloader_interface(
-        &self,
-    ) -> Option<&dyn crate::downloader::VcsCapableDownloaderInterface> {
+    fn as_vcs_capable_downloader_interface(&self) -> Option<&dyn VcsCapableDownloaderInterface> {
         Some(self)
     }
 

@@ -1,5 +1,6 @@
 //! ref: composer/src/Composer/IO/NullIO.php sha1:f36480c2ba0704f5d52fb278b24cfffd70429440
 
+use crate::config::Config;
 use crate::io::{BaseIO, IOInterface, IOInterfaceImmutable, IOInterfaceMutable};
 use bstr::BString;
 use indexmap::IndexMap;
@@ -154,7 +155,7 @@ impl IOInterfaceMutable for NullIO {
         <Self as BaseIO>::set_authentication(self, repository_name, username, password)
     }
 
-    fn load_configuration(&mut self, config: &mut crate::config::Config) -> anyhow::Result<()> {
+    fn load_configuration(&mut self, config: &mut Config) -> anyhow::Result<()> {
         <Self as BaseIO>::load_configuration(self, config)
     }
 }

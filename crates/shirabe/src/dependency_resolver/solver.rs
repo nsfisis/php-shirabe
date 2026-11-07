@@ -9,7 +9,7 @@ use crate::filter::platform_requirement_filter::{
     IgnoreListPlatformRequirementFilter, PlatformRequirementFilterFactory,
     PlatformRequirementFilterInterface,
 };
-use crate::io::{IOInterface, IOInterfaceWrite};
+use crate::io::{DEBUG, IOInterface, IOInterfaceWrite, VERBOSE};
 use crate::package::BasePackageHandle;
 use bstr::{BString, ByteSlice};
 use indexmap::IndexMap;
@@ -226,8 +226,7 @@ impl Solver {
 
         self.setup_fixed_map(request);
 
-        self.io
-            .write_error3("Generating rules", true, crate::io::DEBUG);
+        self.io.write_error3("Generating rules", true, DEBUG);
         let mut rule_set_generator = RuleSetGenerator::new(self.policy.clone(), self.pool.clone());
         self.rules =
             rule_set_generator.get_rules_for(request, Some(platform_requirement_filter.clone()))?;
@@ -250,17 +249,17 @@ impl Solver {
         self.make_assertion_rule_decisions()?;
 
         self.io
-            .write_error3("Resolving dependencies through SAT", true, crate::io::DEBUG);
+            .write_error3("Resolving dependencies through SAT", true, DEBUG);
         let before = microtime();
         self.run_sat()?;
-        self.io.write_error3("", true, crate::io::DEBUG);
+        self.io.write_error3("", true, DEBUG);
         self.io.write_error3(
             sprintf(
                 "Dependency resolution completed in %.3f seconds",
                 &[PhpMixed::Float(microtime() - before)],
             ),
             true,
-            crate::io::VERBOSE,
+            VERBOSE,
         );
 
         if !self.problems.is_empty() {
@@ -768,8 +767,7 @@ impl Solver {
             let mut rules_count = self.rules.count();
             let mut pass = 1_i64;
 
-            self.io
-                .write_error3("Looking at all rules.", true, crate::io::DEBUG);
+            self.io.write_error3("Looking at all rules.", true, DEBUG);
             let mut i = 0_i64;
             let mut n = 0_i64;
             while n < rules_count {
@@ -782,7 +780,7 @@ impl Solver {
                                 ")"
                             ),
                             false,
-                            crate::io::DEBUG,
+                            DEBUG,
                         );
                     } else {
                         self.io.overwrite_error4(
@@ -793,7 +791,7 @@ impl Solver {
                             ),
                             false,
                             None,
-                            crate::io::DEBUG,
+                            DEBUG,
                         );
                     }
 

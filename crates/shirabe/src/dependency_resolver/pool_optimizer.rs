@@ -1,8 +1,8 @@
 //! ref: composer/src/Composer/DependencyResolver/PoolOptimizer.php sha1:12cd78f3f433fa4ff1891edf6cb0f58d5d9892b3
 
 use crate::dependency_resolver::{PolicyInterface, Pool, Request};
-use crate::package::BasePackageHandle;
 use crate::package::version::VersionParser;
+use crate::package::{BasePackageHandle, Link};
 use bstr::{BStr, BString, ByteSlice, ByteVec};
 use indexmap::IndexMap;
 use shirabe_php_shim::{CmpOp, bconcat, implode, ksort};
@@ -334,7 +334,7 @@ impl PoolOptimizer {
     fn calculate_dependency_hash(&self, package: BasePackageHandle) -> BString {
         let mut hash = BString::default();
 
-        let hash_relevant_links: Vec<(&BStr, Vec<crate::package::Link>)> = vec![
+        let hash_relevant_links: Vec<(&BStr, Vec<Link>)> = vec![
             (
                 BStr::new("requires"),
                 package.get_requires().values().cloned().collect(),

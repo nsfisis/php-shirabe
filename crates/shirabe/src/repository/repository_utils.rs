@@ -1,6 +1,6 @@
 //! ref: composer/src/Composer/Repository/RepositoryUtils.php sha1:65b85d34acfe21bd69cadf5c2a7371449060236f
 
-use crate::package::Link;
+use crate::package::{BasePackageHandle, Link, PackageInterfaceHandle};
 use crate::repository::{
     CompositeRepository, FilterRepository, InstalledRepository, RepositoryInterfaceHandle,
 };
@@ -11,11 +11,11 @@ pub struct RepositoryUtils;
 
 impl RepositoryUtils {
     pub fn filter_required_packages(
-        packages: &[crate::package::BasePackageHandle],
-        requirer: crate::package::PackageInterfaceHandle,
+        packages: &[BasePackageHandle],
+        requirer: PackageInterfaceHandle,
         include_require_dev: bool,
-        mut bucket: Vec<crate::package::BasePackageHandle>,
-    ) -> Vec<crate::package::BasePackageHandle> {
+        mut bucket: Vec<BasePackageHandle>,
+    ) -> Vec<BasePackageHandle> {
         let mut requires: IndexMap<BString, Link> = (*requirer.get_requires()).clone();
         if include_require_dev {
             requires.extend(

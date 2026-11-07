@@ -35,7 +35,7 @@ pub struct VersionSelector {
 impl VersionSelector {
     pub fn new(
         repository_set: std::rc::Rc<std::cell::RefCell<dyn RepositorySetInterface>>,
-        platform_repo: Option<&mut crate::repository::PlatformRepository>,
+        platform_repo: Option<&mut PlatformRepository>,
     ) -> anyhow::Result<Self> {
         let mut platform_constraints: IndexMap<BString, Vec<AnyConstraint>> = IndexMap::new();
         if let Some(platform_repo) = platform_repo {
@@ -64,7 +64,7 @@ impl VersionSelector {
         repo_set_flags: i64,
         io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
         show_warnings: ShowWarnings,
-    ) -> anyhow::Result<Option<crate::package::PackageInterfaceHandle>> {
+    ) -> anyhow::Result<Option<PackageInterfaceHandle>> {
         let Some(min_priority) = base_package::stability_priority(preferred_stability) else {
             return Err(UnexpectedValueException::new(bconcat!(
                 "Expected a valid stability name as 3rd argument, got ",
@@ -120,11 +120,11 @@ impl VersionSelector {
             .downcast_ref::<IgnoreAllPlatformRequirementFilter>()
             .is_some();
 
-        let package: Option<crate::package::PackageInterfaceHandle>;
+        let package: Option<PackageInterfaceHandle>;
         if !self.platform_constraints.is_empty() && !is_ignore_all {
             let mut already_warned_names: IndexMap<BString, bool> = IndexMap::new();
             let mut already_seen_names: IndexMap<BString, bool> = IndexMap::new();
-            let mut found_package: Option<crate::package::PackageInterfaceHandle> = None;
+            let mut found_package: Option<PackageInterfaceHandle> = None;
 
             for pkg in candidates.iter() {
                 let reqs = pkg.get_requires();

@@ -2,7 +2,7 @@
 
 use crate::composer::ComposerWeakHandle;
 use crate::dependency_resolver::operation::AnyOperation;
-use crate::event_dispatcher::{Event, EventFlags};
+use crate::event_dispatcher::{Event, EventFlags, delegate_event_interface_to_inner};
 use crate::io::IOInterface;
 use crate::repository::InstalledRepositoryInterfaceHandle;
 use bstr::BString;
@@ -70,4 +70,4 @@ impl PackageEvent {
     }
 }
 
-crate::event_dispatcher::delegate_event_interface_to_inner!(PackageEvent, inner);
+delegate_event_interface_to_inner!(PackageEvent, inner);

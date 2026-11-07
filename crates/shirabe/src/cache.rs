@@ -1,6 +1,6 @@
 //! ref: composer/src/Composer/Cache.php sha1:184c5863c06dfba0950c0d70a167269306a42aa2
 
-use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite};
+use crate::io::{DEBUG, IOInterface, IOInterfaceImmutable, IOInterfaceWrite};
 use crate::util::{Filesystem, Platform};
 use bstr::{BStr, BString};
 use chrono::{DateTime, Utc};
@@ -126,11 +126,8 @@ impl Cache {
         if self.is_enabled() {
             let full_path = self.full_path(file);
             if file_exists(&full_path) {
-                self.io.write_error3(
-                    bconcat!("Reading ", full_path, " from cache"),
-                    true,
-                    crate::io::DEBUG,
-                );
+                self.io
+                    .write_error3(bconcat!("Reading ", full_path, " from cache"), true, DEBUG);
 
                 return file_get_contents(&full_path).map(BString::from).ok();
             }
@@ -151,11 +148,8 @@ impl Cache {
         if self.is_enabled() && !self.read_only {
             let dest = self.full_path(file);
 
-            self.io.write_error3(
-                bconcat!("Writing ", dest, " into cache"),
-                true,
-                crate::io::DEBUG,
-            );
+            self.io
+                .write_error3(bconcat!("Writing ", dest, " into cache"), true, DEBUG);
 
             let temp_file_name = path_from_bytes(&bconcat!(
                 path_to_bytes(&dest),
@@ -190,7 +184,7 @@ impl Cache {
                             "</warning>"
                         ),
                         true,
-                        crate::io::DEBUG,
+                        DEBUG,
                     );
                     let last_error = display_to_bytes(&e);
                     if let Some(m) = preg_match(
@@ -278,11 +272,8 @@ impl Cache {
                     touch(&full_path);
                 }
 
-                self.io.write_error3(
-                    bconcat!("Reading ", full_path, " from cache"),
-                    true,
-                    crate::io::DEBUG,
-                );
+                self.io
+                    .write_error3(bconcat!("Reading ", full_path, " from cache"), true, DEBUG);
 
                 return self
                     .filesystem

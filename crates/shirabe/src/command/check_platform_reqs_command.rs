@@ -1,13 +1,16 @@
 //! ref: composer/src/Composer/Command/CheckPlatformReqsCommand.php sha1:818b09865c5e1c263025439129da49da0cfde714
 
-use crate::command::base_command::base_command_initialize;
+use crate::command::base_command::{base_command_complete, base_command_initialize};
 use crate::command::{BaseCommand, BaseCommandData};
+use crate::composer::composer_full;
 use crate::console::input::{InputOption, SuggestedValues};
+use crate::delegate_base_command_trait_impls_to_inner;
 use crate::io::IOInterfaceWrite;
 use crate::json::JsonFile;
-use crate::package::Link;
+use crate::package::{Link, RootPackageInterfaceHandle};
 use crate::repository::{
-    InstalledRepository, PlatformRepository, RepositoryInterface, RootPackageRepository,
+    InstalledRepository, PlatformRepository, RepositoryInterface, RepositoryInterfaceHandle,
+    RootPackageRepository,
 };
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
@@ -202,7 +205,7 @@ impl Command for CheckPlatformReqsCommand {
         _output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
         let composer = self.require_composer(None, None)?;
-        let composer = crate::composer::composer_full(&composer);
+        let composer = composer_full(&composer);
         let io = self.get_io();
 
         let no_dev = input
@@ -214,7 +217,7 @@ impl Command for CheckPlatformReqsCommand {
         let mut requires: IndexMap<BString, Vec<Link>> = IndexMap::new();
         let mut remove_packages: Vec<BString> = vec![];
 
-        let installed_repo_base: crate::repository::RepositoryInterfaceHandle = if input
+        let installed_repo_base: RepositoryInterfaceHandle = if input
             .borrow()
             .get_option("lock")?
             .as_bool()
@@ -267,12 +270,11 @@ impl Command for CheckPlatformReqsCommand {
             }
         }
 
-        let root_pkg_repo = RootPackageRepository::new(
-            crate::package::RootPackageInterfaceHandle::dup(composer.get_package()),
-        );
+        let root_pkg_repo =
+            RootPackageRepository::new(RootPackageInterfaceHandle::dup(composer.get_package()));
         let mut installed_repo = InstalledRepository::new(vec![
             installed_repo_base,
-            crate::repository::RepositoryInterfaceHandle::new(root_pkg_repo),
+            RepositoryInterfaceHandle::new(root_pkg_repo),
         ]);
 
         for package in installed_repo.get_packages()? {
@@ -290,9 +292,12 @@ impl Command for CheckPlatformReqsCommand {
         let mut requires_sorted: Vec<(BString, Vec<Link>)> = requires.into_iter().collect();
         requires_sorted.sort_by(|a, b| a.0.cmp(&b.0));
 
-        installed_repo.add_repository(crate::repository::RepositoryInterfaceHandle::new(
-            PlatformRepository::new(vec![], indexmap::IndexMap::new(), None, None)?,
-        ));
+        installed_repo.add_repository(RepositoryInterfaceHandle::new(PlatformRepository::new(
+            vec![],
+            indexmap::IndexMap::new(),
+            None,
+            None,
+        )?));
         let installed_repo_with_platform = installed_repo;
 
         let mut results: Vec<CheckResult> = vec![];
@@ -421,16 +426,16 @@ impl Command for CheckPlatformReqsCommand {
         input: &shirabe_symfony_console::completion::CompletionInput,
         suggestions: &mut shirabe_symfony_console::completion::CompletionSuggestions,
     ) -> anyhow::Result<()> {
-        crate::command::base_command::base_command_complete(self, input, suggestions)
+        base_command_complete(self, input, suggestions)
     }
 
     shirabe_symfony_console::delegate_command_trait_impls_to_inner!(base_command_data);
 }
 
 impl BaseCommand for CheckPlatformReqsCommand {
-    fn base_command_data(&self) -> &crate::command::BaseCommandData {
+    fn base_command_data(&self) -> &BaseCommandData {
         &self.base_command_data
     }
 
-    crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
+    delegate_base_command_trait_impls_to_inner!(base_command_data);
 }

@@ -5,12 +5,13 @@ use crate::plugin::job_registry::JobOwner;
 use crate::plugin::rpc::codec::arg;
 use crate::plugin::rpc::dispatch::{error_throw, unavailable_method};
 use crate::plugin::rpc::jobs::{poll_once, resolved_promise};
+use crate::util::Filesystem;
 use bstr::{BStr, BString, ByteSlice};
 use shirabe_php_rpc::{PhpThrow, PluginValue, ToWire};
 use shirabe_php_shim::{bconcat, path_from_bytes};
 
 pub(crate) fn dispatch_filesystem_method(
-    fs: &std::rc::Rc<std::cell::RefCell<crate::util::Filesystem>>,
+    fs: &std::rc::Rc<std::cell::RefCell<Filesystem>>,
     method_name: &BStr,
     args: &[PluginValue],
 ) -> Result<PluginValue, PhpThrow> {
@@ -43,9 +44,9 @@ pub(crate) fn dispatch_filesystem_method(
             let fs = fs.clone();
             let mut future: std::pin::Pin<
                 Box<dyn std::future::Future<Output = anyhow::Result<bool>>>,
-            > = Box::pin(async move {
-                crate::util::Filesystem::remove_directory_async_via(&fs, &directory).await
-            });
+            > = Box::pin(
+                async move { Filesystem::remove_directory_async_via(&fs, &directory).await },
+            );
             // PHP settles the edge cases and starts the removal process before the call returns,
             // and raises what goes wrong up to there out of the call.
             match poll_once(&mut future) {

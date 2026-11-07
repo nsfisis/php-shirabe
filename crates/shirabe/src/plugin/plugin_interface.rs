@@ -3,7 +3,7 @@
 use crate::composer::ComposerHandle;
 use crate::event_dispatcher::EventSubscriberInterface;
 use crate::io::IOInterface;
-use crate::plugin::Capable;
+use crate::plugin::{Capable, PhpPluginProxy};
 use bstr::{BStr, BString};
 use shirabe_php_shim::php_str;
 
@@ -46,7 +46,7 @@ pub trait PluginInterface: std::fmt::Debug {
 
     /// For testing only: recovers the PHP-backed proxy so tests can read plugin properties the
     /// way PHPUnit asserts `$plugins[0]->version`.
-    fn __as_php_plugin_proxy(&self) -> Option<&crate::plugin::PhpPluginProxy> {
+    fn __as_php_plugin_proxy(&self) -> Option<&PhpPluginProxy> {
         None
     }
 }

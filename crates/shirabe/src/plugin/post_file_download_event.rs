@@ -1,6 +1,6 @@
 //! ref: composer/src/Composer/Plugin/PostFileDownloadEvent.php sha1:21d11fc8bbd40bf24affc6731b52fb6c2f2670e2
 
-use crate::event_dispatcher::{Event, EventFlags};
+use crate::event_dispatcher::{Event, EventFlags, delegate_event_interface_to_inner};
 use crate::package::PackageInterfaceHandle;
 use crate::plugin::FileDownloadContext;
 use bstr::{BStr, BString, ByteSlice};
@@ -70,4 +70,4 @@ impl PostFileDownloadEvent {
     }
 }
 
-crate::event_dispatcher::delegate_event_interface_to_inner!(PostFileDownloadEvent, inner);
+delegate_event_interface_to_inner!(PostFileDownloadEvent, inner);

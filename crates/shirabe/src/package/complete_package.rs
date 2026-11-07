@@ -1,6 +1,7 @@
 //! ref: composer/src/Composer/Package/CompletePackage.php sha1:5ecad7006f2ed8a45c520ed56eb176f5ea184f3f
 
 use crate::package::{CompletePackageInterface, DisplayMode, Mirror, Package, PackageInterface};
+use crate::repository::RepositoryInterfaceHandle;
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
@@ -25,7 +26,7 @@ pub struct CompletePackage {
 impl CompletePackage {
     pub fn new(name: BString, version: BString, pretty_version: BString) -> Self {
         Self {
-            inner: crate::package::Package::new(name, version, pretty_version),
+            inner: Package::new(name, version, pretty_version),
             repositories: IndexMap::new(),
             license: Vec::new(),
             keywords: Vec::new(),
@@ -316,14 +317,11 @@ impl PackageInterface for CompletePackage {
         self.inner.get_php_ext().cloned()
     }
 
-    fn set_repository(
-        &mut self,
-        repository: crate::repository::RepositoryInterfaceHandle,
-    ) -> anyhow::Result<()> {
+    fn set_repository(&mut self, repository: RepositoryInterfaceHandle) -> anyhow::Result<()> {
         self.inner.set_repository(repository)
     }
 
-    fn get_repository(&self) -> Option<crate::repository::RepositoryInterfaceHandle> {
+    fn get_repository(&self) -> Option<RepositoryInterfaceHandle> {
         self.inner.get_repository()
     }
 
