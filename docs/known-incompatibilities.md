@@ -8,7 +8,8 @@ NOTE: This is not an exhaustive list. Shirabe is in early development and there 
 We plan to support all platforms that Composer does, but currently:
 
 * Linux: fully supported and tested
-* macOS: unsupported
+* macOS: unsupported, but builds and passes the test suite in CI. It has not been tested in
+  actual use.
 * Windows: unsupported
 
 Unlike Composer, Shirabe does not support 32-bit builds of PHP and never will: it aborts as soon
