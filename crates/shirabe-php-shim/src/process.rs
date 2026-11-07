@@ -183,8 +183,7 @@ pub fn proc_open(
                 Descriptor::Pipe(mode) => {
                     // O_CLOEXEC keeps the parent end out of the child; dup2 clears it on the
                     // child end, which is what makes that one survive the exec.
-                    let (read_end, write_end) = nix::unistd::pipe2(nix::fcntl::OFlag::O_CLOEXEC)
-                        .map_err(std::io::Error::from)?;
+                    let (read_end, write_end) = pipe_cloexec()?;
                     // The mode is the child's point of view, so "r" means the child reads and the
                     // parent writes.
                     let child_reads = mode.starts_with(b"r");
@@ -465,6 +464,25 @@ pub fn get_current_user() -> BString {
         Ok(Some(user)) => user.name.into(),
         _ => BString::default(),
     }
+}
+
+#[cfg(not(target_vendor = "apple"))]
+fn pipe_cloexec() -> std::io::Result<(std::os::fd::OwnedFd, std::os::fd::OwnedFd)> {
+    Ok(nix::unistd::pipe2(nix::fcntl::OFlag::O_CLOEXEC)?)
+}
+
+// Apple platforms have no pipe2(2), so the flag is set after the fact. Another thread that forks
+// between pipe(2) and fcntl(2) can leak the descriptors into its child.
+#[cfg(target_vendor = "apple")]
+fn pipe_cloexec() -> std::io::Result<(std::os::fd::OwnedFd, std::os::fd::OwnedFd)> {
+    let (read_end, write_end) = nix::unistd::pipe()?;
+    for end in [&read_end, &write_end] {
+        nix::fcntl::fcntl(
+            end,
+            nix::fcntl::FcntlArg::F_SETFD(nix::fcntl::FdFlag::FD_CLOEXEC),
+        )?;
+    }
+    Ok((read_end, write_end))
 }
 
 #[cfg(test)]
