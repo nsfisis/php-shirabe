@@ -7,7 +7,7 @@ use crate::plugin::php_call::PhpCall;
 use crate::plugin::proxy::php_is_a;
 use bstr::{BStr, BString, ByteSlice};
 use shirabe_php_rpc::{FromWire, PhpObjHandle, PluginValue};
-use shirabe_php_shim::{PhpClass, PhpMixed, RuntimeException, bconcat};
+use shirabe_php_shim::{PhpClass, PhpMixed, RuntimeException, ToPhpString, bconcat};
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::{InputInterface, InputValue};
 use shirabe_symfony_console::output::OutputInterface;

@@ -1,5 +1,5 @@
 use crate::{
-    PhpMixed, bconcat, canonical_int_key, display_to_bytes, is_numeric_string, php_to_string,
+    PhpMixed, ToPhpString, bconcat, canonical_int_key, display_to_bytes, is_numeric_string,
     strnatcasecmp, to_bool, utf8_text,
 };
 use bstr::{B, BString};
@@ -57,7 +57,7 @@ pub fn array_fill_keys(keys: PhpMixed, value: PhpMixed) -> PhpMixed {
     };
     let mut result: IndexMap<BString, PhpMixed> = IndexMap::new();
     for key in entries {
-        result.insert(php_to_string(key), value.clone());
+        result.insert(key.to_php_string(), value.clone());
     }
     PhpMixed::Array(result)
 }

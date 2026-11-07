@@ -12,9 +12,8 @@ use crate::util::{GetResult, Platform, StreamContextOptions, Url};
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    RuntimeException, bconcat, file_get_contents, file_get_contents_with_max_length,
-    file_put_contents, parse_url, path_from_bytes, php_regex, php_to_string, preg_is_match, strpos,
-    strtr,
+    RuntimeException, ToPhpString, bconcat, file_get_contents, file_get_contents_with_max_length,
+    file_put_contents, parse_url, path_from_bytes, php_regex, preg_is_match, strpos, strtr,
 };
 
 #[derive(Debug)]
@@ -111,7 +110,7 @@ impl LocalFilesystem {
             } else {
                 "&"
             };
-            file_url = bconcat!(file_url, separator, "access_token=", php_to_string(&token));
+            file_url = bconcat!(file_url, separator, "access_token=", token.to_php_string());
         }
 
         let max_file_size = options.max_file_size()?;

@@ -8,7 +8,7 @@ use bstr::{BStr, BString, ByteSlice};
 use chrono::{DateTime, Utc};
 use indexmap::{IndexMap, IndexSet};
 use shirabe_php_shim::{
-    E_USER_DEPRECATED, LogicException, PhpMixed, PregMatches, Stringable, bconcat, ltrim_chars,
+    E_USER_DEPRECATED, LogicException, PhpDisplay, PhpMixed, PregMatches, bconcat, ltrim_chars,
     php_regex, preg_is_match, preg_replace, preg_replace_callback, strpos, strtolower,
     trigger_error,
 };
@@ -777,8 +777,8 @@ impl PackageInterface for Package {
     }
 }
 
-impl Stringable for Package {
-    fn to_php_string(&self) -> BString {
-        self.get_unique_name()
+impl PhpDisplay for Package {
+    fn fmt(&self, out: &mut BString) {
+        out.extend_from_slice(&self.get_unique_name());
     }
 }

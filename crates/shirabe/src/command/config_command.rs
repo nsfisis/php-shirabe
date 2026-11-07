@@ -13,12 +13,12 @@ use crate::util::{Filesystem, Platform};
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    InvalidArgumentException, PhpMixed, RuntimeException, array_is_list, array_key_first,
-    array_merge, array_values_mixed, bconcat, chmod, escapeshellcmd, exec, explode, file_exists,
-    impl_php_class, implode, in_array_loose, in_array_strict, intval, is_array, is_bool, is_dir,
-    is_numeric, is_object, is_string, json_encode, path_from_bytes, path_to_bytes, php_regex,
-    php_str, php_to_string, preg_is_match, preg_match, preg_replace, str_replace, strpos,
-    strtolower, system, touch, trim_chars, var_export,
+    InvalidArgumentException, PhpMixed, RuntimeException, ToPhpString, array_is_list,
+    array_key_first, array_merge, array_values_mixed, bconcat, chmod, escapeshellcmd, exec,
+    explode, file_exists, impl_php_class, implode, in_array_loose, in_array_strict, intval,
+    is_array, is_bool, is_dir, is_numeric, is_object, is_string, json_encode, path_from_bytes,
+    path_to_bytes, php_regex, php_str, preg_is_match, preg_match, preg_replace, str_replace,
+    strpos, strtolower, system, touch, trim_chars, var_export,
 };
 use shirabe_semver::VersionParser;
 use shirabe_symfony_console::command::Command;
@@ -225,7 +225,7 @@ impl ConfigCommand {
                         if is_array(val) {
                             json_encode(val).unwrap_or_default()
                         } else {
-                            php_to_string(val)
+                            val.to_php_string()
                         }
                     })
                     .collect();
@@ -280,7 +280,7 @@ impl ConfigCommand {
                         "</>] <info>",
                         raw_val.as_string().unwrap_or_default(),
                         " (",
-                        php_to_string(&value_inner),
+                        value_inner.to_php_string(),
                         ")</info>",
                         source
                     ),
@@ -295,7 +295,7 @@ impl ConfigCommand {
                         k.clone().unwrap_or_default(),
                         key,
                         "</>] <info>",
-                        php_to_string(&value_inner),
+                        value_inner.to_php_string(),
                         "</info>",
                         source
                     ),
@@ -836,7 +836,7 @@ impl Command for ConfigCommand {
                     },
                 )?
             } else {
-                php_to_string(&value)
+                value.to_php_string()
             };
 
             let mut source_of_config_value = BString::default();

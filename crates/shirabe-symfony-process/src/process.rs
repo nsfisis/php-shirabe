@@ -13,8 +13,8 @@ use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Descriptor, PHP_ENV, PHP_SERVER, PhpMixed, PhpResource, PregMatches, ProcStatus, SEEK_END,
-    SEEK_SET, bconcat, exec, fopen, fseek, fwrite, getcwd, getenv_all, implode, is_dir, microtime,
-    os_str_from_bytes, path_from_bytes, php_regex, php_str, php_to_string, preg_is_match,
+    SEEK_SET, ToPhpString, bconcat, exec, fopen, fseek, fwrite, getcwd, getenv_all, implode,
+    is_dir, microtime, os_str_from_bytes, path_from_bytes, php_regex, php_str, preg_is_match,
     preg_replace, preg_replace_callback, proc_close, proc_get_status, proc_open, proc_terminate,
     stream_get_contents_with_length_and_offset, strpbrk, uniqid, usleep,
 };
@@ -315,7 +315,7 @@ impl Process {
                     .iter()
                     .any(|name| k == name)
             {
-                env_pairs.push(bconcat!(k, "=", php_to_string(v)));
+                env_pairs.push(bconcat!(k, "=", v.to_php_string()));
             }
         }
 
@@ -1130,7 +1130,7 @@ impl Process {
                         commandline
                     ))
                     .into()),
-                    Some(v) => Ok(self.escape_argument(Some(&php_to_string(v)))),
+                    Some(v) => Ok(self.escape_argument(Some(&v.to_php_string()))),
                 }
             },
             commandline,

@@ -6,8 +6,8 @@ use crate::input::{
 };
 use bstr::{BStr, BString, ByteSlice};
 use shirabe_php_shim::{
-    Stringable, explode_with_limit, ltrim_chars, php_regex, php_str, preg_match_all, rtrim, substr,
-    trim_chars,
+    PhpDisplay, ToPhpString, explode_with_limit, ltrim_chars, php_regex, php_str, preg_match_all,
+    rtrim, substr, trim_chars,
 };
 
 /// An input specialized for shell completion.
@@ -286,8 +286,8 @@ impl CompletionInput {
     }
 }
 
-impl Stringable for CompletionInput {
-    fn to_php_string(&self) -> BString {
+impl PhpDisplay for CompletionInput {
+    fn fmt(&self, out: &mut BString) {
         let mut str = BString::default();
         let mut last_i: i64 = 0;
         for (i, token) in self.tokens.iter().enumerate() {
@@ -306,7 +306,7 @@ impl Stringable for CompletionInput {
             str.push(b'|');
         }
 
-        rtrim(&str)
+        out.extend_from_slice(&rtrim(&str));
     }
 }
 

@@ -1,12 +1,12 @@
 //! ref: composer/src/Composer/Config.php sha1:7e0a18fcbf536c9e5003f72a666077a4559cb226
 
 use shirabe_php_shim::{
-    E_USER_DEPRECATED, Error, PhpMixed, PregMatches, RuntimeException, TypeError, array_key_exists,
-    array_merge, array_search_mixed, array_unique, bconcat, canonical_int_key, empty,
-    filter_var_url, get_debug_type, implode, in_array_loose, in_array_strict, intval, is_array,
-    is_numeric_string, is_string, loose_eq, parse_url, php_regex, php_str, php_to_string,
-    preg_is_match, preg_match, preg_replace_callback, rtrim_chars, strtolower, strtoupper, strtr,
-    substr, trigger_error, utf8_text,
+    E_USER_DEPRECATED, Error, PhpMixed, PregMatches, RuntimeException, ToPhpString, TypeError,
+    array_key_exists, array_merge, array_search_mixed, array_unique, bconcat, canonical_int_key,
+    empty, filter_var_url, get_debug_type, implode, in_array_loose, in_array_strict, intval,
+    is_array, is_numeric_string, is_string, loose_eq, parse_url, php_regex, php_str, preg_is_match,
+    preg_match, preg_replace_callback, rtrim_chars, strtolower, strtoupper, strtr, substr,
+    trigger_error, utf8_text,
 };
 mod config_source_interface;
 mod json_config_source;
@@ -701,7 +701,7 @@ impl Config {
         };
 
         let processed = self.process(raw_val, flags)?;
-        let mut val_str = rtrim_chars(php_to_string(&processed), "/\\");
+        let mut val_str = rtrim_chars(processed.to_php_string(), "/\\");
         val_str = Platform::expand_path(&val_str);
 
         if substr(key, -4, None) != "-dir" {
@@ -810,7 +810,7 @@ impl Config {
 
     pub fn get_cache_files_maxsize(&self) -> anyhow::Result<i64> {
         let key = "cache-files-maxsize";
-        let raw = php_to_string(&self.raw_value(key));
+        let raw = self.raw_value(key).to_php_string();
         let Some(matches) = preg_match(
             php_regex!(r"/^\s*([0-9.]+)\s*(?:([kmg])(?:i?b)?)?\s*$/i"),
             &raw,
@@ -871,7 +871,7 @@ impl Config {
             .into());
         };
         let processed = self.process(PhpMixed::string(Platform::expand_path(home)), flags)?;
-        Ok(rtrim_chars(php_to_string(&processed), "/\\"))
+        Ok(rtrim_chars(processed.to_php_string(), "/\\"))
     }
 
     fn bin_compat(&self) -> anyhow::Result<PhpMixed> {
@@ -891,7 +891,7 @@ impl Config {
         ) {
             return Err(RuntimeException::new(bconcat!(
                 "Invalid value for 'bin-compat': ",
-                php_to_string(&value),
+                value.to_php_string(),
                 ". Expected auto, full or proxy"
             ))
             .into());
@@ -946,7 +946,7 @@ impl Config {
             PhpMixed::String(s) if s == "stash" => Ok(DiscardChanges::Stash),
             other => Err(RuntimeException::new(bconcat!(
                 "Invalid value for 'discard-changes': ",
-                php_to_string(&other),
+                other.to_php_string(),
                 ". Expected true, false or stash"
             ))
             .into()),
@@ -992,7 +992,7 @@ impl Config {
         Ok(self
             .github_protocols()?
             .values()
-            .map(php_to_string)
+            .map(ToPhpString::to_php_string)
             .collect())
     }
 
@@ -1404,9 +1404,9 @@ impl Config {
         let result = preg_replace_callback(
             php_regex!(r"#\{\$(.+)\}#"),
             |m: &PregMatches| -> anyhow::Result<BString> {
-                Ok(php_to_string(
-                    &self.get_with_flags(m.get(1).unwrap_or_default(), flags)?,
-                ))
+                Ok(self
+                    .get_with_flags(m.get(1).unwrap_or_default(), flags)?
+                    .to_php_string())
             },
             value.as_string().unwrap_or_default(),
         )?;

@@ -2,7 +2,7 @@
 
 use crate::dependency_resolver::{ReasonData, Rule, RuleBase};
 use bstr::BString;
-use shirabe_php_shim::{Stringable, bconcat};
+use shirabe_php_shim::{PhpDisplay, bconcat};
 
 #[derive(Debug)]
 pub struct Rule2Literals {
@@ -68,16 +68,14 @@ impl Rule2Literals {
     }
 }
 
-impl Stringable for Rule2Literals {
-    fn to_php_string(&self) -> BString {
-        let mut result = BString::from(if self.inner.is_disabled() {
-            "disabled("
+impl PhpDisplay for Rule2Literals {
+    fn fmt(&self, out: &mut BString) {
+        out.extend_from_slice(if self.inner.is_disabled() {
+            b"disabled("
         } else {
-            "("
+            b"("
         });
 
-        result.extend_from_slice(&bconcat!(self.literal1, "|", self.literal2, ")"));
-
-        result
+        out.extend_from_slice(&bconcat!(self.literal1, "|", self.literal2, ")"));
     }
 }

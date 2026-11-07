@@ -8,7 +8,7 @@ use crate::repository::RepositoryInterfaceHandle;
 use bstr::{BStr, BString};
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpMixed, Stringable, php_str};
+use shirabe_php_shim::{PhpDisplay, PhpMixed, php_str};
 
 #[derive(Debug, Clone)]
 pub struct RootPackage {
@@ -412,8 +412,8 @@ impl PackageInterface for RootPackage {
     }
 }
 
-impl Stringable for RootPackage {
-    fn to_php_string(&self) -> BString {
-        self.inner.to_php_string()
+impl PhpDisplay for RootPackage {
+    fn fmt(&self, out: &mut BString) {
+        self.inner.fmt(out);
     }
 }

@@ -6,7 +6,7 @@ use crate::input::{
 };
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpResource, Stringable, bconcat, implode};
+use shirabe_php_shim::{PhpDisplay, PhpResource, ToPhpString, bconcat, implode};
 
 /// ArrayInput represents an input provided as an array.
 ///
@@ -228,8 +228,8 @@ impl ArrayInput {
     }
 }
 
-impl Stringable for ArrayInput {
-    fn to_php_string(&self) -> BString {
+impl PhpDisplay for ArrayInput {
+    fn fmt(&self, out: &mut BString) {
         let mut params: Vec<BString> = vec![];
         for (param, val) in &self.parameters {
             // $param && \is_string($param) && '-' === $param[0]
@@ -275,7 +275,7 @@ impl Stringable for ArrayInput {
             }
         }
 
-        implode(" ", &params)
+        out.extend_from_slice(&implode(" ", &params));
     }
 }
 

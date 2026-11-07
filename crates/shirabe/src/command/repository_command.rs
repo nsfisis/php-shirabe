@@ -10,8 +10,8 @@ use crate::json::JsonFile;
 use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    InvalidArgumentException, PhpMixed, RuntimeException, Stringable, bconcat, impl_php_class,
-    parse_url, path_to_bytes, php_regex, php_to_string, preg_is_match, strtolower,
+    InvalidArgumentException, PhpMixed, RuntimeException, ToPhpString, bconcat, impl_php_class,
+    parse_url, path_to_bytes, php_regex, preg_is_match, strtolower,
 };
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::{InputInterface, InputInterfaceByName, InputValue};
@@ -170,13 +170,13 @@ impl RepositoryCommand {
                 if let Some(list) = repositories.as_list() {
                     for repo in list {
                         if let Some(name) = repo.as_array().and_then(|r| r.get(B("name"))) {
-                            repos.push(php_to_string(name));
+                            repos.push(name.to_php_string());
                         }
                     }
                 } else if let Some(map) = repositories.as_array() {
                     for repo in map.values() {
                         if let Some(name) = repo.as_array().and_then(|r| r.get(B("name"))) {
-                            repos.push(php_to_string(name));
+                            repos.push(name.to_php_string());
                         }
                     }
                 }

@@ -6,7 +6,7 @@ use crate::question::{Question, QuestionInterface};
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpMixed, Stringable, bconcat, explode, implode, loose_eq, php_regex, preg_is_match, sprintf,
+    PhpMixed, ToPhpString, bconcat, explode, implode, loose_eq, php_regex, preg_is_match, sprintf,
     trim,
 };
 

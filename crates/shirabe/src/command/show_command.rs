@@ -28,7 +28,7 @@ use bstr::{BStr, BString, ByteSlice, ByteVec};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     CmpOp, DATE_ATOM, InvalidArgumentException, LogicException, PhpMixed, STR_PAD_RIGHT,
-    Stringable, UnexpectedValueException, array_search, bconcat, date_format_to_strftime,
+    ToPhpString, UnexpectedValueException, array_search, bconcat, date_format_to_strftime,
     date_local, display_to_bytes, extension_loaded, get_class, impl_php_class, implode,
     in_array_loose, in_array_strict, intval, json_bytes, ltrim_chars, path_to_bytes, php_regex,
     preg_is_match, preg_match, preg_quote, preg_replace, realpath, rtrim, str_pad, str_repeat,

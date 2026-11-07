@@ -2,7 +2,7 @@
 
 use crate::Process;
 use crate::exception::RuntimeException;
-use shirabe_php_shim::{PhpMixed, bconcat, impl_php_exception, php_to_string};
+use shirabe_php_shim::{PhpMixed, ToPhpString, bconcat, impl_php_exception};
 
 #[derive(Debug)]
 pub struct ProcessTimedOutException {
@@ -19,7 +19,7 @@ impl ProcessTimedOutException {
             process.get_command_line(),
             "\" exceeded the timeout of ",
             exceeded_timeout
-                .map(|t| php_to_string(&PhpMixed::Float(t)))
+                .map(|t| PhpMixed::Float(t).to_php_string())
                 .unwrap_or_default(),
             " seconds."
         );

@@ -1,4 +1,4 @@
-use crate::{PhpMixed, bconcat, utf8_text};
+use crate::{PhpDisplay, PhpMixed, ToPhpString, bconcat, utf8_text};
 use bstr::{BStr, BString, ByteSlice, ByteVec};
 use indexmap::IndexMap;
 
@@ -253,32 +253,29 @@ pub fn get_debug_type_obj<T>(_value: &T) -> BString {
     std::any::type_name::<T>().into()
 }
 
-pub fn php_to_string(value: &PhpMixed) -> BString {
-    match value {
-        PhpMixed::Null => BString::default(),
-        PhpMixed::Bool(true) => "1".into(),
-        PhpMixed::Bool(false) => BString::default(),
-        PhpMixed::Int(i) => bconcat!(i),
-        PhpMixed::Float(f) => float_to_string(*f),
-        PhpMixed::String(s) => s.clone(),
-        // PHP renders any array as the literal string "Array".
-        PhpMixed::List(_) | PhpMixed::Array(_) => "Array".into(),
-        // TODO(php-runtime): PHP casts an object to string via its __toString() method; PhpMixed::Object
-        // carries no class/method information to dispatch to.
-        PhpMixed::Object(_) => todo!(),
+impl PhpDisplay for PhpMixed {
+    fn fmt(&self, out: &mut BString) {
+        match self {
+            PhpMixed::Null | PhpMixed::Bool(false) => {}
+            PhpMixed::Bool(true) => out.push(b'1'),
+            PhpMixed::Int(i) => i.fmt(out),
+            // TODO(php-runtime): the shim has no ini registry, so this hard-codes precision=14, the
+            // default significant-digit count a float-to-string cast rounds to.
+            PhpMixed::Float(f) => {
+                shirabe_php_src::zend::zend_smart_str::smart_str_append_double(out, *f, 14, false)
+            }
+            PhpMixed::String(s) => out.extend_from_slice(s),
+            // PHP renders any array as the literal string "Array".
+            PhpMixed::List(_) | PhpMixed::Array(_) => out.extend_from_slice(b"Array"),
+            // TODO(php-runtime): PHP casts an object to string via its __toString() method; PhpMixed::Object
+            // carries no class/method information to dispatch to.
+            PhpMixed::Object(_) => todo!(),
+        }
     }
 }
 
-// TODO(php-runtime): the shim has no ini registry, so this hard-codes precision=14, the default
-// significant-digit count a float-to-string cast rounds to.
-fn float_to_string(f: f64) -> BString {
-    let mut out = BString::default();
-    shirabe_php_src::zend::zend_smart_str::smart_str_append_double(&mut out, f, 14, false);
-    out
-}
-
 pub fn strval(value: &PhpMixed) -> BString {
-    php_to_string(value)
+    value.to_php_string()
 }
 
 pub fn intval(value: &PhpMixed) -> i64 {
@@ -355,7 +352,7 @@ pub fn to_array(value: PhpMixed) -> IndexMap<BString, PhpMixed> {
 }
 
 pub fn to_string(value: &PhpMixed) -> BString {
-    php_to_string(value)
+    value.to_php_string()
 }
 
 pub fn to_bool(value: &PhpMixed) -> bool {
@@ -563,7 +560,7 @@ mod tests {
             ("INF", f64::INFINITY),
             ("-INF", f64::NEG_INFINITY),
         ] {
-            assert_eq!(expected, php_to_string(&PhpMixed::Float(value)));
+            assert_eq!(expected, PhpMixed::Float(value).to_php_string());
         }
     }
 

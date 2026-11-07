@@ -65,7 +65,7 @@ use crate::util::Platform;
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    Catch as _, PhpMixed, RuntimeException, Stringable, array_map, array_unique, bconcat, implode,
+    Catch as _, PhpMixed, RuntimeException, ToPhpString, array_map, array_unique, bconcat, implode,
     intval, is_dir, is_numeric, path_from_bytes, strcmp, strpos, strtolower, touch, usort,
 };
 use shirabe_seld_json_lint::ParsingException;

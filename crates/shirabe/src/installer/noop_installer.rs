@@ -4,7 +4,7 @@ use crate::installer::InstallerInterface;
 use crate::package::PackageInterfaceHandle;
 use crate::repository::InstalledRepositoryInterfaceHandle;
 use bstr::BStr;
-use shirabe_php_shim::{InvalidArgumentException, PhpMixed, Stringable, bconcat, path_from_bytes};
+use shirabe_php_shim::{InvalidArgumentException, PhpMixed, ToPhpString, bconcat, path_from_bytes};
 
 #[derive(Debug)]
 pub struct NoopInstaller;

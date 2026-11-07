@@ -2,7 +2,7 @@
 
 use crate::exception::InvalidArgumentException;
 use bstr::BStr;
-use shirabe_php_shim::{PhpMixed, bconcat, is_scalar, is_string, php_to_string};
+use shirabe_php_shim::{PhpMixed, ToPhpString, bconcat, is_scalar, is_string};
 
 /// ProcessUtils is a bunch of utility methods.
 #[derive(Debug)]
@@ -16,7 +16,7 @@ impl ProcessUtils {
                 return Ok(input);
             }
             if is_scalar(&input) {
-                return Ok(PhpMixed::string(php_to_string(&input)));
+                return Ok(PhpMixed::string(input.to_php_string()));
             }
             // TODO(plugin): Process / \Iterator / \Traversable inputs are not modeled by PhpMixed.
 

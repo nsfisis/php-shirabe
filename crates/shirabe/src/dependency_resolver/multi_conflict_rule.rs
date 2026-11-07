@@ -2,7 +2,7 @@
 
 use crate::dependency_resolver::{ReasonData, Rule, RuleBase};
 use bstr::BString;
-use shirabe_php_shim::{PhpConcat, RuntimeException, Stringable, bconcat, hash_raw, implode};
+use shirabe_php_shim::{PhpDisplay, RuntimeException, bconcat, hash_raw, implode};
 
 #[derive(Debug)]
 pub struct MultiConflictRule {
@@ -73,24 +73,22 @@ impl MultiConflictRule {
     }
 }
 
-impl Stringable for MultiConflictRule {
-    fn to_php_string(&self) -> BString {
+impl PhpDisplay for MultiConflictRule {
+    fn fmt(&self, out: &mut BString) {
         // TODO multi conflict?
-        let mut result = BString::from(if self.inner.is_disabled() {
-            "disabled(multi("
+        out.extend_from_slice(if self.inner.is_disabled() {
+            b"disabled(multi("
         } else {
-            "(multi("
+            b"(multi("
         });
 
         for (i, literal) in self.literals.iter().enumerate() {
             if i != 0 {
-                result.push(b'|');
+                out.push(b'|');
             }
-            literal.php_concat_to(&mut result);
+            literal.fmt(out);
         }
 
-        result.extend_from_slice(b"))");
-
-        result
+        out.extend_from_slice(b"))");
     }
 }

@@ -40,13 +40,13 @@ use indexmap::IndexMap;
 use shirabe_php_shim::{
     AnyThrowable, AsAny, Catch as _, Error, ExitException, InvalidArgumentException,
     LogicException as ShimLogicException, PHP_ENV, PHP_SERVER, PhpMixed, PregMatches,
-    RuntimeException, STDIN, STR_PAD_RIGHT, basename, bconcat, bin2hex, chdir, defined, dirname,
-    disk_free_space, display_to_bytes, error_message, exec, explode, explode_limit,
-    extension_loaded, file_exists, file_get_contents, file_put_contents, function_exists,
-    get_debug_type_obj, getcwd, getenv, getmypid, glob, implode, ini_set, intval, is_dir, is_file,
-    is_numeric_string, is_string, json_decode_assoc, levenshtein, ltrim_chars, mb_convert_encoding,
-    mb_convert_variables, mb_detect_encoding, mb_strwidth, microtime, os_str_from_bytes,
-    path_from_bytes, path_to_bytes, php_regex, php_str, php_to_string, php_truthy, php_uname,
+    RuntimeException, STDIN, STR_PAD_RIGHT, ToPhpString, basename, bconcat, bin2hex, chdir,
+    defined, dirname, disk_free_space, display_to_bytes, error_message, exec, explode,
+    explode_limit, extension_loaded, file_exists, file_get_contents, file_put_contents,
+    function_exists, get_debug_type_obj, getcwd, getenv, getmypid, glob, implode, ini_set, intval,
+    is_dir, is_file, is_numeric_string, is_string, json_decode_assoc, levenshtein, ltrim_chars,
+    mb_convert_encoding, mb_convert_variables, mb_detect_encoding, mb_strwidth, microtime,
+    os_str_from_bytes, path_from_bytes, path_to_bytes, php_regex, php_str, php_truthy, php_uname,
     posix_getuid, preg_grep, preg_match, preg_quote, preg_replace_callback, preg_split, putenv,
     random_bytes, realpath, restore_error_handler, round, sort_natural_flag_case, str_pad,
     str_repeat, str_replace, str_split, strlen, strpos, strrpos, strtoupper, substr, substr_count,
@@ -723,7 +723,7 @@ impl Application {
                     .filter(php_truthy)
                     .map(|n| {
                         shirabe_symfony_console::completion::StringOrSuggestion::String(
-                            php_to_string(&n),
+                            n.to_php_string(),
                         )
                     })
                     .collect();
@@ -1099,7 +1099,7 @@ impl Application {
                     let filtered: Vec<BString> = formatted_abbrevs
                         .iter()
                         .filter(|a| php_truthy(a))
-                        .map(php_to_string)
+                        .map(ToPhpString::to_php_string)
                         .collect();
                     let suggestions = self.get_abbreviation_suggestions(&filtered);
 

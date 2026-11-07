@@ -2,7 +2,7 @@
 
 use crate::constraint::{AnyConstraint, Bound, MatchAllConstraint};
 use bstr::BString;
-use shirabe_php_shim::{CmpOp, Stringable, bconcat, implode};
+use shirabe_php_shim::{CmpOp, PhpDisplay, ToPhpString, bconcat, implode};
 use std::sync::OnceLock;
 
 #[derive(Debug, Clone)]
@@ -242,11 +242,6 @@ impl MultiConstraint {
         self.to_php_string()
     }
 
-    /// Appends PHP's `__toString()` to `out`.
-    pub fn append_php_string(&self, out: &mut BString) {
-        out.extend_from_slice(self.php_string());
-    }
-
     fn php_string(&self) -> &BString {
         self.string.get_or_init(|| {
             let parts: Vec<BString> = self.constraints.iter().map(|c| c.to_php_string()).collect();
@@ -264,8 +259,8 @@ impl MultiConstraint {
     }
 }
 
-impl Stringable for MultiConstraint {
-    fn to_php_string(&self) -> BString {
-        self.php_string().clone()
+impl PhpDisplay for MultiConstraint {
+    fn fmt(&self, out: &mut BString) {
+        out.extend_from_slice(self.php_string());
     }
 }

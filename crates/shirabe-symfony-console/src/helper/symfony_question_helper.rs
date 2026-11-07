@@ -6,7 +6,7 @@ use crate::output::{OutputInterface, output_interface};
 use crate::question::QuestionInterface;
 use crate::style::{StyleInterface, SymfonyStyle};
 use bstr::{B, BString};
-use shirabe_php_shim::{Exception, Stringable, bconcat, explode, implode, php_os_family, trim};
+use shirabe_php_shim::{Exception, ToPhpString, bconcat, explode, implode, php_os_family, trim};
 use std::ops::{Deref, DerefMut};
 
 /// Symfony Style Guide compliant question helper.

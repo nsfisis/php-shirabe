@@ -9,7 +9,7 @@ use crate::repository::{PlatformRepository, RepositoryInterface, RepositorySet};
 use bstr::{BStr, BString, ByteSlice, ByteVec};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    LogicException, PhpMixed, RuntimeException, Stringable, array_keys, array_shift, bconcat,
+    LogicException, PhpDisplay, PhpMixed, RuntimeException, array_keys, array_shift, bconcat,
     implode,
 };
 use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
@@ -724,12 +724,12 @@ impl Rule {
     }
 }
 
-impl Stringable for Rule {
-    fn to_php_string(&self) -> BString {
+impl PhpDisplay for Rule {
+    fn fmt(&self, out: &mut BString) {
         match self {
-            Rule::Generic(r) => r.to_php_string(),
-            Rule::MultiConflict(r) => r.to_php_string(),
-            Rule::TwoLiterals(r) => r.to_php_string(),
+            Rule::Generic(r) => r.fmt(out),
+            Rule::MultiConflict(r) => r.fmt(out),
+            Rule::TwoLiterals(r) => r.fmt(out),
         }
     }
 }

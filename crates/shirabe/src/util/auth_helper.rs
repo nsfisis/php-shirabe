@@ -7,9 +7,9 @@ use crate::util::{Bitbucket, GitHub, GitLab, HttpOptions, StreamContextOptions};
 use bstr::{B, BStr, BString, ByteSlice, ByteVec};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    E_USER_DEPRECATED, PhpMixed, RuntimeException, TypeError, array_merge, base64_encode, bconcat,
-    explode, get_debug_type, in_array_loose, in_array_strict, is_array, is_string,
-    json_decode_assoc, parse_url, php_regex, php_to_string, preg_is_match, str_replace, strpos,
+    E_USER_DEPRECATED, PhpMixed, RuntimeException, ToPhpString, TypeError, array_merge,
+    base64_encode, bconcat, explode, get_debug_type, in_array_loose, in_array_strict, is_array,
+    is_string, json_decode_assoc, parse_url, php_regex, preg_is_match, str_replace, strpos,
     strtolower, substr, trigger_error, trim,
 };
 use shirabe_symfony_console::input::InputValue;
@@ -167,7 +167,7 @@ impl AuthHelper {
                     "GitHub API limit (",
                     rate_limit
                         .get(B("limit"))
-                        .map(php_to_string)
+                        .map(ToPhpString::to_php_string)
                         .unwrap_or_default(),
                     " calls/hr) is exhausted, could not fetch ",
                     url,
@@ -176,7 +176,7 @@ impl AuthHelper {
                     " You can also wait until ",
                     rate_limit
                         .get(B("reset"))
-                        .map(php_to_string)
+                        .map(ToPhpString::to_php_string)
                         .unwrap_or_default(),
                     " for the rate limit to reset.\n"
                 );

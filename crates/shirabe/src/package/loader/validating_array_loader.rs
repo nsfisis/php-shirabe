@@ -7,11 +7,12 @@ use crate::repository::PlatformRepository;
 use bstr::{B, BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    CmpOp, E_USER_DEPRECATED, PHP_EOL, PhpMixed, array_intersect_key, array_values, bconcat,
-    date_create, display_to_bytes, error_message, explode, filter_var_email, get_debug_type,
-    implode, is_array, is_bool, is_int, is_numeric, is_scalar, is_string, json_encode, parse_url,
-    pcre_check_utf8_subject, php_regex, php_to_string, preg_is_match, preg_replace, str_replace,
-    strcasecmp, stripos, strtolower, strtotime, substr, trigger_error, trim_chars, var_export,
+    CmpOp, E_USER_DEPRECATED, PHP_EOL, PhpMixed, ToPhpString, array_intersect_key, array_values,
+    bconcat, date_create, display_to_bytes, error_message, explode, filter_var_email,
+    get_debug_type, implode, is_array, is_bool, is_int, is_numeric, is_scalar, is_string,
+    json_encode, parse_url, pcre_check_utf8_subject, php_regex, preg_is_match, preg_replace,
+    str_replace, strcasecmp, stripos, strtolower, strtotime, substr, trigger_error, trim_chars,
+    var_export,
 };
 use shirabe_semver::{
     Intervals,
@@ -283,7 +284,7 @@ impl ValidatingArrayLoader {
             }
 
             if let Some(regex_str) = regex {
-                let value_str = php_to_string(&value);
+                let value_str = value.to_php_string();
                 let pattern = bconcat!("{^", regex_str, "$}u");
                 pcre_check_utf8_subject("preg_match", &pattern, &value_str)?;
                 if !preg_is_match(pattern, &value_str) {
@@ -402,7 +403,7 @@ impl LoaderInterface for ValidatingArrayLoader {
                 if !is_string(&version_val) {
                     self.config.borrow_mut().insert(
                         "version".into(),
-                        PhpMixed::string(php_to_string(&version_val)),
+                        PhpMixed::string(version_val.to_php_string()),
                     );
                 }
                 let version_str = BString::from(
@@ -1608,7 +1609,7 @@ impl LoaderInterface for ValidatingArrayLoader {
                     .get(B("reference"))
                     .filter(|_| isset(BStr::new("reference")))
                 {
-                    let ref_str = php_to_string(ref_val);
+                    let ref_str = ref_val.to_php_string();
                     if preg_is_match(php_regex!("{^\\s*-}"), &ref_str) {
                         self.errors.borrow_mut().push(bconcat!(
                             src_type,
@@ -1619,7 +1620,7 @@ impl LoaderInterface for ValidatingArrayLoader {
                     }
                 }
                 if let Some(url_val) = section.get(B("url")).filter(|_| isset(BStr::new("url"))) {
-                    let url_str = php_to_string(url_val);
+                    let url_str = url_val.to_php_string();
                     if preg_is_match(php_regex!("{^\\s*-}"), &url_str) {
                         self.errors.borrow_mut().push(bconcat!(
                             src_type,

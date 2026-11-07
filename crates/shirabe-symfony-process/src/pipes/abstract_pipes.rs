@@ -3,7 +3,7 @@
 use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpMixed, PhpResource, fclose, fwrite, php_to_string, php_truthy, stream_select,
+    PhpMixed, PhpResource, ToPhpString, fclose, fwrite, php_truthy, stream_select,
     stream_set_blocking, stripos,
 };
 
@@ -27,7 +27,7 @@ impl AbstractPipes {
             input_buffer = s.clone();
             stored_input = PhpMixed::Null;
         } else {
-            input_buffer = php_to_string(&input);
+            input_buffer = input.to_php_string();
             stored_input = PhpMixed::Null;
         }
 

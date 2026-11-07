@@ -9,9 +9,9 @@ use crate::output::{OUTPUT_NORMAL, OutputInterface};
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpMixed, Stringable, array_splice, bconcat, explode, get_debug_type, http_build_query_mixed,
-    implode, mb_detect_encoding, mb_str_split, mb_strwidth, php_regex, preg_is_match, sprintf,
-    str_pad, str_repeat, str_replace, strlen, strstr, substr_count,
+    PhpDisplay, PhpMixed, ToPhpString, array_splice, bconcat, explode, get_debug_type,
+    http_build_query_mixed, implode, mb_detect_encoding, mb_str_split, mb_strwidth, php_regex,
+    preg_is_match, sprintf, str_pad, str_repeat, str_replace, strlen, strstr, substr_count,
 };
 
 /// A single cell within a table row.
@@ -77,12 +77,12 @@ impl Cell {
     }
 }
 
-impl Stringable for Cell {
-    fn to_php_string(&self) -> BString {
+impl PhpDisplay for Cell {
+    fn fmt(&self, out: &mut BString) {
         match self {
-            Cell::Null | Cell::Separator(_) => BString::default(),
-            Cell::Value(s) => s.clone(),
-            Cell::Cell(c) => c.to_php_string(),
+            Cell::Null | Cell::Separator(_) => {}
+            Cell::Value(s) => out.extend_from_slice(s),
+            Cell::Cell(c) => c.fmt(out),
         }
     }
 }

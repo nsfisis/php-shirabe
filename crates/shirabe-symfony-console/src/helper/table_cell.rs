@@ -4,7 +4,7 @@ use crate::exception::InvalidArgumentException;
 use crate::helper::TableCellStyle;
 use bstr::{B, BString};
 use indexmap::IndexMap;
-use shirabe_php_shim::{Stringable, bconcat, implode};
+use shirabe_php_shim::{PhpDisplay, bconcat, implode};
 
 /// A `TableCell` option value: an integer span, a `TableCellStyle`, or null.
 #[derive(Debug, Clone)]
@@ -97,8 +97,8 @@ impl TableCell {
     }
 }
 
-impl Stringable for TableCell {
-    fn to_php_string(&self) -> BString {
-        self.value.clone()
+impl PhpDisplay for TableCell {
+    fn fmt(&self, out: &mut BString) {
+        out.extend_from_slice(&self.value);
     }
 }

@@ -5,7 +5,7 @@ use crate::package::BasePackageHandle;
 use crate::package::version::VersionParser;
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
-use shirabe_php_shim::{CmpOp, STR_PAD_LEFT, Stringable, bconcat, str_pad};
+use shirabe_php_shim::{CmpOp, PhpDisplay, STR_PAD_LEFT, ToPhpString, bconcat, str_pad};
 use shirabe_semver::CompilingMatcher;
 use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
 
@@ -341,12 +341,12 @@ impl Pool {
     }
 }
 
-impl Stringable for Pool {
-    fn to_php_string(&self) -> BString {
-        let mut str = BString::from("Pool:\n");
+impl PhpDisplay for Pool {
+    fn fmt(&self, out: &mut BString) {
+        out.extend_from_slice(b"Pool:\n");
 
         for package in &self.packages {
-            str.extend_from_slice(&bconcat!(
+            out.extend_from_slice(&bconcat!(
                 "- ",
                 str_pad(bconcat!(package.id()), 6, " ", STR_PAD_LEFT),
                 ": ",
@@ -354,7 +354,5 @@ impl Stringable for Pool {
                 "\n"
             ));
         }
-
-        str
     }
 }

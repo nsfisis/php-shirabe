@@ -12,9 +12,9 @@ use crate::util::{HttpDownloader, ProcessExecutor, StreamContextOptions};
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    InvalidArgumentException, PATHINFO_EXTENSION, PhpMixed, UnexpectedValueException, bconcat,
-    get_debug_type, json_encode, path_from_bytes, path_to_bytes, pathinfo, php_regex,
-    php_to_string, preg_replace, realpath, strtr,
+    InvalidArgumentException, PATHINFO_EXTENSION, PhpMixed, ToPhpString, UnexpectedValueException,
+    bconcat, get_debug_type, json_encode, path_from_bytes, path_to_bytes, pathinfo, php_regex,
+    preg_replace, realpath, strtr,
 };
 
 pub struct RepositoryFactory;
@@ -364,7 +364,7 @@ impl RepositoryFactory {
                     .unwrap_or_default();
                 preg_replace(php_regex!("{^https?://}i"), "", url)
             } else {
-                php_to_string(index)
+                index.to_php_string()
             }[..],
         );
         while existing_repos

@@ -9,7 +9,7 @@ use crate::input::{
     DefinitionItem, InputArgument, InputInterface, InputInterfaceByName, InputOption, InputValue,
 };
 use crate::output::OutputInterface;
-use shirabe_php_shim::{Stringable, impl_php_class};
+use shirabe_php_shim::{ToPhpString, impl_php_class};
 use std::ops::{Deref, DerefMut};
 
 /// HelpCommand displays the help for a given command.

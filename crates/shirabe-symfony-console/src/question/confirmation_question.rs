@@ -4,7 +4,7 @@ use crate::exception::InvalidArgumentException;
 use crate::input::InputValue;
 use crate::question::{Question, QuestionInterface};
 use bstr::{BStr, BString};
-use shirabe_php_shim::{Stringable, preg_is_match};
+use shirabe_php_shim::{ToPhpString, preg_is_match};
 
 /// Represents a yes/no question.
 #[derive(Debug)]

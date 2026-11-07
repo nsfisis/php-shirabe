@@ -57,7 +57,7 @@ its type from `.into()`, `.collect()` or a `str` method that returns `String` is
 it reaches a signature or a field.
 
 An impl for `&str` whose only purpose is to accept a Rust string literal where bytes are expected
-(`PhpConcat for str`, `From<&str> for PhpMixed`, ...) records `reason = "a string literal"`.
+(`PhpDisplay for str`, `From<&str> for PhpMixed`, ...) records `reason = "a string literal"`.
 
 rustc ignores a lint attribute on a macro statement such as `assert!(...);`, so `#[expect]` goes on
 the enclosing `let`, expression statement or function.
@@ -116,9 +116,18 @@ which decodes UTF-8 as PHP does, records that reason where it calls one.
 ## Building strings
 
 PHP's `.` operator and string interpolation map to `bconcat!`, and `sprintf()` to the shim's
-`sprintf()`. Both keep the bytes of their operands. `bconcat!` also takes integers, so `bconcat!(n)`
-is the string conversion of `n`. This applies to every string PHP code could observe, including messages read by people: errors, warnings, progress and exception messages. PHP
+`sprintf()`. Both keep the bytes of their operands. This applies to every string PHP code could
+observe, including messages read by people: errors, warnings, progress and exception messages. PHP
 writes those bytes unchanged, and so does Shirabe.
+
+PHP's `(string)` conversion maps to two traits, which mirror `Display` and `ToString`:
+
+* `PhpDisplay` appends the bytes of the conversion to a `BString`, as `Display::fmt` writes into a
+  formatter. Strings, paths, integers and `PhpMixed` implement it, and so does the port of every
+  class that defines `__toString()`. `bconcat!` converts each of its operands with it, so `bconcat!(n)` is
+  `(string) $n`.
+* `ToPhpString` returns the conversion as a `BString`, as `ToString::to_string` does. Every
+  `PhpDisplay` implements it.
 
 `format!` produces a `String`, so formatting bytes into it replaces invalid UTF-8 with U+FFFD. Use it
 only under the reasons above.
@@ -134,5 +143,5 @@ is `core::fmt` (reason 3), format a string explicitly:
 * `display_lossy()` for a `BStr`, as `Path::display()` does for a path.
 * `{:?}` for an error about malformed data, where the exact bytes matter.
 
-`PhpMixed` and the semver constraints do not implement `Display` either: convert them with
-`php_to_string()` and `to_php_string()`, which keep the bytes.
+`PhpMixed` and the semver constraints do not implement `Display` either: they implement
+`PhpDisplay`, so convert them with `to_php_string()`, which keeps the bytes.

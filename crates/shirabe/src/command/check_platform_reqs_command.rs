@@ -16,7 +16,7 @@ use crate::repository::{
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    Stringable, array_merge_map, bconcat, impl_php_class, json_bytes, rtrim, strip_tags,
+    ToPhpString, array_merge_map, bconcat, impl_php_class, json_bytes, rtrim, strip_tags,
 };
 use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
 use shirabe_symfony_console::command::Command;

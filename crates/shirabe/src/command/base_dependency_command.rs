@@ -17,7 +17,7 @@ use crate::util::PackageInfo;
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    InvalidArgumentException, PhpMixed, Stringable, UnexpectedValueException, bconcat, php_str,
+    InvalidArgumentException, PhpMixed, ToPhpString, UnexpectedValueException, bconcat, php_str,
     rtrim,
 };
 use shirabe_semver::constraint::{AnyConstraint, Bound};

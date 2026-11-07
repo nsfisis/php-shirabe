@@ -31,9 +31,9 @@ use crate::util::{
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PHP_EOL, PhpMixed, RuntimeException, TypeError, bconcat, display_to_bytes, get_debug_type,
-    in_array_loose, in_array_strict, intval, json_decode_assoc, parse_url, path_from_bytes,
-    path_to_bytes, php_regex, php_to_string, preg_is_match, preg_quote, preg_replace, rename,
+    PHP_EOL, PhpMixed, RuntimeException, ToPhpString, TypeError, bconcat, display_to_bytes,
+    get_debug_type, in_array_loose, in_array_strict, intval, json_decode_assoc, parse_url,
+    path_from_bytes, path_to_bytes, php_regex, preg_is_match, preg_quote, preg_replace, rename,
     stripos, strlen, strpos, strtolower, substr, trim, unlink_silent, utf8_text,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -922,7 +922,7 @@ impl NativeHttpDownloader {
         let http = options.http();
         let method = http
             .and_then(HttpOptions::method)
-            .map_or_else(|| BString::from("GET"), php_to_string);
+            .map_or_else(|| BString::from("GET"), ToPhpString::to_php_string);
         let body = match http.and_then(HttpOptions::content) {
             None => None,
             // TODO(http): curl sends an array CURLOPT_POSTFIELDS as a multipart/form-data body.
@@ -932,7 +932,7 @@ impl NativeHttpDownloader {
                 )
                 .into());
             }
-            Some(content) => Some(php_to_string(content).into()),
+            Some(content) => Some(content.to_php_string().into()),
         };
         // CURLOPT_TIMEOUT is max(default_socket_timeout, 300) unless http.timeout overrides it,
         // and curl reads 0 as no timeout.

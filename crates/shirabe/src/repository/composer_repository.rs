@@ -30,11 +30,10 @@ use indexmap::IndexMap;
 use shirabe_metadata_minifier::{ExpandedVersion, ExpandedVersions, MetadataMinifier};
 use shirabe_php_shim::{
     AnyThrowable, Catch as _, CmpOp, InvalidArgumentException, LogicException, PHP_EOL, PhpClass,
-    PhpMixed, RuntimeException, UnexpectedValueException, bconcat, error_message, explode,
-    extension_loaded, hash, http_build_query_mixed, implode, json_decode_assoc, parse_url,
-    path_from_bytes, php_regex, php_to_string, preg_grep, preg_is_match, preg_match, preg_replace,
-    preg_split, realpath, rtrim_chars, str_replace, strpos, strtolower, strtr, urlencode,
-    var_export,
+    PhpMixed, RuntimeException, ToPhpString, UnexpectedValueException, bconcat, error_message,
+    explode, extension_loaded, hash, http_build_query_mixed, implode, json_decode_assoc, parse_url,
+    path_from_bytes, php_regex, preg_grep, preg_is_match, preg_match, preg_replace, preg_split,
+    realpath, rtrim_chars, str_replace, strpos, strtolower, strtr, urlencode, var_export,
 };
 use shirabe_semver::CompilingMatcher;
 use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint, SimpleConstraint};
@@ -1547,7 +1546,7 @@ impl ComposerRepository {
                 let uid_key = match version.get(B("uid")) {
                     Some(PhpMixed::Int(i)) => bconcat!(i),
                     Some(PhpMixed::String(s)) => s.clone(),
-                    Some(other) => php_to_string(other),
+                    Some(other) => other.to_php_string(),
                     None => continue,
                 };
                 if !versions_to_load.contains_key(&uid_key) {

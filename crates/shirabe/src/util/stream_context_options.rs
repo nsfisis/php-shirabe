@@ -16,8 +16,8 @@ use bstr::{B, BString};
 use indexmap::IndexMap;
 use shirabe_php_rpc::{FromWire, PhpThrow, PluginValue, ToWire};
 use shirabe_php_shim::{
-    PhpMixed, TypeError, array_replace_recursive, bconcat, error_message, get_debug_type,
-    implode_mixed, php_to_string,
+    PhpMixed, ToPhpString, TypeError, array_replace_recursive, bconcat, error_message,
+    get_debug_type, implode_mixed,
 };
 
 #[derive(Debug, Clone, Default)]
@@ -352,8 +352,10 @@ impl HttpOptions {
     /// string.
     pub fn header_lines(&self) -> anyhow::Result<Vec<BString>> {
         match self.get("header") {
-            Some(PhpMixed::List(list)) => Ok(list.iter().map(php_to_string).collect()),
-            Some(PhpMixed::Array(map)) => Ok(map.values().map(php_to_string).collect()),
+            Some(PhpMixed::List(list)) => Ok(list.iter().map(ToPhpString::to_php_string).collect()),
+            Some(PhpMixed::Array(map)) => {
+                Ok(map.values().map(ToPhpString::to_php_string).collect())
+            }
             other => Err(TypeError::new(bconcat!(
                 "curl_setopt(): The CURLOPT_HTTPHEADER option must have an array value, ",
                 get_debug_type(other.unwrap_or(&PhpMixed::Null)),

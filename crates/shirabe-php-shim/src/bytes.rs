@@ -61,59 +61,74 @@ pub fn path_to_bytes(path: &(impl AsRef<Path> + ?Sized)) -> &[u8] {
     path.as_ref().as_os_str().as_encoded_bytes()
 }
 
-/// A value that PHP's `.` operator (and string interpolation) appends as a string.
-pub trait PhpConcat {
-    fn php_concat_to(&self, out: &mut BString);
+/// PHP's `(string)` conversion: `fmt` appends the bytes PHP produces for the value, as
+/// `Display::fmt` writes text into a formatter. PHP's `.` operator and string interpolation
+/// convert their operands this way.
+pub trait PhpDisplay {
+    fn fmt(&self, out: &mut BString);
 }
 
-impl PhpConcat for [u8] {
-    fn php_concat_to(&self, out: &mut BString) {
+/// `ToString` for [`PhpDisplay`]: the PHP string of a value, as `(string) $value` gives it.
+pub trait ToPhpString {
+    fn to_php_string(&self) -> BString;
+}
+
+impl<T: PhpDisplay + ?Sized> ToPhpString for T {
+    fn to_php_string(&self) -> BString {
+        let mut out = BString::default();
+        self.fmt(&mut out);
+        out
+    }
+}
+
+impl PhpDisplay for [u8] {
+    fn fmt(&self, out: &mut BString) {
         out.extend_from_slice(self);
     }
 }
 
-impl PhpConcat for Vec<u8> {
-    fn php_concat_to(&self, out: &mut BString) {
+impl PhpDisplay for Vec<u8> {
+    fn fmt(&self, out: &mut BString) {
         out.extend_from_slice(self);
     }
 }
 
-impl PhpConcat for bstr::BStr {
-    fn php_concat_to(&self, out: &mut BString) {
+impl PhpDisplay for bstr::BStr {
+    fn fmt(&self, out: &mut BString) {
         out.extend_from_slice(self);
     }
 }
 
-impl PhpConcat for BString {
-    fn php_concat_to(&self, out: &mut BString) {
+impl PhpDisplay for BString {
+    fn fmt(&self, out: &mut BString) {
         out.extend_from_slice(self);
     }
 }
 
 #[expect(clippy::disallowed_types, reason = "a string literal")]
-impl PhpConcat for str {
-    fn php_concat_to(&self, out: &mut BString) {
+impl PhpDisplay for str {
+    fn fmt(&self, out: &mut BString) {
         out.extend_from_slice(self.as_bytes());
     }
 }
 
-impl PhpConcat for Path {
-    fn php_concat_to(&self, out: &mut BString) {
+impl PhpDisplay for Path {
+    fn fmt(&self, out: &mut BString) {
         out.extend_from_slice(path_to_bytes(self));
     }
 }
 
-impl PhpConcat for std::path::PathBuf {
-    fn php_concat_to(&self, out: &mut BString) {
+impl PhpDisplay for std::path::PathBuf {
+    fn fmt(&self, out: &mut BString) {
         out.extend_from_slice(path_to_bytes(self));
     }
 }
 
-macro_rules! impl_php_concat_for_integers {
+macro_rules! impl_php_display_for_integers {
     ($($ty:ty),* $(,)?) => {
         $(
-            impl PhpConcat for $ty {
-                fn php_concat_to(&self, out: &mut BString) {
+            impl PhpDisplay for $ty {
+                fn fmt(&self, out: &mut BString) {
                     use std::io::Write as _;
                     write!(out, "{self}").expect("writing to a Vec cannot fail");
                 }
@@ -123,11 +138,11 @@ macro_rules! impl_php_concat_for_integers {
 }
 
 // `u8` is left out: a Rust `u8` is usually a byte of a string, not a number PHP would print.
-impl_php_concat_for_integers!(i8, i16, i32, i64, isize, u16, u32, u64, usize);
+impl_php_display_for_integers!(i8, i16, i32, i64, isize, u16, u32, u64, usize);
 
-impl<T: PhpConcat + ?Sized> PhpConcat for &T {
-    fn php_concat_to(&self, out: &mut BString) {
-        (**self).php_concat_to(out);
+impl<T: PhpDisplay + ?Sized> PhpDisplay for &T {
+    fn fmt(&self, out: &mut BString) {
+        (**self).fmt(out);
     }
 }
 
@@ -143,7 +158,7 @@ pub fn __bconcat_buffer() -> BString {
 macro_rules! bconcat {
     ($($operand:expr),* $(,)?) => {{
         let mut out = $crate::__bconcat_buffer();
-        $($crate::PhpConcat::php_concat_to(&$operand, &mut out);)*
+        $($crate::PhpDisplay::fmt(&$operand, &mut out);)*
         out
     }};
 }

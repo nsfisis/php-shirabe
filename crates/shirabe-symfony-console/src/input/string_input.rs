@@ -8,7 +8,7 @@ use crate::input::{
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpResource, Stringable, bconcat, php_regex, php_str, preg_match, str_replace_arr,
+    PhpDisplay, PhpResource, bconcat, php_regex, php_str, preg_match, str_replace_arr,
     stripcslashes, strlen, substr,
 };
 
@@ -204,9 +204,9 @@ impl InputInterface for StringInput {
     }
 }
 
-impl Stringable for StringInput {
-    fn to_php_string(&self) -> BString {
-        self.inner.to_php_string()
+impl PhpDisplay for StringInput {
+    fn fmt(&self, out: &mut BString) {
+        self.inner.fmt(out);
     }
 }
 

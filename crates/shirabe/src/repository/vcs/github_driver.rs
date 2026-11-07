@@ -12,11 +12,10 @@ use bstr::{B, BStr, BString, ByteSlice};
 use chrono::{DateTime, FixedOffset};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    Catch as _, InvalidArgumentException, PhpMixed, RuntimeException, array_diff, array_map,
-    array_search_mixed, base64_decode, basename, bconcat, date_create, empty, explode,
-    extension_loaded, in_array_loose, parse_url, path_from_bytes, php_regex, php_to_string,
-    preg_is_match, preg_match, preg_replace, preg_split, strpos, strtolower, substr, trim,
-    trim_chars, urlencode,
+    Catch as _, InvalidArgumentException, PhpMixed, RuntimeException, ToPhpString, array_diff,
+    array_map, array_search_mixed, base64_decode, basename, bconcat, date_create, empty, explode,
+    extension_loaded, in_array_loose, parse_url, path_from_bytes, php_regex, preg_is_match,
+    preg_match, preg_replace, preg_split, strpos, strtolower, substr, trim, trim_chars, urlencode,
 };
 
 #[derive(Debug)]
@@ -1099,7 +1098,7 @@ impl GitHubDriver {
 
                         if rate_limited {
                             let rate_limit = git_hub_util.get_rate_limit(&headers);
-                            self.inner.io.write_error(bconcat!("<error>GitHub API limit (", rate_limit.get(B("limit")).map(php_to_string).unwrap_or_default(), " calls/hr) is exhausted. You are already authorized so you have to wait until ", rate_limit.get(B("reset")).map(php_to_string).unwrap_or_default(), " before doing more requests</error>"));
+                            self.inner.io.write_error(bconcat!("<error>GitHub API limit (", rate_limit.get(B("limit")).map(ToPhpString::to_php_string).unwrap_or_default(), " calls/hr) is exhausted. You are already authorized so you have to wait until ", rate_limit.get(B("reset")).map(ToPhpString::to_php_string).unwrap_or_default(), " before doing more requests</error>"));
                         }
 
                         Ok(Err(e))

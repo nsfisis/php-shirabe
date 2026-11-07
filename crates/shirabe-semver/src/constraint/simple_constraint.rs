@@ -3,7 +3,7 @@
 use crate::constraint::Bound;
 use bstr::{BStr, BString, ByteSlice};
 use shirabe_php_shim::{
-    CmpOp, Stringable, bconcat, implode, str_replace, var_export_str, version_compare,
+    CmpOp, PhpDisplay, ToPhpString, bconcat, implode, str_replace, var_export_str, version_compare,
 };
 
 /// Corresponds to PHP's `Constraint`.
@@ -304,13 +304,6 @@ impl SimpleConstraint {
         self.to_php_string()
     }
 
-    /// Appends PHP's `__toString()` to `out`.
-    pub fn append_php_string(&self, out: &mut BString) {
-        out.extend_from_slice(self.operator.as_str().as_bytes());
-        out.push(b' ');
-        out.extend_from_slice(&self.version);
-    }
-
     pub fn get_lower_bound(&self) -> Bound {
         self.extract_bounds().0
     }
@@ -320,10 +313,10 @@ impl SimpleConstraint {
     }
 }
 
-impl Stringable for SimpleConstraint {
-    fn to_php_string(&self) -> BString {
-        let mut out = BString::default();
-        self.append_php_string(&mut out);
-        out
+impl PhpDisplay for SimpleConstraint {
+    fn fmt(&self, out: &mut BString) {
+        out.extend_from_slice(self.operator.as_str().as_bytes());
+        out.push(b' ');
+        out.extend_from_slice(&self.version);
     }
 }

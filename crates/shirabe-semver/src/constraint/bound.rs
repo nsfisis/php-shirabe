@@ -1,7 +1,7 @@
 //! ref: composer/vendor/composer/semver/src/Constraint/Bound.php sha1:7106e51a8b7f25dc36ed4550d0b3c0e337e3c94b
 
 use bstr::{BStr, BString, ByteSlice};
-use shirabe_php_shim::{InvalidArgumentException, Stringable, bconcat, version_compare_ordering};
+use shirabe_php_shim::{InvalidArgumentException, PhpDisplay, bconcat, version_compare_ordering};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Bound {
@@ -69,15 +69,15 @@ impl Bound {
     }
 }
 
-impl Stringable for Bound {
-    fn to_php_string(&self) -> BString {
-        bconcat!(
+impl PhpDisplay for Bound {
+    fn fmt(&self, out: &mut BString) {
+        out.extend_from_slice(&bconcat!(
             self.get_version(),
             if self.is_inclusive() {
                 " [inclusive]"
             } else {
                 " [exclusive]"
             }
-        )
+        ));
     }
 }

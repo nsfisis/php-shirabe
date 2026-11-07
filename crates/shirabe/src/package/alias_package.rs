@@ -6,7 +6,7 @@ use crate::repository::{RepositoryInterfaceHandle, RepositoryInterfaceWeakHandle
 use bstr::{BStr, BString, ByteSlice};
 use chrono::{DateTime, Utc};
 use indexmap::{IndexMap, IndexSet};
-use shirabe_php_shim::{LogicException, PhpMixed, Stringable, bconcat, strtolower};
+use shirabe_php_shim::{LogicException, PhpDisplay, PhpMixed, bconcat, strtolower};
 use shirabe_semver::constraint::SimpleConstraint;
 
 #[derive(Debug, Clone)]
@@ -409,16 +409,16 @@ impl PackageInterface for AliasPackage {
     }
 }
 
-impl Stringable for AliasPackage {
-    fn to_php_string(&self) -> BString {
-        bconcat!(
+impl PhpDisplay for AliasPackage {
+    fn fmt(&self, out: &mut BString) {
+        out.extend_from_slice(&bconcat!(
             self.get_unique_name(),
             " (",
             if self.root_package_alias { "root " } else { "" },
             "alias of ",
             self.alias_of.get_version(),
             ")"
-        )
+        ));
     }
 }
 

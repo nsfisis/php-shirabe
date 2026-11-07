@@ -313,7 +313,7 @@ pub(crate) fn link_from_wire(value: &PluginValue) -> Result<Link, PhpThrow> {
 mod tests {
     use super::*;
     use shirabe_php_rpc::value::serialize;
-    use shirabe_php_shim::Stringable;
+    use shirabe_php_shim::ToPhpString;
 
     fn simple(operator: &BStr, version: &BStr, pretty_string: Option<&BStr>) -> AnyConstraint {
         AnyConstraint::Simple(SimpleConstraint::new(

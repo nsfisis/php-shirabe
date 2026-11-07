@@ -9,7 +9,7 @@ use crate::io::IOInterfaceWrite;
 use crate::util::{Filesystem, Platform};
 use bstr::BString;
 use shirabe_php_shim::{
-    RuntimeException, Stringable, bconcat, chdir, impl_php_class, path_from_bytes, php_regex,
+    RuntimeException, ToPhpString, bconcat, chdir, impl_php_class, path_from_bytes, php_regex,
     preg_replace_with_limit_and_count, preg_split,
 };
 use shirabe_symfony_console::command::Command;

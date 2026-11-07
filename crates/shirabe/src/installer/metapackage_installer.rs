@@ -8,7 +8,7 @@ use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::package::PackageInterfaceHandle;
 use crate::repository::InstalledRepositoryInterfaceHandle;
 use bstr::BStr;
-use shirabe_php_shim::{InvalidArgumentException, PhpMixed, Stringable, bconcat};
+use shirabe_php_shim::{InvalidArgumentException, PhpMixed, ToPhpString, bconcat};
 
 #[derive(Debug)]
 pub struct MetapackageInstaller {

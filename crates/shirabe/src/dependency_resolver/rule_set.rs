@@ -5,7 +5,7 @@ use crate::repository::RepositorySet;
 use bstr::{BStr, BString, ByteVec};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    OutOfBoundsException, STR_PAD_RIGHT, Stringable, bconcat, php_to_string, str_pad,
+    OutOfBoundsException, PhpDisplay, STR_PAD_RIGHT, ToPhpString, bconcat, str_pad,
 };
 
 #[derive(Debug)]
@@ -62,7 +62,7 @@ impl RuleSet {
             return Err(OutOfBoundsException::new(bconcat!("Unknown rule type: ", r#type)).into());
         }
 
-        let hash = php_to_string(&rule.borrow().get_hash()?);
+        let hash = rule.borrow().get_hash()?.to_php_string();
 
         // Skip exact duplicates that share the same hash.
         if let Some(potential_duplicates) = self.rules_by_hash.get(&hash) {
@@ -173,9 +173,9 @@ impl RuleSet {
     }
 }
 
-impl Stringable for RuleSet {
-    fn to_php_string(&self) -> BString {
-        self.get_pretty_string(None, None, None, false)
-            .expect("RuleSet::get_pretty_string() is infallible without a repository set, a request and a pool")
+impl PhpDisplay for RuleSet {
+    fn fmt(&self, out: &mut BString) {
+        out.extend_from_slice(&self.get_pretty_string(None, None, None, false)
+            .expect("RuleSet::get_pretty_string() is infallible without a repository set, a request and a pool"));
     }
 }

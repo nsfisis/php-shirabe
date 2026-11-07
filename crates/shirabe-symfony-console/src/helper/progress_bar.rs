@@ -9,9 +9,9 @@ use crate::{Cursor, Terminal};
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    AsAny, PHP_EOL, PhpMixed, PregMatches, STR_PAD_LEFT, bconcat, explode, microtime, php_str,
-    php_to_string, preg_replace_callback, round, rtrim_chars, sprintf, str_pad, str_repeat,
-    substr_count, time,
+    AsAny, PHP_EOL, PhpMixed, PregMatches, STR_PAD_LEFT, ToPhpString, bconcat, explode, microtime,
+    php_str, preg_replace_callback, round, rtrim_chars, sprintf, str_pad, str_repeat, substr_count,
+    time,
 };
 
 pub const FORMAT_VERBOSE: &BStr = php_str(b"verbose");
@@ -809,7 +809,7 @@ impl ProgressBar {
             }
 
             // PHP implicitly casts the formatter result to string here.
-            Ok(php_to_string(&text))
+            Ok(text.to_php_string())
         };
 
         preg_replace_callback(regex, callback, &format)

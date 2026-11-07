@@ -4,7 +4,7 @@ use crate::exception::{InvalidArgumentException, LogicException};
 use crate::input::{InputArgument, InputOption, InputValue};
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe_php_shim::{Stringable, bconcat, implode};
+use shirabe_php_shim::{PhpDisplay, ToPhpString, bconcat, implode};
 
 /// A InputDefinition represents a set of valid command line arguments and options.
 ///
@@ -465,11 +465,11 @@ impl ArgumentName {
     }
 }
 
-impl Stringable for ArgumentName {
-    fn to_php_string(&self) -> BString {
+impl PhpDisplay for ArgumentName {
+    fn fmt(&self, out: &mut BString) {
         match self {
-            Self::Name(name) => name.clone(),
-            Self::Position(position) => bconcat!(*position),
+            Self::Name(name) => name.fmt(out),
+            Self::Position(position) => position.fmt(out),
         }
     }
 }

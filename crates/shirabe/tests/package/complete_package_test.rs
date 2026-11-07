@@ -2,7 +2,7 @@
 
 use bstr::{BStr, BString};
 use shirabe::package::{Package, PackageInterface};
-use shirabe_php_shim::{Stringable, bconcat};
+use shirabe_php_shim::{ToPhpString, bconcat};
 use shirabe_semver::VersionParser;
 
 /// Memory package naming, versioning, and marshalling semantics provider

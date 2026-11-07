@@ -424,9 +424,9 @@ macro_rules! delegate_package_interface_to_inner {
             }
         }
 
-        impl shirabe_php_shim::Stringable for $Type {
-            fn to_php_string(&self) -> BString {
-                self.$field.to_php_string()
+        impl shirabe_php_shim::PhpDisplay for $Type {
+            fn fmt(&self, out: &mut BString) {
+                shirabe_php_shim::PhpDisplay::fmt(&self.$field, out);
             }
         }
     };
@@ -761,9 +761,9 @@ macro_rules! impl_package_interface_handle {
             }
         }
 
-        impl shirabe_php_shim::Stringable for $Handle {
-            fn to_php_string(&self) -> BString {
-                shirabe_php_shim::Stringable::to_php_string(self.0.borrow().as_package_interface())
+        impl shirabe_php_shim::PhpDisplay for $Handle {
+            fn fmt(&self, out: &mut BString) {
+                shirabe_php_shim::PhpDisplay::fmt(self.0.borrow().as_package_interface(), out);
             }
         }
     };

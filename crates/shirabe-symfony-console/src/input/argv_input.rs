@@ -7,8 +7,8 @@ use crate::input::{
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpResource, Stringable, bconcat, implode, mb_detect_encoding, mb_substr, path_to_bytes,
-    php_regex, preg_match, strlen, strpos, substr,
+    PhpDisplay, PhpResource, ToPhpString, bconcat, implode, mb_detect_encoding, mb_substr,
+    path_to_bytes, php_regex, preg_match, strlen, strpos, substr,
 };
 
 /// ArgvInput represents an input coming from the CLI arguments.
@@ -544,8 +544,8 @@ impl ArgvInput {
     }
 }
 
-impl Stringable for ArgvInput {
-    fn to_php_string(&self) -> BString {
+impl PhpDisplay for ArgvInput {
+    fn fmt(&self, out: &mut BString) {
         let tokens: Vec<BString> = self
             .tokens
             .iter()
@@ -566,7 +566,7 @@ impl Stringable for ArgvInput {
             })
             .collect();
 
-        implode(" ", &tokens)
+        out.extend_from_slice(&implode(" ", &tokens));
     }
 }
 

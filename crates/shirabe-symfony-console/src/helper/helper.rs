@@ -4,8 +4,8 @@ use crate::formatter::OutputFormatterInterface;
 use crate::helper::HelperSet;
 use bstr::{BStr, BString, ByteSlice};
 use shirabe_php_shim::{
-    PhpMixed, bconcat, mb_detect_encoding, mb_strlen, mb_strwidth, mb_substr, php_regex,
-    php_to_string, preg_is_match, preg_replace, sprintf, strlen, substr, trigger_deprecation,
+    PhpMixed, ToPhpString, bconcat, mb_detect_encoding, mb_strlen, mb_strwidth, mb_substr,
+    php_regex, preg_is_match, preg_replace, sprintf, strlen, substr, trigger_deprecation,
     utf8_text,
 };
 use shirabe_symfony_string::UnicodeString;
@@ -111,7 +111,7 @@ impl Helper {
                     None => return Some(format.1.to_owned()),
                     Some(divisor) => {
                         return Some(bconcat!(
-                            php_to_string(&PhpMixed::Float((secs / divisor).floor())),
+                            PhpMixed::Float((secs / divisor).floor()).to_php_string(),
                             " ",
                             format.1
                         ));

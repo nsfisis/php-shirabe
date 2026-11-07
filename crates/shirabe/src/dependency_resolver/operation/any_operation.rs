@@ -11,7 +11,7 @@ use crate::dependency_resolver::operation::{
 };
 use crate::package::PackageInterfaceHandle;
 use bstr::{BStr, BString};
-use shirabe_php_shim::Stringable;
+use shirabe_php_shim::PhpDisplay;
 
 /// Any solver operation.
 #[derive(Debug, Clone)]
@@ -57,9 +57,9 @@ impl AnyOperation {
     }
 }
 
-impl Stringable for AnyOperation {
-    fn to_php_string(&self) -> BString {
-        self.show(false)
+impl PhpDisplay for AnyOperation {
+    fn fmt(&self, out: &mut BString) {
+        out.extend_from_slice(&self.show(false));
     }
 }
 

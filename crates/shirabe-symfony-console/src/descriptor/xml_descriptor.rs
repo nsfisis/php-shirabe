@@ -9,8 +9,8 @@ use crate::input::{InputArgument, InputDefinition, InputOption};
 use crate::output::OutputInterface;
 use bstr::BString;
 use shirabe_php_shim::{
-    DOMDocument, DOMNode, PhpMixed, bconcat, php_to_string, php_truthy, str_replace, strpos,
-    substr, var_export,
+    DOMDocument, DOMNode, PhpMixed, ToPhpString, bconcat, php_truthy, str_replace, strpos, substr,
+    var_export,
 };
 
 /// XML descriptor.
@@ -229,7 +229,7 @@ impl XmlDescriptor {
             }
             PhpMixed::Bool(_) => vec![var_export(&default_value, true)],
             d if php_truthy(d) => {
-                vec![php_to_string(&default_value)]
+                vec![default_value.to_php_string()]
             }
             _ => vec![],
         };
@@ -290,7 +290,7 @@ impl XmlDescriptor {
                     vec![var_export(&default_value, true)]
                 }
                 d if php_truthy(d) => {
-                    vec![php_to_string(&default_value)]
+                    vec![default_value.to_php_string()]
                 }
                 _ => vec![],
             };
@@ -326,8 +326,8 @@ impl XmlDescriptor {
     /// getInputOptionDocument when the default is an array (returns it verbatim).
     fn default_values_as_strings(&self, default: &PhpMixed) -> Vec<BString> {
         match default {
-            PhpMixed::List(list) => list.iter().map(php_to_string).collect(),
-            PhpMixed::Array(arr) => arr.values().map(php_to_string).collect(),
+            PhpMixed::List(list) => list.iter().map(ToPhpString::to_php_string).collect(),
+            PhpMixed::Array(arr) => arr.values().map(ToPhpString::to_php_string).collect(),
             _ => vec![],
         }
     }

@@ -9,7 +9,7 @@ use crate::repository::{
 use bstr::{B, BStr, BString, ByteSlice, ByteVec};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    CmpOp, LogicException, PhpMixed, Stringable, bconcat, extension_loaded, implode,
+    CmpOp, LogicException, PhpMixed, ToPhpString, bconcat, extension_loaded, implode,
     loosely_compare, php_regex, preg_is_match, preg_match, preg_replace, spl_object_hash, sprintf,
     str_replace, stripos, strpos, strtolower, substr, substr_count, version_compare,
 };

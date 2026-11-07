@@ -14,7 +14,7 @@ use crate::package::BasePackageHandle;
 use bstr::{BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpMixed, Stringable, array_shift, array_unshift, bconcat, microtime, spl_object_hash, sprintf,
+    PhpMixed, ToPhpString, array_shift, array_unshift, bconcat, microtime, spl_object_hash, sprintf,
 };
 use shirabe_semver::constraint::AnyConstraint;
 

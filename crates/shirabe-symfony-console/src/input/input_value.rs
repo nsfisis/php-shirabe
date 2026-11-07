@@ -1,7 +1,7 @@
 //! ref: composer/vendor/symfony/console/Input/InputInterface.php sha1:7c0149e375832cad7933bbe51f11975bf856effb
 
 use bstr::{BStr, BString};
-use shirabe_php_shim::{PhpMixed, Stringable};
+use shirabe_php_shim::{PhpDisplay, PhpMixed};
 
 /// The value an option or an argument can hold, which is also the value a question takes as its
 /// default and gives as its answer.
@@ -102,18 +102,12 @@ impl InputValue {
     }
 }
 
-impl Stringable for InputValue {
-    fn to_php_string(&self) -> BString {
+impl PhpDisplay for InputValue {
+    fn fmt(&self, out: &mut BString) {
         match self {
-            Self::Null => BString::default(),
-            Self::Bool(b) => {
-                if *b {
-                    BString::from("1")
-                } else {
-                    BString::default()
-                }
-            }
-            Self::String(s) => s.clone(),
+            Self::Null | Self::Bool(false) => {}
+            Self::Bool(true) => out.push(b'1'),
+            Self::String(s) => out.extend_from_slice(s),
             Self::Array(_) => panic!("array to string conversion"),
         }
     }

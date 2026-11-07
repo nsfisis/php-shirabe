@@ -8,7 +8,7 @@ use crate::util::{Filesystem, Platform};
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    Catch as _, PhpMixed, RuntimeException, Stringable, bconcat, bin2hex, file_exists, is_dir,
+    Catch as _, PhpMixed, RuntimeException, ToPhpString, bconcat, bin2hex, file_exists, is_dir,
     path_from_bytes, path_to_bytes, random_bytes, realpath,
 };
 use shirabe_symfony_finder::Finder;

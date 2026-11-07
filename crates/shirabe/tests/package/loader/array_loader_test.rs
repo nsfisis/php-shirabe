@@ -6,7 +6,7 @@ use shirabe::package::Link;
 use shirabe::package::dumper::ArrayDumper;
 use shirabe::package::loader::{ArrayLoader, LoaderInterface};
 use shirabe::package::version::VersionParser;
-use shirabe_php_shim::{PhpMixed, Stringable, bconcat, error_message};
+use shirabe_php_shim::{PhpMixed, ToPhpString, bconcat, error_message};
 
 fn set_up() -> ArrayLoader {
     ArrayLoader::new(None, false)

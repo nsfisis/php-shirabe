@@ -2,7 +2,7 @@
 
 use crate::constraint::Bound;
 use bstr::BString;
-use shirabe_php_shim::{CmpOp, Stringable};
+use shirabe_php_shim::{CmpOp, PhpDisplay, ToPhpString};
 
 #[derive(Debug, Clone, Default)]
 pub struct MatchAllConstraint {
@@ -34,15 +34,10 @@ impl MatchAllConstraint {
     pub fn get_lower_bound(&self) -> Bound {
         Bound::zero()
     }
-
-    /// Appends PHP's `__toString()` to `out`.
-    pub fn append_php_string(&self, out: &mut BString) {
-        out.extend_from_slice(b"*");
-    }
 }
 
-impl Stringable for MatchAllConstraint {
-    fn to_php_string(&self) -> BString {
-        "*".into()
+impl PhpDisplay for MatchAllConstraint {
+    fn fmt(&self, out: &mut BString) {
+        out.extend_from_slice(b"*");
     }
 }

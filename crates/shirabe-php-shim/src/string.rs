@@ -1,17 +1,11 @@
 use crate::{
-    PhpMixed, TypeError, bconcat, display_to_bytes, get_debug_type, intval, php_to_string,
-    utf8_text,
+    PhpMixed, ToPhpString, TypeError, bconcat, display_to_bytes, get_debug_type, intval, utf8_text,
 };
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 pub use shirabe_php_src::standard::string::{addcslashes, strip_tags, stripcslashes};
 use shirabe_php_src::standard::string::{php_trim_mask, php_wordwrap};
 use shirabe_php_src::standard::strnatcmp::strnatcmp_ex;
-
-/// PHP's `Stringable`.
-pub trait Stringable {
-    fn to_php_string(&self) -> BString;
-}
 
 /// PHP `strtok($string, $token)` as an initial call: the first token of `string`, skipping
 /// leading delimiters, or `None` (PHP `false`) when `string` consists of delimiters only.
@@ -377,8 +371,8 @@ pub fn implode(glue: impl AsRef<[u8]>, pieces: &[impl AsRef<[u8]>]) -> BString {
 /// anything else fails as PHP's type check does.
 pub fn implode_mixed(glue: impl AsRef<[u8]>, pieces: &PhpMixed) -> anyhow::Result<BString> {
     let pieces: Vec<BString> = match pieces {
-        PhpMixed::List(list) => list.iter().map(php_to_string).collect(),
-        PhpMixed::Array(map) => map.values().map(php_to_string).collect(),
+        PhpMixed::List(list) => list.iter().map(ToPhpString::to_php_string).collect(),
+        PhpMixed::Array(map) => map.values().map(ToPhpString::to_php_string).collect(),
         other => {
             return Err(TypeError::new(bconcat!(
                 "implode(): Argument #2 ($array) must be of type ?array, ",
@@ -886,7 +880,7 @@ pub fn sprintf(format: impl AsRef<[u8]>, args: &[PhpMixed]) -> BString {
                 true,
             ),
             b's' => {
-                let mut s = php_to_string(&arg);
+                let mut s = arg.to_php_string();
                 if let Some(p) = precision.filter(|&p| p < s.len()) {
                     s.truncate(p);
                 }

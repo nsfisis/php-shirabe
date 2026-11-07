@@ -3,7 +3,7 @@
 use crate::constraint::{AnyConstraint, SimpleConstraint};
 use bstr::BString;
 use indexmap::IndexMap;
-use shirabe_php_shim::CmpOp;
+use shirabe_php_shim::{CmpOp, PhpDisplay};
 
 thread_local! {
     static KEY_BUFFER: std::cell::RefCell<BString> =
@@ -34,7 +34,7 @@ impl CompilingMatcher {
             key.clear();
             // The operator constants are single digits.
             key.push(b'0' + SimpleConstraint::get_operator_constant(operator) as u8);
-            constraint.append_php_string(key);
+            constraint.fmt(key);
             key.push(b';');
             key.extend_from_slice(version);
 

@@ -7,7 +7,7 @@ use crate::{DevConstraintSet, Interval};
 use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    CmpOp, Stringable, UnexpectedValueException, array_unique, version_compare,
+    CmpOp, ToPhpString, UnexpectedValueException, array_unique, version_compare,
     version_compare_ordering,
 };
 use std::sync::{Arc, Mutex, OnceLock};

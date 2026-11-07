@@ -10,9 +10,9 @@ use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     AnyThrowable, CmpOp, InvalidArgumentException, PHP_EOL, PhpMixed, PregMatches,
-    RuntimeException, TypeError, array_map, bconcat, clearstatcache, error_message, explode,
-    explode_with_limit, get_debug_type, implode, in_array_loose, is_dir, path_to_bytes, php_regex,
-    php_to_string, preg_is_match, preg_match, preg_quote, preg_replace, rawurldecode, rawurlencode,
+    RuntimeException, ToPhpString, TypeError, array_map, bconcat, clearstatcache, error_message,
+    explode, explode_with_limit, get_debug_type, implode, in_array_loose, is_dir, path_to_bytes,
+    php_regex, preg_is_match, preg_match, preg_quote, preg_replace, rawurldecode, rawurlencode,
     str_replace_array, strlen, strpos, substr, trim, version_compare,
 };
 use shirabe_symfony_console::input::InputValue;
@@ -1222,7 +1222,7 @@ impl Git {
                 ))
                 .into());
             }
-            escaped.push(preg_quote(php_to_string(&domain), None));
+            escaped.push(preg_quote(domain.to_php_string(), None));
         }
         Ok(bconcat!("(", implode("|", &escaped), ")"))
     }

@@ -6,7 +6,7 @@ use crate::package::{
 use crate::repository::RepositoryInterfaceHandle;
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpMixed, Stringable};
+use shirabe_php_shim::{PhpDisplay, PhpMixed};
 
 #[derive(Debug, Clone)]
 pub struct CompletePackage {
@@ -380,8 +380,8 @@ impl PackageInterface for CompletePackage {
     }
 }
 
-impl Stringable for CompletePackage {
-    fn to_php_string(&self) -> BString {
-        self.inner.to_php_string()
+impl PhpDisplay for CompletePackage {
+    fn fmt(&self, out: &mut BString) {
+        self.inner.fmt(out);
     }
 }

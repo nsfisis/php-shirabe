@@ -3,7 +3,7 @@
 use crate::dependency_resolver::{Pool, Rule, SolverBugException};
 use bstr::{BString, ByteVec};
 use indexmap::IndexMap;
-use shirabe_php_shim::{LogicException, Stringable, bconcat};
+use shirabe_php_shim::{LogicException, PhpDisplay, ToPhpString, bconcat};
 
 pub struct Decisions {
     pool: std::rc::Rc<std::cell::RefCell<Pool>>,
@@ -209,8 +209,8 @@ impl Decisions {
     }
 }
 
-impl Stringable for Decisions {
-    fn to_php_string(&self) -> BString {
-        self.to_string_with_pool(None)
+impl PhpDisplay for Decisions {
+    fn fmt(&self, out: &mut BString) {
+        out.extend_from_slice(&self.to_string_with_pool(None));
     }
 }

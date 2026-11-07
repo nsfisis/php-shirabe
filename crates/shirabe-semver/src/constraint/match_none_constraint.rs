@@ -2,7 +2,7 @@
 
 use crate::constraint::Bound;
 use bstr::BString;
-use shirabe_php_shim::{CmpOp, Stringable};
+use shirabe_php_shim::{CmpOp, PhpDisplay, ToPhpString};
 
 #[derive(Debug, Clone)]
 pub struct MatchNoneConstraint {
@@ -34,15 +34,10 @@ impl MatchNoneConstraint {
     pub fn get_lower_bound(&self) -> Bound {
         Bound::new("0.0.0.0-dev", false)
     }
-
-    /// Appends PHP's `__toString()` to `out`.
-    pub fn append_php_string(&self, out: &mut BString) {
-        out.extend_from_slice(b"[]");
-    }
 }
 
-impl Stringable for MatchNoneConstraint {
-    fn to_php_string(&self) -> BString {
-        "[]".into()
+impl PhpDisplay for MatchNoneConstraint {
+    fn fmt(&self, out: &mut BString) {
+        out.extend_from_slice(b"[]");
     }
 }
