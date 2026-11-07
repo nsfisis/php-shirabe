@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
-# Generates the license notices of the Rust crates that the Shirabe executable is built from.
-# Needs cargo-about.
+# Generates a Markdown section that lists the license notices of the Rust crates the Shirabe
+# executable is built from. scripts/release/package appends it to LICENSE.md. Needs cargo-about.
 #
 # Usage: scripts/release/third-party-licenses <output file>
 
