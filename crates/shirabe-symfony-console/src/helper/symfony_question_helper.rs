@@ -3,7 +3,7 @@
 use crate::formatter::OutputFormatter;
 use crate::helper::{QuestionHelper, QuestionHelperInterface};
 use crate::output::{OutputInterface, output_interface};
-use crate::question::{QuestionInterface, array_key};
+use crate::question::QuestionInterface;
 use crate::style::{StyleInterface, SymfonyStyle};
 use bstr::{B, BString};
 use shirabe_php_shim::{Exception, Stringable, bconcat, explode, implode, php_os_family, trim};
@@ -80,7 +80,7 @@ impl QuestionHelperInterface for SymfonyQuestionHelper {
         } else if let Some(choice_question) = question.as_choice() {
             let choices = choice_question.get_choices();
             let shown = choices
-                .get(B(&array_key(&default)))
+                .get(B(&default.array_key()))
                 .cloned()
                 .unwrap_or_else(|| default.to_php_string());
             text = bconcat!(

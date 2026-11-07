@@ -32,7 +32,7 @@ use shirabe_php_shim::{
     date_local, display_to_bytes, extension_loaded, get_class, impl_php_class, implode,
     in_array_loose, in_array_strict, intval, json_bytes, ltrim_chars, path_to_bytes, php_regex,
     preg_is_match, preg_match, preg_quote, preg_replace, realpath, rtrim, str_pad, str_repeat,
-    str_replace, strtolower, version_compare,
+    str_replace, strtok_first, strtolower, version_compare,
 };
 use shirabe_semver::Semver;
 use shirabe_semver::constraint::AnyConstraint;
@@ -189,7 +189,8 @@ impl ShowCommand {
             if let Some(Some(description)) = &package.description
                 && write_description
             {
-                let mut description = BString::from(first_token(description));
+                let mut description =
+                    BString::from(strtok_first(description, "\r\n").unwrap_or_default());
 
                 // Compute remaining width available for the description.
                 let mut remaining = (width as i64)
@@ -915,7 +916,10 @@ impl ShowCommand {
             self.get_io()
                 .write_no_newline(bconcat!(" ", package.version));
             if let Some(description) = &package.description {
-                self.get_io().write(bconcat!(" ", first_token(description)));
+                self.get_io().write(bconcat!(
+                    " ",
+                    strtok_first(description, "\r\n").unwrap_or_default()
+                ));
             } else {
                 // output newline
                 self.get_io().write("");
@@ -2018,8 +2022,10 @@ impl Command for ShowCommand {
                 };
                 if let Some(path) = path {
                     let real = realpath(&path).unwrap_or_default();
-                    self.get_io()
-                        .write(bconcat!(" ", first_token(path_to_bytes(&real))));
+                    self.get_io().write(bconcat!(
+                        " ",
+                        strtok_first(path_to_bytes(&real), "\r\n").unwrap_or_default()
+                    ));
                 } else {
                     self.get_io().write(" null");
                 }
@@ -2394,8 +2400,9 @@ impl Command for ShowCommand {
                                 .get_install_path(package.clone());
                             if let Some(p) = path {
                                 let r = realpath(&p).unwrap_or_default();
-                                package_view_data.path =
-                                    Some(Some(BString::from(first_token(path_to_bytes(&r)))));
+                                package_view_data.path = Some(Some(BString::from(
+                                    strtok_first(path_to_bytes(&r), "\r\n").unwrap_or_default(),
+                                )));
                             } else {
                                 package_view_data.path = Some(None);
                             }
@@ -2918,16 +2925,4 @@ fn option_str_map<S: serde::Serializer>(
         Some(value) => json_bytes::str_map(value, serializer),
         None => serializer.serialize_none(),
     }
-}
-
-/// PHP's `strtok($string, "\r\n")`: the first token, skipping leading line breaks.
-fn first_token(string: &[u8]) -> &BStr {
-    let is_delimiter = |byte: &u8| matches!(byte, b'\r' | b'\n');
-    let start = string
-        .iter()
-        .position(|byte| !is_delimiter(byte))
-        .unwrap_or(string.len());
-    let token = &string[start..];
-    let end = token.iter().position(is_delimiter).unwrap_or(token.len());
-    token[..end].as_bstr()
 }

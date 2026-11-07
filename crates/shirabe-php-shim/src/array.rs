@@ -17,6 +17,17 @@ pub fn array_values_mixed(value: &PhpMixed) -> Vec<PhpMixed> {
     }
 }
 
+pub fn array_key_first(array: &PhpMixed) -> Option<PhpMixed> {
+    match array {
+        PhpMixed::List(items) => (!items.is_empty()).then_some(PhpMixed::Int(0)),
+        PhpMixed::Array(map) => map.keys().next().map(|key| match canonical_int_key(key) {
+            Some(i) => PhpMixed::Int(i),
+            None => PhpMixed::String(key.clone()),
+        }),
+        _ => panic!("array_key_first(): Argument #1 ($array) must be of type array"),
+    }
+}
+
 pub fn array_keys<K: Clone, V>(array: &IndexMap<K, V>) -> Vec<K> {
     array.keys().cloned().collect()
 }
@@ -715,4 +726,27 @@ where
     I: IntoIterator,
 {
     iter.into_iter().collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::array_key_first;
+    use crate::PhpMixed;
+    use indexmap::IndexMap;
+
+    #[test]
+    fn array_key_first_matches_php() {
+        // Expected values are the output of PHP 8.5.12's array_key_first().
+        let map = |key: &[u8]| PhpMixed::Array(IndexMap::from([(key.into(), PhpMixed::Int(1))]));
+        assert_eq!(array_key_first(&map(b"10")), Some(PhpMixed::Int(10)));
+        assert_eq!(
+            array_key_first(&map(b"01")),
+            Some(PhpMixed::String("01".into()))
+        );
+        assert_eq!(
+            array_key_first(&PhpMixed::List(vec![PhpMixed::Int(5)])),
+            Some(PhpMixed::Int(0))
+        );
+        assert_eq!(array_key_first(&PhpMixed::List(vec![])), None);
+    }
 }

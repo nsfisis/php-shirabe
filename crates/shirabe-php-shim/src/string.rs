@@ -13,6 +13,17 @@ pub trait Stringable {
     fn to_php_string(&self) -> BString;
 }
 
+/// PHP `strtok($string, $token)` as an initial call: the first token of `string`, skipping
+/// leading delimiters, or `None` (PHP `false`) when `string` consists of delimiters only.
+pub fn strtok_first(string: &[u8], token: impl AsRef<[u8]>) -> Option<&BStr> {
+    let token = token.as_ref();
+    let is_delimiter = |byte: &u8| token.contains(byte);
+    let start = string.iter().position(|byte| !is_delimiter(byte))?;
+    let rest = &string[start..];
+    let end = rest.iter().position(is_delimiter).unwrap_or(rest.len());
+    Some(rest[..end].as_bstr())
+}
+
 pub fn str_replace(
     search: impl AsRef<[u8]>,
     replace: impl AsRef<[u8]>,
@@ -1233,7 +1244,19 @@ pub fn number_format(
 
 #[cfg(test)]
 mod tests {
-    use super::{str_bitand, substr_replace};
+    use super::{str_bitand, strtok_first, substr_replace};
+
+    #[test]
+    fn strtok_first_matches_php() {
+        // Expected values are the output of PHP 8.5.12's strtok().
+        assert_eq!(
+            strtok_first(b"\r\n\nfoo\r\nbar", "\r\n"),
+            Some("foo".into())
+        );
+        assert_eq!(strtok_first(b"abc", "\r\n"), Some("abc".into()));
+        assert_eq!(strtok_first(b"\r\n", "\r\n"), None);
+        assert_eq!(strtok_first(b"", "\r\n"), None);
+    }
 
     #[test]
     fn substr_replace_matches_php() {

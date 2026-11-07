@@ -87,6 +87,16 @@ impl InputValue {
         }
     }
 
+    /// The key PHP uses when the value indexes an array: `null` is `""` and a bool is `0` or `1`.
+    pub fn array_key(&self) -> BString {
+        match self {
+            Self::Null => BString::default(),
+            Self::Bool(b) => BString::from(if *b { "1" } else { "0" }),
+            Self::String(s) => s.clone(),
+            Self::Array(_) => panic!("an array is not a valid array key"),
+        }
+    }
+
     /// The value as a PHP `mixed`, for the shim functions that take one.
     pub fn to_php_mixed(&self) -> PhpMixed {
         self.clone().into()

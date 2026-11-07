@@ -8,7 +8,7 @@ use crate::input::{InputInterface, InputValue};
 use crate::output::{
     ConsoleOutput, ConsoleOutputInterface, ConsoleSectionOutput, OutputInterface, output_interface,
 };
-use crate::question::{ChoiceQuestion, QuestionInterface, array_key};
+use crate::question::{ChoiceQuestion, QuestionInterface};
 use crate::terminal::Terminal;
 use bstr::{B, BStr, BString, ByteSlice};
 use shirabe_php_shim::{
@@ -309,7 +309,7 @@ impl QuestionHelper {
 
             if !choice_question.is_multiselect() {
                 return Ok(choices
-                    .get(B(&array_key(&default)))
+                    .get(B(&default.array_key()))
                     .cloned()
                     .map(InputValue::String)
                     .unwrap_or(default));

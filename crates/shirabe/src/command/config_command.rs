@@ -14,12 +14,12 @@ use crate::util::{Filesystem, Platform};
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    InvalidArgumentException, PhpMixed, RuntimeException, array_is_list, array_merge,
-    array_values_mixed, bconcat, chmod, escapeshellcmd, exec, explode, file_exists, impl_php_class,
-    implode, in_array_loose, in_array_strict, intval, is_array, is_bool, is_dir, is_numeric,
-    is_object, is_string, json_encode, path_from_bytes, path_to_bytes, php_regex, php_str,
-    php_to_string, preg_is_match, preg_match, preg_replace, str_replace, strpos, strtolower,
-    system, touch, trim_chars, var_export,
+    InvalidArgumentException, PhpMixed, RuntimeException, array_is_list, array_key_first,
+    array_merge, array_values_mixed, bconcat, chmod, escapeshellcmd, exec, explode, file_exists,
+    impl_php_class, implode, in_array_loose, in_array_strict, intval, is_array, is_bool, is_dir,
+    is_numeric, is_object, is_string, json_encode, path_from_bytes, path_to_bytes, php_regex,
+    php_str, php_to_string, preg_is_match, preg_match, preg_replace, str_replace, strpos,
+    strtolower, system, touch, trim_chars, var_export,
 };
 use shirabe_semver::VersionParser;
 use shirabe_symfony_console::input::InputInterfaceByName;
@@ -196,7 +196,7 @@ impl ConfigCommand {
             let mut value_inner = value.clone();
 
             if is_array(&value_inner)
-                && (!is_numeric(&key_first_key(&value_inner).unwrap_or_default().into())
+                && (!is_numeric(&array_key_first(&value_inner).unwrap_or(PhpMixed::Null))
                     || (key == "repositories" && k.is_none()))
             {
                 let mut new_k = k.clone().unwrap_or_default();
@@ -2168,19 +2168,6 @@ fn flatten_setting_keys(config: PhpMixed, prefix: impl AsRef<[u8]>) -> Vec<BStri
         merged.extend(k);
     }
     merged
-}
-
-// PHP key($value) — first key of an array
-fn key_first_key(value: &PhpMixed) -> Option<BString> {
-    if let Some(arr) = value.as_array() {
-        return arr.keys().next().cloned();
-    }
-    if let Some(list) = value.as_list()
-        && !list.is_empty()
-    {
-        return Some("0".into());
-    }
-    None
 }
 
 impl BaseConfigCommand for ConfigCommand {

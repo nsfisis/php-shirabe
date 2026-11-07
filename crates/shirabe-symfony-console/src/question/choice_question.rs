@@ -175,9 +175,9 @@ impl ChoiceQuestion {
                         // $result = $choices[$result];
                         Some(found_key) => Some(choices[B(found_key)].clone()),
                         // isset($choices[$value])
-                        None => choices.get(B(&array_key(value))).cloned(),
+                        None => choices.get(B(&value.array_key())).cloned(),
                     }
-                } else if result_key.is_none() && choices.contains_key(B(&array_key(value))) {
+                } else if result_key.is_none() && choices.contains_key(B(&value.array_key())) {
                     // false === $result && isset($choices[$value])
                     Some(value.to_php_string())
                 } else {
@@ -207,16 +207,6 @@ impl ChoiceQuestion {
                     .expect("a single selection yields one choice"),
             ))
         })
-    }
-}
-
-/// The key PHP uses when `$value` indexes an array: `null` is `""` and a bool is `0` or `1`.
-pub(crate) fn array_key(value: &InputValue) -> BString {
-    match value {
-        InputValue::Null => BString::default(),
-        InputValue::Bool(b) => BString::from(if *b { "1" } else { "0" }),
-        InputValue::String(s) => s.clone(),
-        InputValue::Array(_) => panic!("an array is not a valid array key"),
     }
 }
 
