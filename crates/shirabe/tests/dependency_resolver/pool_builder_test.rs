@@ -16,7 +16,7 @@ use shirabe::repository::{
     RepositoryFactory, RepositoryInterfaceHandle, RepositorySet, RootAliasInput,
 };
 use shirabe_php_shim::{
-    PhpMixed, bformat, display_to_bytes, file_get_contents, path_to_bytes, php_regex,
+    PhpMixed, ToPhpString, bformat, display_to_bytes, file_get_contents, path_to_bytes, php_regex,
     preg_is_match, preg_split_delim_capture, str_replace, utf8_text,
 };
 use std::path::PathBuf;
@@ -197,7 +197,7 @@ fn php_sort_mixed(values: &mut [PhpMixed]) {
         };
         let str_of = |m: &PhpMixed| -> BString {
             match m {
-                PhpMixed::Int(i) => bformat!("{i}"),
+                PhpMixed::Int(i) => i.to_php_string(),
                 PhpMixed::Float(f) => display_to_bytes(f),
                 PhpMixed::String(s) => s.clone(),
                 _ => BString::default(),

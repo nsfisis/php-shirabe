@@ -6,7 +6,9 @@ use crate::repository::{RepositoryInterfaceHandle, RepositoryInterfaceWeakHandle
 use bstr::{BStr, BString, ByteSlice};
 use chrono::{DateTime, Utc};
 use indexmap::{IndexMap, IndexSet};
-use shirabe_php_shim::{LogicException, PhpDisplay, PhpMixed, bformat, bwrite, strtolower};
+use shirabe_php_shim::{
+    LogicException, PhpDisplay, PhpMixed, ToPhpString, bformat, bwrite, strtolower,
+};
 use shirabe_semver::constraint::SimpleConstraint;
 
 #[derive(Debug, Clone)]
@@ -133,7 +135,7 @@ impl AliasPackage {
                 }
             }
             for (index, new_link) in new_links.into_iter().enumerate() {
-                links.insert(bformat!("{index}"), new_link);
+                links.insert(index.to_php_string(), new_link);
             }
         } else {
             for link in links.values_mut() {

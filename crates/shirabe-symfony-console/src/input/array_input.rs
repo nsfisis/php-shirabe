@@ -373,7 +373,7 @@ impl ParameterName {
     fn to_key(&self) -> BString {
         match self {
             Self::Name(name) => name.clone(),
-            Self::Index(index) => bformat!("{}", *index),
+            Self::Index(index) => (*index).to_php_string(),
         }
     }
 

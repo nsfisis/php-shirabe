@@ -6,8 +6,8 @@ use crate::util::{HttpDownloader, StreamContextOptions};
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    InvalidArgumentException, PHP_EOL, PhpMixed, UnexpectedValueException, bformat, implode,
-    path_from_bytes, php_regex, php_str, preg_is_match, trim,
+    InvalidArgumentException, PHP_EOL, PhpMixed, ToPhpString, UnexpectedValueException, bformat,
+    implode, path_from_bytes, php_regex, php_str, preg_is_match, trim,
 };
 
 pub struct Versions {
@@ -63,8 +63,8 @@ impl Versions {
                 .into_iter()
                 .find(|known| channel == *known)
             {
-                self.channel = Some(bformat!("{channel}"));
-                return Ok(bformat!("{channel}"));
+                self.channel = Some(channel.to_php_string());
+                return Ok(channel.to_php_string());
             }
         }
 

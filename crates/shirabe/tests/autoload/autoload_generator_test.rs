@@ -21,8 +21,8 @@ use shirabe::script::ScriptEvents;
 use shirabe::util::HttpDownloader;
 use shirabe::util::r#loop::Loop;
 use shirabe_php_shim::{
-    PhpMixed, bformat, dirname, error_message, path_from_bytes, path_to_bytes, preg_quote,
-    realpath, strtr, symlink,
+    PhpMixed, ToPhpString, bformat, dirname, error_message, path_from_bytes, path_to_bytes,
+    preg_quote, realpath, strtr, symlink,
 };
 use shirabe_semver::VersionParser;
 use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint, SimpleConstraint};
@@ -142,7 +142,7 @@ impl Drop for SetUp {
 }
 
 fn null_path(s: &BStr) -> BString {
-    bformat!("{s}")
+    s.to_php_string()
 }
 
 /// Builds an InstallationManager whose single installer routes `getInstallPath` through
@@ -315,7 +315,11 @@ fn match_all() -> AnyConstraint {
 }
 
 fn constraint(operator: &BStr, version: &BStr) -> AnyConstraint {
-    AnyConstraint::Simple(SimpleConstraint::new(operator, bformat!("{version}"), None))
+    AnyConstraint::Simple(SimpleConstraint::new(
+        operator,
+        version.to_php_string(),
+        None,
+    ))
 }
 
 fn link(
@@ -325,8 +329,8 @@ fn link(
     description: Option<&bstr::BStr>,
 ) -> Link {
     Link::new(
-        bformat!("{source}"),
-        bformat!("{target}"),
+        source.to_php_string(),
+        target.to_php_string(),
         constraint,
         description.map(|d| d.to_owned()),
         Some(BString::default()),
@@ -336,14 +340,14 @@ fn link(
 fn requires(links: Vec<(&BStr, Link)>) -> IndexMap<BString, Link> {
     links
         .into_iter()
-        .map(|(k, v)| (bformat!("{k}"), v))
+        .map(|(k, v)| (k.to_php_string(), v))
         .collect()
 }
 
 fn autoload(entries: Vec<(&BStr, PhpMixed)>) -> IndexMap<BString, PhpMixed> {
     entries
         .into_iter()
-        .map(|(k, v)| (bformat!("{k}"), v))
+        .map(|(k, v)| (k.to_php_string(), v))
         .collect()
 }
 
@@ -351,7 +355,7 @@ fn str_list(items: &[&BStr]) -> PhpMixed {
     PhpMixed::List(
         items
             .iter()
-            .map(|s| PhpMixed::string(bformat!("{s}")))
+            .map(|s| PhpMixed::string(s.to_php_string()))
             .collect(),
     )
 }
@@ -360,18 +364,18 @@ fn str_map(entries: &[(&BStr, PhpMixed)]) -> PhpMixed {
     PhpMixed::Array(
         entries
             .iter()
-            .map(|(k, v)| (bformat!("{k}"), v.clone()))
+            .map(|(k, v)| (k.to_php_string(), v.clone()))
             .collect(),
     )
 }
 
 fn pstr(v: &BStr) -> PhpMixed {
-    PhpMixed::string(bformat!("{v}"))
+    PhpMixed::string(v.to_php_string())
 }
 
 fn new_root_pkg(name: &BStr) -> RootPackageHandle {
     RootPackageHandle::new(
-        bformat!("{name}"),
+        name.to_php_string(),
         null_path(BStr::new("1.0")),
         BString::from("1.0"),
     )
@@ -379,7 +383,7 @@ fn new_root_pkg(name: &BStr) -> RootPackageHandle {
 
 fn new_pkg(name: &BStr) -> PackageHandle {
     PackageHandle::new(
-        bformat!("{name}"),
+        name.to_php_string(),
         BString::from("1.0"),
         BString::from("1.0"),
     )
@@ -405,7 +409,7 @@ fn dump(
         im.clone(),
         BStr::new("composer"),
         scan_psr_packages,
-        Some(bformat!("{suffix}")),
+        Some(suffix.to_php_string()),
         None,
         false,
     )

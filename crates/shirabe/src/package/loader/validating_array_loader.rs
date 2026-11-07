@@ -485,7 +485,7 @@ impl LoaderInterface for ValidatingArrayLoader {
                     PhpMixed::List(items) => items
                         .iter()
                         .enumerate()
-                        .map(|(i, v)| (bformat!("{i}"), v.clone()))
+                        .map(|(i, v)| (i.to_php_string(), v.clone()))
                         .collect(),
                     other => {
                         let mut m = IndexMap::new();
@@ -534,7 +534,7 @@ impl LoaderInterface for ValidatingArrayLoader {
                 let reindexed: Vec<PhpMixed> = array_values(&licenses);
                 let mut reindexed_map: IndexMap<BString, PhpMixed> = IndexMap::new();
                 for (i, v) in reindexed.into_iter().enumerate() {
-                    reindexed_map.insert(bformat!("{i}"), v);
+                    reindexed_map.insert(i.to_php_string(), v);
                 }
                 self.config
                     .borrow_mut()

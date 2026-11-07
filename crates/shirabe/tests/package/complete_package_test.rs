@@ -22,7 +22,7 @@ fn test_package_has_expected_naming_semantics() {
     for (name, version) in provider_versioning_schemes() {
         let version_parser = VersionParser;
         let norm_version = version_parser.normalize(version, None).unwrap();
-        let package = Package::new(bformat!("{name}"), norm_version, bformat!("{version}"));
+        let package = Package::new(name.to_php_string(), norm_version, version.to_php_string());
         assert_eq!(name.to_ascii_lowercase(), package.get_name());
     }
 }
@@ -33,9 +33,9 @@ fn test_package_has_expected_versioning_semantics() {
         let version_parser = VersionParser;
         let norm_version = version_parser.normalize(version, None).unwrap();
         let package = Package::new(
-            bformat!("{name}"),
+            name.to_php_string(),
             norm_version.clone(),
-            bformat!("{version}"),
+            version.to_php_string(),
         );
         assert_eq!(version, package.get_pretty_version());
         assert_eq!(norm_version, package.get_version());
@@ -48,9 +48,9 @@ fn test_package_has_expected_marshalling_semantics() {
         let version_parser = VersionParser;
         let norm_version = version_parser.normalize(version, None).unwrap();
         let package = Package::new(
-            bformat!("{name}"),
+            name.to_php_string(),
             norm_version.clone(),
-            bformat!("{version}"),
+            version.to_php_string(),
         );
         assert_eq!(
             bformat!("{}-{norm_version}", name.to_ascii_lowercase()),

@@ -11,7 +11,8 @@ use crate::event_dispatcher::{Callable, EventFlags};
 use crate::io::IOInterfaceWrite;
 use bstr::BString;
 use shirabe_php_shim::{
-    RuntimeException, basename, bformat, canonical_int_key, chdir, getcwd, glob, impl_php_class,
+    RuntimeException, ToPhpString, basename, bformat, canonical_int_key, chdir, getcwd, glob,
+    impl_php_class,
 };
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::{InputInterface, InputInterfaceByName, InputValue};
@@ -132,7 +133,7 @@ impl Command for ExecCommand {
                 binaries
                     .iter()
                     .enumerate()
-                    .map(|(index, binary)| (bformat!("{index}"), binary.clone()))
+                    .map(|(index, binary)| (index.to_php_string(), binary.clone()))
                     .collect(),
                 InputValue::from(""),
                 Some(1),

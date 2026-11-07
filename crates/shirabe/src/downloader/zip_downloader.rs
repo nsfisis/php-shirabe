@@ -12,10 +12,11 @@ use crate::util::{Filesystem, HttpDownloader, Platform, ProcessExecutor};
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    Catch as _, CmpOp, ErrorException, PhpMixed, RuntimeException, UnexpectedValueException,
-    ZipArchive, bformat, bin2hex, error_message, file_exists, file_get_contents, filesize,
-    hash_file, impl_php_class, implode, is_file, json_encode, path_to_bytes, php_regex, preg_match,
-    random_int, rtrim, str_replace, strlen, substr, version_compare,
+    Catch as _, CmpOp, ErrorException, PhpMixed, RuntimeException, ToPhpString,
+    UnexpectedValueException, ZipArchive, bformat, bin2hex, error_message, file_exists,
+    file_get_contents, filesize, hash_file, impl_php_class, implode, is_file, json_encode,
+    path_to_bytes, php_regex, preg_match, random_int, rtrim, str_replace, strlen, substr,
+    version_compare,
 };
 use shirabe_symfony_process::ExecutableFinder;
 use std::sync::Mutex;
@@ -155,7 +156,7 @@ impl ZipDownloader {
                                 package.get_name(),
                                 process
                                     .get_exit_code()
-                                    .map(|c| bformat!("{c}"))
+                                    .map(|c| c.to_php_string())
                                     .unwrap_or_default(),
                                 implode(" ", &command)
                             ))
@@ -210,7 +211,9 @@ impl ZipDownloader {
                 self.inner.io.borrow().write_error("    <warning>Additional debug info, please report to https://github.com/composer/composer/issues/11148 if you see this:</warning>");
                 self.inner.io.borrow().write_error(bformat!(
                     "File size: {}",
-                    filesize(file).map(|s| bformat!("{s}")).unwrap_or_default()
+                    filesize(file)
+                        .map(|s| s.to_php_string())
+                        .unwrap_or_default()
                 ));
                 self.inner.io.borrow().write_error(bformat!(
                     "File SHA1: {}",

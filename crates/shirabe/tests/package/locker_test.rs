@@ -9,7 +9,9 @@ use shirabe::package::{CompletePackageHandle, Locker, PackageInterfaceHandle};
 use shirabe::plugin::plugin_interface;
 use shirabe::repository::{FindPackageConstraint, RepositoryInterfaceHandle};
 use shirabe::util::ProcessExecutor;
-use shirabe_php_shim::{Catch as _, LogicException, PhpMixed, bformat, hash, trim, utf8_text};
+use shirabe_php_shim::{
+    Catch as _, LogicException, PhpMixed, ToPhpString, bformat, hash, trim, utf8_text,
+};
 use tempfile::TempDir;
 
 fn null_io() -> std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
@@ -25,7 +27,7 @@ fn get_json_content(custom_data: &[(&BStr, &BStr)]) -> BString {
     );
     data.insert("name".into(), PhpMixed::string(BString::from("test")));
     for (k, v) in custom_data {
-        data.insert(bformat!("{k}"), PhpMixed::string(bformat!("{v}")));
+        data.insert(k.to_php_string(), PhpMixed::string(v.to_php_string()));
     }
     data.sort_keys();
 

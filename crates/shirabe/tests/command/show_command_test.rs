@@ -9,7 +9,8 @@ use serial_test::serial;
 use shirabe::package::{Link, PackageInterfaceHandle};
 use shirabe::repository::PlatformRepository;
 use shirabe_php_shim::{
-    STR_PAD_RIGHT, bformat, date_local, error_message, implode, rtrim, str_pad, trim, utf8_text,
+    STR_PAD_RIGHT, ToPhpString, bformat, date_local, error_message, implode, rtrim, str_pad, trim,
+    utf8_text,
 };
 
 /// Build a `Vec<(ParameterName, InputValue)>` command input from `(key, value)` pairs.
@@ -1345,7 +1346,7 @@ fn test_not_existing_package_with_working_dir() {
                 (BStr::new("package"), InputValue::from("not/existing")),
                 (
                     BStr::new("--working-dir"),
-                    InputValue::from(bformat!("{dir}").as_bstr()),
+                    InputValue::from(dir.to_php_string().as_bstr()),
                 ),
             ]),
             RunOptions::default(),
@@ -1547,13 +1548,13 @@ fn package_with_every_link_type() -> PackageInterfaceHandle {
     let link =
         |target: &BStr, operator: &BStr, version: &BStr, pretty: &BStr, r#type: &bstr::BStr| {
             indexmap::IndexMap::from([(
-                bformat!("{target}"),
+                target.to_php_string(),
                 Link::new(
                     BString::from("vendor/package"),
-                    bformat!("{target}"),
+                    target.to_php_string(),
                     get_version_constraint(operator, version),
                     Some(r#type.to_owned()),
-                    Some(bformat!("{pretty}")),
+                    Some(pretty.to_php_string()),
                 ),
             )])
         };

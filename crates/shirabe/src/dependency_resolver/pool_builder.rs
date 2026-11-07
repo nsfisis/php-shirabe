@@ -15,8 +15,8 @@ use crate::repository::{
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    CmpOp, LogicException, PhpMixed, array_map, bformat, display_to_bytes, in_array_strict,
-    microtime, number_format, preg_is_match, round, sprintf, strpos,
+    CmpOp, LogicException, PhpMixed, ToPhpString, array_map, bformat, display_to_bytes,
+    in_array_strict, microtime, number_format, preg_is_match, round, sprintf, strpos,
 };
 use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint, MultiConstraint};
 use shirabe_semver::{CompilingMatcher, Intervals};
@@ -276,7 +276,7 @@ impl PoolBuilder {
                     package_and_aliases.push((i, package.clone()));
                     if let Some(aliases) = self
                         .alias_map
-                        .get(bformat!("{}", package.ptr_id()).as_bytes())
+                        .get(package.ptr_id().to_php_string().as_bytes())
                     {
                         for (idx, alias) in aliases {
                             package_and_aliases.push((*idx, alias.clone().into()));
@@ -310,7 +310,7 @@ impl PoolBuilder {
         if let Some(event_dispatcher) = self.event_dispatcher.clone() {
             let pre_pool_create_event =
                 std::rc::Rc::new(std::cell::RefCell::new(PrePoolCreateEvent::new(
-                    bformat!("{}", PluginEvents::PRE_POOL_CREATE),
+                    PluginEvents::PRE_POOL_CREATE.to_php_string(),
                     repositories.clone(),
                     std::mem::replace(request, Request::new(None)),
                     self.acceptable_stabilities.clone(),
@@ -626,7 +626,7 @@ impl PoolBuilder {
 
         if let Some(alias) = package.as_alias() {
             self.alias_map
-                .entry(bformat!("{}", alias.get_alias_of().ptr_id()))
+                .entry(alias.get_alias_of().ptr_id().to_php_string())
                 .or_default()
                 .insert(index, alias);
         }
@@ -685,7 +685,7 @@ impl PoolBuilder {
             self.index_counter += 1;
             self.packages.insert(new_index, alias_handle.clone().into());
             self.alias_map
-                .entry(bformat!("{}", alias_handle.get_alias_of().ptr_id()))
+                .entry(alias_handle.get_alias_of().ptr_id().to_php_string())
                 .or_default()
                 .insert(new_index, alias_handle);
         }
@@ -1060,7 +1060,7 @@ impl PoolBuilder {
             name_map.shift_remove(&package.get_version());
         }
         self.packages.shift_remove(&index);
-        let object_hash = bformat!("{}", package.ptr_id());
+        let object_hash = package.ptr_id().to_php_string();
         if let Some(aliases) = self.alias_map.shift_remove(bstr::B(&object_hash)) {
             for (alias_index, alias_package) in &aliases {
                 if repo_index >= 0

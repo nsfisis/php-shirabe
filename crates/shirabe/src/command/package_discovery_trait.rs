@@ -17,10 +17,10 @@ use crate::util::Filesystem;
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    Catch as _, Exception, InvalidArgumentException, LogicException, PHP_EOL, PhpMixed, array_keys,
-    array_slice, asort, bformat, explode, file_get_contents, implode, in_array_strict, intval,
-    is_array, is_file, is_numeric, json_decode_assoc, levenshtein, php_regex, preg_is_match,
-    preg_match, sprintf, strlen, strpos, trim, utf8_text,
+    Catch as _, Exception, InvalidArgumentException, LogicException, PHP_EOL, PhpMixed,
+    ToPhpString, array_keys, array_slice, asort, bformat, explode, file_get_contents, implode,
+    in_array_strict, intval, is_array, is_file, is_numeric, json_decode_assoc, levenshtein,
+    php_regex, preg_is_match, preg_match, sprintf, strlen, strpos, trim, utf8_text,
 };
 use shirabe_symfony_console::input::{InputInterface, InputInterfaceByName, InputValue};
 use shirabe_symfony_console::output::OutputInterface;
@@ -593,7 +593,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                         similar
                             .iter()
                             .enumerate()
-                            .map(|(index, similar)| (bformat!("{index}"), similar.clone()))
+                            .map(|(index, similar)| (index.to_php_string(), similar.clone()))
                             .collect(),
                         InputValue::Bool(false),
                         Some(1),

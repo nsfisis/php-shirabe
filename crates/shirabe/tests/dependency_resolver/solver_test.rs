@@ -13,7 +13,7 @@ use shirabe::repository::{
     ArrayRepository, LockArrayRepository, LockArrayRepositoryHandle, RepositoryInterfaceHandle,
     RepositorySet,
 };
-use shirabe_php_shim::bformat;
+use shirabe_php_shim::{ToPhpString, bformat};
 use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint, MultiConstraint};
 
 #[allow(dead_code)]
@@ -54,8 +54,8 @@ fn set_up() -> Fixtures {
 fn link(source: &BStr, target: &BStr, constraint: AnyConstraint, r#type: &bstr::BStr) -> Link {
     let pretty = constraint.get_pretty_string();
     Link::new(
-        bformat!("{source}"),
-        bformat!("{target}"),
+        source.to_php_string(),
+        target.to_php_string(),
         constraint,
         Some(r#type.to_owned()),
         Some(pretty),
@@ -71,11 +71,11 @@ fn link_pretty(
     pretty: &BStr,
 ) -> Link {
     Link::new(
-        bformat!("{source}"),
-        bformat!("{target}"),
+        source.to_php_string(),
+        target.to_php_string(),
         constraint,
         Some(r#type.to_owned()),
-        Some(bformat!("{pretty}")),
+        Some(pretty.to_php_string()),
     )
 }
 
@@ -156,8 +156,8 @@ fn check_solver_result_repo_set(
                 other => panic!("Unexpected operation: {}", BStr::new(other).display_lossy()),
             };
             let package = operation.get_target_package();
-            result_readable.push((bformat!("{job}"), package.get_unique_name()));
-            result_ids.push((bformat!("{job}"), vec![package.ptr_id()]));
+            result_readable.push((job.to_php_string(), package.get_unique_name()));
+            result_ids.push((job.to_php_string(), vec![package.ptr_id()]));
         }
     }
 
@@ -166,8 +166,8 @@ fn check_solver_result_repo_set(
     for job in &expected {
         match job {
             ExpectedJob::Single { job, package } => {
-                expected_readable.push((bformat!("{job}"), package.get_unique_name()));
-                expected_ids.push((bformat!("{job}"), vec![package.ptr_id()]));
+                expected_readable.push((job.to_php_string(), package.get_unique_name()));
+                expected_ids.push((job.to_php_string(), vec![package.ptr_id()]));
             }
             ExpectedJob::Update { from, to } => {
                 expected_readable.push((

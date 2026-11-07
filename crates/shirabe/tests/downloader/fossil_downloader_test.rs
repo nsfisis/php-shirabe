@@ -11,7 +11,7 @@ use shirabe::downloader::{FossilDownloader, VcsDownloader};
 use shirabe::io::IOInterface;
 use shirabe::package::{CompletePackageHandle, PackageInterfaceHandle};
 use shirabe::util::{Filesystem, FilesystemMock, ProcessExecutor};
-use shirabe_php_shim::{PhpMixed, bformat, error_message, path_from_bytes};
+use shirabe_php_shim::{PhpMixed, ToPhpString, bformat, error_message, path_from_bytes};
 use shirabe_semver::VersionParser;
 use tempfile::TempDir;
 
@@ -58,8 +58,8 @@ fn get_package(
         BString::from("1.0.0"),
     );
     package.__set_source_type(Some(BString::from("fossil")));
-    package.set_source_reference(source_reference.map(|s| bformat!("{s}")));
-    package.set_source_url(source_url.map(|s| bformat!("{s}")));
+    package.set_source_reference(source_reference.map(|s| s.to_php_string()));
+    package.set_source_url(source_url.map(|s| s.to_php_string()));
     package.into()
 }
 
@@ -107,7 +107,7 @@ fn test_install() {
     let working_dir = set_up();
     let _tear_down = TearDown::new(working_dir.path().to_path_buf());
 
-    let working_dir_str = bformat!("{}", working_dir.path());
+    let working_dir_str = working_dir.path().to_php_string();
     let package = get_package(
         Some(BStr::new("trunk")),
         Some(BStr::new("http://fossil.kd2.org/kd2fw/")),
@@ -186,7 +186,7 @@ fn test_update() {
     let working_dir = set_up();
     let _tear_down = TearDown::new(working_dir.path().to_path_buf());
 
-    let working_dir_str = bformat!("{}", working_dir.path());
+    let working_dir_str = working_dir.path().to_php_string();
 
     // Ensure the .fslckout metadata file exists.
     let fslckout = working_dir.path().join(".fslckout");
@@ -244,7 +244,7 @@ fn test_update() {
 fn test_remove() {
     let working_dir = set_up();
     let _tear_down = TearDown::new(working_dir.path().to_path_buf());
-    let working_dir_str = bformat!("{}", working_dir.path());
+    let working_dir_str = working_dir.path().to_php_string();
 
     // Ensure file exists
     let file = working_dir.path().join(".fslckout");

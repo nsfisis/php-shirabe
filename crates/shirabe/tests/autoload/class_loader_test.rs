@@ -2,7 +2,7 @@
 
 use bstr::BStr;
 use shirabe::autoload::ClassLoader;
-use shirabe_php_shim::bformat;
+use shirabe_php_shim::{ToPhpString, bformat};
 
 // ref: ClassLoaderTest::getLoadClassTests
 fn get_find_file_tests() -> Vec<(&'static BStr, &'static BStr)> {
@@ -27,13 +27,11 @@ fn get_find_file_tests() -> Vec<(&'static BStr, &'static BStr)> {
 // ref: ClassLoaderTest::testLoadClass
 #[test]
 fn test_find_file() {
-    let fixtures = bformat!(
-        "{}",
-        std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../composer/tests/Composer/Test/Autoload/Fixtures")
-            .canonicalize()
-            .unwrap()
-    );
+    let fixtures = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../composer/tests/Composer/Test/Autoload/Fixtures")
+        .canonicalize()
+        .unwrap()
+        .to_php_string();
 
     for (class, file) in get_find_file_tests() {
         let mut loader = ClassLoader::new(None);

@@ -7,7 +7,9 @@ use indexmap::IndexMap;
 use shirabe::config::ConfigSourceInterface;
 use shirabe::io::{IOInterface, io_interface};
 use shirabe::util::{AuthHelper, Bitbucket, StoreAuth};
-use shirabe_php_shim::{Catch as _, PhpMixed, base64_encode, bformat, json_encode, time};
+use shirabe_php_shim::{
+    Catch as _, PhpMixed, ToPhpString, base64_encode, bformat, json_encode, time,
+};
 use shirabe_symfony_console::input::InputValue;
 
 // Mirrors AuthHelperTest::setUp: a DEBUG-verbosity IOMock plus a real Config, both
@@ -497,8 +499,14 @@ use mock_config_source::MockConfigSource;
 
 fn expected_auth_setting(username: &BStr, password: &BStr) -> PhpMixed {
     let mut auth = IndexMap::new();
-    auth.insert("username".into(), PhpMixed::string(bformat!("{username}")));
-    auth.insert("password".into(), PhpMixed::string(bformat!("{password}")));
+    auth.insert(
+        "username".into(),
+        PhpMixed::string(username.to_php_string()),
+    );
+    auth.insert(
+        "password".into(),
+        PhpMixed::string(password.to_php_string()),
+    );
     PhpMixed::Array(auth)
 }
 

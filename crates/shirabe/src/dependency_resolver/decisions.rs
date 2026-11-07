@@ -183,7 +183,7 @@ impl Decisions {
             let key = if let Some(pool) = pool {
                 pool.literal_to_package(*package_id).to_php_string()
             } else {
-                bformat!("{package_id}")
+                package_id.to_php_string()
             };
             bwrite!(str, "{key}:{},", *level);
         }

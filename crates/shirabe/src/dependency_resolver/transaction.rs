@@ -10,8 +10,8 @@ use crate::repository::PlatformRepository;
 use bstr::{B, BString};
 use indexmap::{IndexMap, IndexSet};
 use shirabe_php_shim::{
-    PhpMixed, array_filter, array_intersect, array_keys, array_pop, array_unshift, bformat, strcmp,
-    uasort, uasort_map,
+    PhpMixed, ToPhpString, array_filter, array_intersect, array_keys, array_pop, array_unshift,
+    bformat, strcmp, uasort, uasort_map,
 };
 
 #[derive(Debug, Clone)]
@@ -84,7 +84,7 @@ impl Transaction {
                     .push(package.clone());
             }
             self.result_package_map
-                .insert(bformat!("{}", package.ptr_id()), package);
+                .insert(package.ptr_id().to_php_string(), package);
         }
 
         uasort_map(&mut self.result_package_map, package_sort);
@@ -124,12 +124,12 @@ impl Transaction {
         while !stack.is_empty() {
             let package = array_pop(&mut stack).unwrap();
 
-            if processed.contains_key(bformat!("{}", package.ptr_id()).as_slice()) {
+            if processed.contains_key(package.ptr_id().to_php_string().as_slice()) {
                 continue;
             }
 
-            if !visited.contains_key(bformat!("{}", package.ptr_id()).as_slice()) {
-                visited.insert(bformat!("{}", package.ptr_id()), true);
+            if !visited.contains_key(package.ptr_id().to_php_string().as_slice()) {
+                visited.insert(package.ptr_id().to_php_string(), true);
 
                 stack.push(package.clone());
                 if let Some(alias) = package.as_alias() {
@@ -143,8 +143,8 @@ impl Transaction {
                         }
                     }
                 }
-            } else if !processed.contains_key(bformat!("{}", package.ptr_id()).as_slice()) {
-                processed.insert(bformat!("{}", package.ptr_id()), true);
+            } else if !processed.contains_key(package.ptr_id().to_php_string().as_slice()) {
+                processed.insert(package.ptr_id().to_php_string(), true);
 
                 if let Some(alias) = package.as_alias() {
                     let alias_key = bformat!("{}::{}", package.get_name(), package.get_version());
@@ -227,8 +227,8 @@ impl Transaction {
 
                 for require in possible_requires {
                     // PHP: if ($require !== $package) — strict reference inequality
-                    if bformat!("{}", require.ptr_id()) != bformat!("{}", package.ptr_id()) {
-                        roots.shift_remove(bformat!("{}", require.ptr_id()).as_slice());
+                    if require.ptr_id().to_php_string() != package.ptr_id().to_php_string() {
+                        roots.shift_remove(require.ptr_id().to_php_string().as_slice());
                     }
                 }
             }

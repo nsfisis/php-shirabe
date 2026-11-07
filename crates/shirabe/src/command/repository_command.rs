@@ -78,7 +78,7 @@ impl RepositoryCommand {
             let mut packagist_entry = IndexMap::new();
             packagist_entry.insert("packagist.org".into(), PhpMixed::Bool(false));
             repos.insert(
-                bformat!("{}", repos.len()),
+                repos.len().to_php_string(),
                 PhpMixed::Array(packagist_entry),
             );
         }

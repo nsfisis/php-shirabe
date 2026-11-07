@@ -164,7 +164,7 @@ impl Problem {
                 &rule
                     .get_literals()
                     .iter()
-                    .map(|l| bformat!("{l}"))
+                    .map(|l| l.to_php_string())
                     .collect::<Vec<_>>(),
             ),
             _ => {
@@ -241,7 +241,7 @@ impl Problem {
                     .insert(version_key, m2.clone());
                 let source_package = rule_ref.get_source_package(pool).unwrap();
                 for (version, pretty_version) in pool.get_removed_versions_by_package(
-                    bformat!("{}", source_package.ptr_id()).as_bstr(),
+                    source_package.ptr_id().to_php_string().as_bstr(),
                 ) {
                     templates
                         .get_mut(&template)
@@ -1030,7 +1030,7 @@ impl Problem {
                 && use_removed_version_group
             {
                 for (version, pretty_version) in
-                    pool.get_removed_versions_by_package(bformat!("{}", package.ptr_id()).as_bstr())
+                    pool.get_removed_versions_by_package(package.ptr_id().to_php_string().as_bstr())
                 {
                     entry.versions.insert(version, pretty_version);
                 }

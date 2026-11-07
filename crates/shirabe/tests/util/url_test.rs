@@ -4,17 +4,17 @@ use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe::config::Config;
 use shirabe::util::Url;
-use shirabe_php_shim::{PhpMixed, bformat};
+use shirabe_php_shim::{PhpMixed, ToPhpString};
 
 fn conf(entries: &[(&BStr, &[&BStr])]) -> IndexMap<BString, PhpMixed> {
     entries
         .iter()
         .map(|(k, vals)| {
             (
-                bformat!("{k}"),
+                k.to_php_string(),
                 PhpMixed::List(
                     vals.iter()
-                        .map(|v| PhpMixed::string(bformat!("{v}")))
+                        .map(|v| PhpMixed::string(v.to_php_string()))
                         .collect(),
                 ),
             )

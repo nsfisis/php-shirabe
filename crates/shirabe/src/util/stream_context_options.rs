@@ -65,7 +65,7 @@ impl StreamContextOptions {
             PhpMixed::List(list) => Self::from_array(
                 list.into_iter()
                     .enumerate()
-                    .map(|(i, value)| (bformat!("{i}"), value))
+                    .map(|(i, value)| (i.to_php_string(), value))
                     .collect(),
             ),
             other => Err(TypeError::new(bformat!(
@@ -248,7 +248,7 @@ impl StreamContextOption {
             PhpMixed::List(list) => list
                 .into_iter()
                 .enumerate()
-                .map(|(i, value)| (bformat!("{i}"), value))
+                .map(|(i, value)| (i.to_php_string(), value))
                 .collect(),
             other => {
                 return Err(TypeError::new(bformat!(

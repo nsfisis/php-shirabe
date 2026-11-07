@@ -13,13 +13,13 @@ use shirabe::downloader::FileDownloader;
 use shirabe::io::{IOInterface, NullIO};
 use shirabe::package::{CompletePackageHandle, PackageInterfaceHandle};
 use shirabe::util::HttpDownloader;
-use shirabe_php_shim::{PhpMixed, bformat, path_to_bytes};
+use shirabe_php_shim::{PhpMixed, ToPhpString, bformat, path_to_bytes};
 use shirabe_semver::VersionParser;
 
 /// ref: TestCase::getPackage (default class CompletePackage)
 fn get_package(name: &BStr, version: &BStr) -> PackageInterfaceHandle {
     let norm_version = VersionParser.normalize(version, None).unwrap();
-    CompletePackageHandle::new(bformat!("{name}"), norm_version, bformat!("{version}")).into()
+    CompletePackageHandle::new(name.to_php_string(), norm_version, version.to_php_string()).into()
 }
 
 /// ref: ArchiveDownloaderTest::getArchiveDownloaderMock (the inherited getFileName/processUrl
@@ -33,7 +33,7 @@ fn get_archive_downloader(vendor_dir: Option<&BStr>) -> FileDownloader {
         let mut config_options: IndexMap<BString, PhpMixed> = IndexMap::new();
         config_options.insert(
             "vendor-dir".into(),
-            PhpMixed::string(bformat!("{vendor_dir}")),
+            PhpMixed::string(vendor_dir.to_php_string()),
         );
         let mut merged: IndexMap<BString, PhpMixed> = IndexMap::new();
         merged.insert("config".into(), PhpMixed::Array(config_options));

@@ -4,7 +4,7 @@ use crate::test_case::get_package;
 use bstr::{BStr, BString};
 use shirabe::package::{DisplayMode, PackageHandle, package_names_to_regexp};
 use shirabe::repository::{ArrayRepository, RepositoryInterfaceHandle};
-use shirabe_php_shim::bformat;
+use shirabe_php_shim::ToPhpString;
 use shirabe_semver::VersionParser;
 
 fn empty_repository() -> RepositoryInterfaceHandle {
@@ -68,7 +68,7 @@ fn test_format_version_for_dev_package() {
             BString::from("PrettyVersion"),
         );
         package.__set_source_type(Some(BString::from("git")));
-        package.set_source_reference(Some(bformat!("{source_reference}")));
+        package.set_source_reference(Some(source_reference.to_php_string()));
 
         assert_eq!(
             expected,

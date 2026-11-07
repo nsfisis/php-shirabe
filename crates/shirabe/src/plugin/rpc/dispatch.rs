@@ -41,7 +41,7 @@ use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_rpc::{PhpThrow, PluginValue, RustMethodDispatcher, ToWire};
 use shirabe_php_shim::{
-    AnyThrowable, bformat, display_to_bytes, error_chain_message, path_to_bytes,
+    AnyThrowable, ToPhpString, bformat, display_to_bytes, error_chain_message, path_to_bytes,
 };
 
 /// Looks a class up in every Rust-side `ClassLoader` on the autoload stack, in stack order — the
@@ -84,7 +84,7 @@ impl RustMethodDispatcher for PluginRpcDispatcher {
                 let input_line = arg::<BString>(method_name, &args, 1)?;
                 return match run_worker_reverse_command(name.as_ref(), input_line.as_ref()) {
                     Ok(code) => Ok(code.to_wire()),
-                    Err(e) => Err(PhpThrow::runtime(bformat!("{}", error_chain_message(&e)))),
+                    Err(e) => Err(PhpThrow::runtime(error_chain_message(&e).to_php_string())),
                 };
             }
             if method_name == "__shirabe_construct" {

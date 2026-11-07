@@ -10,14 +10,14 @@ use shirabe::io::{IOInterface, NullIO};
 use shirabe::package::{CompletePackageHandle, PackageInterfaceHandle};
 use shirabe::util::r#loop::Loop;
 use shirabe::util::{Filesystem, HttpDownloader, Platform, ProcessExecutor};
-use shirabe_php_shim::{PhpMixed, bformat, error_message, path_to_bytes};
+use shirabe_php_shim::{PhpMixed, ToPhpString, bformat, error_message, path_to_bytes};
 use shirabe_semver::VersionParser;
 use tempfile::TempDir;
 
 /// ref: TestCase::getPackage (default class CompletePackage)
 fn get_package(name: &BStr, version: &BStr) -> PackageInterfaceHandle {
     let norm_version = VersionParser.normalize(version, None).unwrap();
-    CompletePackageHandle::new(bformat!("{name}"), norm_version, bformat!("{version}")).into()
+    CompletePackageHandle::new(name.to_php_string(), norm_version, version.to_php_string()).into()
 }
 
 /// ref: setUp markTestSkipped on Windows / 32bit, expressed as a compile-time

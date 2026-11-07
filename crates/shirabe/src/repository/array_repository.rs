@@ -13,8 +13,8 @@ use crate::repository::{
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    bformat, explode_with_limit, implode, php_regex, preg_is_match, preg_quote, preg_split,
-    strtolower,
+    ToPhpString, bformat, explode_with_limit, implode, php_regex, preg_is_match, preg_quote,
+    preg_split, strtolower,
 };
 use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
 use std::rc::Weak;
@@ -267,12 +267,12 @@ impl RepositoryInterface for ArrayRepository {
                         .unwrap_or(false)
                 {
                     // add selected packages which match stability requirements
-                    result.insert(bformat!("{}", package.ptr_id()), package.clone());
+                    result.insert(package.ptr_id().to_php_string(), package.clone());
                     // add the aliased package for packages where the alias matches
                     if let Some(alias) = package.as_alias() {
                         let aliased = alias.get_alias_of();
-                        if !result.contains_key(bformat!("{}", aliased.ptr_id()).as_slice()) {
-                            result.insert(bformat!("{}", aliased.ptr_id()), aliased.into());
+                        if !result.contains_key(aliased.ptr_id().to_php_string().as_slice()) {
+                            result.insert(aliased.ptr_id().to_php_string(), aliased.into());
                         }
                     }
                 }
@@ -285,8 +285,8 @@ impl RepositoryInterface for ArrayRepository {
         for package in &packages {
             if let Some(alias) = package.as_alias() {
                 let aliased = alias.get_alias_of();
-                if result.contains_key(bformat!("{}", aliased.ptr_id()).as_slice()) {
-                    result.insert(bformat!("{}", package.ptr_id()), package.clone());
+                if result.contains_key(aliased.ptr_id().to_php_string().as_slice()) {
+                    result.insert(package.ptr_id().to_php_string(), package.clone());
                 }
             }
         }

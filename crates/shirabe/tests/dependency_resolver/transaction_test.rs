@@ -6,7 +6,7 @@ use indexmap::IndexMap;
 use shirabe::dependency_resolver::Transaction;
 use shirabe::dependency_resolver::operation::AnyOperation;
 use shirabe::package::{Link, PackageInterfaceHandle};
-use shirabe_php_shim::{PhpMixed, bformat};
+use shirabe_php_shim::{PhpMixed, ToPhpString};
 
 /// PHP `new Link($source, $target, $constraint, $type)`: prettyConstraint defaults to
 /// `(string) $constraint`.
@@ -18,8 +18,8 @@ fn mk_link(
 ) -> Link {
     let pretty = constraint.get_pretty_string();
     Link::new(
-        bformat!("{source}"),
-        bformat!("{target}"),
+        source.to_php_string(),
+        target.to_php_string(),
         constraint,
         Some(r#type.to_owned()),
         Some(pretty),

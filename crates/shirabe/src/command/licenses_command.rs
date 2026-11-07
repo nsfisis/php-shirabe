@@ -15,7 +15,8 @@ use crate::util::{PackageInfo, PackageSorter};
 use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    RuntimeException, UnexpectedValueException, bformat, impl_php_class, implode, json_bytes,
+    RuntimeException, ToPhpString, UnexpectedValueException, bformat, impl_php_class, implode,
+    json_bytes,
 };
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::formatter::OutputFormatter;
@@ -300,7 +301,7 @@ impl Command for LicensesCommand {
                 let rows: Vec<Row> = entries
                     .iter()
                     .map(|(license, count)| {
-                        Row::Cells(vec![license.clone().into(), bformat!("{count}").into()])
+                        Row::Cells(vec![license.clone().into(), count.to_php_string().into()])
                     })
                     .collect();
 

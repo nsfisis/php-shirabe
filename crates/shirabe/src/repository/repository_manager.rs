@@ -12,7 +12,7 @@ use crate::util::{HttpDownloader, ProcessExecutor};
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    InvalidArgumentException, PhpMixed, RuntimeException, bformat, json_encode,
+    InvalidArgumentException, PhpMixed, RuntimeException, ToPhpString, bformat, json_encode,
 };
 use shirabe_semver::constraint::AnyConstraint;
 
@@ -202,7 +202,7 @@ impl RepositoryManager {
 
     pub fn set_repository_class(&mut self, r#type: &BStr, class: &BStr) {
         self.repository_classes
-            .insert(bstr::BString::from(r#type), bformat!("{class}"));
+            .insert(bstr::BString::from(r#type), class.to_php_string());
     }
 
     pub fn get_repositories(&self) -> &Vec<RepositoryInterfaceHandle> {

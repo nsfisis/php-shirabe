@@ -856,7 +856,7 @@ pub fn sprintf(format: impl AsRef<[u8]>, args: &[PhpMixed]) -> BString {
 
         let (core, numeric): (BString, bool) = match spec {
             b'd' => (sprintf_signed_int(intval(&arg), plus, space), true),
-            b'u' => (bformat!("{}", intval(&arg) as u64), true),
+            b'u' => ((intval(&arg) as u64).to_php_string(), true),
             b'b' => (
                 display_to_bytes(format_args!("{:b}", intval(&arg) as u64)),
                 true,
@@ -899,13 +899,13 @@ pub fn sprintf(format: impl AsRef<[u8]>, args: &[PhpMixed]) -> BString {
 
 fn sprintf_signed_int(n: i64, plus: bool, space: bool) -> BString {
     if n < 0 {
-        bformat!("{n}")
+        n.to_php_string()
     } else if plus {
         bformat!("+{n}")
     } else if space {
         bformat!(" {n}")
     } else {
-        bformat!("{n}")
+        n.to_php_string()
     }
 }
 

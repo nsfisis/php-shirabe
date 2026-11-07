@@ -22,8 +22,8 @@ use shirabe_class_map_generator::class_map::ClassMap;
 use shirabe_class_map_generator::class_map_generator::ClassMapGenerator;
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, PHP_SERVER, PhpMixed, PregMatches, RuntimeException,
-    array_keys, array_map, array_merge_map, array_merge_recursive, array_shift, array_slice_strs,
-    array_unique, bformat, bin2hex, bwrite, dirname, empty, explode, file_exists,
+    ToPhpString, array_keys, array_map, array_merge_map, array_merge_recursive, array_shift,
+    array_slice_strs, array_unique, bformat, bin2hex, bwrite, dirname, empty, explode, file_exists,
     file_get_contents, hash, implode, intval, is_array, is_dir, ksort, ltrim, ltrim_chars,
     path_from_bytes, path_to_bytes, php_regex, preg_is_match, preg_match, preg_quote, preg_replace,
     preg_replace_callback, random_bytes, realpath, rtrim_chars, str_replace, strlen, strpos, strtr,
@@ -394,7 +394,7 @@ impl AutoloadGenerator {
                 for (namespace, paths) in &map {
                     let mut entry: IndexMap<BString, PhpMixed> = IndexMap::new();
                     entry.insert("paths".into(), paths.clone());
-                    entry.insert("type".into(), PhpMixed::string(bformat!("{psr_type}")));
+                    entry.insert("type".into(), PhpMixed::string(psr_type.to_php_string()));
                     namespaces_to_scan
                         .entry(namespace.clone())
                         .or_default()
@@ -1601,7 +1601,7 @@ if (PHP_INT_SIZE !== 8) {
                 PhpMixed::List(l) => l
                     .iter()
                     .enumerate()
-                    .map(|(i, v)| (bformat!("{i}"), v.clone()))
+                    .map(|(i, v)| (i.to_php_string(), v.clone()))
                     .collect(),
                 _ => IndexMap::new(),
             };
@@ -1720,7 +1720,7 @@ if (PHP_INT_SIZE !== 8) {
                             "{}/{p}($|/)",
                             preg_quote(strtr(path_to_bytes(&resolved_path), "\\", "/"), None)
                         );
-                        autoloads.insert(bformat!("{numeric_index}"), PhpMixed::string(entry));
+                        autoloads.insert(numeric_index.to_php_string(), PhpMixed::string(entry));
                         numeric_index += 1;
                         continue;
                     }
@@ -1743,8 +1743,10 @@ if (PHP_INT_SIZE !== 8) {
                         continue;
                     }
                     if r#type == "classmap" {
-                        autoloads
-                            .insert(bformat!("{numeric_index}"), PhpMixed::string(relative_path));
+                        autoloads.insert(
+                            numeric_index.to_php_string(),
+                            PhpMixed::string(relative_path),
+                        );
                         numeric_index += 1;
                         continue;
                     }

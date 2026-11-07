@@ -35,12 +35,12 @@ use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_rpc::{PhpThrow, PluginValue, RustMethodDispatcher, ToWire};
 use shirabe_php_shim::{
-    Catch as _, InvalidArgumentException, PhpMixed, RuntimeException, array_pop, array_push,
-    array_search_in_vec, array_splice, bformat, display_to_bytes, error_message, explode,
-    explode_with_limit, file_exists, get_class, hash, implode, ini_get, is_callable, is_dir,
-    is_object, krsort, os_str_from_bytes, path_from_bytes, path_to_bytes, php_regex, preg_is_match,
-    preg_match, preg_quote, preg_replace, preg_replace_callback, realpath, str_replace, strlen,
-    strpos, strtoupper, substr, trim_chars, var_export_str,
+    Catch as _, InvalidArgumentException, PhpMixed, RuntimeException, ToPhpString, array_pop,
+    array_push, array_search_in_vec, array_splice, bformat, display_to_bytes, error_message,
+    explode, explode_with_limit, file_exists, get_class, hash, implode, ini_get, is_callable,
+    is_dir, is_object, krsort, os_str_from_bytes, path_from_bytes, path_to_bytes, php_regex,
+    preg_is_match, preg_match, preg_quote, preg_replace, preg_replace_callback, realpath,
+    str_replace, strlen, strpos, strtoupper, substr, trim_chars, var_export_str,
 };
 use shirabe_symfony_console::output::output_interface;
 use shirabe_symfony_process::{ExecutableFinder, PhpExecutableFinder};
@@ -501,7 +501,7 @@ impl EventDispatcher {
                             let exit_code = self.execute_tty(&exec)?;
                             if exit_code != 0 {
                                 self.io.write_error_with_verbosity(
-                                    bformat!("<error>Script {callable_str} handling the {} event returned with error code {}</error>", event_name.as_bstr(), bformat!("{exit_code}")),
+                                    bformat!("<error>Script {callable_str} handling the {} event returned with error code {}</error>", event_name.as_bstr(), exit_code.to_php_string()),
                                     QUIET,
                                 );
 
@@ -865,7 +865,7 @@ impl EventDispatcher {
                         let exit_code = self.execute_tty(&exec)?;
                         if exit_code != 0 {
                             self.io.write_error_with_verbosity(
-                                bformat!("<error>Script {callable_str} handling the {} event returned with error code {}</error>", event_name.as_bstr(), bformat!("{exit_code}")),
+                                bformat!("<error>Script {callable_str} handling the {} event returned with error code {}</error>", event_name.as_bstr(), exit_code.to_php_string()),
                                 QUIET,
                             );
 

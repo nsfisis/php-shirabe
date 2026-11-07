@@ -2,7 +2,7 @@
 
 use crate::Process;
 use crate::exception::{InvalidArgumentException, RuntimeException};
-use shirabe_php_shim::{bformat, bwrite, impl_php_exception};
+use shirabe_php_shim::{ToPhpString, bformat, bwrite, impl_php_exception};
 
 #[derive(Debug)]
 pub struct ProcessFailedException {
@@ -24,7 +24,7 @@ impl ProcessFailedException {
             process.get_command_line(),
             process
                 .get_exit_code()
-                .map(|c| bformat!("{c}"))
+                .map(|c| c.to_php_string())
                 .unwrap_or_default(),
             process.get_exit_code_text().unwrap_or_default(),
             process.get_working_directory().unwrap_or_default()

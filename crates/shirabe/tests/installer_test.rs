@@ -11,9 +11,9 @@ use bstr::{B, BStr, BString, ByteSlice};
 use config_stub::ConfigStubBuilder;
 use serial_test::serial;
 use shirabe_php_shim::{
-    PHP_EOL, PhpJson, PhpMixed, bformat, error_message, implode, path_to_bytes, php_fopen_resource,
-    php_regex, preg_is_match, preg_match, preg_replace, preg_split_delim_capture, rewind, rtrim,
-    str_replace, stream_get_contents, trim, utf8_text,
+    PHP_EOL, PhpJson, PhpMixed, ToPhpString, bformat, error_message, implode, path_to_bytes,
+    php_fopen_resource, php_regex, preg_is_match, preg_match, preg_replace,
+    preg_split_delim_capture, rewind, rtrim, str_replace, stream_get_contents, trim, utf8_text,
 };
 use shirabe_symfony_console::input::{
     InputArgument, InputInterface, InputInterfaceByName, InputOption, InputValue, StringInput,
@@ -259,15 +259,15 @@ impl AutoloadGeneratorInterface for StubAutoloadGenerator {
 /// ref: TestCase::getPackage with class `Composer\Package\RootPackage`.
 fn root_package(name: &BStr, version: &BStr) -> RootPackageHandle {
     let normalized = VersionParser.normalize(version, None).unwrap();
-    RootPackageHandle::new(bformat!("{name}"), normalized, bformat!("{version}"))
+    RootPackageHandle::new(name.to_php_string(), normalized, version.to_php_string())
 }
 
 /// ref: `new Link($source, $target, $constraint, $type, $constraint->getPrettyString())`.
 fn link(source: &BStr, target: &BStr, constraint: AnyConstraint, r#type: &bstr::BStr) -> Link {
     let pretty = constraint.get_pretty_string();
     Link::new(
-        bformat!("{source}"),
-        bformat!("{target}"),
+        source.to_php_string(),
+        target.to_php_string(),
         constraint,
         Some(r#type.to_owned()),
         Some(pretty),

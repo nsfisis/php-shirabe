@@ -17,8 +17,8 @@ use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_rpc::PlatformInfo;
 use shirabe_php_shim::{
-    InvalidArgumentException, PhpMixed, UnexpectedValueException, array_slice_strs, bformat,
-    explode, get_class, get_debug_type, implode, intval, is_string, php_regex, php_str,
+    InvalidArgumentException, PhpMixed, ToPhpString, UnexpectedValueException, array_slice_strs,
+    bformat, explode, get_class, get_debug_type, implode, intval, is_string, php_regex, php_str,
     preg_is_match, preg_match, preg_replace, str_replace, strpos, strtolower, var_export,
 };
 use shirabe_semver::constraint::SimpleConstraint;
@@ -751,7 +751,7 @@ impl PlatformRepository {
                                 &intl_char_versions
                                     .iter()
                                     .take(3)
-                                    .map(|part| bformat!("{part}"))
+                                    .map(|part| part.to_php_string())
                                     .collect::<Vec<BString>>(),
                             )[..],
                         );

@@ -3,7 +3,8 @@
 use bstr::{BStr, BString, ByteSlice};
 use shirabe::question::StrictConfirmationQuestion;
 use shirabe_php_shim::{
-    PhpResource, bformat, error_message, fwrite_resource, php_fopen_resource, php_str, rewind,
+    PhpResource, ToPhpString, bformat, error_message, fwrite_resource, php_fopen_resource, php_str,
+    rewind,
 };
 use shirabe_symfony_console::helper::{QuestionHelper, QuestionHelperInterface};
 use shirabe_symfony_console::input::{
@@ -31,8 +32,8 @@ fn test_ask_confirmation_bad_answer() {
         let mut question = StrictConfirmationQuestion::new(
             BString::from("Do you like French fries?"),
             true,
-            bformat!("{TRUE_ANSWER_REGEX}"),
-            bformat!("{FALSE_ANSWER_REGEX}"),
+            TRUE_ANSWER_REGEX.to_php_string(),
+            FALSE_ANSWER_REGEX.to_php_string(),
         );
         question.inner_mut().set_max_attempts(Some(1)).unwrap();
 
@@ -51,8 +52,8 @@ fn test_ask_confirmation() {
         let question = StrictConfirmationQuestion::new(
             BString::from("Do you like French fries?"),
             default,
-            bformat!("{TRUE_ANSWER_REGEX}"),
-            bformat!("{FALSE_ANSWER_REGEX}"),
+            TRUE_ANSWER_REGEX.to_php_string(),
+            FALSE_ANSWER_REGEX.to_php_string(),
         );
         assert_eq!(
             dialog

@@ -5,12 +5,12 @@ use indexmap::IndexMap;
 use shirabe::config::Config;
 use shirabe::io::{IOInterface, NullIO};
 use shirabe::util::Svn;
-use shirabe_php_shim::{PhpMixed, bformat};
+use shirabe_php_shim::{PhpMixed, ToPhpString};
 
 fn map(pairs: Vec<(&BStr, PhpMixed)>) -> IndexMap<BString, PhpMixed> {
     pairs
         .into_iter()
-        .map(|(k, v)| (bformat!("{k}"), v))
+        .map(|(k, v)| (k.to_php_string(), v))
         .collect()
 }
 
@@ -20,11 +20,11 @@ fn http_basic_config(host: &BStr, username: &BStr, password: &BStr) -> IndexMap<
     let creds = map(vec![
         (
             BStr::new("username"),
-            PhpMixed::string(bformat!("{username}")),
+            PhpMixed::string(username.to_php_string()),
         ),
         (
             BStr::new("password"),
-            PhpMixed::string(bformat!("{password}")),
+            PhpMixed::string(password.to_php_string()),
         ),
     ]);
     let http_basic = map(vec![(host, PhpMixed::Array(creds))]);
@@ -65,7 +65,7 @@ fn test_credentials() {
         let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(true, None)));
         let mut svn = Svn::new(url.into(), io, config, None);
 
-        let expect: Vec<BString> = expect.iter().map(|s| bformat!("{s}")).collect();
+        let expect: Vec<BString> = expect.iter().map(|s| s.to_php_string()).collect();
         assert_eq!(expect, svn.__get_credential_args().unwrap());
     }
 }

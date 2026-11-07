@@ -8,7 +8,7 @@ use shirabe::repository::{
     AdvisoryProviderInterface, ArrayRepository, FilterRepository, RepositoryInterface,
     RepositoryInterfaceHandle,
 };
-use shirabe_php_shim::{PhpMixed, bformat};
+use shirabe_php_shim::{PhpMixed, ToPhpString};
 use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint};
 
 fn set_up() -> RepositoryInterfaceHandle {
@@ -29,7 +29,7 @@ fn config(only: Option<&[&BStr]>, exclude: Option<&[&BStr]>) -> IndexMap<BString
             "only".into(),
             PhpMixed::List(
                 only.iter()
-                    .map(|s| PhpMixed::string(bformat!("{s}")))
+                    .map(|s| PhpMixed::string(s.to_php_string()))
                     .collect(),
             ),
         );
@@ -40,7 +40,7 @@ fn config(only: Option<&[&BStr]>, exclude: Option<&[&BStr]>) -> IndexMap<BString
             PhpMixed::List(
                 exclude
                     .iter()
-                    .map(|s| PhpMixed::string(bformat!("{s}")))
+                    .map(|s| PhpMixed::string(s.to_php_string()))
                     .collect(),
             ),
         );
@@ -106,7 +106,7 @@ fn test_repo_matching() {
             .map(|p| bstr::BString::from(&p.get_name()[..]))
             .collect();
 
-        let expected: Vec<BString> = expected.iter().map(|s| bformat!("{s}")).collect();
+        let expected: Vec<BString> = expected.iter().map(|s| s.to_php_string()).collect();
         assert_eq!(expected, names);
     }
 }

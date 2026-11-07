@@ -1294,7 +1294,7 @@ impl Application {
                 let line = exception
                     .map(AnyThrowable::get_line)
                     .filter(|line| *line != 0)
-                    .map_or_else(|| BString::from("n/a"), |line| bformat!("{line}"));
+                    .map_or_else(|| BString::from("n/a"), |line| line.to_php_string());
                 messages.push(bformat!(
                     "<comment>{}</comment>",
                     OutputFormatter::escape(bformat!("In {file} line {line}:")).unwrap()
@@ -1427,7 +1427,7 @@ impl Application {
             input.borrow_mut().set_interactive(false);
         }
 
-        let shell_verbosity_value = bformat!("{shell_verbosity}");
+        let shell_verbosity_value = shell_verbosity.to_php_string();
         let shell_verbosity_value = os_str_from_bytes(&shell_verbosity_value);
         unsafe {
             putenv(os_str_from_bytes(&bformat!(
@@ -2625,7 +2625,7 @@ impl ApplicationHandle {
                 // $exitCode = $e->getCode();
                 // is_numeric($exitCode) ? max(1, (int) $exitCode) : 1
                 let exit_code = AnyThrowable::of(&e).map_or(0, AnyThrowable::get_code) as i32;
-                if is_numeric_string(bformat!("{exit_code}")) {
+                if is_numeric_string(exit_code.to_php_string()) {
                     if exit_code <= 0 { 1 } else { exit_code }
                 } else {
                     1

@@ -6,20 +6,20 @@ use shirabe::package::Link;
 use shirabe::package::dumper::ArrayDumper;
 use shirabe::package::loader::{ArrayLoader, LoaderInterface};
 use shirabe::package::version::VersionParser;
-use shirabe_php_shim::{PhpMixed, ToPhpString, bformat, error_message};
+use shirabe_php_shim::{PhpMixed, ToPhpString, error_message};
 
 fn set_up() -> ArrayLoader {
     ArrayLoader::new(None, false)
 }
 
 fn s(value: &BStr) -> PhpMixed {
-    PhpMixed::string(bformat!("{value}"))
+    PhpMixed::string(value.to_php_string())
 }
 
 fn map(entries: Vec<(&BStr, PhpMixed)>) -> PhpMixed {
     let mut m: IndexMap<BString, PhpMixed> = IndexMap::new();
     for (k, v) in entries {
-        m.insert(bformat!("{k}"), v);
+        m.insert(k.to_php_string(), v);
     }
     PhpMixed::Array(m)
 }
@@ -27,7 +27,7 @@ fn map(entries: Vec<(&BStr, PhpMixed)>) -> PhpMixed {
 fn make_config(entries: Vec<(&BStr, PhpMixed)>) -> IndexMap<BString, PhpMixed> {
     let mut m: IndexMap<BString, PhpMixed> = IndexMap::new();
     for (k, v) in entries {
-        m.insert(bformat!("{k}"), v);
+        m.insert(k.to_php_string(), v);
     }
     m
 }

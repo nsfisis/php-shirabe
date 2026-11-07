@@ -10,7 +10,7 @@ use shirabe::downloader::{HgDownloader, VcsDownloader};
 use shirabe::io::IOInterface;
 use shirabe::package::{CompletePackageHandle, PackageInterfaceHandle};
 use shirabe::util::{Filesystem, FilesystemMock, ProcessExecutor};
-use shirabe_php_shim::{bformat, error_message, path_from_bytes};
+use shirabe_php_shim::{ToPhpString, error_message, path_from_bytes};
 use shirabe_semver::VersionParser;
 use tempfile::TempDir;
 
@@ -57,8 +57,8 @@ fn get_package(
         BString::from("1.0.0"),
     );
     package.__set_source_type(Some(BString::from("hg")));
-    package.set_source_reference(source_reference.map(|s| bformat!("{s}")));
-    package.set_source_url(source_url.map(|s| bformat!("{s}")));
+    package.set_source_reference(source_reference.map(|s| s.to_php_string()));
+    package.set_source_url(source_url.map(|s| s.to_php_string()));
     package.into()
 }
 
@@ -106,7 +106,7 @@ fn test_download() {
     let working_dir = set_up();
     let _tear_down = TearDown::new(working_dir.path().to_path_buf());
 
-    let working_dir_str = bformat!("{}", working_dir.path());
+    let working_dir_str = working_dir.path().to_php_string();
     let package = get_package(
         Some(BStr::new("ref")),
         Some(BStr::new("https://mercurial.dev/l3l0/composer")),
@@ -178,7 +178,7 @@ fn test_update() {
     let working_dir = set_up();
     let _tear_down = TearDown::new(working_dir.path().to_path_buf());
 
-    let working_dir_str = bformat!("{}", working_dir.path());
+    let working_dir_str = working_dir.path().to_php_string();
 
     let mut fs = Filesystem::new(None);
     fs.ensure_directory_exists(working_dir.path().join(".hg"))
@@ -234,7 +234,7 @@ fn test_update() {
 fn test_remove() {
     let working_dir = set_up();
     let _tear_down = TearDown::new(working_dir.path().to_path_buf());
-    let working_dir_str = bformat!("{}", working_dir.path());
+    let working_dir_str = working_dir.path().to_php_string();
 
     let mut fs = Filesystem::new(None);
     fs.ensure_directory_exists(working_dir.path().join(".hg"))

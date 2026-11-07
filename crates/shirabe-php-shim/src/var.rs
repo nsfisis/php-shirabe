@@ -1,4 +1,4 @@
-use crate::{PhpDisplay, PhpMixed, ToPhpString, bformat, bwrite, utf8_text};
+use crate::{PhpDisplay, PhpMixed, ToPhpString, bwrite, utf8_text};
 use bstr::{BStr, BString, ByteSlice, ByteVec};
 use indexmap::IndexMap;
 
@@ -341,7 +341,7 @@ pub fn to_array(value: PhpMixed) -> IndexMap<BString, PhpMixed> {
         PhpMixed::List(items) => items
             .into_iter()
             .enumerate()
-            .map(|(i, v)| (bformat!("{i}"), v))
+            .map(|(i, v)| (i.to_php_string(), v))
             .collect(),
         scalar => {
             let mut m = IndexMap::new();

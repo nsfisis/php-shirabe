@@ -15,7 +15,9 @@ pub use wire::{FromWire, ToWire};
 use bstr::{B, BStr, BString, ByteSlice};
 use frame::Frame;
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpMixed, bformat, os_str_from_bytes, path_from_bytes, php_str};
+use shirabe_php_shim::{
+    PhpMixed, ToPhpString, bformat, os_str_from_bytes, path_from_bytes, php_str,
+};
 use shirabe_symfony_process::PhpExecutableFinder;
 use std::os::unix::net::UnixStream;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -1114,7 +1116,7 @@ fn spawn_worker() -> anyhow::Result<Worker> {
     }
     command
         .arg(&script_path)
-        .arg(os_str_from_bytes(&bformat!("{WORKER_SOCKET_FD}")))
+        .arg(os_str_from_bytes(&WORKER_SOCKET_FD.to_php_string()))
         .arg(&stubs_dir)
         .arg(&guards_dir);
     // SAFETY: the closure only calls async-signal-safe syscalls, as required between fork and

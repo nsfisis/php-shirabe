@@ -7,7 +7,7 @@ use crate::test_case::{
 use bstr::{BStr, BString, ByteSlice};
 use serial_test::serial;
 use shirabe::package::PackageInterfaceHandle;
-use shirabe_php_shim::{bformat, path_from_bytes, trim};
+use shirabe_php_shim::{ToPhpString, path_from_bytes, trim};
 use shirabe_symfony_console::input::{InputValue, ParameterName};
 
 fn input(pairs: Vec<(&BStr, InputValue)>) -> Vec<(ParameterName, InputValue)> {
@@ -67,17 +67,17 @@ fn run_locally_modified_packages_case(
     let _tear_down = init_temp_composer(Some(&composer_json), None, None, true);
 
     let package = get_package(package_data.name, package_data.version);
-    package.set_installation_source(Some(bformat!("{}", package_data.installation_source)));
+    package.set_installation_source(Some(package_data.installation_source.to_php_string()));
 
     if package_data.installation_source == "source" {
-        package.__set_source_type(Some(bformat!("{}", package_data.r#type)));
-        package.set_source_url(Some(bformat!("{}", package_data.url)));
+        package.__set_source_type(Some(package_data.r#type.to_php_string()));
+        package.set_source_url(Some(package_data.url.to_php_string()));
         package.set_source_reference(package_data.reference.map(|reference| reference.to_owned()));
     }
 
     if package_data.installation_source == "dist" {
-        package.set_dist_type(Some(bformat!("{}", package_data.r#type)));
-        package.set_dist_url(Some(bformat!("{}", package_data.url)));
+        package.set_dist_type(Some(package_data.r#type.to_php_string()));
+        package.set_dist_url(Some(package_data.url.to_php_string()));
         package.set_dist_reference(package_data.reference.map(|reference| reference.to_owned()));
     }
 

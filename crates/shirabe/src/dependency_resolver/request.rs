@@ -4,7 +4,7 @@ use crate::package::BasePackageHandle;
 use crate::repository::{LockArrayRepositoryHandle, RepositoryInterface};
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
-use shirabe_php_shim::{LogicException, bformat, strtolower};
+use shirabe_php_shim::{LogicException, ToPhpString, bformat, strtolower};
 use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint};
 
 /// Identifies a partial update for listed packages only, all dependencies will remain at locked versions
@@ -59,7 +59,7 @@ impl Request {
     /// their installation is generated for dependency resolution. Partial updates with dependencies
     /// cannot in any way modify these packages.
     pub fn fix_package(&mut self, package: BasePackageHandle) {
-        let hash = bformat!("{}", package.ptr_id());
+        let hash = package.ptr_id().to_php_string();
         self.fixed_packages.insert(hash, package);
     }
 
@@ -74,7 +74,7 @@ impl Request {
     /// a partial update these packages can be unlocked, meaning other versions can be installed if
     /// explicitly requested as part of the update.
     pub fn lock_package(&mut self, package: BasePackageHandle) {
-        let hash = bformat!("{}", package.ptr_id());
+        let hash = package.ptr_id().to_php_string();
         self.locked_packages.insert(hash, package);
     }
 
@@ -85,14 +85,14 @@ impl Request {
     /// be marked fixed, as error reporting would then report them as platform packages, so this
     /// still marks them as locked packages at the same time.
     pub fn fix_locked_package(&mut self, package: BasePackageHandle) {
-        let hash = bformat!("{}", package.ptr_id());
+        let hash = package.ptr_id().to_php_string();
         self.fixed_packages.insert(hash.clone(), package.clone());
         self.fixed_locked_packages.insert(hash, package);
     }
 
     pub fn unlock_package(&mut self, package: BasePackageHandle) {
         self.locked_packages
-            .shift_remove(bformat!("{}", package.ptr_id()).as_slice());
+            .shift_remove(package.ptr_id().to_php_string().as_slice());
     }
 
     pub fn set_update_allow_list(
@@ -129,7 +129,7 @@ impl Request {
 
     pub fn is_fixed_package(&self, package: BasePackageHandle) -> bool {
         self.fixed_packages
-            .contains_key(bformat!("{}", package.ptr_id()).as_slice())
+            .contains_key(package.ptr_id().to_php_string().as_slice())
     }
 
     pub fn get_locked_packages(&self) -> &IndexMap<BString, BasePackageHandle> {
@@ -137,7 +137,7 @@ impl Request {
     }
 
     pub fn is_locked_package(&self, package: BasePackageHandle) -> bool {
-        let hash = bformat!("{}", package.ptr_id());
+        let hash = package.ptr_id().to_php_string();
         self.locked_packages.contains_key(bstr::B(&hash))
             || self.fixed_locked_packages.contains_key(bstr::B(&hash))
     }
@@ -170,9 +170,9 @@ impl Request {
             for package in RepositoryInterface::get_packages(&mut *locked_repository.borrow_mut())?
             {
                 let key = if package_ids {
-                    bformat!("{}", package.get_id())
+                    package.get_id().to_php_string()
                 } else {
-                    bformat!("{}", package.ptr_id())
+                    package.ptr_id().to_php_string()
                 };
                 present_map.insert(key, package);
             }
@@ -180,9 +180,9 @@ impl Request {
 
         for (_, package) in &self.fixed_packages {
             let key = if package_ids {
-                bformat!("{}", package.get_id())
+                package.get_id().to_php_string()
             } else {
-                bformat!("{}", package.ptr_id())
+                package.ptr_id().to_php_string()
             };
             present_map.insert(key, package.clone());
         }

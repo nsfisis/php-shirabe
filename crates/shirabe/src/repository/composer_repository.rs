@@ -154,7 +154,7 @@ impl VersionList {
     fn set(&mut self, index: usize, key: &BStr, val: PhpMixed) {
         match self {
             Self::Plain(versions) => {
-                versions[index].insert(bformat!("{key}"), val);
+                versions[index].insert(key.to_php_string(), val);
             }
             Self::Minified(expanded) => expanded.set(index, key, val),
         }
@@ -690,11 +690,11 @@ impl ComposerRepository {
                         }
                     };
                     if matches_constraint {
-                        let hash_c = bformat!("{}", candidate.ptr_id());
+                        let hash_c = candidate.ptr_id().to_php_string();
                         matches.insert(hash_c, candidate.clone());
                         if let Some(alias) = candidate.as_alias() {
                             let aliased = alias.get_alias_of();
-                            let aliased_hash = bformat!("{}", aliased.ptr_id());
+                            let aliased_hash = aliased.ptr_id().to_php_string();
                             if !matches.contains_key(&aliased_hash) {
                                 matches.insert(aliased_hash, aliased.into());
                             }
@@ -706,9 +706,9 @@ impl ComposerRepository {
                 for (_uid, candidate) in candidates.iter() {
                     if let Some(alias) = candidate.as_alias() {
                         let aliased = alias.get_alias_of();
-                        let aliased_hash = bformat!("{}", aliased.ptr_id());
+                        let aliased_hash = aliased.ptr_id().to_php_string();
                         if matches.contains_key(&aliased_hash) {
-                            let hash_c = bformat!("{}", candidate.ptr_id());
+                            let hash_c = candidate.ptr_id().to_php_string();
                             matches.insert(hash_c, candidate.clone());
                         }
                     }
@@ -1524,7 +1524,7 @@ impl ComposerRepository {
                 }
 
                 let uid_key = match version.get(B("uid")) {
-                    Some(PhpMixed::Int(i)) => bformat!("{i}"),
+                    Some(PhpMixed::Int(i)) => i.to_php_string(),
                     Some(PhpMixed::String(s)) => s.clone(),
                     Some(other) => other.to_php_string(),
                     None => continue,
@@ -1913,14 +1913,14 @@ impl ComposerRepository {
                 if let Some(h) = self_handle.as_ref() {
                     package.set_repository(h.clone())?;
                 }
-                let hash_c = bformat!("{}", package.ptr_id());
+                let hash_c = package.ptr_id().to_php_string();
                 if let Some(alias) = package.as_alias() {
                     let aliased = alias.get_alias_of();
                     if let Some(h) = self_handle.as_ref() {
                         let aliased_pkg: PackageInterfaceHandle = aliased.clone().into();
                         aliased_pkg.set_repository(h.clone())?;
                     }
-                    let aliased_hash = bformat!("{}", aliased.ptr_id());
+                    let aliased_hash = aliased.ptr_id().to_php_string();
                     if !packages.contains_key(&aliased_hash) {
                         packages.insert(aliased_hash, aliased.into());
                     }
@@ -2727,7 +2727,7 @@ impl ComposerRepository {
                 if let Some(dispatcher) = self.event_dispatcher.as_ref() {
                     let mut dispatcher = dispatcher.borrow_mut();
                     let mut pre_file_download_event = PreFileDownloadEvent::new(
-                        bformat!("{}", PluginEvents::PRE_FILE_DOWNLOAD),
+                        PluginEvents::PRE_FILE_DOWNLOAD.to_php_string(),
                         self.http_downloader.clone(),
                         filename.clone(),
                         "metadata".into(),
@@ -2771,7 +2771,7 @@ impl ComposerRepository {
                 if let Some(dispatcher) = self.event_dispatcher.as_ref() {
                     let mut dispatcher = dispatcher.borrow_mut();
                     let post_file_download_event = PostFileDownloadEvent::new(
-                        bformat!("{}", PluginEvents::POST_FILE_DOWNLOAD),
+                        PluginEvents::POST_FILE_DOWNLOAD.to_php_string(),
                         None,
                         sha256.map(BString::from),
                         filename.clone(),
@@ -2894,7 +2894,7 @@ impl ComposerRepository {
             if let Some(dispatcher) = self.event_dispatcher.as_ref() {
                 let mut dispatcher = dispatcher.borrow_mut();
                 let mut pre_file_download_event = PreFileDownloadEvent::new(
-                    bformat!("{}", PluginEvents::PRE_FILE_DOWNLOAD),
+                    PluginEvents::PRE_FILE_DOWNLOAD.to_php_string(),
                     self.http_downloader.clone(),
                     filename.clone(),
                     "metadata".into(),
@@ -2932,7 +2932,7 @@ impl ComposerRepository {
             if let Some(dispatcher) = self.event_dispatcher.as_ref() {
                 let mut dispatcher = dispatcher.borrow_mut();
                 let post_file_download_event = PostFileDownloadEvent::new(
-                    bformat!("{}", PluginEvents::POST_FILE_DOWNLOAD),
+                    PluginEvents::POST_FILE_DOWNLOAD.to_php_string(),
                     None,
                     None,
                     filename.clone(),
@@ -3029,7 +3029,7 @@ impl ComposerRepository {
         if let Some(dispatcher) = self.event_dispatcher.as_ref() {
             let mut dispatcher = dispatcher.borrow_mut();
             let mut pre_file_download_event = PreFileDownloadEvent::new(
-                bformat!("{}", PluginEvents::PRE_FILE_DOWNLOAD),
+                PluginEvents::PRE_FILE_DOWNLOAD.to_php_string(),
                 self.http_downloader.clone(),
                 filename.clone(),
                 "metadata".into(),
@@ -3095,7 +3095,7 @@ impl ComposerRepository {
 
         if let Some(dispatcher) = self.event_dispatcher.as_ref() {
             let post_file_download_event = PostFileDownloadEvent::new(
-                bformat!("{}", PluginEvents::POST_FILE_DOWNLOAD),
+                PluginEvents::POST_FILE_DOWNLOAD.to_php_string(),
                 None,
                 None,
                 BString::from(filename),

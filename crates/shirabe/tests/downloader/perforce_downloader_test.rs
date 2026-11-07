@@ -12,7 +12,7 @@ use shirabe::downloader::{PerforceDownloader, VcsDownloader};
 use shirabe::io::{IOInterface, NORMAL};
 use shirabe::package::{CompletePackageHandle, PackageInterfaceHandle};
 use shirabe::util::{Filesystem, MockHandler};
-use shirabe_php_shim::{PhpMixed, bformat, path_to_bytes};
+use shirabe_php_shim::{PhpMixed, ToPhpString, bformat, path_to_bytes};
 use shirabe_semver::VersionParser;
 
 // A getMockBuilder('Composer\Util\Perforce') stand-in: the seam trait extracted from the
@@ -71,7 +71,7 @@ fn make_package(source_reference: Option<&BStr>) -> PackageInterfaceHandle {
         norm_version,
         BString::from("1.0.0"),
     );
-    package.set_source_reference(source_reference.map(|s| bformat!("{s}")));
+    package.set_source_reference(source_reference.map(|s| s.to_php_string()));
     package.into()
 }
 

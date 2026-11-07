@@ -9,8 +9,8 @@ use crate::repository::{PlatformRepository, RepositoryInterface, RepositorySet};
 use bstr::{BStr, BString, ByteSlice, ByteVec};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    LogicException, PhpDisplay, PhpMixed, RuntimeException, array_keys, array_shift, bformat,
-    bwrite, implode,
+    LogicException, PhpDisplay, PhpMixed, RuntimeException, ToPhpString, array_keys, array_shift,
+    bformat, bwrite, implode,
 };
 use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
 
@@ -507,7 +507,7 @@ impl Rule {
                     let mut installed_packages: Vec<BasePackageHandle> = vec![];
                     let mut removable_packages: Vec<BasePackageHandle> = vec![];
                     for literal in &literals {
-                        if installed_map.contains_key(bformat!("{}", literal.abs()).as_bytes()) {
+                        if installed_map.contains_key(literal.abs().to_php_string().as_bytes()) {
                             installed_packages.push(pool.literal_to_package(*literal));
                         } else {
                             removable_packages.push(pool.literal_to_package(*literal));
@@ -561,7 +561,7 @@ impl Rule {
                     for literal in &literals {
                         let package = pool.literal_to_package(*literal);
                         let group = if installed_map
-                            .contains_key(bformat!("{}", package.id()).as_bytes())
+                            .contains_key(package.id().to_php_string().as_bytes())
                         {
                             if *literal > 0 { "keep" } else { "remove" }
                         } else {
@@ -573,7 +573,7 @@ impl Rule {
                         };
 
                         groups
-                            .entry(bformat!("{group}"))
+                            .entry(group.to_php_string())
                             .or_default()
                             .push(self.deduplicate_default_branch_alias(package.clone()));
                     }

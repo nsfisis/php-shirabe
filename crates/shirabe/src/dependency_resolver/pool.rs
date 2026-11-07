@@ -254,7 +254,7 @@ impl Pool {
     ) -> BString {
         let package = self.literal_to_package(literal);
 
-        let prefix = if installed_map.contains_key(bstr::B(&bformat!("{}", package.id()))) {
+        let prefix = if installed_map.contains_key(bstr::B(&package.id().to_php_string())) {
             if literal > 0 { "keep" } else { "remove" }
         } else {
             if literal > 0 {
@@ -349,7 +349,7 @@ impl PhpDisplay for Pool {
             bwrite!(
                 out,
                 "- {}: {}\n",
-                str_pad(bformat!("{}", package.id()), 6, " ", STR_PAD_LEFT),
+                str_pad(package.id().to_php_string(), 6, " ", STR_PAD_LEFT),
                 package.get_name()
             );
         }

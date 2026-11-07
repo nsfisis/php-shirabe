@@ -405,7 +405,7 @@ impl PhpMixed {
                     .filter_map(|k| canonical_int_key(k))
                     .max()
                     .map_or(0, |max| max + 1);
-                map.insert(bformat!("{next}"), item);
+                map.insert(next.to_php_string(), item);
                 Ok(())
             }
             PhpMixed::String(_) => Err(Error::new("[] operator not supported for strings").into()),

@@ -2,13 +2,13 @@
 
 use bstr::{BStr, BString, ByteSlice};
 use shirabe::json::JsonValidationException;
-use shirabe_php_shim::bformat;
+use shirabe_php_shim::ToPhpString;
 
 #[test]
 fn test_get_errors() {
     for (message, errors, expected_message, expected_errors) in error_provider() {
         let object = JsonValidationException::new(
-            bformat!("{message}"),
+            message.to_php_string(),
             errors
                 .iter()
                 .map(|e| bstr::BString::from(e.as_bstr()))

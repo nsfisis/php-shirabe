@@ -16,7 +16,7 @@ use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_rpc::ToWire;
 use shirabe_php_shim::{
-    AnyThrowable, InvalidArgumentException, LogicException, PhpClass as _, PhpMixed,
+    AnyThrowable, InvalidArgumentException, LogicException, PhpClass as _, PhpMixed, ToPhpString,
     UnexpectedValueException, array_flip, bformat, bwrite, canonical_int_key, dirname,
     error_message, get_debug_type, in_array_strict, is_array, is_null, is_string, ksort,
     path_from_bytes, path_to_bytes, realpath, str_repeat, strcmp, strnatcmp, usort, var_export,
@@ -421,7 +421,7 @@ impl FilesystemRepository {
                         let inner_map: IndexMap<BString, PhpMixed> = list
                             .iter()
                             .enumerate()
-                            .map(|(i, v)| (bformat!("{i}"), v.clone()))
+                            .map(|(i, v)| (i.to_php_string(), v.clone()))
                             .collect();
                         lines.extend_from_slice(&self.dump_to_php_code(&inner_map, level));
                     } else {
@@ -865,7 +865,7 @@ fn versions_entry<'a>(
 
 fn push_to_list(entry: &mut IndexMap<BString, PhpMixed>, key: &BStr, value: BString) {
     if let PhpMixed::List(list) = entry
-        .entry(bformat!("{key}"))
+        .entry(key.to_php_string())
         .or_insert_with(|| PhpMixed::List(vec![]))
     {
         list.push(PhpMixed::string(value));

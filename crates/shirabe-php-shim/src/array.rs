@@ -1,6 +1,6 @@
 use crate::{
-    PhpMixed, ToPhpString, bformat, canonical_int_key, display_to_bytes, is_numeric_string,
-    strnatcasecmp, to_bool, utf8_text,
+    PhpMixed, ToPhpString, canonical_int_key, display_to_bytes, is_numeric_string, strnatcasecmp,
+    to_bool, utf8_text,
 };
 use bstr::{B, BString};
 use indexmap::IndexMap;
@@ -81,14 +81,14 @@ pub fn array_merge(array1: PhpMixed, array2: PhpMixed) -> PhpMixed {
         match array {
             PhpMixed::List(items) => {
                 for value in items {
-                    result.insert(bformat!("{next_int}"), value);
+                    result.insert(next_int.to_php_string(), value);
                     next_int += 1;
                 }
             }
             PhpMixed::Array(map) => {
                 for (key, value) in map {
                     if canonical_int_key(&key).is_some() {
-                        result.insert(bformat!("{next_int}"), value);
+                        result.insert(next_int.to_php_string(), value);
                         next_int += 1;
                         continue;
                     }
@@ -101,7 +101,7 @@ pub fn array_merge(array1: PhpMixed, array2: PhpMixed) -> PhpMixed {
     let is_list = result
         .keys()
         .enumerate()
-        .all(|(i, k)| *k == bformat!("{i}"));
+        .all(|(i, k)| *k == i.to_php_string());
     if is_list {
         PhpMixed::List(result.into_values().collect())
     } else {
@@ -126,7 +126,7 @@ where
     for array in [array1, array2] {
         for (key, value) in array {
             if canonical_int_key(key.as_ref()).is_some() {
-                result.insert(bformat!("{next_int}").into(), value);
+                result.insert(next_int.to_php_string().into(), value);
                 next_int += 1;
                 continue;
             }
@@ -340,7 +340,7 @@ pub fn array_flip(array: &PhpMixed) -> PhpMixed {
             for (i, value) in items.iter().enumerate() {
                 match value {
                     PhpMixed::Int(n) => {
-                        result.insert(bformat!("{n}"), PhpMixed::Int(i as i64));
+                        result.insert(n.to_php_string(), PhpMixed::Int(i as i64));
                     }
                     PhpMixed::String(s) => {
                         result.insert(s.clone(), PhpMixed::Int(i as i64));
@@ -354,7 +354,7 @@ pub fn array_flip(array: &PhpMixed) -> PhpMixed {
             for (key, value) in map {
                 match value {
                     PhpMixed::Int(n) => {
-                        result.insert(bformat!("{n}"), php_key_to_mixed(key));
+                        result.insert(n.to_php_string(), php_key_to_mixed(key));
                     }
                     PhpMixed::String(s) => {
                         result.insert(s.clone(), php_key_to_mixed(key));
@@ -378,7 +378,7 @@ where
 pub fn array_is_list(array: &PhpMixed) -> bool {
     match array {
         PhpMixed::List(_) => true,
-        PhpMixed::Array(map) => map.keys().enumerate().all(|(i, k)| *k == bformat!("{i}")),
+        PhpMixed::Array(map) => map.keys().enumerate().all(|(i, k)| *k == i.to_php_string()),
         _ => panic!("array_is_list(): Argument #1 ($array) must be of type array"),
     }
 }
@@ -492,7 +492,7 @@ fn merge_build(acc: Vec<(MergeKey, PhpMixed)>) -> PhpMixed {
         PhpMixed::Array(
             acc.into_iter()
                 .map(|(k, v)| match k {
-                    MergeKey::Int(n) => (bformat!("{n}"), v),
+                    MergeKey::Int(n) => (n.to_php_string(), v),
                     MergeKey::Str(s) => (s, v),
                 })
                 .collect(),
@@ -587,7 +587,7 @@ fn loose_to_number(s: &[u8]) -> Option<f64> {
 
 fn loose_num_to_string(value: &PhpMixed) -> BString {
     match value {
-        PhpMixed::Int(i) => bformat!("{i}"),
+        PhpMixed::Int(i) => i.to_php_string(),
         PhpMixed::Float(f) => display_to_bytes(f),
         _ => BString::default(),
     }

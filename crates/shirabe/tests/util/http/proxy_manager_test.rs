@@ -5,7 +5,7 @@
 use bstr::{BStr, BString};
 use shirabe::util::Platform;
 use shirabe::util::http::ProxyManager;
-use shirabe_php_shim::bformat;
+use shirabe_php_shim::ToPhpString;
 
 fn set_up() {
     Platform::clear_env("HTTP_PROXY").unwrap();
@@ -224,7 +224,7 @@ fn test_get_proxy_for_request() {
         |pairs: &[(&BStr, PhpMixed)]| -> Option<IndexMap<BString, IndexMap<BString, PhpMixed>>> {
             let mut http: IndexMap<BString, PhpMixed> = IndexMap::new();
             for (k, v) in pairs {
-                http.insert(bformat!("{}", (*k)), v.clone());
+                http.insert((*k).to_php_string(), v.clone());
             }
             let mut options: IndexMap<BString, IndexMap<BString, PhpMixed>> = IndexMap::new();
             options.insert(BString::from("http"), http);

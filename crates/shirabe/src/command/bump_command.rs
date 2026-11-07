@@ -15,8 +15,8 @@ use crate::repository::{FindPackageConstraint, PlatformRepository, RepositoryInt
 use crate::util::Filesystem;
 use bstr::{B, BStr, BString};
 use shirabe_php_shim::{
-    PhpMixed, RuntimeException, bformat, file_get_contents, file_put_contents, impl_php_class,
-    is_writable, php_regex, preg_is_match, preg_replace, strtolower,
+    PhpMixed, RuntimeException, ToPhpString, bformat, file_get_contents, file_put_contents,
+    impl_php_class, is_writable, php_regex, preg_is_match, preg_replace, strtolower,
 };
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::{InputInterface, InputInterfaceByName};
@@ -202,7 +202,7 @@ impl BumpCommand {
             for (key, packages) in &updates {
                 for (package, version) in packages {
                     let section = composer_definition
-                        .entry(bformat!("{key}"))
+                        .entry(key.to_php_string())
                         .or_insert_with(|| PhpMixed::Array(indexmap::IndexMap::new()));
                     if let PhpMixed::Array(map) = section {
                         map.insert(package.clone(), PhpMixed::string(version.clone()));

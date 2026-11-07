@@ -424,7 +424,7 @@ impl ProgressBar {
         self.format = None;
         self.max = max.max(0);
         self.step_width = if self.max != 0 {
-            Helper::width(bformat!("{}", self.max))
+            Helper::width(self.max.to_php_string())
         } else {
             4
         };
@@ -677,7 +677,7 @@ impl ProgressBar {
                 |bar: &ProgressBar,
                  _output: &std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>| {
                     Ok(Ok(PhpMixed::string(str_pad(
-                        bformat!("{}", bar.get_progress()),
+                        bar.get_progress().to_php_string(),
                         bar.get_step_width() as usize,
                         " ",
                         STR_PAD_LEFT,

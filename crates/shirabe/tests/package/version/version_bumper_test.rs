@@ -4,7 +4,7 @@ use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe::package::version::VersionBumper;
 use shirabe::package::{Package, PackageHandle, PackageInterfaceHandle};
-use shirabe_php_shim::{PhpMixed, bformat};
+use shirabe_php_shim::{PhpMixed, ToPhpString};
 use shirabe_semver::VersionParser;
 
 #[test]
@@ -18,14 +18,14 @@ fn test_bump_requirement() {
         let mut package = Package::new(
             BString::from("foo/bar"),
             bstr::BString::from(&version_parser.normalize(pretty_version, None).unwrap()[..]),
-            bformat!("{pretty_version}"),
+            pretty_version.to_php_string(),
         );
 
         if let Some(branch_alias) = branch_alias {
             let mut alias_map: IndexMap<BString, PhpMixed> = IndexMap::new();
             alias_map.insert(
-                bformat!("{pretty_version}"),
-                PhpMixed::string(bformat!("{branch_alias}")),
+                pretty_version.to_php_string(),
+                PhpMixed::string(branch_alias.to_php_string()),
             );
             let mut extra: IndexMap<BString, PhpMixed> = IndexMap::new();
             extra.insert("branch-alias".into(), PhpMixed::Array(alias_map));

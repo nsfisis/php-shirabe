@@ -6,11 +6,11 @@ use crate::repository::PlatformRepository;
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    InvalidArgumentException, LogicException, PhpMixed, addcslashes, array_key_exists, array_keys,
-    array_reverse, bformat, empty, explode, implode, in_array_loose, intval, is_array, is_int,
-    is_numeric, json_decode_assoc, json_decode_obj, php_regex, php_str, php_truthy, preg_is_match,
-    preg_match, preg_quote, preg_replace, preg_replace_with_limit_and_count, rtrim_chars,
-    str_repeat, str_replace, strlen, strnatcmp, strpos, substr, trim_chars, uksort,
+    InvalidArgumentException, LogicException, PhpMixed, ToPhpString, addcslashes, array_key_exists,
+    array_keys, array_reverse, bformat, empty, explode, implode, in_array_loose, intval, is_array,
+    is_int, is_numeric, json_decode_assoc, json_decode_obj, php_regex, php_str, php_truthy,
+    preg_is_match, preg_match, preg_quote, preg_replace, preg_replace_with_limit_and_count,
+    rtrim_chars, str_repeat, str_replace, strlen, strnatcmp, strpos, substr, trim_chars, uksort,
 };
 
 #[derive(Debug)]
@@ -316,7 +316,7 @@ impl JsonManipulator {
             if let Some(list) = repos_value.as_ref().and_then(|v| v.as_list()) {
                 list.iter()
                     .enumerate()
-                    .map(|(i, v)| (bformat!("{i}"), v.clone()))
+                    .map(|(i, v)| (i.to_php_string(), v.clone()))
                     .collect()
             } else {
                 repos_value
@@ -543,7 +543,7 @@ impl JsonManipulator {
             } else if let Some(l) = repositories_value.as_ref().and_then(|v| v.as_list()) {
                 l.iter()
                     .enumerate()
-                    .map(|(i, v)| (bformat!("{i}"), v.clone()))
+                    .map(|(i, v)| (i.to_php_string(), v.clone()))
                     .collect()
             } else {
                 Vec::new()

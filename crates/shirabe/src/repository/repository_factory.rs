@@ -317,7 +317,7 @@ impl RepositoryFactory {
                         let created = rm.create_repository(
                             repo_type.as_bstr(),
                             repo_config_map,
-                            Some(bformat!("{index}").as_bstr()),
+                            Some(index.to_php_string().as_bstr()),
                         )?;
                         repo_map.insert(name, created);
                     }
@@ -370,7 +370,7 @@ impl RepositoryFactory {
             &if let Some(url) = repo.get(B("url")).and_then(|v| v.as_string()) {
                 preg_replace(php_regex!("{^https?://}i"), "", url)
             } else {
-                bformat!("{index}")
+                index.to_php_string()
             }[..],
         );
         while existing_repos.contains_key(&name) {

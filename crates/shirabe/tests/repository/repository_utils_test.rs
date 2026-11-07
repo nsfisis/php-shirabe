@@ -6,7 +6,7 @@ use indexmap::IndexMap;
 use shirabe::package::PackageInterfaceHandle;
 use shirabe::package::loader::ArrayLoader;
 use shirabe::repository::RepositoryUtils;
-use shirabe_php_shim::{PhpMixed, bformat};
+use shirabe_php_shim::{PhpMixed, ToPhpString};
 
 /// PHP `configureLinks` sets link arrays on non-root packages; the public handle API only allows
 /// link setters on root packages, so packages carrying links are built via ArrayLoader.
@@ -17,17 +17,17 @@ fn load_with(
     deps: Vec<(&BStr, &BStr)>,
 ) -> PackageInterfaceHandle {
     let mut config: IndexMap<BString, PhpMixed> = IndexMap::new();
-    config.insert("name".into(), PhpMixed::string(bformat!("{name}")));
-    config.insert("version".into(), PhpMixed::string(bformat!("{version}")));
+    config.insert("name".into(), PhpMixed::string(name.to_php_string()));
+    config.insert("version".into(), PhpMixed::string(version.to_php_string()));
 
     let mut links: IndexMap<BString, PhpMixed> = IndexMap::new();
     for (dep, constraint) in deps {
         links.insert(
-            bformat!("{dep}"),
-            PhpMixed::string(bformat!("{constraint}")),
+            dep.to_php_string(),
+            PhpMixed::string(constraint.to_php_string()),
         );
     }
-    config.insert(bformat!("{link_type}"), PhpMixed::Array(links));
+    config.insert(link_type.to_php_string(), PhpMixed::Array(links));
 
     ArrayLoader::new(None, false)
         .load_packages(vec![config])

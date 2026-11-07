@@ -19,7 +19,8 @@ use crate::repository::RepositoryInterface;
 use bstr::{B, BStr, BString, ByteSlice, ByteVec};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpMixed, UnexpectedValueException, bformat, impl_php_class, implode, preg_grep, strtolower,
+    PhpMixed, ToPhpString, UnexpectedValueException, bformat, impl_php_class, implode, preg_grep,
+    strtolower,
 };
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::exception::InvalidArgumentException;
@@ -356,7 +357,7 @@ impl Command for RemoveCommand {
             if let Some(canonical_name) = in_type {
                 if dry_run {
                     to_remove
-                        .entry(bformat!("{}", r#type))
+                        .entry(r#type.to_php_string())
                         .or_default()
                         .push(canonical_name.clone());
                 } else {
@@ -374,7 +375,7 @@ impl Command for RemoveCommand {
                 {
                     if dry_run {
                         to_remove
-                            .entry(bformat!("{alt_type}"))
+                            .entry(alt_type.to_php_string())
                             .or_default()
                             .push(canonical_name.clone());
                     } else {
@@ -413,7 +414,7 @@ impl Command for RemoveCommand {
                     for matched_package in matches_in_type {
                         if dry_run {
                             to_remove
-                                .entry(bformat!("{}", r#type))
+                                .entry(r#type.to_php_string())
                                 .or_default()
                                 .push(matched_package.clone());
                         } else {
@@ -434,7 +435,7 @@ impl Command for RemoveCommand {
                         {
                             if dry_run {
                                 to_remove
-                                    .entry(bformat!("{alt_type}"))
+                                    .entry(alt_type.to_php_string())
                                     .or_default()
                                     .push(matched_package.clone());
                             } else {

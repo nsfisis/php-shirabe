@@ -2,7 +2,7 @@
 
 use crate::dependency_resolver::{ReasonData, Rule, RuleBase};
 use bstr::BString;
-use shirabe_php_shim::{PhpDisplay, RuntimeException, bformat, hash_raw, implode};
+use shirabe_php_shim::{PhpDisplay, RuntimeException, ToPhpString, bformat, hash_raw, implode};
 
 #[derive(Debug)]
 pub struct GenericRule {
@@ -35,7 +35,7 @@ impl GenericRule {
             &self
                 .literals
                 .iter()
-                .map(|l| bformat!("{l}"))
+                .map(|l| l.to_php_string())
                 .collect::<Vec<_>>(),
         );
         let binary = hash_raw("xxh3", &joined);

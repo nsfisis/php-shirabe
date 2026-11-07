@@ -12,7 +12,9 @@ use indexmap::IndexMap;
 use shirabe::installer::InstallerInterface;
 use shirabe::package::loader::{ArrayLoader, JsonLoader, JsonLoaderInput};
 use shirabe::package::{Link, PackageInterfaceHandle};
-use shirabe_php_shim::{Catch, UnexpectedValueException, bformat, implode, path_to_bytes};
+use shirabe_php_shim::{
+    Catch, ToPhpString, UnexpectedValueException, bformat, implode, path_to_bytes,
+};
 use shirabe_semver::constraint::{
     AnyConstraint, MatchAllConstraint, MatchNoneConstraint, MultiConstraint, SimpleConstraint,
 };
@@ -31,7 +33,7 @@ fn values_fixture_package() -> PackageInterfaceHandle {
 fn simple(operator: &BStr, version: &BStr, pretty_string: Option<&BStr>) -> AnyConstraint {
     AnyConstraint::Simple(SimpleConstraint::new(
         operator,
-        bformat!("{version}"),
+        version.to_php_string(),
         pretty_string.map(|s| s.to_owned()),
     ))
 }
@@ -39,10 +41,10 @@ fn simple(operator: &BStr, version: &BStr, pretty_string: Option<&BStr>) -> AnyC
 fn link(target: &BStr, constraint: AnyConstraint, pretty_constraint: &BStr) -> Link {
     Link::new(
         BString::from("dummy/root"),
-        bformat!("{target}"),
+        target.to_php_string(),
         constraint,
         Some(Link::TYPE_REQUIRE.to_owned()),
-        Some(bformat!("{pretty_constraint}")),
+        Some(pretty_constraint.to_php_string()),
     )
 }
 

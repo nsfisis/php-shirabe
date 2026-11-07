@@ -7,7 +7,7 @@ use serial_test::serial;
 use shirabe::config::Config;
 use shirabe::package::version::{VersionGuesser, VersionParser};
 use shirabe::util::{Git as GitUtil, MockExpectation, MockHandler, Platform, ProcessExecutor};
-use shirabe_php_shim::{PhpMixed, bformat};
+use shirabe_php_shim::{PhpMixed, ToPhpString, bformat};
 
 // Mirrors VersionGuesserTest::setUp/tearDown: reset GitUtil's cached `version`
 // static so each test re-runs `git --version` against its own mock.
@@ -45,7 +45,7 @@ fn make_guesser(
 fn package_config(entries: &[(&BStr, PhpMixed)]) -> IndexMap<BString, PhpMixed> {
     let mut map: IndexMap<BString, PhpMixed> = IndexMap::new();
     for (k, v) in entries {
-        map.insert(bformat!("{k}"), v.clone());
+        map.insert(k.to_php_string(), v.clone());
     }
     map
 }
@@ -54,7 +54,7 @@ fn string_list(items: &[&BStr]) -> PhpMixed {
     PhpMixed::List(
         items
             .iter()
-            .map(|s| PhpMixed::string(bformat!("{s}")))
+            .map(|s| PhpMixed::string(s.to_php_string()))
             .collect(),
     )
 }

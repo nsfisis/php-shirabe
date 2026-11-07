@@ -1154,9 +1154,9 @@ impl ShowCommand {
         if let Some(flag_value) = flags.get(bstr::B(&name)) {
             let key_map: IndexMap<BString, BString> = base_package::STABILITIES
                 .iter()
-                .map(|(k, v)| (BString::from(*k), bformat!("{v}")))
+                .map(|(k, v)| (BString::from(*k), v.to_php_string()))
                 .collect();
-            let needle = bformat!("{flag_value}");
+            let needle = flag_value.to_php_string();
             if let Some(found_key) = array_search(&needle, &key_map) {
                 stability = found_key;
             }

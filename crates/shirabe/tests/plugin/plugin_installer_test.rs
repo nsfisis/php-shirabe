@@ -32,8 +32,8 @@ use shirabe::util::r#loop::Loop;
 use shirabe::util::{HttpDownloader, Platform, ProcessExecutor};
 use shirabe_php_rpc::PluginValue;
 use shirabe_php_shim::{
-    Catch as _, PhpMixed, RuntimeException, UnexpectedValueException, bformat, path_from_bytes,
-    path_to_bytes,
+    Catch as _, PhpMixed, RuntimeException, ToPhpString, UnexpectedValueException, bformat,
+    path_from_bytes, path_to_bytes,
 };
 use shirabe_semver::VersionParser;
 use shirabe_symfony_console::output::VERBOSITY_NORMAL;
@@ -651,7 +651,7 @@ fn set_plugin_api_version_with_plugins(
         VersionParser
             .normalize(new_plugin_api_version, None)
             .unwrap(),
-        bformat!("{new_plugin_api_version}"),
+        new_plugin_api_version.to_php_string(),
     )
     .into();
     let repository =
@@ -885,7 +885,7 @@ fn test_capability_implements_composer_plugin_api_class_and_is_constructed_with_
         std::rc::Rc::new(std::cell::RefCell::new(CapablePlugin {
             capabilities: IndexMap::from([(
                 capability_api.into(),
-                PhpMixed::string(bformat!("{capability_implementation}")),
+                PhpMixed::string(capability_implementation.to_php_string()),
             )]),
             get_capabilities_calls: get_capabilities_calls.clone(),
         }));
@@ -1087,7 +1087,7 @@ fn test_querying_with_non_existing_or_wrong_capability_class_types_throws() {
     load_composer_php_runtime();
     for wrong_implementation_class_type in non_existing_or_invalid_implementation_class_types() {
         assert_querying_with_invalid_capability_class_name_throws(
-            &PhpMixed::string(bformat!("{wrong_implementation_class_type}")),
+            &PhpMixed::string(wrong_implementation_class_type.to_php_string()),
             |err| err.is_instanceof::<RuntimeException>(),
             BStr::new("RuntimeException"),
         );

@@ -5,10 +5,10 @@ use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe::package::PackageInterfaceHandle;
 use shirabe::package::loader::{InvalidPackageException, LoaderInterface, ValidatingArrayLoader};
-use shirabe_php_shim::{Catch as _, PHP_EOL, PhpMixed, bformat};
+use shirabe_php_shim::{Catch as _, PHP_EOL, PhpMixed, ToPhpString, bformat};
 
 fn s(v: &BStr) -> PhpMixed {
-    PhpMixed::string(bformat!("{v}"))
+    PhpMixed::string(v.to_php_string())
 }
 
 fn i(v: i64) -> PhpMixed {
@@ -33,7 +33,7 @@ fn arr(entries: Vec<(&BStr, PhpMixed)>) -> PhpMixed {
 fn list(items: Vec<PhpMixed>) -> PhpMixed {
     let mut m = IndexMap::new();
     for (idx, v) in items.into_iter().enumerate() {
-        m.insert(bformat!("{idx}"), v);
+        m.insert(idx.to_php_string(), v);
     }
     PhpMixed::Array(m)
 }

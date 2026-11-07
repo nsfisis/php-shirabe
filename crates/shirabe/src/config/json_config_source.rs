@@ -6,8 +6,8 @@ use crate::util::Filesystem;
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    Catch as _, PHP_EOL, PhpMixed, RuntimeException, bformat, chmod, explode, file_get_contents,
-    file_put_contents, implode, is_writable, path_to_bytes, php_str,
+    Catch as _, PHP_EOL, PhpMixed, RuntimeException, ToPhpString, bformat, chmod, explode,
+    file_get_contents, file_put_contents, implode, is_writable, path_to_bytes, php_str,
 };
 
 /// JSON Configuration Source
@@ -85,7 +85,7 @@ impl JsonConfigSource {
                     && inner.is_empty()
                 {
                     // PHP: $config[$prop] = new \stdClass;
-                    map.insert(bformat!("{prop}"), PhpMixed::Object(IndexMap::new()));
+                    map.insert(prop.to_php_string(), PhpMixed::Object(IndexMap::new()));
                 }
             }
             for prop in ["psr-0", "psr-4"] {
@@ -95,7 +95,8 @@ impl JsonConfigSource {
                         && let Some(PhpMixed::Array(inner_map)) = autoload_map.get(B(prop))
                         && inner_map.is_empty()
                     {
-                        autoload_map.insert(bformat!("{prop}"), PhpMixed::Object(IndexMap::new()));
+                        autoload_map
+                            .insert(prop.to_php_string(), PhpMixed::Object(IndexMap::new()));
                     }
                     if let Some(autoload_dev) = map.get_mut(B("autoload-dev"))
                         && let PhpMixed::Array(autoload_dev_map) = autoload_dev
@@ -103,7 +104,7 @@ impl JsonConfigSource {
                         && inner_map.is_empty()
                     {
                         autoload_dev_map
-                            .insert(bformat!("{prop}"), PhpMixed::Object(IndexMap::new()));
+                            .insert(prop.to_php_string(), PhpMixed::Object(IndexMap::new()));
                     }
                 }
             }
@@ -124,7 +125,7 @@ impl JsonConfigSource {
                     && let Some(PhpMixed::Array(inner_map)) = cfg_map.get(B(prop))
                     && inner_map.is_empty()
                 {
-                    cfg_map.insert(bformat!("{prop}"), PhpMixed::Object(IndexMap::new()));
+                    cfg_map.insert(prop.to_php_string(), PhpMixed::Object(IndexMap::new()));
                 }
             }
             self.file.borrow().write(config)?;

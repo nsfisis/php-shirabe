@@ -3,7 +3,9 @@
 use crate::exception::InvalidArgumentException;
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe_php_shim::{bformat, getenv, implode, php_str, round, strlen, substr, utf8_text};
+use shirabe_php_shim::{
+    ToPhpString, bformat, getenv, implode, php_str, round, strlen, substr, utf8_text,
+};
 
 const COLORS: [(&BStr, i64); 9] = [
     (php_str(b"black"), 0),
@@ -111,7 +113,7 @@ impl Color {
             set_codes.push(self.background.clone());
         }
         for option in self.options.values() {
-            set_codes.push(bformat!("{}", option.0));
+            set_codes.push(option.0.to_php_string());
         }
         if set_codes.is_empty() {
             return BString::default();
@@ -129,7 +131,7 @@ impl Color {
             unset_codes.push(BString::from("49"));
         }
         for option in self.options.values() {
-            unset_codes.push(bformat!("{}", option.1));
+            unset_codes.push(option.1.to_php_string());
         }
         if unset_codes.is_empty() {
             return BString::default();
@@ -196,7 +198,7 @@ impl Color {
 
         // see https://github.com/termstandard/colors/ for more information about true color support
         if getenv("COLORTERM").as_deref() != Some(std::ffi::OsStr::new("truecolor")) {
-            return bformat!("{}", Self::degrade_hex_color_to_ansi(r, g, b));
+            return Self::degrade_hex_color_to_ansi(r, g, b).to_php_string();
         }
 
         bformat!("8;2;{r};{g};{b}")

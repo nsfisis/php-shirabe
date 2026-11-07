@@ -12,7 +12,8 @@ use bstr::{BStr, BString, ByteSlice};
 use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpMixed, bformat, display_to_bytes, path_from_bytes, path_to_bytes, php_str, utf8_text,
+    PhpMixed, ToPhpString, bformat, display_to_bytes, path_from_bytes, path_to_bytes, php_str,
+    utf8_text,
 };
 
 /// Encodes a Rust value as the PHP value the receiving side declares.
@@ -280,7 +281,7 @@ impl<T: FromWire> FromWire for IndexMap<BString, T> {
             PluginValue::List(items) => items
                 .iter()
                 .enumerate()
-                .map(|(index, item)| Ok((bformat!("{index}"), T::from_wire(item)?)))
+                .map(|(index, item)| Ok((index.to_php_string(), T::from_wire(item)?)))
                 .collect(),
             other => Err(unexpected("an array", other)),
         }

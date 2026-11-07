@@ -3,16 +3,16 @@
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe::json::{JsonFile, JsonManipulator};
-use shirabe_php_shim::{PhpMixed, bformat};
+use shirabe_php_shim::{PhpMixed, ToPhpString};
 
 fn s(v: &BStr) -> PhpMixed {
-    PhpMixed::string(bformat!("{v}"))
+    PhpMixed::string(v.to_php_string())
 }
 
 fn arr(pairs: &[(&BStr, PhpMixed)]) -> PhpMixed {
     let mut m: IndexMap<BString, PhpMixed> = IndexMap::new();
     for (k, v) in pairs {
-        m.insert(bformat!("{k}"), v.clone());
+        m.insert(k.to_php_string(), v.clone());
     }
     PhpMixed::Array(m)
 }

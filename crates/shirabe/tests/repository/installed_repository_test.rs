@@ -9,16 +9,16 @@ use shirabe::repository::{
     ArrayRepository, FindPackageConstraint, InstalledArrayRepository, InstalledRepository,
     RepositoryInterfaceHandle,
 };
-use shirabe_php_shim::{PhpMixed, bformat};
+use shirabe_php_shim::{PhpMixed, ToPhpString};
 
 /// PHP `setReplaces`/`setProvides` operate on non-root packages; the public handle API only allows
 /// link setters on root packages, so packages carrying links are built via ArrayLoader.
 fn loaded(name: &BStr, version: &BStr, extra: Vec<(&BStr, PhpMixed)>) -> PackageInterfaceHandle {
     let mut config: IndexMap<BString, PhpMixed> = IndexMap::new();
-    config.insert("name".into(), PhpMixed::string(bformat!("{name}")));
-    config.insert("version".into(), PhpMixed::string(bformat!("{version}")));
+    config.insert("name".into(), PhpMixed::string(name.to_php_string()));
+    config.insert("version".into(), PhpMixed::string(version.to_php_string()));
     for (key, value) in extra {
-        config.insert(bformat!("{key}"), value);
+        config.insert(key.to_php_string(), value);
     }
 
     ArrayLoader::new(None, false)

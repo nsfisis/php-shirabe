@@ -7,7 +7,9 @@ use indexmap::IndexMap;
 use serial_test::serial;
 use shirabe::io::{IOInterface, NullIO};
 use shirabe::util::{Filesystem, MockHandler, Perforce, ProcessExecutor};
-use shirabe_php_shim::{PHP_EOL, PhpMixed, bformat, path_from_bytes, path_to_bytes, php_str};
+use shirabe_php_shim::{
+    PHP_EOL, PhpMixed, ToPhpString, bformat, path_from_bytes, path_to_bytes, php_str,
+};
 use shirabe_symfony_console::input::InputValue;
 
 const TEST_DEPOT: &BStr = php_str(b"depot");
@@ -19,12 +21,18 @@ const TEST_PATH: &BStr = php_str(b"path");
 
 fn get_test_repo_config() -> IndexMap<BString, PhpMixed> {
     let mut config = IndexMap::new();
-    config.insert("depot".into(), PhpMixed::string(bformat!("{TEST_DEPOT}")));
-    config.insert("branch".into(), PhpMixed::string(bformat!("{TEST_BRANCH}")));
-    config.insert("p4user".into(), PhpMixed::string(bformat!("{TEST_P4USER}")));
+    config.insert("depot".into(), PhpMixed::string(TEST_DEPOT.to_php_string()));
+    config.insert(
+        "branch".into(),
+        PhpMixed::string(TEST_BRANCH.to_php_string()),
+    );
+    config.insert(
+        "p4user".into(),
+        PhpMixed::string(TEST_P4USER.to_php_string()),
+    );
     config.insert(
         "unique_perforce_client_name".into(),
-        PhpMixed::string(bformat!("{TEST_CLIENT_NAME}")),
+        PhpMixed::string(TEST_CLIENT_NAME.to_php_string()),
     );
     config
 }

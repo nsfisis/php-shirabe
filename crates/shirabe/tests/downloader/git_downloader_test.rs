@@ -14,7 +14,9 @@ use shirabe::downloader::{GitDownloader, VcsDownloader};
 use shirabe::io::{IOInterface, io_interface};
 use shirabe::package::{CompletePackageHandle, Mirror, PackageInterfaceHandle};
 use shirabe::util::{Filesystem, FilesystemMock, Git as GitUtil, ProcessExecutor};
-use shirabe_php_shim::{PhpMixed, bformat, error_message, path_from_bytes, path_to_bytes};
+use shirabe_php_shim::{
+    PhpMixed, ToPhpString, bformat, error_message, path_from_bytes, path_to_bytes,
+};
 use shirabe_semver::VersionParser;
 use tempfile::TempDir;
 
@@ -67,13 +69,13 @@ fn get_package(
 ) -> PackageInterfaceHandle {
     let norm_version = VersionParser.normalize(pretty_version, None).unwrap();
     let package = CompletePackageHandle::new(
-        bformat!("{name}"),
+        name.to_php_string(),
         norm_version,
-        bformat!("{pretty_version}"),
+        pretty_version.to_php_string(),
     );
     package.__set_source_type(Some(BString::from("git")));
-    package.set_source_reference(source_reference.map(|s| bformat!("{s}")));
-    package.set_source_url(source_url.map(|s| bformat!("{s}")));
+    package.set_source_reference(source_reference.map(|s| s.to_php_string()));
+    package.set_source_url(source_url.map(|s| s.to_php_string()));
     package.into()
 }
 
@@ -162,7 +164,7 @@ fn test_download() {
         Some(url),
     );
 
-    let expected_path = bformat!("{}", working_dir.path().join("composerPath"));
+    let expected_path = working_dir.path().join("composerPath").to_php_string();
 
     let (process, _guard) = get_process_executor_mock(
         vec![
@@ -287,7 +289,7 @@ fn test_download_with_cache() {
         .remove_directory(path_from_bytes(&cache_path))
         .unwrap();
 
-    let expected_path = bformat!("{}", working_dir.path().join("composerPath"));
+    let expected_path = working_dir.path().join("composerPath").to_php_string();
 
     let cache_path_for_callback = cache_path.clone();
     let mut clone_mirror = cmd(vec![
@@ -426,7 +428,7 @@ fn test_download_uses_various_protocols_and_sets_push_url_for_github() {
         preferred: true,
     }]));
 
-    let expected_path = bformat!("{}", working_dir.path().join("composerPath"));
+    let expected_path = working_dir.path().join("composerPath").to_php_string();
 
     let (process, _guard) = get_process_executor_mock(
         vec![
@@ -566,7 +568,7 @@ fn test_download_and_set_push_url_use_custom_various_protocols_for_github() {
             Some(BStr::new("https://github.com/composer/composer")),
         );
 
-        let expected_path = bformat!("{}", working_dir.path().join("composerPath"));
+        let expected_path = working_dir.path().join("composerPath").to_php_string();
 
         let (process, _guard) = get_process_executor_mock(
             vec![
@@ -628,7 +630,7 @@ fn test_download_and_set_push_url_use_custom_various_protocols_for_github() {
             PhpMixed::List(
                 protocols
                     .iter()
-                    .map(|p| PhpMixed::string(bformat!("{p}")))
+                    .map(|p| PhpMixed::string(p.to_php_string()))
                     .collect(),
             ),
         );
@@ -682,7 +684,7 @@ fn test_download_throws_runtime_exception_if_git_command_fails() {
         Some(url),
     );
 
-    let expected_path = bformat!("{}", working_dir.path().join("composerPath"));
+    let expected_path = working_dir.path().join("composerPath").to_php_string();
 
     let (process, _guard) = get_process_executor_mock(
         vec![cmd_full(
@@ -1235,7 +1237,7 @@ fn test_downgrade_shows_appropriate_message() {
         Some(BStr::new("/foo/bar")),
     );
     old_package.set_source_mirrors(Some(vec![Mirror {
-        url: bformat!("{url}"),
+        url: url.to_php_string(),
         preferred: false,
     }]));
     let new_package = get_package(
@@ -1317,7 +1319,7 @@ fn test_not_using_downgrading_with_references() {
     old_package.set_source_reference(Some(BString::from("ref")));
     old_package.set_source_url(Some(BString::from("/foo/bar")));
     old_package.set_source_mirrors(Some(vec![Mirror {
-        url: bformat!("{url}"),
+        url: url.to_php_string(),
         preferred: false,
     }]));
     let old_package: PackageInterfaceHandle = old_package.into();
@@ -1329,7 +1331,7 @@ fn test_not_using_downgrading_with_references() {
     );
     new_package.__set_source_type(Some(BString::from("git")));
     new_package.set_source_reference(Some(BString::from("ref")));
-    new_package.set_source_url(Some(bformat!("{url}")));
+    new_package.set_source_url(Some(url.to_php_string()));
     let new_package: PackageInterfaceHandle = new_package.into();
 
     let (process, _guard) = get_process_executor_mock(vec![], false, Default::default());

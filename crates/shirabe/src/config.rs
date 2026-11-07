@@ -136,7 +136,7 @@ impl Config {
         audit.insert("ignore".into(), PhpMixed::Array(IndexMap::new()));
         audit.insert(
             "abandoned".into(),
-            PhpMixed::string(bformat!("{}", Auditor::ABANDONED_FAIL)),
+            PhpMixed::string(Auditor::ABANDONED_FAIL.to_php_string()),
         );
         c.insert("audit".into(), PhpMixed::Array(audit));
         c.insert("notify-on-install".into(), PhpMixed::Bool(true));
@@ -487,7 +487,7 @@ impl Config {
                 PhpMixed::List(items) => items
                     .iter()
                     .enumerate()
-                    .map(|(i, v)| (bformat!("{i}"), v.clone()))
+                    .map(|(i, v)| (i.to_php_string(), v.clone()))
                     .collect(),
                 _ => IndexMap::new(),
             };
@@ -547,7 +547,7 @@ impl Config {
                         // appending to numeric-keyed map
                         let next_idx = self.repositories.len();
                         self.repositories
-                            .insert(bformat!("{next_idx}"), repository.clone());
+                            .insert(next_idx.to_php_string(), repository.clone());
                     }
                     let found_key = array_search_mixed(
                         repository,
@@ -635,7 +635,7 @@ impl Config {
             b"github-protocols" => {
                 let protos = self.github_protocols()?;
                 Ok(
-                    if protos.keys().enumerate().all(|(i, k)| *k == bformat!("{i}")) {
+                    if protos.keys().enumerate().all(|(i, k)| *k == i.to_php_string()) {
                         PhpMixed::List(protos.into_values().collect())
                     } else {
                         PhpMixed::Array(protos)
@@ -937,7 +937,7 @@ impl Config {
             PhpMixed::List(list) => list
                 .into_iter()
                 .enumerate()
-                .map(|(i, v)| (bformat!("{i}"), v))
+                .map(|(i, v)| (i.to_php_string(), v))
                 .collect(),
             PhpMixed::Array(map) => map,
             other => {
@@ -991,7 +991,7 @@ impl Config {
             if !Auditor::ABANDONEDS.iter().any(|c| abandoned_env == *c) {
                 let valid_choices: Vec<BString> = Auditor::ABANDONEDS
                     .iter()
-                    .map(|s| bformat!("{s}"))
+                    .map(|s| s.to_php_string())
                     .collect();
                 return Err(RuntimeException::new(bformat!("Invalid value for COMPOSER_AUDIT_ABANDONED: {abandoned_env}. Expected one of {}.", implode(", ", &valid_choices)))
                 .into());
@@ -1021,7 +1021,7 @@ impl Config {
                     std::mem::take(list)
                         .into_iter()
                         .enumerate()
-                        .map(|(i, v)| (bformat!("{i}"), v))
+                        .map(|(i, v)| (i.to_php_string(), v))
                         .collect(),
                 )
             }
@@ -1218,7 +1218,7 @@ impl Config {
             PhpMixed::List(list) => Ok(list
                 .into_iter()
                 .enumerate()
-                .map(|(i, v)| (bformat!("{i}"), v))
+                .map(|(i, v)| (i.to_php_string(), v))
                 .collect()),
             other => Err(Self::type_error(key, "array", &other)),
         }
@@ -1231,7 +1231,7 @@ impl Config {
             PhpMixed::List(list) => PreferredInstall::PerPackage(
                 list.into_iter()
                     .enumerate()
-                    .map(|(i, v)| (bformat!("{i}"), v))
+                    .map(|(i, v)| (i.to_php_string(), v))
                     .collect(),
             ),
             other => PreferredInstall::Other(other),

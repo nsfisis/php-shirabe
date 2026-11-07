@@ -4,12 +4,12 @@ use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe::package::{Link, PackageHandle, PackageInterfaceHandle};
 use shirabe::util::PackageSorter;
-use shirabe_php_shim::bformat;
+use shirabe_php_shim::ToPhpString;
 use shirabe_semver::constraint::MatchAllConstraint;
 
 fn create_package(name: &BStr, requires: &[&BStr]) -> PackageInterfaceHandle {
     let package = PackageHandle::new(
-        bformat!("{name}"),
+        name.to_php_string(),
         BString::from("1.0.0.0"),
         BString::from("1.0.0"),
     );
@@ -17,10 +17,10 @@ fn create_package(name: &BStr, requires: &[&BStr]) -> PackageInterfaceHandle {
     let mut links: IndexMap<BString, Link> = IndexMap::new();
     for require_name in requires {
         links.insert(
-            bformat!("{require_name}"),
+            require_name.to_php_string(),
             Link::new(
                 package.get_name(),
-                bformat!("{require_name}"),
+                require_name.to_php_string(),
                 MatchAllConstraint::new(None).into(),
                 None,
                 Some(BString::from("*")),

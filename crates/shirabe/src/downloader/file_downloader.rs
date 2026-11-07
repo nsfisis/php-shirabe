@@ -406,7 +406,7 @@ impl DownloaderInterface for FileDownloader {
             if let Some(event_dispatcher) = self.event_dispatcher.as_ref() {
                 let pre_file_download_event =
                     std::rc::Rc::new(std::cell::RefCell::new(PreFileDownloadEvent::new(
-                        bformat!("{}", PluginEvents::PRE_FILE_DOWNLOAD),
+                        PluginEvents::PRE_FILE_DOWNLOAD.to_php_string(),
                         self.http_downloader.clone(),
                         url.processed.clone(),
                         "package".into(),
@@ -620,7 +620,7 @@ impl DownloaderInterface for FileDownloader {
 
             if let Some(event_dispatcher) = self.event_dispatcher.as_ref() {
                 let post_file_download_event = PostFileDownloadEvent::new(
-                    bformat!("{}", PluginEvents::POST_FILE_DOWNLOAD),
+                    PluginEvents::POST_FILE_DOWNLOAD.to_php_string(),
                     Some(file_name.clone()),
                     checksum.clone(),
                     url.processed.clone(),

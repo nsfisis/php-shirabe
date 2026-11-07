@@ -17,19 +17,19 @@ use indexmap::IndexMap;
 use shirabe::util::http::ProxyManager;
 use shirabe::util::{Platform, StreamContextFactory};
 use shirabe_php_shim::{
-    PhpMixed, base64_encode, bformat, error_message, extension_loaded, implode,
+    PhpMixed, ToPhpString, base64_encode, bformat, error_message, extension_loaded, implode,
     stream_context_get_options, stripos,
 };
 
 fn s(value: &BStr) -> PhpMixed {
-    PhpMixed::string(bformat!("{value}"))
+    PhpMixed::string(value.to_php_string())
 }
 
 fn arr(entries: Vec<(&BStr, PhpMixed)>) -> PhpMixed {
     PhpMixed::Array(
         entries
             .into_iter()
-            .map(|(k, v)| (bformat!("{k}"), v))
+            .map(|(k, v)| (k.to_php_string(), v))
             .collect(),
     )
 }
@@ -41,7 +41,7 @@ fn list(items: Vec<PhpMixed>) -> PhpMixed {
 fn map(entries: Vec<(&BStr, PhpMixed)>) -> IndexMap<BString, PhpMixed> {
     entries
         .into_iter()
-        .map(|(k, v)| (bformat!("{k}"), v))
+        .map(|(k, v)| (k.to_php_string(), v))
         .collect()
 }
 

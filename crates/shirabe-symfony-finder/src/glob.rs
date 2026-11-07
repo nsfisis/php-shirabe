@@ -1,7 +1,7 @@
 //! ref: composer/vendor/symfony/finder/Glob.php sha1:c3790810cef503a99d883b9353bc7fa278b5b04f
 
 use bstr::{BStr, BString, ByteSlice, ByteVec};
-use shirabe_php_shim::{bformat, implode};
+use shirabe_php_shim::{ToPhpString, bformat, implode};
 
 // Regex pattern compatibility:
 // PHP's Glob::toRegex builds its regex in a single character loop and emits PCRE-only
@@ -380,7 +380,7 @@ fn apply_no_dot(tokens: &[Token], ctx: Ctx) -> Out {
             } else {
                 "[^.\\n].*"
             };
-            let consumed = prefix(bformat!("{head}"), render_seq(rest, ctx));
+            let consumed = prefix(head.to_php_string(), render_seq(rest, ctx));
             let skipped = apply_no_dot(rest, ctx);
             match (consumed, skipped) {
                 (Out::Escapes, _) | (_, Out::Escapes) => Out::Escapes,
@@ -396,7 +396,7 @@ fn apply_no_dot(tokens: &[Token], ctx: Ctx) -> Out {
             } else {
                 "[^.\\n]"
             };
-            prefix(bformat!("{head}"), render_seq(rest, ctx))
+            prefix(head.to_php_string(), render_seq(rest, ctx))
         }
         // The construct starts with a literal `/`, which satisfies the constraint.
         Token::Globstar { .. } => render_seq(tokens, ctx),

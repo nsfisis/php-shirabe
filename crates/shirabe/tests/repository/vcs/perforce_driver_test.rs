@@ -8,7 +8,7 @@ use shirabe::config::Config;
 use shirabe::io::{IOInterface, NullIO};
 use shirabe::repository::vcs::PerforceDriver;
 use shirabe::util::{Filesystem, HttpDownloader, MockHandler};
-use shirabe_php_shim::{PhpMixed, bformat, path_to_bytes, php_str};
+use shirabe_php_shim::{PhpMixed, ToPhpString, bformat, path_to_bytes, php_str};
 use tempfile::TempDir;
 
 const TEST_URL: &BStr = php_str(b"TEST_PERFORCE_URL");
@@ -72,9 +72,12 @@ fn set_up() -> SetUp {
     let test_path = get_unique_tmp_directory();
     let config = get_test_config(test_path.path());
     let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
-    repo_config.insert("url".into(), PhpMixed::string(bformat!("{TEST_URL}")));
-    repo_config.insert("depot".into(), PhpMixed::string(bformat!("{TEST_DEPOT}")));
-    repo_config.insert("branch".into(), PhpMixed::string(bformat!("{TEST_BRANCH}")));
+    repo_config.insert("url".into(), PhpMixed::string(TEST_URL.to_php_string()));
+    repo_config.insert("depot".into(), PhpMixed::string(TEST_DEPOT.to_php_string()));
+    repo_config.insert(
+        "branch".into(),
+        PhpMixed::string(TEST_BRANCH.to_php_string()),
+    );
 
     SetUp {
         test_path,

@@ -20,7 +20,7 @@ use shirabe::repository::RepositoryManager;
 use shirabe::util::{
     Git as GitUtil, HttpDownloader, MockExpectation, MockHandler, ProcessExecutor,
 };
-use shirabe_php_shim::{PhpMixed, bformat};
+use shirabe_php_shim::{PhpMixed, ToPhpString};
 
 fn null_io() -> std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
     std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()))
@@ -70,7 +70,7 @@ fn make_manager(
 fn require_map(entries: &[(&BStr, &BStr)]) -> PhpMixed {
     let mut m: IndexMap<BString, PhpMixed> = IndexMap::new();
     for (k, v) in entries {
-        m.insert(bformat!("{k}"), PhpMixed::string(bformat!("{v}")));
+        m.insert(k.to_php_string(), PhpMixed::string(v.to_php_string()));
     }
     PhpMixed::Array(m)
 }

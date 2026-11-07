@@ -10,7 +10,8 @@ use shirabe::io::{IOInterface, NullIO};
 use shirabe::repository::vcs::GitBitbucketDriver;
 use shirabe::util::{Filesystem, HttpDownloader, HttpDownloaderMockHandler, ProcessExecutor};
 use shirabe_php_shim::{
-    Catch as _, InvalidArgumentException, PhpMixed, RuntimeException, bformat, path_to_bytes,
+    Catch as _, InvalidArgumentException, PhpMixed, RuntimeException, ToPhpString, bformat,
+    path_to_bytes,
 };
 use tempfile::TempDir;
 
@@ -71,7 +72,7 @@ fn get_driver(
     http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
 ) -> anyhow::Result<GitBitbucketDriver> {
     let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
-    repo_config.insert("url".into(), PhpMixed::string(bformat!("{url}")));
+    repo_config.insert("url".into(), PhpMixed::string(url.to_php_string()));
 
     let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
         io.clone(),

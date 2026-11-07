@@ -15,7 +15,7 @@ use shirabe::repository::vcs::GitHubDriver;
 use shirabe::util::{
     Filesystem, Git as GitUtil, HttpDownloaderMockHandler, MockHandler, ProcessExecutor,
 };
-use shirabe_php_shim::{PhpMixed, base64_encode, bformat, path_to_bytes};
+use shirabe_php_shim::{PhpMixed, ToPhpString, base64_encode, bformat, path_to_bytes};
 use tempfile::TempDir;
 
 struct SetUp {
@@ -213,12 +213,12 @@ fn test_private_repository() {
         .set_auth_config_source(Box::new(null_config_source()));
 
     let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
-    repo_config.insert("url".into(), PhpMixed::string(bformat!("{repo_url}")));
+    repo_config.insert("url".into(), PhpMixed::string(repo_url.to_php_string()));
 
     let mut git_hub_driver = GitHubDriver::new(repo_config, io, config, http_downloader, process);
     git_hub_driver.initialize().unwrap();
     let mut tags = IndexMap::new();
-    tags.insert(bformat!("{identifier}"), bformat!("{sha}"));
+    tags.insert(identifier.to_php_string(), sha.to_php_string());
     git_hub_driver.__set_tags(Some(tags.into_iter().collect::<indexmap::IndexMap<_, _>>()));
 
     assert_eq!("test_master", git_hub_driver.get_root_identifier().unwrap());
@@ -279,13 +279,13 @@ fn test_public_repository() {
     let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(None)));
 
     let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
-    repo_config.insert("url".into(), PhpMixed::string(bformat!("{repo_url}")));
+    repo_config.insert("url".into(), PhpMixed::string(repo_url.to_php_string()));
     let repo_url = "https://github.com/composer/packagist.git";
 
     let mut git_hub_driver = GitHubDriver::new(repo_config, io, config, http_downloader, process);
     git_hub_driver.initialize().unwrap();
     let mut tags = IndexMap::new();
-    tags.insert(bformat!("{identifier}"), bformat!("{sha}"));
+    tags.insert(identifier.to_php_string(), sha.to_php_string());
     git_hub_driver.__set_tags(Some(tags.into_iter().collect::<indexmap::IndexMap<_, _>>()));
 
     assert_eq!("test_master", git_hub_driver.get_root_identifier().unwrap());
@@ -372,13 +372,13 @@ fn test_public_repository2() {
     let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(None)));
 
     let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
-    repo_config.insert("url".into(), PhpMixed::string(bformat!("{repo_url}")));
+    repo_config.insert("url".into(), PhpMixed::string(repo_url.to_php_string()));
     let repo_url = "https://github.com/composer/packagist.git";
 
     let mut git_hub_driver = GitHubDriver::new(repo_config, io, config, http_downloader, process);
     git_hub_driver.initialize().unwrap();
     let mut tags = IndexMap::new();
-    tags.insert(bformat!("{identifier}"), bformat!("{sha}"));
+    tags.insert(identifier.to_php_string(), sha.to_php_string());
     git_hub_driver.__set_tags(Some(tags.into_iter().collect::<indexmap::IndexMap<_, _>>()));
 
     assert_eq!("test_master", git_hub_driver.get_root_identifier().unwrap());
@@ -471,15 +471,15 @@ fn test_invalid_support_data() {
     let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(None)));
 
     let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
-    repo_config.insert("url".into(), PhpMixed::string(bformat!("{repo_url}")));
+    repo_config.insert("url".into(), PhpMixed::string(repo_url.to_php_string()));
 
     let mut git_hub_driver = GitHubDriver::new(repo_config, io, config, http_downloader, process);
     git_hub_driver.initialize().unwrap();
     let mut tags = IndexMap::new();
-    tags.insert(bformat!("{identifier}"), bformat!("{sha}"));
+    tags.insert(identifier.to_php_string(), sha.to_php_string());
     git_hub_driver.__set_tags(Some(tags.into_iter().collect::<indexmap::IndexMap<_, _>>()));
     let mut branches = IndexMap::new();
-    branches.insert(BString::from("test_master"), bformat!("{sha}"));
+    branches.insert(BString::from("test_master"), sha.to_php_string());
     git_hub_driver.__set_branches(Some(
         branches.into_iter().collect::<indexmap::IndexMap<_, _>>(),
     ));
@@ -658,16 +658,16 @@ fn test_funding_format() {
         let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(None)));
 
         let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
-        repo_config.insert("url".into(), PhpMixed::string(bformat!("{repo_url}")));
+        repo_config.insert("url".into(), PhpMixed::string(repo_url.to_php_string()));
 
         let mut git_hub_driver =
             GitHubDriver::new(repo_config, io, config, http_downloader, process);
         git_hub_driver.initialize().unwrap();
         let mut tags = IndexMap::new();
-        tags.insert(bformat!("{identifier}"), bformat!("{sha}"));
+        tags.insert(identifier.to_php_string(), sha.to_php_string());
         git_hub_driver.__set_tags(Some(tags.into_iter().collect::<indexmap::IndexMap<_, _>>()));
         let mut branches = IndexMap::new();
-        branches.insert(BString::from("test_master"), bformat!("{sha}"));
+        branches.insert(BString::from("test_master"), sha.to_php_string());
         git_hub_driver.__set_branches(Some(
             branches.into_iter().collect::<indexmap::IndexMap<_, _>>(),
         ));
@@ -765,12 +765,12 @@ fn test_public_repository_archived() {
     let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(None)));
 
     let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
-    repo_config.insert("url".into(), PhpMixed::string(bformat!("{repo_url}")));
+    repo_config.insert("url".into(), PhpMixed::string(repo_url.to_php_string()));
 
     let mut git_hub_driver = GitHubDriver::new(repo_config, io, config, http_downloader, process);
     git_hub_driver.initialize().unwrap();
     let mut tags = IndexMap::new();
-    tags.insert(bformat!("{identifier}"), bformat!("{sha}"));
+    tags.insert(identifier.to_php_string(), sha.to_php_string());
     git_hub_driver.__set_tags(Some(tags.into_iter().collect::<indexmap::IndexMap<_, _>>()));
 
     let data = git_hub_driver
@@ -881,7 +881,7 @@ fn test_private_repository_no_interaction() {
     );
 
     let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
-    repo_config.insert("url".into(), PhpMixed::string(bformat!("{repo_url}")));
+    repo_config.insert("url".into(), PhpMixed::string(repo_url.to_php_string()));
 
     let mut git_hub_driver = GitHubDriver::new(repo_config, io, config, http_downloader, process);
     git_hub_driver.initialize().unwrap();
@@ -954,7 +954,7 @@ fn test_initialize_invalid_repo_url() {
         let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(None)));
 
         let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
-        repo_config.insert("url".into(), PhpMixed::string(bformat!("{url}")));
+        repo_config.insert("url".into(), PhpMixed::string(url.to_php_string()));
 
         let mut git_hub_driver =
             GitHubDriver::new(repo_config, io, config, http_downloader, process);
@@ -999,7 +999,7 @@ fn test_get_empty_file_content() {
     let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(None)));
 
     let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
-    repo_config.insert("url".into(), PhpMixed::string(bformat!("{repo_url}")));
+    repo_config.insert("url".into(), PhpMixed::string(repo_url.to_php_string()));
 
     let mut git_hub_driver = GitHubDriver::new(repo_config, io, config, http_downloader, process);
     git_hub_driver.initialize().unwrap();

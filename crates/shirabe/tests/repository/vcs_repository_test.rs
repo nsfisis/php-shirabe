@@ -10,7 +10,7 @@ use shirabe::repository::VcsRepository;
 use shirabe::util::r#loop::Loop;
 use shirabe::util::{Filesystem, HttpDownloader, ProcessExecutor};
 use shirabe_php_shim::{
-    PhpMixed, bformat, implode, os_str_from_bytes, path_from_bytes, path_to_bytes,
+    PhpMixed, ToPhpString, implode, os_str_from_bytes, path_from_bytes, path_to_bytes,
 };
 use tempfile::TempDir;
 
@@ -159,7 +159,7 @@ fn composer(version: Option<&BStr>) -> PhpMixed {
     let mut m: IndexMap<BString, PhpMixed> = IndexMap::new();
     m.insert("name".into(), PhpMixed::string(BString::from("a/b")));
     if let Some(version) = version {
-        m.insert("version".into(), PhpMixed::string(bformat!("{version}")));
+        m.insert("version".into(), PhpMixed::string(version.to_php_string()));
     }
     PhpMixed::Array(m)
 }

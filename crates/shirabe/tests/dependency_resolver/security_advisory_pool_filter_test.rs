@@ -11,7 +11,7 @@ use shirabe::advisory::{AuditConfig, Auditor};
 use shirabe::dependency_resolver::{Pool, Request, SecurityAdvisoryPoolFilter};
 use shirabe::package::{CompletePackageHandle, PackageHandle, PackageInterfaceHandle};
 use shirabe::repository::{PackageRepository, RepositoryInterfaceHandle};
-use shirabe_php_shim::{PhpMixed, bformat, uniqid};
+use shirabe_php_shim::{PhpMixed, ToPhpString, uniqid};
 use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
 
 #[test]
@@ -314,7 +314,7 @@ fn test_dont_filter_packages_with_abandoned_package() {
     );
     abandoned_package.set_abandoned(PhpMixed::Bool(true));
     let ignore_abandoned_package = CompletePackageHandle::new(
-        bformat!("{package_name_ignore_abandoned}"),
+        package_name_ignore_abandoned.to_php_string(),
         BString::from("1.0.0.0"),
         BString::from("1.0"),
     );
@@ -377,7 +377,7 @@ fn generate_security_advisory(
     advisory.insert("advisoryId".into(), PhpMixed::string(uniqid("PKSA-")));
     advisory.insert(
         "packageName".into(),
-        PhpMixed::string(bformat!("{package_name}")),
+        PhpMixed::string(package_name.to_php_string()),
     );
     advisory.insert("remoteId".into(), PhpMixed::string(BString::from("test")));
     advisory.insert(
@@ -388,13 +388,13 @@ fn generate_security_advisory(
     advisory.insert(
         "cve".into(),
         match cve {
-            Some(cve) => PhpMixed::string(bformat!("{cve}")),
+            Some(cve) => PhpMixed::string(cve.to_php_string()),
             None => PhpMixed::Null,
         },
     );
     advisory.insert(
         "affectedVersions".into(),
-        PhpMixed::string(bformat!("{affected_versions}")),
+        PhpMixed::string(affected_versions.to_php_string()),
     );
     advisory.insert("source".into(), PhpMixed::string(BString::from("Tests")));
     advisory.insert(

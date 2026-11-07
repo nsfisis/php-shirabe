@@ -15,15 +15,15 @@ use shirabe::package::{CompletePackageHandle, PackageInterfaceHandle};
 use shirabe::util::r#loop::Loop;
 use shirabe::util::{Filesystem, FilesystemMock, HttpDownloader, HttpDownloaderMockHandler};
 use shirabe_php_shim::{
-    Catch as _, InvalidArgumentException, PhpMixed, RuntimeException, UnexpectedValueException,
-    bformat, error_message, path_to_bytes,
+    Catch as _, InvalidArgumentException, PhpMixed, RuntimeException, ToPhpString,
+    UnexpectedValueException, error_message, path_to_bytes,
 };
 use shirabe_semver::VersionParser;
 
 /// ref: TestCase::getPackage (default class CompletePackage)
 fn get_package(name: &BStr, version: &BStr) -> PackageInterfaceHandle {
     let norm_version = VersionParser.normalize(version, None).unwrap();
-    CompletePackageHandle::new(bformat!("{name}"), norm_version, bformat!("{version}")).into()
+    CompletePackageHandle::new(name.to_php_string(), norm_version, version.to_php_string()).into()
 }
 
 /// ref: TestCase::getConfig

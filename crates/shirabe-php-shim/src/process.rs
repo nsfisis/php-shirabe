@@ -487,7 +487,7 @@ fn pipe_cloexec() -> std::io::Result<(std::os::fd::OwnedFd, std::os::fd::OwnedFd
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{bformat, fclose, fwrite, path_to_bytes, stream_get_contents};
+    use crate::{ToPhpString, bformat, fclose, fwrite, path_to_bytes, stream_get_contents};
 
     #[test]
     fn proc_open_reads_stdout_and_reports_status() {
@@ -651,7 +651,7 @@ mod tests {
             "echo filetest",
             &[
                 Descriptor::Inherit,
-                Descriptor::File(bformat!("{path_str}"), BString::from("w")),
+                Descriptor::File(path_str.to_php_string(), BString::from("w")),
                 Descriptor::Inherit,
             ],
             &mut pipes,

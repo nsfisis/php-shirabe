@@ -10,8 +10,9 @@ use bstr::{BStr, BString, ByteSlice};
 use chrono::{DateTime, FixedOffset, Utc};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    Catch as _, PhpMixed, RuntimeException, bformat, date_create, dirname, explode_with_limit,
-    is_dir, is_file, is_writable, path_from_bytes, php_regex, preg_is_match, preg_replace, trim,
+    Catch as _, PhpMixed, RuntimeException, ToPhpString, bformat, date_create, dirname,
+    explode_with_limit, is_dir, is_file, is_writable, path_from_bytes, php_regex, preg_is_match,
+    preg_replace, trim,
 };
 
 #[derive(Debug)]
@@ -99,7 +100,7 @@ impl FossilDriver {
     fn check_fossil(&self) -> anyhow::Result<()> {
         let mut ignored_output = BString::default();
         if self.inner.process.borrow_mut().execute(
-            ["fossil", "version"].map(|s| bformat!("{s}")).as_ref(),
+            ["fossil", "version"].map(|s| s.to_php_string()).as_ref(),
             &mut ignored_output,
             None,
         )? != 0
@@ -130,13 +131,13 @@ impl FossilDriver {
         if is_file(path_from_bytes(&repo_file))
             && is_dir(path_from_bytes(&self.checkout_dir))
             && self.inner.process.borrow_mut().execute(
-                ["fossil", "info"].map(|s| bformat!("{s}")).as_ref(),
+                ["fossil", "info"].map(|s| s.to_php_string()).as_ref(),
                 &mut BString::default(),
                 Some(path_from_bytes(&self.checkout_dir)),
             )? == 0
         {
             if self.inner.process.borrow_mut().execute(
-                ["fossil", "pull"].map(|s| bformat!("{s}")).as_ref(),
+                ["fossil", "pull"].map(|s| s.to_php_string()).as_ref(),
                 &mut BString::default(),
                 Some(path_from_bytes(&self.checkout_dir)),
             )? != 0
@@ -255,7 +256,7 @@ impl FossilDriver {
         let mut output = BString::default();
         self.inner.process.borrow_mut().execute(
             ["fossil", "finfo", "-b", "-n", "1", "composer.json"]
-                .map(|s| bformat!("{s}"))
+                .map(|s| s.to_php_string())
                 .as_ref(),
             &mut output,
             Some(path_from_bytes(&self.checkout_dir)),
@@ -272,7 +273,9 @@ impl FossilDriver {
             let mut tags: IndexMap<BString, BString> = IndexMap::new();
             let mut output = BString::default();
             self.inner.process.borrow_mut().execute(
-                ["fossil", "tag", "list"].map(|s| bformat!("{s}")).as_ref(),
+                ["fossil", "tag", "list"]
+                    .map(|s| s.to_php_string())
+                    .as_ref(),
                 &mut output,
                 Some(path_from_bytes(&self.checkout_dir)),
             )?;
@@ -290,7 +293,7 @@ impl FossilDriver {
             let mut output = BString::default();
             self.inner.process.borrow_mut().execute(
                 ["fossil", "branch", "list"]
-                    .map(|s| bformat!("{s}"))
+                    .map(|s| s.to_php_string())
                     .as_ref(),
                 &mut output,
                 Some(path_from_bytes(&self.checkout_dir)),
@@ -332,7 +335,7 @@ impl FossilDriver {
             let process = ProcessExecutor::new(Some(io));
             let mut output = BString::default();
             if process.execute(
-                ["fossil", "info"].map(|s| bformat!("{s}")).as_ref(),
+                ["fossil", "info"].map(|s| s.to_php_string()).as_ref(),
                 &mut output,
                 Some(&url),
             )? == 0

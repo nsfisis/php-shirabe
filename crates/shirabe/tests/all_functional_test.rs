@@ -16,8 +16,8 @@ use indexmap::IndexMap;
 use serial_test::serial;
 use shirabe::util::Filesystem;
 use shirabe_php_shim::{
-    PhpMixed, bformat, intval, os_str_from_bytes, path_from_bytes, php_regex, preg_match,
-    preg_split_delim_capture, trim, utf8_text,
+    PhpMixed, ToPhpString, bformat, intval, os_str_from_bytes, path_from_bytes, php_regex,
+    preg_match, preg_split_delim_capture, trim, utf8_text,
 };
 use std::path::{Path, PathBuf};
 
@@ -84,7 +84,7 @@ fn parse_test_file(file: &Path) -> IndexMap<BString, BString> {
 
         // Allow sections to validate, or modify their section data.
         let section_data = match sec.as_bytes() {
-            b"EXPECT-EXIT-CODE" => bformat!("{}", intval(&PhpMixed::from(token))),
+            b"EXPECT-EXIT-CODE" => intval(&PhpMixed::from(token)).to_php_string(),
             b"RUN" | b"EXPECT" | b"EXPECT-REGEX" | b"EXPECT-REGEXES" => trim(&token),
             b"TEST" => token,
             _ => panic!(

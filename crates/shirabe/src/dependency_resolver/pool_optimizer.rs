@@ -449,7 +449,7 @@ impl PoolOptimizer {
                             pkg.clone()
                         };
                         self.removed_versions_by_package
-                            .entry(bformat!("{}", package.ptr_id()))
+                            .entry(package.ptr_id().to_php_string())
                             .or_default()
                             .insert(
                                 BString::from(&pkg.get_version()[..]),

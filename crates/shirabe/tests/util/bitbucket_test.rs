@@ -12,7 +12,7 @@ use shirabe::util::{
     Bitbucket, HttpDownloader, HttpDownloaderMockExpectation, HttpDownloaderMockHandler,
     MockHandler,
 };
-use shirabe_php_shim::{PhpMixed, bformat, php_str, time};
+use shirabe_php_shim::{PhpMixed, ToPhpString, bformat, php_str, time};
 
 const USERNAME: &BStr = php_str(b"username");
 const PASSWORD: &BStr = php_str(b"password");
@@ -179,13 +179,16 @@ fn expected_stored_token(time: i64) -> PhpMixed {
     let mut consumer = IndexMap::new();
     consumer.insert(
         "consumer-key".into(),
-        PhpMixed::string(bformat!("{CONSUMER_KEY}")),
+        PhpMixed::string(CONSUMER_KEY.to_php_string()),
     );
     consumer.insert(
         "consumer-secret".into(),
-        PhpMixed::string(bformat!("{CONSUMER_SECRET}")),
+        PhpMixed::string(CONSUMER_SECRET.to_php_string()),
     );
-    consumer.insert("access-token".into(), PhpMixed::string(bformat!("{TOKEN}")));
+    consumer.insert(
+        "access-token".into(),
+        PhpMixed::string(TOKEN.to_php_string()),
+    );
     consumer.insert("access-token-expiration".into(), PhpMixed::Int(time + 3600));
     PhpMixed::Array(consumer)
 }
@@ -209,7 +212,7 @@ fn test_request_access_token_with_valid_oauth_consumer() {
             vec![Expectation::auth(
                 ORIGIN,
                 CONSUMER_KEY,
-                Some(bformat!("{CONSUMER_SECRET}")),
+                Some(CONSUMER_SECRET.to_php_string()),
             )],
             false,
         )
@@ -233,15 +236,18 @@ fn test_request_access_token_with_valid_oauth_consumer() {
 fn test_request_access_token_with_valid_oauth_consumer_and_valid_stored_access_token() {
     let time = time();
     let mut stored = IndexMap::new();
-    stored.insert("access-token".into(), PhpMixed::string(bformat!("{TOKEN}")));
+    stored.insert(
+        "access-token".into(),
+        PhpMixed::string(TOKEN.to_php_string()),
+    );
     stored.insert("access-token-expiration".into(), PhpMixed::Int(time + 1800));
     stored.insert(
         "consumer-key".into(),
-        PhpMixed::string(bformat!("{CONSUMER_KEY}")),
+        PhpMixed::string(CONSUMER_KEY.to_php_string()),
     );
     stored.insert(
         "consumer-secret".into(),
-        PhpMixed::string(bformat!("{CONSUMER_SECRET}")),
+        PhpMixed::string(CONSUMER_SECRET.to_php_string()),
     );
     let mut oauth = IndexMap::new();
     oauth.insert(ORIGIN.into(), PhpMixed::Array(stored));
@@ -278,11 +284,11 @@ fn test_request_access_token_with_valid_oauth_consumer_and_expired_access_token(
     stored.insert("access-token-expiration".into(), PhpMixed::Int(time - 400));
     stored.insert(
         "consumer-key".into(),
-        PhpMixed::string(bformat!("{CONSUMER_KEY}")),
+        PhpMixed::string(CONSUMER_KEY.to_php_string()),
     );
     stored.insert(
         "consumer-secret".into(),
-        PhpMixed::string(bformat!("{CONSUMER_SECRET}")),
+        PhpMixed::string(CONSUMER_SECRET.to_php_string()),
     );
     let mut oauth = IndexMap::new();
     oauth.insert(ORIGIN.into(), PhpMixed::Array(stored));
@@ -307,7 +313,7 @@ fn test_request_access_token_with_valid_oauth_consumer_and_expired_access_token(
             vec![Expectation::auth(
                 ORIGIN,
                 CONSUMER_KEY,
-                Some(bformat!("{CONSUMER_SECRET}")),
+                Some(CONSUMER_SECRET.to_php_string()),
             )],
             false,
         )
@@ -347,7 +353,7 @@ fn test_request_access_token_with_username_and_password() {
         .borrow_mut()
         .expects(
             vec![
-                Expectation::auth(ORIGIN, USERNAME, Some(bformat!("{PASSWORD}"))),
+                Expectation::auth(ORIGIN, USERNAME, Some(PASSWORD.to_php_string())),
                 Expectation::text("Invalid OAuth consumer provided."),
                 Expectation::text("This can have three reasons:"),
                 Expectation::text(
@@ -394,7 +400,7 @@ fn test_request_access_token_with_username_and_password_with_unauthorized_respon
         .borrow_mut()
         .expects(
             vec![
-                Expectation::auth(ORIGIN, USERNAME, Some(bformat!("{PASSWORD}"))),
+                Expectation::auth(ORIGIN, USERNAME, Some(PASSWORD.to_php_string())),
                 Expectation::text("Invalid OAuth consumer provided."),
                 Expectation::text(
                     "You can also add it manually later by using \"shirabe config --global --auth bitbucket-oauth.bitbucket.org <consumer-key> <consumer-secret>\"",
@@ -435,7 +441,7 @@ fn test_request_access_token_with_username_and_password_with_not_found_response(
             vec![Expectation::auth(
                 ORIGIN,
                 USERNAME,
-                Some(bformat!("{PASSWORD}")),
+                Some(PASSWORD.to_php_string()),
             )],
             false,
         )

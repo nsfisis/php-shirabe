@@ -4,7 +4,7 @@ use crate::helper::{DebugFormatterHelper, Helper, HelperInterface, HelperSet};
 use crate::output::{ConsoleOutput, ConsoleOutputInterface, OutputInterface, output_interface};
 use bstr::{BStr, BString};
 use shirabe_php_shim::{
-    AsAny, InvalidArgumentException, PhpMixed, bformat, spl_object_hash, str_replace,
+    AsAny, InvalidArgumentException, PhpMixed, ToPhpString, bformat, spl_object_hash, str_replace,
 };
 use shirabe_symfony_process::Process;
 use shirabe_symfony_process::exception::ProcessFailedException;
@@ -120,7 +120,7 @@ impl ProcessHelper {
             .enumerate()
             .filter_map(|(i, element)| match element {
                 ProcessHelperCmdElement::String(s) => {
-                    Some((bformat!("{i}"), PhpMixed::string(s.clone())))
+                    Some((i.to_php_string(), PhpMixed::string(s.clone())))
                 }
                 ProcessHelperCmdElement::Process(_) => None,
             })
@@ -144,7 +144,7 @@ impl ProcessHelper {
                     "{} Command did not run successfully",
                     process
                         .get_exit_code()
-                        .map(|code| bformat!("{code}"))
+                        .map(|code| code.to_php_string())
                         .unwrap_or_default()
                 )
             };

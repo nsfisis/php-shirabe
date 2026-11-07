@@ -12,9 +12,9 @@ use crate::util::{Platform, Tar, Zip};
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PATHINFO_EXTENSION, PhpMixed, RuntimeException, UnexpectedValueException, basename, bformat,
-    error_message, extension_loaded, hash_file, path_from_bytes, path_to_bytes, pathinfo,
-    php_regex, preg_is_match, realpath, strtr,
+    PATHINFO_EXTENSION, PhpMixed, RuntimeException, ToPhpString, UnexpectedValueException,
+    basename, bformat, error_message, extension_loaded, hash_file, path_from_bytes, path_to_bytes,
+    pathinfo, php_regex, preg_is_match, realpath, strtr,
 };
 use shirabe_semver::constraint::AnyConstraint;
 use std::path::Path;
@@ -187,7 +187,7 @@ impl ArtifactRepository {
         let shasum = hash_file("sha1", &real_path).unwrap_or_default();
 
         let mut dist = IndexMap::new();
-        dist.insert("type".into(), PhpMixed::string(bformat!("{file_type}")));
+        dist.insert("type".into(), PhpMixed::string(file_type.to_php_string()));
         dist.insert("url".into(), PhpMixed::string(url_normalized));
         dist.insert("shasum".into(), PhpMixed::string(shasum));
         if let Some(arr) = package.as_array_mut() {

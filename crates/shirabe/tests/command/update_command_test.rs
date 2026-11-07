@@ -7,7 +7,7 @@ use crate::test_case::{
 use bstr::{BStr, BString, ByteSlice};
 use serial_test::serial;
 use shirabe::package::Link;
-use shirabe_php_shim::{bformat, error_message, trim, utf8_text};
+use shirabe_php_shim::{ToPhpString, error_message, trim, utf8_text};
 use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint};
 use shirabe_symfony_console::input::{InputValue, ParameterName};
 
@@ -494,7 +494,7 @@ fn test_interactive_tmp() {
         let mut app_tester = get_application_tester();
         let mut inputs: Vec<BString> = package_names
             .iter()
-            .map(|(pkg, _)| bformat!("{pkg}"))
+            .map(|(pkg, _)| pkg.to_php_string())
             .collect();
         inputs.push(BString::from(""));
         inputs.push(BString::from("yes"));

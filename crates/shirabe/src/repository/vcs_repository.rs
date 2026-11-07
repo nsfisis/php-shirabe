@@ -19,8 +19,8 @@ use crate::util::{HttpDownloader, Platform, ProcessExecutor, Url};
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    Catch as _, InvalidArgumentException, PhpClass, PhpMixed, bformat, error_message, php_regex,
-    preg_is_match, preg_replace, str_replace, strpos,
+    Catch as _, InvalidArgumentException, PhpClass, PhpMixed, ToPhpString, bformat, error_message,
+    php_regex, preg_is_match, preg_replace, str_replace, strpos,
 };
 use shirabe_semver::constraint::SimpleConstraint;
 
@@ -544,7 +544,7 @@ impl VcsRepository {
                             te.get_code()
                         )
                     } else {
-                        bformat!("{}", error_message(&e))
+                        error_message(&e).to_php_string()
                     };
                     self.io
                         .write_error(bformat!("<warning>Skipped tag {tag}, {detail}</warning>"));

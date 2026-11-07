@@ -11,7 +11,7 @@ use shirabe::package::{
     PackageInterfaceHandle,
 };
 use shirabe::repository::{PlatformRepository, RepositorySetInterface};
-use shirabe_php_shim::{PhpMixed, bformat};
+use shirabe_php_shim::{PhpMixed, ToPhpString, bformat};
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_symfony_console::output::output_interface;
 
@@ -68,11 +68,11 @@ fn assert_same(
 fn require_link(package_name: &BStr, target: &BStr, pretty_constraint: &BStr) -> Link {
     let parser = VersionParser::new();
     Link::new(
-        bformat!("{package_name}"),
-        bformat!("{target}"),
+        package_name.to_php_string(),
+        target.to_php_string(),
         parser.parse_constraints(pretty_constraint).unwrap(),
         Some(Link::TYPE_REQUIRE.to_owned()),
-        Some(bformat!("{pretty_constraint}")),
+        Some(pretty_constraint.to_php_string()),
     )
 }
 
@@ -862,7 +862,7 @@ fn test_find_recommended_require_version() {
         let mut version_selector = VersionSelector::new(into_seam(repository_set), None).unwrap();
 
         let package = PackageHandle::new(
-            bformat!("{package_name}"),
+            package_name.to_php_string(),
             version_parser.normalize(pretty_version, None).unwrap(),
             pretty_version.clone(),
         );
@@ -871,7 +871,7 @@ fn test_find_recommended_require_version() {
             let mut alias_map: IndexMap<BString, PhpMixed> = IndexMap::new();
             alias_map.insert(
                 pretty_version.as_bstr().into(),
-                PhpMixed::string(bformat!("{branch_alias}")),
+                PhpMixed::string(branch_alias.to_php_string()),
             );
             let mut extra: IndexMap<BString, PhpMixed> = IndexMap::new();
             extra.insert("branch-alias".into(), PhpMixed::Array(alias_map));

@@ -10,8 +10,9 @@ use bstr::{BStr, BString, ByteSlice};
 use chrono::{DateTime, FixedOffset, Utc};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    Catch as _, PhpMixed, RuntimeException, bformat, date_create, dirname, is_dir, is_writable,
-    path_from_bytes, path_to_bytes, php_regex, preg_is_match, preg_match, preg_replace, trim,
+    Catch as _, PhpMixed, RuntimeException, ToPhpString, bformat, date_create, dirname, is_dir,
+    is_writable, path_from_bytes, path_to_bytes, php_regex, preg_is_match, preg_match,
+    preg_replace, trim,
 };
 
 #[derive(Debug)]
@@ -86,13 +87,13 @@ impl HgDriver {
 
             if is_dir(path_from_bytes(&self.repo_dir))
                 && self.inner.process.borrow_mut().execute(
-                    ["hg", "summary"].map(|s| bformat!("{s}")).as_ref(),
+                    ["hg", "summary"].map(|s| s.to_php_string()).as_ref(),
                     &mut BString::default(),
                     Some(path_from_bytes(&self.repo_dir)),
                 )? == 0
             {
                 if self.inner.process.borrow_mut().execute(
-                    ["hg", "pull"].map(|s| bformat!("{s}")).as_ref(),
+                    ["hg", "pull"].map(|s| s.to_php_string()).as_ref(),
                     &mut BString::default(),
                     Some(path_from_bytes(&self.repo_dir)),
                 )? != 0
@@ -130,7 +131,7 @@ impl HgDriver {
             let mut output = BString::default();
             self.inner.process.borrow_mut().execute(
                 ["hg", "tip", "--template", "{node}"]
-                    .map(|s| bformat!("{s}"))
+                    .map(|s| s.to_php_string())
                     .as_ref(),
                 &mut output,
                 Some(path_from_bytes(&self.repo_dir)),
@@ -222,7 +223,7 @@ impl HgDriver {
             let mut tags: IndexMap<BString, BString> = IndexMap::new();
             let mut output = BString::default();
             self.inner.process.borrow_mut().execute(
-                ["hg", "tags"].map(|s| bformat!("{s}")).as_ref(),
+                ["hg", "tags"].map(|s| s.to_php_string()).as_ref(),
                 &mut output,
                 Some(path_from_bytes(&self.repo_dir)),
             )?;
@@ -251,7 +252,7 @@ impl HgDriver {
 
             let mut output = BString::default();
             self.inner.process.borrow_mut().execute(
-                ["hg", "branches"].map(|s| bformat!("{s}")).as_ref(),
+                ["hg", "branches"].map(|s| s.to_php_string()).as_ref(),
                 &mut output,
                 Some(path_from_bytes(&self.repo_dir)),
             )?;
@@ -269,7 +270,7 @@ impl HgDriver {
 
             output.clear();
             self.inner.process.borrow_mut().execute(
-                ["hg", "bookmarks"].map(|s| bformat!("{s}")).as_ref(),
+                ["hg", "bookmarks"].map(|s| s.to_php_string()).as_ref(),
                 &mut output,
                 Some(path_from_bytes(&self.repo_dir)),
             )?;
@@ -317,7 +318,7 @@ impl HgDriver {
             let process = ProcessExecutor::new(Some(io.clone()));
             let mut output = BString::default();
             if process.execute(
-                ["hg", "summary"].map(|s| bformat!("{s}")).as_ref(),
+                ["hg", "summary"].map(|s| s.to_php_string()).as_ref(),
                 &mut output,
                 Some(path_from_bytes(&url)),
             )? == 0

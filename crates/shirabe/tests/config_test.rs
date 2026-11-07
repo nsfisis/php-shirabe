@@ -9,7 +9,7 @@ use shirabe::{
     io::{IOInterface, io_interface},
     util::Platform,
 };
-use shirabe_php_shim::{PhpMixed, bformat, error_message, rtrim_chars};
+use shirabe_php_shim::{PhpMixed, ToPhpString, bformat, error_message, rtrim_chars};
 
 #[path = "common/io_mock.rs"]
 #[allow(dead_code)] // io_mock exposes more helpers than this binary uses
@@ -33,15 +33,15 @@ fn assert_map_equals(expected: &IndexMap<BString, PhpMixed>, actual: &IndexMap<B
 
 fn repo(r#type: &BStr, url: &BStr) -> PhpMixed {
     let mut m: IndexMap<BString, PhpMixed> = IndexMap::new();
-    m.insert("type".into(), PhpMixed::string(bformat!("{}", r#type)));
-    m.insert("url".into(), PhpMixed::string(bformat!("{url}")));
+    m.insert("type".into(), PhpMixed::string(r#type.to_php_string()));
+    m.insert("url".into(), PhpMixed::string(url.to_php_string()));
     PhpMixed::Array(m)
 }
 
 fn map(pairs: Vec<(&BStr, PhpMixed)>) -> IndexMap<BString, PhpMixed> {
     pairs
         .into_iter()
-        .map(|(k, v)| (bformat!("{k}"), v))
+        .map(|(k, v)| (k.to_php_string(), v))
         .collect()
 }
 

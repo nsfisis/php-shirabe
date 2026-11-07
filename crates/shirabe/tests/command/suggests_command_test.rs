@@ -8,7 +8,7 @@ use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use serial_test::serial;
 use shirabe::package::{CompletePackageHandle, Link, PackageInterfaceHandle};
-use shirabe_php_shim::{bformat, trim};
+use shirabe_php_shim::{ToPhpString, trim};
 use shirabe_symfony_console::input::{InputValue, ParameterName};
 
 /// ref: SuggestsCommandTest::getPackageWithSuggestAndRequires
@@ -22,7 +22,7 @@ fn get_package_with_suggest_and_requires(
     let pkg = get_complete_package(name, version);
     let suggests_map: IndexMap<BString, BString> = suggests
         .iter()
-        .map(|(k, v)| (bformat!("{k}"), bformat!("{v}")))
+        .map(|(k, v)| (k.to_php_string(), v.to_php_string()))
         .collect();
     pkg.__set_suggests(
         suggests_map
@@ -31,7 +31,7 @@ fn get_package_with_suggest_and_requires(
     );
     let requires_map: IndexMap<BString, Link> = requires
         .iter()
-        .map(|(k, v)| (bformat!("{k}"), v.clone()))
+        .map(|(k, v)| (k.to_php_string(), v.clone()))
         .collect();
     pkg.__set_requires(
         requires_map
@@ -40,7 +40,7 @@ fn get_package_with_suggest_and_requires(
     );
     let dev_requires_map: IndexMap<BString, Link> = require_devs
         .iter()
-        .map(|(k, v)| (bformat!("{k}"), v.clone()))
+        .map(|(k, v)| (k.to_php_string(), v.clone()))
         .collect();
     pkg.__set_dev_requires(
         dev_requires_map
@@ -52,8 +52,8 @@ fn get_package_with_suggest_and_requires(
 
 fn link(source: &BStr, target: &BStr, description: &bstr::BStr) -> Link {
     Link::new(
-        bformat!("{source}"),
-        bformat!("{target}"),
+        source.to_php_string(),
+        target.to_php_string(),
         get_version_constraint(">=", "1.0"),
         Some(description.to_owned()),
         Some(BString::from("^1.0")),

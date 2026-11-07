@@ -11,7 +11,7 @@ use shirabe::repository::{
     RepositorySet,
 };
 use shirabe::util::Platform;
-use shirabe_php_shim::bformat;
+use shirabe_php_shim::{ToPhpString, bformat};
 use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
 
 #[allow(dead_code)]
@@ -574,8 +574,8 @@ fn test_select_local_repos_first() {
 fn link(source: &BStr, target: &BStr, constraint: AnyConstraint, r#type: &bstr::BStr) -> Link {
     let pretty = constraint.get_pretty_string();
     Link::new(
-        bformat!("{source}"),
-        bformat!("{target}"),
+        source.to_php_string(),
+        target.to_php_string(),
         constraint,
         Some(r#type.to_owned()),
         Some(pretty),
@@ -589,7 +589,7 @@ fn as_complete(
 }
 
 fn constraint(operator: &BStr, version: &BStr) -> AnyConstraint {
-    SimpleConstraint::new(operator, bformat!("{version}"), None).into()
+    SimpleConstraint::new(operator, version.to_php_string(), None).into()
 }
 
 #[test]

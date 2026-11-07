@@ -1,4 +1,6 @@
-use crate::{PhpMixed, bformat, canonical_int_key, display_to_bytes, implode, urlencode};
+use crate::{
+    PhpMixed, ToPhpString, bformat, canonical_int_key, display_to_bytes, implode, urlencode,
+};
 use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_src::standard::url::php_url_parse_ex2;
@@ -70,7 +72,7 @@ fn append_query_pairs(pairs: &mut Vec<(BString, BString)>, key: BString, value: 
         // Null values are omitted from the query string entirely.
         PhpMixed::Null => {}
         PhpMixed::Bool(b) => pairs.push((key, BString::from(if *b { "1" } else { "0" }))),
-        PhpMixed::Int(i) => pairs.push((key, bformat!("{i}"))),
+        PhpMixed::Int(i) => pairs.push((key, i.to_php_string())),
         PhpMixed::Float(f) => pairs.push((key, display_to_bytes(f))),
         PhpMixed::String(s) => pairs.push((key, s.clone())),
         PhpMixed::List(items) => {

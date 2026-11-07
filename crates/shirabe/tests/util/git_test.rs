@@ -13,7 +13,7 @@ use shirabe::util::{
     ProcessExecutor,
 };
 use shirabe_php_shim::{
-    Catch as _, PhpMixed, RuntimeException, bformat, display_to_bytes, path_from_bytes,
+    Catch as _, PhpMixed, RuntimeException, ToPhpString, bformat, display_to_bytes, path_from_bytes,
 };
 
 // No-op ConfigSourceInterface, equivalent to PHPUnit's
@@ -95,7 +95,7 @@ fn mock_config(protocol: &BStr) -> Config {
         )
         .with(
             "github-protocols",
-            PhpMixed::List(vec![PhpMixed::string(bformat!("{protocol}"))]),
+            PhpMixed::List(vec![PhpMixed::string(protocol.to_php_string())]),
         )
         .build()
 }
@@ -212,7 +212,7 @@ fn run_command_private_github_with_authentication(
     expected_url: &BStr,
     expected_failures_before_success: usize,
 ) {
-    let expected_url_owned = bformat!("{expected_url}");
+    let expected_url_owned = expected_url.to_php_string();
     let command_callable: Box<dyn Fn(&bstr::BStr) -> CommandLine> =
         Box::new(move |url: &bstr::BStr| {
             if url != expected_url_owned {
@@ -284,7 +284,7 @@ fn run_command_private_bitbucket_with_authentication(
     expected_failures_before_success: usize,
     bitbucket_git_auth_calls: usize,
 ) {
-    let expected_url_owned = bformat!("{expected_url}");
+    let expected_url_owned = expected_url.to_php_string();
     let command_callable: Box<dyn Fn(&bstr::BStr) -> CommandLine> =
         Box::new(move |url: &bstr::BStr| {
             if url != expected_url_owned {
@@ -433,7 +433,7 @@ fn run_command_private_bitbucket_interactive_with_oauth(
     expected_url: &BStr,
     initial_config: Option<(&BStr, &BStr)>,
 ) {
-    let expected_url_owned = bformat!("{expected_url}");
+    let expected_url_owned = expected_url.to_php_string();
     let command_callable: Box<dyn Fn(&bstr::BStr) -> CommandLine> =
         Box::new(move |url: &bstr::BStr| {
             if url != expected_url_owned {
@@ -486,7 +486,7 @@ fn run_command_private_bitbucket_interactive_with_oauth(
         .with_ask_confirmation(true)
         .with_ask_and_hide_answer_responses(hidden_answers);
     if let Some((username, password)) = initial_config {
-        io = io.with_authentication("bitbucket.org", username, Some(bformat!("{password}")));
+        io = io.with_authentication("bitbucket.org", username, Some(password.to_php_string()));
     }
 
     let (downloader, _http_guard) = get_http_downloader_mock(
@@ -551,13 +551,12 @@ fn test_run_command_private_bitbucket_repository_not_initial_clone_interactive_w
 
 #[test]
 fn test_sync_mirror_sanitizes_url_after_initial_clone() {
-    let non_existent_dir = bformat!(
-        "{}",
-        std::env::temp_dir().join(path_from_bytes(&bformat!(
+    let non_existent_dir = std::env::temp_dir()
+        .join(path_from_bytes(&bformat!(
             "composer-test-nonexistent-{}",
             rand_hex()
         )))
-    );
+        .to_php_string();
 
     let config = mock_sync_mirror_config();
 
@@ -609,7 +608,7 @@ fn test_sync_mirror_sanitizes_url_after_initial_clone() {
 
 #[test]
 fn test_sync_mirror_sanitizes_url_even_after_failed_update() {
-    let dir = bformat!("{}", std::env::temp_dir());
+    let dir = std::env::temp_dir().to_php_string();
 
     let config = mock_sync_mirror_config();
 

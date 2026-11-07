@@ -15,7 +15,7 @@ use shirabe::repository::{FilesystemRepository, RepositoryInterface};
 use shirabe::util::Filesystem;
 use shirabe_php_rpc::{PluginValue, ToWire};
 use shirabe_php_shim::{
-    Catch as _, PhpMixed, bformat, display_to_bytes, path_from_bytes, path_to_bytes,
+    Catch as _, PhpMixed, ToPhpString, bformat, display_to_bytes, path_from_bytes, path_to_bytes,
 };
 use shirabe_semver::VersionParser;
 
@@ -223,8 +223,8 @@ fn configure_links(
     let mut map: IndexMap<BString, PhpMixed> = IndexMap::new();
     for (target, constraint) in links {
         map.insert(
-            bformat!("{}", (*target)),
-            PhpMixed::string(bformat!("{}", (*constraint))),
+            (*target).to_php_string(),
+            PhpMixed::string((*constraint).to_php_string()),
         );
     }
     ArrayLoader::new(None, false)

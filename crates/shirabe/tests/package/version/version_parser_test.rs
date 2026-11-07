@@ -3,16 +3,16 @@
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe::package::version::VersionParser;
-use shirabe_php_shim::bformat;
+use shirabe_php_shim::ToPhpString;
 
 fn pairs(items: &[&BStr]) -> Vec<BString> {
-    items.iter().map(|s| bformat!("{s}")).collect()
+    items.iter().map(|s| s.to_php_string()).collect()
 }
 
 fn entry(fields: &[(&BStr, &BStr)]) -> IndexMap<BString, BString> {
     fields
         .iter()
-        .map(|(k, v)| (bformat!("{k}"), bformat!("{v}")))
+        .map(|(k, v)| (k.to_php_string(), v.to_php_string()))
         .collect()
 }
 

@@ -477,7 +477,7 @@ impl Locker {
                 ) {
                     alias.insert(
                         "version".into(),
-                        PhpMixed::string(bformat!("{}", VersionParser::DEFAULT_BRANCH_ALIAS)),
+                        PhpMixed::string(VersionParser::DEFAULT_BRANCH_ALIAS.to_php_string()),
                     );
                 }
                 alias
@@ -563,7 +563,7 @@ impl Locker {
         }
         lock.insert(
             "plugin-api-version".into(),
-            PhpMixed::string(bformat!("{}", plugin_interface::PLUGIN_API_VERSION)),
+            PhpMixed::string(plugin_interface::PLUGIN_API_VERSION.to_php_string()),
         );
 
         let lock = self.fixup_json_data_type(lock);
@@ -679,7 +679,7 @@ impl Locker {
                 .unwrap_or(false);
             if should_replace {
                 // PHP: new \stdClass() — empty JSON object
-                lock_data.insert(bformat!("{key}"), PhpMixed::Object(IndexMap::new()));
+                lock_data.insert(key.to_php_string(), PhpMixed::Object(IndexMap::new()));
             }
         }
 

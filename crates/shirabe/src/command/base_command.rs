@@ -17,7 +17,7 @@ use crate::util::Platform;
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    InvalidArgumentException, LogicException, PhpClass, PhpMixed, RuntimeException,
+    InvalidArgumentException, LogicException, PhpClass, PhpMixed, RuntimeException, ToPhpString,
     UnexpectedValueException, bformat, count, explode, implode, in_array_strict,
 };
 use shirabe_symfony_console::Terminal;
@@ -819,7 +819,7 @@ pub fn base_command_initialize(
     if let Some(composer) = composer.as_ref() {
         let command_name = cmd.get_name().unwrap_or_default();
         let pre_command_run_event = PreCommandRunEvent::new(
-            bformat!("{}", PluginEvents::PRE_COMMAND_RUN),
+            PluginEvents::PRE_COMMAND_RUN.to_php_string(),
             input.clone(),
             command_name,
         );

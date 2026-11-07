@@ -5,7 +5,7 @@ use crate::package::{BasePackageHandle, stability_priority};
 use crate::util::Platform;
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe_php_shim::{CmpOp, PhpMixed, bformat, implode};
+use shirabe_php_shim::{CmpOp, PhpMixed, ToPhpString, bformat, implode};
 use shirabe_semver::CompilingMatcher;
 use shirabe_semver::constraint::SimpleConstraint;
 
@@ -216,7 +216,10 @@ impl PolicyInterface for DefaultPolicy {
             "{}{}",
             implode(
                 ",",
-                &literals.iter().map(|l| bformat!("{l}")).collect::<Vec<_>>()
+                &literals
+                    .iter()
+                    .map(|l| l.to_php_string())
+                    .collect::<Vec<_>>()
             ),
             required_package.clone().unwrap_or_default()
         );

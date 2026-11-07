@@ -9,7 +9,7 @@ use shirabe::config::Config;
 use shirabe::io::{IOInterface, NullIO};
 use shirabe::repository::vcs::GitLabDriver;
 use shirabe::util::{HttpDownloader, HttpDownloaderMockHandler, MockHandler, ProcessExecutor};
-use shirabe_php_shim::{PhpMixed, bformat, extension_loaded, path_to_bytes};
+use shirabe_php_shim::{PhpMixed, ToPhpString, bformat, extension_loaded, path_to_bytes};
 use tempfile::TempDir;
 
 // Mirrors GitLabDriverTest::setUp's configuration.
@@ -121,7 +121,7 @@ fn do_test_initialize(
     let (http_downloader, guard) = http_mock_with_body(api_url, project_data);
 
     let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
-    repo_config.insert("url".into(), PhpMixed::string(bformat!("{url}")));
+    repo_config.insert("url".into(), PhpMixed::string(url.to_php_string()));
     let mut driver = GitLabDriver::new(
         repo_config,
         fixtures.io.clone(),
@@ -177,7 +177,7 @@ fn do_test_initialize_public_project(
     let (http_downloader, guard) = http_mock_with_body(api_url, project_data);
 
     let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
-    repo_config.insert("url".into(), PhpMixed::string(bformat!("{url}")));
+    repo_config.insert("url".into(), PhpMixed::string(url.to_php_string()));
     let mut driver = GitLabDriver::new(
         repo_config,
         fixtures.io.clone(),
@@ -246,7 +246,7 @@ fn test_initialize_public_project_as_anonymous() {
         let (http_downloader, _guard) = http_mock_with_body(api_url, project_data);
 
         let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
-        repo_config.insert("url".into(), PhpMixed::string(bformat!("{url}")));
+        repo_config.insert("url".into(), PhpMixed::string(url.to_php_string()));
         let mut driver = GitLabDriver::new(
             repo_config,
             fixtures.io.clone(),
@@ -385,7 +385,7 @@ fn test_get_dist() {
     );
     expected.insert(
         "reference".into(),
-        PhpMixed::string(bformat!("{reference}")),
+        PhpMixed::string(reference.to_php_string()),
     );
     expected.insert("shasum".into(), PhpMixed::string(BString::default()));
 
@@ -410,7 +410,7 @@ fn test_get_source() {
     );
     expected.insert(
         "reference".into(),
-        PhpMixed::string(bformat!("{reference}")),
+        PhpMixed::string(reference.to_php_string()),
     );
 
     assert_eq!(expected, driver.get_source(bstr::BStr::new(reference)));
@@ -434,7 +434,7 @@ fn test_get_source_given_public_project() {
     );
     expected.insert(
         "reference".into(),
-        PhpMixed::string(bformat!("{reference}")),
+        PhpMixed::string(reference.to_php_string()),
     );
 
     assert_eq!(expected, driver.get_source(bstr::BStr::new(reference)));
@@ -605,13 +605,13 @@ fn test_get_paginated_refs() {
 
 fn branch_entry(name: &BStr, id: &BStr, committed_date: &BStr) -> PhpMixed {
     let mut commit: IndexMap<BString, PhpMixed> = IndexMap::new();
-    commit.insert("id".into(), PhpMixed::string(bformat!("{id}")));
+    commit.insert("id".into(), PhpMixed::string(id.to_php_string()));
     commit.insert(
         "committed_date".into(),
-        PhpMixed::string(bformat!("{committed_date}")),
+        PhpMixed::string(committed_date.to_php_string()),
     );
     let mut entry: IndexMap<BString, PhpMixed> = IndexMap::new();
-    entry.insert("name".into(), PhpMixed::string(bformat!("{name}")));
+    entry.insert("name".into(), PhpMixed::string(name.to_php_string()));
     entry.insert("commit".into(), PhpMixed::Array(commit));
     PhpMixed::Array(entry)
 }
@@ -770,7 +770,7 @@ fn test_gitlab_sub_directory() {
     let (http_downloader, _guard) = http_mock_with_body(api_url, project_data);
 
     let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
-    repo_config.insert("url".into(), PhpMixed::string(bformat!("{url}")));
+    repo_config.insert("url".into(), PhpMixed::string(url.to_php_string()));
     let mut driver = GitLabDriver::new(
         repo_config,
         fixtures.io.clone(),
@@ -812,7 +812,7 @@ fn test_gitlab_sub_group() {
     let (http_downloader, _guard) = http_mock_with_body(api_url, project_data);
 
     let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
-    repo_config.insert("url".into(), PhpMixed::string(bformat!("{url}")));
+    repo_config.insert("url".into(), PhpMixed::string(url.to_php_string()));
     let mut driver = GitLabDriver::new(
         repo_config,
         fixtures.io.clone(),
@@ -855,7 +855,7 @@ fn test_gitlab_sub_directory_sub_group() {
     let (http_downloader, _guard) = http_mock_with_body(api_url, project_data);
 
     let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
-    repo_config.insert("url".into(), PhpMixed::string(bformat!("{url}")));
+    repo_config.insert("url".into(), PhpMixed::string(url.to_php_string()));
     let mut driver = GitLabDriver::new(
         repo_config,
         fixtures.io.clone(),
@@ -957,7 +957,7 @@ fn test_protocol_override_repository_url_generation() {
     let config = std::rc::Rc::new(std::cell::RefCell::new(config));
 
     let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
-    repo_config.insert("url".into(), PhpMixed::string(bformat!("{url}")));
+    repo_config.insert("url".into(), PhpMixed::string(url.to_php_string()));
     let mut driver = GitLabDriver::new(
         repo_config,
         fixtures.io.clone(),

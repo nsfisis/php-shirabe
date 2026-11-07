@@ -36,10 +36,10 @@ use bstr::{B, BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, PATHINFO_EXTENSION, PHP_EOL, PHP_OS, PHP_SERVER,
-    PhpMixed, RuntimeException, UnexpectedValueException, bformat, dirname, error_message,
-    extension_loaded, file_exists, file_get_contents, file_put_contents, implode, is_dir, is_file,
-    json_decode_assoc, json_decode_obj, mkdir, path_from_bytes, path_to_bytes, pathinfo, realpath,
-    rename, rtrim_chars, strpos, strtr, substr, trim_chars,
+    PhpMixed, RuntimeException, ToPhpString, UnexpectedValueException, bformat, dirname,
+    error_message, extension_loaded, file_exists, file_get_contents, file_put_contents, implode,
+    is_dir, is_file, json_decode_assoc, json_decode_obj, mkdir, path_from_bytes, path_to_bytes,
+    pathinfo, realpath, rename, rtrim_chars, strpos, strtr, substr, trim_chars,
 };
 use shirabe_symfony_console::{
     formatter::{OutputFormatter, OutputFormatterStyle, OutputFormatterStyleInterface},
@@ -839,7 +839,7 @@ impl Factory {
         if full_load {
             // The back-reference is now upgradeable, so dispatching the INIT event (which may read
             // the Composer through the dispatcher) is safe only after the Rc has been constructed.
-            let init_event = Event::from_name(bformat!("{}", PluginEvents::INIT));
+            let init_event = Event::from_name(PluginEvents::INIT.to_php_string());
             let init_event_name = init_event.get_name().to_owned();
             let dispatcher = composer.borrow().get_event_dispatcher();
             dispatcher.borrow_mut().dispatch(

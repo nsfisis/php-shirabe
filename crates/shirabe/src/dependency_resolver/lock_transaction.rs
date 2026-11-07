@@ -5,7 +5,9 @@ use crate::dependency_resolver::{Decisions, Pool, Transaction};
 use crate::package::PackageInterfaceHandle;
 use bstr::{BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe_php_shim::{PregMatches, bformat, php_regex, preg_is_match, preg_replace_callback};
+use shirabe_php_shim::{
+    PregMatches, ToPhpString, bformat, php_regex, preg_is_match, preg_replace_callback,
+};
 
 #[derive(Debug)]
 pub struct LockTransaction {
@@ -125,7 +127,7 @@ impl LockTransaction {
             if update_mirrors
                 && !self
                     .present_map
-                    .contains_key(bformat!("{}", package.ptr_id()).as_bytes())
+                    .contains_key(package.ptr_id().to_php_string().as_bytes())
             {
                 let updated = self.update_mirror_and_urls(package.clone());
                 packages.push(updated);

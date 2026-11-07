@@ -516,7 +516,7 @@ impl Command for ConfigCommand {
                 "bearer",
                 "forgejo-token",
             ] {
-                empty_objs.insert(bformat!("{k}"), PhpMixed::Object(IndexMap::new()));
+                empty_objs.insert(k.to_php_string(), PhpMixed::Object(IndexMap::new()));
             }
             auth_config_file
                 .borrow()
@@ -1125,7 +1125,7 @@ impl Command for ConfigCommand {
                                 PhpMixed::List(l) => l
                                     .iter()
                                     .enumerate()
-                                    .map(|(i, v)| (bformat!("{i}"), v.clone()))
+                                    .map(|(i, v)| (i.to_php_string(), v.clone()))
                                     .collect(),
                                 _ => value.as_array().cloned().unwrap_or_default(),
                             };
@@ -1133,7 +1133,7 @@ impl Command for ConfigCommand {
                                 PhpMixed::List(l) => l
                                     .iter()
                                     .enumerate()
-                                    .map(|(i, v)| (bformat!("{i}"), v.clone()))
+                                    .map(|(i, v)| (i.to_php_string(), v.clone()))
                                     .collect(),
                                 _ => current_value.as_array().cloned().unwrap_or_default(),
                             };
