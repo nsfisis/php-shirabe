@@ -1,7 +1,7 @@
 //! ref: composer/vendor/symfony/console/Formatter/OutputFormatterStyle.php sha1:75b0572d0f3bb48553b2a6d7caa468fe77bceb0d
 
-use crate::color::Color;
-use crate::formatter::output_formatter_style_interface::OutputFormatterStyleInterface;
+use crate::Color;
+use crate::formatter::OutputFormatterStyleInterface;
 use bstr::{BStr, BString, ByteSlice};
 use shirabe_php_shim::{PHP_SERVER, PhpMixed, array_search_in_vec, bconcat, getenv, intval};
 

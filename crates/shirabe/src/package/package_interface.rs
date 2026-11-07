@@ -140,7 +140,6 @@ pub trait PackageInterface: std::fmt::Debug + Stringable {
     /// Stands in for PHP's `$package->{'get'.ucfirst($linkType)}()`, so `link_type` is one of the
     /// `Link::TYPE_*` values.
     fn get_links_for_type(&self, link_type: &BStr) -> std::rc::Rc<IndexMap<BString, Link>> {
-        use crate::package::Link;
         if link_type == Link::TYPE_REQUIRE {
             self.get_requires()
         } else if link_type == Link::TYPE_DEV_REQUIRE {

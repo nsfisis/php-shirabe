@@ -1,9 +1,9 @@
 //! ref: composer/vendor/symfony/console/Output/ConsoleSectionOutput.php sha1:bc4a55cae95d8100b49c72892fc9665d0a6a558e
 
+use crate::Terminal;
 use crate::formatter::OutputFormatterInterface;
 use crate::helper::Helper;
 use crate::output::{DoWrite, OUTPUT_NORMAL, OutputInterface, StreamOutput};
-use crate::terminal::Terminal;
 use bstr::{BStr, BString, ByteSlice};
 use shirabe_php_shim::{
     PHP_EOL, PhpResource, array_reverse, array_splice, array_unshift, bconcat, explode, str_replace,

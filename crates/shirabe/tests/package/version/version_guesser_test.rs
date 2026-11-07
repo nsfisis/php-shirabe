@@ -6,9 +6,7 @@ use indexmap::IndexMap;
 use serial_test::serial;
 use shirabe::config::Config;
 use shirabe::package::version::{VersionGuesser, VersionParser};
-use shirabe::util::Git as GitUtil;
-use shirabe::util::platform::Platform;
-use shirabe::util::process_executor::{MockExpectation, MockHandler, ProcessExecutor};
+use shirabe::util::{Git as GitUtil, MockExpectation, MockHandler, Platform, ProcessExecutor};
 use shirabe_php_shim::{PhpMixed, bconcat};
 
 // Mirrors VersionGuesserTest::setUp/tearDown: reset GitUtil's cached `version`

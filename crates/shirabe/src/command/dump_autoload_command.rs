@@ -1,7 +1,8 @@
 //! ref: composer/src/Composer/Command/DumpAutoloadCommand.php sha1:940644a813d290de4cf46a71c886aac126410f3c
 
-use crate::command::base_command::{base_command_complete, base_command_initialize};
-use crate::command::{BaseCommand, BaseCommandData};
+use crate::command::{
+    BaseCommand, BaseCommandData, base_command_complete, base_command_initialize,
+};
 use crate::composer::composer_full;
 use crate::console::input::InputOption;
 use crate::delegate_base_command_trait_impls_to_inner;
@@ -9,8 +10,9 @@ use crate::io::IOInterfaceWrite;
 use crate::plugin::{CommandEvent, PluginEvents};
 use bstr::{BStr, BString};
 use shirabe_php_shim::{InvalidArgumentException, bconcat, file_exists, impl_php_class};
-use shirabe_symfony_console::input::InputInterfaceByName;
-use shirabe_symfony_console::{command::Command, input::InputInterface, output::OutputInterface};
+use shirabe_symfony_console::command::Command;
+use shirabe_symfony_console::input::{InputInterface, InputInterfaceByName};
+use shirabe_symfony_console::output::OutputInterface;
 
 #[derive(Debug)]
 pub struct DumpAutoloadCommand {

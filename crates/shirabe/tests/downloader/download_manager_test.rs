@@ -4,10 +4,9 @@ use crate::async_runtime::run;
 use crate::io_stub::IOStub;
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
-use shirabe::downloader::DownloaderInterface;
-use shirabe::downloader::download_manager::DownloadManager;
+use shirabe::downloader::{DownloadManager, DownloaderInterface};
 use shirabe::io::IOInterface;
-use shirabe::package::handle::{CompletePackageHandle, PackageInterfaceHandle};
+use shirabe::package::{CompletePackageHandle, PackageInterfaceHandle};
 use shirabe_php_shim::{PhpMixed, RuntimeException, bconcat, impl_php_class, php_str};
 use shirabe_semver::VersionParser;
 

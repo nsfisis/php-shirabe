@@ -1,9 +1,8 @@
 //! ref: composer/tests/Composer/Test/Util/ConfigValidatorTest.php sha1:2fe5ee17eba277a0599a543c0d555753313401d1
 
-use shirabe::io::io_interface::IOInterface;
-use shirabe::io::null_io::NullIO;
-use shirabe::package::loader::validating_array_loader::ValidatingArrayLoader;
-use shirabe::util::config_validator::ConfigValidator;
+use shirabe::io::{IOInterface, NullIO};
+use shirabe::package::loader::ValidatingArrayLoader;
+use shirabe::util::ConfigValidator;
 
 fn fixture(name: impl AsRef<std::path::Path>) -> std::path::PathBuf {
     std::path::Path::new(env!("CARGO_MANIFEST_DIR"))

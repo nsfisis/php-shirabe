@@ -2,9 +2,8 @@
 
 use bstr::BStr;
 use shirabe::cache::{Cache, CacheMock, GcFinderMock};
-use shirabe::io::IOInterface;
-use shirabe::io::null_io::NullIO;
-use shirabe::util::filesystem::Filesystem;
+use shirabe::io::{IOInterface, NullIO};
+use shirabe::util::Filesystem;
 use shirabe_php_shim::{bconcat, path_from_bytes};
 use std::fs;
 use tempfile::TempDir;

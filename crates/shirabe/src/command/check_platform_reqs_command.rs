@@ -1,7 +1,8 @@
 //! ref: composer/src/Composer/Command/CheckPlatformReqsCommand.php sha1:818b09865c5e1c263025439129da49da0cfde714
 
-use crate::command::base_command::{base_command_complete, base_command_initialize};
-use crate::command::{BaseCommand, BaseCommandData};
+use crate::command::{
+    BaseCommand, BaseCommandData, base_command_complete, base_command_initialize,
+};
 use crate::composer::composer_full;
 use crate::console::input::{InputOption, SuggestedValues};
 use crate::delegate_base_command_trait_impls_to_inner;

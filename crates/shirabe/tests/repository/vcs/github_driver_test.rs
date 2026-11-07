@@ -10,13 +10,11 @@ use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use serial_test::serial;
 use shirabe::config::{Config, ConfigSourceInterface};
-use shirabe::io::IOInterface;
-use shirabe::io::null_io::NullIO;
+use shirabe::io::{IOInterface, NullIO};
 use shirabe::repository::vcs::GitHubDriver;
-use shirabe::util::Git as GitUtil;
-use shirabe::util::filesystem::Filesystem;
-use shirabe::util::http_downloader::HttpDownloaderMockHandler;
-use shirabe::util::process_executor::{MockHandler, ProcessExecutor};
+use shirabe::util::{
+    Filesystem, Git as GitUtil, HttpDownloaderMockHandler, MockHandler, ProcessExecutor,
+};
 use shirabe_php_shim::{PhpMixed, base64_encode, bconcat, path_to_bytes};
 use tempfile::TempDir;
 

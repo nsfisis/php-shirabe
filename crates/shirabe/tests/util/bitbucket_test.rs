@@ -8,11 +8,10 @@ use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe::config::{Config, ConfigSourceInterface};
 use shirabe::io::{IOInterface, io_interface};
-use shirabe::util::Bitbucket;
-use shirabe::util::http_downloader::{
-    HttpDownloader, HttpDownloaderMockExpectation, HttpDownloaderMockHandler,
+use shirabe::util::{
+    Bitbucket, HttpDownloader, HttpDownloaderMockExpectation, HttpDownloaderMockHandler,
+    MockHandler,
 };
-use shirabe::util::process_executor::MockHandler;
 use shirabe_php_shim::{PhpMixed, bconcat, php_str, time};
 
 const USERNAME: &BStr = php_str(b"username");

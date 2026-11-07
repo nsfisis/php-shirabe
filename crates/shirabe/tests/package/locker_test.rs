@@ -3,14 +3,12 @@
 use crate::test_case::installation_manager;
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe::io::IOInterface;
-use shirabe::io::null_io::NullIO;
+use shirabe::io::{IOInterface, NullIO};
 use shirabe::json::{JsonEncodeOptions, JsonFile};
-use shirabe::package::Locker;
-use shirabe::package::handle::{CompletePackageHandle, PackageInterfaceHandle};
+use shirabe::package::{CompletePackageHandle, Locker, PackageInterfaceHandle};
 use shirabe::plugin::plugin_interface;
 use shirabe::repository::{FindPackageConstraint, RepositoryInterfaceHandle};
-use shirabe::util::process_executor::ProcessExecutor;
+use shirabe::util::ProcessExecutor;
 use shirabe_php_shim::{Catch as _, LogicException, PhpMixed, bconcat, hash, trim, utf8_text};
 use tempfile::TempDir;
 

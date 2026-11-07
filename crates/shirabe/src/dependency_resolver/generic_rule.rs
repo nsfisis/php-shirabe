@@ -1,7 +1,6 @@
 //! ref: composer/src/Composer/DependencyResolver/GenericRule.php sha1:404c5dc2a6ee6681ca3dfccfe173de73e775813d
 
-use crate::dependency_resolver::rule::ReasonData;
-use crate::dependency_resolver::{Rule, RuleBase};
+use crate::dependency_resolver::{ReasonData, Rule, RuleBase};
 use bstr::BString;
 use shirabe_php_shim::{PhpConcat, RuntimeException, Stringable, bconcat, hash_raw, implode};
 

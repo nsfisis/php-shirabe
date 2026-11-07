@@ -5,11 +5,9 @@ use crate::process_executor_mock::{ProcessExecutorMockGuard, get_process_executo
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe::config::Config;
-use shirabe::io::IOInterface;
-use shirabe::io::null_io::NullIO;
+use shirabe::io::{IOInterface, NullIO};
 use shirabe::repository::vcs::GitLabDriver;
-use shirabe::util::http_downloader::{HttpDownloader, HttpDownloaderMockHandler};
-use shirabe::util::process_executor::{MockHandler, ProcessExecutor};
+use shirabe::util::{HttpDownloader, HttpDownloaderMockHandler, MockHandler, ProcessExecutor};
 use shirabe_php_shim::{PhpMixed, bconcat, extension_loaded, path_to_bytes};
 use tempfile::TempDir;
 

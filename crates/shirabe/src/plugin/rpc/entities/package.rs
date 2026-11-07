@@ -1,10 +1,8 @@
 //! The methods a `Composer\Package\PackageInterface` entity answers over RPC.
 
-use crate::package::base_package::STABILITY_STABLE;
-use crate::package::handle::AnyPackage;
 use crate::package::{
-    AliasPackage, CompletePackageInterface, DisplayMode, Link, Mirror, Package,
-    PackageInterfaceHandle, RootPackageInterface, stability_priority,
+    AliasPackage, AnyPackage, CompletePackageInterface, DisplayMode, Link, Mirror, Package,
+    PackageInterfaceHandle, RootPackageInterface, STABILITY_STABLE, stability_priority,
 };
 use crate::plugin::rpc::codec::{arg, arg_or};
 use crate::plugin::rpc::dispatch::{error_throw, unavailable_method};

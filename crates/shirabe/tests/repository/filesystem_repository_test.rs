@@ -8,12 +8,11 @@ use serial_test::serial;
 use shirabe::dependency_resolver::operation::AnyOperation;
 use shirabe::installer::{InstallationManagerInterface, InstallerInterface};
 use shirabe::io::IOInterface;
-use shirabe::json::json_file::JsonFile;
+use shirabe::json::JsonFile;
 use shirabe::package::loader::ArrayLoader;
 use shirabe::package::{Link, PackageInterfaceHandle, RootAliasPackageHandle, RootPackageHandle};
-use shirabe::repository::RepositoryInterface;
-use shirabe::repository::filesystem_repository::FilesystemRepository;
-use shirabe::util::filesystem::Filesystem;
+use shirabe::repository::{FilesystemRepository, RepositoryInterface};
+use shirabe::util::Filesystem;
 use shirabe_php_rpc::{PluginValue, ToWire};
 use shirabe_php_shim::{
     Catch as _, PhpMixed, bconcat, display_to_bytes, path_from_bytes, path_to_bytes,

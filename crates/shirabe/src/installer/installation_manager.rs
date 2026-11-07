@@ -7,8 +7,9 @@ use crate::dependency_resolver::operation::{
 use crate::downloader::FileDownloader;
 use crate::event_dispatcher::EventDispatcher;
 use crate::installer::{InstallerInterface, PackageEvents};
-use crate::io::buffer_io::BufferIO;
-use crate::io::{ConsoleIO, IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface};
+use crate::io::{
+    BufferIO, ConsoleIO, IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface,
+};
 use crate::package::PackageInterfaceHandle;
 use crate::repository::{InstalledRepositoryInterface, InstalledRepositoryInterfaceHandle};
 use crate::signal::SignalSubscription;

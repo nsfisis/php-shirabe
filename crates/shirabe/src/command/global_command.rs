@@ -1,7 +1,6 @@
 //! ref: composer/src/Composer/Command/GlobalCommand.php sha1:9bf70d11a1ca3b7779ab1c6b71b74f0a4a009fe0
 
-use crate::command::base_command::base_command_initialize;
-use crate::command::{BaseCommand, BaseCommandData};
+use crate::command::{BaseCommand, BaseCommandData, base_command_initialize};
 use crate::console::Application;
 use crate::console::input::InputArgument;
 use crate::delegate_base_command_trait_impls_to_inner;

@@ -1,7 +1,7 @@
 //! ref: composer/tests/Composer/Test/Util/NoProxyPatternTest.php sha1:722c6f6bf67b52b7a10f225950624a487bd2d900
 
 use bstr::{BStr, BString, ByteSlice};
-use shirabe::util::no_proxy_pattern::NoProxyPattern;
+use shirabe::util::NoProxyPattern;
 use shirabe_php_shim::bconcat;
 
 fn run_test(noproxy: &BStr, url: &BStr, expected: bool) {

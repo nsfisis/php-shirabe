@@ -1,6 +1,6 @@
 //! ref: composer/vendor/symfony/console/Exception/InvalidArgumentException.php sha1:29aad04f931c6cb01ff7117c9089bcf1fbc15b35
 
-use crate::exception::exception_interface::ExceptionInterface;
+use crate::exception::ExceptionInterface;
 use bstr::BString;
 use shirabe_php_shim::impl_php_exception;
 

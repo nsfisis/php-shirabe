@@ -1,10 +1,8 @@
 //! ref: composer/vendor/symfony/console/Command/CompleteCommand.php sha1:78febd02a74ab09d930d8a6c220c13a8b69641d2
 
 use crate::command::{Command, CommandData};
-use crate::completion::{
-    BashCompletionOutput, CompletionInput, CompletionOutputInterface, CompletionSuggestions,
-    StringOrSuggestion,
-};
+use crate::completion::output::{BashCompletionOutput, CompletionOutputInterface};
+use crate::completion::{CompletionInput, CompletionSuggestions, StringOrSuggestion};
 use crate::delegate_command_trait_impls_to_inner;
 use crate::input::{InputInterface, InputInterfaceByName, InputOption, InputValue};
 use crate::output::OutputInterface;

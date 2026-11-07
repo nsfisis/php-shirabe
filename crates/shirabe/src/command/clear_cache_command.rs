@@ -1,8 +1,9 @@
 //! ref: composer/src/Composer/Command/ClearCacheCommand.php sha1:f8702b19db8724cfbb8cf8424192b612dbfe4b99
 
 use crate::cache::Cache;
-use crate::command::base_command::{base_command_complete, base_command_initialize};
-use crate::command::{BaseCommand, BaseCommandData};
+use crate::command::{
+    BaseCommand, BaseCommandData, base_command_complete, base_command_initialize,
+};
 use crate::config::Config;
 use crate::console::input::InputOption;
 use crate::delegate_base_command_trait_impls_to_inner;

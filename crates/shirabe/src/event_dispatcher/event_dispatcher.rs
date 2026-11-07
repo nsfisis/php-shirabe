@@ -11,9 +11,6 @@ use crate::event_dispatcher::{
 use crate::installer::{BinaryInstaller, InstallerEvent, PackageEvent};
 use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, QUIET, VERBOSE};
 use crate::plugin::php_call::PhpCall;
-use crate::plugin::post_file_download_event::PostFileDownloadEvent;
-use crate::plugin::pre_file_download_event::PreFileDownloadEvent;
-use crate::plugin::pre_pool_create_event::PrePoolCreateEvent;
 use crate::plugin::rpc::dispatch::{
     PluginRpcDispatcher, call_static_entity, construct_entity, dispatch_job_service_method,
     dispatch_r_table_method, error_throw, find_file_in_registered_loaders, unavailable_method,
@@ -27,7 +24,10 @@ use crate::plugin::rpc::table::{
     register_io_entity, repository_handle_value, rust_handle_value, transaction_handle_value,
 };
 use crate::plugin::throwable_bridge::throw_into_error;
-use crate::plugin::{CommandEvent, PreCommandRunEvent};
+use crate::plugin::{
+    CommandEvent, PostFileDownloadEvent, PreCommandRunEvent, PreFileDownloadEvent,
+    PrePoolCreateEvent,
+};
 use crate::repository::{FilesystemRepository, InstalledRepositoryInterfaceHandle};
 use crate::script::Event as ScriptEvent;
 use crate::util::{Platform, ProcessExecutor};

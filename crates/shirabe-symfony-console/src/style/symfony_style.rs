@@ -1,5 +1,6 @@
 //! ref: composer/vendor/symfony/console/Style/SymfonyStyle.php sha1:7f214d121b04636b9508de280456273d709bab8b
 
+use crate::Terminal;
 use crate::formatter::{OutputFormatter, OutputFormatterInterface};
 use crate::helper::{
     Cell, Helper, QuestionHelperInterface, Row, StyleName, SymfonyQuestionHelper, Table,
@@ -9,9 +10,7 @@ use crate::output::{
     ConsoleOutput, ConsoleOutputInterface, OUTPUT_NORMAL, OutputInterface, TrimmedBufferOutput,
 };
 use crate::question::{ConfirmationQuestion, QuestionInterface};
-use crate::style::output_style::OutputStyle;
-use crate::style::style_interface::StyleInterface;
-use crate::terminal::Terminal;
+use crate::style::{OutputStyle, StyleInterface};
 use bstr::{BStr, BString, ByteSlice};
 use shirabe_php_shim::{
     AsAny, PHP_EOL, array_unshift, bconcat, explode, str_repeat, str_replace, strlen, substr,

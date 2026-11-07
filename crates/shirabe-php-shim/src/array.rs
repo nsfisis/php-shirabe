@@ -1,6 +1,6 @@
-use crate::var::{is_numeric_string, to_bool};
 use crate::{
-    PhpMixed, bconcat, canonical_int_key, display_to_bytes, php_to_string, strnatcasecmp, utf8_text,
+    PhpMixed, bconcat, canonical_int_key, display_to_bytes, is_numeric_string, php_to_string,
+    strnatcasecmp, to_bool, utf8_text,
 };
 use bstr::{B, BString};
 use indexmap::IndexMap;
@@ -731,8 +731,6 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::PhpMixed;
-    use indexmap::IndexMap;
 
     #[test]
     fn array_key_first_matches_php() {

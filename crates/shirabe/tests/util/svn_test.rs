@@ -3,9 +3,8 @@
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe::config::Config;
-use shirabe::io::IOInterface;
-use shirabe::io::null_io::NullIO;
-use shirabe::util::svn::Svn;
+use shirabe::io::{IOInterface, NullIO};
+use shirabe::util::Svn;
 use shirabe_php_shim::{PhpMixed, bconcat};
 
 fn map(pairs: Vec<(&BStr, PhpMixed)>) -> IndexMap<BString, PhpMixed> {

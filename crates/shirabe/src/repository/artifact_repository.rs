@@ -67,7 +67,6 @@ impl ArtifactRepository {
     /// `RepositoryInterface::getPackages` dispatch in PHP.
     pub fn __get_packages(&mut self) -> anyhow::Result<Vec<BasePackageHandle>> {
         self.initialize()?;
-        use crate::repository::RepositoryInterface;
         self.inner.get_packages()
     }
 

@@ -2,7 +2,7 @@
 
 use crate::test_case::get_package;
 use bstr::BString;
-use shirabe::package::handle::PackageInterfaceHandle;
+use shirabe::package::PackageInterfaceHandle;
 use shirabe::repository::{
     ArrayRepository, CompositeRepository, FindPackageConstraint, RepositoryInterface,
     RepositoryInterfaceHandle, SEARCH_FULLTEXT,

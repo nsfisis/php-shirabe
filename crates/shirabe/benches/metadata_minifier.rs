@@ -8,7 +8,7 @@
 use bstr::{BStr, BString, ByteSlice};
 use criterion::{BatchSize, BenchmarkId, Criterion, criterion_group, criterion_main};
 use indexmap::IndexMap;
-use shirabe::json::json_file::JsonFile;
+use shirabe::json::JsonFile;
 use shirabe_metadata_minifier::MetadataMinifier;
 use shirabe_php_shim::{PhpMixed, php_str};
 use std::hint::black_box;

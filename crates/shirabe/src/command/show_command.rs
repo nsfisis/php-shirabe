@@ -1,7 +1,8 @@
 //! ref: composer/src/Composer/Command/ShowCommand.php sha1:642e86b7272ebdbe29416da4ef521a4e0c3e64dd
 
-use crate::command::base_command::{base_command_complete, base_command_initialize};
-use crate::command::{BaseCommand, BaseCommandData, CompletionTrait};
+use crate::command::{
+    BaseCommand, BaseCommandData, CompletionTrait, base_command_complete, base_command_initialize,
+};
 use crate::composer::{PartialComposerHandle, composer_full};
 use crate::console::input::{InputArgument, InputOption, SuggestedValues};
 use crate::delegate_base_command_trait_impls_to_inner;
@@ -10,8 +11,7 @@ use crate::event_dispatcher::EventFlags;
 use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
 use crate::io::{IOInterfaceImmutable, IOInterfaceWrite};
 use crate::json::JsonFile;
-use crate::package::version::version_selector::ShowWarnings;
-use crate::package::version::{VersionParser, VersionSelector};
+use crate::package::version::{ShowWarnings, VersionParser, VersionSelector};
 use crate::package::{
     CompletePackageInterfaceHandle, DisplayMode, Link, PackageInterfaceHandle,
     RootPackageInterfaceHandle, base_package,

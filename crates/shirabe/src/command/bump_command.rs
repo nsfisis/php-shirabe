@@ -1,7 +1,8 @@
 //! ref: composer/src/Composer/Command/BumpCommand.php sha1:9779ca6e6334d1c464f8bec6258eb38439cd65ac
 
-use crate::command::base_command::{base_command_complete, base_command_initialize};
-use crate::command::{BaseCommand, BaseCommandData, CompletionTrait};
+use crate::command::{
+    BaseCommand, BaseCommandData, CompletionTrait, base_command_complete, base_command_initialize,
+};
 use crate::composer::composer_full;
 use crate::console::input::{InputArgument, InputOption};
 use crate::delegate_base_command_trait_impls_to_inner;

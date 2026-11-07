@@ -1,7 +1,8 @@
 //! ref: composer/src/Composer/Command/FundCommand.php sha1:0de174fed688fc40fbd2886d33bd5c16513fe73d
 
-use crate::command::base_command::{base_command_complete, base_command_initialize};
-use crate::command::{BaseCommand, BaseCommandData};
+use crate::command::{
+    BaseCommand, BaseCommandData, base_command_complete, base_command_initialize,
+};
 use crate::composer::composer_full;
 use crate::console::input::{InputOption, SuggestedValues};
 use crate::delegate_base_command_trait_impls_to_inner;

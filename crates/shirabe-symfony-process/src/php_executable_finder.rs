@@ -1,6 +1,6 @@
 //! ref: composer/vendor/symfony/process/PhpExecutableFinder.php sha1:c51b0d1a20509fc57cdc06502e44099f5f3bde17
 
-use crate::executable_finder::ExecutableFinder;
+use crate::ExecutableFinder;
 use bstr::BString;
 use shirabe_php_shim::{getenv, is_dir, is_executable, path_from_bytes, path_to_bytes};
 

@@ -4,11 +4,8 @@
 use bstr::BString;
 use indexmap::IndexMap;
 use shirabe::config::Config;
-use shirabe::io::IOInterface;
-use shirabe::io::null_io::NullIO;
-use shirabe::util::http_downloader::{
-    HttpDownloader, HttpDownloaderMockExpectation, HttpDownloaderMockHandler,
-};
+use shirabe::io::{IOInterface, NullIO};
+use shirabe::util::{HttpDownloader, HttpDownloaderMockExpectation, HttpDownloaderMockHandler};
 use shirabe_php_shim::PhpMixed;
 
 // A single HTTP request expectation as written in the PHP tests: a `url` plus an

@@ -8,7 +8,7 @@
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use serial_test::serial;
-use shirabe::util::filesystem::Filesystem;
+use shirabe::util::Filesystem;
 use shirabe_php_shim::{
     PhpMixed, bconcat, intval, os_str_from_bytes, path_from_bytes, php_regex, preg_match,
     preg_split_delim_capture, trim, utf8_text,

@@ -1,8 +1,7 @@
 //! ref: composer/src/Composer/Advisory/Auditor.php sha1:e2575416d104b436981565df0389ffe67cad9f4f
 
 use crate::advisory::{AnySecurityAdvisory, SecurityAdvisory};
-use crate::io::buffer_io::BufferIO;
-use crate::io::{ConsoleIO, IOInterface, IOInterfaceWrite};
+use crate::io::{BufferIO, ConsoleIO, IOInterface, IOInterfaceWrite};
 use crate::json::JsonFile;
 use crate::package::{CompletePackageInterfaceHandle, PackageInterfaceHandle, base_package};
 use crate::repository::RepositorySet;

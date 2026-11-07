@@ -1,7 +1,8 @@
 //! ref: composer/src/Composer/Command/ScriptAliasCommand.php sha1:098a85149d8bc3d10182f2f82fad53aaa7c67eb4
 
-use crate::command::base_command::{base_command_complete, base_command_initialize};
-use crate::command::{BaseCommand, BaseCommandData};
+use crate::command::{
+    BaseCommand, BaseCommandData, base_command_complete, base_command_initialize,
+};
 use crate::composer::composer_full;
 use crate::console::input::{InputArgument, InputOption};
 use crate::delegate_base_command_trait_impls_to_inner;
@@ -12,8 +13,9 @@ use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, bconcat, impl_php_class, is_string, php_regex,
     preg_replace_with_limit_and_count,
 };
-use shirabe_symfony_console::input::InputInterfaceByName;
-use shirabe_symfony_console::{command::Command, input::InputInterface, output::OutputInterface};
+use shirabe_symfony_console::command::Command;
+use shirabe_symfony_console::input::{InputInterface, InputInterfaceByName};
+use shirabe_symfony_console::output::OutputInterface;
 
 #[derive(Debug)]
 pub struct ScriptAliasCommand {

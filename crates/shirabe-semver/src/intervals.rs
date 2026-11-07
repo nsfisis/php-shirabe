@@ -3,7 +3,7 @@
 use crate::constraint::{
     AnyConstraint, MatchAllConstraint, MatchNoneConstraint, MultiConstraint, SimpleConstraint,
 };
-use crate::interval::{DevConstraintSet, Interval};
+use crate::{DevConstraintSet, Interval};
 use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::{

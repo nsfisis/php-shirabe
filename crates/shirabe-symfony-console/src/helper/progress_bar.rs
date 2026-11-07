@@ -1,12 +1,11 @@
 //! ref: composer/vendor/symfony/console/Helper/ProgressBar.php sha1:240e6cdb125cbeb0137ca60ccf4cc236d5d335c3
 
-use crate::cursor::Cursor;
 use crate::exception::LogicException;
 use crate::helper::Helper;
 use crate::output::{
     ConsoleOutput, ConsoleOutputInterface, ConsoleSectionOutput, OutputInterface, output_interface,
 };
-use crate::terminal::Terminal;
+use crate::{Cursor, Terminal};
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{

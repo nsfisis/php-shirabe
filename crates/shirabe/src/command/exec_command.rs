@@ -1,7 +1,8 @@
 //! ref: composer/src/Composer/Command/ExecCommand.php sha1:b51c35ccde1a66c0df3e8136b27be5ae67016cc0
 
-use crate::command::base_command::{base_command_complete, base_command_initialize};
-use crate::command::{BaseCommand, BaseCommandData};
+use crate::command::{
+    BaseCommand, BaseCommandData, base_command_complete, base_command_initialize,
+};
 use crate::composer::composer_full;
 use crate::console::Application;
 use crate::console::input::{InputArgument, InputOption, SuggestedValues};

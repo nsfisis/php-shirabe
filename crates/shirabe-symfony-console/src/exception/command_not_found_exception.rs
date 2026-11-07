@@ -1,6 +1,6 @@
 //! ref: composer/vendor/symfony/console/Exception/CommandNotFoundException.php sha1:4cbfe3d0bd964e1153c09786e456a73af9234eb9
 
-use crate::exception::exception_interface::ExceptionInterface;
+use crate::exception::ExceptionInterface;
 use bstr::BString;
 use shirabe_php_shim::{InvalidArgumentException, impl_php_exception};
 

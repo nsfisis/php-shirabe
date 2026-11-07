@@ -1,8 +1,7 @@
 //! ref: composer/src/Composer/Command/ConfigCommand.php sha1:81de5feaf3b7e975424e4cce2c773869b5283f7b
 
 use crate::advisory::Auditor;
-use crate::command::base_command::base_command_complete;
-use crate::command::{BaseCommand, BaseCommandData, BaseConfigCommand};
+use crate::command::{BaseCommand, BaseCommandData, BaseConfigCommand, base_command_complete};
 use crate::config::{Config, ConfigSourceInterface, JsonConfigSource};
 use crate::console::input::{InputArgument, InputOption, SuggestedValues};
 use crate::delegate_base_command_trait_impls_to_inner;
@@ -22,8 +21,9 @@ use shirabe_php_shim::{
     strtolower, system, touch, trim_chars, var_export,
 };
 use shirabe_semver::VersionParser;
-use shirabe_symfony_console::input::InputInterfaceByName;
-use shirabe_symfony_console::{command::Command, input::InputInterface, output::OutputInterface};
+use shirabe_symfony_console::command::Command;
+use shirabe_symfony_console::input::{InputInterface, InputInterfaceByName};
+use shirabe_symfony_console::output::OutputInterface;
 
 #[derive(Debug)]
 pub struct ConfigCommand {

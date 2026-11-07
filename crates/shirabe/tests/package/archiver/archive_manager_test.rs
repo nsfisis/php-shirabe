@@ -3,11 +3,9 @@
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe::factory::Factory;
-use shirabe::io::IOInterface;
-use shirabe::io::null_io::NullIO;
-use shirabe::package::CompletePackageInterfaceHandle;
+use shirabe::io::{IOInterface, NullIO};
 use shirabe::package::archiver::ArchiveManager;
-use shirabe::package::handle::CompletePackageHandle;
+use shirabe::package::{CompletePackageHandle, CompletePackageInterfaceHandle};
 use shirabe::util::r#loop::Loop;
 use shirabe::util::{ProcessExecutor, StreamContextOptions};
 use shirabe_php_shim::{

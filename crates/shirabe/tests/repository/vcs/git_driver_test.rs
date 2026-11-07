@@ -9,10 +9,7 @@ use serial_test::serial;
 use shirabe::config::Config;
 use shirabe::io::IOInterface;
 use shirabe::repository::vcs::GitDriver;
-use shirabe::util::filesystem::Filesystem;
-use shirabe::util::http_downloader::HttpDownloaderMockHandler;
-use shirabe::util::platform::Platform;
-use shirabe::util::process_executor::MockHandler;
+use shirabe::util::{Filesystem, HttpDownloaderMockHandler, MockHandler, Platform};
 use shirabe_php_shim::{Catch as _, PhpMixed, RuntimeException, path_to_bytes};
 use tempfile::TempDir;
 

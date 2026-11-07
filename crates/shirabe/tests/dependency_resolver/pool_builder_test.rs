@@ -3,22 +3,18 @@
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe::config::Config;
-use shirabe::dependency_resolver::default_policy::DefaultPolicy;
-use shirabe::dependency_resolver::pool::Pool;
-use shirabe::dependency_resolver::pool_optimizer::PoolOptimizer;
-use shirabe::dependency_resolver::request::{Request, UpdateAllowTransitiveDeps};
-use shirabe::io::io_interface::IOInterface;
-use shirabe::io::null_io::NullIO;
+use shirabe::dependency_resolver::{
+    DefaultPolicy, Pool, PoolOptimizer, Request, UpdateAllowTransitiveDeps,
+};
+use shirabe::io::{IOInterface, NullIO};
 use shirabe::json::JsonFile;
 use shirabe::package::loader::{ArrayLoader, LoaderInterface};
-use shirabe::package::version::version_parser::VersionParser;
+use shirabe::package::version::VersionParser;
 use shirabe::package::{BasePackageHandle, STABILITIES};
-use shirabe::repository::array_repository::ArrayRepository;
-use shirabe::repository::filter_repository::FilterRepository;
-use shirabe::repository::handle::{LockArrayRepositoryHandle, RepositoryInterfaceHandle};
-use shirabe::repository::lock_array_repository::LockArrayRepository;
-use shirabe::repository::repository_factory::RepositoryFactory;
-use shirabe::repository::repository_set::{RepositorySet, RootAliasInput};
+use shirabe::repository::{
+    ArrayRepository, FilterRepository, LockArrayRepository, LockArrayRepositoryHandle,
+    RepositoryFactory, RepositoryInterfaceHandle, RepositorySet, RootAliasInput,
+};
 use shirabe_php_shim::{
     PhpMixed, bconcat, display_to_bytes, file_get_contents, path_to_bytes, php_regex,
     preg_is_match, preg_split_delim_capture, str_replace, utf8_text,

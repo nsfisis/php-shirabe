@@ -4,11 +4,11 @@ use crate::http_downloader_mock::{HttpDownloaderMockGuard, expect_full, get_http
 use bstr::{B, BStr, BString};
 use indexmap::IndexMap;
 use shirabe::config::Config;
-use shirabe::io::IOInterface;
-use shirabe::io::null_io::NullIO;
-use shirabe::repository::composer_repository::{ComposerRepository, ProviderListingEntry};
-use shirabe::repository::{RepositoryInterface, SEARCH_FULLTEXT};
-use shirabe::util::http_downloader::HttpDownloaderMockHandler;
+use shirabe::io::{IOInterface, NullIO};
+use shirabe::repository::{
+    ComposerRepository, ProviderListingEntry, RepositoryInterface, SEARCH_FULLTEXT,
+};
+use shirabe::util::HttpDownloaderMockHandler;
 use shirabe_php_shim::{PhpMixed, bconcat, hash, path_to_bytes, uniqid};
 use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
 use tempfile::TempDir;

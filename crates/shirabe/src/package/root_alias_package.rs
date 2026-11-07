@@ -1,9 +1,8 @@
 //! ref: composer/src/Composer/Package/RootAliasPackage.php sha1:4ce3293acb03778811142181959f6b2fe0c1d4c7
 
-use crate::package::handle::delegate_package_interface_to_inner;
 use crate::package::{
     CompleteAliasPackage, CompletePackageHandle, CompletePackageInterface, Link, PackageInterface,
-    RootPackageHandle, RootPackageInterface,
+    RootPackageHandle, RootPackageInterface, delegate_package_interface_to_inner,
 };
 use bstr::{BStr, BString};
 use indexmap::IndexMap;

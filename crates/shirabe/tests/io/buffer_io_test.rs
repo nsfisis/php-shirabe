@@ -1,8 +1,7 @@
 //! ref: composer/tests/Composer/Test/IO/BufferIOTest.php sha1:182a18be83ead9e2a60c96143b9baee30292a800
 
 use bstr::BString;
-use shirabe::io::IOInterfaceWrite;
-use shirabe::io::buffer_io::BufferIO;
+use shirabe::io::{BufferIO, IOInterfaceWrite};
 use shirabe_symfony_console::input::InputValue;
 use shirabe_symfony_console::output::VERBOSITY_NORMAL;
 

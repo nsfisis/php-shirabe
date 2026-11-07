@@ -1,7 +1,8 @@
 //! ref: composer/src/Composer/Command/RunScriptCommand.php sha1:fd39fdf758c5f1fd032eefcb82e4ce49beba2882
 
-use crate::command::base_command::{base_command_complete, base_command_initialize};
-use crate::command::{BaseCommand, BaseCommandData};
+use crate::command::{
+    BaseCommand, BaseCommandData, base_command_complete, base_command_initialize,
+};
 use crate::composer::composer_full;
 use crate::console::input::{InputArgument, InputOption, SuggestedValues};
 use crate::delegate_base_command_trait_impls_to_inner;

@@ -1,7 +1,7 @@
 //! Benchmarks for `ProcessExecutor::execute_async`.
 
 use criterion::{BatchSize, BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
-use shirabe::util::process_executor::ProcessExecutor;
+use shirabe::util::ProcessExecutor;
 
 /// Pinned so the measurement does not depend on `COMPOSER_MAX_PARALLEL_PROCESSES`, which
 /// `ProcessExecutor::new` otherwise reads to size the semaphore.

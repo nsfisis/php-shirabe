@@ -31,8 +31,6 @@
 //! repository API (`RepositoryInterface` and its consumers `PoolBuilder` / `Problem`) and
 //! `VersionGuesser`'s callers (`RootPackageLoader`) to become `async fn`.
 
-use std::future::Future;
-
 /// Drives `fut` to completion, riding the ambient tokio runtime if one is entered (the normal
 /// case once `main.rs` has started), or a disposable one-off runtime otherwise.
 ///

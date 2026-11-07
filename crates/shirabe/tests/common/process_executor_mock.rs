@@ -1,6 +1,6 @@
 //! ref: composer/tests/Composer/Test/Mock/ProcessExecutorMock.php sha1:fd3bb92a020bed3c6639bc6c44f606b37689ae2d
 
-use shirabe::util::process_executor::{CommandLine, MockExpectation, MockHandler, ProcessExecutor};
+use shirabe::util::{CommandLine, MockExpectation, MockHandler, ProcessExecutor};
 
 // A command expectation as written in the PHP tests: either a bare command
 // (`'git command'` / `['git', '--version']`) or the full

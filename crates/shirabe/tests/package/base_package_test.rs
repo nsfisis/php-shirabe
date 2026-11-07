@@ -2,9 +2,7 @@
 
 use crate::test_case::get_package;
 use bstr::{BStr, BString};
-use shirabe::package::DisplayMode;
-use shirabe::package::base_package::package_names_to_regexp;
-use shirabe::package::handle::PackageHandle;
+use shirabe::package::{DisplayMode, PackageHandle, package_names_to_regexp};
 use shirabe::repository::{ArrayRepository, RepositoryInterfaceHandle};
 use shirabe_php_shim::bconcat;
 use shirabe_semver::VersionParser;

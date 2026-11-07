@@ -1,7 +1,7 @@
 //! ref: composer/tests/Composer/Test/Package/Archiver/GitExcludeFilterTest.php sha1:934311419504913979476c79a7e8136e12be10af
 
 use bstr::BStr;
-use shirabe::package::archiver::git_exclude_filter::GitExcludeFilter;
+use shirabe::package::archiver::GitExcludeFilter;
 
 #[test]
 fn test_pattern_escape() {

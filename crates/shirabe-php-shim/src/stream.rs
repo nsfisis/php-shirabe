@@ -1,5 +1,4 @@
-use crate::fs::{SEEK_SET, fopen, fseek};
-use crate::{PhpMixed, PhpResource, StreamBacking, path_from_bytes};
+use crate::{PhpMixed, PhpResource, SEEK_SET, StreamBacking, fopen, fseek, path_from_bytes};
 use bstr::{B, BStr, BString};
 use indexmap::IndexMap;
 use std::io::{Read as _, Write as _};

@@ -2,8 +2,8 @@
 
 use crate::test_case::{get_package, get_version_constraint};
 use indexmap::IndexMap;
-use shirabe::dependency_resolver::pool::Pool;
-use shirabe::package::handle::PackageInterfaceHandle;
+use shirabe::dependency_resolver::Pool;
+use shirabe::package::PackageInterfaceHandle;
 
 // ref: PoolTest::createPool
 fn create_pool(packages: Vec<PackageInterfaceHandle>) -> Pool {

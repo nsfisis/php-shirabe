@@ -6,9 +6,7 @@ use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use serial_test::serial;
 use shirabe::io::{IOInterface, NullIO};
-use shirabe::util::Perforce;
-use shirabe::util::filesystem::Filesystem;
-use shirabe::util::process_executor::{MockHandler, ProcessExecutor};
+use shirabe::util::{Filesystem, MockHandler, Perforce, ProcessExecutor};
 use shirabe_php_shim::{PHP_EOL, PhpMixed, bconcat, path_from_bytes, path_to_bytes, php_str};
 use shirabe_symfony_console::input::InputValue;
 

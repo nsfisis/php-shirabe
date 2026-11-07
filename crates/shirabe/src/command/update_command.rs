@@ -1,18 +1,19 @@
 //! ref: composer/src/Composer/Command/UpdateCommand.php sha1:9736a7deae25a549c219cfca41b5a8c128047e9b
 
 use crate::advisory::Auditor;
-use crate::command::base_command::{base_command_complete, base_command_initialize};
-use crate::command::{BaseCommand, BaseCommandData, BumpCommand, CompletionTrait, FAILURE};
+use crate::command::{
+    BaseCommand, BaseCommandData, BumpCommand, CompletionTrait, FAILURE, base_command_complete,
+    base_command_initialize,
+};
 use crate::composer::{PartialComposerHandle, composer_full};
 use crate::config::BumpAfterUpdate;
 use crate::console::input::{InputArgument, InputOption, SuggestedValues};
 use crate::delegate_base_command_trait_impls_to_inner;
-use crate::dependency_resolver::request::UpdateAllowTransitiveDeps;
+use crate::dependency_resolver::UpdateAllowTransitiveDeps;
 use crate::installer::Installer;
 use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::package::loader::RootPackageLoader;
-use crate::package::version::version_selector::ShowWarnings;
-use crate::package::version::{VersionParser, VersionSelector};
+use crate::package::version::{ShowWarnings, VersionParser, VersionSelector};
 use crate::package::{PackageInterfaceHandle, base_package};
 use crate::plugin::{CommandEvent, PluginEvents};
 use crate::repository::{
@@ -26,14 +27,12 @@ use shirabe_php_shim::{
     array_merge_map, array_search_in_vec, bconcat, impl_php_class, php_regex, preg_is_match,
     preg_match, preg_replace, strtolower,
 };
-use shirabe_semver::{Intervals, constraint::MultiConstraint};
-use shirabe_symfony_console::input::InputInterfaceByName;
-use shirabe_symfony_console::{
-    command::Command,
-    helper::{Cell, Table},
-    input::{InputInterface, InputValue},
-    output::OutputInterface,
-};
+use shirabe_semver::Intervals;
+use shirabe_semver::constraint::MultiConstraint;
+use shirabe_symfony_console::command::Command;
+use shirabe_symfony_console::helper::{Cell, Table};
+use shirabe_symfony_console::input::{InputInterface, InputInterfaceByName, InputValue};
+use shirabe_symfony_console::output::OutputInterface;
 
 #[derive(Debug)]
 pub struct UpdateCommand {

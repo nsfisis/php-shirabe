@@ -1,8 +1,9 @@
 //! ref: composer/src/Composer/Command/RemoveCommand.php sha1:6fc635adbb71d96ddf7e00e7a1373b7d0045bccb
 
 use crate::advisory::Auditor;
-use crate::command::base_command::{base_command_complete, base_command_initialize};
-use crate::command::{BaseCommand, BaseCommandData, CompletionTrait};
+use crate::command::{
+    BaseCommand, BaseCommandData, CompletionTrait, base_command_complete, base_command_initialize,
+};
 use crate::composer::composer_full;
 use crate::config::{ConfigSourceInterface, JsonConfigSource};
 use crate::console::input::{InputArgument, InputOption, SuggestedValues};
@@ -20,13 +21,10 @@ use indexmap::IndexMap;
 use shirabe_php_shim::{
     PhpMixed, UnexpectedValueException, bconcat, impl_php_class, implode, preg_grep, strtolower,
 };
-use shirabe_symfony_console::input::InputInterfaceByName;
-use shirabe_symfony_console::{
-    command::Command,
-    exception::InvalidArgumentException,
-    input::{InputInterface, InputValue},
-    output::OutputInterface,
-};
+use shirabe_symfony_console::command::Command;
+use shirabe_symfony_console::exception::InvalidArgumentException;
+use shirabe_symfony_console::input::{InputInterface, InputInterfaceByName, InputValue};
+use shirabe_symfony_console::output::OutputInterface;
 
 #[derive(Debug)]
 pub struct RemoveCommand {

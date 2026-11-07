@@ -6,7 +6,7 @@
 //! `RecursiveDirectoryIterator` attaches to each `SplFileInfo` is carried on the
 //! private `Entry` struct so the path/exclude filters keep their exact behavior.
 
-use crate::glob::Glob;
+use crate::Glob;
 use bstr::{BStr, BString, ByteSlice};
 use chrono::{DateTime, TimeZone};
 use indexmap::IndexSet;

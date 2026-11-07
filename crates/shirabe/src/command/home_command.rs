@@ -1,7 +1,8 @@
 //! ref: composer/src/Composer/Command/HomeCommand.php sha1:5061876538d1ca2bacd748bf99b98c2333ee55fd
 
-use crate::command::base_command::{base_command_complete, base_command_initialize};
-use crate::command::{BaseCommand, BaseCommandData, CompletionTrait};
+use crate::command::{
+    BaseCommand, BaseCommandData, CompletionTrait, base_command_complete, base_command_initialize,
+};
 use crate::composer::composer_full;
 use crate::console::input::{InputArgument, InputOption};
 use crate::delegate_base_command_trait_impls_to_inner;

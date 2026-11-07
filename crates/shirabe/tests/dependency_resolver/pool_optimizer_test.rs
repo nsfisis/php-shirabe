@@ -2,16 +2,12 @@
 
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe::dependency_resolver::default_policy::DefaultPolicy;
-use shirabe::dependency_resolver::pool::Pool;
-use shirabe::dependency_resolver::pool_optimizer::PoolOptimizer;
-use shirabe::dependency_resolver::request::Request;
+use shirabe::dependency_resolver::{DefaultPolicy, Pool, PoolOptimizer, Request};
 use shirabe::json::JsonFile;
 use shirabe::package::BasePackageHandle;
 use shirabe::package::loader::{ArrayLoader, LoaderInterface};
-use shirabe::package::version::version_parser::VersionParser;
-use shirabe::repository::handle::LockArrayRepositoryHandle;
-use shirabe::repository::lock_array_repository::LockArrayRepository;
+use shirabe::package::version::VersionParser;
+use shirabe::repository::{LockArrayRepository, LockArrayRepositoryHandle};
 use shirabe_php_shim::{
     PhpMixed, bconcat, file_get_contents, path_to_bytes, php_regex, preg_is_match,
     preg_split_delim_capture, str_replace,

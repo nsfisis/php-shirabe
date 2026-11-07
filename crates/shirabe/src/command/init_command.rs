@@ -1,7 +1,9 @@
 //! ref: composer/src/Composer/Command/InitCommand.php sha1:a93b652d60d0065d28b054d23ed093664106d9cb
 
-use crate::command::base_command::{base_command_complete, base_command_initialize};
-use crate::command::{BaseCommand, BaseCommandData, CompletionTrait, PackageDiscoveryTrait};
+use crate::command::{
+    BaseCommand, BaseCommandData, CompletionTrait, PackageDiscoveryTrait, base_command_complete,
+    base_command_initialize,
+};
 use crate::console::input::InputOption;
 use crate::delegate_base_command_trait_impls_to_inner;
 use crate::factory::Factory;
@@ -24,13 +26,12 @@ use shirabe_php_shim::{
     preg_replace, realpath, str_replace, strpos, strtolower, trim, ucwords, unlink,
 };
 use shirabe_spdx_licenses::SpdxLicenses;
-use shirabe_symfony_console::input::InputInterfaceByName;
-use shirabe_symfony_console::{
-    command::Command,
-    helper::FormatBlockMessages,
-    input::{ArrayInput, InputInterface, InputValue},
-    output::OutputInterface,
+use shirabe_symfony_console::command::Command;
+use shirabe_symfony_console::helper::FormatBlockMessages;
+use shirabe_symfony_console::input::{
+    ArrayInput, InputInterface, InputInterfaceByName, InputValue,
 };
+use shirabe_symfony_console::output::OutputInterface;
 use std::path::Path;
 
 #[derive(Debug)]

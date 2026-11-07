@@ -14,9 +14,8 @@
 // util/http/proxy_manager_test.rs and http_downloader_test.rs).
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe::util::http::proxy_manager::ProxyManager;
-use shirabe::util::platform::Platform;
-use shirabe::util::stream_context_factory::StreamContextFactory;
+use shirabe::util::http::ProxyManager;
+use shirabe::util::{Platform, StreamContextFactory};
 use shirabe_php_shim::{
     PhpMixed, base64_encode, bconcat, error_message, extension_loaded, implode,
     stream_context_get_options, stripos,

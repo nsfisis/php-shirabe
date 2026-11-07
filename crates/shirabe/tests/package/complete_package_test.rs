@@ -1,8 +1,7 @@
 //! ref: composer/tests/Composer/Test/Package/CompletePackageTest.php sha1:49d1cc8808cabebb0080c40aee4cb75be9179bfd
 
 use bstr::{BStr, BString};
-use shirabe::package::package::Package;
-use shirabe::package::package_interface::PackageInterface;
+use shirabe::package::{Package, PackageInterface};
 use shirabe_php_shim::{Stringable, bconcat};
 use shirabe_semver::VersionParser;
 

@@ -3,9 +3,9 @@
 use crate::test_case::{RestoreEnv, RunOptions, get_application_tester, init_temp_composer};
 use bstr::{BStr, BString, ByteSlice};
 use serial_test::serial;
-use shirabe::command::init_command::InitCommand;
+use shirabe::command::InitCommand;
 use shirabe::json::JsonFile;
-use shirabe::util::platform::Platform;
+use shirabe::util::Platform;
 use shirabe_php_shim::{
     PHP_SERVER, PhpJson, PhpMixed, error_chain_message, path_to_bytes, utf8_text,
 };

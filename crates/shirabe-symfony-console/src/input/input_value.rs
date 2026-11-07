@@ -26,7 +26,6 @@ impl InputValue {
     /// TODO(type-model): the plugin bridge still hands back a `PhpMixed`, so a value outside this
     /// domain can only be rejected here.
     pub fn from_php_mixed(value: &PhpMixed) -> Self {
-        use shirabe_php_shim::PhpMixed;
         match value {
             PhpMixed::Null => Self::Null,
             PhpMixed::Bool(b) => Self::Bool(*b),

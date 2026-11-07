@@ -5,14 +5,12 @@ use shirabe::composer::Composer;
 use shirabe::config::Config;
 use shirabe::downloader::{DownloadManager, DownloadManagerInterface};
 use shirabe::installer::{InstallationManager, InstallationManagerInterface};
-use shirabe::io::IOInterface;
-use shirabe::io::null_io::NullIO;
+use shirabe::io::{IOInterface, NullIO};
 use shirabe::json::JsonFile;
 use shirabe::package::{Locker, LockerInterface, RootPackageHandle, RootPackageInterfaceHandle};
 use shirabe::repository::{RepositoryManager, RepositoryManagerInterface};
-use shirabe::util::http_downloader::HttpDownloader;
 use shirabe::util::r#loop::Loop;
-use shirabe::util::process_executor::ProcessExecutor;
+use shirabe::util::{HttpDownloader, ProcessExecutor};
 
 fn null_io() -> std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
     std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()))

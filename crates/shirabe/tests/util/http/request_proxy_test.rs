@@ -2,7 +2,7 @@
 
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
-use shirabe::util::http::request_proxy::RequestProxy;
+use shirabe::util::http::RequestProxy;
 use shirabe_php_shim::{
     CURLAUTH_BASIC, CURLOPT_NOPROXY, CURLOPT_PROXY, CURLOPT_PROXY_CAINFO, CURLOPT_PROXY_CAPATH,
     CURLOPT_PROXYAUTH, CURLOPT_PROXYUSERPWD, PhpMixed,

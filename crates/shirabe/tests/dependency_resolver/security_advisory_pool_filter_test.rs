@@ -8,10 +8,8 @@
 use bstr::{B, BStr, BString};
 use indexmap::IndexMap;
 use shirabe::advisory::{AuditConfig, Auditor};
-use shirabe::dependency_resolver::SecurityAdvisoryPoolFilter;
-use shirabe::dependency_resolver::pool::Pool;
-use shirabe::dependency_resolver::request::Request;
-use shirabe::package::handle::{CompletePackageHandle, PackageHandle, PackageInterfaceHandle};
+use shirabe::dependency_resolver::{Pool, Request, SecurityAdvisoryPoolFilter};
+use shirabe::package::{CompletePackageHandle, PackageHandle, PackageInterfaceHandle};
 use shirabe::repository::{PackageRepository, RepositoryInterfaceHandle};
 use shirabe_php_shim::{PhpMixed, bconcat, uniqid};
 use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};

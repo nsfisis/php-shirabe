@@ -80,7 +80,6 @@ impl PackageRepository {
     }
 
     pub fn get_repo_name(&self) -> anyhow::Result<BString> {
-        use crate::repository::RepositoryInterface;
         // PHP: parent::getRepoName() counts through the late-bound $this->initialize(),
         // which resolves to PackageRepository::initialize (loading the config packages).
         self.ensure_initialized()?;

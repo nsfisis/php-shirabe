@@ -10,14 +10,11 @@ use bstr::{BString, ByteSlice};
 use indexmap::IndexMap;
 use serial_test::serial;
 use shirabe::config::Config;
-use shirabe::downloader::zip_downloader::ZipDownloader;
-use shirabe::downloader::{ArchiveDownloader, DownloaderInterface};
+use shirabe::downloader::{ArchiveDownloader, DownloaderInterface, ZipDownloader};
 use shirabe::io::IOInterface;
-use shirabe::package::handle::{CompletePackageHandle, PackageInterfaceHandle};
-use shirabe::util::filesystem::Filesystem;
+use shirabe::package::{CompletePackageHandle, PackageInterfaceHandle};
 use shirabe::util::r#loop::Loop;
-use shirabe::util::process_executor::MockHandler;
-use shirabe::util::{HttpDownloader, ProcessExecutor};
+use shirabe::util::{Filesystem, HttpDownloader, MockHandler, ProcessExecutor};
 use shirabe_php_shim::{
     PhpMixed, ZipArchive, ZipArchiveMock, bconcat, error_message, path_to_bytes,
 };

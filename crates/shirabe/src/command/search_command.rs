@@ -1,15 +1,18 @@
 //! ref: composer/src/Composer/Command/SearchCommand.php sha1:d7a378817f3a2321c5ca4564477de847bb902f13
 
-use crate::command::base_command::{base_command_complete, base_command_initialize};
-use crate::command::{BaseCommand, BaseCommandData};
+use crate::command::{
+    BaseCommand, BaseCommandData, base_command_complete, base_command_initialize,
+};
 use crate::composer::composer_full;
 use crate::console::input::{InputArgument, InputOption, SuggestedValues};
 use crate::delegate_base_command_trait_impls_to_inner;
 use crate::io::IOInterfaceWrite;
 use crate::json::JsonFile;
 use crate::plugin::{CommandEvent, PluginEvents};
-use crate::repository::repository_interface::{self, AbandonedInfo, RepositoryInterface};
-use crate::repository::{CompositeRepository, PlatformRepository, RepositoryInterfaceHandle};
+use crate::repository::{
+    AbandonedInfo, CompositeRepository, PlatformRepository, RepositoryInterface,
+    RepositoryInterfaceHandle, repository_interface,
+};
 use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::{

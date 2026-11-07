@@ -4,11 +4,10 @@
 // TODO(php-semantics): this differs from PHP's `Phar` and `PharData` in details. Its compatibility
 // needs to be investigated against the C sources of PHP's `ext/phar`.
 
-use crate::hash::calculate_hash;
-use crate::zip::start_directory;
 use crate::{
-    Exception, UnexpectedValueException, bconcat, display_to_bytes, file_exists,
-    impl_php_exception, os_str_from_bytes, path_from_bytes, path_to_bytes, rtrim_chars, trim_chars,
+    Exception, UnexpectedValueException, bconcat, calculate_hash, display_to_bytes, file_exists,
+    impl_php_exception, os_str_from_bytes, path_from_bytes, path_to_bytes, rtrim_chars,
+    start_directory, trim_chars,
 };
 use bstr::{BStr, BString, ByteSlice};
 use std::io::{Read as _, Write as _};
@@ -1022,8 +1021,7 @@ impl PharData {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::hash::calculate_hash;
-    use crate::{Catch as _, error_message, path_from_bytes};
+    use crate::{Catch as _, error_message};
 
     #[test]
     fn tar_entry_name_keeps_bytes_that_are_not_valid_utf8() {

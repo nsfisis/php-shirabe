@@ -1,6 +1,6 @@
 //! ref: composer/vendor/symfony/console/Descriptor/MarkdownDescriptor.php sha1:5fe59dff3f093090358e23d35f7f69ffdaba4227
 
-use crate::application::Application;
+use crate::Application;
 use crate::command::Command;
 use crate::descriptor::{
     ApplicationDescription, DescribableObject, Descriptor, DescriptorInterface, DescriptorOptions,

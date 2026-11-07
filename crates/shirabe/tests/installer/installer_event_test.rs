@@ -5,8 +5,7 @@ use shirabe::composer::{ComposerHandle, PartialOrFullComposer};
 use shirabe::dependency_resolver::{AnyTransaction, Transaction};
 use shirabe::event_dispatcher::EventInterface;
 use shirabe::installer::InstallerEvent;
-use shirabe::io::IOInterface;
-use shirabe::io::null_io::NullIO;
+use shirabe::io::{IOInterface, NullIO};
 
 #[test]
 fn test_getter() {

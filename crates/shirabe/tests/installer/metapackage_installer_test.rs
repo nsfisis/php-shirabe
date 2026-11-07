@@ -6,8 +6,7 @@
 use crate::async_runtime::run;
 use crate::test_case::get_package;
 use shirabe::installer::{InstallerInterface, MetapackageInstaller};
-use shirabe::io::IOInterface;
-use shirabe::io::null_io::NullIO;
+use shirabe::io::{IOInterface, NullIO};
 use shirabe::repository::{InstalledArrayRepository, InstalledRepositoryInterfaceHandle};
 
 fn installer() -> MetapackageInstaller {

@@ -2,9 +2,8 @@
 
 use crate::cache::Cache;
 use crate::config::Config;
-use crate::downloader::file_downloader::RESPONSE_HEADERS;
 use crate::downloader::{
-    ArchiveDownloader, ChangeReportInterface, DownloaderInterface, FileDownloader,
+    ArchiveDownloader, ChangeReportInterface, DownloaderInterface, FileDownloader, RESPONSE_HEADERS,
 };
 use crate::event_dispatcher::EventDispatcher;
 use crate::io::{IOInterface, IOInterfaceWrite};

@@ -10,8 +10,9 @@ use crate::downloader::{
 };
 use crate::event_dispatcher::EventDispatcher;
 use crate::exception::IrrecoverableDownloadException;
-use crate::io::io_interface::VERY_VERBOSE;
-use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, NullIO, io_interface};
+use crate::io::{
+    IOInterface, IOInterfaceImmutable, IOInterfaceWrite, NullIO, VERY_VERBOSE, io_interface,
+};
 use crate::package::comparer::Comparer;
 use crate::package::{DisplayMode, PackageInterfaceHandle};
 use crate::plugin::{

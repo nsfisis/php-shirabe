@@ -1,7 +1,6 @@
 //! ref: composer/vendor/symfony/console/Exception/MissingInputException.php sha1:74cde09c0e0e708505feca111cc942abd8200149
 
-use crate::exception::exception_interface::ExceptionInterface;
-use crate::exception::runtime_exception::RuntimeException;
+use crate::exception::{ExceptionInterface, RuntimeException};
 use bstr::BString;
 use shirabe_php_shim::impl_php_exception;
 

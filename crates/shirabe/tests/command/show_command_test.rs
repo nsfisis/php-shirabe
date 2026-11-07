@@ -6,8 +6,7 @@ use crate::test_case::{
 };
 use bstr::{BStr, BString, ByteSlice};
 use serial_test::serial;
-use shirabe::package::Link;
-use shirabe::package::handle::PackageInterfaceHandle;
+use shirabe::package::{Link, PackageInterfaceHandle};
 use shirabe::repository::PlatformRepository;
 use shirabe_php_shim::{
     STR_PAD_RIGHT, bconcat, date_local, error_message, implode, rtrim, str_pad, trim, utf8_text,

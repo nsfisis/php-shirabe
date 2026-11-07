@@ -14,25 +14,21 @@ use shirabe::factory::DisablePlugins;
 use shirabe::installer::{
     InstallationManager, InstallationManagerInterface, InstallerInterface, PluginInstaller,
 };
-use shirabe::io::IOInterface;
-use shirabe::io::buffer_io::BufferIO;
+use shirabe::io::{BufferIO, IOInterface};
 use shirabe::json::JsonFile;
 use shirabe::package::loader::{ArrayLoader, JsonLoader, JsonLoaderInput};
 use shirabe::package::{
     CompletePackageHandle, Locker, LockerInterface, PackageInterfaceHandle, RootPackageHandle,
 };
 use shirabe::plugin::php_call::PhpCall;
-use shirabe::plugin::plugin_interface::PluginInterface;
 use shirabe::plugin::rpc::table::{composer_handle_value, io_handle_value, plugin_handle_value};
-use shirabe::plugin::{Capable, PluginManager};
+use shirabe::plugin::{Capable, PluginInterface, PluginManager};
 use shirabe::repository::{
     InstalledArrayRepository, InstalledRepositoryInterfaceHandle, RepositoryInterfaceHandle,
     RepositoryManagerInterface,
 };
-use shirabe::util::Platform;
-use shirabe::util::http_downloader::HttpDownloader;
 use shirabe::util::r#loop::Loop;
-use shirabe::util::process_executor::ProcessExecutor;
+use shirabe::util::{HttpDownloader, Platform, ProcessExecutor};
 use shirabe_php_rpc::PluginValue;
 use shirabe_php_shim::{
     Catch as _, PhpMixed, RuntimeException, UnexpectedValueException, bconcat, path_from_bytes,

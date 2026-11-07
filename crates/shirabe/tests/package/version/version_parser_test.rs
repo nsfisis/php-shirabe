@@ -2,7 +2,7 @@
 
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe::package::version::version_parser::VersionParser;
+use shirabe::package::version::VersionParser;
 use shirabe_php_shim::bconcat;
 
 fn pairs(items: &[&BStr]) -> Vec<BString> {

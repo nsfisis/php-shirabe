@@ -1,8 +1,9 @@
 //! ref: composer/src/Composer/Command/OutdatedCommand.php sha1:35c29722d782b5b6f5452752135fba0b4ff93832
 
-use crate::command::base_command::{base_command_complete, base_command_initialize};
-use crate::command::{BaseCommand, BaseCommandData, CompletionTrait};
-use crate::console::application::Application;
+use crate::command::{
+    BaseCommand, BaseCommandData, CompletionTrait, base_command_complete, base_command_initialize,
+};
+use crate::console::Application;
 use crate::console::input::{InputArgument, InputOption, SuggestedValues};
 use crate::delegate_base_command_trait_impls_to_inner;
 use bstr::BString;

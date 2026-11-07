@@ -4,10 +4,9 @@ use crate::command::BaseCommand;
 use crate::composer::composer_full;
 use crate::console::input::SuggestedValues;
 use crate::package::{RootPackageInterfaceHandle, base_package};
-use crate::repository::repository_interface::{SEARCH_NAME, SEARCH_VENDOR, SearchResult};
 use crate::repository::{
     CompositeRepository, InstalledRepository, PlatformRepository, RepositoryInterface,
-    RepositoryInterfaceHandle, RootPackageRepository,
+    RepositoryInterfaceHandle, RootPackageRepository, SEARCH_NAME, SEARCH_VENDOR, SearchResult,
 };
 use bstr::BString;
 use indexmap::IndexMap;

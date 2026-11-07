@@ -3,8 +3,8 @@
 use crate::test_case::{get_alias_package, get_package};
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
-use shirabe::package::handle::PackageInterfaceHandle;
-use shirabe::package::loader::array_loader::ArrayLoader;
+use shirabe::package::PackageInterfaceHandle;
+use shirabe::package::loader::ArrayLoader;
 use shirabe::repository::{
     AbandonedInfo, ArrayRepository, RepositoryInterface, SEARCH_FULLTEXT, SearchResult,
 };

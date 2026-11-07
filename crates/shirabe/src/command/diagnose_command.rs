@@ -1,8 +1,9 @@
 //! ref: composer/src/Composer/Command/DiagnoseCommand.php sha1:fc82ca5045451163f82c40d1acbc3a9c1feb0a38
 
 use crate::advisory::Auditor;
-use crate::command::base_command::{base_command_complete, base_command_initialize};
-use crate::command::{BaseCommand, BaseCommandData};
+use crate::command::{
+    BaseCommand, BaseCommandData, base_command_complete, base_command_initialize,
+};
 use crate::composer::composer_full;
 use crate::config::Config;
 use crate::downloader::TransportException;

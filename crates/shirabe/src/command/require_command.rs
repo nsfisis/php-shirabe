@@ -1,8 +1,10 @@
 //! ref: composer/src/Composer/Command/RequireCommand.php sha1:a02d20cec157fdeaea438599245710b76345bb8e
 
 use crate::advisory::Auditor;
-use crate::command::base_command::{base_command_complete, base_command_initialize};
-use crate::command::{BaseCommand, BaseCommandData, CompletionTrait, PackageDiscoveryTrait};
+use crate::command::{
+    BaseCommand, BaseCommandData, CompletionTrait, PackageDiscoveryTrait, base_command_complete,
+    base_command_initialize,
+};
 use crate::composer::composer_full;
 use crate::console::input::{InputArgument, InputOption, SuggestedValues};
 use crate::delegate_base_command_trait_impls_to_inner;
@@ -29,12 +31,9 @@ use shirabe_php_shim::{
     array_unique, bconcat, empty, file_exists, file_get_contents, file_put_contents, filesize,
     impl_php_class, implode, is_writable, strtolower, unlink,
 };
-use shirabe_symfony_console::input::InputInterfaceByName;
-use shirabe_symfony_console::{
-    command::Command,
-    input::{InputInterface, InputValue},
-    output::OutputInterface,
-};
+use shirabe_symfony_console::command::Command;
+use shirabe_symfony_console::input::{InputInterface, InputInterfaceByName, InputValue};
+use shirabe_symfony_console::output::OutputInterface;
 use std::path::PathBuf;
 
 #[derive(Debug)]

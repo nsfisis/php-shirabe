@@ -1,6 +1,6 @@
 //! ref: composer/vendor/symfony/console/Descriptor/Descriptor.php sha1:4b4866d2edfab4974c000ab7b8cf46660aed0e32
 
-use crate::application::Application;
+use crate::Application;
 use crate::command::Command;
 use crate::descriptor::{DescribableObject, DescriptorInterface, DescriptorOptions};
 use crate::input::{InputArgument, InputDefinition, InputOption};

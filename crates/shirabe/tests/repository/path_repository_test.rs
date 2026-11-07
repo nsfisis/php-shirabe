@@ -7,9 +7,8 @@ use serial_test::serial;
 use shirabe::config::Config;
 use shirabe::io::{IOInterface, NullIO};
 use shirabe::repository::PathRepository;
-use shirabe::util::http_downloader::HttpDownloader;
 use shirabe::util::r#loop::Loop;
-use shirabe::util::{Platform, ProcessExecutor};
+use shirabe::util::{HttpDownloader, Platform, ProcessExecutor};
 use shirabe_php_shim::{
     PhpMixed, bconcat, file_get_contents, hash, path_from_bytes, path_to_bytes, realpath,
     serialize, str_replace,

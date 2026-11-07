@@ -1,7 +1,8 @@
 //! ref: composer/src/Composer/Command/SelfUpdateCommand.php sha1:3f12bb7d55ca3264807f5239c06b02dba7842fd2
 
-use crate::command::base_command::{base_command_complete, base_command_initialize};
-use crate::command::{BaseCommand, BaseCommandData};
+use crate::command::{
+    BaseCommand, BaseCommandData, base_command_complete, base_command_initialize,
+};
 use crate::console::input::{InputArgument, InputOption};
 use crate::delegate_base_command_trait_impls_to_inner;
 use crate::io::IOInterfaceWrite;

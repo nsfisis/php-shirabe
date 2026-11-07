@@ -1,7 +1,8 @@
 //! ref: composer/src/Composer/Command/ValidateCommand.php sha1:4eb6eacebeea00753a769b0f558d22007698dcf9
 
-use crate::command::base_command::{base_command_complete, base_command_initialize};
-use crate::command::{BaseCommand, BaseCommandData};
+use crate::command::{
+    BaseCommand, BaseCommandData, base_command_complete, base_command_initialize,
+};
 use crate::composer::composer_full;
 use crate::console::input::{InputArgument, InputOption};
 use crate::delegate_base_command_trait_impls_to_inner;
@@ -12,8 +13,9 @@ use crate::plugin::{CommandEvent, PluginEvents};
 use crate::util::{ConfigValidator, Filesystem};
 use bstr::{BStr, BString, ByteSlice};
 use shirabe_php_shim::{bconcat, impl_php_class, path_from_bytes, path_to_bytes};
-use shirabe_symfony_console::input::InputInterfaceByName;
-use shirabe_symfony_console::{command::Command, input::InputInterface, output::OutputInterface};
+use shirabe_symfony_console::command::Command;
+use shirabe_symfony_console::input::{InputInterface, InputInterfaceByName};
+use shirabe_symfony_console::output::OutputInterface;
 
 #[derive(Debug)]
 pub struct ValidateCommand {

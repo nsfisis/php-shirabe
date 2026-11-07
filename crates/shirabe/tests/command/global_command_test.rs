@@ -6,7 +6,7 @@ use crate::test_case::{
 };
 use bstr::{BString, ByteSlice};
 use serial_test::serial;
-use shirabe::util::platform::Platform;
+use shirabe::util::Platform;
 use shirabe_php_shim::{bconcat, error_message, path_to_bytes};
 use shirabe_symfony_console::input::{InputValue, ParameterName};
 use std::path::PathBuf;

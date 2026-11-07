@@ -1,7 +1,8 @@
 //! ref: composer/src/Composer/Command/AboutCommand.php sha1:d39db171494c75612f7ddd753cf9d0f39ded3863
 
-use crate::command::base_command::{base_command_complete, base_command_initialize};
-use crate::command::{BaseCommand, BaseCommandData};
+use crate::command::{
+    BaseCommand, BaseCommandData, base_command_complete, base_command_initialize,
+};
 use crate::io::IOInterfaceWrite;
 use crate::{composer, delegate_base_command_trait_impls_to_inner};
 use shirabe_php_shim::{bconcat, impl_php_class};

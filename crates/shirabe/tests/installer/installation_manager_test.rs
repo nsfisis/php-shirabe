@@ -7,12 +7,10 @@ use shirabe::dependency_resolver::operation::{
     InstallOperation, UninstallOperation, UpdateOperation,
 };
 use shirabe::installer::{BinaryPresenceInterface, InstallerInterface};
-use shirabe::io::IOInterface;
-use shirabe::io::null_io::NullIO;
-use shirabe::package::PackageInterfaceHandle;
-use shirabe::package::handle::CompletePackageHandle;
+use shirabe::io::{IOInterface, NullIO};
+use shirabe::package::{CompletePackageHandle, PackageInterfaceHandle};
 use shirabe::repository::{InstalledArrayRepository, InstalledRepositoryInterfaceHandle};
-use shirabe::util::http_downloader::HttpDownloader;
+use shirabe::util::HttpDownloader;
 use shirabe::util::r#loop::Loop;
 use shirabe_php_shim::{PhpMixed, bconcat};
 use shirabe_semver::VersionParser;

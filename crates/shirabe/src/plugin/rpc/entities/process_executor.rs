@@ -9,8 +9,7 @@ use crate::plugin::rpc::jobs::{
     PROCESS_EXECUTOR_TICK_CAP, dispatch_tick_method, poll_once, rejected_promise,
 };
 use crate::plugin::rpc::table::{RustEntity, register_entity, rust_handle_value};
-use crate::util::ProcessExecutor;
-use crate::util::process_executor::CommandLine;
+use crate::util::{CommandLine, ProcessExecutor};
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_rpc::{FromWire, PhpThrow, PluginValue, ToWire, wire};
@@ -189,7 +188,6 @@ fn exec_command_arg(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::util::process_executor::CommandLine;
 
     #[test]
     fn a_process_command_keeps_its_bytes() {

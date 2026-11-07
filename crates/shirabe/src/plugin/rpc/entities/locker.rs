@@ -1,7 +1,6 @@
 //! The methods a `Composer\Package\Locker` entity answers over RPC.
 
-use crate::package::PackageInterfaceHandle;
-use crate::package::locker::LockerInterface;
+use crate::package::{LockerInterface, PackageInterfaceHandle};
 use crate::plugin::rpc::codec::{arg, arg_or};
 use crate::plugin::rpc::dispatch::{error_throw, unavailable_method};
 use crate::plugin::rpc::entities::autoload_generator::root_package_arg;

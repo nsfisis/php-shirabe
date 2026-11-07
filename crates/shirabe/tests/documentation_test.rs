@@ -1,7 +1,7 @@
 //! ref: composer/tests/Composer/Test/DocumentationTest.php sha1:683180f3a77f548922fcfffb6ff2fc8f3437234c
 
 use bstr::{BString, ByteSlice};
-use shirabe::console::application::ApplicationHandle;
+use shirabe::console::ApplicationHandle;
 use shirabe_php_shim::bconcat;
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::descriptor::ApplicationDescription;

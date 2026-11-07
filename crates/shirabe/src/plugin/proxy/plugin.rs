@@ -3,10 +3,9 @@
 use crate::composer::ComposerHandle;
 use crate::event_dispatcher::{EventSubscriberInterface, SubscribedEventEntry};
 use crate::io::IOInterface;
-use crate::plugin::capable::Capable;
 use crate::plugin::php_call::PhpCall;
-use crate::plugin::plugin_interface::PluginInterface;
 use crate::plugin::rpc::table::{composer_handle_value, io_handle_value};
+use crate::plugin::{Capable, PluginInterface};
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_rpc::{FromWire, PhpObjHandle, PhpThrow, PluginValue, wire};

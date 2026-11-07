@@ -1,6 +1,6 @@
 //! ref: composer/tests/bootstrap.php sha1:703e1adc1686d94fa017350e4cffc8aa9a8a884c
 
-use shirabe::util::platform::Platform;
+use shirabe::util::Platform;
 
 /// PHPUnit loads `bootstrap.php` once for the entire test run (see `composer/phpunit.xml.dist`'s
 /// `bootstrap` attribute), so every PHP test implicitly gets `COMPOSER_TESTS_ARE_RUNNING=1`

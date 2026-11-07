@@ -56,7 +56,6 @@ pub use repository_security_exception::*;
 pub use repository_set::*;
 pub use repository_utils::*;
 pub use root_package_repository::*;
-pub use vcs::*;
 pub use vcs_repository::*;
 pub use version_cache_interface::*;
 pub use writable_array_repository::*;

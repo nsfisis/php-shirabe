@@ -2,8 +2,8 @@
 
 use bstr::{B, BString};
 use indexmap::IndexMap;
-use shirabe::package::ArrayDumper;
-use shirabe::package::handle::{CompletePackageHandle, RootPackageHandle};
+use shirabe::package::dumper::ArrayDumper;
+use shirabe::package::{CompletePackageHandle, RootPackageHandle};
 use shirabe_php_shim::PhpMixed;
 use shirabe_semver::VersionParser;
 

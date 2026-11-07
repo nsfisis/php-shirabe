@@ -3,20 +3,16 @@
 use crate::test_case::{get_alias_package, get_package, get_version_constraint};
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe::dependency_resolver::PolicyInterface;
-use shirabe::dependency_resolver::default_policy::DefaultPolicy;
 use shirabe::dependency_resolver::operation::AnyOperation;
-use shirabe::dependency_resolver::pool::Pool;
-use shirabe::dependency_resolver::request::Request;
-use shirabe::dependency_resolver::solver_problems_exception::SolverProblemsException;
-use shirabe::io::io_interface::IOInterface;
-use shirabe::io::null_io::NullIO;
-use shirabe::package::Link;
-use shirabe::package::handle::PackageInterfaceHandle;
-use shirabe::repository::array_repository::ArrayRepository;
-use shirabe::repository::handle::{LockArrayRepositoryHandle, RepositoryInterfaceHandle};
-use shirabe::repository::lock_array_repository::LockArrayRepository;
-use shirabe::repository::repository_set::RepositorySet;
+use shirabe::dependency_resolver::{
+    DefaultPolicy, PolicyInterface, Pool, Request, SolverProblemsException,
+};
+use shirabe::io::{IOInterface, NullIO};
+use shirabe::package::{Link, PackageInterfaceHandle};
+use shirabe::repository::{
+    ArrayRepository, LockArrayRepository, LockArrayRepositoryHandle, RepositoryInterfaceHandle,
+    RepositorySet,
+};
 use shirabe_php_shim::bconcat;
 use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint, MultiConstraint};
 

@@ -3,10 +3,9 @@
 use crate::test_case::{get_alias_package, get_package, get_version_constraint};
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
+use shirabe::dependency_resolver::Transaction;
 use shirabe::dependency_resolver::operation::AnyOperation;
-use shirabe::dependency_resolver::transaction::Transaction;
-use shirabe::package::Link;
-use shirabe::package::handle::PackageInterfaceHandle;
+use shirabe::package::{Link, PackageInterfaceHandle};
 use shirabe_php_shim::{PhpMixed, bconcat};
 
 /// PHP `new Link($source, $target, $constraint, $type)`: prettyConstraint defaults to

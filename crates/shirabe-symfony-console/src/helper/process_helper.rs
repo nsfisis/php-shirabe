@@ -6,8 +6,8 @@ use bstr::{BStr, BString};
 use shirabe_php_shim::{
     AsAny, InvalidArgumentException, PhpMixed, bconcat, spl_object_hash, str_replace,
 };
+use shirabe_symfony_process::Process;
 use shirabe_symfony_process::exception::ProcessFailedException;
-use shirabe_symfony_process::process::Process;
 
 /// The ProcessHelper class provides helpers to run external processes.
 #[derive(Debug, Default)]

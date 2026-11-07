@@ -258,7 +258,6 @@ impl VcsRepository {
     /// in PHP where `VcsRepository` inherits `getPackages` from `ArrayRepository`.
     pub fn __get_packages(&mut self) -> anyhow::Result<Vec<BasePackageHandle>> {
         self.initialize()?;
-        use crate::repository::RepositoryInterface;
         self.inner.get_packages()
     }
 

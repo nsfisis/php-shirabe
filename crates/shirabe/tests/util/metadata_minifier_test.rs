@@ -2,8 +2,8 @@
 
 use bstr::BString;
 use indexmap::{IndexMap, indexmap};
-use shirabe::package::ArrayDumper;
-use shirabe::package::handle::CompletePackageHandle;
+use shirabe::package::CompletePackageHandle;
+use shirabe::package::dumper::ArrayDumper;
 use shirabe_metadata_minifier::MetadataMinifier;
 use shirabe_php_shim::PhpMixed;
 

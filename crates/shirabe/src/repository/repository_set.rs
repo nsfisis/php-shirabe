@@ -7,11 +7,10 @@ use crate::dependency_resolver::{
 use crate::downloader::TransportException;
 use crate::event_dispatcher::EventDispatcherInterface;
 use crate::io::{IOInterface, NullIO};
-use crate::package::base_package::stability_priority;
 use crate::package::version::StabilityFilter;
 use crate::package::{
     AliasPackageHandle, BasePackageHandle, CompleteAliasPackageHandle, PackageInterfaceHandle,
-    STABILITIES,
+    STABILITIES, stability_priority,
 };
 use crate::repository::{
     CompositeRepository, FindPackageConstraint, InstalledRepository, LockArrayRepositoryHandle,

@@ -1,6 +1,5 @@
 //! ref: composer/vendor/symfony/console/Helper/QuestionHelper.php sha1:8abb8babab68ebd26d086355a98f61bb83b8f5b7
 
-use crate::cursor::Cursor;
 use crate::exception::{InvalidArgumentException, MissingInputException, RuntimeException};
 use crate::formatter::{OutputFormatter, OutputFormatterStyle};
 use crate::helper::{FormatBlockMessages, Helper, HelperInterface, HelperSet};
@@ -9,7 +8,7 @@ use crate::output::{
     ConsoleOutput, ConsoleOutputInterface, ConsoleSectionOutput, OutputInterface, output_interface,
 };
 use crate::question::{ChoiceQuestion, QuestionInterface};
-use crate::terminal::Terminal;
+use crate::{Cursor, Terminal};
 use bstr::{B, BStr, BString, ByteSlice};
 use shirabe_php_shim::{
     Exception, PHP_EOL, PhpResource, SEEK_SET, Stringable, bconcat, copy, dir, explode, feof,

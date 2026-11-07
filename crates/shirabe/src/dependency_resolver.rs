@@ -31,7 +31,6 @@ pub use generic_rule::*;
 pub use local_repo_transaction::*;
 pub use lock_transaction::*;
 pub use multi_conflict_rule::*;
-pub use operation::*;
 pub use policy_interface::*;
 pub use pool::*;
 pub use pool_builder::*;

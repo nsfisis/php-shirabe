@@ -3,8 +3,8 @@
 // ProxyManager reads HTTP(S)_PROXY / CGI_HTTP_PROXY / no_proxy environment variables; the
 // env-dependent setup (without its setUp/tearDown isolation) is not ported.
 use bstr::{BStr, BString};
-use shirabe::util::http::proxy_manager::ProxyManager;
-use shirabe::util::platform::Platform;
+use shirabe::util::Platform;
+use shirabe::util::http::ProxyManager;
 use shirabe_php_shim::bconcat;
 
 fn set_up() {

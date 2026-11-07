@@ -1,7 +1,7 @@
 //! ref: composer/tests/Composer/Test/Autoload/ClassLoaderTest.php sha1:35d37dbe71a91e3d75493e8226d3603350006876
 
 use bstr::BStr;
-use shirabe::autoload::class_loader::ClassLoader;
+use shirabe::autoload::ClassLoader;
 use shirabe_php_shim::bconcat;
 
 // ref: ClassLoaderTest::getLoadClassTests

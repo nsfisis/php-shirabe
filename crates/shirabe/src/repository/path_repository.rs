@@ -112,21 +112,18 @@ impl PathRepository {
     /// mirroring the polymorphic `RepositoryInterface::getPackages` dispatch in PHP.
     pub fn __get_packages(&mut self) -> anyhow::Result<Vec<BasePackageHandle>> {
         self.initialize()?;
-        use crate::repository::RepositoryInterface;
         self.inner.get_packages()
     }
 
     /// For testing only: returns `RepositoryInterface::count` after `initialize`.
     pub fn __count(&mut self) -> anyhow::Result<usize> {
         self.initialize()?;
-        use crate::repository::RepositoryInterface;
         self.inner.count()
     }
 
     /// For testing only: returns `RepositoryInterface::has_package` after `initialize`.
     pub fn __has_package(&mut self, package: PackageInterfaceHandle) -> anyhow::Result<bool> {
         self.initialize()?;
-        use crate::repository::RepositoryInterface;
         self.inner.has_package(package)
     }
 

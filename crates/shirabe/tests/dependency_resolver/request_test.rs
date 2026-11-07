@@ -2,8 +2,8 @@
 
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
-use shirabe::dependency_resolver::request::Request;
-use shirabe::package::version::version_parser::VersionParser;
+use shirabe::dependency_resolver::Request;
+use shirabe::package::version::VersionParser;
 use shirabe_php_shim::{bconcat, display_to_bytes};
 use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint, SimpleConstraint};
 

@@ -1,6 +1,6 @@
 //! ref: composer/vendor/symfony/string/ByteString.php sha1:cb3e2b07672e990bb8bccff8b657d7cdcf697e6a
 
-use crate::code_point_string::CodePointString;
+use crate::CodePointString;
 use crate::exception::InvalidArgumentException;
 use bstr::{BStr, BString, ByteSlice};
 use shirabe_php_shim::{bconcat, mb_convert_encoding, mb_detect_encoding, utf8_text};

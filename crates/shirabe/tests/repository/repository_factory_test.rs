@@ -3,10 +3,9 @@
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe::config::Config;
-use shirabe::io::IOInterface;
-use shirabe::io::null_io::NullIO;
+use shirabe::io::{IOInterface, NullIO};
 use shirabe::repository::RepositoryFactory;
-use shirabe::util::http_downloader::HttpDownloader;
+use shirabe::util::HttpDownloader;
 use shirabe_php_shim::{PhpMixed, bconcat};
 
 #[test]

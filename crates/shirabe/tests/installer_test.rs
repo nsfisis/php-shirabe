@@ -25,7 +25,7 @@ use indexmap::IndexMap;
 use shirabe::advisory::{AuditConfig, Auditor};
 use shirabe::autoload::{AutoloadGeneratorInterface, ClassLoader};
 use shirabe::config::Config;
-use shirabe::console::application::ApplicationHandle;
+use shirabe::console::ApplicationHandle;
 use shirabe::dependency_resolver::{AnyTransaction, UpdateAllowTransitiveDeps};
 use shirabe::downloader::{DownloadManagerInterface, DownloaderInterface};
 use shirabe::event_dispatcher::{Callable, EventDispatcherInterface, EventInterface};
@@ -34,8 +34,7 @@ use shirabe::filter::platform_requirement_filter::{
     PlatformRequirementFilterFactory, PlatformRequirementFilterInterface,
 };
 use shirabe::installer::{InstallationManager, Installer};
-use shirabe::io::IOInterface;
-use shirabe::io::buffer_io::BufferIO;
+use shirabe::io::{BufferIO, IOInterface};
 use shirabe::json::JsonFile;
 use shirabe::package::dumper::ArrayDumper;
 use shirabe::package::{
@@ -46,10 +45,8 @@ use shirabe::repository::{
     ArrayRepository, InstalledArrayRepository, RepositoryInterfaceHandle, RepositoryManager,
     RepositoryManagerInterface,
 };
-use shirabe::util::http_downloader::HttpDownloader;
 use shirabe::util::r#loop::Loop;
-use shirabe::util::platform::Platform;
-use shirabe::util::process_executor::ProcessExecutor;
+use shirabe::util::{HttpDownloader, Platform, ProcessExecutor};
 use shirabe_class_map_generator::class_map::ClassMap;
 use shirabe_semver::VersionParser;
 use shirabe_semver::constraint::AnyConstraint;

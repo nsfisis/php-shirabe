@@ -7,13 +7,11 @@
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe::config::Config;
-use shirabe::io::IOInterface;
-use shirabe::io::null_io::NullIO;
+use shirabe::io::{IOInterface, NullIO};
 use shirabe::repository::{
     ArrayRepository, FilterRepository, PathRepository, RepositoryInterfaceHandle, RepositoryManager,
 };
-use shirabe::util::filesystem::Filesystem;
-use shirabe::util::http_downloader::HttpDownloader;
+use shirabe::util::{Filesystem, HttpDownloader};
 use shirabe_php_shim::{PhpMixed, bconcat, path_to_bytes};
 use tempfile::TempDir;
 

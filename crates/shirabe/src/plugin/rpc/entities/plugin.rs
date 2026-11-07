@@ -1,6 +1,6 @@
 //! The methods a Rust-implemented `Composer\Plugin\PluginInterface` entity answers over RPC.
 
-use crate::plugin::plugin_interface::PluginInterface;
+use crate::plugin::PluginInterface;
 use crate::plugin::rpc::dispatch::{error_throw, unavailable_method};
 use bstr::{BStr, ByteSlice};
 use shirabe_php_rpc::{PhpThrow, PluginValue, ToWire};

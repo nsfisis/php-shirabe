@@ -1,7 +1,9 @@
 //! ref: composer/src/Composer/Command/ProhibitsCommand.php sha1:79ea52c04b3bca3b42cb1f47ec94aae1941d95bd
 
-use crate::command::base_command::{base_command_complete, base_command_initialize};
-use crate::command::{BaseCommand, BaseCommandData, BaseDependencyCommand, CompletionTrait};
+use crate::command::{
+    BaseCommand, BaseCommandData, BaseDependencyCommand, CompletionTrait, base_command_complete,
+    base_command_initialize,
+};
 use crate::console::input::{InputArgument, InputOption};
 use crate::delegate_base_command_trait_impls_to_inner;
 use bstr::BString;

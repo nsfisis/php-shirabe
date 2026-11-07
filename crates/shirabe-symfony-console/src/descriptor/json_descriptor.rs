@@ -1,6 +1,6 @@
 //! ref: composer/vendor/symfony/console/Descriptor/JsonDescriptor.php sha1:3d3638a68954b0dd9dd156a7e4413e3b91b03b88
 
-use crate::application::Application;
+use crate::Application;
 use crate::command::Command;
 use crate::descriptor::{
     ApplicationDescription, DescribableObject, Descriptor, DescriptorInterface, DescriptorOptions,

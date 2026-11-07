@@ -46,7 +46,6 @@ pub use git::*;
 pub use github::*;
 pub use gitlab::*;
 pub use hg::*;
-pub use http::*;
 pub use http_downloader::*;
 pub use ini_helper::*;
 pub use local_filesystem::*;

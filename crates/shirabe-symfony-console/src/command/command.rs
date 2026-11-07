@@ -1,6 +1,6 @@
 //! ref: composer/vendor/symfony/console/Command/Command.php sha1:ff5e9f0b654e88fe02d8b81db7b1c7d6f1be8330
 
-use crate::application::Application;
+use crate::Application;
 use crate::completion::{CompletionInput, CompletionSuggestions};
 use crate::exception::{InvalidArgumentException, LogicException};
 use crate::helper::{HelperInterface, HelperSet};
@@ -810,8 +810,7 @@ impl std::fmt::Debug for CommandData {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::exception::{InvalidArgumentException, LogicException};
-    use crate::helper::{FormatterHelper, HelperInterface};
+    use crate::helper::FormatterHelper;
     use shirabe_php_shim::Catch;
 
     #[test]

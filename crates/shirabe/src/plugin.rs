@@ -17,7 +17,6 @@ pub mod proxy;
 pub mod rpc;
 pub(crate) mod throwable_bridge;
 
-pub use capability::*;
 pub use capable::*;
 pub use command_event::*;
 pub use plugin_blocked_exception::*;
@@ -28,4 +27,3 @@ pub use post_file_download_event::*;
 pub use pre_command_run_event::*;
 pub use pre_file_download_event::*;
 pub use pre_pool_create_event::*;
-pub use proxy::*;

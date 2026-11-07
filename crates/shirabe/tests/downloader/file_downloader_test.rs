@@ -9,13 +9,10 @@ use serial_test::serial;
 use shirabe::cache::{Cache, CacheMock};
 use shirabe::config::Config;
 use shirabe::downloader::{DownloaderInterface, FileDownloader};
-use shirabe::io::null_io::NullIO;
-use shirabe::io::{IOInterface, io_interface};
-use shirabe::package::handle::{CompletePackageHandle, PackageInterfaceHandle};
-use shirabe::util::HttpDownloader;
-use shirabe::util::filesystem::{Filesystem, FilesystemMock};
-use shirabe::util::http_downloader::HttpDownloaderMockHandler;
+use shirabe::io::{IOInterface, NullIO, io_interface};
+use shirabe::package::{CompletePackageHandle, PackageInterfaceHandle};
 use shirabe::util::r#loop::Loop;
+use shirabe::util::{Filesystem, FilesystemMock, HttpDownloader, HttpDownloaderMockHandler};
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, PhpMixed, RuntimeException, UnexpectedValueException,
     bconcat, error_message, path_to_bytes,

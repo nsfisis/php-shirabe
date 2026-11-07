@@ -1,6 +1,6 @@
 //! ref: composer/vendor/symfony/console/Formatter/OutputFormatterInterface.php sha1:99387196cc903214f82d69bedcb0b6c7499babb9
 
-use crate::formatter::output_formatter_style_interface::OutputFormatterStyleInterface;
+use crate::formatter::OutputFormatterStyleInterface;
 use bstr::{BStr, BString};
 use shirabe_php_shim::AsAny;
 

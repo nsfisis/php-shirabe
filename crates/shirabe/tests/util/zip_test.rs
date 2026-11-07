@@ -1,6 +1,6 @@
 //! ref: composer/tests/Composer/Test/Util/ZipTest.php sha1:eb19980a56f6652c9ae7fce4e2f8f7e0225e5f49
 
-use shirabe::util::zip::Zip;
+use shirabe::util::Zip;
 
 /// Reuses the PHP fixtures under composer/tests/Composer/Test/Util/Fixtures/Zip.
 fn fixture(name: impl AsRef<std::path::Path>) -> std::path::PathBuf {

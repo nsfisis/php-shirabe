@@ -2,8 +2,8 @@
 
 use bstr::{BStr, BString, ByteSlice};
 use serial_test::serial;
+use shirabe::package::CompletePackageHandle;
 use shirabe::package::archiver::{ArchiverInterface, PharArchiver};
-use shirabe::package::handle::CompletePackageHandle;
 use shirabe::util::{Filesystem, Platform};
 use shirabe_php_shim::{
     dirname, file_exists, file_put_contents, mkdir, path_from_bytes, path_to_bytes, realpath,

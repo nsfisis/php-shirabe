@@ -17,6 +17,7 @@ use Shirabe\Lint\Linters\NoModRs;
 use Shirabe\Lint\Linters\NoPhpDocTag;
 use Shirabe\Lint\Linters\NoQualifiedCratePath;
 use Shirabe\Lint\Linters\NoQualifiedPhpShimPath;
+use Shirabe\Lint\Linters\NoRedundantModulePath;
 use Shirabe\Lint\Linters\NoStdCollectionsMaps;
 use Shirabe\Lint\Linters\NoSuperPath;
 use Shirabe\Lint\Linters\NoUseAsAlias;
@@ -74,6 +75,7 @@ $runner = new Runner($rootDir, [
         'crates/shirabe-symfony-process/src/exception/runtime_exception.rs',
         'crates/shirabe-symfony-string/src/exception/invalid_argument_exception.rs',
     ]],
+    [new NoRedundantModulePath(), []],
     [new NoStdCollectionsMaps(), []],
     [new NoSuperPath(), []],
     [new NoUseAsAlias(), []],

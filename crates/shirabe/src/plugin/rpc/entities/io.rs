@@ -1,7 +1,6 @@
 //! The methods a `Composer\IO\IOInterface` entity answers over RPC.
 
-use crate::io::buffer_io::BufferIO;
-use crate::io::{IOInterface, NORMAL};
+use crate::io::{BufferIO, IOInterface, NORMAL};
 use crate::plugin::rpc::codec::{arg, arg_or};
 use crate::plugin::rpc::dispatch::{error_throw, unavailable_method};
 use bstr::{BStr, BString, ByteSlice};

@@ -10,15 +10,12 @@ use bstr::{BStr, BString, ByteSlice};
 use criterion::{BatchSize, BenchmarkId, Criterion, criterion_group, criterion_main};
 use indexmap::IndexMap;
 use shirabe::config::Config;
-use shirabe::io::IOInterface;
-use shirabe::io::null_io::NullIO;
-use shirabe::json::json_file::JsonFile;
-use shirabe::package::base_package::STABILITY_STABLE;
+use shirabe::io::{IOInterface, NullIO};
+use shirabe::json::JsonFile;
+use shirabe::package::STABILITY_STABLE;
 use shirabe::package::version::VersionParser;
-use shirabe::repository::composer_repository::ComposerRepository;
-use shirabe::util::http_downloader::{
-    HttpDownloader, HttpDownloaderMockExpectation, HttpDownloaderMockHandler,
-};
+use shirabe::repository::ComposerRepository;
+use shirabe::util::{HttpDownloader, HttpDownloaderMockExpectation, HttpDownloaderMockHandler};
 use shirabe_php_shim::{PhpMixed, path_to_bytes, php_str, str_replace};
 use shirabe_semver::constraint::AnyConstraint;
 use tempfile::TempDir;

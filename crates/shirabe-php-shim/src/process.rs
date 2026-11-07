@@ -1,7 +1,6 @@
-use crate::fs::fopen;
 use crate::{
-    ChildPipe, PhpMixed, PhpResource, StreamBacking, StreamState, bconcat, os_str_from_bytes,
-    path_from_bytes,
+    ChildPipe, PhpMixed, PhpResource, StreamBacking, StreamState, bconcat, fopen,
+    os_str_from_bytes, path_from_bytes,
 };
 use bstr::{BString, ByteSlice};
 use indexmap::IndexMap;
@@ -470,9 +469,7 @@ pub fn get_current_user() -> BString {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::fs::{fclose, fwrite};
-    use crate::stream::stream_get_contents;
-    use crate::{bconcat, path_from_bytes, path_to_bytes};
+    use crate::{bconcat, fclose, fwrite, path_to_bytes, stream_get_contents};
 
     #[test]
     fn proc_open_reads_stdout_and_reports_status() {

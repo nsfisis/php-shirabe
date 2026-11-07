@@ -7,8 +7,7 @@ use crate::test_case::{
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use serial_test::serial;
-use shirabe::package::Link;
-use shirabe::package::handle::{CompletePackageHandle, PackageInterfaceHandle};
+use shirabe::package::{CompletePackageHandle, Link, PackageInterfaceHandle};
 use shirabe_php_shim::{bconcat, trim};
 use shirabe_symfony_console::input::{InputValue, ParameterName};
 

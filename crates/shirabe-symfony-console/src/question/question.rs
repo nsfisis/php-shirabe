@@ -2,8 +2,7 @@
 
 use crate::exception::{InvalidArgumentException, LogicException};
 use crate::input::InputValue;
-use crate::question::choice_question::ChoiceQuestion;
-use crate::question::confirmation_question::ConfirmationQuestion;
+use crate::question::{ChoiceQuestion, ConfirmationQuestion};
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::canonical_int_key;

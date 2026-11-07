@@ -1,8 +1,7 @@
 //! ref: composer/vendor/symfony/console/Formatter/OutputFormatterStyleStack.php sha1:0fd11705cc75d284828d4f058fe7677932cd14ea
 
 use crate::exception::InvalidArgumentException;
-use crate::formatter::output_formatter_style::OutputFormatterStyle;
-use crate::formatter::output_formatter_style_interface::OutputFormatterStyleInterface;
+use crate::formatter::{OutputFormatterStyle, OutputFormatterStyleInterface};
 use shirabe_php_shim::array_pop;
 
 #[derive(Debug)]

@@ -3,10 +3,9 @@
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe::config::Config;
-use shirabe::io::IOInterface;
-use shirabe::io::null_io::NullIO;
+use shirabe::io::{IOInterface, NullIO};
 use shirabe::repository::vcs::FossilDriver;
-use shirabe::util::filesystem::Filesystem;
+use shirabe::util::Filesystem;
 use shirabe_php_shim::{PhpMixed, path_to_bytes};
 use tempfile::TempDir;
 

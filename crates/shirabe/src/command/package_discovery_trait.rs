@@ -7,13 +7,11 @@ use crate::filter::platform_requirement_filter::{
 };
 use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::package::PackageInterfaceHandle;
-use crate::package::version::version_selector::ShowWarnings;
-use crate::package::version::{VersionParser, VersionSelector};
-use crate::repository::repository_interface::SEARCH_FULLTEXT;
+use crate::package::version::{ShowWarnings, VersionParser, VersionSelector};
 use crate::repository::{
     AbandonedInfo, CompositeRepository, FindPackageConstraint, PlatformRepository,
     PlatformRepositoryHandle, ProviderInfo, RepositoryFactory, RepositoryInterface,
-    RepositoryInterfaceHandle, RepositorySet, SearchResult,
+    RepositoryInterfaceHandle, RepositorySet, SEARCH_FULLTEXT, SearchResult,
 };
 use crate::util::Filesystem;
 use bstr::{B, BStr, BString, ByteSlice};
@@ -24,11 +22,8 @@ use shirabe_php_shim::{
     is_array, is_file, is_numeric, json_decode_assoc, levenshtein, php_regex, preg_is_match,
     preg_match, sprintf, strlen, strpos, trim, utf8_text,
 };
-use shirabe_symfony_console::input::InputInterfaceByName;
-use shirabe_symfony_console::{
-    input::{InputInterface, InputValue},
-    output::OutputInterface,
-};
+use shirabe_symfony_console::input::{InputInterface, InputInterfaceByName, InputValue};
+use shirabe_symfony_console::output::OutputInterface;
 
 pub trait PackageDiscoveryTrait: BaseCommand {
     fn get_repos_mut(&self) -> std::cell::RefMut<'_, Option<RepositoryInterfaceHandle>>;

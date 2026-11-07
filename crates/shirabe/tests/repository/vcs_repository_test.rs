@@ -4,13 +4,10 @@ use bstr::{BStr, BString, ByteSlice};
 use indexmap::{IndexMap, IndexSet};
 use serial_test::serial;
 use shirabe::config::Config;
-use shirabe::io::IOInterface;
-use shirabe::io::null_io::NullIO;
+use shirabe::io::{IOInterface, NullIO};
 use shirabe::repository::VcsRepository;
-use shirabe::util::ProcessExecutor;
-use shirabe::util::filesystem::Filesystem;
-use shirabe::util::http_downloader::HttpDownloader;
 use shirabe::util::r#loop::Loop;
+use shirabe::util::{Filesystem, HttpDownloader, ProcessExecutor};
 use shirabe_php_shim::{
     PhpMixed, bconcat, implode, os_str_from_bytes, path_from_bytes, path_to_bytes,
 };

@@ -1,11 +1,9 @@
 //! ref: composer/tests/Composer/Test/DependencyResolver/RuleSetIteratorTest.php sha1:720f6ce751357cfb762594ccdfc2d3796c3f93aa
 
 use indexmap::IndexMap;
-use shirabe::dependency_resolver::generic_rule::GenericRule;
-use shirabe::dependency_resolver::pool::Pool;
-use shirabe::dependency_resolver::rule::{RULE_LEARNED, RULE_ROOT_REQUIRE, ReasonData, Rule};
-use shirabe::dependency_resolver::rule_set::RuleSet;
-use shirabe::dependency_resolver::rule_set_iterator::RuleSetIterator;
+use shirabe::dependency_resolver::{
+    GenericRule, Pool, RULE_LEARNED, RULE_ROOT_REQUIRE, ReasonData, Rule, RuleSet, RuleSetIterator,
+};
 use shirabe_semver::constraint::MatchAllConstraint;
 
 type Rules = IndexMap<i64, Vec<std::rc::Rc<std::cell::RefCell<Rule>>>>;

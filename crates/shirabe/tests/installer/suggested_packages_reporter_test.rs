@@ -5,8 +5,7 @@ use crate::test_case::get_package;
 use bstr::BString;
 use indexmap::IndexMap;
 use shirabe::installer::SuggestedPackagesReporter;
-use shirabe::io::null_io::NullIO;
-use shirabe::io::{IOInterface, io_interface};
+use shirabe::io::{IOInterface, NullIO, io_interface};
 use shirabe::repository::{InstalledRepository, LockArrayRepository, RepositoryInterfaceHandle};
 
 /// ref: SuggestedPackagesReporterTest::setUp.

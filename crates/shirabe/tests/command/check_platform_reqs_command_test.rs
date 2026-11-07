@@ -6,7 +6,7 @@ use crate::test_case::{
 };
 use bstr::{BStr, ByteSlice};
 use serial_test::serial;
-use shirabe::package::handle::PackageInterfaceHandle;
+use shirabe::package::PackageInterfaceHandle;
 use shirabe_php_shim::{error_message, trim};
 use shirabe_symfony_console::input::{InputValue, ParameterName};
 

@@ -1211,7 +1211,6 @@ impl Table {
 mod tests {
     use super::*;
     use crate::output::BufferedOutput;
-    use bstr::ByteSlice;
 
     #[test]
     fn style_characters_and_cell_format_keep_their_bytes() {

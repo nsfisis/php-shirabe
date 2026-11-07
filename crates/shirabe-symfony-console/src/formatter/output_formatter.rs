@@ -1,11 +1,10 @@
 //! ref: composer/vendor/symfony/console/Formatter/OutputFormatter.php sha1:d7a9e8fe948164afe0627c7b18e986be19245d87
 
 use crate::exception::InvalidArgumentException;
-use crate::formatter::output_formatter_interface::OutputFormatterInterface;
-use crate::formatter::output_formatter_style::OutputFormatterStyle;
-use crate::formatter::output_formatter_style_interface::OutputFormatterStyleInterface;
-use crate::formatter::output_formatter_style_stack::OutputFormatterStyleStack;
-use crate::formatter::wrappable_output_formatter_interface::WrappableOutputFormatterInterface;
+use crate::formatter::{
+    OutputFormatterInterface, OutputFormatterStyle, OutputFormatterStyleInterface,
+    OutputFormatterStyleStack, WrappableOutputFormatterInterface,
+};
 use bstr::{BStr, BString, ByteSlice};
 use shirabe_php_shim::{
     PregMatches, bconcat, byte_at, explode, implode, ltrim, mb_detect_encoding, php_regex,

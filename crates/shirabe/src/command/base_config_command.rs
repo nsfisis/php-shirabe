@@ -1,7 +1,6 @@
 //! ref: composer/src/Composer/Command/BaseConfigCommand.php sha1:b3b6b6fae4224776ba59b8fad4e26013467e6c73
 
-use crate::command::BaseCommand;
-use crate::command::base_command::base_command_initialize;
+use crate::command::{BaseCommand, base_command_initialize};
 use crate::config::{Config, JsonConfigSource};
 use crate::factory::Factory;
 use crate::json::JsonFile;
@@ -11,8 +10,8 @@ use indexmap::IndexMap;
 use shirabe_php_shim::{
     PhpMixed, RuntimeException, bconcat, chmod, dirname, path_from_bytes, path_to_bytes, touch,
 };
-use shirabe_symfony_console::input::InputInterfaceByName;
-use shirabe_symfony_console::{input::InputInterface, output::OutputInterface};
+use shirabe_symfony_console::input::{InputInterface, InputInterfaceByName};
+use shirabe_symfony_console::output::OutputInterface;
 use std::path::PathBuf;
 
 pub trait BaseConfigCommand: BaseCommand {

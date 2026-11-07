@@ -5,9 +5,8 @@
 // see the individual `// TODO(async)` comments below.
 
 use bstr::{BStr, BString, ByteSlice};
-use shirabe::io::buffer_io::BufferIO;
-use shirabe::io::{ConsoleIO, IOInterface};
-use shirabe::util::process_executor::ProcessExecutor;
+use shirabe::io::{BufferIO, ConsoleIO, IOInterface};
+use shirabe::util::ProcessExecutor;
 use shirabe_php_shim::{PHP_EOL, bconcat, trim};
 use shirabe_symfony_console::helper::QuestionHelper;
 use shirabe_symfony_console::input::{ArrayInput, InputInterface};
@@ -244,7 +243,7 @@ fn test_escape_argument() {
 #[test]
 fn test_mock_consumes_expectations_in_order() {
     use crate::process_executor_mock::{cmd_full, get_process_executor_mock};
-    use shirabe::util::process_executor::MockHandler;
+    use shirabe::util::MockHandler;
 
     let (process, _guard) = get_process_executor_mock(
         vec![
@@ -277,7 +276,7 @@ fn test_mock_consumes_expectations_in_order() {
 #[test]
 fn test_mock_default_handler_for_unexpected_command() {
     use crate::process_executor_mock::get_process_executor_mock;
-    use shirabe::util::process_executor::MockHandler;
+    use shirabe::util::MockHandler;
 
     let (process, _guard) = get_process_executor_mock(
         vec![],

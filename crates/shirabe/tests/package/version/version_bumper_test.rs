@@ -2,9 +2,8 @@
 
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
-use shirabe::package::handle::{PackageHandle, PackageInterfaceHandle};
-use shirabe::package::package::Package;
-use shirabe::package::version::version_bumper::VersionBumper;
+use shirabe::package::version::VersionBumper;
+use shirabe::package::{Package, PackageHandle, PackageInterfaceHandle};
 use shirabe_php_shim::{PhpMixed, bconcat};
 use shirabe_semver::VersionParser;
 

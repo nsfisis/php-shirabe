@@ -1,7 +1,7 @@
 //! ref: composer/tests/Composer/Test/Platform/VersionTest.php sha1:dac663441d569b0c89b96df5fde03d8272991b0e
 
 use bstr::BStr;
-use shirabe::platform::version::Version;
+use shirabe::platform::Version;
 use shirabe_semver::VersionParser;
 
 fn provide_openssl_versions() -> Vec<(&'static BStr, &'static BStr, bool, Option<&'static BStr>)> {

@@ -464,9 +464,7 @@ pub const NULL: PluginValue = PluginValue::Null;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::PhpObject;
     use crate::value::serialize;
-    use bstr::ByteSlice;
     use chrono::Timelike;
 
     #[test]

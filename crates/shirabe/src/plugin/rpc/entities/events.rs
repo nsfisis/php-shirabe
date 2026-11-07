@@ -2,13 +2,13 @@
 //! `PrePoolCreateEvent`) declare beyond the base event's, answered over RPC.
 
 use crate::package::PackageInterfaceHandle;
-use crate::plugin::post_file_download_event::PostFileDownloadEvent;
-use crate::plugin::pre_file_download_event::{FileDownloadContext, PreFileDownloadEvent};
-use crate::plugin::pre_pool_create_event::PrePoolCreateEvent;
 use crate::plugin::rpc::codec::arg;
 use crate::plugin::rpc::dispatch::unavailable_method;
 use crate::plugin::rpc::table::{
     RustEntity, register_entity, repository_handle_value, rust_handle_value,
+};
+use crate::plugin::{
+    FileDownloadContext, PostFileDownloadEvent, PreFileDownloadEvent, PrePoolCreateEvent,
 };
 use crate::util::StreamContextOptions;
 use bstr::{BStr, BString, ByteSlice};

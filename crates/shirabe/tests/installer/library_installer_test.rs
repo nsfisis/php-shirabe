@@ -10,11 +10,10 @@ use shirabe::composer::{
 use shirabe::config::Config;
 use shirabe::downloader::{DownloadManagerInterface, DownloaderInterface};
 use shirabe::installer::{BinaryInstallerInterface, InstallerInterface, LibraryInstaller};
-use shirabe::io::IOInterface;
-use shirabe::io::null_io::NullIO;
+use shirabe::io::{IOInterface, NullIO};
 use shirabe::package::PackageInterfaceHandle;
 use shirabe::repository::{InstalledArrayRepository, InstalledRepositoryInterfaceHandle};
-use shirabe::util::filesystem::Filesystem;
+use shirabe::util::Filesystem;
 use shirabe_php_shim::{PhpMixed, path_from_bytes, path_to_bytes};
 use std::fs;
 use tempfile::TempDir;

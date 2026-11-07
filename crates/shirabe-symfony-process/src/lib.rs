@@ -5,7 +5,6 @@ mod pipes;
 pub mod process;
 mod process_utils;
 
-pub use exception::*;
 pub use executable_finder::*;
 pub use php_executable_finder::*;
 pub use process::*;

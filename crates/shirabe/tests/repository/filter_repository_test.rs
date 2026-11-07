@@ -3,7 +3,7 @@
 use crate::test_case::get_package;
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
-use shirabe::package::base_package::STABILITIES;
+use shirabe::package::STABILITIES;
 use shirabe::repository::{
     AdvisoryProviderInterface, ArrayRepository, FilterRepository, RepositoryInterface,
     RepositoryInterfaceHandle,

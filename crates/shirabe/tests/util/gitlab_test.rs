@@ -6,8 +6,7 @@ use crate::io_mock::{Expectation, IOMock, get_io_mock};
 use bstr::BStr;
 use shirabe::config::{Config, ConfigSourceInterface};
 use shirabe::io::{IOInterface, io_interface};
-use shirabe::util::GitLab;
-use shirabe::util::http_downloader::HttpDownloaderMockHandler;
+use shirabe::util::{GitLab, HttpDownloaderMockHandler};
 use shirabe_php_shim::{PhpMixed, bconcat, error_message, php_str};
 
 const USERNAME: &BStr = php_str(b"username");

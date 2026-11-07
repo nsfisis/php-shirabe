@@ -11,13 +11,13 @@ use shirabe::event_dispatcher::EventDispatcher;
 use shirabe::filter::platform_requirement_filter::PlatformRequirementFilterFactory;
 use shirabe::installer::{InstallationManager, InstallerInterface};
 use shirabe::io::{BufferIO, IOInterface};
-use shirabe::package::handle::{
-    AliasPackageHandle, CompletePackageHandle, PackageHandle, RootPackageHandle,
+use shirabe::package::{
+    AliasPackageHandle, CompletePackageHandle, Link, PackageHandle, PackageInterfaceHandle,
+    RootPackageHandle, RootPackageInterfaceHandle,
 };
-use shirabe::package::{Link, PackageInterfaceHandle, RootPackageInterfaceHandle};
 use shirabe::repository::{InstalledArrayRepository, InstalledRepositoryInterfaceHandle};
 use shirabe::script::ScriptEvents;
-use shirabe::util::http_downloader::HttpDownloader;
+use shirabe::util::HttpDownloader;
 use shirabe::util::r#loop::Loop;
 use shirabe_php_shim::{
     PhpMixed, bconcat, dirname, error_message, path_from_bytes, path_to_bytes, preg_quote,

@@ -1,6 +1,6 @@
 //! ref: composer/vendor/symfony/console/Descriptor/TextDescriptor.php sha1:3100d8bd2d91d6b105b8a4e9f6f4963bb8faa096
 
-use crate::application::Application;
+use crate::Application;
 use crate::command::Command;
 use crate::descriptor::{
     ApplicationDescription, DescribableObject, Descriptor, DescriptorInterface, DescriptorOptions,

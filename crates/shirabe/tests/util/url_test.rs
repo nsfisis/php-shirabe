@@ -3,7 +3,7 @@
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe::config::Config;
-use shirabe::util::url::Url;
+use shirabe::util::Url;
 use shirabe_php_shim::{PhpMixed, bconcat};
 
 fn conf(entries: &[(&BStr, &[&BStr])]) -> IndexMap<BString, PhpMixed> {

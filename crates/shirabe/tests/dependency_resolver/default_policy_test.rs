@@ -4,15 +4,13 @@ use crate::test_case::get_package;
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use serial_test::serial;
-use shirabe::dependency_resolver::PolicyInterface;
-use shirabe::dependency_resolver::default_policy::DefaultPolicy;
-use shirabe::package::Link;
-use shirabe::package::handle::{CompleteAliasPackageHandle, CompletePackageHandle};
-use shirabe::repository::array_repository::ArrayRepository;
-use shirabe::repository::handle::{LockArrayRepositoryHandle, RepositoryInterfaceHandle};
-use shirabe::repository::lock_array_repository::LockArrayRepository;
-use shirabe::repository::repository_set::RepositorySet;
-use shirabe::util::platform::Platform;
+use shirabe::dependency_resolver::{DefaultPolicy, PolicyInterface};
+use shirabe::package::{CompleteAliasPackageHandle, CompletePackageHandle, Link};
+use shirabe::repository::{
+    ArrayRepository, LockArrayRepository, LockArrayRepositoryHandle, RepositoryInterfaceHandle,
+    RepositorySet,
+};
+use shirabe::util::Platform;
 use shirabe_php_shim::bconcat;
 use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
 

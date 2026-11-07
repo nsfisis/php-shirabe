@@ -5,7 +5,7 @@ use crate::test_case::{
 };
 use bstr::BStr;
 use serial_test::serial;
-use shirabe::util::platform::Platform;
+use shirabe::util::Platform;
 use shirabe_php_shim::{chmod, function_exists, posix_getuid, trim};
 use shirabe_symfony_console::input::{InputValue, ParameterName};
 

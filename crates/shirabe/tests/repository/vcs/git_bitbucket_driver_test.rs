@@ -5,12 +5,9 @@ use crate::io_stub::IOStub;
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe::config::Config;
-use shirabe::io::IOInterface;
-use shirabe::io::null_io::NullIO;
+use shirabe::io::{IOInterface, NullIO};
 use shirabe::repository::vcs::GitBitbucketDriver;
-use shirabe::util::filesystem::Filesystem;
-use shirabe::util::http_downloader::{HttpDownloader, HttpDownloaderMockHandler};
-use shirabe::util::process_executor::ProcessExecutor;
+use shirabe::util::{Filesystem, HttpDownloader, HttpDownloaderMockHandler, ProcessExecutor};
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, PhpMixed, RuntimeException, bconcat, path_to_bytes,
 };

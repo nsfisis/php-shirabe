@@ -3,7 +3,7 @@
 use serial_test::serial;
 use shirabe::factory::Factory;
 use shirabe::io::{IOInterface, io_interface};
-use shirabe::util::platform::Platform;
+use shirabe::util::Platform;
 use shirabe_php_shim::{PhpMixed, bconcat, error_message, path_to_bytes};
 
 #[path = "common/config_stub.rs"]

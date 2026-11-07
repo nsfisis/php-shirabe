@@ -312,7 +312,6 @@ pub(crate) fn link_from_wire(value: &PluginValue) -> Result<Link, PhpThrow> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bstr::{BStr, ByteSlice};
     use shirabe_php_rpc::value::serialize;
     use shirabe_php_shim::Stringable;
 

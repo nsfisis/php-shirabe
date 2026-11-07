@@ -1,9 +1,9 @@
 //! ref: composer/src/Composer/DependencyResolver/Solver.php sha1:5b3356dacafa1a7d64590f049ecc236800ef6342
 
-use crate::dependency_resolver::rule::{self, Rule};
 use crate::dependency_resolver::{
-    Decisions, GenericRule, LockTransaction, PolicyInterface, Pool, Problem, Request, RuleSet,
-    RuleSetGenerator, RuleWatchGraph, RuleWatchNode, SolverBugException, SolverProblemsException,
+    Decisions, GenericRule, LockTransaction, PolicyInterface, Pool, Problem, Request, Rule,
+    RuleSet, RuleSetGenerator, RuleWatchGraph, RuleWatchNode, SolverBugException,
+    SolverProblemsException, rule,
 };
 use crate::filter::platform_requirement_filter::{
     IgnoreListPlatformRequirementFilter, PlatformRequirementFilterFactory,

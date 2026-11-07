@@ -1,8 +1,9 @@
 //! ref: composer/src/Composer/Command/CreateProjectCommand.php sha1:028857d3493a517f6883959aeb89cea1068f369a
 
 use crate::advisory::Auditor;
-use crate::command::base_command::{base_command_complete, base_command_initialize};
-use crate::command::{BaseCommand, BaseCommandData, CompletionTrait};
+use crate::command::{
+    BaseCommand, BaseCommandData, CompletionTrait, base_command_complete, base_command_initialize,
+};
 use crate::composer::composer_full;
 use crate::config::{Config, ConfigSourceInterface, JsonConfigSource};
 use crate::console::input::{InputArgument, InputOption, SuggestedValues};
@@ -17,8 +18,7 @@ use crate::filter::platform_requirement_filter::{
 use crate::installer::{Installer, ProjectInstaller, SuggestedPackagesReporter};
 use crate::io::{DEBUG, IOInterface, IOInterfaceImmutable, IOInterfaceWrite};
 use crate::json::JsonFile;
-use crate::package::version::version_selector::ShowWarnings;
-use crate::package::version::{VersionParser, VersionSelector};
+use crate::package::version::{ShowWarnings, VersionParser, VersionSelector};
 use crate::package::{DisplayMode, STABILITIES, SUPPORTED_LINK_TYPES, stability_priority};
 use crate::plugin::PluginBlockedException;
 use crate::repository::{

@@ -1,8 +1,7 @@
 //! ref: composer/vendor/composer/semver/src/Semver.php sha1:d1a57c70418d7e765271d708d48e369e27c47ef1
 
-use crate::comparator::Comparator;
 use crate::constraint::SimpleConstraint;
-use crate::version_parser::VersionParser;
+use crate::{Comparator, VersionParser};
 use bstr::BString;
 use std::sync::OnceLock;
 

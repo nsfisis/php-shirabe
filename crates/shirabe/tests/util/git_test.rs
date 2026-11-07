@@ -8,10 +8,10 @@ use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe::config::{Config, ConfigSourceInterface};
 use shirabe::io::IOInterface;
-use shirabe::util::filesystem::Filesystem;
-use shirabe::util::git::Git;
-use shirabe::util::http_downloader::HttpDownloaderMockHandler;
-use shirabe::util::process_executor::{CommandLine, MockExpectation, MockHandler, ProcessExecutor};
+use shirabe::util::{
+    CommandLine, Filesystem, Git, HttpDownloaderMockHandler, MockExpectation, MockHandler,
+    ProcessExecutor,
+};
 use shirabe_php_shim::{
     Catch as _, PhpMixed, RuntimeException, bconcat, display_to_bytes, path_from_bytes,
 };

@@ -4,8 +4,7 @@
 // junctions over a temp tree). The on-disk tests build their temp tree with tempfile::TempDir in
 // place of TestCase::getUniqueTmpDirectory, which is not ported.
 use bstr::{BStr, ByteSlice};
-use shirabe::util::filesystem::Filesystem;
-use shirabe::util::platform::Platform;
+use shirabe::util::{Filesystem, Platform};
 use shirabe_php_shim::{
     error_message, file_exists, file_put_contents, is_dir, mkdir, path_from_bytes, path_to_bytes,
     symlink, touch,

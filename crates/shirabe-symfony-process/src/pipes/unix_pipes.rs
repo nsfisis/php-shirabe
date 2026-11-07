@@ -1,8 +1,8 @@
 //! ref: composer/vendor/symfony/process/Pipes/UnixPipes.php sha1:3dc0695870857e218472857b3c9a53c89dc60e2c
 
+use crate::Process;
 use crate::pipes::abstract_pipes::AbstractPipes;
 use crate::pipes::pipes_interface::{CHUNK_SIZE, PipesInterface};
-use crate::process::Process;
 use indexmap::IndexMap;
 use shirabe_php_shim::{Descriptor, PhpMixed, PhpResource, fclose, feof, fread, stream_select};
 

@@ -1,6 +1,6 @@
 //! ref: composer/vendor/symfony/console/Descriptor/XmlDescriptor.php sha1:bf9fcbfac4b4a0332af6b871125de1520774184a
 
-use crate::application::Application;
+use crate::Application;
 use crate::command::Command;
 use crate::descriptor::{
     ApplicationDescription, DescribableObject, Descriptor, DescriptorInterface, DescriptorOptions,

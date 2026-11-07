@@ -10,7 +10,7 @@ use shirabe_php_shim::{
     PHP_SERVER, PhpMixed, basename, bconcat, file_exists, impl_php_class, implode, path_from_bytes,
     path_to_bytes, php_str, realpath, str_replace_arrays, sys_get_temp_dir, touch,
 };
-use shirabe_symfony_process::process::Process;
+use shirabe_symfony_process::Process;
 use std::ops::{Deref, DerefMut};
 use std::path::PathBuf;
 

@@ -13,10 +13,9 @@ use shirabe::config::Config;
 use shirabe::dependency_resolver::operation::AnyOperation;
 use shirabe::dependency_resolver::{AnyTransaction, Transaction};
 use shirabe::event_dispatcher::{Callable, EventDispatcher, EventFlags, EventInterface};
-use shirabe::filter::PlatformRequirementFilterInterface;
+use shirabe::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
 use shirabe::installer::{InstallationManagerInterface, InstallerEvents, InstallerInterface};
-use shirabe::io::buffer_io::BufferIO;
-use shirabe::io::{IOInterface, io_interface};
+use shirabe::io::{BufferIO, IOInterface, io_interface};
 use shirabe::package::{
     LockerInterface, PackageInterfaceHandle, RootPackageHandle, RootPackageInterfaceHandle,
 };
@@ -24,8 +23,7 @@ use shirabe::repository::{
     InstalledArrayRepository, RepositoryInterfaceHandle, RepositoryManagerInterface,
 };
 use shirabe::script::{Event as ScriptEvent, ScriptEvents};
-use shirabe::util::platform::Platform;
-use shirabe::util::process_executor::{MockHandler, ProcessExecutor};
+use shirabe::util::{MockHandler, Platform, ProcessExecutor};
 use shirabe_class_map_generator::class_map::ClassMap;
 use shirabe_php_shim::{
     Catch as _, PHP_EOL, PhpMixed, RuntimeException, bconcat, error_message, getenv, path_to_bytes,

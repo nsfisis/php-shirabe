@@ -6,4 +6,3 @@ pub mod input;
 pub use application::*;
 pub use github_action_error::*;
 pub use html_output_formatter::*;
-pub use input::*;

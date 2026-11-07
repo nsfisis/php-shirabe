@@ -4,8 +4,7 @@ use bstr::BString;
 use shirabe::composer::{ComposerHandle, PartialOrFullComposer};
 use shirabe::config::Config;
 use shirabe::event_dispatcher::{Event as BaseEvent, EventFlags, EventInterface};
-use shirabe::io::IOInterface;
-use shirabe::io::null_io::NullIO;
+use shirabe::io::{IOInterface, NullIO};
 use shirabe::package::{RootPackageHandle, RootPackageInterfaceHandle};
 use shirabe::script::{Event, OriginatingEvent};
 

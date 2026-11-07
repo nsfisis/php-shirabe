@@ -1,7 +1,6 @@
 //! ref: composer/src/Composer/Command/RepositoryCommand.php sha1:c02582e37b0040d5cf80534502873f1f61fc16d9
 
-use crate::command::base_command::base_command_complete;
-use crate::command::{BaseCommand, BaseCommandData, BaseConfigCommand};
+use crate::command::{BaseCommand, BaseCommandData, BaseConfigCommand, base_command_complete};
 use crate::config::{Config, ConfigSourceInterface, JsonConfigSource};
 use crate::console::input::{InputArgument, InputOption, SuggestedValues};
 use crate::delegate_base_command_trait_impls_to_inner;
@@ -14,12 +13,9 @@ use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, RuntimeException, Stringable, bconcat, impl_php_class,
     parse_url, path_to_bytes, php_regex, php_to_string, preg_is_match, strtolower,
 };
-use shirabe_symfony_console::input::InputInterfaceByName;
-use shirabe_symfony_console::{
-    command::Command,
-    input::{InputInterface, InputValue},
-    output::OutputInterface,
-};
+use shirabe_symfony_console::command::Command;
+use shirabe_symfony_console::input::{InputInterface, InputInterfaceByName, InputValue};
+use shirabe_symfony_console::output::OutputInterface;
 
 #[derive(Debug)]
 pub struct RepositoryCommand {

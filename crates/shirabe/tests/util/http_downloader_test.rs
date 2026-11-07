@@ -6,10 +6,8 @@ use bstr::BString;
 use indexmap::IndexMap;
 use shirabe::config::Config;
 use shirabe::downloader::TransportException;
-use shirabe::io::buffer_io::BufferIO;
-use shirabe::io::{IOInterface, io_interface};
-use shirabe::util::Platform;
-use shirabe::util::http_downloader::HttpDownloader;
+use shirabe::io::{BufferIO, IOInterface, io_interface};
+use shirabe::util::{HttpDownloader, Platform};
 use shirabe_php_shim::{Catch as _, PHP_EOL, PhpMixed, bconcat};
 use shirabe_symfony_console::output::VERBOSITY_NORMAL;
 

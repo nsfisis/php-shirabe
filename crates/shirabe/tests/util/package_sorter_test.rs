@@ -2,9 +2,8 @@
 
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
-use shirabe::package::Link;
-use shirabe::package::handle::{PackageHandle, PackageInterfaceHandle};
-use shirabe::util::package_sorter::PackageSorter;
+use shirabe::package::{Link, PackageHandle, PackageInterfaceHandle};
+use shirabe::util::PackageSorter;
 use shirabe_php_shim::bconcat;
 use shirabe_semver::constraint::MatchAllConstraint;
 

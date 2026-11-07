@@ -3,15 +3,13 @@
 use crate::config_stub::ConfigStubBuilder;
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
-use shirabe::command::BaseCommand;
-use shirabe::command::archive_command::ArchiveCommand;
+use shirabe::command::{ArchiveCommand, BaseCommand};
 use shirabe::composer::{Composer, PartialComposerHandle, PartialOrFullComposer};
 use shirabe::config::Config;
 use shirabe::dependency_resolver::AnyTransaction;
 use shirabe::event_dispatcher::{Callable, EventDispatcherInterface, EventInterface};
-use shirabe::package::{
-    ArchiveManagerInterface, CompletePackageInterfaceHandle, RootPackageHandle,
-};
+use shirabe::package::archiver::ArchiveManagerInterface;
+use shirabe::package::{CompletePackageInterfaceHandle, RootPackageHandle};
 use shirabe::repository::{
     InstalledArrayRepository, RepositoryInterfaceHandle, RepositoryManagerInterface,
 };

@@ -30,9 +30,9 @@ use crate::plugin::console_bridge::{
     reset_pending_plugin_command_handles, take_pending_plugin_command_handles,
 };
 use crate::plugin::php_call::PhpCall;
+use crate::plugin::proxy::{PhpCommandProxy, new_php_object, php_class_query};
 use crate::plugin::rpc::dispatch::find_file_in_registered_loaders;
 use crate::plugin::rpc::table::{composer_handle_value, io_handle_value};
-use crate::plugin::{PhpCommandProxy, new_php_object, php_class_query};
 use crate::util::sync_executor::block_on;
 use crate::util::{ErrorHandler, Filesystem, HttpDownloader, Platform, Silencer};
 use bstr::{B, BStr, BString, ByteSlice, ByteVec};
@@ -53,30 +53,28 @@ use shirabe_php_shim::{
     sys_get_temp_dir, time, trim, unlink,
 };
 use shirabe_seld_json_lint::ParsingException;
-use shirabe_symfony_console::input::InputInterfaceByName;
-use shirabe_symfony_console::{
-    application::Application as BaseApplication,
-    command::{Command as SymfonyCommand, HelpCommand},
-    command_loader::CommandLoaderInterface,
-    completion::{CompletionInput, CompletionSuggestions},
-    exception::{
-        CommandNotFoundException, InvalidArgumentException as ConsoleInvalidArgumentException,
-        InvalidOptionException, LogicException as ConsoleLogicException, MissingInputException,
-        NamespaceNotFoundException, RuntimeException as ConsoleRuntimeException,
-    },
-    formatter::OutputFormatter,
-    helper::{
-        DebugFormatterHelper, FormatBlockMessages, FormatterHelper, Helper, HelperSet,
-        ProcessHelper, QuestionHelper,
-    },
-    input::{
-        ArgumentName, ArgvInput, ArrayInput, InputArgument, InputDefinition, InputInterface,
-        InputOption, InputValue, ParameterName,
-    },
-    output::{ConsoleOutput, ConsoleOutputInterface, OutputInterface, output_interface},
-    style::{StyleInterface, SymfonyStyle},
-    terminal::Terminal,
+use shirabe_symfony_console::command::{Command as SymfonyCommand, HelpCommand};
+use shirabe_symfony_console::command_loader::CommandLoaderInterface;
+use shirabe_symfony_console::completion::{CompletionInput, CompletionSuggestions};
+use shirabe_symfony_console::exception::{
+    CommandNotFoundException, InvalidArgumentException as ConsoleInvalidArgumentException,
+    InvalidOptionException, LogicException as ConsoleLogicException, MissingInputException,
+    NamespaceNotFoundException, RuntimeException as ConsoleRuntimeException,
 };
+use shirabe_symfony_console::formatter::OutputFormatter;
+use shirabe_symfony_console::helper::{
+    DebugFormatterHelper, FormatBlockMessages, FormatterHelper, Helper, HelperSet, ProcessHelper,
+    QuestionHelper,
+};
+use shirabe_symfony_console::input::{
+    ArgumentName, ArgvInput, ArrayInput, InputArgument, InputDefinition, InputInterface,
+    InputInterfaceByName, InputOption, InputValue, ParameterName,
+};
+use shirabe_symfony_console::output::{
+    ConsoleOutput, ConsoleOutputInterface, OutputInterface, output_interface,
+};
+use shirabe_symfony_console::style::{StyleInterface, SymfonyStyle};
+use shirabe_symfony_console::{Application as BaseApplication, Terminal};
 use shirabe_symfony_process::exception::ProcessTimedOutException;
 use std::path::PathBuf;
 
@@ -1575,7 +1573,7 @@ impl Application {
         &self,
     ) -> Vec<std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>> {
         use shirabe_symfony_console::command::{
-            CompleteCommand, DumpCompletionCommand, HelpCommand, ListCommand,
+            CompleteCommand, DumpCompletionCommand, ListCommand,
         };
 
         vec![

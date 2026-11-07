@@ -3,7 +3,7 @@
 use crate::test_case;
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
-use shirabe::package::handle::PackageInterfaceHandle;
+use shirabe::package::PackageInterfaceHandle;
 use shirabe::package::loader::{InvalidPackageException, LoaderInterface, ValidatingArrayLoader};
 use shirabe_php_shim::{Catch as _, PHP_EOL, PhpMixed, bconcat};
 

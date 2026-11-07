@@ -9,14 +9,9 @@ use crate::dependency_resolver::operation::AnyOperation;
 use crate::downloader::DownloadManagerInterface;
 use crate::event_dispatcher::{EventDispatcherInterface, EventInterface};
 use crate::installer::InstallationManagerInterface;
-use crate::io::IOInterface;
-use crate::io::buffer_io::BufferIO;
-use crate::io::console_io::ConsoleIO;
-use crate::io::null_io::NullIO;
-use crate::package::PackageInterfaceHandle;
-use crate::package::handle::AnyPackage;
-use crate::package::locker::LockerInterface;
-use crate::plugin::plugin_interface::PluginInterface;
+use crate::io::{BufferIO, ConsoleIO, IOInterface, NullIO};
+use crate::package::{AnyPackage, LockerInterface, PackageInterfaceHandle};
+use crate::plugin::PluginInterface;
 use crate::plugin::rpc::codec::arg_throw;
 use crate::repository::{
     InstalledArrayRepository, InstalledFilesystemRepository, LockArrayRepository,

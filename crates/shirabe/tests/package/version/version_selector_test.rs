@@ -5,11 +5,9 @@ use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe::filter::platform_requirement_filter::PlatformRequirementFilterFactory;
 use shirabe::io::{BufferIO, IOInterface};
-use shirabe::package::handle::PackageHandle;
-use shirabe::package::version::VersionSelector;
-use shirabe::package::version::version_parser::VersionParser;
+use shirabe::package::version::{VersionParser, VersionSelector};
 use shirabe::package::{
-    BasePackageHandle, CompleteAliasPackageHandle, CompletePackageHandle, Link,
+    BasePackageHandle, CompleteAliasPackageHandle, CompletePackageHandle, Link, PackageHandle,
     PackageInterfaceHandle,
 };
 use shirabe::repository::{PlatformRepository, RepositorySetInterface};

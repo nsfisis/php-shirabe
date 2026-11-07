@@ -17,7 +17,7 @@ mod isolated_cwd;
 use bstr::{BStr, BString, ByteSlice};
 #[cfg(not(target_os = "linux"))]
 use serial_test::serial;
-use shirabe::console::application::{Application, ApplicationHandle};
+use shirabe::console::{Application, ApplicationHandle};
 use shirabe_php_shim::{implode, php_str};
 use shirabe_symfony_console::tester::CommandCompletionTester;
 

@@ -4,7 +4,7 @@ use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe::config::{ConfigSourceInterface, JsonConfigSource};
 use shirabe::json::JsonFile;
-use shirabe::util::filesystem::Filesystem;
+use shirabe::util::Filesystem;
 use shirabe_php_shim::{PhpMixed, bconcat, path_from_bytes};
 use std::path::PathBuf;
 use tempfile::TempDir;

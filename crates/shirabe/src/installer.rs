@@ -69,7 +69,6 @@ use shirabe_php_shim::{
     intval, is_dir, is_numeric, path_from_bytes, strcmp, strpos, strtolower, touch, usort,
 };
 use shirabe_seld_json_lint::ParsingException;
-use shirabe_semver;
 use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
 
 #[derive(Debug)]

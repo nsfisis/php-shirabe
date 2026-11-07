@@ -3,18 +3,16 @@
 
 use crate::autoload::ClassLoader;
 use crate::config::Config;
-use crate::console::application::run_worker_reverse_command;
+use crate::console::run_worker_reverse_command;
 use crate::dependency_resolver::operation::{
     AnyOperation, InstallOperation, MarkAliasInstalledOperation, MarkAliasUninstalledOperation,
     UninstallOperation, UpdateOperation,
 };
-use crate::event_dispatcher::event_dispatcher::dispatch_event_method;
-use crate::io::IOInterface;
-use crate::io::buffer_io::BufferIO;
-use crate::package::handle::AnyPackage;
+use crate::event_dispatcher::dispatch_event_method;
+use crate::io::{BufferIO, IOInterface};
 use crate::package::{
-    AliasPackage, AliasPackageHandle, CompleteAliasPackage, CompletePackage, Locker, Package,
-    PackageInterfaceHandle, RootAliasPackage,
+    AliasPackage, AliasPackageHandle, AnyPackage, CompleteAliasPackage, CompletePackage, Locker,
+    Package, PackageInterfaceHandle, RootAliasPackage,
 };
 use crate::plugin::job_registry;
 use crate::plugin::rpc::codec::{arg, arg_or};

@@ -1,7 +1,8 @@
 //! ref: composer/src/Composer/Command/ArchiveCommand.php sha1:735beefe6c65976d3dc9179d6d7229436ec617e5
 
-use crate::command::base_command::{base_command_complete, base_command_initialize};
-use crate::command::{BaseCommand, BaseCommandData, CompletionTrait};
+use crate::command::{
+    BaseCommand, BaseCommandData, CompletionTrait, base_command_complete, base_command_initialize,
+};
 use crate::composer::{PartialComposerHandle, composer_full};
 use crate::config::Config;
 use crate::console::input::{InputArgument, InputOption, SuggestedValues};
@@ -10,8 +11,7 @@ use crate::event_dispatcher::EventFlags;
 use crate::factory::Factory;
 use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::package::archiver::ArchiveManagerInterface;
-use crate::package::version::version_selector::ShowWarnings;
-use crate::package::version::{VersionParser, VersionSelector};
+use crate::package::version::{ShowWarnings, VersionParser, VersionSelector};
 use crate::package::{CompletePackageInterfaceHandle, PackageInterfaceHandle};
 use crate::plugin::{CommandEvent, PluginEvents};
 use crate::repository::{
@@ -26,8 +26,9 @@ use shirabe_php_shim::{
     LogicException, PhpMixed, bconcat, get_debug_type, impl_php_class, implode, path_from_bytes,
     path_to_bytes, php_regex, php_str, preg_match, strtolower,
 };
-use shirabe_symfony_console::input::InputInterfaceByName;
-use shirabe_symfony_console::{command::Command, input::InputInterface, output::OutputInterface};
+use shirabe_symfony_console::command::Command;
+use shirabe_symfony_console::input::{InputInterface, InputInterfaceByName};
+use shirabe_symfony_console::output::OutputInterface;
 
 #[derive(Debug)]
 pub struct ArchiveCommand {

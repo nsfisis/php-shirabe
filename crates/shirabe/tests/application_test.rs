@@ -10,10 +10,9 @@ use serial_test::serial;
 use shirabe_symfony_console::input::{ArrayInput, InputInterface, InputValue, ParameterName};
 use test_case::init_temp_composer;
 
-use shirabe::command::about_command::AboutCommand;
-use shirabe::command::self_update_command::SelfUpdateCommand;
-use shirabe::console::application::{Application, ApplicationHandle};
-use shirabe::util::platform::Platform;
+use shirabe::command::{AboutCommand, SelfUpdateCommand};
+use shirabe::console::{Application, ApplicationHandle};
+use shirabe::util::Platform;
 use shirabe_php_shim::{PHP_EOL, PHP_SERVER, RuntimeException, bconcat, time};
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::output::{BufferedOutput, OutputInterface};

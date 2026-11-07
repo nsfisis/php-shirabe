@@ -14,10 +14,11 @@ use crate::package::{
 };
 use crate::plugin::capability::Capability;
 use crate::plugin::php_call::PhpCall;
-use crate::plugin::plugin_interface::{self, PluginInterface};
-use crate::plugin::proxy::{PhpCapabilityProxy, PhpCommandProviderProxy, PhpPluginProxy, php_is_a};
+use crate::plugin::proxy::{
+    PhpCapabilityProxy, PhpCommandProviderProxy, PhpPluginProxy, php_installer_proxy, php_is_a,
+};
 use crate::plugin::rpc::table::{composer_handle_value, io_handle_value, plugin_handle_value};
-use crate::plugin::{PluginBlockedException, php_installer_proxy};
+use crate::plugin::{PluginBlockedException, PluginInterface, plugin_interface};
 use crate::repository::{
     InstalledRepository, RepositoryInterfaceHandle, RepositoryUtils, RootPackageRepository,
 };

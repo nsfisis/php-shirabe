@@ -8,21 +8,16 @@ use crate::bootstrap::bootstrap;
 use bstr::BString;
 use indexmap::IndexMap;
 use shirabe::config::Config;
-use shirabe::console::application::ApplicationHandle;
+use shirabe::console::ApplicationHandle;
 use shirabe::installer::InstallationManager;
-use shirabe::io::IOInterface;
-use shirabe::io::null_io::NullIO;
+use shirabe::io::{IOInterface, NullIO};
 use shirabe::json::JsonFile;
-use shirabe::package::Locker;
-use shirabe::package::handle::{
-    CompleteAliasPackageHandle, CompletePackageHandle, PackageInterfaceHandle,
+use shirabe::package::{
+    CompleteAliasPackageHandle, CompletePackageHandle, Locker, PackageInterfaceHandle,
 };
 use shirabe::repository::{InstalledFilesystemRepository, WritableRepositoryInterface};
-use shirabe::util::Git as GitUtil;
-use shirabe::util::http_downloader::HttpDownloader;
 use shirabe::util::r#loop::Loop;
-use shirabe::util::platform::Platform;
-use shirabe::util::process_executor::ProcessExecutor;
+use shirabe::util::{Git as GitUtil, HttpDownloader, Platform, ProcessExecutor};
 use shirabe_php_shim::{
     PHP_ENV, PHP_EOL, PHP_SERVER, PhpResource, bconcat, function_exists, fwrite_resource, getenv,
     path_from_bytes, path_to_bytes, php_fopen_resource, putenv, rewind, stream_get_contents,

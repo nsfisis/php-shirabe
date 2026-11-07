@@ -1,6 +1,6 @@
 //! ref: composer/vendor/symfony/console/Exception/RuntimeException.php sha1:a5de32b70926a03f0d8a306a01f3b75eebe60103
 
-use crate::exception::exception_interface::ExceptionInterface;
+use crate::exception::ExceptionInterface;
 use bstr::BString;
 use shirabe_php_shim::impl_php_exception;
 

@@ -8,8 +8,7 @@ use crate::plugin::rpc::dispatch::{error_throw, unavailable_method};
 use crate::plugin::rpc::jobs::{
     HTTP_DOWNLOADER_TICK_CAP, dispatch_tick_method, rejected_promise, resolved_promise,
 };
-use crate::util::http_downloader::HttpDownloaderJob;
-use crate::util::{HttpDownloader, StreamContextOptions};
+use crate::util::{HttpDownloader, HttpDownloaderJob, StreamContextOptions};
 use bstr::{BStr, BString, ByteSlice};
 use shirabe_php_rpc::{PhpThrow, PluginValue, ToWire};
 use shirabe_php_shim::{bconcat, path_from_bytes};

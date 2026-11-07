@@ -7,7 +7,7 @@ use crate::test_case::{
 use bstr::{BStr, ByteSlice};
 use serial_test::serial;
 use shirabe::json::JsonFile;
-use shirabe::package::handle::PackageInterfaceHandle;
+use shirabe::package::PackageInterfaceHandle;
 use shirabe_php_shim::{chmod, function_exists, posix_getuid};
 use shirabe_symfony_console::input::{InputValue, ParameterName};
 

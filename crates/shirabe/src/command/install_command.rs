@@ -1,8 +1,9 @@
 //! ref: composer/src/Composer/Command/InstallCommand.php sha1:f259b576a55a58e2be6884e9e4c3bcd97ceec5a2
 
 use crate::advisory::Auditor;
-use crate::command::base_command::{base_command_complete, base_command_initialize};
-use crate::command::{BaseCommand, BaseCommandData, CompletionTrait};
+use crate::command::{
+    BaseCommand, BaseCommandData, CompletionTrait, base_command_complete, base_command_initialize,
+};
 use crate::composer::composer_full;
 use crate::console::input::{InputArgument, InputOption, SuggestedValues};
 use crate::delegate_base_command_trait_impls_to_inner;
@@ -11,12 +12,9 @@ use crate::io::IOInterfaceWrite;
 use crate::plugin::{CommandEvent, PluginEvents};
 use bstr::BStr;
 use shirabe_php_shim::{bconcat, impl_php_class, implode};
-use shirabe_symfony_console::input::InputInterfaceByName;
-use shirabe_symfony_console::{
-    command::Command,
-    input::{InputInterface, InputValue},
-    output::OutputInterface,
-};
+use shirabe_symfony_console::command::Command;
+use shirabe_symfony_console::input::{InputInterface, InputInterfaceByName, InputValue};
+use shirabe_symfony_console::output::OutputInterface;
 
 #[derive(Debug)]
 pub struct InstallCommand {

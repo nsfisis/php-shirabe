@@ -8,7 +8,7 @@ use shirabe_php_shim::{
     php_to_string, preg_is_match, preg_replace, sprintf, strlen, substr, trigger_deprecation,
     utf8_text,
 };
-use shirabe_symfony_string::unicode_string::UnicodeString;
+use shirabe_symfony_string::UnicodeString;
 
 /// Helper is the base class for all helper classes.
 #[derive(Debug, Default)]

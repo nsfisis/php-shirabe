@@ -1,6 +1,6 @@
 //! ref: composer/tests/Composer/Test/Util/PlatformTest.php sha1:b857dacddc127df7cc5c28da628085154a794f8f
 
-use shirabe::util::platform::Platform;
+use shirabe::util::Platform;
 use shirabe_php_shim::{bconcat, defined};
 
 #[test]

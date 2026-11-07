@@ -1,10 +1,8 @@
 //! ref: composer/src/Composer/Filter/PlatformRequirementFilter/PlatformRequirementFilterFactory.php sha1:76632cb894b3e1ffccddaa8e5774199fcadc8fbc
 
 use crate::filter::platform_requirement_filter::{
-    ignore_all_platform_requirement_filter::IgnoreAllPlatformRequirementFilter,
-    ignore_list_platform_requirement_filter::IgnoreListPlatformRequirementFilter,
-    ignore_nothing_platform_requirement_filter::IgnoreNothingPlatformRequirementFilter,
-    platform_requirement_filter_interface::PlatformRequirementFilterInterface,
+    IgnoreAllPlatformRequirementFilter, IgnoreListPlatformRequirementFilter,
+    IgnoreNothingPlatformRequirementFilter, PlatformRequirementFilterInterface,
 };
 use bstr::BString;
 use shirabe_php_shim::{InvalidArgumentException, PhpMixed, bconcat, get_debug_type};

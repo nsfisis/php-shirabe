@@ -830,8 +830,7 @@ fn match_and_delimiter(b: &[u8], i: usize) -> Option<usize> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bstr::BStr;
-    use shirabe_php_shim::{Catch as _, UnexpectedValueException, error_message};
+    use shirabe_php_shim::Catch as _;
 
     #[test]
     fn invalid_version_keeps_non_utf8_bytes_in_the_exception() {
