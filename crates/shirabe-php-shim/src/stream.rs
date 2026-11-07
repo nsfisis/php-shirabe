@@ -339,7 +339,11 @@ pub fn stream_select(
 
 /// PHP `stream_get_contents($stream, $maxlength, $offset)`. A non-negative `offset` seeks there
 /// first; `max_length < 0` reads until end.
-pub fn stream_get_contents3(stream: &PhpResource, max_length: i64, offset: i64) -> Option<Vec<u8>> {
+pub fn stream_get_contents_with_length_and_offset(
+    stream: &PhpResource,
+    max_length: i64,
+    offset: i64,
+) -> Option<Vec<u8>> {
     if offset >= 0 {
         fseek(stream, offset, SEEK_SET);
     }

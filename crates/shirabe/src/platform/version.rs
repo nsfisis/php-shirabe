@@ -3,7 +3,8 @@
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    CmpOp, bconcat, ltrim2, php_regex, preg_match, rtrim2, strpos, strtr_array, version_compare,
+    CmpOp, bconcat, ltrim_chars, php_regex, preg_match, rtrim_chars, strpos, strtr_array,
+    version_compare,
 };
 
 pub struct Version;
@@ -31,11 +32,11 @@ impl Version {
 
         *is_fips = strpos(suffix_str, "fips").is_some();
         let suffix = strtr_array(
-            bconcat!("-", ltrim2(suffix_str, "-")),
+            bconcat!("-", ltrim_chars(suffix_str, "-")),
             &IndexMap::from([("-fips", ""), ("-pre", "-alpha")]),
         );
 
-        Some(rtrim2(bconcat!(version, patch, suffix), "-"))
+        Some(rtrim_chars(bconcat!(version, patch, suffix), "-"))
     }
 
     pub fn parse_libjpeg(libjpeg_version: impl AsRef<[u8]>) -> Option<BString> {

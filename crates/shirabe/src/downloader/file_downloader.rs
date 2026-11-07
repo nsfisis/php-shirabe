@@ -26,8 +26,8 @@ use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, PATHINFO_BASENAME, PATHINFO_EXTENSION, PhpMixed,
     RuntimeException, Stringable, UnexpectedValueException, bconcat, chmod, dirname, error_message,
     explode, extension_loaded, file_exists, filesize, get_class, hash, hash_file, impl_php_class,
-    is_dir, is_executable, parse_url, path_from_bytes, path_to_bytes, pathinfo, realpath, rtrim2,
-    spl_object_hash, strlen, strpos, strtr, trim, umask, usleep,
+    is_dir, is_executable, parse_url, path_from_bytes, path_to_bytes, pathinfo, realpath,
+    rtrim_chars, spl_object_hash, strlen, strpos, strtr, trim, umask, usleep,
 };
 use std::path::{Path, PathBuf};
 use std::sync::{LazyLock, Mutex};
@@ -269,7 +269,7 @@ impl FileDownloader {
             extension
         };
 
-        Ok(PathBuf::from(path_from_bytes(&rtrim2(
+        Ok(PathBuf::from(path_from_bytes(&rtrim_chars(
             bconcat!(
                 self.config.borrow().get_path("vendor-dir")?,
                 "/composer/tmp-",

@@ -10,7 +10,7 @@ use crate::util::Platform;
 use bstr::{BStr, BString, ByteSlice};
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, bconcat, impl_php_class, is_string, php_regex,
-    preg_replace2,
+    preg_replace_with_limit_and_count,
 };
 use shirabe_symfony_console::input::InputInterfaceByName;
 use shirabe_symfony_console::{command::Command, input::InputInterface, output::OutputInterface};
@@ -121,7 +121,7 @@ impl Command for ScriptAliasCommand {
 
         Platform::put_env("COMPOSER_DEV_MODE", if dev_mode { "1" } else { "0" })?;
 
-        let script_alias_input = preg_replace2(
+        let script_alias_input = preg_replace_with_limit_and_count(
             php_regex!(r"{^\S+ ?}"),
             "",
             input.borrow().to_php_string(),

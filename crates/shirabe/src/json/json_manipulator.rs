@@ -9,8 +9,8 @@ use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpMixed, addcslashes, array_key_exists, array_keys,
     array_reverse, bconcat, empty, explode, implode, in_array_loose, intval, is_array, is_int,
     is_numeric, json_decode_assoc, json_decode_obj, php_regex, php_str, php_truthy, preg_is_match,
-    preg_match, preg_quote, preg_replace, preg_replace2, rtrim2, str_repeat, str_replace, strlen,
-    strnatcmp, strpos, substr, trim2, uksort,
+    preg_match, preg_quote, preg_replace, preg_replace_with_limit_and_count, rtrim_chars,
+    str_repeat, str_replace, strlen, strnatcmp, strpos, substr, trim_chars, uksort,
 };
 
 #[derive(Debug)]
@@ -34,7 +34,7 @@ impl JsonManipulator {
     );
 
     pub fn new(contents: impl AsRef<[u8]>) -> anyhow::Result<Self> {
-        let mut contents = trim2(contents, " \t\n\r\0\u{0B}");
+        let mut contents = trim_chars(contents, " \t\n\r\0\u{0B}");
         if contents.is_empty() {
             contents = BString::from("{}");
         }
@@ -950,7 +950,7 @@ impl JsonManipulator {
                     }
                 }
                 let mut count_out: usize = 0;
-                let cleaned = preg_replace2(
+                let cleaned = preg_replace_with_limit_and_count(
                     bconcat!("{,\\s*", preg_quote(&best_match, None), "}i"),
                     "",
                     &children,
@@ -958,7 +958,7 @@ impl JsonManipulator {
                     Some(&mut count_out),
                 );
                 if 1 != count_out {
-                    let cleaned2 = preg_replace2(
+                    let cleaned2 = preg_replace_with_limit_and_count(
                         bconcat!("{", preg_quote(&best_match, None), "\\s*,?\\s*}i"),
                         "",
                         &cleaned,
@@ -1450,7 +1450,7 @@ impl JsonManipulator {
             if preg_is_match(php_regex!("#,\\s*$#"), &start)
                 && preg_is_match(php_regex!("#^\\}$#"), &end)
             {
-                start = rtrim2(
+                start = rtrim_chars(
                     preg_replace(php_regex!("#,(\\s*)$#"), "$1", &start),
                     &self.indent,
                 );

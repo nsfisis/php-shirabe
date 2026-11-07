@@ -10,8 +10,9 @@ use shirabe_php_shim::{
     Catch as _, LogicException, PHP_EOL, PhpMixed, PregMatches, RuntimeException, array_intersect,
     array_map, bconcat, display_to_bytes, escapeshellarg, explode, implode, in_array_strict,
     intval, is_dir, is_numeric, path_from_bytes, path_to_bytes, php_regex, php_str, preg_is_match,
-    preg_match, preg_replace, preg_replace_callback, preg_replace2, preg_split, rtrim2,
-    str_replace, strcspn, strlen, strpbrk, strtolower, strtr_array, substr_replace, trim,
+    preg_match, preg_replace, preg_replace_callback, preg_replace_with_limit_and_count, preg_split,
+    rtrim_chars, str_replace, strcspn, strlen, strpbrk, strtolower, strtr_array, substr_replace,
+    trim,
 };
 use shirabe_symfony_process::{
     ExecutableFinder, Process, ProcessMock,
@@ -364,7 +365,7 @@ impl ProcessExecutor {
             && requires_git_dir_env
         {
             let is_bare_repository = !is_dir(path_from_bytes(&bconcat!(
-                rtrim2(path_to_bytes(cwd), "/"),
+                rtrim_chars(path_to_bytes(cwd), "/"),
                 "/.git"
             )));
             if is_bare_repository {
@@ -858,7 +859,7 @@ impl ProcessExecutor {
         let mut quote = strpbrk(&argument, " \t,").is_some();
         let mut dquotes: usize = 0;
         // PHP: Preg::replace('/(\\\\*)"/', '$1$1\\"', $argument, -1, $dquotes)
-        argument = preg_replace2(
+        argument = preg_replace_with_limit_and_count(
             php_regex!(r#"/(\\*)"/"#),
             r#"$1$1\""#,
             &argument,

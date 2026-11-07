@@ -33,7 +33,7 @@ use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, PhpMixed, RuntimeException, UnexpectedValueException,
     array_pop, bconcat, chdir, error_message, explode_with_limit, file_exists, getcwd,
     impl_php_class, implode, is_dir, is_file, mkdir, path_from_bytes, path_to_bytes, preg_match,
-    realpath, rtrim2, strtolower, unlink,
+    realpath, rtrim_chars, strtolower, unlink,
 };
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::{InputInterface, InputInterfaceByName, InputValue};
@@ -443,7 +443,7 @@ impl CreateProjectCommand {
             }
             Some(directory) => directory,
         };
-        directory = path_from_bytes(&rtrim2(path_to_bytes(&directory), "/\\")).to_path_buf();
+        directory = path_from_bytes(&rtrim_chars(path_to_bytes(&directory), "/\\")).to_path_buf();
 
         let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
             io.clone(),

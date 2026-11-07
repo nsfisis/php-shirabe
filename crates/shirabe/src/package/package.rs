@@ -8,7 +8,7 @@ use bstr::{BStr, BString, ByteSlice};
 use chrono::{DateTime, Utc};
 use indexmap::{IndexMap, IndexSet};
 use shirabe_php_shim::{
-    E_USER_DEPRECATED, LogicException, PhpMixed, PregMatches, Stringable, bconcat, ltrim2,
+    E_USER_DEPRECATED, LogicException, PhpMixed, PregMatches, Stringable, bconcat, ltrim_chars,
     php_regex, preg_is_match, preg_replace, preg_replace_callback, strpos, strtolower,
     trigger_error,
 };
@@ -142,7 +142,7 @@ impl Package {
             "/",
             target_dir,
         );
-        Some(ltrim2(&replaced, "/"))
+        Some(ltrim_chars(&replaced, "/"))
     }
 
     pub fn set_extra(&mut self, extra: IndexMap<BString, PhpMixed>) {

@@ -19,7 +19,7 @@ use shirabe_php_shim::{
     implode, in_array_loose, in_array_strict, intval, is_array, is_bool, is_dir, is_numeric,
     is_object, is_string, json_encode, path_from_bytes, path_to_bytes, php_regex, php_str,
     php_to_string, preg_is_match, preg_match, preg_replace, str_replace, strpos, strtolower,
-    system, touch, trim2, var_export,
+    system, touch, trim_chars, var_export,
 };
 use shirabe_semver::VersionParser;
 use shirabe_symfony_console::input::InputInterfaceByName;
@@ -264,7 +264,7 @@ impl ConfigCommand {
                     let id = preg_replace(
                         php_regex!("{[^a-z0-9]}i"),
                         "-",
-                        strtolower(trim2(&id, " \t\n\r\0\u{0B}")),
+                        strtolower(trim_chars(&id, " \t\n\r\0\u{0B}")),
                     );
                     let id = preg_replace(php_regex!("{-+}"), "-", &id);
                     bconcat!("https://getcomposer.org/doc/06-config.md#", id)

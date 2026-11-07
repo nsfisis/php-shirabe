@@ -12,8 +12,8 @@ use crate::util::{Filesystem, Platform};
 use bstr::{BStr, BString, ByteSlice};
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpMixed, Stringable, bconcat, dirname, is_dir,
-    is_link, path_from_bytes, path_to_bytes, preg_quote, preg_replace, realpath, rmdir, rtrim2,
-    str_replace, strpos,
+    is_link, path_from_bytes, path_to_bytes, preg_quote, preg_replace, realpath, rmdir,
+    rtrim_chars, str_replace, strpos,
 };
 use std::path::PathBuf;
 
@@ -50,7 +50,7 @@ impl LibraryInstaller {
 
         let filesystem = filesystem
             .unwrap_or_else(|| std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(None))));
-        let vendor_dir = PathBuf::from(path_from_bytes(&rtrim2(
+        let vendor_dir = PathBuf::from(path_from_bytes(&rtrim_chars(
             composer_ref.get_config().borrow().get_path("vendor-dir")?,
             "/",
         )));
@@ -58,7 +58,7 @@ impl LibraryInstaller {
             match binary_installer {
                 Some(binary_installer) => binary_installer,
                 None => {
-                    let bin_dir = PathBuf::from(path_from_bytes(&rtrim2(
+                    let bin_dir = PathBuf::from(path_from_bytes(&rtrim_chars(
                         composer_ref.get_config().borrow().get_path("bin-dir")?,
                         "/",
                     )));

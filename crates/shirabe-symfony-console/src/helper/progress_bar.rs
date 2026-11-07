@@ -11,7 +11,7 @@ use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     AsAny, PHP_EOL, PhpMixed, PregMatches, STR_PAD_LEFT, bconcat, explode, microtime, php_str,
-    php_to_string, preg_replace_callback, round, rtrim2, sprintf, str_pad, str_repeat,
+    php_to_string, preg_replace_callback, round, rtrim_chars, sprintf, str_pad, str_repeat,
     substr_count, time,
 };
 
@@ -765,7 +765,7 @@ impl ProgressBar {
             .map(|sub_line| {
                 Helper::width(Helper::remove_decoration(
                     &mut *self.output.borrow().get_formatter().borrow_mut(),
-                    rtrim2(sub_line, "\r"),
+                    rtrim_chars(sub_line, "\r"),
                 ))
             })
             .collect();

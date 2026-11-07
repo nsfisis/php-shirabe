@@ -12,7 +12,7 @@ use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     FILE_APPEND, PHP_EOL, PHP_SERVER, PhpMixed, RuntimeException, Stringable, basename, bconcat,
-    ctype_digit, date_utc, error_message, file_put_contents3, filter_var_boolean, getenv,
+    ctype_digit, date_utc, error_message, file_put_contents_with_flags, filter_var_boolean, getenv,
     impl_php_class, implode, intval, path_from_bytes, php_str, sys_get_temp_dir,
 };
 use std::ops::{Deref, DerefMut};
@@ -133,7 +133,7 @@ impl CompleteCommand {
                 .as_encoded_bytes(),
         );
         let tmp_dir = sys_get_temp_dir();
-        file_put_contents3(
+        file_put_contents_with_flags(
             path_from_bytes(&bconcat!(tmp_dir, "/sf_", command_name, ".log")),
             &bconcat!(implode(PHP_EOL, &messages), PHP_EOL),
             FILE_APPEND,

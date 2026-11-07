@@ -28,8 +28,8 @@ use shirabe_php_rpc::PluginValue;
 use shirabe_php_shim::{
     CmpOp, E_USER_DEPRECATED, PhpMixed, RuntimeException, UnexpectedValueException, bconcat,
     dirname, empty, file_get_contents, implode, ksort, path_from_bytes, php_regex, preg_is_match,
-    preg_quote, preg_replace2, strrpos, strtr_array, substr, trigger_error, trim2, var_export,
-    var_export_str, version_compare,
+    preg_quote, preg_replace_with_limit_and_count, strrpos, strtr_array, substr, trigger_error,
+    trim_chars, var_export, var_export_str, version_compare,
 };
 use shirabe_semver::constraint::SimpleConstraint;
 use shirabe_symfony_console::input::InputValue;
@@ -434,7 +434,7 @@ impl PluginManager {
         for class in classes {
             let mut class = class;
             if self.php_runtime_class_exists(class.as_bstr(), false)? {
-                class = trim2(&class, "\\");
+                class = trim_chars(&class, "\\");
                 let path = class_loader
                     .borrow_mut()
                     .find_file(&class)?
@@ -459,7 +459,7 @@ impl PluginManager {
                 {
                     class_name = substr(&class, (separator_pos + 1) as i64, None);
                 }
-                let code = preg_replace2(
+                let code = preg_replace_with_limit_and_count(
                     bconcat!(
                         "{^((?:(?:final|readonly)\\s+)*(?:\\s*))class\\s+(",
                         preg_quote(&class_name, None),
@@ -478,7 +478,8 @@ impl PluginManager {
                 );
                 replacements.insert(BString::from("__CLASS__"), var_export_str(&class, true));
                 let code = strtr_array(&code, &replacements);
-                let code = preg_replace2(r"/^\s*<\?(php)?/i", "", &code, 1, None);
+                let code =
+                    preg_replace_with_limit_and_count(r"/^\s*<\?(php)?/i", "", &code, 1, None);
                 self.php_runtime_eval(code)?;
                 class = bconcat!(class, "_composer_tmp", class_counter);
                 CLASS_COUNTER.store(class_counter + 1, std::sync::atomic::Ordering::Relaxed);
@@ -998,7 +999,7 @@ impl PluginManager {
             && !empty(value)
             && let PhpMixed::String(s) = value
         {
-            let trimmed = trim2(s, " \t\n\r\0\u{0B}");
+            let trimmed = trim_chars(s, " \t\n\r\0\u{0B}");
             // PHP evaluates trim(...) in boolean context: "" and "0" are falsy.
             if !trimmed.is_empty() && trimmed != "0" {
                 return Ok(Some(trimmed));

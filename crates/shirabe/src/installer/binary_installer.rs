@@ -7,8 +7,8 @@ use bstr::{BStr, BString, ByteSlice};
 use shirabe_php_shim::{
     basename, basename_with_suffix, bconcat, chmod, dirname, fclose, fgets, file_exists,
     file_get_contents_with_max_length, file_put_contents, fopen, is_dir, is_file, is_link,
-    path_from_bytes, path_to_bytes, php_regex, preg_match, realpath, rmdir, substr, trim, trim2,
-    umask,
+    path_from_bytes, path_to_bytes, php_regex, preg_match, realpath, rmdir, substr, trim,
+    trim_chars, umask,
 };
 use std::path::{Path, PathBuf};
 
@@ -280,7 +280,7 @@ impl BinaryInstaller {
                 "@ECHO OFF\r\n",
                 "setlocal DISABLEDELAYEDEXPANSION\r\n",
                 "SET BIN_TARGET=%~dp0/",
-                trim2(
+                trim_chars(
                     ProcessExecutor::escape(basename_with_suffix(path_to_bytes(link), ".bat")),
                     "\"'"
                 ),
@@ -295,7 +295,7 @@ impl BinaryInstaller {
             "@ECHO OFF\r\n",
             "setlocal DISABLEDELAYEDEXPANSION\r\n",
             "SET BIN_TARGET=%~dp0/",
-            trim2(ProcessExecutor::escape(path_to_bytes(&bin_path)), "\"'"),
+            trim_chars(ProcessExecutor::escape(path_to_bytes(&bin_path)), "\"'"),
             "\r\n",
             "SET COMPOSER_RUNTIME_BIN_DIR=%~dp0\r\n",
             caller,

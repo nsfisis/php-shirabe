@@ -228,10 +228,10 @@ pub fn preg_replace(
     replacement: impl AsRef<[u8]>,
     subject: impl AsRef<[u8]>,
 ) -> BString {
-    preg_replace2(pattern, replacement, subject, -1, None)
+    preg_replace_with_limit_and_count(pattern, replacement, subject, -1, None)
 }
 
-pub fn preg_replace2(
+pub fn preg_replace_with_limit_and_count(
     pattern: impl PregPattern,
     replacement: impl AsRef<[u8]>,
     subject: impl AsRef<[u8]>,

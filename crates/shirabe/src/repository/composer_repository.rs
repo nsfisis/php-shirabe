@@ -33,7 +33,8 @@ use shirabe_php_shim::{
     PhpMixed, RuntimeException, UnexpectedValueException, bconcat, error_message, explode,
     extension_loaded, hash, http_build_query_mixed, implode, json_decode_assoc, parse_url,
     path_from_bytes, php_regex, php_to_string, preg_grep, preg_is_match, preg_match, preg_replace,
-    preg_split, realpath, rtrim2, str_replace, strpos, strtolower, strtr, urlencode, var_export,
+    preg_split, realpath, rtrim_chars, str_replace, strpos, strtolower, strtr, urlencode,
+    var_export,
 };
 use shirabe_semver::CompilingMatcher;
 use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint, SimpleConstraint};
@@ -240,7 +241,7 @@ impl ComposerRepository {
                 repo_config.insert("url".into(), PhpMixed::string(bconcat!("http://", url_str)));
             }
         }
-        let url_after = rtrim2(
+        let url_after = rtrim_chars(
             repo_config
                 .get(B("url"))
                 .and_then(|v| v.as_string())
@@ -314,7 +315,7 @@ impl ComposerRepository {
 
         let base_url_trimmed =
             preg_replace(php_regex!(r"{(?:/[^/\\]+\.json)?(?:[?#].*)?$}"), "", &url);
-        let base_url = rtrim2(&base_url_trimmed, "/");
+        let base_url = rtrim_chars(&base_url_trimmed, "/");
         assert!(!base_url.is_empty());
 
         let cache_dir = bconcat!(

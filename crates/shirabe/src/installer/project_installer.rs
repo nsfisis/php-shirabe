@@ -7,7 +7,7 @@ use crate::repository::InstalledRepositoryInterfaceHandle;
 use crate::util::Filesystem;
 use bstr::{BStr, BString};
 use shirabe_php_shim::{
-    InvalidArgumentException, PhpMixed, bconcat, path_from_bytes, path_to_bytes, rtrim2, strtr,
+    InvalidArgumentException, PhpMixed, bconcat, path_from_bytes, path_to_bytes, rtrim_chars, strtr,
 };
 use std::path::{Path, PathBuf};
 
@@ -25,7 +25,7 @@ impl ProjectInstaller {
         fs: std::rc::Rc<std::cell::RefCell<Filesystem>>,
     ) -> Self {
         let install_path = PathBuf::from(path_from_bytes(&bconcat!(
-            rtrim2(strtr(path_to_bytes(install_path), "\\", "/"), "/"),
+            rtrim_chars(strtr(path_to_bytes(install_path), "\\", "/"), "/"),
             "/"
         )));
         Self {

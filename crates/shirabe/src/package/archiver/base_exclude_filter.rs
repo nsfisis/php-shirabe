@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/Package/Archiver/BaseExcludeFilter.php sha1:16a9cbcc09a710ac828d7dd91d2b1812411fdb9d
 
 use bstr::{BStr, BString, ByteSlice};
-use shirabe_php_shim::{bconcat, ltrim2, preg_is_match, trim, trim2};
+use shirabe_php_shim::{bconcat, ltrim_chars, preg_is_match, trim, trim_chars};
 use shirabe_symfony_finder::Glob;
 use std::path::{Path, PathBuf};
 
@@ -49,7 +49,7 @@ impl BaseExcludeFilterBase {
         let mut rule = BString::from(rule);
         if rule.starts_with(b"!") {
             negate = true;
-            rule = ltrim2(&rule, "!");
+            rule = ltrim_chars(&rule, "!");
         }
 
         let first_slash_position = rule.find_byte(b'/');
@@ -59,7 +59,7 @@ impl BaseExcludeFilterBase {
             pattern = BString::from("/");
         }
 
-        let rule = trim2(&rule, "/");
+        let rule = trim_chars(&rule, "/");
 
         // Regex pattern compatibility:
         // PHP strips the delimiters/anchors off Glob::toRegex output and appends the

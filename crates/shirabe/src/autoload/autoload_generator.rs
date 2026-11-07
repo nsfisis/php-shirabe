@@ -24,10 +24,10 @@ use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, PHP_SERVER, PhpMixed, PregMatches, RuntimeException,
     array_keys, array_map, array_merge_map, array_merge_recursive, array_shift, array_slice_strs,
     array_unique, bconcat, bin2hex, dirname, empty, explode, file_exists, file_get_contents, hash,
-    implode, intval, is_array, is_dir, ksort, ltrim, ltrim2, path_from_bytes, path_to_bytes,
+    implode, intval, is_array, is_dir, ksort, ltrim, ltrim_chars, path_from_bytes, path_to_bytes,
     php_regex, preg_is_match, preg_match, preg_quote, preg_replace, preg_replace_callback,
-    random_bytes, realpath, rtrim2, str_replace, strlen, strpos, strtr, strtr_array, substr,
-    substr_count, trim, trim2, unlink, utf8_text, var_export,
+    random_bytes, realpath, rtrim_chars, str_replace, strlen, strpos, strtr, strtr_array, substr,
+    substr_count, trim, trim_chars, unlink, utf8_text, var_export,
 };
 use shirabe_semver::constraint::Bound;
 use shirabe_symfony_console::formatter::OutputFormatter;
@@ -1037,7 +1037,7 @@ impl AutoloadGenerator {
             }
 
             for include_path in package.get_include_paths() {
-                let include_path = trim2(&include_path, "/");
+                let include_path = trim_chars(&include_path, "/");
                 include_paths.push(if install_path.is_empty() {
                     include_path
                 } else {
@@ -1686,7 +1686,10 @@ require_once "#,
             bconcat!(
                 " => ",
                 substr(
-                    var_export(&PhpMixed::string(bconcat!(rtrim2(dir, "\\/"), "/")), true),
+                    var_export(
+                        &PhpMixed::string(bconcat!(rtrim_chars(dir, "\\/"), "/")),
+                        true
+                    ),
                     0,
                     Some(-1),
                 )
@@ -1827,7 +1830,7 @@ require_once "#,
             for (namespace, paths) in type_arr {
                 let namespace = if [B("psr-4"), B("psr-0")].contains(&r#type.as_bytes()) {
                     // normalize namespaces to ensure "\" becomes "" and others do not have leading separators as they are not needed
-                    ltrim2(&namespace, "\\")
+                    ltrim_chars(&namespace, "\\")
                 } else {
                     namespace
                 };
@@ -1868,11 +1871,11 @@ require_once "#,
                                     .map(|segment| preg_quote(segment, None))
                                     .collect::<Vec<BString>>(),
                             );
-                            path_str = ltrim2(
+                            path_str = ltrim_chars(
                                 preg_replace(
                                     bconcat!("{^", target_dir, "}"),
                                     "",
-                                    ltrim2(&path_str, "\\/"),
+                                    ltrim_chars(&path_str, "\\/"),
                                 ),
                                 "\\/",
                             );
@@ -1891,7 +1894,7 @@ require_once "#,
                         let p = preg_replace(
                             php_regex!("{/+}"),
                             "/",
-                            preg_quote(trim2(strtr(&path_str, "\\", "/"), "/"), None),
+                            preg_quote(trim_chars(strtr(&path_str, "\\", "/"), "/"), None),
                         );
 
                         // add support for wildcards * and **
@@ -2230,14 +2233,14 @@ fn require_generated_php_array(file: &Path) -> PhpMixed {
         let line = trim(line);
         if let Some(rest) = line.strip_prefix(b"$vendorDir = ") {
             vendor_dir = eval_php_path_expr(
-                rtrim2(rest, ";").as_bstr(),
+                rtrim_chars(rest, ";").as_bstr(),
                 dir.as_bstr(),
                 b"".as_bstr(),
                 b"".as_bstr(),
             );
         } else if let Some(rest) = line.strip_prefix(b"$baseDir = ") {
             base_dir = eval_php_path_expr(
-                rtrim2(rest, ";").as_bstr(),
+                rtrim_chars(rest, ";").as_bstr(),
                 dir.as_bstr(),
                 vendor_dir.as_bstr(),
                 b"".as_bstr(),
@@ -2327,7 +2330,7 @@ fn eval_php_dirname(term: &BStr, dir: &BStr, vendor_dir: &BStr, base_dir: &BStr)
         .and_then(|s| s.strip_suffix(b")"))
         .unwrap_or_default();
     let resolved = eval_php_path_expr(inner.as_bstr(), dir, vendor_dir, base_dir);
-    let path = rtrim2(&resolved, "/");
+    let path = rtrim_chars(&resolved, "/");
     match path.rfind("/") {
         Some(0) => BString::from("/"),
         Some(i) => BString::from(&path[..i]),

@@ -2,7 +2,8 @@
 
 use bstr::{BStr, BString};
 use shirabe_php_shim::{
-    bconcat, hash, php_regex, preg_is_match, preg_match, preg_replace, str_replace_array, trim2,
+    bconcat, hash, php_regex, preg_is_match, preg_match, preg_replace, str_replace_array,
+    trim_chars,
 };
 
 pub struct ComposerMirror;
@@ -76,7 +77,7 @@ impl ComposerMirror {
                 bb_matches.get(2).unwrap_or_default(),
             )
         } else {
-            preg_replace(php_regex!(r"{[^a-z0-9_.-]}i"), "-", trim2(url, "/"))
+            preg_replace(php_regex!(r"{[^a-z0-9_.-]}i"), "-", trim_chars(url, "/"))
         };
 
         let from: [&[u8]; 3] = [b"%package%", b"%normalizedUrl%", b"%type%"];

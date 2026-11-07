@@ -10,8 +10,8 @@ use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, LogicException, PhpMixed, RuntimeException, Stringable,
     array_keys, array_reverse, array_shift, bconcat, dirname, implode, in_array_strict,
-    path_from_bytes, path_to_bytes, preg_is_match, preg_quote, rtrim2, str_replace, strtolower,
-    usort,
+    path_from_bytes, path_to_bytes, preg_is_match, preg_quote, rtrim_chars, str_replace,
+    strtolower, usort,
 };
 use std::path::{Path, PathBuf};
 
@@ -480,7 +480,7 @@ impl DownloadManager {
             return path_from_bytes(dir).to_path_buf();
         }
 
-        path_from_bytes(&rtrim2(dir, "\\/")).to_path_buf()
+        path_from_bytes(&rtrim_chars(dir, "\\/")).to_path_buf()
     }
 }
 

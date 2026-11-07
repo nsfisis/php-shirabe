@@ -4,8 +4,8 @@ use crate::php_file_cleaner::PhpFileCleaner;
 use bstr::{BStr, BString, ByteSlice, ByteVec};
 use shirabe_php_shim::{
     PHP_EOL, RuntimeException, bconcat, display_to_bytes, file_exists, file_get_contents, is_file,
-    is_readable, ltrim2, path_from_bytes, php_strip_whitespace, preg_match_all, str_replace_array,
-    strrpos, strtolower, substr, trim,
+    is_readable, ltrim_chars, path_from_bytes, php_strip_whitespace, preg_match_all,
+    str_replace_array, strrpos, strtolower, substr, trim,
 };
 use std::sync::OnceLock;
 
@@ -135,7 +135,7 @@ impl PhpFileParser {
                     BString::from(name)
                 };
 
-                let class_name = ltrim2(bconcat!(namespace, name), "\\");
+                let class_name = ltrim_chars(bconcat!(namespace, name), "\\");
                 classes.push(class_name);
             }
         }

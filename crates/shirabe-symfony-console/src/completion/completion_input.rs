@@ -6,8 +6,8 @@ use crate::input::{
 };
 use bstr::{BStr, BString, ByteSlice};
 use shirabe_php_shim::{
-    Stringable, explode_with_limit, ltrim2, php_regex, php_str, preg_match_all, rtrim, substr,
-    trim2,
+    Stringable, explode_with_limit, ltrim_chars, php_regex, php_str, preg_match_all, rtrim, substr,
+    trim_chars,
 };
 
 /// An input specialized for shell completion.
@@ -111,7 +111,7 @@ impl CompletionInput {
         }
 
         let previous_token = self.tokens[(self.current_index - 1) as usize].clone();
-        if previous_token[0..1] == *b"-" && !trim2(&previous_token, "-").is_empty() {
+        if previous_token[0..1] == *b"-" && !trim_chars(&previous_token, "-").is_empty() {
             // check if previous option accepted a value
             let previous_option = self.get_option_from_token(previous_token.as_ref());
             if let Some(previous_option) = &previous_option
@@ -237,7 +237,7 @@ impl CompletionInput {
     }
 
     fn get_option_from_token(&self, option_token: &BStr) -> Option<std::rc::Rc<InputOption>> {
-        let option_name = ltrim2(option_token, "-");
+        let option_name = ltrim_chars(option_token, "-");
         if option_name.is_empty() {
             return None;
         }

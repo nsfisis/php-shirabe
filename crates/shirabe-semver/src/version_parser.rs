@@ -4,7 +4,7 @@ use crate::constraint::{AnyConstraint, MatchAllConstraint, MultiConstraint, Simp
 use bstr::{BStr, BString, ByteVec};
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, PregMatches, UnexpectedValueException, bconcat,
-    error_message, intval, ltrim2, php_regex, php_str, preg_is_match, preg_match, preg_quote,
+    error_message, intval, ltrim_chars, php_regex, php_str, preg_is_match, preg_match, preg_quote,
     preg_replace, preg_split, str_replace, str_replace_arr, strtolower, substr, trim,
 };
 
@@ -180,7 +180,7 @@ impl VersionParser {
                     "-",
                     self.expand_stability(mi),
                     if !mi1.is_empty() {
-                        ltrim2(mi1, ".-")
+                        ltrim_chars(mi1, ".-")
                     } else {
                         BString::default()
                     }

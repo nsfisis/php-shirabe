@@ -39,7 +39,7 @@ use shirabe_php_shim::{
     PhpMixed, RuntimeException, UnexpectedValueException, bconcat, dirname, error_message,
     extension_loaded, file_exists, file_get_contents, file_put_contents, implode, is_dir, is_file,
     json_decode_assoc, json_decode_obj, mkdir, path_from_bytes, path_to_bytes, pathinfo, realpath,
-    rename, rtrim2, strpos, strtr, substr, trim2,
+    rename, rtrim_chars, strpos, strtr, substr, trim_chars,
 };
 use shirabe_symfony_console::{
     formatter::{OutputFormatter, OutputFormatterStyle, OutputFormatterStyleInterface},
@@ -95,7 +95,7 @@ impl Factory {
 
             let appdata = Platform::get_env("APPDATA").unwrap_or_default();
             return Ok(bconcat!(
-                rtrim2(strtr(&appdata, "\\", "/"), "/"),
+                rtrim_chars(strtr(&appdata, "\\", "/"), "/"),
                 "/Shirabe"
             ));
         }
@@ -145,7 +145,7 @@ impl Factory {
                 cache_dir = bconcat!(home, "/cache");
             }
 
-            return Ok(rtrim2(strtr(&cache_dir, "\\", "/"), "/"));
+            return Ok(rtrim_chars(strtr(&cache_dir, "\\", "/"), "/"));
         }
 
         let user_dir = Self::get_user_dir()?;
@@ -326,7 +326,7 @@ impl Factory {
     pub fn get_composer_file() -> anyhow::Result<PathBuf> {
         let env = Platform::get_env("COMPOSER");
         if let Some(env_str) = env {
-            let env_trimmed = trim2(&env_str, " \t\n\r\0\u{0B}");
+            let env_trimmed = trim_chars(&env_str, " \t\n\r\0\u{0B}");
             if !env_trimmed.is_empty() {
                 let env_trimmed = path_from_bytes(&env_trimmed);
                 if is_dir(env_trimmed) {
@@ -1212,12 +1212,12 @@ impl Factory {
                 .expect("Composer must outlive create_default_installers");
             let composer_ref = composer_rc.borrow_partial();
             let config = composer_ref.get_config();
-            let bin_dir = std::path::PathBuf::from(path_from_bytes(&rtrim2(
+            let bin_dir = std::path::PathBuf::from(path_from_bytes(&rtrim_chars(
                 config.borrow().get_path("bin-dir")?,
                 "/",
             )));
             let bin_compat = config.borrow().get_bin_compat()?;
-            let vendor_dir = std::path::PathBuf::from(path_from_bytes(&rtrim2(
+            let vendor_dir = std::path::PathBuf::from(path_from_bytes(&rtrim_chars(
                 config.borrow().get_path("vendor-dir")?,
                 "/",
             )));
@@ -1510,7 +1510,7 @@ impl Factory {
             return Err(RuntimeException::new(BString::from("The HOME or COMPOSER_HOME environment variable must be set for composer to run correctly")).into());
         }
 
-        Ok(rtrim2(strtr(&home, "\\", "/"), "/"))
+        Ok(rtrim_chars(strtr(&home, "\\", "/"), "/"))
     }
 
     fn validate_json_schema(

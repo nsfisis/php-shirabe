@@ -29,8 +29,8 @@ use indexmap::IndexMap;
 use shirabe_php_shim::{
     AnyThrowable, Catch as _, CmpOp, Exception, InvalidArgumentException, PHP_EOL, PhpClass as _,
     PhpMixed, bconcat, disk_free_space, error_message, file_exists, filter_var_boolean, hash,
-    impl_php_class, implode, path_from_bytes, php_regex, preg_match, rtrim2, str_replace, strpos,
-    strstr, strstr3, strtolower, trim2, version_compare,
+    impl_php_class, implode, path_from_bytes, php_regex, preg_match, rtrim_chars, str_replace,
+    strpos, strstr, strstr_with_before_needle, strtolower, trim_chars, version_compare,
 };
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::InputInterface;
@@ -104,7 +104,7 @@ impl DiagnoseCommand {
             }
 
             return Ok(CheckResult::Message(
-                rtrim2(&output, " \t\n\r\0\u{0B}").to_owned(),
+                rtrim_chars(&output, " \t\n\r\0\u{0B}").to_owned(),
             ));
         }
 
@@ -127,7 +127,7 @@ impl DiagnoseCommand {
                     }
 
                     return Ok(CheckResult::Message(
-                        trim2(&output, " \t\n\r\0\u{0B}").to_owned(),
+                        trim_chars(&output, " \t\n\r\0\u{0B}").to_owned(),
                     ));
                 }
                 return Err(e);
@@ -160,7 +160,7 @@ impl DiagnoseCommand {
                 &mut output,
                 None,
             );
-        if strtolower(trim2(&output, " \t\n\r\0\u{0B}")) == "always" {
+        if strtolower(trim_chars(&output, " \t\n\r\0\u{0B}")) == "always" {
             return Ok(BString::from(
                 "<comment>Your git color.ui setting is set to always, this is known to create issues. Use \"git config --global color.ui true\" to set it correctly.</comment>",
             ));
@@ -845,7 +845,7 @@ impl DiagnoseCommand {
         }
 
         for message in &messages {
-            io.write(trim2(message, " \t\n\r\0\u{0B}"));
+            io.write(trim_chars(message, " \t\n\r\0\u{0B}"));
         }
     }
 
@@ -1092,12 +1092,13 @@ impl DiagnoseCommand {
                         // Attempt to parse version number out, fallback to whole string value.
                         let openssl_version_text =
                             diagnostics.openssl_version_text.clone().unwrap_or_default();
-                        let openssl_trimmed = trim2(
+                        let openssl_trimmed = trim_chars(
                             strstr(&openssl_version_text, " ").unwrap_or_default(),
                             " \t\n\r\0\u{0B}",
                         );
                         let mut openssl_version =
-                            strstr3(&openssl_trimmed, " ", true).unwrap_or_default();
+                            strstr_with_before_needle(&openssl_trimmed, " ", true)
+                                .unwrap_or_default();
                         if openssl_version.is_empty() {
                             openssl_version = openssl_version_text;
                         }

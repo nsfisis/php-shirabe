@@ -22,7 +22,7 @@ use shirabe_php_shim::{
     Catch as _, DATE_RFC3339, LogicException, PhpMixed, RuntimeException, Stringable,
     array_intersect, array_keys, array_map, array_merge, bconcat, display_to_bytes, empty,
     file_get_contents, filemtime, hash, in_array_loose, intval, is_int, ksort, php_regex,
-    preg_is_match, preg_match, realpath, strcmp, strtolower, touch2, trim, usort,
+    preg_is_match, preg_match, realpath, strcmp, strtolower, touch_with_mtime, trim, usort,
 };
 use shirabe_seld_json_lint::ParsingException;
 
@@ -660,7 +660,7 @@ impl Locker {
         if let Some(mtime) = lock_mtime
             && is_int(&PhpMixed::Int(mtime))
         {
-            let _ = touch2(self.lock_file.get_path(), mtime);
+            let _ = touch_with_mtime(self.lock_file.get_path(), mtime);
         }
         Ok(())
     }

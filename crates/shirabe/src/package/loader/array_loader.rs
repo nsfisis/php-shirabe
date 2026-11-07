@@ -12,7 +12,7 @@ use chrono::Utc;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     AnyThrowable, E_USER_DEPRECATED, PhpMixed, UnexpectedValueException, bconcat, date_create,
-    empty, error_message, is_scalar, is_string, json_encode, ltrim2, php_regex, preg_is_match,
+    empty, error_message, is_scalar, is_string, json_encode, ltrim_chars, php_regex, preg_is_match,
     preg_replace, stripos, strpos, strtolower, strval, substr, trigger_error, trim,
 };
 
@@ -208,13 +208,13 @@ impl ArrayLoader {
             if let PhpMixed::List(ref mut list) = bin_list {
                 for item in list.iter_mut() {
                     if let Some(s) = item.as_string() {
-                        *item = PhpMixed::string(ltrim2(s, "/"));
+                        *item = PhpMixed::string(ltrim_chars(s, "/"));
                     }
                 }
             } else if let PhpMixed::Array(ref mut map) = bin_list {
                 for (_k, v) in map.iter_mut() {
                     if let Some(s) = v.as_string() {
-                        *v = PhpMixed::string(ltrim2(s, "/"));
+                        *v = PhpMixed::string(ltrim_chars(s, "/"));
                     }
                 }
             }

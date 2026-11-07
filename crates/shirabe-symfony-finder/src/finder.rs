@@ -13,7 +13,7 @@ use indexmap::IndexSet;
 use shirabe_php_shim::{
     GLOB_BRACE, GLOB_ONLYDIR, bconcat, file_exists, glob_with_flags, implode, is_dir,
     loosely_compare, path_from_bytes, path_to_bytes, php_regex, php_str, preg_is_match, preg_match,
-    preg_quote, rtrim2, str_replace,
+    preg_quote, rtrim_chars, str_replace,
 };
 use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
@@ -319,7 +319,7 @@ impl Finder {
             return dir.into();
         }
 
-        let mut dir = rtrim2(dir, "/");
+        let mut dir = rtrim_chars(dir, "/");
 
         if preg_is_match(php_regex!("#^(ssh2\\.)?s?ftp://#"), &dir) {
             dir.push(b'/');
@@ -589,7 +589,7 @@ fn build_exclude(directories: &[BString]) -> (IndexSet<BString>, Option<BString>
     let mut patterns: Vec<BString> = Vec::new();
 
     for directory in directories {
-        let directory = rtrim2(directory, "/");
+        let directory = rtrim_chars(directory, "/");
         // The inner iterator is always recursive, so only `/`-containing names become patterns.
         if directory.contains_str("/") {
             patterns.push(preg_quote(&directory, Some(b'#')));
@@ -808,7 +808,7 @@ impl IntoIterator for &mut Finder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use shirabe_php_shim::{time, touch2};
+    use shirabe_php_shim::{time, touch_with_mtime};
 
     fn relative_names(finder: &Finder, root: &Path) -> Vec<BString> {
         let mut names: Vec<BString> = finder
@@ -857,7 +857,10 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         std::fs::write(tmp.path().join("old"), b"").unwrap();
         std::fs::write(tmp.path().join("new"), b"").unwrap();
-        assert!(touch2(tmp.path().join("old"), time() - 3 * 86_400));
+        assert!(touch_with_mtime(
+            tmp.path().join("old"),
+            time() - 3 * 86_400
+        ));
 
         let mut finder = Finder::create();
         finder

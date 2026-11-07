@@ -44,7 +44,7 @@ use shirabe_php_shim::{
     disk_free_space, display_to_bytes, error_message, exec, explode, explode_limit,
     extension_loaded, file_exists, file_get_contents, file_put_contents, function_exists,
     get_debug_type_obj, getcwd, getenv, getmypid, glob, implode, ini_set, intval, is_dir, is_file,
-    is_numeric_string, is_string, json_decode_assoc, levenshtein, ltrim2, mb_convert_encoding,
+    is_numeric_string, is_string, json_decode_assoc, levenshtein, ltrim_chars, mb_convert_encoding,
     mb_convert_variables, mb_detect_encoding, mb_strwidth, microtime, os_str_from_bytes,
     path_from_bytes, path_to_bytes, php_regex, php_str, php_to_string, php_truthy, php_uname,
     posix_getuid, preg_grep, preg_match, preg_quote, preg_replace_callback, preg_split, putenv,
@@ -1698,7 +1698,7 @@ impl Application {
         command_name: &BStr,
         is_single_command: bool,
     ) -> anyhow::Result<&mut Self> {
-        self.default_command = explode("|", ltrim2(command_name, "|")).swap_remove(0);
+        self.default_command = explode("|", ltrim_chars(command_name, "|")).swap_remove(0);
 
         if is_single_command {
             // Ensure the command exist

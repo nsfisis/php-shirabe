@@ -9,7 +9,7 @@ use shirabe::{
     io::{IOInterface, io_interface},
     util::Platform,
 };
-use shirabe_php_shim::{PhpMixed, bconcat, error_message, rtrim2};
+use shirabe_php_shim::{PhpMixed, bconcat, error_message, rtrim_chars};
 
 #[path = "common/io_mock.rs"]
 #[allow(dead_code)] // io_mock exposes more helpers than this binary uses
@@ -379,7 +379,7 @@ fn test_var_replacement() {
         .filter(|s| !s.is_empty())
         .or_else(|| Platform::get_env("USERPROFILE"))
         .unwrap_or_default();
-    let home = rtrim2(&home_raw, "\\/");
+    let home = rtrim_chars(&home_raw, "\\/");
     assert_eq!(
         PhpMixed::string(BString::from("b")),
         config.get("c").unwrap()
@@ -419,7 +419,7 @@ fn test_realpath_replacement() {
         .filter(|s| !s.is_empty())
         .or_else(|| Platform::get_env("USERPROFILE"))
         .unwrap_or_default();
-    let home = rtrim2(&home_raw, "\\/");
+    let home = rtrim_chars(&home_raw, "\\/");
     assert_eq!(
         PhpMixed::string(BString::from("/foo/bar/vendor")),
         config.get("vendor-dir").unwrap()

@@ -8,7 +8,7 @@ use crate::hash::calculate_hash;
 use crate::zip::start_directory;
 use crate::{
     Exception, UnexpectedValueException, bconcat, display_to_bytes, file_exists,
-    impl_php_exception, os_str_from_bytes, path_from_bytes, path_to_bytes, rtrim2, trim2,
+    impl_php_exception, os_str_from_bytes, path_from_bytes, path_to_bytes, rtrim_chars, trim_chars,
 };
 use bstr::{BStr, BString, ByteSlice};
 use std::io::{Read as _, Write as _};
@@ -138,7 +138,7 @@ fn read_archive_entries(
             let file = zip.by_index_raw(i).map_err(|e| {
                 corruption_error(path, bconcat!("invalid zip entry: ", display_to_bytes(e)))
             })?;
-            let localname = rtrim2(file.name_raw(), "/");
+            let localname = rtrim_chars(file.name_raw(), "/");
             if file.is_dir() {
                 entries.push(PharEntry {
                     localname,
@@ -177,7 +177,7 @@ fn read_archive_entries(
         if entry_type.is_pax_global_extensions() || entry_type.is_pax_local_extensions() {
             continue;
         }
-        let localname = rtrim2(entry.path_bytes(), "/");
+        let localname = rtrim_chars(entry.path_bytes(), "/");
         let mode = entry.header().mode().ok().map(|m| m & 0o7777);
         let mtime = entry.header().mtime().ok();
         if entry_type.is_dir() {
@@ -513,7 +513,7 @@ fn parse_native_phar(path: &std::path::Path) -> anyhow::Result<Vec<PharEntry>> {
         let mtime = Some(raw.timestamp as u64);
         if raw.name.ends_with(b"/") {
             entries.push(PharEntry {
-                localname: rtrim2(&raw.name, "/"),
+                localname: rtrim_chars(&raw.name, "/"),
                 data: PharEntryData::Dir,
                 mode,
                 mtime,
@@ -703,7 +703,7 @@ impl PharData {
 
     pub fn get(&self, key: impl AsRef<[u8]>) -> Option<PharFileInfo> {
         let entries = self.entries.borrow();
-        let key = rtrim2(key, "/");
+        let key = rtrim_chars(key, "/");
         for entry in entries.iter() {
             if entry.localname == key {
                 return Some(self.file_info(entry.localname.clone(), entry.data.clone()));
@@ -770,7 +770,7 @@ impl PharData {
     }
 
     pub fn add_empty_dir(&self, dirname: impl AsRef<[u8]>) -> anyhow::Result<()> {
-        let localname = trim2(dirname, "/");
+        let localname = trim_chars(dirname, "/");
         {
             let mut entries = self.entries.borrow_mut();
             if !entries.iter().any(|e| e.localname == localname) {

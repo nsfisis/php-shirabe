@@ -9,8 +9,8 @@ use crate::formatter::wrappable_output_formatter_interface::WrappableOutputForma
 use bstr::{BStr, BString, ByteSlice};
 use shirabe_php_shim::{
     PregMatches, bconcat, byte_at, explode, implode, ltrim, mb_detect_encoding, php_regex,
-    preg_match, preg_match_all, preg_replace, rtrim2, str_repeat, str_replace, strlen, strtolower,
-    strtr_array, substr,
+    preg_match, preg_match_all, preg_replace, rtrim_chars, str_repeat, str_replace, strlen,
+    strtolower, strtr_array, substr,
 };
 use shirabe_symfony_string::b;
 
@@ -38,7 +38,7 @@ impl OutputFormatter {
         let mut text = BString::from(text.as_ref());
         if text.ends_with(b"\\") {
             let len = strlen(&text);
-            text = rtrim2(&text, "\\");
+            text = rtrim_chars(&text, "\\");
             text = str_replace("\0", "", &text);
             let padding = str_repeat("\0", (len - strlen(&text)) as usize);
             text.extend_from_slice(&padding);
@@ -198,7 +198,7 @@ impl OutputFormatter {
                 .unwrap_or_default(),
         );
         text = bconcat!(prefix, self.add_line_breaks(text.as_bstr(), width)?);
-        text = bconcat!(rtrim2(&text, "\n"), trailing);
+        text = bconcat!(rtrim_chars(&text, "\n"), trailing);
 
         if *current_line_length == 0 && !current.is_empty() && substr(current, -1, None) != "\n" {
             text = bconcat!("\n", text);

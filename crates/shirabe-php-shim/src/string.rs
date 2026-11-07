@@ -289,10 +289,10 @@ pub fn strcspn(string: impl AsRef<[u8]>, characters: impl AsRef<[u8]>) -> usize 
 }
 
 pub fn strstr(haystack: impl AsRef<[u8]>, needle: impl AsRef<[u8]>) -> Option<BString> {
-    strstr3(haystack, needle, false)
+    strstr_with_before_needle(haystack, needle, false)
 }
 
-pub fn strstr3(
+pub fn strstr_with_before_needle(
     haystack: impl AsRef<[u8]>,
     needle: impl AsRef<[u8]>,
     before_needle: bool,
@@ -331,7 +331,7 @@ pub fn rtrim(s: impl AsRef<[u8]>) -> BString {
     php_trim(s.as_ref(), PHP_TRIM_DEFAULT_CHARS, false, true)
 }
 
-pub fn rtrim2(s: impl AsRef<[u8]>, characters: impl AsRef<[u8]>) -> BString {
+pub fn rtrim_chars(s: impl AsRef<[u8]>, characters: impl AsRef<[u8]>) -> BString {
     php_trim(s.as_ref(), characters.as_ref(), false, true)
 }
 
@@ -339,7 +339,7 @@ pub fn ltrim(s: impl AsRef<[u8]>) -> BString {
     php_trim(s.as_ref(), PHP_TRIM_DEFAULT_CHARS, true, false)
 }
 
-pub fn ltrim2(s: impl AsRef<[u8]>, characters: impl AsRef<[u8]>) -> BString {
+pub fn ltrim_chars(s: impl AsRef<[u8]>, characters: impl AsRef<[u8]>) -> BString {
     php_trim(s.as_ref(), characters.as_ref(), true, false)
 }
 
@@ -347,7 +347,7 @@ pub fn trim(s: impl AsRef<[u8]>) -> BString {
     php_trim(s.as_ref(), PHP_TRIM_DEFAULT_CHARS, true, true)
 }
 
-pub fn trim2(s: impl AsRef<[u8]>, characters: impl AsRef<[u8]>) -> BString {
+pub fn trim_chars(s: impl AsRef<[u8]>, characters: impl AsRef<[u8]>) -> BString {
     php_trim(s.as_ref(), characters.as_ref(), true, true)
 }
 
@@ -962,7 +962,7 @@ fn php_to_float(v: &PhpMixed) -> f64 {
         PhpMixed::String(s) => {
             // PHP's (float) cast reads the leading numeric portion of the string, after any
             // leading whitespace.
-            let bytes = ltrim2(s, " \t\n\r\x0B\x0C");
+            let bytes = ltrim_chars(s, " \t\n\r\x0B\x0C");
             let mut end = 0;
             if end < bytes.len() && (bytes[end] == b'+' || bytes[end] == b'-') {
                 end += 1;

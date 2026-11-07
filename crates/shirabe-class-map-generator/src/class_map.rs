@@ -2,7 +2,7 @@
 
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe_php_shim::{OutOfBoundsException, bconcat, preg_is_match, rtrim2, strpos, strtr};
+use shirabe_php_shim::{OutOfBoundsException, bconcat, preg_is_match, rtrim_chars, strpos, strtr};
 
 #[derive(Debug, Clone)]
 pub struct PsrViolationEntry {
@@ -114,7 +114,7 @@ impl ClassMap {
         class_name: impl Into<BString>,
         path: impl AsRef<[u8]>,
     ) {
-        let path = rtrim2(strtr(path, "\\", "/"), "/");
+        let path = rtrim_chars(strtr(path, "\\", "/"), "/");
 
         self.psr_violations
             .entry(path)
@@ -126,7 +126,7 @@ impl ClassMap {
     }
 
     pub fn clear_psr_violations_by_path(&mut self, path_prefix: impl AsRef<[u8]>) {
-        let path_prefix = rtrim2(strtr(path_prefix, "\\", "/"), "/");
+        let path_prefix = rtrim_chars(strtr(path_prefix, "\\", "/"), "/");
 
         self.psr_violations.retain(|path, _| {
             path != &path_prefix && strpos(path, bconcat!(path_prefix, "/")) != Some(0)

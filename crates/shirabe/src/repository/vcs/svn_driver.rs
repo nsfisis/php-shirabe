@@ -12,8 +12,8 @@ use chrono::{DateTime, FixedOffset, Utc};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, PhpMixed, RuntimeException, bconcat, date_create, error_message, intval,
-    path_from_bytes, php_regex, preg_is_match, preg_match, preg_replace, rtrim2, stripos, strrpos,
-    strtr, substr, trim, trim2,
+    path_from_bytes, php_regex, preg_is_match, preg_match, preg_replace, rtrim_chars, stripos,
+    strrpos, strtr, substr, trim, trim_chars,
 };
 
 #[derive(Debug)]
@@ -58,7 +58,7 @@ impl SvnDriver {
 
     pub fn initialize(&mut self) -> anyhow::Result<()> {
         let normalized = Self::normalize_url(self.inner.url.as_bstr());
-        self.inner.url = rtrim2(&normalized, "/");
+        self.inner.url = rtrim_chars(&normalized, "/");
         self.base_url = self.inner.url.clone();
 
         SvnUtil::clean_env()?;
@@ -78,7 +78,7 @@ impl SvnDriver {
             self.cache_credentials = v.to_bool();
         }
         if let Some(PhpMixed::String(v)) = self.inner.repo_config.get(B("package-path")).cloned() {
-            self.package_path = bconcat!("/", trim2(&v, "/"));
+            self.package_path = bconcat!("/", trim_chars(&v, "/"));
         }
 
         if let Some(pos) = strrpos(
@@ -239,7 +239,7 @@ impl SvnDriver {
         file: &BStr,
         identifier: &BStr,
     ) -> anyhow::Result<Option<BString>> {
-        let identifier = bconcat!("/", trim2(identifier, "/"), "/");
+        let identifier = bconcat!("/", trim_chars(identifier, "/"), "/");
 
         let (path, rev) = if let Some(m) = preg_match(php_regex!(r"{^(.+?)(@\d+)?/$}"), &identifier)
             && let Some(rev) = m.get(2)
@@ -275,7 +275,7 @@ impl SvnDriver {
         &mut self,
         identifier: &BStr,
     ) -> anyhow::Result<Option<DateTime<FixedOffset>>> {
-        let identifier = bconcat!("/", trim2(identifier, "/"), "/");
+        let identifier = bconcat!("/", trim_chars(identifier, "/"), "/");
 
         let (path, rev) = if let Some(m) = preg_match(php_regex!(r"{^(.+?)(@\d+)?/$}"), &identifier)
             && let Some(rev) = m.get(2)
@@ -337,7 +337,7 @@ impl SvnDriver {
                                     bconcat!("/", self.tags_path, "/", path).as_bstr(),
                                     std::cmp::max(last_rev, rev),
                                 );
-                                tags.insert(rtrim2(&path, "/"), identifier);
+                                tags.insert(rtrim_chars(&path, "/"), identifier);
                             }
                         }
                     }
@@ -418,7 +418,7 @@ impl SvnDriver {
                                     bconcat!("/", self.branches_path, "/", path).as_bstr(),
                                     std::cmp::max(last_rev, rev),
                                 );
-                                branches.insert(rtrim2(&path, "/"), identifier);
+                                branches.insert(rtrim_chars(&path, "/"), identifier);
                             }
                         }
                     }
@@ -540,7 +540,12 @@ impl SvnDriver {
 
     /// Build the identifier respecting "package-path" config option
     fn build_identifier(&self, base_dir: &BStr, revision: i64) -> BString {
-        bconcat!(rtrim2(base_dir, "/"), self.package_path, "/@", revision)
+        bconcat!(
+            rtrim_chars(base_dir, "/"),
+            self.package_path,
+            "/@",
+            revision
+        )
     }
 }
 

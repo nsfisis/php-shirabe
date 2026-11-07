@@ -9,9 +9,10 @@ use shirabe_php_shim::{
     Catch as _, Error, InvalidArgumentException, JSON_PRETTY_PRINT, JSON_UNESCAPED_SLASHES,
     JSON_UNESCAPED_UNICODE, PhpJson, PhpMixed, RuntimeException, UnexpectedValueException, bconcat,
     dirname, display_to_bytes, error_message, file_exists, file_get_contents, file_put_contents,
-    is_dir, is_file, json_decode_assoc, json_decode_obj, json_encode_ex, ltrim2, mkdir,
-    path_from_bytes, path_to_bytes, php_regex, php_str, preg_is_match, preg_match, preg_replace2,
-    rawurldecode, realpath, sprintf, str_replace, strpos, usleep, utf8_text,
+    is_dir, is_file, json_decode_assoc, json_decode_obj, json_encode_ex, ltrim_chars, mkdir,
+    path_from_bytes, path_to_bytes, php_regex, php_str, preg_is_match, preg_match,
+    preg_replace_with_limit_and_count, rawurldecode, realpath, sprintf, str_replace, strpos,
+    usleep, utf8_text,
 };
 use shirabe_seld_json_lint::{ParsingException, ParsingExceptionDetails};
 use std::path::{Path, PathBuf};
@@ -380,7 +381,7 @@ impl JsonFile {
             .iter_errors(&data_value)
             .map(|error| {
                 let mut property =
-                    str_replace("/", ".", ltrim2(error.instance_path().as_str(), "/"));
+                    str_replace("/", ".", ltrim_chars(error.instance_path().as_str(), "/"));
                 // A missing required property is reported against its parent object, so the
                 // instance path is the parent (empty at the root). Composer points the error at
                 // the missing property itself, so append its name to match the `PROPERTY : MESSAGE`
@@ -468,7 +469,7 @@ impl JsonFile {
                 && json.contains_str("\"content-hash\"")
             {
                 let mut count: usize = 0;
-                let replaced = preg_replace2(
+                let replaced = preg_replace_with_limit_and_count(
                     php_regex!(
                         r#"{\r?\n<<<<<<< [^\r\n]+\r?\n\s+"content-hash": *"[0-9a-f]+", *\r?\n(?:\|{7} [^\r\n]+\r?\n\s+"content-hash": *"[0-9a-f]+", *\r?\n)?=======\r?\n\s+"content-hash": *"[0-9a-f]+", *\r?\n>>>>>>> [^\r\n]+(\r?\n)}"#
                     ),

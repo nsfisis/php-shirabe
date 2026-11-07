@@ -11,7 +11,7 @@ use crate::util::{Filesystem, Platform};
 use bstr::BString;
 use shirabe_php_shim::{
     RuntimeException, Stringable, bconcat, chdir, impl_php_class, path_from_bytes, php_regex,
-    preg_replace2, preg_split,
+    preg_replace_with_limit_and_count, preg_split,
 };
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::completion::{
@@ -84,7 +84,7 @@ impl GlobalCommand {
             ));
         }
 
-        let new_input_str = preg_replace2(
+        let new_input_str = preg_replace_with_limit_and_count(
             php_regex!(r"{\bg(?:l(?:o(?:b(?:a(?:l)?)?)?)?)?\b}"),
             "",
             input.borrow().to_php_string(),

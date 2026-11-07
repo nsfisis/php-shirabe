@@ -5,7 +5,7 @@ use shirabe_php_shim::{
     array_merge, array_search_mixed, array_unique, bconcat, canonical_int_key, empty,
     filter_var_url, get_debug_type, implode, in_array_loose, in_array_strict, intval, is_array,
     is_numeric_string, is_string, loose_eq, parse_url, php_regex, php_str, php_to_string,
-    preg_is_match, preg_match, preg_replace_callback, rtrim2, strtolower, strtoupper, strtr,
+    preg_is_match, preg_match, preg_replace_callback, rtrim_chars, strtolower, strtoupper, strtr,
     substr, trigger_error, utf8_text,
 };
 mod config_source_interface;
@@ -701,7 +701,7 @@ impl Config {
         };
 
         let processed = self.process(raw_val, flags)?;
-        let mut val_str = rtrim2(php_to_string(&processed), "/\\");
+        let mut val_str = rtrim_chars(php_to_string(&processed), "/\\");
         val_str = Platform::expand_path(&val_str);
 
         if substr(key, -4, None) != "-dir" {
@@ -871,7 +871,7 @@ impl Config {
             .into());
         };
         let processed = self.process(PhpMixed::string(Platform::expand_path(home)), flags)?;
-        Ok(rtrim2(php_to_string(&processed), "/\\"))
+        Ok(rtrim_chars(php_to_string(&processed), "/\\"))
     }
 
     fn bin_compat(&self) -> anyhow::Result<PhpMixed> {

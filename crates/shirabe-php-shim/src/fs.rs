@@ -776,12 +776,16 @@ fn touch_impl(path: &std::path::Path, mtime: i64, atime: i64) -> bool {
 
 /// PHP `touch($path, $mtime)`: sets the modification time (and access time, per PHP, to the same
 /// value). Returns `false` (PHP failure) on error.
-pub fn touch2(path: impl AsRef<std::path::Path>, mtime: i64) -> bool {
+pub fn touch_with_mtime(path: impl AsRef<std::path::Path>, mtime: i64) -> bool {
     touch_impl(path.as_ref(), mtime, mtime)
 }
 
 /// PHP `touch($path, $mtime, $atime)`.
-pub fn touch3(path: impl AsRef<std::path::Path>, mtime: i64, atime: i64) -> bool {
+pub fn touch_with_mtime_and_atime(
+    path: impl AsRef<std::path::Path>,
+    mtime: i64,
+    atime: i64,
+) -> bool {
     touch_impl(path.as_ref(), mtime, atime)
 }
 
@@ -876,7 +880,7 @@ pub fn file_put_contents(path: impl AsRef<std::path::Path>, data: impl AsRef<[u8
 }
 
 /// Only `FILE_APPEND` is honored; `LOCK_EX` and `FILE_USE_INCLUDE_PATH` have no effect.
-pub fn file_put_contents3(
+pub fn file_put_contents_with_flags(
     filename: impl AsRef<std::path::Path>,
     data: impl AsRef<[u8]>,
     flags: i64,
@@ -1115,7 +1119,10 @@ pub fn clearstatcache() {
     // cache to invalidate.
 }
 
-pub fn clearstatcache2(_clear_realpath_cache: bool, _filename: impl AsRef<std::path::Path>) {
+pub fn clearstatcache_with_realpath_cache_and_filename(
+    _clear_realpath_cache: bool,
+    _filename: impl AsRef<std::path::Path>,
+) {
     // Rust performs a fresh syscall for every metadata query; there is no stat
     // cache to invalidate.
 }

@@ -3,7 +3,7 @@
 use crate::exception::{InvalidArgumentException, LogicException};
 use crate::input::InputValue;
 use bstr::{BStr, BString, ByteSlice};
-use shirabe_php_shim::{bconcat, implode, ltrim2, php_regex, preg_split};
+use shirabe_php_shim::{bconcat, implode, ltrim_chars, php_regex, preg_split};
 
 #[derive(Debug, Clone)]
 pub struct InputOption {
@@ -77,7 +77,7 @@ impl InputOption {
     }
 
     fn normalize_shortcut(s: &BStr) -> anyhow::Result<Option<BString>> {
-        let shortcuts: Vec<BString> = preg_split(php_regex!(r"{(\|)-?}"), ltrim2(s, "-"))
+        let shortcuts: Vec<BString> = preg_split(php_regex!(r"{(\|)-?}"), ltrim_chars(s, "-"))
             .into_iter()
             .filter(|part| !part.is_empty())
             .collect();

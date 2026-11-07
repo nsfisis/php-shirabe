@@ -16,7 +16,7 @@ use shirabe_php_shim::{
     SEEK_SET, bconcat, exec, fopen, fseek, fwrite, getcwd, getenv_all, implode, is_dir, microtime,
     os_str_from_bytes, path_from_bytes, php_regex, php_str, php_to_string, preg_is_match,
     preg_replace, preg_replace_callback, proc_close, proc_get_status, proc_open, proc_terminate,
-    stream_get_contents3, strpbrk, uniqid, usleep,
+    stream_get_contents_with_length_and_offset, strpbrk, uniqid, usleep,
 };
 use std::sync::OnceLock;
 
@@ -443,7 +443,8 @@ impl Process {
         self.read_pipes_for_output(BStr::new("getOutput"), false)?;
 
         Ok(BString::from(
-            stream_get_contents3(self.stdout.as_ref().unwrap(), -1, 0).unwrap_or_default(),
+            stream_get_contents_with_length_and_offset(self.stdout.as_ref().unwrap(), -1, 0)
+                .unwrap_or_default(),
         ))
     }
 
@@ -456,7 +457,8 @@ impl Process {
         self.read_pipes_for_output(BStr::new("getErrorOutput"), false)?;
 
         Ok(BString::from(
-            stream_get_contents3(self.stderr.as_ref().unwrap(), -1, 0).unwrap_or_default(),
+            stream_get_contents_with_length_and_offset(self.stderr.as_ref().unwrap(), -1, 0)
+                .unwrap_or_default(),
         ))
     }
 

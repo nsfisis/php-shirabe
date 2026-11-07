@@ -30,7 +30,7 @@ use shirabe_php_shim::{
     CmpOp, DATE_ATOM, InvalidArgumentException, LogicException, PhpMixed, STR_PAD_RIGHT,
     Stringable, UnexpectedValueException, array_search, bconcat, date_format_to_strftime,
     date_local, display_to_bytes, extension_loaded, get_class, impl_php_class, implode,
-    in_array_loose, in_array_strict, intval, json_bytes, ltrim2, path_to_bytes, php_regex,
+    in_array_loose, in_array_strict, intval, json_bytes, ltrim_chars, path_to_bytes, php_regex,
     preg_is_match, preg_match, preg_quote, preg_replace, realpath, rtrim, str_pad, str_repeat,
     str_replace, strtolower, version_compare,
 };
@@ -2333,7 +2333,7 @@ impl Command for ShowCommand {
                             let mut version_str =
                                 package.get_full_pretty_version(true, DisplayMode::SourceRefIfDev);
                             if format == "text" {
-                                version_str = ltrim2(&version_str, "v");
+                                version_str = ltrim_chars(&version_str, "v");
                             }
                             version_length = version_length.max(version_str.len());
                             package_view_data.version = Some(version_str);
@@ -2361,7 +2361,7 @@ impl Command for ShowCommand {
                             let mut latest_version_str =
                                 latest.get_full_pretty_version(true, DisplayMode::SourceRefIfDev);
                             if format == "text" {
-                                latest_version_str = ltrim2(&latest_version_str, "v");
+                                latest_version_str = ltrim_chars(&latest_version_str, "v");
                             }
                             let update_status =
                                 Self::get_update_status(latest.clone(), package.clone())?;

@@ -11,7 +11,7 @@ use shirabe_php_shim::{
     date_create, display_to_bytes, error_message, explode, filter_var_email, get_debug_type,
     implode, is_array, is_bool, is_int, is_numeric, is_scalar, is_string, json_encode, parse_url,
     pcre_check_utf8_subject, php_regex, php_to_string, preg_is_match, preg_replace, str_replace,
-    strcasecmp, stripos, strtolower, strtotime, substr, trigger_error, trim2, var_export,
+    strcasecmp, stripos, strtolower, strtotime, substr, trigger_error, trim_chars, var_export,
 };
 use shirabe_semver::{
     Intervals,
@@ -191,7 +191,7 @@ impl ValidatingArrayLoader {
         }
 
         let is_empty = !self.config.borrow().contains_key(B(property))
-            || trim2(
+            || trim_chars(
                 self.config.borrow()[B(property)]
                     .as_string()
                     .unwrap_or_default(),
@@ -564,7 +564,7 @@ impl LoaderInterface for ValidatingArrayLoader {
                         let license_to_validate = str_replace("proprietary", "MIT", &license_str);
                         if !license_validator.validate(&license_to_validate) {
                             if license_validator
-                                .validate(trim2(&license_to_validate, " \t\n\r\0\u{0B}"))
+                                .validate(trim_chars(&license_to_validate, " \t\n\r\0\u{0B}"))
                             {
                                 self.warnings.borrow_mut().push(bconcat!(
                                     "License ",

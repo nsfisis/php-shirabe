@@ -4,7 +4,7 @@ use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     RuntimeException, bconcat, explode, filter_var_int_with_range, filter_var_ip, inet_pton,
-    ltrim2, parse_url, php_regex, preg_split, stripos, strlen, strpbrk, strpos, substr,
+    ltrim_chars, parse_url, php_regex, preg_split, stripos, strlen, strpbrk, strpos, substr,
     substr_count, utf8_text,
 };
 
@@ -340,7 +340,7 @@ impl NoProxyPattern {
     fn make_data(&self, host: &BStr, port: i64, ipdata: Option<IpData>) -> UrlData {
         UrlData {
             host: host.into(),
-            name: bconcat!(".", ltrim2(host, ".")),
+            name: bconcat!(".", ltrim_chars(host, ".")),
             port,
             ipdata,
         }

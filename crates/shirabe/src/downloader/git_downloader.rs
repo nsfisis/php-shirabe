@@ -14,8 +14,8 @@ use indexmap::IndexMap;
 use shirabe_php_shim::{
     CmpOp, PhpMixed, RuntimeException, array_map, basename, bconcat, dirname, impl_php_class,
     implode, is_dir, path_from_bytes, path_to_bytes, php_regex, preg_is_match, preg_match,
-    preg_match_all, preg_quote, preg_replace, preg_split, realpath, rtrim2, strlen, strpos, substr,
-    trim, version_compare,
+    preg_match_all, preg_quote, preg_replace, preg_split, realpath, rtrim_chars, strlen, strpos,
+    substr, trim, version_compare,
 };
 use shirabe_symfony_console::input::InputValue;
 use std::path::{Path, PathBuf};
@@ -633,7 +633,7 @@ impl GitDownloader {
                 return PathBuf::from(path_from_bytes(&path));
             }
 
-            path = rtrim2(
+            path = rtrim_chars(
                 bconcat!(
                     realpath(path_from_bytes(&base_path)).unwrap_or_default(),
                     "/",

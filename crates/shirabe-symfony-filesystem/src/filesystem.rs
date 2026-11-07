@@ -6,8 +6,8 @@ use shirabe_php_shim::{
     Catch as _, FilesystemIterator, PHP_MAXPATHLEN, base64_encode, bconcat, chmod, copy, dirname,
     display_to_bytes, file_exists, filemtime, fileperms, filesize, filesystem_iterator, is_dir,
     is_file, is_link, mkdir, parse_url, path_from_bytes, path_to_bytes, random_bytes, readlink,
-    realpath, rename, rmdir, rtrim2, stream_is_local, stripos, strpos, strrev, strtr, symlink,
-    touch2, umask, unlink,
+    realpath, rename, rmdir, rtrim_chars, stream_is_local, stripos, strpos, strrev, strtr, symlink,
+    touch_with_mtime, umask, unlink,
 };
 use std::path::{Path, PathBuf};
 
@@ -109,7 +109,7 @@ impl Filesystem {
                 );
 
                 // Like `cp`, preserve the file modification time.
-                touch2(target_file, filemtime(origin_file).unwrap_or(0));
+                touch_with_mtime(target_file, filemtime(origin_file).unwrap_or(0));
 
                 let bytes_origin = filesize(origin_file);
                 if bytes_copied != bytes_origin {
@@ -311,8 +311,8 @@ impl Filesystem {
         target_dir: impl AsRef<Path>,
         iterator: Vec<PathBuf>,
     ) -> anyhow::Result<()> {
-        let target_dir = rtrim2(path_to_bytes(target_dir.as_ref()), "/\\");
-        let origin_dir = rtrim2(path_to_bytes(origin_dir.as_ref()), "/\\");
+        let target_dir = rtrim_chars(path_to_bytes(target_dir.as_ref()), "/\\");
+        let origin_dir = rtrim_chars(path_to_bytes(origin_dir.as_ref()), "/\\");
         let origin_dir_len = origin_dir.len();
 
         if !self.exists(path_from_bytes(&origin_dir))? {

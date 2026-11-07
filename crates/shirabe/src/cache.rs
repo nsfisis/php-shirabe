@@ -8,7 +8,7 @@ use shirabe_php_shim::{
     bconcat, bin2hex, clearstatcache, dirname, disk_free_space, display_to_bytes, file_exists,
     file_get_contents, file_put_contents, filemtime, hash_file, is_dir, is_writable, mkdir,
     path_from_bytes, path_to_bytes, php_regex, preg_is_match, preg_match, preg_replace,
-    random_bytes, random_int, rename, rtrim2, time, touch, touch3, unlink,
+    random_bytes, random_int, rename, rtrim_chars, time, touch, touch_with_mtime_and_atime, unlink,
 };
 use shirabe_symfony_finder::Finder;
 use std::path::{Path, PathBuf};
@@ -60,8 +60,8 @@ impl Cache {
     ) -> Self {
         let cache_dir = cache_dir.as_ref();
         let allowlist = allowlist.unwrap_or(BStr::new("a-z0-9._")).to_owned();
-        let root =
-            path_from_bytes(&bconcat!(rtrim2(path_to_bytes(cache_dir), "/\\"), "/")).to_path_buf();
+        let root = path_from_bytes(&bconcat!(rtrim_chars(path_to_bytes(cache_dir), "/\\"), "/"))
+            .to_path_buf();
         let filesystem = filesystem
             .unwrap_or_else(|| std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(None))));
         let mut this = Self {
@@ -266,7 +266,11 @@ impl Cache {
         if self.is_enabled() {
             let full_path = self.full_path(file);
             if file_exists(&full_path) {
-                if !touch3(&full_path, filemtime(&full_path).unwrap_or(0), time()) {
+                if !touch_with_mtime_and_atime(
+                    &full_path,
+                    filemtime(&full_path).unwrap_or(0),
+                    time(),
+                ) {
                     // fallback in case the above failed due to incorrect ownership
                     // see https://github.com/composer/composer/issues/4070
                     touch(&full_path);

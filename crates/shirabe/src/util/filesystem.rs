@@ -4,14 +4,14 @@ use crate::util::{Platform, ProcessExecutor};
 use bstr::{BString, ByteVec};
 use shirabe_php_shim::{
     CHILD_FIRST, InvalidArgumentException, LogicException, PhpMixed, PregMatches, RuntimeException,
-    SELF_FIRST, SKIP_DOTS, array_pop, basename, bconcat, chdir, clearstatcache, clearstatcache2,
-    copy, dirname, display_to_bytes, explode, fclose, feof, file_exists, file_get_contents,
-    file_put_contents, fileatime, filemtime, filesize, fopen, fread, fwrite, implode, is_dir,
-    is_file, is_link, is_readable, lstat, mkdir, path_from_bytes, path_to_bytes, php_regex,
-    preg_is_match, preg_match, preg_replace, preg_replace_callback, recursive_directory_iterator,
-    recursive_iterator_iterator, rename, rmdir, rtrim2, str_repeat, str_replace,
-    stream_copy_to_stream, strlen, strpos, strtoupper, strtr, substr, substr_count, symlink, touch,
-    unlink, usleep, var_export,
+    SELF_FIRST, SKIP_DOTS, array_pop, basename, bconcat, chdir, clearstatcache,
+    clearstatcache_with_realpath_cache_and_filename, copy, dirname, display_to_bytes, explode,
+    fclose, feof, file_exists, file_get_contents, file_put_contents, fileatime, filemtime,
+    filesize, fopen, fread, fwrite, implode, is_dir, is_file, is_link, is_readable, lstat, mkdir,
+    path_from_bytes, path_to_bytes, php_regex, preg_is_match, preg_match, preg_replace,
+    preg_replace_callback, recursive_directory_iterator, recursive_iterator_iterator, rename,
+    rmdir, rtrim_chars, str_repeat, str_replace, stream_copy_to_stream, strlen, strpos, strtoupper,
+    strtr, substr, substr_count, symlink, touch, unlink, usleep, var_export,
 };
 use shirabe_symfony_filesystem::exception::IOException;
 use shirabe_symfony_finder::Finder;
@@ -143,7 +143,7 @@ impl Filesystem {
         };
 
         // clear stat cache because external processes aren't tracked by the php stat cache
-        clearstatcache2(false, "");
+        clearstatcache_with_realpath_cache_and_filename(false, "");
 
         if result && !is_dir(directory) {
             return Ok(true);
@@ -195,7 +195,7 @@ impl Filesystem {
         };
 
         // clear stat cache because external processes aren't tracked by the php stat cache
-        clearstatcache2(false, "");
+        clearstatcache_with_realpath_cache_and_filename(false, "");
 
         if result && !is_dir(directory) {
             return Ok(true);
@@ -499,7 +499,7 @@ impl Filesystem {
             )?;
 
             // clear stat cache because external processes aren't tracked by the php stat cache
-            clearstatcache2(false, "");
+            clearstatcache_with_realpath_cache_and_filename(false, "");
 
             if 0 == result {
                 self.remove(source)?;
@@ -517,7 +517,7 @@ impl Filesystem {
             )?;
 
             // clear stat cache because external processes aren't tracked by the php stat cache
-            clearstatcache2(false, "");
+            clearstatcache_with_realpath_cache_and_filename(false, "");
 
             if 0 == result {
                 return Ok(());
@@ -551,7 +551,7 @@ impl Filesystem {
         let to = BString::from(path_to_bytes(&self.normalize_path(to)));
 
         if directories {
-            from = bconcat!(rtrim2(&from, "/"), "/dummy_file");
+            from = bconcat!(rtrim_chars(&from, "/"), "/dummy_file");
         }
 
         if dirname(&from) == dirname(&to) {
@@ -571,7 +571,7 @@ impl Filesystem {
             return Ok(Self::path_buf(to));
         }
 
-        common_path = bconcat!(rtrim2(&common_path, "/"), "/");
+        common_path = bconcat!(rtrim_chars(&common_path, "/"), "/");
         let source_path_depth = substr_count(substr(&from, strlen(&common_path), None), "/");
         let common_path_code = str_repeat("../", source_path_depth as usize);
 
@@ -630,7 +630,7 @@ impl Filesystem {
             return Ok(var_export(&PhpMixed::string(to), true));
         }
 
-        common_path = bconcat!(rtrim2(&common_path, "/"), "/");
+        common_path = bconcat!(rtrim_chars(&common_path, "/"), "/");
         if to.starts_with(&bconcat!(from, "/")) {
             return Ok(bconcat!(
                 "__DIR__ . ",
@@ -765,7 +765,7 @@ impl Filesystem {
     pub fn trim_trailing_slash(path: impl AsRef<Path>) -> PathBuf {
         let mut path = BString::from(path_to_bytes(path.as_ref()));
         if !preg_is_match(php_regex!("{^[/\\\\]+$}"), &path) {
-            path = rtrim2(&path, "/\\");
+            path = rtrim_chars(&path, "/\\");
         }
 
         Self::path_buf(path)
@@ -911,7 +911,7 @@ impl Filesystem {
             return pathname.to_path_buf();
         }
 
-        let resolved = rtrim2(path_to_bytes(pathname), "/");
+        let resolved = rtrim_chars(path_to_bytes(pathname), "/");
 
         if 0 == strlen(&resolved) {
             return pathname.to_path_buf();
@@ -976,7 +976,7 @@ impl Filesystem {
             )
             .into());
         }
-        clearstatcache2(true, junction);
+        clearstatcache_with_realpath_cache_and_filename(true, junction);
         Ok(())
     }
 
@@ -1002,7 +1002,7 @@ impl Filesystem {
         }
 
         // Important to clear all caches first
-        clearstatcache2(true, junction);
+        clearstatcache_with_realpath_cache_and_filename(true, junction);
 
         if !is_dir(junction) || is_link(junction) {
             return false;
@@ -1022,7 +1022,7 @@ impl Filesystem {
         if !Platform::is_windows() {
             return Ok(false);
         }
-        let junction = Self::path_buf(rtrim2(
+        let junction = Self::path_buf(rtrim_chars(
             str_replace(
                 "/",
                 std::path::MAIN_SEPARATOR_STR,

@@ -17,7 +17,7 @@ use indexmap::IndexMap;
 use shirabe_php_shim::{
     GLOB_BRACE, GLOB_MARK, GLOB_ONLYDIR, PhpMixed, RuntimeException, bconcat, dirname, file_exists,
     file_get_contents, glob_with_flags, hash, is_dir, path_from_bytes, path_to_bytes, php_regex,
-    preg_is_match, realpath, rtrim2, serialize, str_replace, trim,
+    preg_is_match, realpath, rtrim_chars, serialize, str_replace, trim,
 };
 
 #[derive(Debug)]
@@ -282,7 +282,7 @@ impl PathRepository {
                 args
             })?;
             if reference == "auto"
-                && is_dir(path_from_bytes(&bconcat!(rtrim2(&path, "/"), "/.git")))
+                && is_dir(path_from_bytes(&bconcat!(rtrim_chars(&path, "/"), "/.git")))
                 && self
                     .process
                     .borrow_mut()
@@ -362,7 +362,7 @@ impl PathRepository {
             .into_iter()
             .map(|val| {
                 BString::from(
-                    &rtrim2(str_replace(std::path::MAIN_SEPARATOR_STR, "/", &val), "/")[..],
+                    &rtrim_chars(str_replace(std::path::MAIN_SEPARATOR_STR, "/", &val), "/")[..],
                 )
             })
             .collect())

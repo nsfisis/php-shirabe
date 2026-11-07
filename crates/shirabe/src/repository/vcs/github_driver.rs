@@ -15,8 +15,8 @@ use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, PhpMixed, RuntimeException, array_diff, array_map,
     array_search_mixed, base64_decode, basename, bconcat, date_create, empty, explode,
     extension_loaded, in_array_loose, parse_url, path_from_bytes, php_regex, php_to_string,
-    preg_is_match, preg_match, preg_replace, preg_split, strpos, strtolower, substr, trim, trim2,
-    urlencode,
+    preg_is_match, preg_match, preg_replace, preg_split, strpos, strtolower, substr, trim,
+    trim_chars, urlencode,
 };
 
 #[derive(Debug)]
@@ -503,7 +503,7 @@ impl GitHubDriver {
                     ) {
                         let mut entry = IndexMap::new();
                         entry.insert("type".into(), PhpMixed::string(g1.clone()));
-                        entry.insert("url".into(), PhpMixed::string(trim2(&item, "\"' ")));
+                        entry.insert("url".into(), PhpMixed::string(trim_chars(&item, "\"' ")));
                         result.push(entry);
                     }
                 } else if let Some(m2) = preg_match(php_regex!(r"{^([^#].*?)(?:\s+#.*)?$}"), &g2) {
@@ -511,7 +511,7 @@ impl GitHubDriver {
                     entry.insert("type".into(), PhpMixed::string(g1.clone()));
                     entry.insert(
                         "url".into(),
-                        PhpMixed::string(trim2(m2.get(1).unwrap_or_default(), "\"' ")),
+                        PhpMixed::string(trim_chars(m2.get(1).unwrap_or_default(), "\"' ")),
                     );
                     result.push(entry);
                 }
@@ -529,7 +529,7 @@ impl GitHubDriver {
                 );
                 entry.insert(
                     "url".into(),
-                    PhpMixed::string(trim2(m.get(1).unwrap_or_default(), "\"' ")),
+                    PhpMixed::string(trim_chars(m.get(1).unwrap_or_default(), "\"' ")),
                 );
                 result.push(entry);
             } else if key.is_some() && line == "]" {

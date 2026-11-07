@@ -40,7 +40,7 @@ use shirabe_php_shim::{
     explode_with_limit, file_exists, get_class, hash, implode, ini_get, is_callable, is_dir,
     is_object, krsort, os_str_from_bytes, path_from_bytes, path_to_bytes, php_regex, preg_is_match,
     preg_match, preg_quote, preg_replace, preg_replace_callback, realpath, str_replace, strlen,
-    strpos, strtoupper, substr, trim2,
+    strpos, strtoupper, substr, trim_chars,
 };
 use shirabe_symfony_console::output::output_interface;
 use shirabe_symfony_process::{ExecutableFinder, PhpExecutableFinder};
@@ -149,7 +149,7 @@ impl EventDispatcher {
         let skip_scripts_env = Platform::get_env("COMPOSER_SKIP_SCRIPTS").unwrap_or_default();
         let skip_scripts: Vec<BString> = explode(",", &skip_scripts_env)
             .iter()
-            .map(|v| trim2(v, " \t\n\r\0\u{0B}"))
+            .map(|v| trim_chars(v, " \t\n\r\0\u{0B}"))
             .filter(|val| !val.is_empty())
             .collect();
         Self {
