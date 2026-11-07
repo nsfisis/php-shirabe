@@ -143,7 +143,7 @@ impl Filesystem {
         };
 
         // clear stat cache because external processes aren't tracked by the php stat cache
-        clearstatcache_with_realpath_cache_and_filename(false, "");
+        clearstatcache();
 
         if result && !is_dir(directory) {
             return Ok(true);
@@ -195,7 +195,7 @@ impl Filesystem {
         };
 
         // clear stat cache because external processes aren't tracked by the php stat cache
-        clearstatcache_with_realpath_cache_and_filename(false, "");
+        clearstatcache();
 
         if result && !is_dir(directory) {
             return Ok(true);
@@ -499,7 +499,7 @@ impl Filesystem {
             )?;
 
             // clear stat cache because external processes aren't tracked by the php stat cache
-            clearstatcache_with_realpath_cache_and_filename(false, "");
+            clearstatcache();
 
             if 0 == result {
                 self.remove(source)?;
@@ -517,7 +517,7 @@ impl Filesystem {
             )?;
 
             // clear stat cache because external processes aren't tracked by the php stat cache
-            clearstatcache_with_realpath_cache_and_filename(false, "");
+            clearstatcache();
 
             if 0 == result {
                 return Ok(());
