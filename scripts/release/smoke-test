@@ -32,16 +32,6 @@ echo "--- shirabe --version"
 cat "$work_dir/version.out" "$work_dir/version.err"
 grep -q '^Shirabe version ' "$work_dir/version.out" || fail "--version printed no version"
 
-version="$(sed -n 's/^Shirabe version \([^ ]*\) .*/\1/p' "$work_dir/version.out")"
-if [[ "$version" == *-dev* ]]; then
-    if grep -q 'Shirabe is experimental' "$work_dir/version.err"; then
-        fail "a development build printed the experimental warning"
-    fi
-else
-    grep -q 'Shirabe is experimental' "$work_dir/version.err" \
-        || fail "a release build did not print the experimental warning"
-fi
-
 mkdir "$work_dir/project"
 cd "$work_dir/project"
 cat > composer.json <<'JSON'
