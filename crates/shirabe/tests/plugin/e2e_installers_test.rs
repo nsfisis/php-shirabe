@@ -6,7 +6,7 @@
 //! test skips itself while that directory, the PHP runtime or the Composer checkout is missing.
 
 use crate::e2e_extension_installer_test::{copy_dir, upstream_composer_bin};
-use crate::php_worker::{lock_php_worker, php_runtime_available};
+use crate::php_worker::lock_php_worker;
 use bstr::{BStr, BString, ByteSlice};
 use shirabe_php_shim::{os_str_from_bytes, path_to_bytes};
 use std::ffi::OsStr;
@@ -119,7 +119,7 @@ fn edit(path: &Path, from: &BStr, to: &BStr) {
 #[ignore = "LibraryInstaller is Rust-owned and has no proxy a plugin can subclass; see the TODO(plugin) above"]
 #[test]
 fn test_composer_installers_matches_upstream_composer() {
-    if !php_runtime_available() || !plugin_fetched() {
+    if !plugin_fetched() {
         return;
     }
     let Some(composer_bin) = upstream_composer_bin() else {
@@ -159,7 +159,7 @@ fn test_composer_installers_matches_upstream_composer() {
 #[ignore = "LibraryInstaller is Rust-owned and has no proxy a plugin can subclass; see the TODO(plugin) above"]
 #[test]
 fn test_composer_installers_update_and_remove_match_upstream_composer() {
-    if !php_runtime_available() || !plugin_fetched() {
+    if !plugin_fetched() {
         return;
     }
     let Some(composer_bin) = upstream_composer_bin() else {
@@ -223,7 +223,7 @@ fn test_composer_installers_update_and_remove_match_upstream_composer() {
 #[ignore = "LibraryInstaller is Rust-owned and has no proxy a plugin can subclass; see the TODO(plugin) above"]
 #[test]
 fn test_composer_installers_custom_paths_match_upstream_composer() {
-    if !php_runtime_available() || !plugin_fetched() {
+    if !plugin_fetched() {
         return;
     }
     let Some(composer_bin) = upstream_composer_bin() else {

@@ -1,7 +1,7 @@
 //! ref: composer/tests/Composer/Test/Plugin/PluginInstallerTest.php sha1:8796f169f09df6f0e369d5c6041fa2dc8ad4858d
 
 use crate::async_runtime::run;
-use crate::php_worker::{load_composer_php_runtime, lock_php_worker, php_runtime_available};
+use crate::php_worker::{load_composer_php_runtime, lock_php_worker};
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe::autoload::AutoloadGenerator;
@@ -430,9 +430,6 @@ pub(crate) fn new_installer(set_up: &SetUp) -> PluginInstaller {
 
 #[test]
 fn test_install_new_plugin() {
-    if !php_runtime_available() {
-        return;
-    }
     let _worker = lock_php_worker();
     let set_up = set_up();
     // PHP: $this->repository->getPackages() returns [].
@@ -452,9 +449,6 @@ fn test_install_new_plugin() {
 
 #[test]
 fn test_install_plugin_with_root_package_having_files_autoload() {
-    if !php_runtime_available() {
-        return;
-    }
     let _worker = lock_php_worker();
     let set_up = set_up();
     // PHP: $this->repository->getPackages() returns [].
@@ -487,9 +481,6 @@ fn test_install_plugin_with_root_package_having_files_autoload() {
 
 #[test]
 fn test_install_multiple_plugins() {
-    if !php_runtime_available() {
-        return;
-    }
     let _worker = lock_php_worker();
     let set_up = set_up();
     // PHP: $this->repository->getPackages() returns [$this->packages[3]].
@@ -523,9 +514,6 @@ fn test_install_multiple_plugins() {
 
 #[test]
 fn test_upgrade_with_new_class_name() {
-    if !php_runtime_available() {
-        return;
-    }
     let _worker = lock_php_worker();
     let set_up = set_up();
     // PHP: getPackages returns [$this->packages[0]]; hasPackage answers (true, false), which a
@@ -562,9 +550,6 @@ fn test_upgrade_with_new_class_name() {
 
 #[test]
 fn test_uninstall() {
-    if !php_runtime_available() {
-        return;
-    }
     let _worker = lock_php_worker();
     let set_up = set_up();
     set_up
@@ -588,9 +573,6 @@ fn test_uninstall() {
 
 #[test]
 fn test_upgrade_with_same_class_name() {
-    if !php_runtime_available() {
-        return;
-    }
     let _worker = lock_php_worker();
     let set_up = set_up();
     // PHP: getPackages returns [$this->packages[1]]; hasPackage answers (true, false).
@@ -623,9 +605,6 @@ fn test_upgrade_with_same_class_name() {
 
 #[test]
 fn test_register_plugin_only_one_time() {
-    if !php_runtime_available() {
-        return;
-    }
     let _worker = lock_php_worker();
     let set_up = set_up();
     // PHP: $this->repository->getPackages() returns [].
@@ -701,9 +680,6 @@ fn set_plugin_api_version_with_plugins(
 
 #[test]
 fn test_star_plugin_version_works_with_any_api_version() {
-    if !php_runtime_available() {
-        return;
-    }
     let _worker = lock_php_worker();
     let set_up = set_up();
     let star_version_plugin = || vec![PackageInterfaceHandle::dup(&set_up.packages[4])];
@@ -730,9 +706,6 @@ fn test_star_plugin_version_works_with_any_api_version() {
 
 #[test]
 fn test_plugin_constraint_works_only_with_certain_api_version() {
-    if !php_runtime_available() {
-        return;
-    }
     let _worker = lock_php_worker();
     let set_up = set_up();
     let plugin_with_api_constraint = || vec![PackageInterfaceHandle::dup(&set_up.packages[5])];
@@ -768,9 +741,6 @@ fn test_plugin_constraint_works_only_with_certain_api_version() {
 
 #[test]
 fn test_plugin_range_constraints_work_only_with_certain_api_version() {
-    if !php_runtime_available() {
-        return;
-    }
     let _worker = lock_php_worker();
     let set_up = set_up();
     let plugin_with_api_constraint = || vec![PackageInterfaceHandle::dup(&set_up.packages[6])];
@@ -799,9 +769,6 @@ fn test_plugin_range_constraints_work_only_with_certain_api_version() {
 
 #[test]
 fn test_command_provider_capability() {
-    if !php_runtime_available() {
-        return;
-    }
     let _worker = lock_php_worker();
     let set_up = set_up();
     // PHP mocks the repository so getPackages() returns [$this->packages[7]] (plugin-v8);
@@ -910,9 +877,6 @@ fn load_mock_capability_class() {
 
 #[test]
 fn test_capability_implements_composer_plugin_api_class_and_is_constructed_with_args() {
-    if !php_runtime_available() {
-        return;
-    }
     let _worker = lock_php_worker();
     let set_up = set_up();
     load_mock_capability_class();
@@ -1121,9 +1085,6 @@ fn non_existing_or_invalid_implementation_class_types() -> Vec<&'static BStr> {
 
 #[test]
 fn test_querying_with_non_existing_or_wrong_capability_class_types_throws() {
-    if !php_runtime_available() {
-        return;
-    }
     let _worker = lock_php_worker();
     // `new \stdClass($ctorArgs)` receives the plugin, whose proxy stub implements the real
     // PluginInterface in the child.

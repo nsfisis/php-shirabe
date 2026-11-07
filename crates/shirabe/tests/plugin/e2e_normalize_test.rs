@@ -8,7 +8,7 @@
 //! The test skips while any of these is missing; test runs themselves are offline.
 
 use crate::e2e_extension_installer_test::{copy_dir, upstream_composer_bin};
-use crate::php_worker::{lock_php_worker, php_runtime_available};
+use crate::php_worker::lock_php_worker;
 use bstr::{BStr, BString, ByteSlice};
 use shirabe_php_shim::os_str_from_bytes;
 use std::ffi::OsStr;
@@ -79,9 +79,6 @@ fn normalize_lines(stdout: &[u8]) -> Vec<&BStr> {
 #[ignore = "the plugin's command provider constructs Composer\\Factory, which the worker has no counterpart for; see the TODO(plugin) above"]
 #[test]
 fn test_normalize_listing_matches_upstream_composer() {
-    if !php_runtime_available() {
-        return;
-    }
     let Some(composer_bin) = upstream_composer_bin() else {
         return;
     };
@@ -151,9 +148,6 @@ fn test_normalize_listing_matches_upstream_composer() {
 #[ignore = "the worker cannot construct a second native Composer instance yet; see the TODO(plugin) above"]
 #[test]
 fn test_normalize_execution_matches_upstream_composer() {
-    if !php_runtime_available() {
-        return;
-    }
     let Some(composer_bin) = upstream_composer_bin() else {
         return;
     };

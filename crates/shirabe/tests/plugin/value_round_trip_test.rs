@@ -5,7 +5,7 @@
 //! are Shirabe-owned.
 
 use crate::async_runtime::run;
-use crate::php_worker::{lock_php_worker, php_runtime_available};
+use crate::php_worker::lock_php_worker;
 use crate::plugin_installer_test::{new_installer, set_up};
 use bstr::{B, BStr, BString};
 use indexmap::IndexMap;
@@ -148,9 +148,6 @@ fn describe_links(links: &IndexMap<BString, Link>) -> Vec<BString> {
 
 #[test]
 fn test_links_and_release_date_round_trip_through_the_plugin() {
-    if !php_runtime_available() {
-        return;
-    }
     let _worker = lock_php_worker();
     let set_up = set_up();
     let package = set_up.composer.borrow().get_package().clone();
@@ -213,9 +210,6 @@ fn link_pretty_constraint_fixture_package() -> PackageInterfaceHandle {
 /// directions, so `getPrettyConstraint()` throws on either side as it does in PHP.
 #[test]
 fn test_link_without_pretty_constraint_throws_on_both_sides() {
-    if !php_runtime_available() {
-        return;
-    }
     let _worker = lock_php_worker();
     let set_up = set_up();
     let package = set_up.composer.borrow().get_package().clone();

@@ -7,7 +7,7 @@
 //! PHP runtime or the Composer checkout is missing.
 
 use crate::e2e_extension_installer_test::{copy_dir, upstream_composer_bin};
-use crate::php_worker::{lock_php_worker, php_runtime_available};
+use crate::php_worker::lock_php_worker;
 use bstr::{BStr, BString, ByteSlice};
 use shirabe_php_shim::os_str_from_bytes;
 use std::ffi::OsStr;
@@ -65,9 +65,6 @@ fn install_then_require(program: &BStr, prefix_args: &[&OsStr]) -> Run {
 
 #[test]
 fn test_pre_pool_create_matches_upstream_composer() {
-    if !php_runtime_available() {
-        return;
-    }
     let Some(composer_bin) = upstream_composer_bin() else {
         return;
     };

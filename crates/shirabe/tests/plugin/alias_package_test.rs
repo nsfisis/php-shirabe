@@ -3,7 +3,7 @@
 //! Shirabe-owned.
 
 use crate::async_runtime::run;
-use crate::php_worker::{lock_php_worker, php_runtime_available};
+use crate::php_worker::lock_php_worker;
 use crate::plugin_installer_test::{new_installer, set_up};
 use bstr::{B, BString};
 use shirabe::installer::InstallerInterface;
@@ -26,9 +26,6 @@ fn alias_fixture_package() -> PackageInterfaceHandle {
 
 #[test]
 fn test_alias_packages_cross_the_plugin_boundary() {
-    if !php_runtime_available() {
-        return;
-    }
     let _worker = lock_php_worker();
     let set_up = set_up();
 

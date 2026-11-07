@@ -1181,11 +1181,6 @@ mod tests {
 
     #[test]
     fn worker_starts_with_xdebug_switched_off() {
-        if PhpExecutableFinder::new().find(false).is_none() {
-            // No PHP in this environment; the worker cannot start.
-            return;
-        }
-
         let mut worker = spawn_worker().expect("failed to spawn PHP worker");
 
         // The `-d xdebug.mode=off` half is invisible from PHP while the extension is not loaded
@@ -1211,24 +1206,14 @@ mod tests {
     }
 
     #[test]
-    fn queries_string_lists_when_php_available() {
-        if PhpExecutableFinder::new().find(false).is_none() {
-            // No PHP in this environment; the worker cannot start.
-            return;
-        }
-
+    fn queries_string_lists() {
         // XdebugHandler::getAllIniFiles() always yields at least one entry, which is the empty
         // string when no php.ini is loaded.
         assert!(!get_all_ini_files().unwrap().is_empty());
     }
 
     #[test]
-    fn queries_memory_usage_when_php_available() {
-        if PhpExecutableFinder::new().find(false).is_none() {
-            // No PHP in this environment; the worker cannot start.
-            return;
-        }
-
+    fn queries_memory_usage() {
         for real_usage in [false, true] {
             let usage = memory_get_usage(real_usage).unwrap();
             assert!(usage > 0);
@@ -1237,12 +1222,7 @@ mod tests {
     }
 
     #[test]
-    fn queries_diagnostics_when_php_available() {
-        if PhpExecutableFinder::new().find(false).is_none() {
-            // No PHP in this environment; the worker cannot start.
-            return;
-        }
-
+    fn queries_diagnostics() {
         let diagnostics = get_diagnostics().unwrap();
         assert_eq!(diagnostics.php_version, get_php_version().unwrap().version);
         assert!(diagnostics.php_version_id >= 70205);
@@ -1261,12 +1241,7 @@ mod tests {
     }
 
     #[test]
-    fn queries_real_php_when_available() {
-        if PhpExecutableFinder::new().find(false).is_none() {
-            // No PHP in this environment; the worker cannot start.
-            return;
-        }
-
+    fn queries_real_php() {
         let php = get_php_version().unwrap();
         assert!(!php.version.is_empty(), "expected a PHP version");
         assert_eq!(
@@ -1293,12 +1268,7 @@ mod tests {
     }
 
     #[test]
-    fn queries_platform_info_when_php_available() {
-        if PhpExecutableFinder::new().find(false).is_none() {
-            // No PHP in this environment; the worker cannot start.
-            return;
-        }
-
+    fn queries_platform_info() {
         let platform_info = get_platform_info().unwrap();
 
         let extensions = platform_info.get_extensions();

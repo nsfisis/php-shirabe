@@ -1,9 +1,7 @@
 //! ref: composer/tests/Composer/Test/EventDispatcher/EventDispatcherTest.php sha1:a442e982a12ea580c37cef848e294882192c65f5
 
 use crate::io_mock::{Expectation, get_io_mock};
-use crate::php_worker::{
-    load_composer_php_runtime, php_eval, php_runtime_available, php_single_quote,
-};
+use crate::php_worker::{load_composer_php_runtime, php_eval, php_single_quote};
 use crate::process_executor_mock::{ProcessExecutorMockGuard, cmd, get_process_executor_mock};
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
@@ -133,23 +131,20 @@ fn null_io() -> std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
 /// export `PHP_BINARY` for the child). PHP's own test suite always runs under an interpreter, so
 /// `PHP_BINARY` is implicitly set; the Rust `PhpExecutableFinder` fallbacks that read the running
 /// SAPI are unportable, so we seed `PHP_BINARY` the way the PHP runtime would. Tests that reach the
-/// command-line branch must call this. Returns false (skipping the assertion) when no PHP is found.
-fn ensure_php_binary() -> bool {
+/// command-line branch must call this.
+fn ensure_php_binary() {
     if Platform::get_env("PHP_BINARY")
         .filter(|v| !v.is_empty())
         .is_some()
     {
-        return true;
+        return;
     }
     let path = getenv("PATH").unwrap_or_default();
-    for dir in std::env::split_paths(&path) {
-        let candidate = dir.join("php");
-        if candidate.is_file() {
-            Platform::put_env("PHP_BINARY", path_to_bytes(&candidate)).unwrap();
-            return true;
-        }
-    }
-    false
+    let candidate = std::env::split_paths(&path)
+        .map(|dir| dir.join("php"))
+        .find(|candidate| candidate.is_file())
+        .expect("no php binary on PATH");
+    Platform::put_env("PHP_BINARY", path_to_bytes(&candidate)).unwrap();
 }
 
 fn buffer_io_verbose() -> std::rc::Rc<std::cell::RefCell<BufferIO>> {
@@ -197,10 +192,7 @@ fn listeners_const(listeners: Vec<&BStr>) -> Box<dyn Fn(&dyn EventInterface) -> 
 #[serial]
 fn test_dispatcher_can_execute_single_command_line_script() {
     let _tear_down = TearDown;
-    if !ensure_php_binary() {
-        eprintln!("skipping: no php binary on PATH");
-        return;
-    }
+    ensure_php_binary();
     for command in ["phpunit", "echo foo", "echo -n foo"] {
         let (process, _process_guard): (_, ProcessExecutorMockGuard) =
             get_process_executor_mock(vec![cmd(command)], true, MockHandler::default());
@@ -228,10 +220,7 @@ fn test_dispatcher_can_execute_single_command_line_script() {
 #[serial]
 fn test_dispatcher_can_execute_composer_script_groups() {
     let _tear_down = TearDown;
-    if !ensure_php_binary() {
-        eprintln!("skipping: no php binary on PATH");
-        return;
-    }
+    ensure_php_binary();
     let (process, _process_guard) = get_process_executor_mock(
         vec![cmd("echo -n foo"), cmd("echo -n baz"), cmd("echo -n bar")],
         true,
@@ -289,10 +278,7 @@ fn test_dispatcher_can_execute_composer_script_groups() {
 #[serial]
 fn test_recursion_in_scripts_names() {
     let _tear_down = TearDown;
-    if !ensure_php_binary() {
-        eprintln!("skipping: no php binary on PATH");
-        return;
-    }
+    ensure_php_binary();
     let (process, _process_guard) = get_process_executor_mock(
         vec![cmd(bconcat!(
             "echo Hello ",
@@ -444,9 +430,6 @@ fn test_dispatcher_doesnt_return_skipped_scripts() {
 #[serial]
 fn test_listener_exceptions_are_caught() {
     let _tear_down = TearDown;
-    if !php_runtime_available() {
-        return;
-    }
     load_php_listener_class();
 
     let (io_mock, _io_guard) = get_io_mock(io_interface::NORMAL).unwrap();
@@ -614,10 +597,7 @@ use mock_installation_manager::MockInstallationManager;
 #[serial]
 fn test_dispatcher_pass_dev_mode_to_autoload_generator_for_script_events() {
     let _tear_down = TearDown;
-    if !ensure_php_binary() {
-        // The php-script listener path queries class_exists through the PHP worker.
-        return;
-    }
+    ensure_php_binary();
 
     // dataProvider provideDevModes
     for dev_mode in [true, false] {
@@ -713,9 +693,6 @@ fn test_dispatcher_pass_dev_mode_to_autoload_generator_for_script_events() {
 #[serial]
 fn test_dispatcher_remove_listener() {
     let _tear_down = TearDown;
-    if !php_runtime_available() {
-        return;
-    }
     load_php_listener_class();
 
     let composer = create_composer_instance();
@@ -789,9 +766,7 @@ fn test_dispatcher_remove_listener() {
 #[serial]
 fn test_dispatcher_can_execute_cli_and_php_in_same_event_script_stack() {
     let _tear_down = TearDown;
-    if !ensure_php_binary() || !php_runtime_available() {
-        return;
-    }
+    ensure_php_binary();
     load_php_listener_class();
 
     let (process, _process_guard) = get_process_executor_mock(
@@ -839,9 +814,6 @@ fn test_dispatcher_can_execute_cli_and_php_in_same_event_script_stack() {
 #[serial]
 fn test_dispatcher_can_put_env() {
     let _tear_down = TearDown;
-    if !php_runtime_available() {
-        return;
-    }
     load_php_listener_class();
 
     let (process, _process_guard) =
@@ -883,9 +855,6 @@ fn test_dispatcher_can_put_env() {
 #[serial]
 fn test_dispatcher_appends_dir_bin_on_path_for_every_listener() {
     let _tear_down = TearDown;
-    if !php_runtime_available() {
-        return;
-    }
     load_php_listener_class();
 
     let current_directory_bkp = Platform::get_cwd(false).unwrap();
@@ -942,10 +911,7 @@ fn test_dispatcher_appends_dir_bin_on_path_for_every_listener() {
 #[serial]
 fn test_dispatcher_support_for_additional_args() {
     let _tear_down = TearDown;
-    if !ensure_php_binary() {
-        eprintln!("skipping: no php binary on PATH");
-        return;
-    }
+    ensure_php_binary();
 
     let composer = create_composer_instance();
     let io = buffer_io_verbose();

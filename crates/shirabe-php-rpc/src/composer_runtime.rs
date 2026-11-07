@@ -167,7 +167,6 @@ fn extract_into(root: &std::path::Path) -> anyhow::Result<std::path::PathBuf> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use shirabe_symfony_process::PhpExecutableFinder;
 
     fn sentinel_of(directory: &std::path::Path) -> BString {
         std::fs::read(directory.join(path_from_bytes(SENTINEL_PATH)))
@@ -203,11 +202,6 @@ mod tests {
 
     #[test]
     fn the_worker_reads_the_bundle_out_of_this_executable() {
-        if PhpExecutableFinder::new().find(false).is_none() {
-            // No PHP in this environment; the worker cannot start.
-            return;
-        }
-
         let cache = tempfile::tempdir().unwrap();
         assert_eq!(
             base_path(|| Ok(cache.path().to_path_buf())).unwrap(),
@@ -219,11 +213,6 @@ mod tests {
     /// unpacked tree, and has to reach the same classes through it.
     #[test]
     fn the_worker_loads_the_composer_runtime_from_an_unpacked_bundle() {
-        if PhpExecutableFinder::new().find(false).is_none() {
-            // No PHP in this environment; the worker cannot start.
-            return;
-        }
-
         let root = tempfile::tempdir().unwrap();
         let autoload = extract_into(root.path())
             .unwrap()

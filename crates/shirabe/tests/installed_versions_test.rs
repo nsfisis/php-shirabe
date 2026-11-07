@@ -11,8 +11,7 @@ mod php_worker;
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use php_worker::{
-    load_composer_php_runtime, lock_php_worker, php_call_static, php_eval, php_runtime_available,
-    php_single_quote,
+    load_composer_php_runtime, lock_php_worker, php_call_static, php_eval, php_single_quote,
 };
 use shirabe::plugin::php_call::PhpCall;
 use shirabe_php_rpc::{PluginValue, ToWire};
@@ -96,9 +95,6 @@ fn string_list(names: &[impl AsRef<[u8]>]) -> PluginValue {
 
 #[test]
 fn test_get_installed_packages() {
-    if !php_runtime_available() {
-        return;
-    }
     let _worker = lock_php_worker();
     let _set_up = set_up();
 
@@ -121,9 +117,6 @@ fn test_get_installed_packages() {
 
 #[test]
 fn test_is_installed() {
-    if !php_runtime_available() {
-        return;
-    }
     let _worker = lock_php_worker();
     let _set_up = set_up();
 
@@ -158,9 +151,6 @@ fn is_installed_provider() -> Vec<(bool, &'static BStr, bool)> {
 
 #[test]
 fn test_satisfies() {
-    if !php_runtime_available() {
-        return;
-    }
     let _worker = lock_php_worker();
     let _set_up = set_up();
 
@@ -215,9 +205,6 @@ fn satisfies_provider() -> Vec<(bool, &'static BStr, &'static BStr)> {
 
 #[test]
 fn test_get_version_ranges() {
-    if !php_runtime_available() {
-        return;
-    }
     let _worker = lock_php_worker();
     let _set_up = set_up();
 
@@ -252,9 +239,6 @@ fn get_version_ranges_provider() -> Vec<(&'static BStr, &'static BStr)> {
 
 #[test]
 fn test_get_version() {
-    if !php_runtime_available() {
-        return;
-    }
     let _worker = lock_php_worker();
     let _set_up = set_up();
 
@@ -283,9 +267,6 @@ fn get_version_provider() -> Vec<(Option<&'static BStr>, &'static BStr)> {
 
 #[test]
 fn test_get_pretty_version() {
-    if !php_runtime_available() {
-        return;
-    }
     let _worker = lock_php_worker();
     let _set_up = set_up();
 
@@ -324,9 +305,6 @@ fn optional_string(value: Option<&BStr>) -> PluginValue {
 
 #[test]
 fn test_get_version_out_of_bounds() {
-    if !php_runtime_available() {
-        return;
-    }
     let _worker = lock_php_worker();
     let _set_up = set_up();
 
@@ -339,9 +317,6 @@ fn test_get_version_out_of_bounds() {
 
 #[test]
 fn test_get_root_package() {
-    if !php_runtime_available() {
-        return;
-    }
     let _worker = lock_php_worker();
     let set_up = set_up();
 
@@ -379,9 +354,6 @@ fn test_get_root_package() {
 
 #[test]
 fn test_get_raw_data() {
-    if !php_runtime_available() {
-        return;
-    }
     let _worker = lock_php_worker();
     let set_up = set_up();
 
@@ -393,9 +365,6 @@ fn test_get_raw_data() {
 
 #[test]
 fn test_get_reference() {
-    if !php_runtime_available() {
-        return;
-    }
     let _worker = lock_php_worker();
     let _set_up = set_up();
 
@@ -433,9 +402,6 @@ fn get_reference_provider() -> Vec<(Option<&'static BStr>, &'static BStr)> {
 
 #[test]
 fn test_get_installed_packages_by_type() {
-    if !php_runtime_available() {
-        return;
-    }
     let _worker = lock_php_worker();
     let _set_up = set_up();
 
@@ -451,9 +417,6 @@ fn test_get_installed_packages_by_type() {
 
 #[test]
 fn test_get_install_path() {
-    if !php_runtime_available() {
-        return;
-    }
     let _worker = lock_php_worker();
     let set_up = set_up();
 
@@ -484,9 +447,6 @@ fn test_get_install_path() {
 
 #[test]
 fn test_with_class_loader_loaded() {
-    if !php_runtime_available() {
-        return;
-    }
     let _worker = lock_php_worker();
     let _set_up = set_up();
 
@@ -549,9 +509,6 @@ fn test_with_class_loader_loaded() {
 /// have to be the same bytes for the tests above to say anything about what Shirabe ships.
 #[test]
 fn test_worker_loads_the_installed_versions_file_shirabe_dumps() {
-    if !php_runtime_available() {
-        return;
-    }
     let _worker = lock_php_worker();
     load_composer_php_runtime();
 

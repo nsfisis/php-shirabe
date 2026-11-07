@@ -3,7 +3,7 @@
 //! `Parent@anonymous` through the class table of the running PHP, which for Shirabe is the
 //! worker's. Upstream has no test for this, so the PHP code is written here.
 
-use crate::php_worker::{lock_php_worker, php_runtime_available};
+use crate::php_worker::lock_php_worker;
 use bstr::{BStr, ByteSlice};
 use shirabe::console::application::Application;
 use shirabe::plugin::php_call::PhpCall;
@@ -31,9 +31,6 @@ throw new \RuntimeException(implode("\n", [
 
 #[test]
 fn anonymous_class_names_in_a_message_are_rendered_by_their_parent() {
-    if !php_runtime_available() {
-        return;
-    }
     let _worker = lock_php_worker();
 
     let dir = tempfile::TempDir::new().unwrap();
@@ -77,9 +74,6 @@ throw new class('boom') extends \RuntimeException {};
 
 #[test]
 fn an_anonymous_exception_class_is_titled_by_its_debug_type() {
-    if !php_runtime_available() {
-        return;
-    }
     let _worker = lock_php_worker();
 
     let dir = tempfile::TempDir::new().unwrap();

@@ -3,7 +3,7 @@
 //! these tests use a Shirabe-owned fixture (`fixtures/subscriber-v1`) instead of a ported one.
 
 use crate::async_runtime::run;
-use crate::php_worker::{lock_php_worker, php_runtime_available};
+use crate::php_worker::lock_php_worker;
 use crate::plugin_installer_test::{new_installer, set_up};
 use bstr::BStr;
 use shirabe::installer::InstallerInterface;
@@ -39,9 +39,6 @@ fn dispatch(set_up: &crate::plugin_installer_test::SetUp, event_name: &BStr) -> 
 
 #[test]
 fn test_subscriber_listener_receives_event() {
-    if !php_runtime_available() {
-        return;
-    }
     let _worker = lock_php_worker();
     let set_up = set_up();
     install_subscriber_plugin(&set_up);
@@ -59,9 +56,6 @@ fn test_subscriber_listener_receives_event() {
 
 #[test]
 fn test_subscriber_listeners_run_in_priority_order() {
-    if !php_runtime_available() {
-        return;
-    }
     let _worker = lock_php_worker();
     let set_up = set_up();
     install_subscriber_plugin(&set_up);
@@ -78,9 +72,6 @@ fn test_subscriber_listeners_run_in_priority_order() {
 
 #[test]
 fn test_subscriber_listener_returning_false_sets_return_code() {
-    if !php_runtime_available() {
-        return;
-    }
     let _worker = lock_php_worker();
     let set_up = set_up();
     install_subscriber_plugin(&set_up);
@@ -98,9 +89,6 @@ fn test_subscriber_listener_returning_false_sets_return_code() {
 
 #[test]
 fn test_remove_plugin_removes_its_subscribed_listeners() {
-    if !php_runtime_available() {
-        return;
-    }
     let _worker = lock_php_worker();
     let set_up = set_up();
     install_subscriber_plugin(&set_up);
@@ -136,9 +124,6 @@ fn test_remove_plugin_removes_its_subscribed_listeners() {
 
 #[test]
 fn test_unrelated_event_does_not_reach_the_subscriber() {
-    if !php_runtime_available() {
-        return;
-    }
     let _worker = lock_php_worker();
     let set_up = set_up();
     install_subscriber_plugin(&set_up);

@@ -8,13 +8,6 @@ use bstr::{BStr, BString};
 use shirabe::plugin::php_call::PhpCall;
 use shirabe_php_rpc::PluginValue;
 use shirabe_php_shim::{bconcat, str_replace};
-use shirabe_symfony_process::PhpExecutableFinder;
-
-/// Whether a PHP binary is available. Without one the worker cannot start, so tests that need it
-/// return early instead of failing.
-pub fn php_runtime_available() -> bool {
-    PhpExecutableFinder::new().find(false).is_some()
-}
 
 /// All tests in one binary share the single PHP worker, whose loaded-class table and class statics
 /// persist across tests just like PHPUnit's single-process runs. Interleaving two tests would let

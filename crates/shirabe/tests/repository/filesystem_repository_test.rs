@@ -1,6 +1,6 @@
 //! ref: composer/tests/Composer/Test/Repository/FilesystemRepositoryTest.php sha1:4154499d3819d9388049af193e825d43d1ef8fae
 
-use crate::php_worker::{load_composer_php_runtime, php_call_static, php_runtime_available};
+use crate::php_worker::{load_composer_php_runtime, php_call_static};
 use crate::test_case::{get_alias_package, get_package};
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
@@ -374,9 +374,6 @@ fn test_repository_writes_installed_php() {
 // the same worker, which would replace the state asserted here.
 #[serial]
 fn test_safely_load_installed_versions() {
-    if !php_runtime_available() {
-        return;
-    }
     load_composer_php_runtime();
 
     let fixtures_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))

@@ -12,7 +12,6 @@ use shirabe_php_rpc::value::{serialize, unserialize};
 use shirabe_php_rpc::{
     PhpObject, PhpThrow, PluginValue, RustMethodDispatcher, RustObjHandle, call_function,
 };
-use shirabe_symfony_process::PhpExecutableFinder;
 
 /// The snippets these tests run never call back into Rust.
 struct NoCallbacks;
@@ -27,10 +26,6 @@ impl RustMethodDispatcher for NoCallbacks {
     ) -> Result<PluginValue, PhpThrow> {
         panic!("unexpected callback `{method_name:?}`")
     }
-}
-
-fn php_available() -> bool {
-    PhpExecutableFinder::new().find(false).is_some()
 }
 
 /// Feeds raw serialize() bytes through the PHP core codec and returns what PHP re-serializes.
@@ -70,10 +65,6 @@ fn assert_php_agrees(value: &PluginValue) {
 
 #[test]
 fn encode_direction_matches_php_for_scalars_and_floats() {
-    if !php_available() {
-        return;
-    }
-
     let floats = [
         0.0,
         -0.0,
@@ -135,10 +126,6 @@ fn encode_direction_matches_php_for_scalars_and_floats() {
 
 #[test]
 fn encode_direction_matches_php_for_non_utf8_bytes() {
-    if !php_available() {
-        return;
-    }
-
     assert_php_agrees(&PluginValue::String(
         vec![0xff, 0x00, 0xfe, 0x80, b'"'].into(),
     ));
@@ -156,10 +143,6 @@ fn encode_direction_matches_php_for_non_utf8_bytes() {
 
 #[test]
 fn encode_direction_matches_php_for_nested_arrays() {
-    if !php_available() {
-        return;
-    }
-
     let mut inner: IndexMap<BString, PluginValue> = IndexMap::new();
     inner.insert(b"a".into(), PluginValue::Int(1));
     inner.insert(
@@ -184,10 +167,6 @@ fn encode_direction_matches_php_for_nested_arrays() {
 /// same bytes back.
 #[test]
 fn encode_direction_matches_php_for_object_records() {
-    if !php_available() {
-        return;
-    }
-
     let mut date = PhpObject::new("DateTimeImmutable");
     date.set_public("date", PluginValue::string("2024-03-04 05:06:07.123456"));
     date.set_public("timezone_type", PluginValue::Int(3));
@@ -202,10 +181,6 @@ fn encode_direction_matches_php_for_object_records() {
 
 #[test]
 fn decode_direction_matches_php_for_object_records() {
-    if !php_available() {
-        return;
-    }
-
     let snippets = [
         r#"return serialize(new DateTimeImmutable('2024-03-04 05:06:07.123456', new DateTimeZone('UTC')));"#,
         r#"return serialize(new DateTime('2024-03-04 05:06:07.123456', new DateTimeZone('+09:00')));"#,
@@ -233,10 +208,6 @@ fn decode_direction_matches_php_for_object_records() {
 /// for an instance of that class.
 #[test]
 fn descriptor_records_match_php_in_both_directions() {
-    if !php_available() {
-        return;
-    }
-
     assert_php_agrees(&PluginValue::RustHandle(RustObjHandle {
         rhandle: 3,
         class: "Composer\\Script\\Event".into(),
@@ -273,10 +244,6 @@ fn descriptor_records_match_php_in_both_directions() {
 /// payload, so decoding one means counting exactly the way PHP counts.
 #[test]
 fn decode_direction_resolves_php_back_references() {
-    if !php_available() {
-        return;
-    }
-
     let PluginValue::String(php_bytes) = php_eval(
         r#"$c = new stdClass; $c->p = [1, "x"]; $e = new stdClass; $e->q = 2;
            return serialize([$c, $c, $e, [$c, $e]]);"#,
@@ -298,10 +265,6 @@ fn decode_direction_resolves_php_back_references() {
 
 #[test]
 fn decode_direction_matches_php_serialize_output() {
-    if !php_available() {
-        return;
-    }
-
     let snippets = [
         // Mixed key types: PHP canonicalizes "5" to an int key, keeps "05" as a string.
         r#"return serialize(["a" => 1, 5 => true, "05" => [1, 2, [0.5]], "z" => null]);"#,
@@ -336,10 +299,6 @@ fn decode_direction_matches_php_serialize_output() {
 
 #[test]
 fn decode_direction_distinguishes_lists_from_maps() {
-    if !php_available() {
-        return;
-    }
-
     let PluginValue::String(bytes) = php_eval(r#"return serialize([10, 20, 30]);"#) else {
         panic!("expected serialized bytes");
     };

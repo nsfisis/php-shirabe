@@ -8,7 +8,7 @@
 
 use crate::e2e_extension_installer_test::{copy_dir, upstream_composer_bin};
 use crate::e2e_installers_test::{implementations, run_command, tree};
-use crate::php_worker::{lock_php_worker, php_runtime_available};
+use crate::php_worker::lock_php_worker;
 use bstr::BStr;
 use std::path::{Path, PathBuf};
 use tempfile::TempDir;
@@ -27,7 +27,7 @@ fn plugin_fetched() -> bool {
 /// `optimize` flag, under which it scans the PSR-4 directories into its class map as well.
 #[test]
 fn test_jetpack_autoloader_matches_upstream_composer() {
-    if !php_runtime_available() || !plugin_fetched() {
+    if !plugin_fetched() {
         return;
     }
     let Some(composer_bin) = upstream_composer_bin() else {

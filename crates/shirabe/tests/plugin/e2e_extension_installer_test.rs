@@ -8,7 +8,7 @@
 //! any of these is missing. Test runs themselves are offline: the fixture project resolves
 //! everything from local repositories.
 
-use crate::php_worker::{lock_php_worker, php_runtime_available};
+use crate::php_worker::lock_php_worker;
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{bconcat, getenv, os_str_from_bytes, path_to_bytes};
@@ -116,9 +116,6 @@ fn run_install(work: &Path, program: &BStr, args: &[&std::ffi::OsStr]) -> Instal
 
 #[test]
 fn test_extension_installer_install_matches_upstream_composer() {
-    if !php_runtime_available() {
-        return;
-    }
     let Some(composer_bin) = upstream_composer_bin() else {
         return;
     };

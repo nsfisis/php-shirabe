@@ -6,7 +6,7 @@
 //! fetched; the tests skip only while the PHP runtime or the Composer checkout is missing.
 
 use crate::e2e_extension_installer_test::{copy_dir, upstream_composer_bin};
-use crate::php_worker::{lock_php_worker, php_runtime_available};
+use crate::php_worker::lock_php_worker;
 use bstr::{BStr, BString};
 use shirabe_php_shim::{os_str_from_bytes, path_from_bytes};
 use std::ffi::OsStr;
@@ -71,9 +71,6 @@ fn run_commands(program: &BStr, prefix_args: &[&OsStr]) -> Run {
 
 #[test]
 fn test_command_events_match_upstream_composer() {
-    if !php_runtime_available() {
-        return;
-    }
     let Some(composer_bin) = upstream_composer_bin() else {
         return;
     };
@@ -106,9 +103,6 @@ command class=Composer\\Plugin\\CommandEvent commandName=validate
 #[ignore = "the console input and output of a command event do not cross into the plugin process, so getInput() and getOutput() raise an explicit error (TODO(plugin) symfony/console two-world)"]
 #[test]
 fn test_command_event_console_matches_upstream_composer() {
-    if !php_runtime_available() {
-        return;
-    }
     let Some(composer_bin) = upstream_composer_bin() else {
         return;
     };

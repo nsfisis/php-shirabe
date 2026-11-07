@@ -6,7 +6,7 @@
 //! missing.
 
 use crate::e2e_extension_installer_test::{copy_dir, upstream_composer_bin};
-use crate::php_worker::{lock_php_worker, php_runtime_available};
+use crate::php_worker::lock_php_worker;
 use bstr::{BStr, BString};
 use shirabe_php_shim::{os_str_from_bytes, path_from_bytes};
 use std::ffi::OsStr;
@@ -52,9 +52,6 @@ fn install(program: &BStr, prefix_args: &[&OsStr]) -> Run {
 
 #[test]
 fn test_package_events_match_upstream_composer() {
-    if !php_runtime_available() {
-        return;
-    }
     let Some(composer_bin) = upstream_composer_bin() else {
         return;
     };
@@ -93,9 +90,6 @@ post-package-install devMode=1 class=Composer\\DependencyResolver\\Operation\\In
 #[ignore = "operation chains run where they are built upstream but only in wait_on_promises here, so the repository state a package event observes differs (TODO(async) promise cluster)"]
 #[test]
 fn test_local_repository_seen_by_package_events_matches_upstream_composer() {
-    if !php_runtime_available() {
-        return;
-    }
     let Some(composer_bin) = upstream_composer_bin() else {
         return;
     };

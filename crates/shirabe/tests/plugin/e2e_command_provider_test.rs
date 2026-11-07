@@ -7,7 +7,7 @@
 //! fetched; the test skips only while the PHP runtime or the Composer checkout is missing.
 
 use crate::e2e_extension_installer_test::{copy_dir, upstream_composer_bin};
-use crate::php_worker::{lock_php_worker, php_runtime_available};
+use crate::php_worker::lock_php_worker;
 use bstr::{BStr, BString, ByteSlice};
 use shirabe_php_shim::{bconcat, os_str_from_bytes};
 use std::ffi::OsStr;
@@ -69,9 +69,6 @@ fn list_lines_mentioning_greet(stdout: &[u8]) -> Vec<&BStr> {
 
 #[test]
 fn test_command_provider_execution_matches_upstream_composer() {
-    if !php_runtime_available() {
-        return;
-    }
     let Some(composer_bin) = upstream_composer_bin() else {
         return;
     };
