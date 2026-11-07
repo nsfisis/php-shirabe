@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+#
+# Packages a release build of the Shirabe executable into
+# `<output dir>/shirabe-<version>-<target>.tar.gz`, along with its license notices, and writes the
+# SHA-256 checksum of the archive next to it.
+#
+# Usage: scripts/release/package <target> <path to the shirabe executable> <third-party licenses file> <output dir>
+
+set -euo pipefail
+
+if [[ $# -ne 4 ]]; then
+    echo "usage: $0 <target> <path to the shirabe executable> <third-party licenses file> <output dir>" >&2
+    exit 2
+fi
+
+target="$1"
+bin="$2"
+third_party_licenses="$3"
+out_dir="$4"
+repo_root="$(dirname "$0")/../.."
+
+version="$(cargo metadata --no-deps --format-version 1 --manifest-path "$repo_root/Cargo.toml" \
+    | jq --raw-output '.packages[] | select(.name == "shirabe") | .version')"
+name="shirabe-$version-$target"
+
+mkdir -p "$out_dir/$name"
+cp "$bin" "$out_dir/$name/shirabe"
+cp "$third_party_licenses" "$out_dir/$name/THIRD-PARTY-LICENSES"
+cp "$repo_root/LICENSE.md" "$repo_root/README.md" "$out_dir/$name/"
+tar -C "$out_dir" -czf "$out_dir/$name.tar.gz" "$name"
+(cd "$out_dir" && shasum -a 256 "$name.tar.gz" > "$name.tar.gz.sha256")
+cat "$out_dir/$name.tar.gz.sha256"

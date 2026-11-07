@@ -3,15 +3,9 @@ name: Release
 on:
   push:
     tags: ["[0-9]+.[0-9]+.[0-9]+*"]
-  # Builds and checks the release archives without publishing them.
-  pull_request:
-    paths:
-      - .github/workflows/release.yaml
-      - scripts/release/**
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -56,28 +50,7 @@ jobs:
 
       - run: cargo build --release --locked --target "$TARGET" -p shirabe --bin shirabe
 
-      - name: Check linkage
-        run: |
-          bin="target/$TARGET/release/shirabe"
-          file "$bin"
-          if [[ "$RUNNER_OS" == Linux ]]; then
-            readelf --program-headers --wide "$bin"
-            readelf --dynamic --wide "$bin"
-            if readelf --program-headers --wide "$bin" | grep --quiet INTERP; then
-              echo "the executable requests a dynamic loader" >&2
-              exit 1
-            fi
-            if readelf --dynamic --wide "$bin" | grep --quiet NEEDED; then
-              echo "the executable links shared libraries" >&2
-              exit 1
-            fi
-          else
-            otool -L "$bin"
-            if otool -L "$bin" | tail -n +2 | grep --invert-match --quiet --extended-regexp '^\s+/(usr/lib|System/Library)/'; then
-              echo "the executable links libraries outside the system" >&2
-              exit 1
-            fi
-          fi
+      - run: scripts/release/check-linkage "target/$TARGET/release/shirabe"
 
       - run: scripts/release/smoke-test "target/$TARGET/release/shirabe"
 
@@ -86,22 +59,9 @@ jobs:
           tool: cargo-about@0.9.2
           fallback: none
 
-      - run: >-
-          cargo about generate --locked --fail
-          --manifest-path crates/shirabe/Cargo.toml
-          --config scripts/release/about.toml
-          --output-file THIRD-PARTY-LICENSES
-          scripts/release/third-party-licenses.hbs
+      - run: scripts/release/third-party-licenses THIRD-PARTY-LICENSES
 
-      - name: Package
-        run: |
-          version="$(cargo metadata --no-deps --format-version 1 | jq --raw-output '.packages[] | select(.name == "shirabe") | .version')"
-          name="shirabe-$version-$TARGET"
-          mkdir -p "dist/$name"
-          cp "target/$TARGET/release/shirabe" LICENSE.md THIRD-PARTY-LICENSES README.md "dist/$name/"
-          tar -C dist -czf "dist/$name.tar.gz" "$name"
-          (cd dist && shasum -a 256 "$name.tar.gz" > "$name.tar.gz.sha256")
-          cat "dist/$name.tar.gz.sha256"
+      - run: scripts/release/package "$TARGET" "target/$TARGET/release/shirabe" THIRD-PARTY-LICENSES dist
 
       - uses: actions/upload-artifact@v7.0.2
         with:
@@ -112,7 +72,6 @@ jobs:
           if-no-files-found: error
 
   release:
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
     needs: build
     runs-on: ubuntu-24.04
     permissions:
@@ -163,8 +122,6 @@ jobs:
             exit 1
           fi
 
-      # With immutable releases, a release can no longer change once published. Upload every
-      # asset to a draft first so that the published release is complete.
       - run: gh release create "$TAG" --draft --verify-tag --title "$TAG" --notes-file release-notes.md
       - run: gh release upload "$TAG" dist/*.tar.gz dist/*.tar.gz.sha256
       - run: gh release edit "$TAG" --draft=false

@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+#
+# Checks that a release build of the Shirabe executable depends on no library that a user's system
+# may lack: on Linux, the executable must be fully static; on macOS, it may link only the system
+# libraries.
+#
+# Usage: scripts/release/check-linkage <path to the shirabe executable>
+
+set -euo pipefail
+
+if [[ $# -ne 1 ]]; then
+    echo "usage: $0 <path to the shirabe executable>" >&2
+    exit 2
+fi
+
+bin="$1"
+
+fail() {
+    echo "linkage check failed: $*" >&2
+    exit 1
+}
+
+file "$bin"
+case "$(uname -s)" in
+    Linux)
+        readelf --program-headers --wide "$bin"
+        readelf --dynamic --wide "$bin"
+        if readelf --program-headers --wide "$bin" | grep --quiet INTERP; then
+            fail "the executable requests a dynamic loader"
+        fi
+        if readelf --dynamic --wide "$bin" | grep --quiet NEEDED; then
+            fail "the executable links shared libraries"
+        fi
+        ;;
+    Darwin)
+        otool -L "$bin"
+        if otool -L "$bin" | tail -n +2 \
+            | grep --invert-match --quiet --extended-regexp '^\s+/(usr/lib|System/Library)/'; then
+            fail "the executable links libraries outside the system"
+        fi
+        ;;
+    *)
+        fail "unsupported platform $(uname -s)"
+        ;;
+esac
+
+echo "linkage check passed"

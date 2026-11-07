@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+#
+# Generates the license notices of the Rust crates that the Shirabe executable is built from.
+# Needs cargo-about.
+#
+# Usage: scripts/release/third-party-licenses <output file>
+
+set -euo pipefail
+
+if [[ $# -ne 1 ]]; then
+    echo "usage: $0 <output file>" >&2
+    exit 2
+fi
+
+script_dir="$(dirname "$0")"
+
+cargo about generate --locked --fail \
+    --manifest-path "$script_dir/../../crates/shirabe/Cargo.toml" \
+    --config "$script_dir/about.toml" \
+    --output-file "$1" \
+    "$script_dir/third-party-licenses.hbs"
