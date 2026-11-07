@@ -1,6 +1,7 @@
 //! ref: composer/tests/Composer/Test/Repository/Vcs/PerforceDriverTest.php sha1:6c072a07aec086188a523097f460d8a86499a83e
 
 use crate::process_executor_mock::{ProcessExecutorMockGuard, get_process_executor_mock};
+use crate::test_case::get_unique_tmp_directory;
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe::config::Config;
@@ -68,7 +69,7 @@ fn get_test_config(test_path: &std::path::Path) -> Config {
 }
 
 fn set_up() -> SetUp {
-    let test_path = TempDir::new().unwrap();
+    let test_path = get_unique_tmp_directory();
     let config = get_test_config(test_path.path());
     let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
     repo_config.insert("url".into(), PhpMixed::string(bconcat!(TEST_URL)));

@@ -604,6 +604,10 @@ mod tests {
     use super::*;
 
     #[test]
+    #[cfg_attr(
+        target_vendor = "apple",
+        ignore = "APFS rejects file names that are not valid UTF-8 with EILSEQ"
+    )]
     fn schema_path_is_read_whatever_its_bytes() {
         let dir = tempfile::tempdir().unwrap();
         for name in [&b"sch\xE9ma 100%25.json"[..], &b"caf\xC3\xA9?.json"[..]] {

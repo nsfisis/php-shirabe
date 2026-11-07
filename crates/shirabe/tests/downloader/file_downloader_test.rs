@@ -3,6 +3,7 @@
 use crate::async_runtime::run;
 use crate::http_downloader_mock::{HttpDownloaderMockGuard, get_http_downloader_mock};
 use crate::io_mock::{Expectation, get_io_mock};
+use crate::test_case::get_unique_tmp_directory;
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use serial_test::serial;
@@ -18,7 +19,6 @@ use shirabe_php_shim::{
     bconcat, error_message, path_to_bytes,
 };
 use shirabe_semver::VersionParser;
-use tempfile::TempDir;
 
 /// ref: TestCase::getPackage (default class CompletePackage)
 fn get_package(name: &BStr, version: &BStr) -> PackageInterfaceHandle {
@@ -94,7 +94,7 @@ fn test_download_to_existing_file() {
     package.set_dist_url(Some(BString::from("url")));
 
     // createTempFile(getUniqueTmpDirectory()): a regular file used as the download target path.
-    let tmp_dir = TempDir::new().unwrap();
+    let tmp_dir = get_unique_tmp_directory();
     let path = tmp_dir.path().join("composer_test_file");
     std::fs::write(&path, b"").unwrap();
     let path = path.to_path_buf();
@@ -147,7 +147,7 @@ fn test_download_but_file_is_unsaved() {
     let package = get_package(BStr::new("dummy/pkg"), BStr::new("1.0.0"));
     package.set_dist_url(Some(BString::from("http://example.com/script.js")));
 
-    let tmp_dir = TempDir::new().unwrap();
+    let tmp_dir = get_unique_tmp_directory();
     let path = tmp_dir.path().to_path_buf();
 
     // The PHP IOMock write callback unlinks the half-written script.js; the Rust mock never writes
@@ -221,7 +221,7 @@ fn test_cache_garbage_collection_is_called() {
 
     // The PHP Cache mock forces gcIsNecessary() true and records the single gc() call; the CacheMock
     // seam plays both roles here.
-    let tmp_dir = TempDir::new().unwrap();
+    let tmp_dir = get_unique_tmp_directory();
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
     let mut cache = Cache::new(io, tmp_dir.path(), None, None, false);
@@ -270,7 +270,7 @@ fn test_download_file_with_invalid_checksum() {
     package.set_dist_url(Some(BString::from("http://example.com/script.js")));
     package.__set_dist_sha1_checksum(Some(BString::from("invalid")));
 
-    let tmp_dir = TempDir::new().unwrap();
+    let tmp_dir = get_unique_tmp_directory();
     let path = tmp_dir.path().to_path_buf();
     let mut config_options: IndexMap<BString, PhpMixed> = IndexMap::new();
     config_options.insert(
@@ -330,7 +330,7 @@ fn test_downgrade_shows_appropriate_message() {
         )
         .unwrap();
 
-    let tmp_dir = TempDir::new().unwrap();
+    let tmp_dir = get_unique_tmp_directory();
     let path = tmp_dir.path().to_path_buf();
     let mut config_options: IndexMap<BString, PhpMixed> = IndexMap::new();
     config_options.insert(

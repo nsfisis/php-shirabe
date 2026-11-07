@@ -5,6 +5,12 @@
 // integration fixtures by invoking that binary as a subprocess, mirroring the PHP harness which
 // shells out to the built composer.phar.
 
+#[path = "common/bootstrap.rs"]
+mod bootstrap;
+#[path = "common/test_case.rs"]
+mod test_case;
+
+use crate::test_case::get_unique_tmp_directory;
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use serial_test::serial;
@@ -54,16 +60,6 @@ fn fixtures_dir() -> PathBuf {
         .join("../../composer/tests/Composer/Test/Fixtures/functional")
         .canonicalize()
         .unwrap()
-}
-
-/// ref: TestCase::getUniqueTmpDirectory. Returns a fresh directory whose removal is left to the
-/// caller (the `TearDown` guard), matching PHP's manual `Filesystem::removeDirectory($testDir)`.
-fn unique_tmp_directory() -> PathBuf {
-    tempfile::Builder::new()
-        .prefix("composer-test-")
-        .tempdir()
-        .unwrap()
-        .keep()
 }
 
 // ref: AllFunctionalTest::parseTestFile
@@ -199,7 +195,7 @@ fn run_integration(test_filename: &BStr) {
     let test_file = fixtures_dir().join(path_from_bytes(test_filename));
     let test_data = parse_test_file(&test_file);
 
-    let test_dir = unique_tmp_directory();
+    let test_dir = get_unique_tmp_directory().keep();
     *guard.test_dir.borrow_mut() = Some(test_dir.clone());
 
     // if a dir is present with the name of the .test file (without .test), we copy all its contents

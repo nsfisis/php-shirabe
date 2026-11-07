@@ -1,5 +1,6 @@
 //! ref: composer/tests/Composer/Test/Package/Archiver/PharArchiverTest.php sha1:bb3df0d5b21448501a2b6f9bf54744293b1a33ec
 
+use crate::test_case::get_unique_tmp_directory;
 use bstr::{BStr, BString, ByteSlice};
 use serial_test::serial;
 use shirabe::package::CompletePackageHandle;
@@ -19,7 +20,7 @@ struct ArchiverTestCase {
 
 impl ArchiverTestCase {
     fn set_up() -> Self {
-        let guard = TempDir::new().unwrap();
+        let guard = get_unique_tmp_directory();
         let test_dir = guard.path().to_path_buf();
         Self {
             filesystem: Filesystem::new(None),
@@ -95,7 +96,7 @@ fn test_tar_archive() {
 
     test_case.setup_dummy_repo();
     let package = test_case.setup_package();
-    let target_dir = TempDir::new().unwrap();
+    let target_dir = get_unique_tmp_directory();
     let target = target_dir.path().join("composer_archiver_test.tar");
 
     let archiver = PharArchiver::new();
@@ -123,7 +124,7 @@ fn test_zip_archive() {
 
     test_case.setup_dummy_repo();
     let package = test_case.setup_package();
-    let target_dir = TempDir::new().unwrap();
+    let target_dir = get_unique_tmp_directory();
     let target = target_dir.path().join("composer_archiver_test.zip");
 
     let archiver = PharArchiver::new();

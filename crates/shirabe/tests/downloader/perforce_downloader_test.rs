@@ -4,6 +4,7 @@ use crate::async_runtime::run;
 use crate::io_mock::{Expectation, get_io_mock};
 use crate::io_stub::IOStub;
 use crate::process_executor_mock::get_process_executor_mock;
+use crate::test_case::get_unique_tmp_directory;
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe::config::Config;
@@ -13,7 +14,6 @@ use shirabe::package::{CompletePackageHandle, PackageInterfaceHandle};
 use shirabe::util::{Filesystem, MockHandler};
 use shirabe_php_shim::{PhpMixed, bconcat, path_to_bytes};
 use shirabe_semver::VersionParser;
-use tempfile::TempDir;
 
 // A getMockBuilder('Composer\Util\Perforce') stand-in: the seam trait extracted from the
 // concrete `Perforce` struct, mocked so the downloader's workflow can be verified.
@@ -82,7 +82,7 @@ fn test_init_perforce_instantiates_a_new_perforce_object() {
     // current port VcsRepository implements ConfigurableRepositoryInterface only (not
     // RepositoryInterface), so it cannot be held in a RepositoryInterfaceHandle. The package
     // is therefore built without a repository, yielding an empty repo config.
-    let test_path = TempDir::new().unwrap();
+    let test_path = get_unique_tmp_directory();
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(IOStub::new()));
     let config = std::rc::Rc::new(std::cell::RefCell::new(get_config(test_path.path())));
@@ -98,7 +98,7 @@ fn test_init_perforce_instantiates_a_new_perforce_object() {
 
 #[test]
 fn test_init_perforce_does_nothing_if_perforce_already_set() {
-    let test_path = TempDir::new().unwrap();
+    let test_path = get_unique_tmp_directory();
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(IOStub::new()));
     let config = std::rc::Rc::new(std::cell::RefCell::new(get_config(test_path.path())));
@@ -130,7 +130,7 @@ fn test_do_install_with_no_tag() {
 // Shared body for testDoInstallWithTag / testDoInstallWithNoTag: enforce the install workflow
 // against a mocked Perforce, asserting each step is invoked exactly once.
 fn do_install_workflow(source_ref: &'static BStr, expected_label: Option<BString>) {
-    let test_path = TempDir::new().unwrap();
+    let test_path = get_unique_tmp_directory();
     let test_path_str = test_path.path().to_path_buf();
 
     let (io_mock, _io_guard) = get_io_mock(NORMAL).unwrap();

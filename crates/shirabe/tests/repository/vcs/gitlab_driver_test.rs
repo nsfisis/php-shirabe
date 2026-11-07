@@ -2,6 +2,7 @@
 
 use crate::http_downloader_mock::{HttpDownloaderMockGuard, expect_full, get_http_downloader_mock};
 use crate::process_executor_mock::{ProcessExecutorMockGuard, get_process_executor_mock};
+use crate::test_case::get_unique_tmp_directory;
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe::config::Config;
@@ -45,7 +46,7 @@ struct Fixtures {
 }
 
 fn fixtures() -> Fixtures {
-    let home = TempDir::new().unwrap();
+    let home = get_unique_tmp_directory();
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
     let config = std::rc::Rc::new(std::cell::RefCell::new(make_config(home.path())));
@@ -708,7 +709,7 @@ fn test_get_branches() {
 #[test]
 fn test_supports() {
     for (url, expected) in data_for_test_supports() {
-        let home = TempDir::new().unwrap();
+        let home = get_unique_tmp_directory();
         let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
             std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
         let config = std::rc::Rc::new(std::cell::RefCell::new(make_config(home.path())));

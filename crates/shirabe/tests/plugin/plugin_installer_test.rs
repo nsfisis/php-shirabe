@@ -2,6 +2,7 @@
 
 use crate::async_runtime::run;
 use crate::php_worker::{load_composer_php_runtime, lock_php_worker};
+use crate::test_case::get_unique_tmp_directory;
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe::autoload::AutoloadGenerator;
@@ -242,7 +243,7 @@ pub(crate) struct SetUp {
 pub(crate) fn set_up() -> SetUp {
     let loader = JsonLoader::new(Box::new(ArrayLoader::new(None, false)));
     let mut packages = vec![];
-    let directory = TempDir::new().unwrap();
+    let directory = get_unique_tmp_directory();
     let directory_path = directory.path();
     for i in 1..=8 {
         std::fs::create_dir_all(

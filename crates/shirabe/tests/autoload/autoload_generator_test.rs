@@ -1,6 +1,7 @@
 //! ref: composer/tests/Composer/Test/Autoload/AutoloadGeneratorTest.php sha1:49ef7fbbc645f03edff5d75bd89005271cbfffd2
 
 use crate::config_stub::ConfigStubBuilder;
+use crate::test_case::get_unique_tmp_directory;
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use serial_test::serial;
@@ -166,7 +167,7 @@ fn make_installation_manager(
 }
 
 fn set_up() -> SetUp {
-    let temp_dir = TempDir::new().unwrap();
+    let temp_dir = get_unique_tmp_directory();
     let working_dir = temp_dir.path().to_path_buf();
     let vendor_dir = working_dir.join("composer-test-autoload");
     std::fs::create_dir_all(&vendor_dir).unwrap();

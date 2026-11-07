@@ -306,7 +306,11 @@ pub fn stream_select(
     prepare(&mut writefds, write);
     prepare(&mut exceptfds, except);
 
-    let mut timeout = nix::sys::time::TimeVal::new(seconds, microseconds.unwrap_or(0));
+    let mut timeout = nix::sys::time::TimeVal::new(
+        seconds,
+        nix::libc::suseconds_t::try_from(microseconds.unwrap_or(0))
+            .expect("microseconds must fit in suseconds_t"),
+    );
 
     let ret = nix::sys::select::select(
         None,

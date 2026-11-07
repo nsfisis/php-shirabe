@@ -1,6 +1,8 @@
 //! ref: composer/tests/Composer/Test/Command/InitCommandTest.php sha1:bfb524fae99e00e4a4902efb5867b9c45278db7e
 
-use crate::test_case::{RestoreEnv, RunOptions, get_application_tester, init_temp_composer};
+use crate::test_case::{
+    RestoreEnv, RunOptions, get_application_tester, get_unique_tmp_directory, init_temp_composer,
+};
 use bstr::{BStr, BString, ByteSlice};
 use serial_test::serial;
 use shirabe::command::InitCommand;
@@ -678,7 +680,7 @@ fn test_get_git_config() {
 fn test_add_vendor_ignore() {
     set_up();
 
-    let tmp = TempDir::new().unwrap();
+    let tmp = get_unique_tmp_directory();
     let ignore_file = tmp.path().join("ignore");
 
     let command = InitCommand::new();
@@ -692,7 +694,7 @@ fn test_add_vendor_ignore() {
 fn test_has_vendor_ignore() {
     set_up();
 
-    let tmp = TempDir::new().unwrap();
+    let tmp = get_unique_tmp_directory();
     let ignore_file = tmp.path().join("ignore");
 
     let command = InitCommand::new();

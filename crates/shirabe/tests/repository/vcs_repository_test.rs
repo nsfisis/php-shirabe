@@ -1,5 +1,6 @@
 //! ref: composer/tests/Composer/Test/Repository/VcsRepositoryTest.php sha1:628daae845b6a291274618b8cd28d0fd8069a6a9
 
+use crate::test_case::get_unique_tmp_directory;
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::{IndexMap, IndexSet};
 use serial_test::serial;
@@ -23,8 +24,8 @@ struct SetUp {
 fn set_up() -> Option<SetUp> {
     which_git()?;
 
-    let composer_home = TempDir::new().unwrap();
-    let git_repo = TempDir::new().unwrap();
+    let composer_home = get_unique_tmp_directory();
+    let git_repo = get_unique_tmp_directory();
     let path = git_repo.path();
 
     let exec = |args: &[&BStr]| {

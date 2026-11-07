@@ -5,6 +5,7 @@ use crate::config_stub::ConfigStubBuilder;
 use crate::io_mock::{Expectation, get_io_mock};
 use crate::io_stub::IOStub;
 use crate::process_executor_mock::{cmd, cmd_full, get_process_executor_mock};
+use crate::test_case::get_unique_tmp_directory;
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use serial_test::serial;
@@ -23,7 +24,7 @@ fn set_up() -> TempDir {
     // initGitVersion('1.0.0'): seed the Composer\Util\Git static version cache.
     GitUtil::__set_version(Some("1.0.0".into()));
 
-    TempDir::new().unwrap()
+    get_unique_tmp_directory()
 }
 
 fn tear_down(working_dir: &std::path::Path) {

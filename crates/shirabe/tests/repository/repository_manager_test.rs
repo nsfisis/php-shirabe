@@ -4,6 +4,7 @@
 // curl_multi_init, todo!()) with a mocked IO/Config/EventDispatcher and exercise repo
 // creation/prepending/wrapping.
 
+use crate::test_case::get_unique_tmp_directory;
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe::config::Config;
@@ -20,7 +21,7 @@ struct SetUp {
 }
 
 fn set_up() -> SetUp {
-    let tmpdir = TempDir::new().unwrap();
+    let tmpdir = get_unique_tmp_directory();
     SetUp { tmpdir }
 }
 

@@ -1,5 +1,6 @@
 //! ref: composer/tests/Composer/Test/Package/Archiver/ArchivableFilesFinderTest.php sha1:9d96f4e20720a26a3662e8c5d191999cc82eda1d
 
+use crate::test_case::get_unique_tmp_directory;
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe::package::archiver::ArchivableFilesFinder;
@@ -20,8 +21,8 @@ struct SetUp {
 fn set_up() -> SetUp {
     let mut fs = Filesystem::new(None);
 
-    let sources_dir = TempDir::new().unwrap();
-    let sources = fs.normalize_path(sources_dir.path().canonicalize().unwrap());
+    let sources_dir = get_unique_tmp_directory();
+    let sources = fs.normalize_path(sources_dir.path());
 
     let file_tree = [
         ".foo",

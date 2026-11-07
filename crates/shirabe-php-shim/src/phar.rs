@@ -1024,6 +1024,10 @@ mod tests {
     use crate::{Catch as _, error_message};
 
     #[test]
+    #[cfg_attr(
+        target_vendor = "apple",
+        ignore = "APFS rejects file names that are not valid UTF-8 with EILSEQ"
+    )]
     fn tar_entry_name_keeps_bytes_that_are_not_valid_utf8() {
         let dir = tempfile::tempdir().unwrap();
         let src = dir.path().join("src");
@@ -1048,6 +1052,10 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(
+        target_vendor = "apple",
+        ignore = "APFS rejects file names that are not valid UTF-8 with EILSEQ"
+    )]
     fn zip_entry_name_keeps_bytes_that_are_not_valid_utf8() {
         let dir = tempfile::tempdir().unwrap();
         let src = dir.path().join("src");

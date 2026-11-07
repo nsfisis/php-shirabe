@@ -2,7 +2,7 @@
 
 use crate::test_case::{
     RunOptions, create_composer_lock, create_installed_json, get_application_tester,
-    get_complete_package, get_package, init_temp_composer,
+    get_complete_package, get_package, get_unique_tmp_directory, init_temp_composer,
 };
 use bstr::{BString, ByteSlice};
 use serial_test::serial;
@@ -10,7 +10,6 @@ use shirabe::util::Platform;
 use shirabe_php_shim::{bconcat, error_message, path_to_bytes};
 use shirabe_symfony_console::input::{InputValue, ParameterName};
 use std::path::PathBuf;
-use tempfile::TempDir;
 
 /// ref: GlobalCommandTest::tearDown (the COMPOSER part; COMPOSER_HOME is restored by the
 /// `init_temp_composer` guard).
@@ -20,15 +19,6 @@ impl Drop for EnvGuard {
     fn drop(&mut self) {
         Platform::clear_env("COMPOSER").unwrap();
     }
-}
-
-/// ref: TestCase::getUniqueTmpDirectory followed by `chdir($dir)`.
-///
-/// Returns the temp dir guard (kept alive by the caller so it is removed at end of scope).
-fn chdir_unique_tmp_directory() -> TempDir {
-    let test_dir = TempDir::new().unwrap();
-    std::env::set_current_dir(test_dir.path()).unwrap();
-    test_dir
 }
 
 #[test]
@@ -54,7 +44,8 @@ fn test_global() {
     Platform::put_env("COMPOSER_HOME", path_to_bytes(&composer_home_str)).unwrap();
     Platform::put_env("COMPOSER", fake_composer).unwrap();
 
-    let _test_dir = chdir_unique_tmp_directory();
+    let test_dir = get_unique_tmp_directory();
+    std::env::set_current_dir(test_dir.path()).unwrap();
 
     let mut app_tester = get_application_tester();
     let _ = app_tester.run(
@@ -91,7 +82,7 @@ fn test_global() {
 fn test_cannot_create_home() {
     let _env_guard = EnvGuard;
 
-    let dir = TempDir::new().unwrap();
+    let dir = get_unique_tmp_directory();
     let filename = dir.path().join("file");
     std::fs::write(&filename, "").unwrap();
     let filename_str = filename.to_path_buf();
@@ -156,7 +147,8 @@ fn test_global_show() {
 
     Platform::put_env("COMPOSER_HOME", path_to_bytes(&composer_home_str)).unwrap();
 
-    let _test_dir = chdir_unique_tmp_directory();
+    let test_dir = get_unique_tmp_directory();
+    std::env::set_current_dir(test_dir.path()).unwrap();
 
     let mut app_tester = get_application_tester();
     app_tester.set_inputs(vec![BString::from("")]);
@@ -195,7 +187,8 @@ fn test_global_show_without_packages() {
 
     Platform::put_env("COMPOSER_HOME", path_to_bytes(&composer_home_str)).unwrap();
 
-    let _test_dir = chdir_unique_tmp_directory();
+    let test_dir = get_unique_tmp_directory();
+    std::env::set_current_dir(test_dir.path()).unwrap();
 
     let mut app_tester = get_application_tester();
     app_tester.set_inputs(vec![BString::from("")]);
@@ -243,7 +236,8 @@ fn test_global_require() {
 
     Platform::put_env("COMPOSER_HOME", path_to_bytes(&composer_home_str)).unwrap();
 
-    let _test_dir = chdir_unique_tmp_directory();
+    let test_dir = get_unique_tmp_directory();
+    std::env::set_current_dir(test_dir.path()).unwrap();
 
     let mut app_tester = get_application_tester();
     app_tester.set_inputs(vec![BString::from("")]);
@@ -307,7 +301,8 @@ fn test_global_update() {
 
     Platform::put_env("COMPOSER_HOME", path_to_bytes(&composer_home_str)).unwrap();
 
-    let _test_dir = chdir_unique_tmp_directory();
+    let test_dir = get_unique_tmp_directory();
+    std::env::set_current_dir(test_dir.path()).unwrap();
 
     let mut app_tester = get_application_tester();
     app_tester.set_inputs(vec![BString::from("")]);
@@ -346,7 +341,8 @@ fn test_global_changes_directory() {
 
     Platform::put_env("COMPOSER_HOME", path_to_bytes(&composer_home_str)).unwrap();
 
-    let _test_dir = chdir_unique_tmp_directory();
+    let test_dir = get_unique_tmp_directory();
+    std::env::set_current_dir(test_dir.path()).unwrap();
 
     let mut app_tester = get_application_tester();
     app_tester.set_inputs(vec![BString::from("")]);

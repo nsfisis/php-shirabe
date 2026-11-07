@@ -3,6 +3,7 @@
 use crate::async_runtime::run;
 use crate::io_stub::IOStub;
 use crate::process_executor_mock::{cmd, get_process_executor_mock};
+use crate::test_case::get_unique_tmp_directory;
 use bstr::{BStr, BString, ByteSlice};
 use shirabe::config::Config;
 use shirabe::downloader::{HgDownloader, VcsDownloader};
@@ -14,7 +15,7 @@ use shirabe_semver::VersionParser;
 use tempfile::TempDir;
 
 fn set_up() -> TempDir {
-    TempDir::new().unwrap()
+    get_unique_tmp_directory()
 }
 
 fn tear_down(working_dir: &std::path::Path) {

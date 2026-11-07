@@ -2,6 +2,7 @@
 
 use crate::http_downloader_mock::{HttpDownloaderMockGuard, expect_full, get_http_downloader_mock};
 use crate::io_stub::IOStub;
+use crate::test_case::get_unique_tmp_directory;
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe::config::Config;
@@ -19,7 +20,7 @@ struct SetUp {
 }
 
 fn set_up() -> SetUp {
-    let home = TempDir::new().unwrap();
+    let home = get_unique_tmp_directory();
     let mut config = Config::new(true, None);
     let mut top: IndexMap<BString, PhpMixed> = IndexMap::new();
     let mut config_section: IndexMap<BString, PhpMixed> = IndexMap::new();

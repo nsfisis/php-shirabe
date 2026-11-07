@@ -3,6 +3,7 @@
 use crate::http_downloader_mock::{HttpDownloaderMockGuard, get_http_downloader_mock};
 use crate::io_stub::IOStub;
 use crate::process_executor_mock::{ProcessExecutorMockGuard, cmd_full, get_process_executor_mock};
+use crate::test_case::get_unique_tmp_directory;
 use bstr::{BString, ByteSlice};
 use indexmap::IndexMap;
 use serial_test::serial;
@@ -20,7 +21,7 @@ struct SetUp {
 }
 
 fn set_up() -> SetUp {
-    let home = TempDir::new().unwrap();
+    let home = get_unique_tmp_directory();
     let mut config = Config::new(true, None);
     let mut top: IndexMap<BString, PhpMixed> = IndexMap::new();
     let mut config_section: IndexMap<BString, PhpMixed> = IndexMap::new();
