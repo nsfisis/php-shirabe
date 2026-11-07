@@ -6,6 +6,7 @@
 namespace Composer\Util;
 
 use Composer\IO\IOInterface;
+use Composer\Pcre\Preg;
 use React\Promise\PromiseInterface;
 
 class ProcessExecutor implements \ShirabeRustStub
@@ -87,6 +88,61 @@ class ProcessExecutor implements \ShirabeRustStub
         ['remote', 'set-url'],
     ];
 
+    public static function escape($argument): string
+    {
+        return self::escapeArgument($argument);
+    }
+
+    private static function escapeArgument($argument): string
+    {
+        if ('' === ($argument = (string) $argument)) {
+            return escapeshellarg($argument);
+        }
+
+        if (!Platform::isWindows()) {
+            return "'".str_replace("'", "'\\''", $argument)."'";
+        }
+
+        // New lines break cmd.exe command parsing
+        // and special chars like the fullwidth quote can be used to break out
+        // of parameter encoding via "Best Fit" encoding conversion
+        $argument = strtr($argument, [
+            "\n" => ' ',
+            "\u{ff02}" => '"',
+            "\u{02ba}" => '"',
+            "\u{301d}" => '"',
+            "\u{301e}" => '"',
+            "\u{030e}" => '"',
+            "\u{ff1a}" => ':',
+            "\u{0589}" => ':',
+            "\u{2236}" => ':',
+            "\u{ff0f}" => '/',
+            "\u{2044}" => '/',
+            "\u{2215}" => '/',
+            "\u{00b4}" => '/',
+        ]);
+
+        // In addition to whitespace, commas need quoting to preserve paths
+        $quote = strpbrk($argument, " \t,") !== false;
+        $argument = Preg::replace('/(\\\\*)"/', '$1$1\\"', $argument, -1, $dquotes);
+        $meta = $dquotes > 0 || Preg::isMatch('/%[^%]+%|![^!]+!/', $argument);
+
+        if (!$meta && !$quote) {
+            $quote = strpbrk($argument, '^&|<>()') !== false;
+        }
+
+        if ($quote) {
+            $argument = '"'.Preg::replace('/(\\\\*)$/', '$1$1', $argument).'"';
+        }
+
+        if ($meta) {
+            $argument = Preg::replace('/(["^&|<>()%])/', '^$1', $argument);
+            $argument = Preg::replace('/(!)/', '^^$1', $argument);
+        }
+
+        return $argument;
+    }
+
     // Forwarded rather than materialized: it reads the static property $timeout, whose value the Rust side owns.
     public static function getTimeout(): int
     {
@@ -97,12 +153,6 @@ class ProcessExecutor implements \ShirabeRustStub
     public static function setTimeout(int $timeout): void
     {
         \ShirabeRpcRuntime::callRust(0, '__shirabe_call_static', [self::class, 'setTimeout', [$timeout]]);
-    }
-
-    // Forwarded rather than materialized: it references Composer\Util\Platform, which a guard shadows in the worker.
-    public static function escape($argument): string
-    {
-        return \ShirabeRpcRuntime::callRust(0, '__shirabe_call_static', [self::class, 'escape', [$argument]]);
     }
 
     public function execute($command, &$output = null, ?string $cwd = null): int

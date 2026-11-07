@@ -109,11 +109,15 @@ and wraps it in the adapter for its interface; a capability interface it has
 no adapter for (one a plugin ships itself) is an explicit error.
 
 For abstract *classes* with concrete state and bodies (`BaseIO`,
-`BasePackage`) — and likewise for concrete base classes plugins subclass,
-such as `LibraryInstaller` (`rust-proxy`) — a declaration-only stub is not
-enough: real plugins subclass them relying on the inherited behavior, so the stub
-must carry the concrete members (proxy-dispatched or operating on snapshot
-state) — the per-method rows in the report cover exactly these members.
+`BasePackage`) a declaration-only stub is not enough: real plugins subclass
+them relying on the inherited behavior, so the stub must carry the concrete
+members (proxy-dispatched or operating on snapshot state) — the per-method
+rows in the report cover exactly these members. Concrete base classes plugins
+subclass whose instances only the plugin constructs, such as
+`LibraryInstaller`, are instead exempted from guarding
+(`scripts/plugin-stub-generator/guard-exemptions.list`): the worker runs the
+real implementation over the proxy stubs of the services it holds, and the
+Rust side reaches the instance through the `InstallerInterface` adapter.
 
 #### two-world
 

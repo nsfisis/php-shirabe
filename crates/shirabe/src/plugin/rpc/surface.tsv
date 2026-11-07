@@ -974,11 +974,9 @@ Composer\Util\Filesystem::ensureDirectoryExists	method	supported
 Composer\Util\Filesystem::filePutContentsIfModified	method	supported
 Composer\Util\Filesystem::findShortestPath	method	supported
 Composer\Util\Filesystem::findShortestPathCode	method	supported
-Composer\Util\Filesystem::getPlatformPath	static	supported
 Composer\Util\Filesystem::isAbsolutePath	method	supported
 Composer\Util\Filesystem::isDirEmpty	method	supported
 Composer\Util\Filesystem::isJunction	method	supported
-Composer\Util\Filesystem::isLocalPath	static	supported
 Composer\Util\Filesystem::isSymlinkedDirectory	method	supported
 Composer\Util\Filesystem::junction	method	supported
 Composer\Util\Filesystem::normalizePath	method	supported
@@ -1006,7 +1004,6 @@ Composer\Util\HttpDownloader::wait	method	supported
 Composer\Util\ProcessExecutor::__construct	constructor	supported
 Composer\Util\ProcessExecutor::countActiveJobs	method	supported
 Composer\Util\ProcessExecutor::enableAsync	method	supported
-Composer\Util\ProcessExecutor::escape	static	supported
 Composer\Util\ProcessExecutor::execute	method	supported
 Composer\Util\ProcessExecutor::executeAsync	method	supported
 Composer\Util\ProcessExecutor::executeTty	method	supported

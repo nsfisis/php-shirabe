@@ -112,11 +112,6 @@ fn edit(path: &Path, from: &BStr, to: &BStr) {
     std::fs::write(path, text.replace(from, to)).unwrap();
 }
 
-// TODO(plugin): the plugin's Installer extends Composer\Installer\LibraryInstaller, whose
-// constructor the guard class the worker loads rejects with an explicit error: the Rust side owns
-// LibraryInstaller and has no proxy a plugin can subclass. The same applies to the two tests
-// below.
-#[ignore = "LibraryInstaller is Rust-owned and has no proxy a plugin can subclass; see the TODO(plugin) above"]
 #[test]
 fn test_composer_installers_matches_upstream_composer() {
     if !plugin_fetched() {
@@ -156,7 +151,6 @@ fn test_composer_installers_matches_upstream_composer() {
 /// The rest of the installer contract: `update` reinstalls a package in place, a second `install`
 /// runs over an already-installed tree, and `remove` reaches the plugin's own `uninstall()`
 /// override — the one that chains onto the promise `LibraryInstaller::uninstall` returns.
-#[ignore = "LibraryInstaller is Rust-owned and has no proxy a plugin can subclass; see the TODO(plugin) above"]
 #[test]
 fn test_composer_installers_update_and_remove_match_upstream_composer() {
     if !plugin_fetched() {
@@ -220,7 +214,6 @@ fn test_composer_installers_update_and_remove_match_upstream_composer() {
 /// The plugin's configuration surface: `installer-paths` in the root package's extra (both the
 /// `type:` and the package-name matcher, with `{$name}` templating) and `installer-name` in the
 /// installed package's own extra. Both are read back through the package proxy.
-#[ignore = "LibraryInstaller is Rust-owned and has no proxy a plugin can subclass; see the TODO(plugin) above"]
 #[test]
 fn test_composer_installers_custom_paths_match_upstream_composer() {
     if !plugin_fetched() {

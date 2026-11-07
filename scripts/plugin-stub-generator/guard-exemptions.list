@@ -11,3 +11,21 @@ Composer\Package\Link
 # The wire codec revives values of this class from the object record serialize() writes for them
 # (php/runtime/Shirabe/MaterializedValue.php), so the real declaration has to stay loadable.
 Composer\Util\Http\Response
+
+# Plugins subclass this class to provide their own installers. An instance is constructed by the
+# plugin and lives only in the worker; the Rust side reaches it solely through the
+# InstallerInterface reverse adapter once the plugin registers it with the InstallationManager.
+# Every service it holds (IO, Composer, DownloadManager, Filesystem, repositories, packages) is a
+# proxy stub, so the real implementation works on the entities the Rust side owns, and the
+# subclass's overrides see PHP's late binding of $this.
+Composer\Installer\LibraryInstaller
+
+# Constructed by the real LibraryInstaller above for the same plugin-owned instance; it holds
+# only proxy stubs (IO, Filesystem) and its own configuration strings.
+Composer\Installer\BinaryInstaller
+
+# A static-only helper the real LibraryInstaller and BinaryInstaller above call. It keeps no
+# entity the Rust side owns: its answers derive from the worker process's environment and OS.
+# TODO(php-runtime): environment overrides the Rust side makes with Platform::putEnv after the
+# worker started are not visible to this copy.
+Composer\Util\Platform

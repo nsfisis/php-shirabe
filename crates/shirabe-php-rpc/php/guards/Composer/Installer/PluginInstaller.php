@@ -61,4 +61,54 @@ class PluginInstaller extends LibraryInstaller
     {
         \ShirabeUnsupportedClass::fail(self::class, 'getPluginManager');
     }
+
+    public function isInstalled(InstalledRepositoryInterface $repo, PackageInterface $package)
+    {
+        \ShirabeUnsupportedClass::fail(self::class, 'isInstalled');
+    }
+
+    public function cleanup($type, PackageInterface $package, ?PackageInterface $prevPackage = null)
+    {
+        \ShirabeUnsupportedClass::fail(self::class, 'cleanup');
+    }
+
+    public function getInstallPath(PackageInterface $package)
+    {
+        \ShirabeUnsupportedClass::fail(self::class, 'getInstallPath');
+    }
+
+    public function ensureBinariesPresence(PackageInterface $package)
+    {
+        \ShirabeUnsupportedClass::fail(self::class, 'ensureBinariesPresence');
+    }
+
+    protected function getPackageBasePath(PackageInterface $package)
+    {
+        \ShirabeUnsupportedClass::fail(self::class, 'getPackageBasePath');
+    }
+
+    protected function installCode(PackageInterface $package)
+    {
+        \ShirabeUnsupportedClass::fail(self::class, 'installCode');
+    }
+
+    protected function updateCode(PackageInterface $initial, PackageInterface $target)
+    {
+        \ShirabeUnsupportedClass::fail(self::class, 'updateCode');
+    }
+
+    protected function removeCode(PackageInterface $package)
+    {
+        \ShirabeUnsupportedClass::fail(self::class, 'removeCode');
+    }
+
+    protected function initializeVendorDir()
+    {
+        \ShirabeUnsupportedClass::fail(self::class, 'initializeVendorDir');
+    }
+
+    protected function getDownloadManager(): DownloadManager
+    {
+        \ShirabeUnsupportedClass::fail(self::class, 'getDownloadManager');
+    }
 }

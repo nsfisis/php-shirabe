@@ -523,12 +523,6 @@ pub(crate) fn call_static_entity(args: &[PluginValue]) -> Result<PluginValue, Ph
     let name = bformat!("{class}::{method}");
     let string_arg = |position: usize| arg::<BString>(name.as_bstr(), &call_args, position);
     match (class.as_slice(), method.as_slice()) {
-        (b"Composer\\Util\\Filesystem", b"isLocalPath") => {
-            Ok(Filesystem::is_local_path(&string_arg(0)?).to_wire())
-        }
-        (b"Composer\\Util\\Filesystem", b"getPlatformPath") => Ok(PluginValue::string(
-            path_to_bytes(&Filesystem::get_platform_path(&string_arg(0)?)),
-        )),
         (b"Composer\\Factory", b"getComposerFile") => Factory::get_composer_file()
             .map(|file| PluginValue::string(path_to_bytes(&file)))
             .map_err(|error| error_throw(b"getComposerFile failed", &error)),
@@ -543,17 +537,6 @@ pub(crate) fn call_static_entity(args: &[PluginValue]) -> Result<PluginValue, Ph
         (b"Composer\\Util\\ProcessExecutor", b"setTimeout") => {
             ProcessExecutor::set_timeout(arg::<i64>(name.as_bstr(), &call_args, 0)?);
             Ok(PluginValue::Null)
-        }
-        // `escape(string|false|null $argument)` casts its argument to string first, which turns
-        // both of the non-string forms into the empty string.
-        (b"Composer\\Util\\ProcessExecutor", b"escape") => {
-            let argument = match call_args.first() {
-                None | Some(PluginValue::Null) | Some(PluginValue::Bool(false)) => {
-                    BString::default()
-                }
-                _ => string_arg(0)?,
-            };
-            Ok(PluginValue::string(ProcessExecutor::escape(&argument)))
         }
         _ => Err(PhpThrow::runtime(bformat!(
             "the static method {name} is not available over RPC yet"
