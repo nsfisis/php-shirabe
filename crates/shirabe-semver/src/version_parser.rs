@@ -829,7 +829,7 @@ fn match_and_delimiter(b: &[u8], i: usize) -> Option<usize> {
 
 #[cfg(test)]
 mod tests {
-    use super::{VersionParser, split_and_constraints};
+    use super::*;
     use bstr::BStr;
     use shirabe_php_shim::{Catch as _, UnexpectedValueException, error_message};
 

@@ -129,7 +129,7 @@ impl Drop for SignalSubscription {
 
 #[cfg(test)]
 mod tests {
-    use super::SignalSubscription;
+    use super::*;
     use shirabe_php_shim::getenv;
 
     fn raise_sigint() {

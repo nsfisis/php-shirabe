@@ -316,7 +316,7 @@ fn ws0_end(s: &[u8], pos: usize) -> usize {
 
 #[cfg(test)]
 mod tests {
-    use super::SpdxLicenses;
+    use super::*;
 
     // Every case below was cross-checked against `Composer\Spdx\SpdxLicenses::validate()` running
     // under real PHP (composer/vendor/composer/spdx-licenses), which has no test suite of its own

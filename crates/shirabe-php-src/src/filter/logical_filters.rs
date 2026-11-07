@@ -1,9 +1,9 @@
-use super::filter_private::{
+use crate::filter::filter_private::{
     FILTER_FLAG_ALLOW_HEX, FILTER_FLAG_ALLOW_OCTAL, FILTER_FLAG_GLOBAL_RANGE, FILTER_FLAG_HOSTNAME,
     FILTER_FLAG_IPV4, FILTER_FLAG_IPV6, FILTER_FLAG_NO_PRIV_RANGE, FILTER_FLAG_NO_RES_RANGE,
     FILTER_FLAG_PATH_REQUIRED, FILTER_FLAG_QUERY_REQUIRED,
 };
-use super::sanitizing_filters::php_filter_url;
+use crate::filter::sanitizing_filters::php_filter_url;
 use crate::standard::url::php_url_parse_ex2;
 
 /// php-src: Zend/zend_long.h `MAX_LENGTH_OF_LONG` (PHP 8.5.5), for a 64-bit `zend_long`.

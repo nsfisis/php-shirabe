@@ -2,7 +2,7 @@
 //!
 //! The response `NativeHttpDownloader` builds, in the place of Composer's `CurlResponse`.
 
-use super::Response;
+use crate::util::http::Response;
 use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;

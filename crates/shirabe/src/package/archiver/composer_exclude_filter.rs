@@ -1,6 +1,6 @@
 //! ref: composer/src/Composer/Package/Archiver/ComposerExcludeFilter.php sha1:43fdb55ca6e70b15f416c66fc0ca8db8e893c8d8
 
-use super::{BaseExcludeFilter, BaseExcludeFilterBase};
+use crate::package::archiver::{BaseExcludeFilter, BaseExcludeFilterBase};
 use bstr::BString;
 use std::path::{Path, PathBuf};
 

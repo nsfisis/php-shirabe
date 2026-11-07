@@ -84,7 +84,7 @@ impl serde::Serialize for ByteString<'_> {
 /// bytes to `serialize_bytes`; serialize the value through [`PhpJson`](crate::PhpJson)
 /// to write them as JSON strings.
 pub mod json_bytes {
-    use super::ByteString;
+    use crate::ByteString;
     use bstr::BString;
     use indexmap::IndexMap;
     use serde::ser::{SerializeMap, SerializeSeq};

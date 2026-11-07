@@ -1244,7 +1244,7 @@ pub fn number_format(
 
 #[cfg(test)]
 mod tests {
-    use super::{str_bitand, strtok_first, substr_replace};
+    use super::*;
 
     #[test]
     fn strtok_first_matches_php() {

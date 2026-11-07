@@ -1,6 +1,8 @@
 //! ref: composer/src/Composer/Package/CompletePackage.php sha1:5ecad7006f2ed8a45c520ed56eb176f5ea184f3f
 
-use crate::package::{CompletePackageInterface, DisplayMode, Mirror, Package, PackageInterface};
+use crate::package::{
+    CompletePackageInterface, DisplayMode, Link, Mirror, Package, PackageInterface,
+};
 use crate::repository::RepositoryInterfaceHandle;
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
@@ -277,23 +279,23 @@ impl PackageInterface for CompletePackage {
         self.inner.get_stability()
     }
 
-    fn get_requires(&self) -> std::rc::Rc<IndexMap<BString, super::Link>> {
+    fn get_requires(&self) -> std::rc::Rc<IndexMap<BString, Link>> {
         PackageInterface::get_requires(&self.inner)
     }
 
-    fn get_conflicts(&self) -> std::rc::Rc<IndexMap<BString, super::Link>> {
+    fn get_conflicts(&self) -> std::rc::Rc<IndexMap<BString, Link>> {
         PackageInterface::get_conflicts(&self.inner)
     }
 
-    fn get_provides(&self) -> std::rc::Rc<IndexMap<BString, super::Link>> {
+    fn get_provides(&self) -> std::rc::Rc<IndexMap<BString, Link>> {
         PackageInterface::get_provides(&self.inner)
     }
 
-    fn get_replaces(&self) -> std::rc::Rc<IndexMap<BString, super::Link>> {
+    fn get_replaces(&self) -> std::rc::Rc<IndexMap<BString, Link>> {
         PackageInterface::get_replaces(&self.inner)
     }
 
-    fn get_dev_requires(&self) -> std::rc::Rc<IndexMap<BString, super::Link>> {
+    fn get_dev_requires(&self) -> std::rc::Rc<IndexMap<BString, Link>> {
         PackageInterface::get_dev_requires(&self.inner)
     }
 

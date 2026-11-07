@@ -1,7 +1,7 @@
 //! ref: composer/vendor/symfony/console/Exception/NamespaceNotFoundException.php sha1:d05538674c77701898da90ca8f9010ffa14d6aba
 
-use super::command_not_found_exception::CommandNotFoundException;
-use super::exception_interface::ExceptionInterface;
+use crate::exception::command_not_found_exception::CommandNotFoundException;
+use crate::exception::exception_interface::ExceptionInterface;
 use bstr::BString;
 use shirabe_php_shim::impl_php_exception;
 

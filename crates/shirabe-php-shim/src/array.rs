@@ -730,7 +730,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::array_key_first;
+    use super::*;
     use crate::PhpMixed;
     use indexmap::IndexMap;
 
