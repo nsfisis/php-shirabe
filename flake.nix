@@ -154,6 +154,7 @@
             php.packages.composer
             pkgs.just
             pkgs.hyperfine
+            pkgs.cargo-about
 
             # The following softwares are used for testing:
 

@@ -1,0 +1,21 @@
+Third-party licenses
+====================
+
+The Shirabe executable is built from the Rust crates listed below. Each section
+gives a license and the crates distributed under it.
+
+The PHP sources of Composer and its dependencies that the executable embeds
+carry their own LICENSE files inside the embedded bundle.
+{{#each licenses}}
+
+================================================================================
+{{{name}}} ({{id}})
+
+Used by:
+{{#each used_by}}
+  - {{crate.name}} {{crate.version}}
+{{/each}}
+--------------------------------------------------------------------------------
+
+{{{text}}}
+{{/each}}
