@@ -1,0 +1,6 @@
+{
+    "name": "acme/coding-standard",
+    "description": "E2E fixture: a PHPCS standard the installer plugin registers.",
+    "version": "1.0.0",
+    "type": "phpcodesniffer-standard"
+}

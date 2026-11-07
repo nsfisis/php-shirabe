@@ -1,11 +1,12 @@
 //! The methods a `Composer\Repository\RepositoryInterface` entity answers over RPC.
 
 use crate::package::PackageInterfaceHandle;
-use crate::plugin::rpc::codec::arg;
+use crate::plugin::php_plugin_value::constraint_from_wire;
+use crate::plugin::rpc::codec::{arg, arg_throw};
 use crate::plugin::rpc::dispatch::{error_throw, unavailable_method};
 use crate::plugin::rpc::table::package_handle_value;
-use crate::repository::RepositoryInterfaceHandle;
-use bstr::{BStr, ByteSlice};
+use crate::repository::{FindPackageConstraint, RepositoryInterfaceHandle};
+use bstr::{BStr, BString, ByteSlice};
 use shirabe_php_rpc::{PhpThrow, PluginValue, ToWire};
 use shirabe_php_shim::bformat;
 
@@ -50,6 +51,36 @@ pub(crate) fn dispatch_repository_method(
             }
             Ok(PluginValue::List(items))
         }
+        b"findPackage" => {
+            let name = arg::<BString>(method_name, args, 0)?;
+            let constraint = find_package_constraint(method_name, args, 1)?.ok_or_else(|| {
+                arg_throw(
+                    method_name,
+                    1,
+                    PhpThrow::runtime("expected a constraint string or object, got null"),
+                )
+            })?;
+            let package = repository
+                .borrow_mut()
+                .find_package(name.as_bstr(), constraint)
+                .map_err(|error| error_throw(b"findPackage failed", &error))?;
+            Ok(package.map_or(PluginValue::Null, |package| {
+                package_handle_value(package.as_rc())
+            }))
+        }
+        b"findPackages" => {
+            let name = arg::<BString>(method_name, args, 0)?;
+            let constraint = find_package_constraint(method_name, args, 1)?;
+            let packages = repository
+                .borrow_mut()
+                .find_packages(name.as_bstr(), constraint)
+                .map_err(|error| error_throw(b"findPackages failed", &error))?;
+            let mut items = Vec::with_capacity(packages.len());
+            for package in packages {
+                items.push(package_handle_value(package.as_rc()));
+            }
+            Ok(PluginValue::List(items))
+        }
         b"getCanonicalPackages" => {
             let mut borrowed = repository.borrow_mut();
             let writable = borrowed
@@ -65,5 +96,22 @@ pub(crate) fn dispatch_repository_method(
         // TODO(plugin): the remaining RepositoryInterface surface is widened on demand,
         // driven by explicit errors from real plugins.
         other => Err(unavailable_method("repository", other)),
+    }
+}
+
+/// `string|ConstraintInterface|null`, the constraint `findPackage`/`findPackages` take.
+fn find_package_constraint(
+    method_name: &BStr,
+    args: &[PluginValue],
+    position: usize,
+) -> Result<Option<FindPackageConstraint>, PhpThrow> {
+    match args.get(position) {
+        None | Some(PluginValue::Null) => Ok(None),
+        Some(PluginValue::String(constraint)) => {
+            Ok(Some(FindPackageConstraint::String(constraint.clone())))
+        }
+        Some(value) => constraint_from_wire(value)
+            .map(|constraint| Some(FindPackageConstraint::Constraint(constraint)))
+            .map_err(|throw| arg_throw(method_name, position, throw)),
     }
 }

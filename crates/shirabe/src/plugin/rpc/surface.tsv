@@ -897,8 +897,8 @@ Composer\Repository\FilesystemRepository::__construct	constructor	unsupported
 Composer\Repository\InstalledArrayRepository::__construct	constructor	unsupported
 Composer\Repository\InstalledArrayRepository::addPackage	method	supported
 Composer\Repository\InstalledArrayRepository::count	method	unsupported
-Composer\Repository\InstalledArrayRepository::findPackage	method	unsupported
-Composer\Repository\InstalledArrayRepository::findPackages	method	unsupported
+Composer\Repository\InstalledArrayRepository::findPackage	method	supported
+Composer\Repository\InstalledArrayRepository::findPackages	method	supported
 Composer\Repository\InstalledArrayRepository::getCanonicalPackages	method	supported
 Composer\Repository\InstalledArrayRepository::getDevMode	method	unsupported
 Composer\Repository\InstalledArrayRepository::getDevPackageNames	method	unsupported
@@ -916,8 +916,8 @@ Composer\Repository\InstalledArrayRepository::write	method	unsupported
 Composer\Repository\InstalledFilesystemRepository::__construct	constructor	unsupported
 Composer\Repository\InstalledFilesystemRepository::addPackage	method	supported
 Composer\Repository\InstalledFilesystemRepository::count	method	unsupported
-Composer\Repository\InstalledFilesystemRepository::findPackage	method	unsupported
-Composer\Repository\InstalledFilesystemRepository::findPackages	method	unsupported
+Composer\Repository\InstalledFilesystemRepository::findPackage	method	supported
+Composer\Repository\InstalledFilesystemRepository::findPackages	method	supported
 Composer\Repository\InstalledFilesystemRepository::getCanonicalPackages	method	supported
 Composer\Repository\InstalledFilesystemRepository::getDevMode	method	unsupported
 Composer\Repository\InstalledFilesystemRepository::getDevPackageNames	method	unsupported
@@ -935,8 +935,8 @@ Composer\Repository\InstalledFilesystemRepository::write	method	unsupported
 Composer\Repository\LockArrayRepository::__construct	constructor	unsupported
 Composer\Repository\LockArrayRepository::addPackage	method	supported
 Composer\Repository\LockArrayRepository::count	method	unsupported
-Composer\Repository\LockArrayRepository::findPackage	method	unsupported
-Composer\Repository\LockArrayRepository::findPackages	method	unsupported
+Composer\Repository\LockArrayRepository::findPackage	method	supported
+Composer\Repository\LockArrayRepository::findPackages	method	supported
 Composer\Repository\LockArrayRepository::getPackages	method	supported
 Composer\Repository\LockArrayRepository::getProviders	method	unsupported
 Composer\Repository\LockArrayRepository::getRepoName	method	unsupported

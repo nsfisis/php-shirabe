@@ -32,6 +32,7 @@ mod e2e_kept_event_test;
 mod e2e_locker_test;
 mod e2e_normalize_test;
 mod e2e_package_event_test;
+mod e2e_phpcs_installer_test;
 mod e2e_plugin_loaders_test;
 mod e2e_pre_pool_create_test;
 mod e2e_process_executor_test;

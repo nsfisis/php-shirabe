@@ -101,7 +101,7 @@ fn constraint_to_wire(constraint: &AnyConstraint) -> PluginValue {
     PluginValue::PhpObject(object)
 }
 
-fn constraint_from_wire(value: &PluginValue) -> Result<AnyConstraint, PhpThrow> {
+pub(crate) fn constraint_from_wire(value: &PluginValue) -> Result<AnyConstraint, PhpThrow> {
     let object = as_object(value).ok_or_else(|| {
         PhpThrow::runtime(bformat!(
             "expected a semver constraint from the plugin, got {}",

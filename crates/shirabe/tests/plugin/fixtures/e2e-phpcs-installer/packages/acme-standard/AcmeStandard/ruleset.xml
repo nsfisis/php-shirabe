@@ -1,0 +1,4 @@
+<?xml version="1.0"?>
+<ruleset name="AcmeStandard">
+    <description>E2E fixture standard.</description>
+</ruleset>

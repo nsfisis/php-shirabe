@@ -1,0 +1,55 @@
+#!/bin/sh
+# Fetches the external packages the E2E test runs against, into the git-ignored ext/
+# directory: the plugin and the PHP_CodeSniffer it registers standards with. Each is
+# pinned to an immutable upstream commit and the extracted files are verified by hash,
+# so the test stays deterministic without the third-party source ever entering this
+# repository. Requires network once; the E2E test skips itself while ext/ is absent.
+set -eu
+
+ext="$(dirname "$0")/ext"
+
+# fetch <owner/repo> <commit> <expected digest> <directory under ext/> <file proving completeness>
+fetch() {
+    repo=$1
+    commit=$2
+    expected=$3
+    dir="$ext/$4"
+
+    if [ -f "$dir/$5" ]; then
+        return 0
+    fi
+
+    # Staged next to the destination and only moved into place once verified, so a
+    # mismatched tree is never observable under the name the test looks for.
+    staging="$ext/.staging-$commit"
+    mkdir -p "$staging"
+    curl -fsSL "https://codeload.github.com/$repo/tar.gz/$commit" \
+        | tar -xz -C "$staging" --strip-components=1
+
+    # GitHub archives are content-addressed by the commit, but the archive encoding is
+    # not guaranteed stable; the extracted files are what the test consumes, so they are
+    # what gets pinned, as one digest over the sorted per-file digests.
+    actual=$(cd "$staging" && find . -type f | sort | xargs sha256sum | sha256sum | cut -d' ' -f1)
+    if [ "$actual" != "$expected" ]; then
+        echo "hash mismatch for $repo: expected $expected, got $actual" >&2
+        echo "the fetched tree was left in $staging for inspection; delete it before retrying" >&2
+        exit 1
+    fi
+
+    mv "$staging" "$dir"
+    echo "fetched: $dir"
+}
+
+# dealerdirect/phpcodesniffer-composer-installer v1.2.1
+fetch PHPCSStandards/composer-installer \
+    963f0c67bffde0eac41b56be71ac0e8ba132f0bd \
+    d60f58ee248ddee4d03956f121d8434fa4c8f70c00844ba3a79ba6e7a2a6eaa7 \
+    phpcodesniffer-composer-installer-1.2.1 \
+    src/Plugin.php
+
+# squizlabs/php_codesniffer 4.0.4
+fetch PHPCSStandards/PHP_CodeSniffer \
+    bbdc3d0532623e21838b7041a4364383a8126f96 \
+    fea3115bdd74a8cf1dcd31d02857de452aed2a9395f947e0c6b5116575e0e1bd \
+    php_codesniffer-4.0.4 \
+    bin/phpcs
