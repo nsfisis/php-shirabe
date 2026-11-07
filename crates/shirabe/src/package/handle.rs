@@ -384,9 +384,6 @@ macro_rules! delegate_package_interface_to_inner {
             fn get_unique_name(&self) -> BString {
                 self.$field.get_unique_name()
             }
-            fn to_php_string(&self) -> BString {
-                self.$field.to_php_string()
-            }
             fn get_notification_url(&self) -> Option<BString> {
                 self.$field.get_notification_url()
             }
@@ -424,6 +421,12 @@ macro_rules! delegate_package_interface_to_inner {
             }
             fn set_source_dist_references(&mut self, reference: BString) {
                 self.$field.set_source_dist_references(reference);
+            }
+        }
+
+        impl shirabe_php_shim::Stringable for $Type {
+            fn to_php_string(&self) -> BString {
+                self.$field.to_php_string()
             }
         }
     };
@@ -681,10 +684,6 @@ macro_rules! impl_package_interface_handle {
                 self.0.borrow().as_package_interface().get_unique_name()
             }
 
-            pub fn to_php_string(&self) -> BString {
-                self.0.borrow().as_package_interface().to_php_string()
-            }
-
             pub fn get_notification_url(&self) -> Option<BString> {
                 self.0
                     .borrow()
@@ -759,6 +758,12 @@ macro_rules! impl_package_interface_handle {
                     .borrow_mut()
                     .as_package_interface_mut()
                     .set_source_dist_references(reference);
+            }
+        }
+
+        impl shirabe_php_shim::Stringable for $Handle {
+            fn to_php_string(&self) -> BString {
+                shirabe_php_shim::Stringable::to_php_string(self.0.borrow().as_package_interface())
             }
         }
     };

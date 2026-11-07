@@ -10,8 +10,8 @@ use crate::io::IOInterfaceWrite;
 use crate::util::{Filesystem, Platform};
 use bstr::BString;
 use shirabe_php_shim::{
-    RuntimeException, bconcat, chdir, impl_php_class, path_from_bytes, php_regex, preg_replace2,
-    preg_split,
+    RuntimeException, Stringable, bconcat, chdir, impl_php_class, path_from_bytes, php_regex,
+    preg_replace2, preg_split,
 };
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::completion::{
@@ -87,7 +87,7 @@ impl GlobalCommand {
         let new_input_str = preg_replace2(
             php_regex!(r"{\bg(?:l(?:o(?:b(?:a(?:l)?)?)?)?)?\b}"),
             "",
-            input.borrow().__to_string(),
+            input.borrow().to_php_string(),
             1,
             None,
         );
@@ -181,7 +181,7 @@ impl Command for GlobalCommand {
                 std::rc::Rc::new(std::cell::RefCell::new(input.clone())),
                 true,
             )?;
-            let mut input = CompletionInput::from_string(prepared.__to_string(), 2)?;
+            let mut input = CompletionInput::from_string(prepared.to_php_string(), 2)?;
             let command = {
                 let mut app_ref = application.borrow_mut();
                 let app = app_ref
@@ -207,7 +207,7 @@ impl Command for GlobalCommand {
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
-        let tokens = preg_split(php_regex!(r"{\s+}"), input.borrow().__to_string());
+        let tokens = preg_split(php_regex!(r"{\s+}"), input.borrow().to_php_string());
         let mut args: Vec<&bstr::BString> = vec![];
         for token in &tokens {
             if !token.is_empty() && !token.starts_with(b"-") {

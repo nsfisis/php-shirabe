@@ -2,7 +2,7 @@
 
 use crate::constraint::Bound;
 use bstr::BString;
-use shirabe_php_shim::CmpOp;
+use shirabe_php_shim::{CmpOp, Stringable};
 
 #[derive(Debug, Clone)]
 pub struct MatchNoneConstraint {
@@ -35,19 +35,14 @@ impl MatchNoneConstraint {
         Bound::new("0.0.0.0-dev", false)
     }
 
-    /// PHP's `__toString()`.
-    pub fn to_php_string(&self) -> BString {
-        "[]".into()
-    }
-
     /// Appends PHP's `__toString()` to `out`.
     pub fn append_php_string(&self, out: &mut BString) {
         out.extend_from_slice(b"[]");
     }
 }
 
-impl std::fmt::Display for MatchNoneConstraint {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "[]")
+impl Stringable for MatchNoneConstraint {
+    fn to_php_string(&self) -> BString {
+        "[]".into()
     }
 }

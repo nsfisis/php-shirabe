@@ -2,8 +2,8 @@
 
 use crate::dependency_resolver::operation::SolverOperation;
 use crate::package::{DisplayMode, PackageInterfaceHandle};
-use bstr::BStr;
-use shirabe_php_shim::{bconcat, php_str};
+use bstr::{BStr, BString};
+use shirabe_php_shim::{Stringable, bconcat, php_str};
 
 #[derive(Debug, Clone)]
 pub struct InstallOperation {
@@ -39,8 +39,8 @@ impl SolverOperation for InstallOperation {
     const TYPE: &'static BStr = php_str(b"install");
 }
 
-impl std::fmt::Display for InstallOperation {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.show(false).display_lossy())
+impl Stringable for InstallOperation {
+    fn to_php_string(&self) -> BString {
+        self.show(false)
     }
 }

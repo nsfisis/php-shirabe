@@ -124,7 +124,7 @@ impl Command for ScriptAliasCommand {
         let script_alias_input = preg_replace2(
             php_regex!(r"{^\S+ ?}"),
             "",
-            input.borrow().__to_string(),
+            input.borrow().to_php_string(),
             1,
             None,
         );

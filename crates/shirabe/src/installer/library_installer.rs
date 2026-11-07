@@ -11,9 +11,9 @@ use crate::repository::InstalledRepositoryInterfaceHandle;
 use crate::util::{Filesystem, Platform};
 use bstr::{BStr, BString, ByteSlice};
 use shirabe_php_shim::{
-    InvalidArgumentException, LogicException, PhpMixed, bconcat, dirname, is_dir, is_link,
-    path_from_bytes, path_to_bytes, preg_quote, preg_replace, realpath, rmdir, rtrim2, str_replace,
-    strpos,
+    InvalidArgumentException, LogicException, PhpMixed, Stringable, bconcat, dirname, is_dir,
+    is_link, path_from_bytes, path_to_bytes, preg_quote, preg_replace, realpath, rmdir, rtrim2,
+    str_replace, strpos,
 };
 use std::path::PathBuf;
 

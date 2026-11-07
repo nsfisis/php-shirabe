@@ -7,8 +7,8 @@ use crate::input::{
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpResource, bconcat, implode, mb_detect_encoding, mb_substr, path_to_bytes, php_regex,
-    preg_match, strlen, strpos, substr,
+    PhpResource, Stringable, bconcat, implode, mb_detect_encoding, mb_substr, path_to_bytes,
+    php_regex, preg_match, strlen, strpos, substr,
 };
 
 /// ArgvInput represents an input coming from the CLI arguments.
@@ -542,9 +542,10 @@ impl ArgvInput {
 
         default
     }
+}
 
-    /// Returns a stringified representation of the args passed to the command.
-    pub fn __to_string(&self) -> BString {
+impl Stringable for ArgvInput {
+    fn to_php_string(&self) -> BString {
         let tokens: Vec<BString> = self
             .tokens
             .iter()
@@ -637,10 +638,6 @@ impl InputInterface for ArgvInput {
 
     fn set_interactive(&mut self, interactive: bool) {
         self.inner.set_interactive(interactive)
-    }
-
-    fn __to_string(&self) -> BString {
-        ArgvInput::__to_string(self)
     }
 
     fn as_streamable(&self) -> Option<&dyn StreamableInputInterface> {

@@ -11,8 +11,8 @@ use crate::json::JsonFile;
 use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    InvalidArgumentException, PhpMixed, RuntimeException, bconcat, impl_php_class, parse_url,
-    path_to_bytes, php_regex, php_to_string, preg_is_match, strtolower,
+    InvalidArgumentException, PhpMixed, RuntimeException, Stringable, bconcat, impl_php_class,
+    parse_url, path_to_bytes, php_regex, php_to_string, preg_is_match, strtolower,
 };
 use shirabe_symfony_console::input::InputInterfaceByName;
 use shirabe_symfony_console::{

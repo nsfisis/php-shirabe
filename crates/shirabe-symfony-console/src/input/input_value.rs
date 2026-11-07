@@ -1,7 +1,7 @@
 //! ref: composer/vendor/symfony/console/Input/InputInterface.php sha1:7c0149e375832cad7933bbe51f11975bf856effb
 
 use bstr::{BStr, BString};
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, Stringable};
 
 /// The value an option or an argument can hold, which is also the value a question takes as its
 /// default and gives as its answer.
@@ -91,9 +91,10 @@ impl InputValue {
     pub fn to_php_mixed(&self) -> PhpMixed {
         self.clone().into()
     }
+}
 
-    /// PHP's `(string) $value`, which is a fatal error for an array.
-    pub fn to_php_string(&self) -> BString {
+impl Stringable for InputValue {
+    fn to_php_string(&self) -> BString {
         match self {
             Self::Null => BString::default(),
             Self::Bool(b) => {

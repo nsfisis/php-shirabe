@@ -2,7 +2,7 @@
 
 use crate::constraint::Bound;
 use bstr::BString;
-use shirabe_php_shim::CmpOp;
+use shirabe_php_shim::{CmpOp, Stringable};
 
 #[derive(Debug, Clone, Default)]
 pub struct MatchAllConstraint {
@@ -35,19 +35,14 @@ impl MatchAllConstraint {
         Bound::zero()
     }
 
-    /// PHP's `__toString()`.
-    pub fn to_php_string(&self) -> BString {
-        "*".into()
-    }
-
     /// Appends PHP's `__toString()` to `out`.
     pub fn append_php_string(&self, out: &mut BString) {
         out.extend_from_slice(b"*");
     }
 }
 
-impl std::fmt::Display for MatchAllConstraint {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "*")
+impl Stringable for MatchAllConstraint {
+    fn to_php_string(&self) -> BString {
+        "*".into()
     }
 }

@@ -5,7 +5,7 @@ use crate::repository::RepositoryInterfaceHandle;
 use bstr::{BStr, BString};
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, Stringable};
 
 /// Selects how `get_full_pretty_version` renders the reference.
 ///
@@ -22,7 +22,7 @@ pub enum DisplayMode {
 /// Defines the essential information a package has that is used during solving/installation
 ///
 /// PackageInterface & derivatives are considered internal, you may use them in type hints but extending/implementing them is not recommended and not supported. Things may change without notice.
-pub trait PackageInterface: std::fmt::Debug {
+pub trait PackageInterface: std::fmt::Debug + Stringable {
     /// Returns the package's name without version info, thus not a unique identifier
     fn get_name(&self) -> &BStr;
 
@@ -193,11 +193,6 @@ pub trait PackageInterface: std::fmt::Debug {
 
     /// Returns the package notification url
     fn get_notification_url(&self) -> Option<BString>;
-
-    /// PHP's `__toString()`.
-    fn to_php_string(&self) -> BString {
-        self.get_unique_name()
-    }
 
     /// Converts the package into a pretty readable string
     fn get_pretty_string(&self) -> BString;

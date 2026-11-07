@@ -6,7 +6,7 @@ use crate::input::{
 };
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpResource, bconcat, implode};
+use shirabe_php_shim::{PhpResource, Stringable, bconcat, implode};
 
 /// ArrayInput represents an input provided as an array.
 ///
@@ -226,9 +226,10 @@ impl ArrayInput {
 
         Ok(())
     }
+}
 
-    /// Returns a stringified representation of the args passed to the command.
-    pub fn __to_string(&self) -> BString {
+impl Stringable for ArrayInput {
+    fn to_php_string(&self) -> BString {
         let mut params: Vec<BString> = vec![];
         for (param, val) in &self.parameters {
             // $param && \is_string($param) && '-' === $param[0]
@@ -348,10 +349,6 @@ impl InputInterface for ArrayInput {
         self.inner.set_interactive(interactive)
     }
 
-    fn __to_string(&self) -> BString {
-        ArrayInput::__to_string(self)
-    }
-
     fn as_streamable(&self) -> Option<&dyn StreamableInputInterface> {
         Some(self)
     }
@@ -392,15 +389,6 @@ impl ParameterName {
         match self {
             Self::Name(name) => ArgumentName::Name(name.clone()),
             Self::Index(index) => ArgumentName::Position(*index),
-        }
-    }
-}
-
-impl std::fmt::Display for ParameterName {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Name(name) => write!(f, "{}", name.display_lossy()),
-            Self::Index(index) => write!(f, "{}", index),
         }
     }
 }

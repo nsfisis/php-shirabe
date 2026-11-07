@@ -2,8 +2,8 @@
 
 use crate::dependency_resolver::operation::SolverOperation;
 use crate::package::{DisplayMode, PackageInterfaceHandle};
-use bstr::BStr;
-use shirabe_php_shim::{bconcat, php_str};
+use bstr::{BStr, BString};
+use shirabe_php_shim::{Stringable, bconcat, php_str};
 
 #[derive(Debug, Clone)]
 pub struct UninstallOperation {
@@ -38,8 +38,8 @@ impl SolverOperation for UninstallOperation {
     const TYPE: &'static BStr = php_str(b"uninstall");
 }
 
-impl std::fmt::Display for UninstallOperation {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.show(false).display_lossy())
+impl Stringable for UninstallOperation {
+    fn to_php_string(&self) -> BString {
+        self.show(false)
     }
 }

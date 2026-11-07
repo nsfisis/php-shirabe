@@ -12,9 +12,7 @@ use indexmap::IndexMap;
 use shirabe::installer::InstallerInterface;
 use shirabe::package::loader::{ArrayLoader, JsonLoader, JsonLoaderInput};
 use shirabe::package::{Link, PackageInterfaceHandle};
-use shirabe_php_shim::{
-    Catch, UnexpectedValueException, bconcat, display_to_bytes, implode, path_to_bytes,
-};
+use shirabe_php_shim::{Catch, UnexpectedValueException, bconcat, implode, path_to_bytes};
 use shirabe_semver::constraint::{
     AnyConstraint, MatchAllConstraint, MatchNoneConstraint, MultiConstraint, SimpleConstraint,
 };
@@ -103,7 +101,7 @@ fn describe(constraint: &AnyConstraint) -> BString {
         AnyConstraint::Simple(c) => {
             bconcat!(
                 "Constraint(",
-                display_to_bytes(c.get_operator()),
+                c.get_operator().as_str(),
                 " ",
                 c.get_version(),
                 ")"

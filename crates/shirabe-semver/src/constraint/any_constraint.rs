@@ -4,7 +4,7 @@ use crate::constraint::{
     Bound, MatchAllConstraint, MatchNoneConstraint, MultiConstraint, SimpleConstraint,
 };
 use bstr::{BStr, BString};
-use shirabe_php_shim::CmpOp;
+use shirabe_php_shim::{CmpOp, Stringable};
 
 /// Corresponds to PHP's `ConstraintInterface`.
 #[derive(Clone, Debug)]
@@ -145,16 +145,6 @@ impl AnyConstraint {
         }
     }
 
-    /// PHP's `__toString()`.
-    pub fn to_php_string(&self) -> BString {
-        match self {
-            Self::Simple(c) => c.to_php_string(),
-            Self::Multi(c) => c.to_php_string(),
-            Self::MatchAll(c) => c.to_php_string(),
-            Self::MatchNone(c) => c.to_php_string(),
-        }
-    }
-
     /// Appends PHP's `__toString()` to `out`.
     pub fn append_php_string(&self, out: &mut BString) {
         match self {
@@ -162,6 +152,17 @@ impl AnyConstraint {
             Self::Multi(c) => c.append_php_string(out),
             Self::MatchAll(c) => c.append_php_string(out),
             Self::MatchNone(c) => c.append_php_string(out),
+        }
+    }
+}
+
+impl Stringable for AnyConstraint {
+    fn to_php_string(&self) -> BString {
+        match self {
+            Self::Simple(c) => c.to_php_string(),
+            Self::Multi(c) => c.to_php_string(),
+            Self::MatchAll(c) => c.to_php_string(),
+            Self::MatchNone(c) => c.to_php_string(),
         }
     }
 }

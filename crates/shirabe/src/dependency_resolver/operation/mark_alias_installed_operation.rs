@@ -2,8 +2,8 @@
 
 use crate::dependency_resolver::operation::SolverOperation;
 use crate::package::{AliasPackageHandle, DisplayMode};
-use bstr::BStr;
-use shirabe_php_shim::{bconcat, php_str};
+use bstr::{BStr, BString};
+use shirabe_php_shim::{Stringable, bconcat, php_str};
 
 #[derive(Debug, Clone)]
 pub struct MarkAliasInstalledOperation {
@@ -41,8 +41,8 @@ impl SolverOperation for MarkAliasInstalledOperation {
     const TYPE: &'static BStr = php_str(b"markAliasInstalled");
 }
 
-impl std::fmt::Display for MarkAliasInstalledOperation {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.show(false).display_lossy())
+impl Stringable for MarkAliasInstalledOperation {
+    fn to_php_string(&self) -> BString {
+        self.show(false)
     }
 }

@@ -14,8 +14,7 @@ use crate::package::BasePackageHandle;
 use bstr::{BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpMixed, array_shift, array_unshift, bconcat, display_to_bytes, microtime, spl_object_hash,
-    sprintf,
+    PhpMixed, Stringable, array_shift, array_unshift, bconcat, microtime, spl_object_hash, sprintf,
 };
 use shirabe_semver::constraint::AnyConstraint;
 
@@ -504,9 +503,9 @@ impl Solver {
                             "Reached invalid decision id ",
                             decision_id,
                             " while looking through ",
-                            display_to_bytes(&*rule.borrow()),
+                            rule.borrow().to_php_string(),
                             " for a literal present in the analyzed rule ",
-                            display_to_bytes(&*analyzed_rule.borrow()),
+                            analyzed_rule.borrow().to_php_string(),
                             "."
                         ))
                         .into());
@@ -588,7 +587,7 @@ impl Solver {
             None => {
                 return Err(SolverBugException::new(bconcat!(
                     "Did not find a learnable literal in analyzed rule ",
-                    display_to_bytes(&*analyzed_rule.borrow()),
+                    analyzed_rule.borrow().to_php_string(),
                     "."
                 ))
                 .into());

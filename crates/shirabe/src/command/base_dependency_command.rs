@@ -17,7 +17,8 @@ use crate::util::PackageInfo;
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    InvalidArgumentException, PhpMixed, UnexpectedValueException, bconcat, php_str, rtrim,
+    InvalidArgumentException, PhpMixed, Stringable, UnexpectedValueException, bconcat, php_str,
+    rtrim,
 };
 use shirabe_semver::constraint::{AnyConstraint, Bound};
 use shirabe_symfony_console::formatter::{OutputFormatter, OutputFormatterStyle};

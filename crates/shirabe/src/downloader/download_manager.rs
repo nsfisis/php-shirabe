@@ -8,9 +8,10 @@ use crate::util::Filesystem;
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    Catch as _, InvalidArgumentException, LogicException, PhpMixed, RuntimeException, array_keys,
-    array_reverse, array_shift, bconcat, dirname, implode, in_array_strict, path_from_bytes,
-    path_to_bytes, preg_is_match, preg_quote, rtrim2, str_replace, strtolower, usort,
+    Catch as _, InvalidArgumentException, LogicException, PhpMixed, RuntimeException, Stringable,
+    array_keys, array_reverse, array_shift, bconcat, dirname, implode, in_array_strict,
+    path_from_bytes, path_to_bytes, preg_is_match, preg_quote, rtrim2, str_replace, strtolower,
+    usort,
 };
 use std::path::{Path, PathBuf};
 

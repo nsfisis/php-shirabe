@@ -5,7 +5,7 @@ use crate::repository::RepositorySet;
 use bstr::{BStr, BString, ByteVec};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    OutOfBoundsException, STR_PAD_RIGHT, bconcat, display_to_bytes, php_to_string, str_pad,
+    OutOfBoundsException, STR_PAD_RIGHT, Stringable, bconcat, php_to_string, str_pad,
 };
 
 #[derive(Debug)]
@@ -162,7 +162,7 @@ impl RuleSet {
                         &dummy_learned_pool,
                     )?);
                 } else {
-                    string.push_str(display_to_bytes(&*rule.borrow()));
+                    string.push_str(rule.borrow().to_php_string());
                 }
                 string.push(b'\n');
             }
@@ -173,11 +173,9 @@ impl RuleSet {
     }
 }
 
-impl std::fmt::Display for RuleSet {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let pretty = self
-            .get_pretty_string(None, None, None, false)
-            .expect("RuleSet::get_pretty_string() is infallible without a repository set, a request and a pool");
-        write!(f, "{}", pretty.display_lossy())
+impl Stringable for RuleSet {
+    fn to_php_string(&self) -> BString {
+        self.get_pretty_string(None, None, None, false)
+            .expect("RuleSet::get_pretty_string() is infallible without a repository set, a request and a pool")
     }
 }

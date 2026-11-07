@@ -205,12 +205,6 @@ impl CmpOp {
     }
 }
 
-impl std::fmt::Display for CmpOp {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.as_str().display_lossy())
-    }
-}
-
 pub fn version_compare(v1: impl AsRef<[u8]>, v2: impl AsRef<[u8]>, op: CmpOp) -> bool {
     let ord = version_compare_ordering(v1, v2);
     match op {

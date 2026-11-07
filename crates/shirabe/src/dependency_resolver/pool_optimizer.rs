@@ -5,7 +5,7 @@ use crate::package::version::VersionParser;
 use crate::package::{BasePackageHandle, Link};
 use bstr::{BStr, BString, ByteSlice, ByteVec};
 use indexmap::IndexMap;
-use shirabe_php_shim::{CmpOp, bconcat, implode, ksort};
+use shirabe_php_shim::{CmpOp, Stringable, bconcat, implode, ksort};
 use shirabe_semver::constraint::{AnyConstraint, MultiConstraint, SimpleConstraint};
 use shirabe_semver::{CompilingMatcher, Intervals};
 

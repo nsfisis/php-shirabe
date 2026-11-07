@@ -4,7 +4,7 @@ use crate::exception::InvalidArgumentException;
 use crate::helper::TableCellStyle;
 use bstr::{B, BString};
 use indexmap::IndexMap;
-use shirabe_php_shim::{bconcat, implode};
+use shirabe_php_shim::{Stringable, bconcat, implode};
 
 /// A `TableCell` option value: an integer span, a `TableCellStyle`, or null.
 #[derive(Debug, Clone)]
@@ -86,15 +86,16 @@ impl TableCell {
         }
     }
 
-    /// PHP `__toString()`.
-    pub fn to_php_string(&self) -> BString {
-        self.value.clone()
-    }
-
     pub fn get_style(&self) -> Option<std::rc::Rc<TableCellStyle>> {
         match &self.options[B("style")] {
             TableCellOption::Style(style) => Some(style.clone()),
             _ => None,
         }
+    }
+}
+
+impl Stringable for TableCell {
+    fn to_php_string(&self) -> BString {
+        self.value.clone()
     }
 }

@@ -205,7 +205,7 @@ impl Command for PhpCommandProxy {
                 .into()
             })?;
         let app = context.booted_app()?;
-        let input_line = input.borrow().__to_string();
+        let input_line = input.borrow().to_php_string();
         PhpCall::Function(BStr::new("__shirabe_run_console_application")).run(vec![
             PluginValue::PhpHandle(app),
             PluginValue::string(input_line),

@@ -9,7 +9,8 @@ use crate::repository::{PlatformRepository, RepositoryInterface, RepositorySet};
 use bstr::{BStr, BString, ByteSlice, ByteVec};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    LogicException, PhpMixed, RuntimeException, array_keys, array_shift, bconcat, implode,
+    LogicException, PhpMixed, RuntimeException, Stringable, array_keys, array_shift, bconcat,
+    implode,
 };
 use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
 
@@ -723,12 +724,12 @@ impl Rule {
     }
 }
 
-impl std::fmt::Display for Rule {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Stringable for Rule {
+    fn to_php_string(&self) -> BString {
         match self {
-            Rule::Generic(r) => write!(f, "{}", r),
-            Rule::MultiConflict(r) => write!(f, "{}", r),
-            Rule::TwoLiterals(r) => write!(f, "{}", r),
+            Rule::Generic(r) => r.to_php_string(),
+            Rule::MultiConflict(r) => r.to_php_string(),
+            Rule::TwoLiterals(r) => r.to_php_string(),
         }
     }
 }

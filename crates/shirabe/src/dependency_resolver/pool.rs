@@ -5,10 +5,9 @@ use crate::package::BasePackageHandle;
 use crate::package::version::VersionParser;
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
-use shirabe_php_shim::{CmpOp, STR_PAD_LEFT, bconcat, str_pad};
+use shirabe_php_shim::{CmpOp, STR_PAD_LEFT, Stringable, bconcat, str_pad};
 use shirabe_semver::CompilingMatcher;
 use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
-use std::fmt;
 
 /// A package pool contains all packages for dependency resolution
 #[derive(Debug)]
@@ -342,19 +341,20 @@ impl Pool {
     }
 }
 
-impl fmt::Display for Pool {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "Pool:")?;
+impl Stringable for Pool {
+    fn to_php_string(&self) -> BString {
+        let mut str = BString::from("Pool:\n");
 
         for package in &self.packages {
-            writeln!(
-                f,
-                "- {}: {}",
-                str_pad(bconcat!(package.id()), 6, " ", STR_PAD_LEFT).display_lossy(),
-                package.get_name().display_lossy()
-            )?;
+            str.extend_from_slice(&bconcat!(
+                "- ",
+                str_pad(bconcat!(package.id()), 6, " ", STR_PAD_LEFT),
+                ": ",
+                package.get_name(),
+                "\n"
+            ));
         }
 
-        Ok(())
+        str
     }
 }

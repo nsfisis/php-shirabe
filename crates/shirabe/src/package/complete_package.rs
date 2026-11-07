@@ -4,7 +4,7 @@ use crate::package::{CompletePackageInterface, DisplayMode, Mirror, Package, Pac
 use crate::repository::RepositoryInterfaceHandle;
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, Stringable};
 
 #[derive(Debug, Clone)]
 pub struct CompletePackage {
@@ -375,5 +375,11 @@ impl PackageInterface for CompletePackage {
 
     fn set_source_dist_references(&mut self, reference: BString) {
         self.inner.set_source_dist_references(reference);
+    }
+}
+
+impl Stringable for CompletePackage {
+    fn to_php_string(&self) -> BString {
+        self.inner.to_php_string()
     }
 }

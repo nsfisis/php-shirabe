@@ -1,9 +1,9 @@
 //! ref: composer/vendor/symfony/console/Input/InputInterface.php sha1:7c0149e375832cad7933bbe51f11975bf856effb
 
 use crate::input::{InputDefinition, InputValue, StreamableInputInterface};
-use shirabe_php_shim::AsAny;
+use shirabe_php_shim::{AsAny, Stringable};
 
-pub trait InputInterface: std::fmt::Debug + AsAny {
+pub trait InputInterface: std::fmt::Debug + AsAny + Stringable {
     /// Models PHP's `clone` operatior.
     fn dup(&self) -> std::rc::Rc<std::cell::RefCell<dyn InputInterface>>;
 
@@ -41,9 +41,6 @@ pub trait InputInterface: std::fmt::Debug + AsAny {
     fn is_interactive(&self) -> bool;
 
     fn set_interactive(&mut self, interactive: bool);
-
-    /// PHP's `(string) $input` (the `__toString` magic method every Symfony input implements).
-    fn __to_string(&self) -> bstr::BString;
 
     /// Models PHP's `$input instanceof StreamableInputInterface` check. Streamable inputs override
     /// this to return `Some(self)`; everything else falls back to `None`.

@@ -2,7 +2,7 @@
 
 use crate::package::PackageInterfaceHandle;
 use bstr::{BStr, BString, ByteSlice};
-use shirabe_php_shim::{UnexpectedValueException, bconcat, php_str, strtolower};
+use shirabe_php_shim::{Stringable, UnexpectedValueException, bconcat, php_str, strtolower};
 use shirabe_semver::constraint::AnyConstraint;
 
 #[derive(Clone, Debug)]
@@ -101,9 +101,10 @@ impl Link {
             self.constraint.get_pretty_string()
         )
     }
+}
 
-    /// PHP's `__toString()`.
-    pub fn to_php_string(&self) -> BString {
+impl Stringable for Link {
+    fn to_php_string(&self) -> BString {
         bconcat!(
             self.source,
             " ",

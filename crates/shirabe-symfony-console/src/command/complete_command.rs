@@ -11,9 +11,9 @@ use crate::output::OutputInterface;
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    FILE_APPEND, PHP_EOL, PHP_SERVER, PhpMixed, RuntimeException, basename, bconcat, ctype_digit,
-    date_utc, error_message, file_put_contents3, filter_var_boolean, getenv, impl_php_class,
-    implode, intval, path_from_bytes, php_str, sys_get_temp_dir,
+    FILE_APPEND, PHP_EOL, PHP_SERVER, PhpMixed, RuntimeException, Stringable, basename, bconcat,
+    ctype_digit, date_utc, error_message, file_put_contents3, filter_var_boolean, getenv,
+    impl_php_class, implode, intval, path_from_bytes, php_str, sys_get_temp_dir,
 };
 use std::ops::{Deref, DerefMut};
 
@@ -282,7 +282,7 @@ impl Command for CompleteCommand {
                 BString::default(),
                 bconcat!("<comment>", date_utc("Y-m-d H:i:s", None), "</>"),
                 BString::from("<info>Input:</> <comment>(\"|\" indicates the cursor position)</>"),
-                bconcat!("  ", completion_input.__to_string()),
+                bconcat!("  ", completion_input.to_php_string()),
                 BString::from("<info>Command:</>"),
                 bconcat!(
                     "  ",

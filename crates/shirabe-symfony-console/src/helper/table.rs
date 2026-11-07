@@ -9,9 +9,9 @@ use crate::output::{OUTPUT_NORMAL, OutputInterface};
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpMixed, array_splice, bconcat, explode, get_debug_type, http_build_query_mixed, implode,
-    mb_detect_encoding, mb_str_split, mb_strwidth, php_regex, preg_is_match, sprintf, str_pad,
-    str_repeat, str_replace, strlen, strstr, substr_count,
+    PhpMixed, Stringable, array_splice, bconcat, explode, get_debug_type, http_build_query_mixed,
+    implode, mb_detect_encoding, mb_str_split, mb_strwidth, php_regex, preg_is_match, sprintf,
+    str_pad, str_repeat, str_replace, strlen, strstr, substr_count,
 };
 
 /// A single cell within a table row.
@@ -62,15 +62,6 @@ impl Cell {
         }
     }
 
-    /// PHP `(string) $cell`.
-    fn to_php_string(&self) -> BString {
-        match self {
-            Cell::Null | Cell::Separator(_) => BString::default(),
-            Cell::Value(s) => s.clone(),
-            Cell::Cell(c) => c.to_php_string(),
-        }
-    }
-
     /// PHP truthiness / `!empty($cell)` for a cell value: only "" and "0" (and null) are falsy;
     /// any object is truthy.
     fn is_truthy(&self) -> bool {
@@ -83,6 +74,16 @@ impl Cell {
 
     fn is_null(&self) -> bool {
         matches!(self, Cell::Null)
+    }
+}
+
+impl Stringable for Cell {
+    fn to_php_string(&self) -> BString {
+        match self {
+            Cell::Null | Cell::Separator(_) => BString::default(),
+            Cell::Value(s) => s.clone(),
+            Cell::Cell(c) => c.to_php_string(),
+        }
     }
 }
 

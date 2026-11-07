@@ -8,8 +8,8 @@ use crate::input::{
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpResource, bconcat, php_regex, php_str, preg_match, str_replace_arr, stripcslashes, strlen,
-    substr,
+    PhpResource, Stringable, bconcat, php_regex, php_str, preg_match, str_replace_arr,
+    stripcslashes, strlen, substr,
 };
 
 /// StringInput represents an input provided as a string.
@@ -195,16 +195,18 @@ impl InputInterface for StringInput {
         self.inner.set_interactive(interactive)
     }
 
-    fn __to_string(&self) -> BString {
-        self.inner.__to_string()
-    }
-
     fn as_streamable(&self) -> Option<&dyn StreamableInputInterface> {
         Some(self)
     }
 
     fn as_streamable_mut(&mut self) -> Option<&mut dyn StreamableInputInterface> {
         Some(self)
+    }
+}
+
+impl Stringable for StringInput {
+    fn to_php_string(&self) -> BString {
+        self.inner.to_php_string()
     }
 }
 

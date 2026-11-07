@@ -10,7 +10,8 @@ use crate::dependency_resolver::operation::{
     UninstallOperation, UpdateOperation,
 };
 use crate::package::PackageInterfaceHandle;
-use bstr::BStr;
+use bstr::{BStr, BString};
+use shirabe_php_shim::Stringable;
 
 /// Any solver operation.
 #[derive(Debug, Clone)]
@@ -56,9 +57,9 @@ impl AnyOperation {
     }
 }
 
-impl std::fmt::Display for AnyOperation {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.show(false).display_lossy())
+impl Stringable for AnyOperation {
+    fn to_php_string(&self) -> BString {
+        self.show(false)
     }
 }
 

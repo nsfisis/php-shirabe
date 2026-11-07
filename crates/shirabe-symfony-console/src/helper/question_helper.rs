@@ -12,8 +12,8 @@ use crate::question::{ChoiceQuestion, QuestionInterface, array_key};
 use crate::terminal::Terminal;
 use bstr::{B, BStr, BString, ByteSlice};
 use shirabe_php_shim::{
-    Exception, PHP_EOL, PhpResource, SEEK_SET, bconcat, copy, dir, explode, feof, fgetc, fgets,
-    fopen, fread, fseek, ftell, function_exists, mb_detect_encoding, mb_strlen, ord,
+    Exception, PHP_EOL, PhpResource, SEEK_SET, Stringable, bconcat, copy, dir, explode, feof,
+    fgetc, fgets, fopen, fread, fseek, ftell, function_exists, mb_detect_encoding, mb_strlen, ord,
     path_from_bytes, path_to_bytes, php_fopen_resource, rewind, rtrim, sapi_windows_cp_conv,
     sapi_windows_cp_get, sapi_windows_cp_set, shell_exec, stdin, str_bitand, str_repeat,
     stream_copy_to_stream, stream_get_meta_data, stream_isatty_resource, stream_select,

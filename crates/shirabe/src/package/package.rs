@@ -8,8 +8,9 @@ use bstr::{BStr, BString, ByteSlice};
 use chrono::{DateTime, Utc};
 use indexmap::{IndexMap, IndexSet};
 use shirabe_php_shim::{
-    E_USER_DEPRECATED, LogicException, PhpMixed, PregMatches, bconcat, ltrim2, php_regex,
-    preg_is_match, preg_replace, preg_replace_callback, strpos, strtolower, trigger_error,
+    E_USER_DEPRECATED, LogicException, PhpMixed, PregMatches, Stringable, bconcat, ltrim2,
+    php_regex, preg_is_match, preg_replace, preg_replace_callback, strpos, strtolower,
+    trigger_error,
 };
 
 /// Mirror entry, e.g. `['url' => 'https://...', 'preferred' => true]`.
@@ -773,5 +774,11 @@ impl PackageInterface for Package {
     }
     fn set_source_dist_references(&mut self, reference: BString) {
         Package::set_source_dist_references(self, reference);
+    }
+}
+
+impl Stringable for Package {
+    fn to_php_string(&self) -> BString {
+        self.get_unique_name()
     }
 }

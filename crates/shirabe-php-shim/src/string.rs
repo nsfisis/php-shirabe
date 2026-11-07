@@ -8,6 +8,11 @@ pub use shirabe_php_src::standard::string::{addcslashes, strip_tags, stripcslash
 use shirabe_php_src::standard::string::{php_trim_mask, php_wordwrap};
 use shirabe_php_src::standard::strnatcmp::strnatcmp_ex;
 
+/// PHP's `Stringable`.
+pub trait Stringable {
+    fn to_php_string(&self) -> BString;
+}
+
 pub fn str_replace(
     search: impl AsRef<[u8]>,
     replace: impl AsRef<[u8]>,

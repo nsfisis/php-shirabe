@@ -2,7 +2,8 @@
 
 use super::rule::ReasonData;
 use crate::dependency_resolver::{Rule, RuleBase};
-use shirabe_php_shim::{RuntimeException, bconcat, hash_raw, implode};
+use bstr::BString;
+use shirabe_php_shim::{PhpConcat, RuntimeException, Stringable, bconcat, hash_raw, implode};
 
 #[derive(Debug)]
 pub struct GenericRule {
@@ -54,24 +55,23 @@ impl GenericRule {
     }
 }
 
-impl std::fmt::Display for GenericRule {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}",
-            if self.inner.is_disabled() {
-                "disabled("
-            } else {
-                "("
-            }
-        )?;
+impl Stringable for GenericRule {
+    fn to_php_string(&self) -> BString {
+        let mut result = BString::from(if self.inner.is_disabled() {
+            "disabled("
+        } else {
+            "("
+        });
 
         for (i, literal) in self.literals.iter().enumerate() {
             if i != 0 {
-                write!(f, "|")?;
+                result.push(b'|');
             }
-            write!(f, "{}", literal)?;
+            literal.php_concat_to(&mut result);
         }
-        write!(f, ")")
+
+        result.push(b')');
+
+        result
     }
 }

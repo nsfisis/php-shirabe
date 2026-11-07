@@ -123,7 +123,7 @@ fn constraint_from_wire(value: &PluginValue) -> Result<AnyConstraint, PhpThrow> 
                 ))
             })?;
             AnyConstraint::Simple(SimpleConstraint::new(
-                display_to_bytes(operator),
+                operator.as_str(),
                 property::<BString>("a semver constraint version", object.protected("version"))?,
                 pretty_string,
             ))
@@ -314,6 +314,7 @@ mod tests {
     use super::*;
     use bstr::{BStr, ByteSlice};
     use shirabe_php_rpc::value::serialize;
+    use shirabe_php_shim::Stringable;
 
     fn simple(operator: &BStr, version: &BStr, pretty_string: Option<&BStr>) -> AnyConstraint {
         AnyConstraint::Simple(SimpleConstraint::new(
