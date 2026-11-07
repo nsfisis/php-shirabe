@@ -1,0 +1,45 @@
+accepted = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Zlib",
+    "Unicode-3.0",
+    "MIT-0",
+    "bzip2-1.0.6",
+    "CDLA-Permissive-2.0",
+]
+targets = [
+    "x86_64-unknown-linux-musl",
+    "aarch64-unknown-linux-musl",
+    "aarch64-apple-darwin",
+]
+ignore-build-dependencies = true
+ignore-dev-dependencies = true
+
+[shirabe-php-src.clarify]
+license = "BSD-3-Clause AND Zlib"
+
+[[shirabe-php-src.clarify.files]]
+path = "LICENSE"
+license = "BSD-3-Clause"
+checksum = "eed2ef55b3758763bac528795075a646313057eb6897fb57bf1c49e8fef485a2"
+start = "Copyright © 1999–2026, The PHP Group"
+end = "OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE."
+
+[[shirabe-php-src.clarify.files]]
+path = "LICENSE"
+license = "Zlib"
+checksum = "8621bd193c0d7074242dbff754b54fd24abb9c76556d50b18fc419de6019b42c"
+start = "strnatcmp.c -- Perform"
+end = "3. This notice may not be removed or altered from any source distribution."
+
+[aws-lc-sys.clarify]
+license = "ISC AND (Apache-2.0 OR ISC) AND Apache-2.0 AND MIT AND BSD-3-Clause AND (Apache-2.0 OR ISC OR MIT) AND (Apache-2.0 OR ISC OR MIT-0)"
+
+[[aws-lc-sys.clarify.files]]
+path = "LICENSE"
+license = "Apache-2.0"
+checksum = "728536b4160e051f86d7c9c388f704866b3d512cd7df97ac3516c65279523c4e"

@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+#
+# Runs a release build of the Shirabe executable through the code paths that a packaged binary
+# must keep working: printing its version and starting the PHP worker, which opens the Composer
+# runtime bundle embedded in the executable. Needs `php` on PATH (or PHP_BINARY) but no network.
+#
+# Usage: scripts/release/smoke-test <path to the shirabe executable>
+
+set -euo pipefail
+
+if [[ $# -ne 1 ]]; then
+    echo "usage: $0 <path to the shirabe executable>" >&2
+    exit 2
+fi
+
+shirabe="$(realpath "$1")"
+work_dir="$(mktemp -d)"
+trap 'rm -rf "$work_dir"' EXIT
+
+export COMPOSER_HOME="$work_dir/home"
+export COMPOSER_CACHE_DIR="$work_dir/cache"
+export COMPOSER_NO_INTERACTION=1
+
+fail() {
+    echo "smoke test failed: $*" >&2
+    exit 1
+}
+
+echo "--- shirabe --version"
+"$shirabe" --version > "$work_dir/version.out" 2> "$work_dir/version.err" \
+    || fail "--version exited with $?"
+cat "$work_dir/version.out" "$work_dir/version.err"
+grep -q '^Shirabe version ' "$work_dir/version.out" || fail "--version printed no version"
+
+version="$(sed -n 's/^Shirabe version \([^ ]*\) .*/\1/p' "$work_dir/version.out")"
+if [[ "$version" == *-dev* ]]; then
+    if grep -q 'Shirabe is experimental' "$work_dir/version.err"; then
+        fail "a development build printed the experimental warning"
+    fi
+else
+    grep -q 'Shirabe is experimental' "$work_dir/version.err" \
+        || fail "a release build did not print the experimental warning"
+fi
+
+mkdir "$work_dir/project"
+cd "$work_dir/project"
+cat > composer.json <<'JSON'
+{
+    "scripts": {
+        "smoke": "Composer\\Config::disableProcessTimeout",
+        "missing": "Shirabe\\SmokeTest\\Missing::run"
+    }
+}
+JSON
+
+# A PHP callback script makes the PHP worker load the class through the autoloader of the
+# embedded bundle, so this fails if the worker cannot open the bundle.
+echo "--- shirabe run-script smoke"
+"$shirabe" run-script smoke > "$work_dir/smoke.out" 2>&1 || fail "run-script smoke exited with $?"
+cat "$work_dir/smoke.out"
+if grep -q 'not autoloadable\|not callable' "$work_dir/smoke.out"; then
+    fail "the PHP worker could not load Composer\\Config"
+fi
+
+# The negative case shows that the check above did go through the PHP worker.
+echo "--- shirabe run-script missing"
+"$shirabe" run-script missing > "$work_dir/missing.out" 2>&1 || fail "run-script missing exited with $?"
+cat "$work_dir/missing.out"
+grep -q 'Class Shirabe\\SmokeTest\\Missing is not autoloadable' "$work_dir/missing.out" \
+    || fail "the PHP worker did not report the missing class"
+
+echo "smoke test passed"
