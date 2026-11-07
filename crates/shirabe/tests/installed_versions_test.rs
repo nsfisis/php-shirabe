@@ -10,12 +10,12 @@ mod php_worker;
 
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
-use php_worker::{
-    load_composer_php_runtime, lock_php_worker, php_call_static, php_eval, php_single_quote,
-};
+use php_worker::{load_composer_php_runtime, lock_php_worker, php_call_static, php_eval};
 use shirabe::plugin::php_call::PhpCall;
 use shirabe_php_rpc::{PluginValue, ToWire};
-use shirabe_php_shim::{PhpMixed, bconcat, path_from_bytes, path_to_bytes, php_str, realpath};
+use shirabe_php_shim::{
+    PhpMixed, bconcat, path_from_bytes, path_to_bytes, php_str, realpath, var_export_str,
+};
 use tempfile::TempDir;
 
 const INSTALLED_VERSIONS: &BStr = php_str(b"Composer\\InstalledVersions");
@@ -58,9 +58,9 @@ fn set_up() -> SetUp {
 fn fixture_data(dir: &std::path::Path) -> PluginValue {
     php_eval(bconcat!(
         "$dir = ",
-        php_single_quote(path_to_bytes(dir)),
+        var_export_str(path_to_bytes(dir), true),
         ";\nreturn require ",
-        php_single_quote(path_to_bytes(&fixture_path("installed_relative.php"))),
+        var_export_str(path_to_bytes(&fixture_path("installed_relative.php")), true),
         ";",
     ))
 }

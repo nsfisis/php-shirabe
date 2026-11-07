@@ -1,6 +1,5 @@
 //! ref: composer/src/Composer/Repository/FilesystemRepository.php sha1:5d96f85f11239302b49400fe9625697a25ad0428
 
-use crate::config::is_php_integer_key;
 use crate::installer::InstallationManagerInterface;
 use crate::json::JsonFile;
 use crate::package::dumper::ArrayDumper;
@@ -18,9 +17,9 @@ use indexmap::IndexMap;
 use shirabe_php_rpc::ToWire;
 use shirabe_php_shim::{
     AnyThrowable, InvalidArgumentException, LogicException, PhpClass as _, PhpMixed,
-    UnexpectedValueException, array_flip, bconcat, dirname, error_message, get_debug_type,
-    in_array_strict, is_array, is_null, is_string, ksort, path_from_bytes, path_to_bytes, realpath,
-    str_repeat, strcmp, strnatcmp, usort, var_export,
+    UnexpectedValueException, array_flip, bconcat, canonical_int_key, dirname, error_message,
+    get_debug_type, in_array_strict, is_array, is_null, is_string, ksort, path_from_bytes,
+    path_to_bytes, realpath, str_repeat, strcmp, strnatcmp, usort, var_export,
 };
 use shirabe_semver::constraint::AnyConstraint;
 use std::path::Path;
@@ -404,7 +403,7 @@ impl FilesystemRepository {
 
         for (key, value) in array {
             lines.extend_from_slice(&str_repeat("    ", level as usize));
-            lines.extend_from_slice(&if is_php_integer_key(key) {
+            lines.extend_from_slice(&if canonical_int_key(key).is_some() {
                 bconcat!(key, " => ")
             } else {
                 bconcat!(var_export(&PhpMixed::String(key.clone()), true), " => ")

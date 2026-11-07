@@ -538,7 +538,7 @@ impl Config {
                 }
 
                 // store repo
-                let is_numeric_name = is_php_integer_key(name);
+                let is_numeric_name = canonical_int_key(name).is_some();
                 if is_numeric_name {
                     if !self.repositories.contains_key(name) {
                         self.repositories.insert(name.clone(), repository.clone());
@@ -1561,13 +1561,4 @@ impl Config {
         // Override global timeout set earlier by environment or config
         ProcessExecutor::set_timeout(0);
     }
-}
-
-/// Whether a string array key would have been coerced to an integer key by PHP.
-///
-/// PHP stores a string array key as an integer when it is a canonical decimal
-/// representation: "0", or an optionally negative sequence of digits with no
-/// leading zero and no leading plus sign, that fits in a platform integer.
-pub(crate) fn is_php_integer_key(key: &[u8]) -> bool {
-    canonical_int_key(key).is_some()
 }

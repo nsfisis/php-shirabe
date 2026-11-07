@@ -12,7 +12,7 @@
 use anyhow::bail;
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe_php_shim::{bconcat, utf8_text};
+use shirabe_php_shim::{bconcat, canonical_int_key, utf8_text};
 use std::sync::{Arc, LazyLock, Mutex, MutexGuard, Weak};
 
 /// A handle to an object whose entity lives on the Rust side. PHP holds a thin proxy stub.
@@ -352,22 +352,6 @@ fn serialize_map(map: &IndexMap<BString, PluginValue>, out: &mut Vec<u8>) {
         serialize_into(value, out);
     }
     out.push(b'}');
-}
-
-/// PHP canonicalizes array keys: a string key that is the canonical decimal form of an integer
-/// (no leading zeros, no `-0`, within the platform int range) is stored as an int key, so such a
-/// key can never appear as `s:...` on the wire.
-fn canonical_int_key(key: &[u8]) -> Option<i64> {
-    if key == b"0" {
-        return Some(0);
-    }
-    let digits = key.strip_prefix(b"-").unwrap_or(key);
-    match digits {
-        [b'1'..=b'9', rest @ ..] if rest.iter().all(u8::is_ascii_digit) => {
-            utf8_text(key)?.parse().ok()
-        }
-        _ => None,
-    }
 }
 
 /// Decodes a whole `serialize()` payload into a `PluginValue`, rejecting trailing garbage.

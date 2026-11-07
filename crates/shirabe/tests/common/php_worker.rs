@@ -4,10 +4,9 @@
 //! `#[path = "../common/php_worker.rs"] mod php_worker;`.
 #![allow(dead_code)]
 
-use bstr::{BStr, BString};
+use bstr::BStr;
 use shirabe::plugin::php_call::PhpCall;
 use shirabe_php_rpc::PluginValue;
-use shirabe_php_shim::{bconcat, str_replace};
 
 /// All tests in one binary share the single PHP worker, whose loaded-class table and class statics
 /// persist across tests just like PHPUnit's single-process runs. Interleaving two tests would let
@@ -63,10 +62,4 @@ pub fn php_eval(code: impl AsRef<[u8]>) -> PluginValue {
         .try_run(vec![PluginValue::string(code.as_ref())])
         .expect("eval request failed")
         .expect("eval threw")
-}
-
-/// Quotes a string as a PHP single-quoted literal for a generated snippet.
-pub fn php_single_quote(value: impl AsRef<[u8]>) -> BString {
-    let escaped = str_replace("'", "\\'", str_replace("\\", "\\\\", value));
-    bconcat!("'", escaped, "'")
 }

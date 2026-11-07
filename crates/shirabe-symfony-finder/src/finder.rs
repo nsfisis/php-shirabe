@@ -11,12 +11,11 @@ use bstr::{BStr, BString, ByteSlice};
 use chrono::{DateTime, TimeZone};
 use indexmap::IndexSet;
 use shirabe_php_shim::{
-    GLOB_BRACE, GLOB_ONLYDIR, bconcat, file_exists, glob_with_flags, implode, is_dir,
-    loosely_compare, path_from_bytes, path_to_bytes, php_regex, php_str, preg_is_match, preg_match,
-    preg_quote, rtrim_chars, str_replace,
+    GLOB_BRACE, GLOB_ONLYDIR, bconcat, file_exists, fileatime, filemtime, glob_with_flags, implode,
+    is_dir, loosely_compare, path_from_bytes, path_to_bytes, php_regex, php_str, preg_is_match,
+    preg_match, preg_quote, realpath, rtrim_chars, str_replace,
 };
 use std::path::{Path, PathBuf};
-use std::time::UNIX_EPOCH;
 
 const IGNORE_VCS_FILES: i64 = 1;
 const IGNORE_DOT_FILES: i64 = 2;
@@ -432,7 +431,9 @@ impl Finder {
                 if !file_exists(&entry.pathname) {
                     continue;
                 }
-                let filedate = mtime(&entry.pathname);
+                // TODO(error-model): SplFileInfo::getMTime() throws a RuntimeException when stat
+                // fails (e.g. the file vanished after file_exists()); it is not propagated here.
+                let filedate = filemtime(&entry.pathname).expect("filemtime() failed");
                 if !self.dates.iter().all(|(operator, target)| {
                     comparator_test(operator.as_bstr(), filedate, *target)
                 }) {
@@ -551,8 +552,8 @@ impl Finder {
             }
             Sort::ByName => {
                 entries.sort_by(|a, b| {
-                    let pa = realpath_or_pathname(&a.pathname);
-                    let pb = realpath_or_pathname(&b.pathname);
+                    let pa = realpath(&a.pathname).unwrap_or_else(|| a.pathname.clone());
+                    let pb = realpath(&b.pathname).unwrap_or_else(|| b.pathname.clone());
                     apply_order(
                         pa.as_os_str()
                             .as_encoded_bytes()
@@ -562,7 +563,10 @@ impl Finder {
                 });
             }
             Sort::ByAccessedTime => {
+                // TODO(error-model): SplFileInfo::getATime() throws a RuntimeException when stat
+                // fails; the sort comparator cannot propagate it.
                 entries.sort_by(|a, b| {
+                    let atime = |path: &Path| fileatime(path).expect("fileatime() failed");
                     apply_order((atime(&a.pathname) - atime(&b.pathname)).cmp(&0), order)
                 });
             }
@@ -721,31 +725,6 @@ fn apply_order(ordering: std::cmp::Ordering, order: i64) -> std::cmp::Ordering {
     } else {
         ordering
     }
-}
-
-/// `$file->getRealPath() ?: $file->getPathname()`.
-fn realpath_or_pathname(path: &Path) -> std::path::PathBuf {
-    std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf())
-}
-
-fn mtime(path: &Path) -> i64 {
-    file_unix_time(path, |metadata| metadata.modified())
-}
-
-fn atime(path: &Path) -> i64 {
-    file_unix_time(path, |metadata| metadata.accessed())
-}
-
-fn file_unix_time(
-    path: &Path,
-    accessor: fn(&std::fs::Metadata) -> std::io::Result<std::time::SystemTime>,
-) -> i64 {
-    std::fs::metadata(path)
-        .ok()
-        .and_then(|metadata| accessor(&metadata).ok())
-        .and_then(|time| time.duration_since(UNIX_EPOCH).ok())
-        .map(|duration| duration.as_secs() as i64)
-        .unwrap_or(0)
 }
 
 #[derive(Debug)]

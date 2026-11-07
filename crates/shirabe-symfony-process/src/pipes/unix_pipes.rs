@@ -4,9 +4,7 @@ use crate::pipes::abstract_pipes::AbstractPipes;
 use crate::pipes::pipes_interface::{CHUNK_SIZE, PipesInterface};
 use crate::process::Process;
 use indexmap::IndexMap;
-use shirabe_php_shim::{
-    Descriptor, PhpMixed, PhpResource, bconcat, fclose, feof, fread, stream_select,
-};
+use shirabe_php_shim::{Descriptor, PhpMixed, PhpResource, fclose, feof, fread, stream_select};
 
 /// UnixPipes implementation uses unix pipes as handles.
 #[derive(Debug)]
@@ -24,28 +22,20 @@ impl UnixPipes {
     }
 }
 
-fn descriptor(items: &[&[u8]]) -> Descriptor {
-    match items {
-        [b"pipe", mode] => Descriptor::Pipe(bconcat!(mode)),
-        [b"file", path, mode] => Descriptor::File(bconcat!(path), bconcat!(mode)),
-        _ => panic!("unsupported descriptor spec: {:?}", items),
-    }
-}
-
 impl PipesInterface for UnixPipes {
     fn get_descriptors(&mut self) -> Vec<Descriptor> {
         if self.tty_mode == Some(true) {
             return vec![
-                descriptor(&[b"file", b"/dev/tty", b"r"]),
-                descriptor(&[b"file", b"/dev/tty", b"w"]),
-                descriptor(&[b"file", b"/dev/tty", b"w"]),
+                Descriptor::File("/dev/tty".into(), "r".into()),
+                Descriptor::File("/dev/tty".into(), "w".into()),
+                Descriptor::File("/dev/tty".into(), "w".into()),
             ];
         }
 
         vec![
-            descriptor(&[b"pipe", b"r"]),
-            descriptor(&[b"pipe", b"w"]),
-            descriptor(&[b"pipe", b"w"]),
+            Descriptor::Pipe("r".into()),
+            Descriptor::Pipe("w".into()),
+            Descriptor::Pipe("w".into()),
         ]
     }
 

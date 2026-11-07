@@ -2,7 +2,7 @@
 
 use crate::io_mock::{Expectation, get_io_mock};
 use crate::io_stub::IOStub;
-use crate::php_worker::{load_composer_php_runtime, php_eval, php_single_quote};
+use crate::php_worker::{load_composer_php_runtime, php_eval};
 use crate::process_executor_mock::{ProcessExecutorMockGuard, cmd, get_process_executor_mock};
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
@@ -29,6 +29,7 @@ use shirabe::util::process_executor::{MockHandler, ProcessExecutor};
 use shirabe_class_map_generator::class_map::ClassMap;
 use shirabe_php_shim::{
     Catch as _, PHP_EOL, PhpMixed, RuntimeException, bconcat, error_message, getenv, path_to_bytes,
+    var_export_str,
 };
 use shirabe_symfony_console::output::output_interface;
 
@@ -117,7 +118,7 @@ fn load_php_listener_class() {
             composer_test_dir().join("EventDispatcher/EventDispatcherTest.php"),
         ] {
             let path = path_to_bytes(&file);
-            php_eval(bconcat!("require ", php_single_quote(path), ";"));
+            php_eval(bconcat!("require ", var_export_str(path, true), ";"));
         }
     });
 }

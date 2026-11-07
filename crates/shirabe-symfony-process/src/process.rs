@@ -92,30 +92,6 @@ impl std::fmt::Debug for Process {
     }
 }
 
-fn descriptor(items: &[&[u8]]) -> Descriptor {
-    match items {
-        [b"pipe", mode] => Descriptor::Pipe(bconcat!(mode)),
-        [b"file", path, mode] => Descriptor::File(bconcat!(path), bconcat!(mode)),
-        _ => panic!("unsupported descriptor spec: {:?}", items),
-    }
-}
-
-/// PHP `(string)` cast for an environment value or stream payload.
-fn to_php_string(value: &PhpMixed) -> BString {
-    match value {
-        PhpMixed::String(s) => s.clone(),
-        PhpMixed::Int(_) | PhpMixed::Float(_) => php_to_string(value),
-        PhpMixed::Bool(b) => {
-            if *b {
-                "1".into()
-            } else {
-                BString::default()
-            }
-        }
-        _ => BString::default(),
-    }
-}
-
 impl Process {
     pub const ERR: &'static BStr = php_str(b"err");
     pub const OUT: &'static BStr = php_str(b"out");
@@ -339,7 +315,7 @@ impl Process {
                     .iter()
                     .any(|name| k == name)
             {
-                env_pairs.push(bconcat!(k, "=", to_php_string(v)));
+                env_pairs.push(bconcat!(k, "=", php_to_string(v)));
             }
         }
 
@@ -737,9 +713,9 @@ impl Process {
             proc_open(
                 "echo 1 >/dev/null",
                 &[
-                    descriptor(&[b"file", b"/dev/tty", b"r"]),
-                    descriptor(&[b"file", b"/dev/tty", b"w"]),
-                    descriptor(&[b"file", b"/dev/tty", b"w"]),
+                    Descriptor::File("/dev/tty".into(), "r".into()),
+                    Descriptor::File("/dev/tty".into(), "w".into()),
+                    Descriptor::File("/dev/tty".into(), "w".into()),
                 ],
                 &mut pipes,
                 None,
@@ -1154,7 +1130,7 @@ impl Process {
                         commandline
                     ))
                     .into()),
-                    Some(v) => Ok(self.escape_argument(Some(&to_php_string(v)))),
+                    Some(v) => Ok(self.escape_argument(Some(&php_to_string(v)))),
                 }
             },
             commandline,

@@ -40,7 +40,7 @@ use shirabe_php_shim::{
     explode_with_limit, file_exists, get_class, hash, implode, ini_get, is_callable, is_dir,
     is_object, krsort, os_str_from_bytes, path_from_bytes, path_to_bytes, php_regex, preg_is_match,
     preg_match, preg_quote, preg_replace, preg_replace_callback, realpath, str_replace, strlen,
-    strpos, strtoupper, substr, trim_chars,
+    strpos, strtoupper, substr, trim_chars, var_export_str,
 };
 use shirabe_symfony_console::output::output_interface;
 use shirabe_symfony_process::{ExecutableFinder, PhpExecutableFinder};
@@ -774,7 +774,7 @@ impl EventDispatcher {
                         };
                         let snippet = bconcat!(
                             "\n$className = ",
-                            php_single_quote(class_name.as_ref()),
+                            var_export_str(&class_name, true),
                             r#";
 $app = new \Symfony\Component\Console\Application();
 $app->setCatchExceptions(false);
@@ -783,7 +783,7 @@ if (method_exists($app, 'setCatchErrors')) {
 }
 $app->setAutoExit(false);
 $cmd = new $className("#,
-                            php_single_quote(event_name.as_bstr()),
+                            var_export_str(&event_name, true),
                             r#");
 if (method_exists($app, 'addCommand')) {
     $app->addCommand($cmd);
@@ -802,7 +802,7 @@ $output = new \Symfony\Component\Console\Output\BufferedOutput("#,
                             r#");
 try {
     $status = $app->run(new \Symfony\Component\Console\Input\StringInput("#,
-                            php_single_quote(string_input.as_ref()),
+                            var_export_str(&string_input, true),
                             r#"), $output);
     return ['status' => $status, 'output' => $output->fetch(), 'throw' => null, 'caught' => false];
 } catch (\Throwable $e) {
@@ -1823,11 +1823,6 @@ fn package_event(event: &dyn EventInterface) -> Option<&PackageEvent> {
 
 fn installer_event(event: &dyn EventInterface) -> Option<&InstallerEvent> {
     event.as_any().downcast_ref::<InstallerEvent>()
-}
-
-/// Quotes a string as a PHP single-quoted literal for a generated snippet.
-fn php_single_quote(value: &BStr) -> BString {
-    bconcat!("'", value.replace("\\", "\\\\").replace("'", "\\'"), "'")
 }
 
 // Composer's PartialComposer::setEventDispatcher() accepts any EventDispatcher subclass, so plugins
