@@ -6,6 +6,7 @@
 
 use crate::async_runtime::run;
 use crate::io_stub::IOStub;
+use crate::test_case::get_unique_tmp_directory;
 use bstr::{BString, ByteSlice};
 use indexmap::IndexMap;
 use serial_test::serial;
@@ -40,7 +41,7 @@ struct SetUp {
 /// the `extract` path exercised by the ported tests), and the package is a real CompletePackage whose
 /// `getName()` is `test/pkg`, matching the PHP mock's `->method('getName')->willReturn('test/pkg')`.
 fn set_up() -> SetUp {
-    let test_dir = TempDir::new().unwrap();
+    let test_dir = get_unique_tmp_directory();
 
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(IOStub::new()));
@@ -122,7 +123,7 @@ fn make_downloader_with_process(
 fn test_error_messages() {
     // class_exists('ZipArchive') is always true in Shirabe, which implements ZipArchive natively, so
     // the zip-extension-missing skip never applies here.
-    let test_dir = TempDir::new().unwrap();
+    let test_dir = get_unique_tmp_directory();
     let _tear_down = TearDown::new(test_dir.path().to_path_buf());
 
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =

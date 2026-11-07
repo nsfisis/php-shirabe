@@ -25,7 +25,8 @@ use shirabe::util::platform::Platform;
 use shirabe::util::process_executor::ProcessExecutor;
 use shirabe_php_shim::{
     PHP_ENV, PHP_EOL, PHP_SERVER, PhpResource, bconcat, function_exists, fwrite_resource, getenv,
-    path_from_bytes, path_to_bytes, php_fopen_resource, putenv, rewind, stream_get_contents,
+    path_from_bytes, path_to_bytes, php_fopen_resource, putenv, realpath, rewind,
+    stream_get_contents, sys_get_temp_dir,
 };
 use shirabe_semver::VersionParser;
 use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
@@ -37,6 +38,19 @@ use shirabe_symfony_console::output::{
 };
 use std::path::PathBuf;
 use tempfile::TempDir;
+
+/// ref: TestCase::getUniqueTmpDirectory
+///
+/// The directory is created under the realpath of the system temp dir, so its path is a realpath
+/// as in PHP. The returned guard removes the tree on drop, standing in for the removal each PHP
+/// caller does in `tearDown`; use `TempDir::keep` where the caller removes it explicitly.
+pub fn get_unique_tmp_directory() -> TempDir {
+    let root = realpath(sys_get_temp_dir()).expect("the system temp dir exists");
+    tempfile::Builder::new()
+        .prefix("composer-test-")
+        .tempdir_in(root)
+        .expect("Failed to create a unique temporary directory.")
+}
 
 /// ref: TestCase::getPackage (default class CompletePackage)
 pub fn get_package(name: impl AsRef<[u8]>, version: impl AsRef<[u8]>) -> PackageInterfaceHandle {
@@ -127,7 +141,7 @@ pub fn init_temp_composer(
     composer_lock: Option<&serde_json::Value>,
     setup_repositories: bool,
 ) -> TearDown {
-    let temp_dir = TempDir::new().unwrap();
+    let temp_dir = get_unique_tmp_directory();
     let dir = temp_dir.path().to_path_buf();
 
     let prev_cwd = std::env::current_dir().unwrap();

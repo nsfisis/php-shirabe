@@ -1,9 +1,13 @@
 #[path = "../common/async_runtime.rs"]
 mod async_runtime;
+#[path = "../common/bootstrap.rs"]
+mod bootstrap;
 #[path = "../common/config_stub.rs"]
 mod config_stub;
 #[path = "../common/php_worker.rs"]
 mod php_worker;
+#[path = "../common/test_case.rs"]
+mod test_case;
 
 mod alias_package_test;
 mod anonymous_class_message_test;

@@ -1,7 +1,7 @@
 //! ref: composer/tests/Composer/Test/Repository/FilesystemRepositoryTest.php sha1:4154499d3819d9388049af193e825d43d1ef8fae
 
 use crate::php_worker::{load_composer_php_runtime, php_call_static};
-use crate::test_case::{get_alias_package, get_package};
+use crate::test_case::{get_alias_package, get_package, get_unique_tmp_directory};
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use serial_test::serial;
@@ -200,7 +200,7 @@ struct CwdGuard {
 
 impl CwdGuard {
     fn new() -> Self {
-        let temp = tempfile::TempDir::new().unwrap();
+        let temp = get_unique_tmp_directory();
         let prev_cwd = std::env::current_dir().unwrap();
         std::env::set_current_dir(temp.path()).unwrap();
         Self { temp, prev_cwd }

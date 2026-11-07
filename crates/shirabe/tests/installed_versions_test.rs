@@ -5,9 +5,14 @@
 //! PHP class there, autoloaded from the Composer checkout's vendor directory just as PHPUnit
 //! autoloads it upstream, so `$selfDir` and the registered `ClassLoader` match the upstream run.
 
+#[path = "common/bootstrap.rs"]
+mod bootstrap;
 #[path = "common/php_worker.rs"]
 mod php_worker;
+#[path = "common/test_case.rs"]
+mod test_case;
 
+use crate::test_case::get_unique_tmp_directory;
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use php_worker::{load_composer_php_runtime, lock_php_worker, php_call_static, php_eval};
@@ -47,7 +52,7 @@ fn set_up() -> SetUp {
         return true;",
     );
 
-    let root = TempDir::new().unwrap();
+    let root = get_unique_tmp_directory();
     let data = fixture_data(root.path());
     call_static(BStr::new("reload"), vec![data]);
     SetUp { root }

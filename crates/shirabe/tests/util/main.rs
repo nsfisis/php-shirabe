@@ -1,3 +1,5 @@
+#[path = "../common/bootstrap.rs"]
+mod bootstrap;
 #[path = "../common/config_stub.rs"]
 mod config_stub;
 #[path = "../common/http_downloader_mock.rs"]
@@ -8,6 +10,8 @@ mod io_mock;
 mod io_stub;
 #[path = "../common/process_executor_mock.rs"]
 mod process_executor_mock;
+#[path = "../common/test_case.rs"]
+mod test_case;
 
 mod auth_helper_test;
 mod bitbucket_test;

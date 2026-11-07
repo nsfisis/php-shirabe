@@ -1,5 +1,6 @@
 //! ref: composer/tests/Composer/Test/Repository/Vcs/FossilDriverTest.php sha1:34866db75424df152980619fff8ccb23c4fce503
 
+use crate::test_case::get_unique_tmp_directory;
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe::config::Config;
@@ -16,7 +17,7 @@ struct SetUp {
 }
 
 fn set_up() -> SetUp {
-    let home = TempDir::new().unwrap();
+    let home = get_unique_tmp_directory();
     let mut config = Config::new(true, None);
     let mut top: IndexMap<BString, PhpMixed> = IndexMap::new();
     let mut config_section: IndexMap<BString, PhpMixed> = IndexMap::new();

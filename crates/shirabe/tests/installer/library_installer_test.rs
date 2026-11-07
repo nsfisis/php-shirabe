@@ -1,7 +1,7 @@
 //! ref: composer/tests/Composer/Test/Installer/LibraryInstallerTest.php sha1:b328e8e7890fcfd29a72381402e4de514b0ab77a
 
 use crate::async_runtime::run;
-use crate::test_case::get_package;
+use crate::test_case::{get_package, get_unique_tmp_directory};
 use bstr::BString;
 use indexmap::IndexMap;
 use shirabe::composer::{
@@ -133,8 +133,8 @@ fn set_download_manager(setup: &SetUp, dm: MockDownloadManager) {
 fn set_up() -> SetUp {
     let fs = Filesystem::new(None);
 
-    let root = TempDir::new().unwrap();
-    let root_dir = fs::canonicalize(root.path()).unwrap();
+    let root = get_unique_tmp_directory();
+    let root_dir = root.path().to_path_buf();
 
     let vendor_dir = root_dir.join("vendor");
     fs::create_dir_all(&vendor_dir).unwrap();

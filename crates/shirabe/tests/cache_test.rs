@@ -1,5 +1,11 @@
 //! ref: composer/tests/Composer/Test/CacheTest.php sha1:7fe2a014d894e069a4fcc574ab2f83e1b726f146
 
+#[path = "common/bootstrap.rs"]
+mod bootstrap;
+#[path = "common/test_case.rs"]
+mod test_case;
+
+use crate::test_case::get_unique_tmp_directory;
 use bstr::BStr;
 use shirabe::cache::{Cache, CacheMock, GcFinderMock};
 use shirabe::io::IOInterface;
@@ -16,7 +22,7 @@ struct SetUp {
 }
 
 fn set_up() -> SetUp {
-    let root = TempDir::new().unwrap();
+    let root = get_unique_tmp_directory();
     let mut files: Vec<std::path::PathBuf> = Vec::new();
     let zeros = "0".repeat(1000);
 
@@ -115,7 +121,7 @@ fn test_remove_files_when_cache_is_too_large() {
 
 #[test]
 fn test_clear_cache() {
-    let root = TempDir::new().unwrap();
+    let root = get_unique_tmp_directory();
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
     let mut cache = Cache::new(io, root.path(), Some(BStr::new("a-z0-9.")), None, false);

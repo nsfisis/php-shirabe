@@ -3,6 +3,7 @@
 // These exercise Filesystem path helpers and on-disk operations (sizes, copy, symlinks and
 // junctions over a temp tree). The on-disk tests build their temp tree with tempfile::TempDir in
 // place of TestCase::getUniqueTmpDirectory, which is not ported.
+use crate::test_case::get_unique_tmp_directory;
 use bstr::{BStr, ByteSlice};
 use shirabe::util::filesystem::Filesystem;
 use shirabe::util::platform::Platform;
@@ -685,7 +686,7 @@ fn test_find_shortest_path() {
 
 #[test]
 fn test_remove_directory_php() {
-    let working_dir = tempfile::TempDir::new().unwrap();
+    let working_dir = get_unique_tmp_directory();
     let working_dir = working_dir.path().to_path_buf();
 
     mkdir(working_dir.join("level1/level2"), 0o777, true);
@@ -698,7 +699,7 @@ fn test_remove_directory_php() {
 
 #[test]
 fn test_file_size() {
-    let unique_tmp = tempfile::TempDir::new().unwrap();
+    let unique_tmp = get_unique_tmp_directory();
     let test_file = unique_tmp.path().join("composer_test_file");
 
     file_put_contents(&test_file, b"Hello");
@@ -709,7 +710,7 @@ fn test_file_size() {
 
 #[test]
 fn test_directory_size() {
-    let working_dir = tempfile::TempDir::new().unwrap();
+    let working_dir = get_unique_tmp_directory();
     let working_dir = working_dir.path().to_path_buf();
 
     mkdir(&working_dir, 0o777, true);
@@ -768,7 +769,7 @@ fn test_normalize_path() {
 
 #[test]
 fn test_unlink_symlinked_directory() {
-    let working_dir = tempfile::TempDir::new().unwrap();
+    let working_dir = get_unique_tmp_directory();
     let basepath = working_dir.path().to_path_buf();
     let symlinked = basepath.join("linked");
     mkdir(basepath.join("real"), 0o777, true);
@@ -793,7 +794,7 @@ fn test_unlink_symlinked_directory() {
 
 #[test]
 fn test_remove_symlinked_directory_with_trailing_slash() {
-    let working_dir = tempfile::TempDir::new().unwrap();
+    let working_dir = get_unique_tmp_directory();
     let working_dir = working_dir.path().to_path_buf();
 
     mkdir(working_dir.join("real"), 0o777, true);
@@ -826,7 +827,7 @@ fn test_remove_symlinked_directory_with_trailing_slash() {
 
 #[test]
 fn test_junctions() {
-    let working_dir = tempfile::TempDir::new().unwrap();
+    let working_dir = get_unique_tmp_directory();
     let working_dir = working_dir.path().to_path_buf();
 
     mkdir(working_dir.join("real/nesting/testing"), 0o777, true);
@@ -897,7 +898,7 @@ fn test_override_junctions() {
         return;
     }
 
-    let working_dir = tempfile::TempDir::new().unwrap();
+    let working_dir = get_unique_tmp_directory();
     let working_dir = working_dir.path().to_path_buf();
 
     mkdir(working_dir.join("real/nesting/testing"), 0o777, true);
@@ -948,9 +949,9 @@ fn test_override_junctions() {
 
 #[test]
 fn test_copy() {
-    let working_dir = tempfile::TempDir::new().unwrap();
+    let working_dir = get_unique_tmp_directory();
     let working_dir = working_dir.path().to_path_buf();
-    let unique_tmp = tempfile::TempDir::new().unwrap();
+    let unique_tmp = get_unique_tmp_directory();
     let test_file = unique_tmp.path().join("composer_test_file");
 
     mkdir(working_dir.join("foo/bar"), 0o777, true);
@@ -1006,9 +1007,9 @@ fn test_copy() {
 
 #[test]
 fn test_copy_then_remove() {
-    let working_dir = tempfile::TempDir::new().unwrap();
+    let working_dir = get_unique_tmp_directory();
     let working_dir = working_dir.path().to_path_buf();
-    let unique_tmp = tempfile::TempDir::new().unwrap();
+    let unique_tmp = get_unique_tmp_directory();
     let test_file = unique_tmp.path().join("composer_test_file");
 
     mkdir(working_dir.join("foo/bar"), 0o777, true);

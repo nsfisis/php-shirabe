@@ -1,5 +1,6 @@
 //! ref: composer/tests/Composer/Test/Package/Archiver/ZipArchiverTest.php sha1:0c48cf2bc2810e10439d89b1d11ec8c133635320
 
+use crate::test_case::get_unique_tmp_directory;
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use serial_test::serial;
@@ -29,7 +30,7 @@ impl Drop for ArchiverTestCase {
 
 impl ArchiverTestCase {
     fn set_up() -> Self {
-        let guard = TempDir::new().unwrap();
+        let guard = get_unique_tmp_directory();
         let test_dir = guard.path().to_path_buf();
         Self {
             test_dir,

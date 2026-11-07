@@ -1,6 +1,7 @@
 //! ref: composer/tests/Composer/Test/Downloader/XzDownloaderTest.php sha1:a64362aa02e8f92c98f1ad72f81f23d2a656873d
 
 use crate::async_runtime::run;
+use crate::test_case::get_unique_tmp_directory;
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe::config::Config;
@@ -25,7 +26,7 @@ fn get_package(name: &BStr, version: &BStr) -> PackageInterfaceHandle {
 /// ref: setUp markTestSkipped on Windows / 32bit, expressed as a compile-time
 /// cfg gate on the test function below.
 fn set_up() -> TempDir {
-    TempDir::new().unwrap()
+    get_unique_tmp_directory()
 }
 
 fn tear_down(test_dir: &std::path::Path) {

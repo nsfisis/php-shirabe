@@ -1,5 +1,6 @@
 //! ref: composer/tests/Composer/Test/Config/JsonConfigSourceTest.php sha1:97705eb746c7a88f7083059db9ba74d3e6d0f1ac
 
+use crate::test_case::get_unique_tmp_directory;
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe::config::{ConfigSourceInterface, JsonConfigSource};
@@ -11,8 +12,7 @@ use tempfile::TempDir;
 
 fn set_up() -> TearDown {
     let fs = Filesystem::new(None);
-    // getUniqueTmpDirectory creates a fresh unique temp directory.
-    let working_dir = TempDir::new().unwrap();
+    let working_dir = get_unique_tmp_directory();
     TearDown { fs, working_dir }
 }
 

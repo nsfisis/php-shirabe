@@ -1,6 +1,6 @@
 //! ref: composer/tests/Composer/Test/Installer/BinaryInstallerTest.php sha1:d7895f44cd080bd7f8b6faa332f2a81cbe827305
 
-use crate::test_case::get_package;
+use crate::test_case::{get_package, get_unique_tmp_directory};
 use base64::Engine;
 use bstr::{BStr, BString};
 use shirabe::installer::BinaryInstaller;
@@ -24,8 +24,8 @@ struct SetUp {
 fn set_up() -> SetUp {
     let fs = Filesystem::new(None);
 
-    let root = TempDir::new().unwrap();
-    let root_dir = fs::canonicalize(root.path()).unwrap();
+    let root = get_unique_tmp_directory();
+    let root_dir = root.path().to_path_buf();
 
     let vendor_dir = root_dir.join("vendor");
     fs::create_dir_all(&vendor_dir).unwrap();
