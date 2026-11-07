@@ -1,0 +1,38 @@
+#!/bin/sh
+# Fetches the external plugin the E2E test runs against, into the git-ignored ext/
+# directory. The plugin is pinned to an immutable upstream commit and the extracted
+# files are verified by hash, so the test stays deterministic without the third-party
+# source ever entering this repository. Requires network once; the E2E test skips
+# itself while ext/ is absent.
+set -eu
+
+# symfony/runtime v8.1.11
+commit=c673bbd5997f0039b27810b5e1f4eb70b172917b
+# GitHub archives are content-addressed by the commit, but the archive encoding is not
+# guaranteed stable; the extracted files are what the test consumes, so they are what
+# gets pinned, as one digest over the sorted per-file digests.
+expected=5f116fc23bb883d5d7314fe53862d2d13aa3ddf76a14fd633c54de525c65e50f
+
+ext="$(dirname "$0")/ext"
+dir="$ext/symfony-runtime-8.1.11"
+
+if [ -f "$dir/Internal/ComposerPlugin.php" ]; then
+    exit 0
+fi
+
+# Staged next to the destination and only moved into place once verified, so a mismatched
+# tree is never observable under the name the test looks for.
+staging="$ext/.staging-$commit"
+mkdir -p "$staging"
+curl -fsSL "https://codeload.github.com/symfony/runtime/tar.gz/$commit" \
+    | tar -xz -C "$staging" --strip-components=1
+
+actual=$(cd "$staging" && find . -type f | sort | xargs sha256sum | sha256sum | cut -d' ' -f1)
+if [ "$actual" != "$expected" ]; then
+    echo "hash mismatch: expected $expected, got $actual" >&2
+    echo "the fetched tree was left in $staging for inspection; delete it before retrying" >&2
+    exit 1
+fi
+
+mv "$staging" "$dir"
+echo "fetched: $dir"

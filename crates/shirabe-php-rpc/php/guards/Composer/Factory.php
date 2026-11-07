@@ -5,6 +5,7 @@
 // The Rust side owns this class and the worker has no proxy for it, so this
 // declaration shadows the real one: the constants and the hierarchy stay, while
 // constructing it or calling anything on it raises an explicit error.
+// Composer\Factory::getComposerFile() is the exception: it forwards to the Rust side.
 
 namespace Composer;
 
@@ -47,9 +48,10 @@ class Factory
         \ShirabeUnsupportedClass::fail(self::class, 'createConfig');
     }
 
+    // Forwarded rather than guarded: it only reads the COMPOSER environment variable, whose value the Rust side owns.
     public static function getComposerFile(): string
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getComposerFile');
+        return \ShirabeRpcRuntime::callRust(0, '__shirabe_call_static', [self::class, 'getComposerFile', []]);
     }
 
     public static function getLockFile(string $composerFile): string

@@ -24,7 +24,8 @@ use PhpParser\ParserFactory;
  *
  * The forwarding side is read from the PHP classes the worker resolves proxied FQCNs to (the
  * generated stubs and the hand-written runtime classes): every `\ShirabeRpcRuntime::callRust` on
- * the instance handle, every `__shirabe_construct` and every `__shirabe_call_static`. The
+ * the instance handle, every `__shirabe_construct` and every `__shirabe_call_static`, plus the
+ * `__shirabe_call_static` forwards of the guard classes. The
  * answering side is read from the `match` arms of the Rust dispatchers that serve them: the
  * functions `dispatchers.list` names for each class, `construct_entity` and `call_static_entity`.
  *
@@ -55,11 +56,15 @@ final class SurfaceManifest
      * @param array<string, list<string>> $dispatchers FQCN => the Rust functions answering its
      *                                                 instance methods; empty for a class no
      *                                                 entity is handed out as
+     * @param list<string> $guardDirs the directories of the guard classes; only the static
+     *                                methods a guard forwards are read from them, since every
+     *                                other member of a guard is an explicit error
      */
     public function __construct(
         private readonly array $phpDirs,
         private readonly string $rustSourceDir,
         private readonly array $dispatchers,
+        private readonly array $guardDirs = [],
     ) {
     }
 
@@ -218,7 +223,11 @@ final class SurfaceManifest
     {
         $parser = (new ParserFactory())->createForNewestSupportedVersion();
         $finder = new NodeFinder();
-        foreach ($this->phpDirs as $dir) {
+        $dirs = array_merge(
+            array_map(static fn (string $dir): array => [$dir, false], $this->phpDirs),
+            array_map(static fn (string $dir): array => [$dir, true], $this->guardDirs),
+        );
+        foreach ($dirs as [$dir, $isGuard]) {
             $iterator = new \RecursiveIteratorIterator(
                 new \RecursiveDirectoryIterator($dir, \FilesystemIterator::SKIP_DOTS)
             );
@@ -238,13 +247,13 @@ final class SurfaceManifest
                     if ($class->namespacedName === null) {
                         continue;
                     }
-                    $this->readClass($path, $class, $finder);
+                    $this->readClass($path, $class, $finder, $isGuard);
                 }
             }
         }
     }
 
-    private function readClass(string $path, Class_ $class, NodeFinder $finder): void
+    private function readClass(string $path, Class_ $class, NodeFinder $finder, bool $isGuard): void
     {
         $fqcn = $class->namespacedName->toString();
         $entry = [
@@ -261,6 +270,12 @@ final class SurfaceManifest
             foreach ($finder->find($method->stmts ?? [], self::isCallRust(...)) as $call) {
                 $this->readCall($path, $fqcn, $method, $call, $entry);
             }
+        }
+        if ($isGuard) {
+            if ($entry['statics'] === []) {
+                return;
+            }
+            $entry = ['parent' => null, 'abstract' => $entry['abstract'], 'methods' => [], 'statics' => $entry['statics'], 'constructs' => null];
         }
         if (isset($this->classes[$fqcn])) {
             throw new GenerationError(["$path declares $fqcn a second time"]);

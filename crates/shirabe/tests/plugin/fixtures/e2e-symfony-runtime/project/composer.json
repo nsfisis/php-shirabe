@@ -1,0 +1,54 @@
+{
+    "name": "shirabe/e2e-symfony-runtime",
+    "description": "E2E fixture project: let symfony/runtime generate vendor/autoload_runtime.php after Composer's own dump.",
+    "repositories": [
+        {
+            "type": "package",
+            "package": {
+                "name": "symfony/runtime",
+                "version": "8.1.11",
+                "type": "composer-plugin",
+                "license": "MIT",
+                "autoload": {
+                    "psr-4": {
+                        "Symfony\\Component\\Runtime\\": "",
+                        "Symfony\\Runtime\\Symfony\\Component\\": "Internal/"
+                    }
+                },
+                "require": {
+                    "php": ">=8.4.1",
+                    "composer-plugin-api": "^1.0|^2.0"
+                },
+                "extra": {
+                    "class": "Symfony\\Component\\Runtime\\Internal\\ComposerPlugin"
+                },
+                "dist": {
+                    "type": "path",
+                    "url": "../ext/symfony-runtime-8.1.11"
+                },
+                "transport-options": {
+                    "symlink": false
+                }
+            }
+        },
+        {
+            "packagist.org": false
+        }
+    ],
+    "require": {
+        "symfony/runtime": "8.1.11"
+    },
+    "extra": {
+        "runtime": {
+            "project_dir": "app",
+            "dotenv_path": ".env.local",
+            "disable_dotenv": true
+        }
+    },
+    "config": {
+        "autoloader-suffix": "E2E",
+        "allow-plugins": {
+            "symfony/runtime": true
+        }
+    }
+}

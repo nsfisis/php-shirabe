@@ -38,6 +38,7 @@ mod e2e_process_executor_test;
 mod e2e_script_command_test;
 mod e2e_script_event_test;
 mod e2e_script_find_test;
+mod e2e_symfony_runtime_test;
 mod e2e_worker_exit_test;
 mod plugin_installer_test;
 mod subscriber_test;

@@ -165,6 +165,15 @@ Abstract methods of an abstract guard stay abstract. A method an ancestor
 declares `final` cannot be redeclared, so it keeps running the real
 implementation; the guard's header names each one.
 
+A static method listed in `GuardGenerator::FORWARDED_STATICS` forwards through
+`__shirabe_call_static` on handle 0 instead, like a forwarded static of a stub,
+and the guard's header names it. An entry qualifies only when the method reads
+no entity, so serving it on the Rust side cannot fork the state of a second
+instance: `Factory::getComposerFile()` reads nothing but the `COMPOSER`
+environment variable. `surface-manifest` reads these forwards from the guards,
+and nothing else of a guard. An entry naming a class that is not a guard target
+fails generation.
+
 ## Coverage assertions
 
 Generation fails — instead of emitting something quietly wrong — on:

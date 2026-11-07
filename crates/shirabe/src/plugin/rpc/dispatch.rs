@@ -9,6 +9,7 @@ use crate::dependency_resolver::operation::{
     UninstallOperation, UpdateOperation,
 };
 use crate::event_dispatcher::dispatch_event_method;
+use crate::factory::Factory;
 use crate::io::{BufferIO, IOInterface};
 use crate::package::{
     AliasPackage, AliasPackageHandle, AnyPackage, CompleteAliasPackage, CompletePackage, Locker,
@@ -528,6 +529,9 @@ pub(crate) fn call_static_entity(args: &[PluginValue]) -> Result<PluginValue, Ph
         (b"Composer\\Util\\Filesystem", b"getPlatformPath") => Ok(PluginValue::string(
             path_to_bytes(&Filesystem::get_platform_path(&string_arg(0)?)),
         )),
+        (b"Composer\\Factory", b"getComposerFile") => Factory::get_composer_file()
+            .map(|file| PluginValue::string(path_to_bytes(&file)))
+            .map_err(|error| error_throw(b"getComposerFile failed", &error)),
         (b"Composer\\Package\\Locker", b"getContentHash") => {
             Locker::get_content_hash(string_arg(0)?)
                 .map(PluginValue::string)

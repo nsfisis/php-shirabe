@@ -111,6 +111,7 @@ Composer\EventDispatcher\EventDispatcher::dispatchScript	method	unsupported
 Composer\EventDispatcher\EventDispatcher::hasEventListeners	method	unsupported
 Composer\EventDispatcher\EventDispatcher::removeListener	method	unsupported
 Composer\EventDispatcher\EventDispatcher::setRunScripts	method	unsupported
+Composer\Factory::getComposerFile	static	supported
 Composer\IO\BufferIO::__construct	constructor	supported
 Composer\IO\BufferIO::alert	method	unsupported
 Composer\IO\BufferIO::ask	method	unsupported

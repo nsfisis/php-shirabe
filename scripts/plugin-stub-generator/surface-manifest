@@ -41,6 +41,7 @@ $manifest = new SurfaceManifest(
     [$phpDir . '/stubs', $phpDir . '/runtime'],
     $repoRoot . '/crates/shirabe/src',
     $dispatchers,
+    [$phpDir . '/guards'],
 );
 try {
     $content = $manifest->render();

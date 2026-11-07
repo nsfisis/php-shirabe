@@ -19,6 +19,15 @@ use PhpParser\Node\Stmt\ClassMethod;
  */
 final class GuardGenerator
 {
+    /**
+     * Static methods of guarded classes that forward to the Rust side through
+     * `__shirabe_call_static` instead of failing, each with the reason it is safe to serve: the
+     * call reads no entity, so there is no second instance for it to fork.
+     */
+    private const FORWARDED_STATICS = [
+        'Composer\\Factory::getComposerFile' => 'it only reads the COMPOSER environment variable, whose value the Rust side owns.',
+    ];
+
     /** @var list<string> */
     private array $errors = [];
 
@@ -54,6 +63,11 @@ final class GuardGenerator
     /** @return array<string, string> relative guard path => file content */
     public function generate(): array
     {
+        foreach (array_keys(self::FORWARDED_STATICS) as $member) {
+            if (!in_array(explode('::', $member)[0], $this->targets, true)) {
+                $this->errors[] = "FORWARDED_STATICS names $member, which is not a guard target";
+            }
+        }
         $files = [];
         foreach ($this->targets as $fqcn) {
             $files[str_replace('\\', '/', $fqcn) . '.php'] = $this->emitClass($fqcn);
@@ -101,7 +115,7 @@ final class GuardGenerator
                 // destructor that throws would fire while an exception is already unwinding.
                 continue;
             }
-            $methods[] = $this->renderMethod($class, $method, $declaringFile);
+            $methods[] = $this->renderMethod($fqcn, $class, $method, $declaringFile);
         }
 
         $decl = ($class->isAbstract() ? 'abstract ' : '') . ($class->isFinal() ? 'final ' : '')
@@ -123,6 +137,11 @@ final class GuardGenerator
             . "// constructing it or calling anything on it raises an explicit error.";
         foreach ($this->inheritedFinals as $member) {
             $header .= "\n// $member() is final, so it keeps running the real implementation here.";
+        }
+        foreach (array_keys(self::FORWARDED_STATICS) as $member) {
+            if (str_starts_with($member, "$fqcn::")) {
+                $header .= "\n// $member() is the exception: it forwards to the Rust side.";
+            }
         }
         $text = "<?php\n\n$header\n\nnamespace {$file->namespace};\n\n";
         $uses = $file->importsUsedBy($decl . "\n" . $body);
@@ -180,7 +199,7 @@ final class GuardGenerator
         return $methods;
     }
 
-    private function renderMethod(Class_ $class, ClassMethod $method, SourceFile $target): string
+    private function renderMethod(string $fqcn, Class_ $class, ClassMethod $method, SourceFile $target): string
     {
         $name = $method->name->toString();
         $params = [];
@@ -207,6 +226,20 @@ final class GuardGenerator
             . ($returnType === '' ? '' : ": $returnType");
         if ($abstract) {
             return "    $signature;";
+        }
+        $member = "$fqcn::$name";
+        if ($method->isStatic() && isset(self::FORWARDED_STATICS[$member])) {
+            foreach ($method->params as $param) {
+                if ($param->byRef) {
+                    $this->errors[] = "$member: a forwarded static may not take by-ref parameters";
+                }
+            }
+            $args = implode(', ', array_map(static fn ($param): string => '$' . $param->var->name, $method->params));
+            $call = "\\ShirabeRpcRuntime::callRust(0, '__shirabe_call_static', [self::class, '$name', [$args]])";
+            $isVoid = $returnType === 'void';
+            return "    // Forwarded rather than guarded: " . self::FORWARDED_STATICS[$member] . "\n"
+                . "    $signature\n    {\n"
+                . "        " . ($isVoid ? '' : 'return ') . "$call;\n    }";
         }
         return "    $signature\n    {\n"
             . "        \\ShirabeUnsupportedClass::fail(self::class, '$name');\n    }";
