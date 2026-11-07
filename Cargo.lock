@@ -2310,7 +2310,7 @@ dependencies = [
 
 [[package]]
 name = "shirabe"
-version = "0.2.0-dev"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2352,14 +2352,14 @@ dependencies = [
 
 [[package]]
 name = "shirabe-ca-bundle"
-version = "0.2.0-dev"
+version = "0.2.0"
 dependencies = [
  "shirabe-php-shim",
 ]
 
 [[package]]
 name = "shirabe-class-map-generator"
-version = "0.2.0-dev"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "bstr",
@@ -2372,7 +2372,7 @@ dependencies = [
 
 [[package]]
 name = "shirabe-metadata-minifier"
-version = "0.2.0-dev"
+version = "0.2.0"
 dependencies = [
  "bstr",
  "indexmap",
@@ -2381,7 +2381,7 @@ dependencies = [
 
 [[package]]
 name = "shirabe-php-rpc"
-version = "0.2.0-dev"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "bstr",
@@ -2398,7 +2398,7 @@ dependencies = [
 
 [[package]]
 name = "shirabe-php-shim"
-version = "0.2.0-dev"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "bstr",
@@ -2426,7 +2426,7 @@ dependencies = [
 
 [[package]]
 name = "shirabe-php-shim-macros"
-version = "0.2.0-dev"
+version = "0.2.0"
 dependencies = [
  "bstr",
  "proc-macro2",
@@ -2437,14 +2437,14 @@ dependencies = [
 
 [[package]]
 name = "shirabe-php-src"
-version = "0.2.0-dev"
+version = "0.2.0"
 dependencies = [
  "bstr",
 ]
 
 [[package]]
 name = "shirabe-seld-json-lint"
-version = "0.2.0-dev"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "bstr",
@@ -2453,7 +2453,7 @@ dependencies = [
 
 [[package]]
 name = "shirabe-semver"
-version = "0.2.0-dev"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "bstr",
@@ -2463,7 +2463,7 @@ dependencies = [
 
 [[package]]
 name = "shirabe-spdx-licenses"
-version = "0.2.0-dev"
+version = "0.2.0"
 dependencies = [
  "bstr",
  "indexmap",
@@ -2473,7 +2473,7 @@ dependencies = [
 
 [[package]]
 name = "shirabe-symfony-console"
-version = "0.2.0-dev"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2489,7 +2489,7 @@ dependencies = [
 
 [[package]]
 name = "shirabe-symfony-filesystem"
-version = "0.2.0-dev"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "bstr",
@@ -2499,7 +2499,7 @@ dependencies = [
 
 [[package]]
 name = "shirabe-symfony-finder"
-version = "0.2.0-dev"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "bstr",
@@ -2512,7 +2512,7 @@ dependencies = [
 
 [[package]]
 name = "shirabe-symfony-process"
-version = "0.2.0-dev"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "bstr",
@@ -2522,7 +2522,7 @@ dependencies = [
 
 [[package]]
 name = "shirabe-symfony-string"
-version = "0.2.0-dev"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "bstr",
