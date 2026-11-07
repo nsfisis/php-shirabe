@@ -22,6 +22,7 @@ mod e2e_exception_test;
 mod e2e_extension_installer_test;
 mod e2e_file_download_test;
 mod e2e_global_plugin_script_test;
+mod e2e_http_discovery_test;
 mod e2e_http_downloader_test;
 mod e2e_installed_versions_test;
 mod e2e_installer_event_test;

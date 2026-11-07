@@ -1,0 +1,72 @@
+{
+    "name": "shirabe/e2e-http-discovery",
+    "description": "E2E fixture project: let php-http/discovery check the required HTTP abstractions after an update and generate a discovery strategy for a pinned implementation before the autoload dump.",
+    "repositories": [
+        {
+            "type": "package",
+            "package": {
+                "name": "php-http/discovery",
+                "version": "1.20.0",
+                "type": "composer-plugin",
+                "license": "MIT",
+                "provide": {
+                    "php-http/async-client-implementation": "*",
+                    "php-http/client-implementation": "*",
+                    "psr/http-client-implementation": "*",
+                    "psr/http-factory-implementation": "*",
+                    "psr/http-message-implementation": "*"
+                },
+                "require": {
+                    "php": "^7.1 || ^8.0",
+                    "composer-plugin-api": "^1.0|^2.0"
+                },
+                "autoload": {
+                    "psr-4": {
+                        "Http\\Discovery\\": "src/"
+                    },
+                    "exclude-from-classmap": [
+                        "src/Composer/Plugin.php"
+                    ]
+                },
+                "extra": {
+                    "class": "Http\\Discovery\\Composer\\Plugin",
+                    "plugin-optional": true
+                },
+                "dist": {
+                    "type": "path",
+                    "url": "../ext/discovery-1.20.0"
+                },
+                "transport-options": {
+                    "symlink": false
+                }
+            }
+        },
+        {
+            "type": "path",
+            "url": "../packages/*",
+            "options": {
+                "symlink": false
+            }
+        },
+        {
+            "packagist.org": false
+        }
+    ],
+    "require": {
+        "php-http/discovery": "1.20.0",
+        "acme/client": "1.0.0",
+        "acme/psr7": "1.0.0"
+    },
+    "extra": {
+        "discovery": {
+            "psr/http-factory-implementation": "Acme\\Psr7\\Factory",
+            "Psr\\Http\\Client\\ClientInterface": "Acme\\Client\\Client"
+        }
+    },
+    "config": {
+        "autoloader-suffix": "E2E",
+        "allow-plugins": {
+            "php-http/discovery": true
+        }
+    }
+}

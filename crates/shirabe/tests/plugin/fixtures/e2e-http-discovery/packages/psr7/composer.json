@@ -1,0 +1,12 @@
+{
+    "name": "acme/psr7",
+    "version": "1.0.0",
+    "provide": {
+        "psr/http-factory-implementation": "1.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Acme\\Psr7\\": "src/"
+        }
+    }
+}

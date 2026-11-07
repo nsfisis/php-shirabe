@@ -1,0 +1,17 @@
+{
+    "name": "acme/client",
+    "version": "1.0.0",
+    "require": {
+        "php-http/discovery": "^1.20",
+        "psr/http-factory-implementation": "*",
+        "psr/http-client-implementation": "*"
+    },
+    "provide": {
+        "psr/http-client-implementation": "1.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Acme\\Client\\": "src/"
+        }
+    }
+}

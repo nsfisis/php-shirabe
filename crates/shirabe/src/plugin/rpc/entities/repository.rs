@@ -93,6 +93,15 @@ pub(crate) fn dispatch_repository_method(
                 .map_err(|error| error_throw(b"getCanonicalPackages failed", &error))?;
             Ok(packages.to_wire())
         }
+        b"getDevPackageNames" => {
+            let mut borrowed = repository.borrow_mut();
+            let writable = borrowed
+                .as_writable_repository_interface_mut()
+                .ok_or_else(|| {
+                    PhpThrow::runtime("the repository behind this handle is not writable, so `getDevPackageNames` cannot be called on it")
+                })?;
+            Ok(writable.get_dev_package_names().to_wire())
+        }
         // TODO(plugin): the remaining RepositoryInterface surface is widened on demand,
         // driven by explicit errors from real plugins.
         other => Err(unavailable_method("repository", other)),

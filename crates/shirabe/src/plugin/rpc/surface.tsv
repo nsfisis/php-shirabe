@@ -901,7 +901,7 @@ Composer\Repository\InstalledArrayRepository::findPackage	method	supported
 Composer\Repository\InstalledArrayRepository::findPackages	method	supported
 Composer\Repository\InstalledArrayRepository::getCanonicalPackages	method	supported
 Composer\Repository\InstalledArrayRepository::getDevMode	method	unsupported
-Composer\Repository\InstalledArrayRepository::getDevPackageNames	method	unsupported
+Composer\Repository\InstalledArrayRepository::getDevPackageNames	method	supported
 Composer\Repository\InstalledArrayRepository::getPackages	method	supported
 Composer\Repository\InstalledArrayRepository::getProviders	method	unsupported
 Composer\Repository\InstalledArrayRepository::getRepoName	method	unsupported
@@ -920,7 +920,7 @@ Composer\Repository\InstalledFilesystemRepository::findPackage	method	supported
 Composer\Repository\InstalledFilesystemRepository::findPackages	method	supported
 Composer\Repository\InstalledFilesystemRepository::getCanonicalPackages	method	supported
 Composer\Repository\InstalledFilesystemRepository::getDevMode	method	unsupported
-Composer\Repository\InstalledFilesystemRepository::getDevPackageNames	method	unsupported
+Composer\Repository\InstalledFilesystemRepository::getDevPackageNames	method	supported
 Composer\Repository\InstalledFilesystemRepository::getPackages	method	supported
 Composer\Repository\InstalledFilesystemRepository::getProviders	method	unsupported
 Composer\Repository\InstalledFilesystemRepository::getRepoName	method	unsupported
