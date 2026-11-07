@@ -2671,7 +2671,7 @@ struct PackageInfoJson {
     dist: Option<PackageReferenceJson>,
     #[serde(
         skip_serializing_if = "Option::is_none",
-        serialize_with = "nested_option_str"
+        serialize_with = "json_bytes::option_option_str"
     )]
     path: Option<Option<BString>>,
     #[serde(
@@ -2681,50 +2681,50 @@ struct PackageInfoJson {
     released: Option<BString>,
     #[serde(
         skip_serializing_if = "Option::is_none",
-        serialize_with = "nested_option_str"
+        serialize_with = "json_bytes::option_option_str"
     )]
     replacement: Option<Option<BString>>,
     #[serde(
         skip_serializing_if = "Option::is_none",
-        serialize_with = "option_str_map"
+        serialize_with = "json_bytes::option_str_map"
     )]
     suggests: Option<IndexMap<BString, BString>>,
     #[serde(
         skip_serializing_if = "Option::is_none",
-        serialize_with = "option_str_map"
+        serialize_with = "json_bytes::option_str_map"
     )]
     support: Option<IndexMap<BString, BString>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     autoload: Option<PhpMixed>,
     #[serde(
         skip_serializing_if = "Option::is_none",
-        serialize_with = "option_str_vec"
+        serialize_with = "json_bytes::option_str_vec"
     )]
     include_path: Option<Vec<BString>>,
     #[serde(
         skip_serializing_if = "Option::is_none",
-        serialize_with = "option_str_map"
+        serialize_with = "json_bytes::option_str_map"
     )]
     requires: Option<IndexMap<BString, BString>>,
     #[serde(
         rename = "devRequires",
         skip_serializing_if = "Option::is_none",
-        serialize_with = "option_str_map"
+        serialize_with = "json_bytes::option_str_map"
     )]
     dev_requires: Option<IndexMap<BString, BString>>,
     #[serde(
         skip_serializing_if = "Option::is_none",
-        serialize_with = "option_str_map"
+        serialize_with = "json_bytes::option_str_map"
     )]
     provides: Option<IndexMap<BString, BString>>,
     #[serde(
         skip_serializing_if = "Option::is_none",
-        serialize_with = "option_str_map"
+        serialize_with = "json_bytes::option_str_map"
     )]
     conflicts: Option<IndexMap<BString, BString>>,
     #[serde(
         skip_serializing_if = "Option::is_none",
-        serialize_with = "option_str_map"
+        serialize_with = "json_bytes::option_str_map"
     )]
     replaces: Option<IndexMap<BString, BString>>,
 }
@@ -2822,12 +2822,12 @@ struct PackageViewData {
     direct_dependency: Option<bool>,
     #[serde(
         skip_serializing_if = "Option::is_none",
-        serialize_with = "nested_option_str"
+        serialize_with = "json_bytes::option_option_str"
     )]
     homepage: Option<Option<BString>>,
     #[serde(
         skip_serializing_if = "Option::is_none",
-        serialize_with = "nested_option_str"
+        serialize_with = "json_bytes::option_option_str"
     )]
     source: Option<Option<BString>>,
     #[serde(
@@ -2866,12 +2866,12 @@ struct PackageViewData {
     latest_release_date: Option<BString>,
     #[serde(
         skip_serializing_if = "Option::is_none",
-        serialize_with = "nested_option_str"
+        serialize_with = "json_bytes::option_option_str"
     )]
     description: Option<Option<BString>>,
     #[serde(
         skip_serializing_if = "Option::is_none",
-        serialize_with = "nested_option_str"
+        serialize_with = "json_bytes::option_option_str"
     )]
     path: Option<Option<BString>>,
     #[serde(
@@ -2898,31 +2898,4 @@ struct ViewMetaData {
     release_date_length: usize,
     write_latest: bool,
     write_release_date: bool,
-}
-
-fn nested_option_str<S: serde::Serializer>(
-    value: &Option<Option<BString>>,
-    serializer: S,
-) -> Result<S::Ok, S::Error> {
-    json_bytes::option_str(value.as_ref().unwrap_or(&None), serializer)
-}
-
-fn option_str_vec<S: serde::Serializer>(
-    value: &Option<Vec<BString>>,
-    serializer: S,
-) -> Result<S::Ok, S::Error> {
-    match value {
-        Some(value) => json_bytes::str_vec(value, serializer),
-        None => serializer.serialize_none(),
-    }
-}
-
-fn option_str_map<S: serde::Serializer>(
-    value: &Option<IndexMap<BString, BString>>,
-    serializer: S,
-) -> Result<S::Ok, S::Error> {
-    match value {
-        Some(value) => json_bytes::str_map(value, serializer),
-        None => serializer.serialize_none(),
-    }
 }

@@ -89,6 +89,7 @@ pub mod json_bytes {
     use indexmap::IndexMap;
     use serde::ser::{SerializeMap, SerializeSeq};
     use serde::{Serialize, Serializer};
+    use std::borrow::Borrow;
 
     struct StrMap<'a>(&'a IndexMap<BString, BString>);
 
@@ -120,6 +121,14 @@ pub mod json_bytes {
         }
     }
 
+    /// Like [`option_str`], for a field whose value is itself nullable: `Some(None)` writes `null`.
+    pub fn option_option_str<S: Serializer>(
+        value: &Option<Option<BString>>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
+        option_str(value.as_ref().unwrap_or(&None), serializer)
+    }
+
     pub fn str_vec<S: Serializer>(value: &[BString], serializer: S) -> Result<S::Ok, S::Error> {
         let mut seq = serializer.serialize_seq(Some(value.len()))?;
         for item in value {
@@ -137,6 +146,26 @@ pub mod json_bytes {
             map.serialize_entry(&ByteString(k), &ByteString(v))?;
         }
         map.end()
+    }
+
+    pub fn option_str_vec<S: Serializer, V: AsRef<[BString]>>(
+        value: &Option<V>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
+        match value {
+            Some(value) => str_vec(value.as_ref(), serializer),
+            None => serializer.serialize_none(),
+        }
+    }
+
+    pub fn option_str_map<S: Serializer, M: Borrow<IndexMap<BString, BString>>>(
+        value: &Option<M>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
+        match value {
+            Some(value) => str_map(value.borrow(), serializer),
+            None => serializer.serialize_none(),
+        }
     }
 
     pub fn str_map_vec<S: Serializer>(
@@ -163,6 +192,16 @@ pub mod json_bytes {
             map.serialize_entry(&ByteString(k), v)?;
         }
         map.end()
+    }
+
+    pub fn option_keyed<S: Serializer, V: Serialize, M: Borrow<IndexMap<BString, V>>>(
+        value: &Option<M>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
+        match value {
+            Some(value) => keyed(value.borrow(), serializer),
+            None => serializer.serialize_none(),
+        }
     }
 
     /// Like [`keyed`], for values that are lists of PHP strings.

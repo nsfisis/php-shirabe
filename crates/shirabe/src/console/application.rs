@@ -2993,22 +2993,6 @@ fn anonymous_class_display_name(class: &BStr) -> anyhow::Result<BString> {
     Ok(bconcat!(name, "@anonymous"))
 }
 
-/// Borrows the shared input as a mutable `dyn InputInterface` for passing to
-/// `SymfonyCommand::run`, which takes `&mut dyn InputInterface`.
-fn borrow_input_mut(
-    input: &std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
-) -> std::cell::RefMut<'_, dyn InputInterface> {
-    input.borrow_mut()
-}
-
-/// Borrows the shared output as a mutable `dyn OutputInterface` for passing to
-/// `SymfonyCommand::run`, which takes `&mut dyn OutputInterface`.
-fn borrow_output_mut(
-    output: &std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
-) -> std::cell::RefMut<'_, dyn OutputInterface> {
-    output.borrow_mut()
-}
-
 thread_local! {
     /// The application answering `__shirabe_run_rust_command` callbacks from the plugin
     /// worker's reverse command stubs; registered when plugin commands are collected.

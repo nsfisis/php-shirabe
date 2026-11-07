@@ -555,7 +555,7 @@ impl Filesystem {
         }
 
         if dirname(&from) == dirname(&to) {
-            return Ok(Self::path_buf(bconcat!("./", basename(&to))));
+            return Ok(path_from_bytes(&bconcat!("./", basename(&to))).to_path_buf());
         }
 
         let mut common_path = to.clone();
@@ -568,7 +568,7 @@ impl Filesystem {
 
         // no commonality at all
         if Some(0) != strpos(&from, &common_path) {
-            return Ok(Self::path_buf(to));
+            return Ok(path_from_bytes(&to).to_path_buf());
         }
 
         common_path = bconcat!(rtrim_chars(&common_path, "/"), "/");
@@ -577,7 +577,7 @@ impl Filesystem {
 
         // allow top level /foo & /bar dirs to be addressed relatively as this is common in Docker setups
         if !prefer_relative && "/" == common_path && source_path_depth > 1 {
-            return Ok(Self::path_buf(to));
+            return Ok(path_from_bytes(&to).to_path_buf());
         }
 
         let result = bconcat!(common_path_code, substr(&to, strlen(&common_path), None));
@@ -585,7 +585,7 @@ impl Filesystem {
             return Ok(PathBuf::from("./"));
         }
 
-        Ok(Self::path_buf(result))
+        Ok(path_from_bytes(&result).to_path_buf())
     }
 
     /// Returns PHP code that, when executed in $from, will return the path to $to
@@ -674,10 +674,6 @@ impl Filesystem {
         ))
     }
 
-    fn path_buf(path: impl AsRef<[u8]>) -> PathBuf {
-        path_from_bytes(&path).to_path_buf()
-    }
-
     /// Checks if the given path is absolute
     pub fn is_absolute_path(&self, path: impl AsRef<Path>) -> bool {
         // std::path::Path::is_absolute() is environment-dependent, while PHP's
@@ -756,7 +752,7 @@ impl Filesystem {
         )
         .expect("the replacement callback cannot fail");
 
-        Self::path_buf(bconcat!(prefix, absolute, implode("/", &parts)))
+        path_from_bytes(&bconcat!(prefix, absolute, implode("/", &parts))).to_path_buf()
     }
 
     /// Remove trailing slashes if present to avoid issues with symlinks
@@ -768,7 +764,7 @@ impl Filesystem {
             path = rtrim_chars(&path, "/\\");
         }
 
-        Self::path_buf(path)
+        path_from_bytes(&path).to_path_buf()
     }
 
     /// Return if the given path is local
@@ -801,7 +797,7 @@ impl Filesystem {
             );
         }
 
-        Self::path_buf(preg_replace(php_regex!("{^file://}i"), "", &path))
+        path_from_bytes(&preg_replace(php_regex!("{^file://}i"), "", &path)).to_path_buf()
     }
 
     /// Cross-platform safe version of is_readable()
@@ -917,7 +913,7 @@ impl Filesystem {
             return pathname.to_path_buf();
         }
 
-        Self::path_buf(resolved)
+        path_from_bytes(&resolved).to_path_buf()
     }
 
     /// Creates an NTFS junction.
@@ -1022,14 +1018,15 @@ impl Filesystem {
         if !Platform::is_windows() {
             return Ok(false);
         }
-        let junction = Self::path_buf(rtrim_chars(
+        let junction = path_from_bytes(&rtrim_chars(
             str_replace(
                 "/",
                 std::path::MAIN_SEPARATOR_STR,
                 path_to_bytes(junction.as_ref()),
             ),
             std::path::MAIN_SEPARATOR_STR,
-        ));
+        ))
+        .to_path_buf();
         if !self.is_junction(&junction) {
             return Err(IOException::new(
                 bconcat!(

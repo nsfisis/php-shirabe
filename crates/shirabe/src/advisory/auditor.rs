@@ -25,13 +25,13 @@ struct AuditJsonReport<'a> {
     #[serde(
         rename = "ignored-advisories",
         skip_serializing_if = "Option::is_none",
-        serialize_with = "serialize_ignored_advisories_field"
+        serialize_with = "json_bytes::option_keyed"
     )]
     ignored_advisories: Option<&'a IndexMap<BString, Vec<std::rc::Rc<AnySecurityAdvisory>>>>,
     #[serde(
         rename = "unreachable-repositories",
         skip_serializing_if = "Option::is_none",
-        serialize_with = "serialize_unreachable_repositories_field"
+        serialize_with = "json_bytes::option_str_vec"
     )]
     unreachable_repositories: Option<&'a Vec<BString>>,
     #[serde(serialize_with = "shirabe_php_shim::json_bytes::keyed_option_str")]
@@ -46,32 +46,6 @@ where
     S: serde::Serializer,
 {
     json_bytes::keyed(*map, serializer)
-}
-
-fn serialize_ignored_advisories_field<S>(
-    map: &Option<&IndexMap<BString, Vec<std::rc::Rc<AnySecurityAdvisory>>>>,
-    serializer: S,
-) -> anyhow::Result<S::Ok, S::Error>
-where
-    S: serde::Serializer,
-{
-    match map {
-        Some(map) => json_bytes::keyed(map, serializer),
-        None => serializer.serialize_none(),
-    }
-}
-
-fn serialize_unreachable_repositories_field<S>(
-    repositories: &Option<&Vec<BString>>,
-    serializer: S,
-) -> anyhow::Result<S::Ok, S::Error>
-where
-    S: serde::Serializer,
-{
-    match repositories {
-        Some(repositories) => json_bytes::str_vec(repositories, serializer),
-        None => serializer.serialize_none(),
-    }
 }
 
 #[derive(Debug)]

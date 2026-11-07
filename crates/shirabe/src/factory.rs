@@ -151,8 +151,11 @@ impl Factory {
         let user_dir = Self::get_user_dir()?;
         if PHP_OS == "Darwin" {
             // Migrate existing cache dir in old location if present
-            if is_dir_at(bconcat!(home, "/cache"))
-                && !is_dir_at(bconcat!(user_dir, "/Library/Caches/shirabe"))
+            if is_dir(path_from_bytes(&bconcat!(home, "/cache")))
+                && !is_dir(path_from_bytes(&bconcat!(
+                    user_dir,
+                    "/Library/Caches/shirabe"
+                )))
             {
                 let from = bconcat!(home, "/cache");
                 let to = bconcat!(user_dir, "/Library/Caches/shirabe");
@@ -162,7 +165,9 @@ impl Factory {
             return Ok(bconcat!(user_dir, "/Library/Caches/shirabe"));
         }
 
-        if home == bconcat!(user_dir, "/.shirabe") && is_dir_at(bconcat!(home, "/cache")) {
+        if home == bconcat!(user_dir, "/.shirabe")
+            && is_dir(path_from_bytes(&bconcat!(home, "/cache")))
+        {
             return Ok(bconcat!(home, "/cache"));
         }
 
@@ -1538,8 +1543,4 @@ impl Factory {
 enum ValidateJsonInput<'a> {
     File(&'a JsonFile),
     Data(PhpMixed),
-}
-
-fn is_dir_at(path: BString) -> bool {
-    is_dir(path_from_bytes(&path))
 }

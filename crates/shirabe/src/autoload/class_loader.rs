@@ -47,10 +47,6 @@ pub struct ClassLoader {
 }
 
 // PHP: $string[0], the first byte.
-fn first_byte(s: &BStr) -> BString {
-    BString::from(&s[..1.min(s.len())])
-}
-
 impl ClassLoader {
     pub fn new(vendor_dir: Option<BString>) -> Self {
         Self {
@@ -129,7 +125,7 @@ impl ClassLoader {
             return;
         }
 
-        let first = first_byte(prefix);
+        let first = BString::from(&prefix[..1]);
         let entry = self.prefixes_psr0.entry(first).or_default();
         if !entry.contains_key(prefix) {
             entry.insert(prefix.to_owned(), paths);
@@ -173,7 +169,7 @@ impl ClassLoader {
                 .into());
             }
             self.prefix_lengths_psr4
-                .entry(first_byte(prefix))
+                .entry(BString::from(&prefix[..1]))
                 .or_default()
                 .insert(prefix.to_owned(), length);
             self.prefix_dirs_psr4.insert(prefix.to_owned(), paths);
@@ -199,7 +195,7 @@ impl ClassLoader {
             self.fallback_dirs_psr0 = paths;
         } else {
             self.prefixes_psr0
-                .entry(first_byte(prefix))
+                .entry(BString::from(&prefix[..1]))
                 .or_default()
                 .insert(prefix.to_owned(), paths);
         }
@@ -224,7 +220,7 @@ impl ClassLoader {
                 .into());
             }
             self.prefix_lengths_psr4
-                .entry(first_byte(prefix))
+                .entry(BString::from(&prefix[..1]))
                 .or_default()
                 .insert(prefix.to_owned(), length);
             self.prefix_dirs_psr4.insert(prefix.to_owned(), paths);
@@ -357,7 +353,7 @@ impl ClassLoader {
         // PSR-4 lookup
         let logical_path_psr4 = bconcat!(strtr(class, "\\", std::path::MAIN_SEPARATOR_STR), ext);
 
-        let first = first_byte(class);
+        let first = BString::from(&class[..1.min(class.len())]);
         if self.prefix_lengths_psr4.contains_key(&first) {
             let mut sub_path = class.to_owned();
             while let Some(last_pos) = strrpos(&sub_path, "\\") {

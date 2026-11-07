@@ -11,9 +11,10 @@ use bstr::{B, BStr, BString, ByteSlice};
 use chrono::Utc;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    AnyThrowable, E_USER_DEPRECATED, PhpMixed, UnexpectedValueException, bconcat, date_create,
-    empty, error_message, is_scalar, is_string, json_encode, ltrim_chars, php_regex, preg_is_match,
-    preg_replace, stripos, strpos, strtolower, strval, substr, trigger_error, trim,
+    AnyThrowable, E_USER_DEPRECATED, PhpMixed, TypeError, UnexpectedValueException, bconcat,
+    date_create, empty, error_message, get_debug_type, is_scalar, is_string, json_encode,
+    ltrim_chars, php_regex, preg_is_match, preg_replace, stripos, strpos, strtolower, strval,
+    substr, to_array, trigger_error, trim,
 };
 
 /// The fields of one package version, read without regard for how they are stored. A version
@@ -194,10 +195,9 @@ impl ArrayLoader {
         }
 
         if let Some(extra) = config.get(B("extra"))
-            && matches!(extra, PhpMixed::Array(_))
+            && matches!(extra, PhpMixed::Array(_) | PhpMixed::List(_))
         {
-            let extra_map = php_to_map(extra);
-            package.package_mut().set_extra(extra_map);
+            package.package_mut().set_extra(to_array(extra.clone()));
         }
 
         if let Some(bin) = config.get(B("bin")).cloned() {
@@ -218,7 +218,7 @@ impl ArrayLoader {
                     }
                 }
             }
-            let binaries = php_to_string_vec(&bin_list);
+            let binaries = bin_list.values().into_iter().map(strval).collect();
             config.insert("bin".into(), bin_list);
             package.package_mut().set_binaries(binaries);
         }
@@ -268,10 +268,13 @@ impl ArrayLoader {
                     .filter(|v| !v.is_null())
                     .map(strval),
             );
-            if let Some(mirrors) = source_map.get(B("mirrors")) {
+            if let Some(mirrors) = source_map.get(B("mirrors")).filter(|v| !v.is_null()) {
                 package
                     .package_mut()
-                    .set_source_mirrors(Some(php_to_mirrors(mirrors)));
+                    .set_source_mirrors(Some(php_to_mirrors(
+                        mirrors,
+                        "Composer\\Package\\Package::setSourceMirrors",
+                    )?));
             }
         }
 
@@ -307,10 +310,11 @@ impl ArrayLoader {
             package
                 .package_mut()
                 .set_dist_sha1_checksum(dist_map.get(B("shasum")).map(strval));
-            if let Some(mirrors) = dist_map.get(B("mirrors")) {
-                package
-                    .package_mut()
-                    .set_dist_mirrors(Some(php_to_mirrors(mirrors)));
+            if let Some(mirrors) = dist_map.get(B("mirrors")).filter(|v| !v.is_null()) {
+                package.package_mut().set_dist_mirrors(Some(php_to_mirrors(
+                    mirrors,
+                    "Composer\\Package\\Package::setDistMirrors",
+                )?));
             }
         }
 
@@ -333,24 +337,41 @@ impl ArrayLoader {
             package.package_mut().set_suggests(suggests);
         }
 
-        if let Some(autoload) = config.get(B("autoload")) {
-            let autoload_map = php_to_map(autoload);
-            package.package_mut().set_autoload(autoload_map);
+        if let Some(autoload) = config.get(B("autoload")).filter(|v| !v.is_null()) {
+            package.package_mut().set_autoload(array_argument(
+                autoload,
+                "Composer\\Package\\Package::setAutoload",
+                "autoload",
+            )?);
         }
 
-        if let Some(autoload_dev) = config.get(B("autoload-dev")) {
-            let dev_autoload_map = php_to_map(autoload_dev);
-            package.package_mut().set_dev_autoload(dev_autoload_map);
+        if let Some(autoload_dev) = config.get(B("autoload-dev")).filter(|v| !v.is_null()) {
+            package.package_mut().set_dev_autoload(array_argument(
+                autoload_dev,
+                "Composer\\Package\\Package::setDevAutoload",
+                "devAutoload",
+            )?);
         }
 
-        if let Some(include_path) = config.get(B("include-path")) {
-            let include_paths = php_to_string_vec(include_path);
-            package.package_mut().set_include_paths(include_paths);
+        if let Some(include_path) = config.get(B("include-path")).filter(|v| !v.is_null()) {
+            package.package_mut().set_include_paths(
+                array_argument(
+                    include_path,
+                    "Composer\\Package\\Package::setIncludePaths",
+                    "includePaths",
+                )?
+                .values()
+                .map(strval)
+                .collect(),
+            );
         }
 
-        if let Some(php_ext) = config.get(B("php-ext")) {
-            let php_ext_map = php_to_map(php_ext);
-            package.package_mut().set_php_ext(Some(php_ext_map));
+        if let Some(php_ext) = config.get(B("php-ext")).filter(|v| !v.is_null()) {
+            package.package_mut().set_php_ext(Some(array_argument(
+                php_ext,
+                "Composer\\Package\\Package::setPhpExt",
+                "phpExt",
+            )?));
         }
 
         if let Some(time_value) = config.get(B("time"))
@@ -387,9 +408,16 @@ impl ArrayLoader {
             if let Some(exclude) = archive_map.get(B("exclude"))
                 && !empty(exclude)
             {
-                package
-                    .complete_mut()
-                    .set_archive_excludes(php_to_string_vec(exclude));
+                package.complete_mut().set_archive_excludes(
+                    array_argument(
+                        exclude,
+                        "Composer\\Package\\CompletePackage::setArchiveExcludes",
+                        "excludes",
+                    )?
+                    .values()
+                    .map(strval)
+                    .collect(),
+                );
             }
         }
 
@@ -418,7 +446,7 @@ impl ArrayLoader {
             }
             let scripts: IndexMap<BString, Vec<BString>> = scripts_map
                 .iter()
-                .map(|(k, v)| (k.clone(), php_to_string_vec(v)))
+                .map(|(k, v)| (k.clone(), v.values().into_iter().map(strval).collect()))
                 .collect();
             config.insert("scripts".into(), PhpMixed::Array(scripts_map));
             package.complete_mut().set_scripts(scripts);
@@ -520,10 +548,14 @@ impl ArrayLoader {
         }
 
         if self.load_options
-            && let Some(transport_options) = config.get(B("transport-options"))
+            && let Some(transport_options) =
+                config.get(B("transport-options")).filter(|v| !v.is_null())
         {
-            let options = php_to_map(transport_options);
-            package.package_mut().set_transport_options(options);
+            package.package_mut().set_transport_options(array_argument(
+                transport_options,
+                "Composer\\Package\\Package::setTransportOptions",
+                "options",
+            )?);
         }
 
         let alias_normalized = self.get_branch_alias(config)?;
@@ -838,18 +870,24 @@ impl CompleteOrRootPackage {
     }
 }
 
-fn php_to_map(value: &PhpMixed) -> IndexMap<BString, PhpMixed> {
+/// `value` passed as the `array $param` argument of the setter `method`, which raises a TypeError
+/// for anything but an array.
+fn array_argument(
+    value: &PhpMixed,
+    method: impl AsRef<[u8]>,
+    param: impl AsRef<[u8]>,
+) -> anyhow::Result<IndexMap<BString, PhpMixed>> {
     match value {
-        PhpMixed::Array(m) => m.clone(),
-        _ => IndexMap::new(),
-    }
-}
-
-fn php_to_string_vec(value: &PhpMixed) -> Vec<BString> {
-    match value {
-        PhpMixed::List(l) => l.iter().map(strval).collect(),
-        PhpMixed::Array(m) => m.values().map(strval).collect(),
-        _ => Vec::new(),
+        PhpMixed::Array(_) | PhpMixed::List(_) => Ok(to_array(value.clone())),
+        other => Err(TypeError::new(bconcat!(
+            method.as_ref(),
+            "(): Argument #1 ($",
+            param.as_ref(),
+            ") must be of type array, ",
+            get_debug_type(other),
+            " given"
+        ))
+        .into()),
     }
 }
 
@@ -867,24 +905,23 @@ fn apply_link_setter(package: &mut Package, method: &BStr, links: IndexMap<BStri
     }
 }
 
-fn php_to_mirrors(value: &PhpMixed) -> Vec<Mirror> {
-    let entries: Vec<&PhpMixed> = match value {
-        PhpMixed::List(l) => l.iter().collect(),
-        PhpMixed::Array(m) => m.values().collect(),
-        _ => Vec::new(),
-    };
-    entries
-        .into_iter()
-        .filter_map(|entry| match entry {
-            PhpMixed::Array(m) => Some(Mirror {
-                url: BString::from(
-                    m.get(B("url"))
-                        .and_then(|v| v.as_string())
-                        .unwrap_or_default(),
-                ),
-                preferred: m.get(B("preferred")).is_some_and(|v| v.to_bool()),
-            }),
-            _ => None,
+fn php_to_mirrors(value: &PhpMixed, method: impl AsRef<[u8]>) -> anyhow::Result<Vec<Mirror>> {
+    array_argument(value, method, "mirrors")?
+        .values()
+        .map(|entry| {
+            let url = entry.as_array().and_then(|m| m.get(B("url")));
+            match (entry, url) {
+                (PhpMixed::Array(m), Some(PhpMixed::String(url))) => Ok(Mirror {
+                    url: url.clone(),
+                    preferred: m.get(B("preferred")).is_some_and(|v| v.to_bool()),
+                }),
+                _ => Err(TypeError::new(bconcat!(
+                    "A mirror must be an array with a string \"url\", ",
+                    json_encode(entry).unwrap_or_default(),
+                    " given"
+                ))
+                .into()),
+            }
         })
         .collect()
 }

@@ -26,13 +26,6 @@ impl LogLevel {
     pub const DEBUG: &'static BStr = php_str(b"debug");
 }
 
-fn log_context(context: &[(&BStr, &BStr)]) -> IndexMap<BString, PhpMixed> {
-    context
-        .iter()
-        .map(|(k, v)| (BString::from(*k), PhpMixed::string(*v)))
-        .collect()
-}
-
 pub trait BaseIO: IOInterface {
     fn authentications(&self) -> &IndexMap<BString, IndexMap<BString, Option<BString>>>;
     fn authentications_mut(&mut self)
@@ -396,7 +389,12 @@ pub trait BaseIO: IOInterface {
 
         if !context.is_empty() {
             let json = json_encode_ex(
-                &PhpMixed::Array(log_context(context)),
+                &PhpMixed::Array(
+                    context
+                        .iter()
+                        .map(|(k, v)| (BString::from(*k), PhpMixed::string(*v)))
+                        .collect(),
+                ),
                 JSON_INVALID_UTF8_IGNORE | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE,
             );
             if let Ok(json_str) = json {

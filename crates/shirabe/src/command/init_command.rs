@@ -19,7 +19,7 @@ use shirabe_php_shim::{
     Catch as _, FILE_IGNORE_NEW_LINES, InvalidArgumentException, PHP_EOL, PHP_SERVER, PhpMixed,
     array_filter_map, array_intersect_key, array_map, basename, bconcat, empty, explode, file,
     file_exists, file_get_contents, file_put_contents, filter_var_email, get_current_user,
-    impl_php_class, implode, is_dir, is_string, os_str_from_bytes, path_from_bytes, path_to_bytes,
+    impl_php_class, implode, is_dir, is_string, path_from_bytes, path_to_bytes,
     pcre_check_utf8_subject, php_regex, preg_is_match, preg_match, preg_match_all, preg_quote,
     preg_replace, realpath, str_replace, strpos, strtolower, trim, ucwords, unlink,
 };
@@ -357,9 +357,21 @@ impl InitCommand {
         let name = self.sanitize_package_name_component(name.as_bstr())?;
 
         let mut vendor = name.clone();
-        let composer_default_vendor = server_value(BStr::new("COMPOSER_DEFAULT_VENDOR"));
-        let server_username = server_value(BStr::new("USERNAME"));
-        let server_user = server_value(BStr::new("USER"));
+        let composer_default_vendor = PHP_SERVER
+            .lock()
+            .unwrap()
+            .get("COMPOSER_DEFAULT_VENDOR")
+            .map(|value| BString::from(value.into_encoded_bytes()));
+        let server_username = PHP_SERVER
+            .lock()
+            .unwrap()
+            .get("USERNAME")
+            .map(|value| BString::from(value.into_encoded_bytes()));
+        let server_user = PHP_SERVER
+            .lock()
+            .unwrap()
+            .get("USER")
+            .map(|value| BString::from(value.into_encoded_bytes()));
         if !empty(
             &composer_default_vendor
                 .clone()
@@ -396,7 +408,11 @@ impl InitCommand {
         let git = self.get_git_config()?;
 
         let mut author_name: Option<BString> = None;
-        let composer_default_author = server_value(BStr::new("COMPOSER_DEFAULT_AUTHOR"));
+        let composer_default_author = PHP_SERVER
+            .lock()
+            .unwrap()
+            .get("COMPOSER_DEFAULT_AUTHOR")
+            .map(|value| BString::from(value.into_encoded_bytes()));
         if !empty(
             &composer_default_author
                 .clone()
@@ -409,7 +425,11 @@ impl InitCommand {
         }
 
         let mut author_email: Option<BString> = None;
-        let composer_default_email = server_value(BStr::new("COMPOSER_DEFAULT_EMAIL"));
+        let composer_default_email = PHP_SERVER
+            .lock()
+            .unwrap()
+            .get("COMPOSER_DEFAULT_EMAIL")
+            .map(|value| BString::from(value.into_encoded_bytes()));
         if !empty(
             &composer_default_email
                 .clone()
@@ -427,15 +447,6 @@ impl InitCommand {
 
         Ok(None)
     }
-}
-
-/// `$_SERVER[$name]`, holding the bytes of the environment.
-fn server_value(name: &BStr) -> Option<BString> {
-    PHP_SERVER
-        .lock()
-        .unwrap()
-        .get(os_str_from_bytes(name))
-        .map(|value| BString::from(value.as_encoded_bytes()))
 }
 
 #[async_trait::async_trait(?Send)]
@@ -1038,7 +1049,11 @@ impl Command for InitCommand {
                 .as_string()
                 .map(BString::from);
             if license.is_none() {
-                let default_license = server_value(BStr::new("COMPOSER_DEFAULT_LICENSE"));
+                let default_license = PHP_SERVER
+                    .lock()
+                    .unwrap()
+                    .get("COMPOSER_DEFAULT_LICENSE")
+                    .map(|value| BString::from(value.into_encoded_bytes()));
                 if !empty(
                     &default_license
                         .clone()

@@ -39,7 +39,7 @@ use shirabe_php_shim::{
 use shirabe_semver::CompilingMatcher;
 use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint, SimpleConstraint};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum RootData {
     Data(IndexMap<BString, PhpMixed>),
     True,
@@ -2130,7 +2130,7 @@ impl ComposerRepository {
 
     fn load_root_server_file(&mut self, root_max_age: Option<i64>) -> anyhow::Result<RootData> {
         if let Some(rd) = &self.root_data {
-            return Ok(clone_root_data(rd));
+            return Ok(rd.clone());
         }
 
         if !extension_loaded("openssl") && self.url.starts_with(b"https") {
@@ -3323,13 +3323,6 @@ impl std::fmt::Display for RetryMarker {
 }
 
 impl std::error::Error for RetryMarker {}
-
-fn clone_root_data(rd: &RootData) -> RootData {
-    match rd {
-        RootData::True => RootData::True,
-        RootData::Data(d) => RootData::Data(d.clone()),
-    }
-}
 
 impl RepositoryInterface for ComposerRepository {
     // PHP's ArrayRepository::count()/hasPackage() call $this->initialize(), which

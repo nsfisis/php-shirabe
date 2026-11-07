@@ -20,10 +20,6 @@ impl Default for Filesystem {
     }
 }
 
-fn path_buf(path: impl AsRef<[u8]>) -> PathBuf {
-    path_from_bytes(&path).to_path_buf()
-}
-
 impl Filesystem {
     pub fn new() -> Self {
         Filesystem
@@ -48,7 +44,7 @@ impl Filesystem {
             .into());
         }
 
-        self.mkdir(&path_buf(dirname(path_to_bytes(target_file))), 0o777)?;
+        self.mkdir(path_from_bytes(&dirname(path_to_bytes(target_file))), 0o777)?;
 
         let mut do_copy = true;
         // PHP: !$overwriteNewerFiles && !parse_url($originFile, PHP_URL_HOST) && is_file($targetFile)
@@ -201,11 +197,12 @@ impl Filesystem {
                 // if the final rmdir fails, so a failure leaves the path where the caller left it.
                 let mut orig_file = None;
                 if !is_recursive {
-                    let tmp_name = path_buf(bconcat!(
+                    let tmp_name = path_from_bytes(&bconcat!(
                         dirname(path_to_bytes(&realpath(&file).unwrap_or_default())),
                         "/.!",
                         strrev(strtr(base64_encode(random_bytes(2)), "/=", "-!"))
-                    ));
+                    ))
+                    .to_path_buf();
 
                     if file_exists(&tmp_name)
                         && let Err(error) = Self::do_remove(vec![tmp_name.clone()], true)
@@ -271,11 +268,13 @@ impl Filesystem {
         let mut target_dir = target_dir.as_ref().to_path_buf();
 
         if cfg!(windows) {
-            origin_dir = path_buf(strtr(path_to_bytes(&origin_dir), "/", "\\"));
-            target_dir = path_buf(strtr(path_to_bytes(&target_dir), "/", "\\"));
+            origin_dir =
+                path_from_bytes(&strtr(path_to_bytes(&origin_dir), "/", "\\")).to_path_buf();
+            target_dir =
+                path_from_bytes(&strtr(path_to_bytes(&target_dir), "/", "\\")).to_path_buf();
         }
 
-        self.mkdir(&path_buf(dirname(path_to_bytes(&target_dir))), 0o777)?;
+        self.mkdir(path_from_bytes(&dirname(path_to_bytes(&target_dir))), 0o777)?;
 
         if is_link(&target_dir) {
             // PHP compares the raw strings, so `Path`'s component-wise equality is not used.
@@ -349,7 +348,7 @@ impl Filesystem {
 
             let target = bconcat!(target_dir, &pathname_bytes[origin_dir_len..]);
             files_created_while_mirroring.insert(target.clone(), true);
-            let target = path_buf(target);
+            let target = path_from_bytes(&target).to_path_buf();
 
             if is_link(&pathname) {
                 // PHP coerces the false getLinkTarget() returns on failure to the empty string.

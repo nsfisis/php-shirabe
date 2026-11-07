@@ -11,10 +11,6 @@ use shirabe_php_shim::{
     Catch as _, LogicException, PhpMixed, bconcat, json_encode, php_str, time, trim,
 };
 
-fn transport_error_code(err: &anyhow::Error) -> Option<i64> {
-    err.catch::<TransportException>().map(|te| te.get_code())
-}
-
 #[derive(Debug)]
 pub struct Bitbucket {
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
@@ -109,7 +105,10 @@ impl Bitbucket {
         {
             Ok(r) => r,
             Err(te) => {
-                let code = transport_error_code(&te).unwrap_or(0);
+                let code = te
+                    .catch::<TransportException>()
+                    .map(|te| te.get_code())
+                    .unwrap_or(0);
                 if code == 400 {
                     self.io
                         .write_error("<error>Invalid OAuth consumer provided.</error>");

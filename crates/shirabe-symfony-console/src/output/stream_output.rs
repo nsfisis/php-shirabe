@@ -5,8 +5,8 @@ use crate::formatter::OutputFormatterInterface;
 use crate::output::{DoWrite, Output, OutputInterface, VERBOSITY_NORMAL};
 use bstr::{BStr, BString, ByteSlice};
 use shirabe_php_shim::{
-    PHP_EOL, PhpResource, fflush_resource, fwrite_resource, get_resource_type, getenv, php_regex,
-    preg_is_match, sapi_windows_vt100_support, stream_isatty_resource,
+    PHP_EOL, PHP_SERVER, PhpResource, fflush_resource, fwrite_resource, get_resource_type, getenv,
+    php_regex, preg_is_match, sapi_windows_vt100_support, stream_isatty_resource,
 };
 
 /// StreamOutput writes the output to a given stream.
@@ -81,7 +81,14 @@ impl StreamOutput {
     /// https://github.com/composer/xdebug-handler
     fn has_color_support(stream: &PhpResource) -> bool {
         // Follow https://no-color.org/
-        if no_color_first_char().is_some() {
+        if !PHP_SERVER
+            .lock()
+            .unwrap()
+            .get("NO_COLOR")
+            .or_else(|| getenv("NO_COLOR"))
+            .unwrap_or_default()
+            .is_empty()
+        {
             return false;
         }
 
@@ -125,15 +132,6 @@ impl StreamOutput {
             term,
         )
     }
-}
-
-/// PHP: `(($_SERVER['NO_COLOR'] ?? getenv('NO_COLOR'))[0] ?? '')`.
-fn no_color_first_char() -> Option<u8> {
-    getenv("NO_COLOR")
-        .unwrap_or_default()
-        .as_encoded_bytes()
-        .first()
-        .copied()
 }
 
 impl DoWrite for StreamOutput {

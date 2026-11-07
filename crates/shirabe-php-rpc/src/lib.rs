@@ -166,10 +166,6 @@ const DIAGNOSE_INI_SETTINGS: &[&BStr] = &[
     php_str(b"xdebug.profiler_enabled"),
 ];
 
-fn bstr_list(names: &[&BStr]) -> Vec<BString> {
-    names.iter().map(|name| (*name).to_owned()).collect()
-}
-
 impl Diagnostics {
     /// PHP `extension_loaded($name)`. Only the extensions the worker reports can be asked about;
     /// any other name is a bug in the caller, not a missing extension.
@@ -211,9 +207,18 @@ pub fn get_diagnostics() -> anyhow::Result<&'static Diagnostics> {
         query(
             "__shirabe_diagnose",
             DiagnoseQuery {
-                extensions: bstr_list(DIAGNOSE_EXTENSIONS),
-                functions: bstr_list(DIAGNOSE_FUNCTIONS),
-                ini_settings: bstr_list(DIAGNOSE_INI_SETTINGS),
+                extensions: DIAGNOSE_EXTENSIONS
+                    .iter()
+                    .map(|name| (*name).to_owned())
+                    .collect(),
+                functions: DIAGNOSE_FUNCTIONS
+                    .iter()
+                    .map(|name| (*name).to_owned())
+                    .collect(),
+                ini_settings: DIAGNOSE_INI_SETTINGS
+                    .iter()
+                    .map(|name| (*name).to_owned())
+                    .collect(),
             },
         )
     })
@@ -477,9 +482,18 @@ pub fn get_platform_info() -> anyhow::Result<&'static PlatformInfo> {
         let payload: PlatformPayload = query(
             "__shirabe_platform",
             PlatformQuery {
-                constants: bstr_list(PLATFORM_CONSTANTS),
-                classes: bstr_list(PLATFORM_CLASSES),
-                extension_info: bstr_list(PLATFORM_EXTENSION_INFO),
+                constants: PLATFORM_CONSTANTS
+                    .iter()
+                    .map(|name| (*name).to_owned())
+                    .collect(),
+                classes: PLATFORM_CLASSES
+                    .iter()
+                    .map(|name| (*name).to_owned())
+                    .collect(),
+                extension_info: PLATFORM_EXTENSION_INFO
+                    .iter()
+                    .map(|name| (*name).to_owned())
+                    .collect(),
             },
         )?;
         Ok(PlatformInfo {
