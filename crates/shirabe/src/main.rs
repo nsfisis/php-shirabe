@@ -38,9 +38,10 @@ fn main() {
     std::sync::LazyLock::force(&PHP_ENV);
     std::sync::LazyLock::force(&PHP_SERVER);
 
-    // Shirabe-specific: Composer prints no such notice. Development builds (`-dev` versions) omit
-    // it so that their output stays identical to Composer's.
-    if env!("CARGO_PKG_VERSION_PRE") != "dev" {
+    // Shirabe-specific: Composer prints no such notice. It is printed only when stderr is a terminal
+    // and only by release builds, so that output captured by scripts and the output of development
+    // builds (`-dev` versions) stay identical to Composer's.
+    if !matches!(env!("CARGO_PKG_VERSION_PRE"), "dev") && std::io::stderr().is_terminal() {
         eprintln!(
             "Warning: Shirabe is experimental. Please report problems at \
              https://github.com/nsfisis/php-shirabe/issues"
