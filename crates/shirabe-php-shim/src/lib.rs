@@ -1,3 +1,5 @@
+extern crate self as shirabe_php_shim;
+
 mod array;
 mod bytes;
 mod compress;

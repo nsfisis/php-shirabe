@@ -1,6 +1,7 @@
 //! Conversions between PHP strings, which are byte strings, and Rust's text and path types.
 
 use bstr::{BStr, BString};
+pub use shirabe_php_shim_macros::{bformat, bwrite};
 use std::ffi::OsStr;
 use std::path::Path;
 
@@ -179,6 +180,61 @@ mod tests {
     fn bconcat_writes_integers_in_decimal() {
         let out = bconcat!(-1i8, " ", 2u16, " ", 3u32, " ", 4usize);
         assert_eq!(out, BString::from("-1 2 3 4"));
+    }
+
+    #[test]
+    fn bformat_keeps_invalid_utf8() {
+        let name = BString::from(b"\xffvendor".to_vec());
+        let path = path_from_bytes(b"/tmp/\xfe");
+        let out = bformat!("a {name} {path} {} {}", b" ".as_slice(), 42i64);
+        assert_eq!(out, BString::from(b"a \xffvendor /tmp/\xfe   42".to_vec()));
+    }
+
+    #[test]
+    fn bformat_resolves_placeholders() {
+        let a = "A";
+        let out = bformat!("{1}{}{0}{}{a}{b}{a}", "x", "y", b = "B");
+        assert_eq!(out, BString::from("yxxyABA"));
+    }
+
+    #[test]
+    fn bformat_escapes_braces() {
+        assert_eq!(bformat!("{{{}}}}}", 1i64), BString::from("{1}}"));
+        assert_eq!(bformat!(""), BString::from(""));
+    }
+
+    #[test]
+    fn bformat_takes_a_byte_string_format() {
+        let x = 1i64;
+        assert_eq!(bformat!(b"\xff{x}"), BString::from(b"\xff1".to_vec()));
+    }
+
+    #[test]
+    fn bformat_evaluates_each_argument_once_in_order() {
+        let mut order = Vec::new();
+        let mut next = |n: i64| {
+            order.push(n);
+            n
+        };
+        let out = bformat!("{1}{0}{1}", next(1), next(2));
+        assert_eq!(out, BString::from("212"));
+        assert_eq!(order, [1, 2]);
+    }
+
+    #[test]
+    fn bformat_borrows_each_argument_as_a_whole() {
+        let x = 1i64;
+        let out = bformat!("{} {}", x + 1, b"ab".len() as u16);
+        assert_eq!(out, BString::from("2 2"));
+    }
+
+    #[test]
+    fn bwrite_appends() {
+        let mut out = BString::from("a");
+        bwrite!(out, "{}", 1i64);
+        let target = &mut out;
+        bwrite!(target, "{}", 2i64);
+        assert_eq!(out, BString::from("a12"));
     }
 
     #[test]

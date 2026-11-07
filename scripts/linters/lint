@@ -65,6 +65,8 @@ $runner = new Runner($rootDir, [
     [new NoPhpDocTag(), []],
     [new NoQualifiedCratePath(), []],
     [new NoQualifiedPhpShimPath(), [
+        // Generates code that expands in the caller's scope, as a `macro_rules!` body does.
+        'crates/shirabe-php-shim-macros/src/lib.rs',
         // Newtypes named after the shim exception they wrap; the shim type cannot be imported
         // under its own name.
         'crates/shirabe-symfony-console/src/exception/invalid_argument_exception.rs',

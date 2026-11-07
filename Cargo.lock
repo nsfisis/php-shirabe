@@ -2415,12 +2415,24 @@ dependencies = [
  "serde_json",
  "sha1",
  "sha2",
+ "shirabe-php-shim-macros",
  "shirabe-php-src",
  "tar",
  "tempfile",
  "twox-hash",
  "tzfile",
  "zip",
+]
+
+[[package]]
+name = "shirabe-php-shim-macros"
+version = "0.2.0-dev"
+dependencies = [
+ "bstr",
+ "proc-macro2",
+ "quote",
+ "shirabe-php-shim",
+ "syn 3.0.9",
 ]
 
 [[package]]

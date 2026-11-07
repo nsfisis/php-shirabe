@@ -8,6 +8,7 @@ repository.workspace = true
 license.workspace = true
 
 [dependencies]
+shirabe-php-shim-macros.workspace = true
 shirabe-php-src.workspace = true
 anyhow.workspace = true
 bstr.workspace = true

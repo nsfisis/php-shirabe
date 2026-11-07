@@ -16,6 +16,7 @@ shirabe-class-map-generator = { path = "crates/shirabe-class-map-generator" }
 shirabe-metadata-minifier = { path = "crates/shirabe-metadata-minifier" }
 shirabe-php-rpc = { path = "crates/shirabe-php-rpc" }
 shirabe-php-shim = { path = "crates/shirabe-php-shim" }
+shirabe-php-shim-macros = { path = "crates/shirabe-php-shim-macros" }
 shirabe-php-src = { path = "crates/shirabe-php-src" }
 shirabe-seld-json-lint = { path = "crates/shirabe-seld-json-lint" }
 shirabe-semver = { path = "crates/shirabe-semver" }
@@ -42,6 +43,8 @@ memchr = "2.8.3"
 mimalloc = "0.1.52"
 mockall = "0.15.0"
 nix = { version = "0.31.3", features = ["feature", "fs", "poll", "process", "sched", "signal", "user"] }
+proc-macro2 = "1.0.107"
+quote = "1.0.47"
 regex = "1.13.1"
 reqwest = { version = "0.13.5", features = ["blocking", "brotli", "deflate", "gzip", "zstd"] }
 serde = { version = "1.0.229", features = ["derive", "rc"] }
@@ -49,6 +52,7 @@ serde_json = { version = "1.0.154", features = ["preserve_order"] }
 serial_test = "4.0.1"
 sha1 = "0.11.0"
 sha2 = "0.11.1"
+syn = { version = "3.0.9", features = ["full"] }
 tar = "0.4.46"
 tempfile = "3.27.0"
 tokio = { version = "1.54.1", features = ["full"] }

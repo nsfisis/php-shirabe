@@ -115,22 +115,35 @@ which decodes UTF-8 as PHP does, records that reason where it calls one.
 
 ## Building strings
 
-PHP's `.` operator and string interpolation map to `bconcat!`, and `sprintf()` to the shim's
-`sprintf()`. Both keep the bytes of their operands. This applies to every string PHP code could
+PHP's string interpolation and `.` operator map to `bformat!`, and `sprintf()` to the shim's
+`sprintf()`. Both keep the bytes of their arguments. This applies to every string PHP code could
 observe, including messages read by people: errors, warnings, progress and exception messages. PHP
 writes those bytes unchanged, and so does Shirabe.
+
+```rust
+bformat!("Package {name} not found in {}", repo.get_repo_name())
+```
+
+* The syntax is that of `format!`, restricted to the placeholders `{}`, `{<index>}` and
+  `{<identifier>}`. Format specs such as `{:>10}` are rejected, since a width would have to count
+  either bytes or characters: use the shims of `sprintf()` and `str_pad()`, which count bytes as PHP
+  does.
+* An argument is anything that implements `PhpDisplay` (see below). `bformat!("{n}")` is
+  `(string) $n`.
+* The format may also be a byte string literal (`b"..."`), for bytes that a `str` literal cannot
+  hold.
+* `bwrite!(out, ...)` appends to an existing `BString`, as `write!` does.
 
 PHP's `(string)` conversion maps to two traits, which mirror `Display` and `ToString`:
 
 * `PhpDisplay` appends the bytes of the conversion to a `BString`, as `Display::fmt` writes into a
   formatter. Strings, paths, integers and `PhpMixed` implement it, and so does the port of every
-  class that defines `__toString()`. `bconcat!` converts each of its operands with it, so `bconcat!(n)` is
-  `(string) $n`.
+  class that defines `__toString()`.
 * `ToPhpString` returns the conversion as a `BString`, as `ToString::to_string` does. Every
   `PhpDisplay` implements it.
 
-`format!` produces a `String`, so formatting bytes into it replaces invalid UTF-8 with U+FFFD. Use it
-only under the reasons above.
+`format!` produces a `String`, which cannot hold bytes that are not valid UTF-8, so a PHP string
+has to be converted lossily before it is formatted into one. Use it only under the reasons above.
 
 Exceptions hold their message as a `BString`. A `Throwable` also implements `Display`, as `anyhow`
 requires, and that output is lossy, so read a message with `get_message()` and not with

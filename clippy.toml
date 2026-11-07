@@ -17,7 +17,7 @@ disallowed-methods = [
     { path = "bstr::ByteSlice::to_str_lossy", reason = "use display_lossy() for a message; see docs/dev/strings-porting.md" },
     { path = "bstr::ByteSlice::to_str_lossy_into", reason = "use display_lossy() for a message; see docs/dev/strings-porting.md" },
     { path = "bstr::ByteVec::into_string", reason = "keep the bytes; see docs/dev/strings-porting.md" },
-    { path = "std::string::ToString::to_string", reason = "use bconcat!(), display_to_bytes() or error_message(); see docs/dev/strings-porting.md" },
+    { path = "std::string::ToString::to_string", reason = "use bformat!(), display_to_bytes() or error_message(); see docs/dev/strings-porting.md" },
     { path = "std::fs::read_to_string", reason = "use std::fs::read(); see docs/dev/strings-porting.md" },
     { path = "bstr::ByteSlice::trim", reason = "use the shim of the PHP function; see docs/dev/strings-porting.md" },
     { path = "bstr::ByteSlice::trim_start", reason = "use the shim of the PHP function; see docs/dev/strings-porting.md" },
@@ -38,5 +38,5 @@ disallowed-types = [
     { path = "str", reason = "use &BStr unless the value has a reason to be UTF-8; see docs/dev/strings-porting.md" },
 ]
 disallowed-macros = [
-    { path = "std::format", reason = "use bconcat! or sprintf() unless the destination is core::fmt; see docs/dev/strings-porting.md" },
+    { path = "std::format", reason = "use bformat! or sprintf() unless the destination is core::fmt; see docs/dev/strings-porting.md" },
 ]
