@@ -41,6 +41,27 @@ Building Shirabe requires:
 Nix flake supported; use `nix develop` to enter the development shell.
 
 
+## Install
+
+Prebuilt binaries are available on the [releases page](https://github.com/nsfisis/php-shirabe/releases) for the following targets:
+
+* `x86_64-unknown-linux-musl`: Linux on x86-64 (statically linked)
+* `aarch64-unknown-linux-musl`: Linux on ARM64 (statically linked)
+* `aarch64-apple-darwin`: macOS on Apple silicon
+
+Download the archive for your platform, verify its build provenance attestation with the [GitHub CLI](https://cli.github.com/), and put the `shirabe` executable on your `PATH`:
+
+```
+$ VERSION=0.2.0
+$ TARGET=x86_64-unknown-linux-musl
+$ curl -LO "https://github.com/nsfisis/php-shirabe/releases/download/$VERSION/shirabe-$VERSION-$TARGET.tar.gz"
+$ gh attestation verify "shirabe-$VERSION-$TARGET.tar.gz" --repo nsfisis/php-shirabe
+$ tar -xzf "shirabe-$VERSION-$TARGET.tar.gz"
+$ install -m 755 "shirabe-$VERSION-$TARGET/shirabe" ~/.local/bin/shirabe
+$ shirabe --version
+```
+
+
 ## Build
 
 ```
