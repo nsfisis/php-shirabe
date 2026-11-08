@@ -12,35 +12,24 @@ use shirabe::json::JsonFile;
 use shirabe::package::loader::ArrayLoader;
 use shirabe::package::{Link, PackageInterfaceHandle, RootAliasPackageHandle, RootPackageHandle};
 use shirabe::repository::{FilesystemRepository, RepositoryInterface};
-use shirabe::util::Filesystem;
 use shirabe_php_rpc::{PluginValue, ToWire};
 use shirabe_php_shim::{
-    Catch as _, PhpMixed, ToPhpString, bformat, display_to_bytes, path_from_bytes, path_to_bytes,
+    Catch as _, PhpMixed, ToPhpString, bformat, path_from_bytes, path_to_bytes,
 };
 use shirabe_semver::VersionParser;
 
 /// PHP mocks JsonFile::read()/exists(); without a mocking framework the canned read value is
 /// materialized as a real temp file whose decoded JSON reproduces the mock return value exactly.
-fn create_temp_json_file(contents: &BStr) -> std::path::PathBuf {
-    let mut path = std::env::temp_dir();
-    let unique = bformat!(
-        "shirabe_filesystemrepositorytest_{}_{}",
-        std::process::id(),
-        display_to_bytes(
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        )
-    );
-    path.push(path_from_bytes(&unique));
+fn create_temp_json_file(contents: &BStr) -> (tempfile::TempDir, std::path::PathBuf) {
+    let dir = get_unique_tmp_directory();
+    let path = dir.path().join("repository.json");
     std::fs::write(&path, contents.as_bytes()).unwrap();
-    path
+    (dir, path)
 }
 
 #[test]
 fn test_repository_read() {
-    let path = create_temp_json_file(BStr::new(
+    let (_dir, path) = create_temp_json_file(BStr::new(
         r#"[{"name": "package1", "version": "1.0.0-beta", "type": "vendor"}]"#,
     ));
     let json = JsonFile::new(path, None, None).unwrap();
@@ -59,7 +48,7 @@ fn test_repository_read() {
 fn test_corrupted_repository_file() {
     // PHP mocks read() to return the scalar string 'foo'; a real file containing the JSON string
     // "foo" decodes to the same value, which the repository rejects as a non-array package list.
-    let path = create_temp_json_file(BStr::new(r#""foo""#));
+    let (_dir, path) = create_temp_json_file(BStr::new(r#""foo""#));
     let json = JsonFile::new(path, None, None).unwrap();
 
     let mut repository = FilesystemRepository::new(json, false, None, None).unwrap();
@@ -74,17 +63,8 @@ fn test_corrupted_repository_file() {
 
 #[test]
 fn test_unexistent_repository_file() {
-    let mut path = std::env::temp_dir();
-    path.push(path_from_bytes(&bformat!(
-        "shirabe_filesystemrepositorytest_missing_{}_{}",
-        std::process::id(),
-        display_to_bytes(
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        )
-    )));
+    let dir = get_unique_tmp_directory();
+    let path = dir.path().join("missing.json");
     let json = JsonFile::new(&path, None, None).unwrap();
 
     let mut repository = FilesystemRepository::new(json, false, None, None).unwrap();
@@ -138,19 +118,8 @@ fn test_repository_write() {
     // PHP mocks JsonFile::write/read/getPath; here a real JsonFile under a temp repo dir is written
     // and read back. write() never reads the file (it dumps the in-memory packages), so the mocked
     // read()/exists() return values are irrelevant to the result.
-    let base = std::fs::canonicalize(std::env::temp_dir()).unwrap();
-    let repo_dir = base.join(path_from_bytes(&bformat!(
-        "shirabe_repo_write_test_{}_{}",
-        std::process::id(),
-        display_to_bytes(
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        )
-    )));
-    let mut fs = Filesystem::new(None);
-    fs.remove_directory(&repo_dir).ok();
+    let temp = get_unique_tmp_directory();
+    let repo_dir = temp.path().to_path_buf();
 
     let json_path = repo_dir.join("vendor/composer/installed.json");
     let json = JsonFile::new(&json_path, None, None).unwrap();
@@ -182,8 +151,6 @@ fn test_repository_write() {
         "dev-package-names": ["mypkg2"],
     });
     assert_eq!(actual, expected);
-
-    fs.remove_directory(&repo_dir).ok();
 }
 
 /// chdir()s into a fresh temp dir on construction and restores the previous cwd on drop, mirroring
