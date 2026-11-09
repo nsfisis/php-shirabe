@@ -4,7 +4,7 @@ use crate::command::{BaseCommand, BaseCommandData};
 use crate::delegate_base_command_trait_impls_to_inner;
 use crate::php_worker::call::PhpCall;
 use crate::php_worker::console::{CONSOLE_APP_CONTEXT, PENDING_COMMAND_HANDLES};
-use crate::php_worker::runtime::php_is_a;
+use crate::php_worker::runtime;
 use bstr::{BStr, BString, ByteSlice};
 use shirabe_php_rpc::{FromWire, PhpObjHandle, PluginValue};
 use shirabe_php_shim::{PhpClass, PhpMixed, RuntimeException, ToPhpString, bformat};
@@ -72,12 +72,49 @@ impl PhpCommandProxy {
     /// A command class named by a `composer.json` script only has to extend Symfony's `Command`,
     /// so `isProxyCommand()` is asked for only when it also extends Composer's `BaseCommand`.
     pub(crate) fn new_script_command(handle: PhpObjHandle) -> anyhow::Result<Self> {
-        let proxy_command = if php_is_a(&handle, BStr::new("Composer\\Command\\BaseCommand"))? {
+        let proxy_command = if runtime::is_a(&handle, BStr::new("Composer\\Command\\BaseCommand"))?
+        {
             Self::call_metadata_getter(&handle, BStr::new("isProxyCommand"))?
         } else {
             false
         };
         Self::build(handle, proxy_command)
+    }
+
+    /// `new $class($name)` for a command class named by a `composer.json` script, with the
+    /// script autoloader active.
+    pub(crate) fn instantiate_script_command(
+        class: &BStr,
+        name: &BStr,
+    ) -> anyhow::Result<PhpObjHandle> {
+        runtime::autoloading_new_object(class, vec![PluginValue::string(name)])
+    }
+
+    /// `$command->getName()` on a command entity no proxy is built for yet.
+    pub(crate) fn command_get_name(handle: &PhpObjHandle) -> anyhow::Result<Option<BString>> {
+        PhpCall::Method(handle, BStr::new("getName")).run(Vec::new())
+    }
+
+    /// `$command->setName($name)` on a command entity no proxy is built for yet.
+    pub(crate) fn command_set_name(handle: &PhpObjHandle, name: &BStr) -> anyhow::Result<()> {
+        PhpCall::Method(handle, BStr::new("setName"))
+            .run::<PluginValue>(vec![PluginValue::string(name)])?;
+        Ok(())
+    }
+
+    /// `$command->getDescription()` on a command entity no proxy is built for yet.
+    pub(crate) fn command_get_description(handle: &PhpObjHandle) -> anyhow::Result<BString> {
+        PhpCall::Method(handle, BStr::new("getDescription")).run(Vec::new())
+    }
+
+    /// `$command->setDescription($description)` on a command entity no proxy is built for yet.
+    pub(crate) fn command_set_description(
+        handle: &PhpObjHandle,
+        description: &BStr,
+    ) -> anyhow::Result<()> {
+        PhpCall::Method(handle, BStr::new("setDescription"))
+            .run::<PluginValue>(vec![PluginValue::string(description)])?;
+        Ok(())
     }
 
     fn build(handle: PhpObjHandle, proxy_command: bool) -> anyhow::Result<Self> {

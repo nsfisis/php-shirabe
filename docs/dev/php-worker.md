@@ -13,10 +13,14 @@ The `shirabe` crate calls into the worker through `php_worker::call::PhpCall` an
 names what to run (a function or entry point, a method of a P-table entity, a static method, a
 constructor) and decodes the answer as the type the caller asks for (`FromWire`). The callbacks
 the worker makes while the call is in flight are served by `PluginRpcDispatcher` — the runtime
-service endpoint and the R table — unless the caller brings a dispatcher of its own, as script
-execution does to answer autoload lookups from the class loader it built. A PHP exception becomes the error of the ported
-exception it stands for (`try_run` keeps it apart for a caller that catches it), and an answer
-that does not decode is an error naming the call and the value it answered with.
+service endpoint and the R table — unless the caller brings a dispatcher of its own. Script
+execution brings `ScriptRpcDispatcher`, which answers the same runtime service methods and R
+table except `__shirabe_run_rust_command`. Both dispatchers live in
+`php_worker/rpc/dispatch.rs`. The ported code reaches the worker through the named functions of
+`php_worker` (`runtime`, `callable`, `installed_versions`, the proxies) rather than building
+calls itself. A PHP exception becomes the error of the ported exception it stands for (`try_run`
+keeps it apart for a caller that catches it), and an answer that does not decode is an error
+naming the call and the value it answered with.
 
 ## Entry points
 

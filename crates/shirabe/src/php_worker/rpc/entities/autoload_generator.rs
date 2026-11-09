@@ -10,7 +10,7 @@ use crate::php_worker::codec::class_map_to_wire;
 use crate::php_worker::rpc::args::{arg, arg_or, arg_throw};
 use crate::php_worker::rpc::dispatch::{error_throw, unavailable_method};
 use crate::php_worker::rpc::table::{entity_arg, optional_entity_arg};
-use crate::php_worker::runtime::new_php_object;
+use crate::php_worker::runtime::autoloading_new_object;
 use crate::repository::RepositoryInterfaceHandle;
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
@@ -194,7 +194,7 @@ fn class_loader_to_php(
     loader: &ClassLoader,
     vendor_dir: Option<BString>,
 ) -> anyhow::Result<PluginValue> {
-    let handle = new_php_object(
+    let handle = autoloading_new_object(
         BStr::new("Composer\\Autoload\\ClassLoader"),
         vec![vendor_dir.to_wire()],
     )?;

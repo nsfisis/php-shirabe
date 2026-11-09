@@ -5,7 +5,7 @@ use crate::package::PackageInterfaceHandle;
 use crate::php_worker::proxy::{forget_php_installer_proxy, php_installer_proxy};
 use crate::php_worker::rpc::args::arg;
 use crate::php_worker::rpc::dispatch::unavailable_method;
-use crate::php_worker::runtime::php_is_a;
+use crate::php_worker::runtime;
 use bstr::{BStr, ByteSlice};
 use shirabe_php_rpc::{PhpObjHandle, PhpThrow, PluginValue, ToWire};
 use shirabe_php_shim::{bformat, error_chain_message};
@@ -22,7 +22,7 @@ pub(crate) fn dispatch_installation_manager_method(
         }
         b"addInstaller" | b"removeInstaller" => {
             let handle = arg::<PhpObjHandle>(method_name, args, 0)?;
-            if !php_is_a(
+            if !runtime::is_a(
                 &handle,
                 BStr::new("Composer\\Installer\\InstallerInterface"),
             )

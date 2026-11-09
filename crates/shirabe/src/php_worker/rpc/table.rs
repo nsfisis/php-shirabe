@@ -7,16 +7,20 @@ use crate::config::Config;
 use crate::dependency_resolver::AnyTransaction;
 use crate::dependency_resolver::operation::AnyOperation;
 use crate::downloader::DownloadManagerInterface;
-use crate::event_dispatcher::{EventDispatcherInterface, EventInterface};
-use crate::installer::InstallationManagerInterface;
+use crate::event_dispatcher::{Event, EventDispatcherInterface, EventInterface};
+use crate::installer::{InstallationManagerInterface, InstallerEvent, PackageEvent};
 use crate::io::{BufferIO, ConsoleIO, IOInterface, NullIO};
 use crate::package::{AnyPackage, LockerInterface, PackageInterfaceHandle};
 use crate::php_worker::rpc::args::arg_throw;
-use crate::plugin::PluginInterface;
+use crate::plugin::{
+    CommandEvent, PluginInterface, PostFileDownloadEvent, PreCommandRunEvent, PreFileDownloadEvent,
+    PrePoolCreateEvent,
+};
 use crate::repository::{
     InstalledArrayRepository, InstalledFilesystemRepository, LockArrayRepository,
     RepositoryInterfaceHandle, RepositoryManagerInterface,
 };
+use crate::script::Event as ScriptEvent;
 use crate::util::{Filesystem, HttpDownloader, ProcessExecutor};
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
@@ -277,6 +281,48 @@ pub(crate) fn io_stub_class(
 }
 
 /// Wire value handing the shared Rust-side `$composer` to the child, interned in the R table.
+/// The proxy stub class (same FQCN as the real event class) an event crosses the RPC
+/// boundary as, or `None` when no stub exists for it yet.
+pub(crate) fn event_stub_class(event: &dyn EventInterface) -> Option<&'static BStr> {
+    if event.as_any().downcast_ref::<ScriptEvent>().is_some() {
+        Some(BStr::new("Composer\\Script\\Event"))
+    } else if event.as_any().downcast_ref::<PackageEvent>().is_some() {
+        Some(BStr::new("Composer\\Installer\\PackageEvent"))
+    } else if event.as_any().downcast_ref::<InstallerEvent>().is_some() {
+        Some(BStr::new("Composer\\Installer\\InstallerEvent"))
+    } else if event
+        .as_any()
+        .downcast_ref::<PreFileDownloadEvent>()
+        .is_some()
+    {
+        Some(BStr::new("Composer\\Plugin\\PreFileDownloadEvent"))
+    } else if event
+        .as_any()
+        .downcast_ref::<PostFileDownloadEvent>()
+        .is_some()
+    {
+        Some(BStr::new("Composer\\Plugin\\PostFileDownloadEvent"))
+    } else if event
+        .as_any()
+        .downcast_ref::<PrePoolCreateEvent>()
+        .is_some()
+    {
+        Some(BStr::new("Composer\\Plugin\\PrePoolCreateEvent"))
+    } else if event.as_any().downcast_ref::<CommandEvent>().is_some() {
+        Some(BStr::new("Composer\\Plugin\\CommandEvent"))
+    } else if event
+        .as_any()
+        .downcast_ref::<PreCommandRunEvent>()
+        .is_some()
+    {
+        Some(BStr::new("Composer\\Plugin\\PreCommandRunEvent"))
+    } else if event.as_any().downcast_ref::<Event>().is_some() {
+        Some(BStr::new("Composer\\EventDispatcher\\Event"))
+    } else {
+        None
+    }
+}
+
 pub fn composer_handle_value(composer: &ComposerHandle) -> PluginValue {
     rust_handle_value(register_composer_entity(composer), "Composer\\Composer")
 }

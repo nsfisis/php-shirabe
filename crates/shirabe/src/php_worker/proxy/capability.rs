@@ -3,11 +3,34 @@
 use crate::command::BaseCommand;
 use crate::php_worker::call::PhpCall;
 use crate::php_worker::proxy::PhpCommandProxy;
-use crate::php_worker::runtime::php_is_a;
+use crate::php_worker::rpc::table::plugin_handle_value;
+use crate::php_worker::runtime;
+use crate::plugin::PluginInterface;
 use crate::plugin::capability::{Capability, CommandProvider};
-use bstr::BStr;
+use bstr::{BStr, BString};
+use indexmap::IndexMap;
 use shirabe_php_rpc::{PhpObjHandle, PluginValue};
 use shirabe_php_shim::{UnexpectedValueException, bformat};
+
+/// `new $capabilityClass($ctorArgs)` with `$ctorArgs['plugin'] = $plugin`: the capability
+/// constructor receives the plugin instance itself. A PHP-implemented plugin already has an
+/// entity in the child's P table; a Rust-implemented one crosses as a handle to its R-table
+/// entity.
+pub(crate) fn new_capability_object(
+    capability_class: &BStr,
+    mut ctor_args: IndexMap<BString, PluginValue>,
+    plugin: &std::rc::Rc<std::cell::RefCell<dyn PluginInterface>>,
+) -> anyhow::Result<PhpObjHandle> {
+    let plugin_value = match plugin.borrow().__as_php_plugin_proxy() {
+        Some(proxy) => PluginValue::PhpHandle(proxy.handle.clone()),
+        None => plugin_handle_value(plugin),
+    };
+    ctor_args.insert(BString::from("plugin"), plugin_value);
+    runtime::new_object(
+        capability_class,
+        vec![PluginValue::Array(ctor_args.into_iter().collect())],
+    )
+}
 
 /// `Capability` adapter for a capability entity living in the PHP child process, for
 /// capability interfaces that add no methods of their own (the plain
@@ -90,7 +113,7 @@ impl CommandProvider for PhpCommandProviderProxy {
                 PluginValue::PhpHandle(handle) => handle,
                 _ => return Err(invalid_command_error(&self.handle)),
             };
-            if !php_is_a(&command_handle, BStr::new("Composer\\Command\\BaseCommand"))? {
+            if !runtime::is_a(&command_handle, BStr::new("Composer\\Command\\BaseCommand"))? {
                 return Err(invalid_command_error(&self.handle));
             }
             commands.push(std::rc::Rc::new(std::cell::RefCell::new(

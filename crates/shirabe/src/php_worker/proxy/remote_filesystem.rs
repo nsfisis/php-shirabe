@@ -7,10 +7,10 @@
 //! built on first use, so a run that never needs it never spawns the worker.
 
 use crate::config::Config;
-use crate::event_dispatcher::EventDispatcher;
 use crate::io::IOInterface;
 use crate::php_worker::call::PhpCall;
 use crate::php_worker::rpc::table::{config_handle_value, io_handle_value};
+use crate::php_worker::runtime;
 use crate::util::StreamContextOptions;
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
@@ -140,7 +140,7 @@ impl RemoteFilesystem {
             return Ok(entity);
         }
 
-        EventDispatcher::ensure_composer_php_runtime(|| {
+        runtime::ensure_composer_php_runtime(|| {
             let cache_dir = self.config.borrow().get_path("cache-dir")?;
             Ok(path_from_bytes(&cache_dir).to_path_buf())
         })?;

@@ -26,8 +26,7 @@ pub fn lock_php_worker() -> std::sync::MutexGuard<'static, ()> {
 pub fn load_composer_php_runtime() {
     static CACHE: std::sync::OnceLock<tempfile::TempDir> = std::sync::OnceLock::new();
     let cache = CACHE.get_or_init(|| tempfile::tempdir().expect("no cache directory for the test"));
-    shirabe::event_dispatcher::EventDispatcher::__ensure_composer_php_runtime(cache.path())
-        .unwrap();
+    shirabe::php_worker::runtime::__ensure_composer_php_runtime(cache.path()).unwrap();
 }
 
 /// Calls a static method in the worker, panicking on either failure lane.

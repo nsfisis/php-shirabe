@@ -3,10 +3,12 @@
 //! Composer counterpart.
 
 pub mod call;
+pub(crate) mod callable;
 pub mod codec;
 pub(crate) mod console;
+pub(crate) mod installed_versions;
 pub(crate) mod job;
 pub mod proxy;
 pub mod rpc;
-pub(crate) mod runtime;
+pub mod runtime;
 pub(crate) mod throwable;

@@ -13,12 +13,13 @@
 //! constraint) has no faithful constructor call.
 
 use crate::package::{DisplayMode, Link, Mirror};
+use crate::util::StreamContextOptions;
 use crate::util::http::Response;
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_class_map_generator::class_map::ClassMap;
 use shirabe_php_rpc::{FromWire, PhpObject, PhpThrow, PluginValue, ToWire, wire};
-use shirabe_php_shim::{bformat, display_to_bytes, php_str};
+use shirabe_php_shim::{PhpMixed, bformat, display_to_bytes, error_message, php_str};
 use shirabe_semver::constraint::{
     AnyConstraint, MatchAllConstraint, MatchNoneConstraint, MultiConstraint, SimpleConstraint,
 };
@@ -350,6 +351,19 @@ impl FromWire for DisplayMode {
             PluginValue::Int(2) => Ok(DisplayMode::DistRef),
             other => Err(wire::unexpected("a display mode of 0..=2", other)),
         }
+    }
+}
+
+impl ToWire for StreamContextOptions {
+    fn to_wire(self) -> PluginValue {
+        PhpMixed::Array(self.into_array()).to_wire()
+    }
+}
+
+impl FromWire for StreamContextOptions {
+    fn from_wire(value: &PluginValue) -> Result<Self, PhpThrow> {
+        Self::from_array(IndexMap::<BString, PhpMixed>::from_wire(value)?)
+            .map_err(|error| PhpThrow::new("TypeError", error_message(&error), 0))
     }
 }
 

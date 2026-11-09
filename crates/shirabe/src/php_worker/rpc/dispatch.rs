@@ -3,18 +3,17 @@
 
 use crate::autoload::ClassLoader;
 use crate::config::Config;
-use crate::console::run_worker_reverse_command;
 use crate::dependency_resolver::operation::{
     AnyOperation, InstallOperation, MarkAliasInstalledOperation, MarkAliasUninstalledOperation,
     UninstallOperation, UpdateOperation,
 };
-use crate::event_dispatcher::dispatch_event_method;
 use crate::factory::Factory;
 use crate::io::{BufferIO, IOInterface};
 use crate::package::{
     AliasPackage, AliasPackageHandle, AnyPackage, CompleteAliasPackage, CompletePackage, Locker,
     Package, PackageInterfaceHandle, RootAliasPackage,
 };
+use crate::php_worker::console::run_worker_reverse_command;
 use crate::php_worker::job;
 use crate::php_worker::rpc::args::{arg, arg_or};
 use crate::php_worker::rpc::entities::autoload_generator::dispatch_autoload_generator_method;
@@ -22,6 +21,7 @@ use crate::php_worker::rpc::entities::composer::dispatch_composer_method;
 use crate::php_worker::rpc::entities::config::dispatch_config_method;
 use crate::php_worker::rpc::entities::download_manager::dispatch_download_manager_method;
 use crate::php_worker::rpc::entities::event_dispatcher::dispatch_event_dispatcher_method;
+use crate::php_worker::rpc::entities::events::dispatch_event_method;
 use crate::php_worker::rpc::entities::filesystem::dispatch_filesystem_method;
 use crate::php_worker::rpc::entities::http_downloader::dispatch_http_downloader_method;
 use crate::php_worker::rpc::entities::installation_manager::dispatch_installation_manager_method;
@@ -60,8 +60,9 @@ pub(crate) fn find_file_in_registered_loaders(
 }
 
 /// Serves `CallRustMethod` requests from the child while a plugin-related call is in flight:
-/// rhandle 0 is the runtime service endpoint (autoload lookups), every other rhandle resolves
-/// through the R table. Unsupported methods are explicit errors, never silent fallbacks.
+/// rhandle 0 is the runtime service endpoint (autoload lookups, the built-in commands a
+/// plugin-provided command runs), every other rhandle resolves through the R table. Unsupported
+/// methods are explicit errors, never silent fallbacks.
 #[derive(Debug)]
 pub(crate) struct PluginRpcDispatcher;
 
@@ -74,12 +75,6 @@ impl RustMethodDispatcher for PluginRpcDispatcher {
         out_params: &mut IndexMap<u32, PluginValue>,
     ) -> Result<PluginValue, PhpThrow> {
         if rhandle == 0 {
-            if method_name == "__shirabe_find_file" {
-                let class = arg::<BString>(method_name, &args, 0)?;
-                return Ok(find_file_in_registered_loaders(&class)
-                    .map_err(|error| error_throw(b"__shirabe_find_file failed", &error))?
-                    .to_wire());
-            }
             if method_name == "__shirabe_run_rust_command" {
                 let name = arg::<BString>(method_name, &args, 0)?;
                 let input_line = arg::<BString>(method_name, &args, 1)?;
@@ -88,28 +83,65 @@ impl RustMethodDispatcher for PluginRpcDispatcher {
                     Err(e) => Err(PhpThrow::runtime(error_chain_message(&e).to_php_string())),
                 };
             }
-            if method_name == "__shirabe_construct" {
-                return construct_entity(&args);
-            }
-            if method_name == "__shirabe_call_static" {
-                return call_static_entity(&args);
-            }
-            if let Some(answer) = dispatch_job_service_method(method_name, &args) {
-                return answer;
-            }
-            return Err(PhpThrow::runtime(bformat!(
-                "unknown runtime service method `{method_name}`"
-            )));
+            return dispatch_runtime_service_method(method_name, &args);
         }
 
         dispatch_r_table_method(rhandle, method_name, &args, out_params)
     }
 }
 
+/// Serves `CallRustMethod` requests issued by the PHP worker while a script-related call is in
+/// flight: Rust handle 0 is the runtime service endpoint (autoload lookups against the
+/// Rust-side [`ClassLoader`]s on the autoload stack), every other rhandle resolves through the R
+/// table.
+#[derive(Debug)]
+pub(crate) struct ScriptRpcDispatcher;
+
+impl RustMethodDispatcher for ScriptRpcDispatcher {
+    fn dispatch(
+        &mut self,
+        rhandle: u64,
+        method_name: &BStr,
+        args: Vec<PluginValue>,
+        out_params: &mut IndexMap<u32, PluginValue>,
+    ) -> Result<PluginValue, PhpThrow> {
+        if rhandle == 0 {
+            return dispatch_runtime_service_method(method_name, &args);
+        }
+        dispatch_r_table_method(rhandle, method_name, &args, out_params)
+    }
+}
+
+/// Serves the runtime service methods (Rust handle 0) every dispatcher answers: autoload
+/// lookups, entity construction and static calls, and the job registry.
+fn dispatch_runtime_service_method(
+    method_name: &BStr,
+    args: &[PluginValue],
+) -> Result<PluginValue, PhpThrow> {
+    if method_name == "__shirabe_find_file" {
+        let class = arg::<BString>(method_name, args, 0)?;
+        return Ok(find_file_in_registered_loaders(&class)
+            .map_err(|error| error_throw(b"__shirabe_find_file failed", &error))?
+            .to_wire());
+    }
+    if method_name == "__shirabe_construct" {
+        return construct_entity(args);
+    }
+    if method_name == "__shirabe_call_static" {
+        return call_static_entity(args);
+    }
+    if let Some(answer) = dispatch_job_service_method(method_name, args) {
+        return answer;
+    }
+    Err(PhpThrow::runtime(bformat!(
+        "unknown runtime service method `{method_name}`"
+    )))
+}
+
 /// Serves the runtime service methods of the job registry (`docs/dev/plugin-async.md`), shared by
 /// every dispatcher: the worker reports on a job whenever the promise behind it settles or is
 /// cancelled, whichever call happens to be in flight then. `None` for any other method.
-pub(crate) fn dispatch_job_service_method(
+fn dispatch_job_service_method(
     method_name: &BStr,
     args: &[PluginValue],
 ) -> Option<Result<PluginValue, PhpThrow>> {
@@ -143,7 +175,7 @@ pub(crate) fn dispatch_job_service_method(
 /// Serves a method call on an R-table entity, shared by every dispatcher: the child holds a
 /// stub for an entity registered by an earlier call, and the handle outlives the call that
 /// minted it.
-pub(crate) fn dispatch_r_table_method(
+fn dispatch_r_table_method(
     rhandle: u64,
     method_name: &BStr,
     args: &[PluginValue],
@@ -215,7 +247,7 @@ pub(crate) fn dispatch_r_table_method(
 /// gets a fresh Rust-side entity, since the proxied FQCN has no implementation of its own in the
 /// child. Classes whose entity cannot be built here are an explicit error, so a plugin never
 /// ends up holding a second, unconnected instance of a Composer service.
-pub(crate) fn construct_entity(args: &[PluginValue]) -> Result<PluginValue, PhpThrow> {
+fn construct_entity(args: &[PluginValue]) -> Result<PluginValue, PhpThrow> {
     let (class, ctor_args) = match (args.first(), args.get(1)) {
         (Some(PluginValue::String(class)), Some(PluginValue::List(ctor_args))) => {
             (class, ctor_args)
@@ -501,7 +533,7 @@ fn dispatch_property_access(
 
 /// Serves the static methods a proxy stub forwards instead of running locally, because their real
 /// bodies reach state the Rust side owns or classes the worker has no code for.
-pub(crate) fn call_static_entity(args: &[PluginValue]) -> Result<PluginValue, PhpThrow> {
+fn call_static_entity(args: &[PluginValue]) -> Result<PluginValue, PhpThrow> {
     let (class, method, call_args) = match (args.first(), args.get(1), args.get(2)) {
         (
             Some(PluginValue::String(class)),

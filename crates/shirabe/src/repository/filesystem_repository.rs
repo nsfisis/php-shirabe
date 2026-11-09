@@ -5,7 +5,7 @@ use crate::json::JsonFile;
 use crate::package::dumper::ArrayDumper;
 use crate::package::loader::{ArrayLoader, LoaderInterface};
 use crate::package::{BasePackageHandle, PackageInterfaceHandle, RootPackageInterfaceHandle};
-use crate::php_worker::call::PhpCall;
+use crate::php_worker::installed_versions;
 use crate::repository::{
     FindPackageConstraint, InvalidRepositoryException, LoadPackagesResult, PlatformRepository,
     ProviderInfo, RepositoryInterface, RepositoryInterfaceWeakHandle, SearchResult,
@@ -14,7 +14,6 @@ use crate::repository::{
 use crate::util::{Filesystem, Platform};
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe_php_rpc::ToWire;
 use shirabe_php_shim::{
     AnyThrowable, InvalidArgumentException, LogicException, PhpClass as _, PhpMixed, ToPhpString,
     UnexpectedValueException, array_flip, bformat, bwrite, canonical_int_key, dirname,
@@ -23,11 +22,6 @@ use shirabe_php_shim::{
 };
 use shirabe_semver::constraint::AnyConstraint;
 use std::path::Path;
-
-/// The `installed.php` passed to `FilesystemRepository::safely_load_installed_versions`, waiting
-/// for the Composer PHP runtime to be loaded into the PHP worker.
-static PENDING_INSTALLED_VERSIONS: std::sync::Mutex<Option<std::path::PathBuf>> =
-    std::sync::Mutex::new(None);
 
 /// Filesystem repository.
 #[derive(Debug)]
@@ -345,17 +339,8 @@ impl FilesystemRepository {
 
             // make sure the in memory state is up to date with on disk
             // The upstream in-process reload/selfDir/installedIsLocalDir tail is pushed to the
-            // PHP worker, where the real observers (plugins) live. The push is skipped when no
-            // worker is running — with no child there is nothing that could observe the state;
-            // the glue skips it only when the class is not even autoloadable there (no Composer
-            // PHP runtime = no observer code either).
-            if shirabe_php_rpc::worker_is_running() {
-                PhpCall::Function(BStr::new("__shirabe_installed_versions_reload"))
-                    .run::<shirabe_php_rpc::PluginValue>(vec![
-                    PhpMixed::Array(versions).to_wire(),
-                    shirabe_php_rpc::PluginValue::string(path_to_bytes(&repo_dir)),
-                ])?;
-            }
+            // PHP worker, where the real observers (plugins) live.
+            installed_versions::reload(versions, &repo_dir)?;
         }
 
         Ok(())
@@ -364,33 +349,10 @@ impl FilesystemRepository {
     /// As we load the file from vendor dir during bootstrap, we need to make sure it contains only expected code before executing it
     ///
     /// `InstalledVersions` lives in the PHP worker, so the file is validated and loaded there, once
-    /// the Composer PHP runtime is loaded into the worker (see
-    /// [`Self::load_pending_installed_versions`]). Unlike Composer, which returns whether the file
-    /// passed the validation, this therefore returns nothing. Only the first path is kept, as
-    /// Composer loads the file only while `InstalledVersions` is not defined yet.
+    /// the Composer PHP runtime is loaded into the worker. Unlike Composer, which returns whether
+    /// the file passed the validation, this therefore returns nothing.
     pub fn safely_load_installed_versions(path: &std::path::Path) {
-        let mut pending = PENDING_INSTALLED_VERSIONS
-            .lock()
-            .unwrap_or_else(|e| panic!("pending installed.php mutex poisoned: {e}"));
-        if pending.is_none() {
-            *pending = Some(path.to_path_buf());
-        }
-    }
-
-    /// Runs the deferred [`Self::safely_load_installed_versions`] in the PHP worker. Called right
-    /// after the Composer PHP runtime is loaded there, before any plugin or script code runs.
-    pub(crate) fn load_pending_installed_versions() -> anyhow::Result<()> {
-        let path = PENDING_INSTALLED_VERSIONS
-            .lock()
-            .unwrap_or_else(|e| panic!("pending installed.php mutex poisoned: {e}"))
-            .take();
-        if let Some(path) = path {
-            PhpCall::Function(BStr::new("__shirabe_safely_load_installed_versions"))
-                .run::<shirabe_php_rpc::PluginValue>(vec![shirabe_php_rpc::PluginValue::string(
-                path_to_bytes(&path),
-            )])?;
-        }
-        Ok(())
+        installed_versions::safely_load(path);
     }
 
     fn dump_to_php_code(&self, array: &IndexMap<BString, PhpMixed>, level: i64) -> BString {

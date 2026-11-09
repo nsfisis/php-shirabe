@@ -16,7 +16,7 @@ use crate::composer::{ComposerHandle, PartialComposerHandle, composer_full};
 use crate::config::UseParentDir;
 use crate::console::GithubActionError;
 use crate::downloader::TransportException;
-use crate::event_dispatcher::{EventDispatcher, ScriptExecutionException};
+use crate::event_dispatcher::ScriptExecutionException;
 use crate::exception::NoSslException;
 use crate::factory::{DisablePlugins, Factory};
 use crate::installer::Installer;
@@ -24,17 +24,16 @@ use crate::io::{
     ConsoleIO, IOInterface, IOInterfaceImmutable, IOInterfaceWrite, NullIO, io_interface,
 };
 use crate::json::JsonValidationException;
-use crate::php_worker::call::PhpCall;
 use crate::php_worker::console::{
     RustCommandMetadata, extend_console_application_commands,
     extend_console_application_rust_command, publish_console_application_context,
-    reset_pending_plugin_command_handles, take_pending_plugin_command_handles,
+    register_worker_reverse_application, reset_pending_plugin_command_handles,
+    rust_command_metadata, take_pending_plugin_command_handles,
 };
 use crate::php_worker::proxy::PhpCommandProxy;
 use crate::php_worker::rpc::dispatch::find_file_in_registered_loaders;
 use crate::php_worker::rpc::table::{composer_handle_value, io_handle_value};
-use crate::php_worker::runtime::{new_php_object, php_class_query};
-use crate::util::sync_executor::block_on;
+use crate::php_worker::runtime;
 use crate::util::{ErrorHandler, Filesystem, HttpDownloader, Platform, Silencer};
 use bstr::{B, BStr, BString, ByteSlice, ByteVec};
 use indexmap::IndexMap;
@@ -1256,7 +1255,7 @@ impl Application {
                     php_regex!(
                         r"/[a-zA-Z_\x7f-\xff][\\a-zA-Z0-9_\x7f-\xff]*@anonymous\x00.*?\.php(?:0x?|:[0-9]+\$)?[0-9a-fA-F]+/"
                     ),
-                    |m: &PregMatches| anonymous_class_display_name(m.get(0).unwrap()),
+                    |m: &PregMatches| runtime::anonymous_class_display_name(m.get(0).unwrap()),
                     &message,
                 )?;
             }
@@ -2312,7 +2311,7 @@ impl ApplicationHandle {
                                 let is_command_class = is_string(dummy)
                                     && find_file_in_registered_loaders(dummy_str)?.is_some()
                                     && {
-                                        EventDispatcher::ensure_composer_php_runtime(|| {
+                                        runtime::ensure_composer_php_runtime(|| {
                                             let cache_dir = match composer_opt {
                                                 Some(ref composer_handle) => {
                                                     composer_full(composer_handle)
@@ -2327,68 +2326,51 @@ impl ApplicationHandle {
                                             };
                                             Ok(path_from_bytes(&cache_dir).to_path_buf())
                                         })?;
-                                        php_class_query(
-                                            BStr::new("class_exists"),
-                                            vec![shirabe_php_rpc::PluginValue::string(dummy_str)],
-                                        )? && php_class_query(
-                                            BStr::new("is_subclass_of"),
-                                            vec![
-                                                shirabe_php_rpc::PluginValue::string(dummy_str),
-                                                shirabe_php_rpc::PluginValue::string(
+                                        runtime::autoloading_class_exists(dummy_str.as_bstr())?
+                                            && runtime::autoloading_is_subclass_of(
+                                                dummy_str.as_bstr(),
+                                                BStr::new(
                                                     "Symfony\\Component\\Console\\Command\\Command",
                                                 ),
-                                                shirabe_php_rpc::PluginValue::Bool(true),
-                                            ],
-                                        )?
+                                            )?
                                     };
                                 let cmd: std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>> =
                                     if is_command_class {
-                                        if php_class_query(
-                                            BStr::new("is_subclass_of"),
-                                            vec![
-                                                shirabe_php_rpc::PluginValue::string(dummy_str),
-                                                shirabe_php_rpc::PluginValue::string(
-                                                    "Symfony\\Component\\Console\\SingleCommandApplication",
-                                                ),
-                                                shirabe_php_rpc::PluginValue::Bool(true),
-                                            ],
+                                        if runtime::autoloading_is_subclass_of(
+                                            dummy_str.as_bstr(),
+                                            BStr::new(
+                                                "Symfony\\Component\\Console\\SingleCommandApplication",
+                                            ),
                                         )? {
                                             io.write_error(bformat!("<warning>The script named {script} extends SingleCommandApplication which is not compatible with Composer 2.9+, make sure you extend Symfony\\Component\\Console\\Command instead.</warning>"));
                                         }
 
-                                        let handle = new_php_object(
+                                        let handle = PhpCommandProxy::instantiate_script_command(
                                             dummy_str.as_bstr(),
-                                            vec![shirabe_php_rpc::PluginValue::string(
-                                                script.clone(),
-                                            )],
+                                            script.as_bstr(),
                                         )?;
 
                                         // makes sure the command is find()'able by the name defined in composer.json, and the name isn't overridden in its configure()
-                                        let cmd_name: Option<BString> =
-                                            PhpCall::Method(&handle, BStr::new("getName"))
-                                                .run(Vec::new())?;
+                                        let cmd_name = PhpCommandProxy::command_get_name(&handle)?;
                                         if let Some(ref bytes) = cmd_name
                                             && !bytes.is_empty()
                                             && bytes != script
                                         {
                                             io.write_error(bformat!("<warning>The script named {script} in composer.json has a mismatched name in its class definition. For consistency, either use the same name, or do not define one inside the class.</warning>"));
                                             // override it with the defined script name
-                                            PhpCall::Method(&handle, BStr::new("setName"))
-                                                .run::<shirabe_php_rpc::PluginValue>(vec![
-                                                shirabe_php_rpc::PluginValue::string(
-                                                    script.clone(),
-                                                ),
-                                            ])?;
+                                            PhpCommandProxy::command_set_name(
+                                                &handle,
+                                                script.as_bstr(),
+                                            )?;
                                         }
 
-                                        let cmd_description: BString =
-                                            PhpCall::Method(&handle, BStr::new("getDescription"))
-                                                .run(Vec::new())?;
+                                        let cmd_description =
+                                            PhpCommandProxy::command_get_description(&handle)?;
                                         if cmd_description.is_empty() {
-                                            PhpCall::Method(&handle, BStr::new("setDescription"))
-                                                .run::<shirabe_php_rpc::PluginValue>(vec![
-                                                shirabe_php_rpc::PluginValue::string(description),
-                                            ])?;
+                                            PhpCommandProxy::command_set_description(
+                                                &handle,
+                                                description.as_bstr(),
+                                            )?;
                                         }
 
                                         let cmd = PhpCommandProxy::new_script_command(handle)?;
@@ -2900,114 +2882,4 @@ fn throwable_is_exception_interface(e: Option<&AnyThrowable>) -> bool {
             || e.is_instanceof::<InvalidOptionException>()
             || e.is_instanceof::<MissingInputException>()
     })
-}
-
-/// The replacement `doRenderThrowable` writes for an anonymous class name found in a message:
-/// `(get_parent_class($class) ?: key(class_implements($class)) ?: 'class').'@anonymous'` when
-/// `class_exists($class, false)`, else the name unchanged. Anonymous classes are declared only by
-/// PHP code the worker ran, so the worker's class table answers, and without a worker no such
-/// class exists.
-fn anonymous_class_display_name(class: &BStr) -> anyhow::Result<BString> {
-    let string = || shirabe_php_rpc::PluginValue::string(class);
-    let exists = shirabe_php_rpc::worker_is_running()
-        && PhpCall::Function(BStr::new("class_exists"))
-            .run::<bool>(vec![string(), shirabe_php_rpc::PluginValue::Bool(false)])?;
-    if !exists {
-        return Ok(class.to_owned());
-    }
-
-    let get_parent_class = PhpCall::Function(BStr::new("get_parent_class"));
-    let parent = match get_parent_class.run::<shirabe_php_rpc::PluginValue>(vec![string()])? {
-        shirabe_php_rpc::PluginValue::Bool(false) => None,
-        value => Some(
-            <BString as shirabe_php_rpc::FromWire>::from_wire(&value)
-                .map_err(|throw| get_parent_class.unsupported_shape(throw))?,
-        ),
-    };
-    let name = match parent {
-        Some(parent) => parent,
-        None => PhpCall::Function(BStr::new("class_implements"))
-            .run::<IndexMap<BString, shirabe_php_rpc::PluginValue>>(vec![string()])?
-            .into_keys()
-            .next()
-            .unwrap_or_else(|| BString::from("class")),
-    };
-    Ok(bformat!("{name}@anonymous"))
-}
-
-thread_local! {
-    /// The application answering `__shirabe_run_rust_command` callbacks from the plugin
-    /// worker's reverse command stubs; registered when plugin commands are collected.
-    static WORKER_REVERSE_APPLICATION: std::cell::RefCell<
-        Option<std::rc::Weak<std::cell::RefCell<Application>>>,
-    > = const { std::cell::RefCell::new(None) };
-}
-
-/// The metadata a worker-side `\Shirabe\RustCommandStub` mirrors of a registered command.
-fn rust_command_metadata(command: &dyn SymfonyCommand) -> RustCommandMetadata {
-    RustCommandMetadata {
-        name: command
-            .get_name()
-            .expect("a registered command always has a name"),
-        description: command.get_description(),
-        aliases: command.get_aliases(),
-        hidden: command.is_hidden(),
-    }
-}
-
-/// Registers the application the worker's reverse command stubs call back into.
-fn register_worker_reverse_application(
-    application: std::rc::Weak<std::cell::RefCell<Application>>,
-) {
-    WORKER_REVERSE_APPLICATION.with(|slot| *slot.borrow_mut() = Some(application));
-}
-
-/// Runs a built-in command on behalf of a plugin-provided command executing in the worker
-/// (the reverse half of the two-world command split): the stringified input the plugin passed
-/// is re-parsed here and the command runs against this side's application state — helper set
-/// included — writing to the same stdio the worker inherited.
-pub(crate) fn run_worker_reverse_command(name: &BStr, input_line: &BStr) -> anyhow::Result<i64> {
-    let application = WORKER_REVERSE_APPLICATION
-        .with(|slot| slot.borrow().as_ref().and_then(std::rc::Weak::upgrade))
-        .ok_or_else(|| -> anyhow::Error {
-            RuntimeException::new(bformat!(
-                "cannot run command {name}: no application is registered for worker callbacks"
-            ))
-            .into()
-        })?;
-    let command = application.borrow_mut().find(name)?;
-    // PHP's `(string) $input` omits the command name when the input was built without an
-    // explicit `command` entry, but the merged definition binds the first positional token to
-    // the `command` argument, so the name is prepended when the first token is not this
-    // command.
-    let trimmed = trim(input_line);
-    let first_token = trimmed
-        .split(u8::is_ascii_whitespace)
-        .find(|token| !token.is_empty())
-        .unwrap_or_default();
-    let is_named = {
-        let command = command.borrow();
-        command
-            .get_name()
-            .is_some_and(|name| name.as_slice() == first_token)
-            || command
-                .get_aliases()
-                .iter()
-                .any(|alias| alias.as_slice() == first_token)
-    };
-    let line = if is_named {
-        trimmed
-    } else if trimmed.is_empty() {
-        BString::from(name)
-    } else {
-        bformat!("{name} {trimmed}")
-    };
-    let input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>> = std::rc::Rc::new(
-        std::cell::RefCell::new(shirabe_symfony_console::input::StringInput::new(&line)?),
-    );
-    let output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>> = std::rc::Rc::new(
-        std::cell::RefCell::new(ConsoleOutput::new(None, None, None)?),
-    );
-    // The worker's callback is a synchronous RPC request, answered on the thread serving it.
-    block_on(command.borrow().run(input, output))
 }
