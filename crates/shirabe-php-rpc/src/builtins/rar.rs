@@ -6,8 +6,10 @@
 //! the available decoders (the `unrar` crate and its bindings) build on the UnRAR library, whose
 //! license is not an open source one. A native decoder could still replace the worker here.
 
+use crate::PhpObjHandle;
+use crate::builtins::or_false;
+use crate::transport::{RefuseCallbacks, call_php_method, call_static_method};
 use crate::wire::{ToWire, protocol_value};
-use crate::{PhpObjHandle, RefuseCallbacks, call_php_method, call_static_method, or_false};
 use bstr::BStr;
 use shirabe_php_shim::php_str;
 

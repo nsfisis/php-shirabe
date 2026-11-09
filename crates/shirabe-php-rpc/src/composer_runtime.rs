@@ -2,7 +2,8 @@
 //!
 //! See `docs/dev/composer-runtime-bundle.md`.
 
-use crate::{PluginValue, call_internal_function};
+use crate::PluginValue;
+use crate::transport::call_internal_function;
 use bstr::{BStr, BString};
 use shirabe_php_shim::{
     AnyThrowable, Phar, RuntimeException, bformat, display_to_bytes, getenv, os_str_from_bytes,

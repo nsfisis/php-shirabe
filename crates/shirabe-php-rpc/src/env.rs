@@ -9,7 +9,8 @@
 //! TODO(php-runtime): the reverse direction is missing — a write PHP code makes to its own
 //! environment is not reflected back into the Rust-side storages.
 
-use crate::{PluginValue, call_internal_function};
+use crate::PluginValue;
+use crate::transport::call_internal_function;
 use bstr::BStr;
 use shirabe_php_shim::{EnvStorageKind, env_mutations_since};
 use std::os::unix::ffi::OsStrExt as _;
