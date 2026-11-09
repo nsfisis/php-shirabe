@@ -2326,8 +2326,8 @@ impl ApplicationHandle {
                                             };
                                             Ok(path_from_bytes(&cache_dir).to_path_buf())
                                         })?;
-                                        runtime::autoloading_class_exists(dummy_str.as_bstr())?
-                                            && runtime::autoloading_is_subclass_of(
+                                        runtime::autoloading::class_exists(dummy_str.as_bstr())?
+                                            && runtime::autoloading::is_subclass_of(
                                                 dummy_str.as_bstr(),
                                                 BStr::new(
                                                     "Symfony\\Component\\Console\\Command\\Command",
@@ -2336,7 +2336,7 @@ impl ApplicationHandle {
                                     };
                                 let cmd: std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>> =
                                     if is_command_class {
-                                        if runtime::autoloading_is_subclass_of(
+                                        if runtime::autoloading::is_subclass_of(
                                             dummy_str.as_bstr(),
                                             BStr::new(
                                                 "Symfony\\Component\\Console\\SingleCommandApplication",

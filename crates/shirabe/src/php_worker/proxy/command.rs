@@ -87,7 +87,7 @@ impl PhpCommandProxy {
         class: &BStr,
         name: &BStr,
     ) -> anyhow::Result<PhpObjHandle> {
-        runtime::autoloading_new_object(class, vec![PluginValue::string(name)])
+        runtime::autoloading::new_object(class, vec![PluginValue::string(name)])
     }
 
     /// `$command->getName()` on a command entity no proxy is built for yet.

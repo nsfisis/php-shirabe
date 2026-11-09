@@ -1,23 +1,22 @@
 //! Thin wrappers that evaluate a PHP built-in, or load a piece of runtime, in the worker on behalf
 //! of the ported code.
 //!
-//! The wrappers differ in what they set up before the call, and are kept apart by name:
+//! The wrappers differ in what they set up before the call, and are kept apart by module:
 //!
-//! - the unprefixed ones run against whatever the worker has loaded so far;
-//! - the `autoloading_` ones turn the script autoloader on first, so a class named by
-//!   `composer.json` resolves through the Rust-side [`ClassLoader`]s;
-//! - the `script_` ones turn the script autoloader on and serve the callbacks with the
-//!   [`ScriptRpcDispatcher`], for the queries `EventDispatcher` makes about a script.
-//!
-//! [`ClassLoader`]: crate::autoload::ClassLoader
+//! - the ones here run against whatever the worker has loaded so far;
+//! - the ones in [`autoloading`] turn the script autoloader on first;
+//! - the ones in [`script`] turn the script autoloader on and serve the callbacks with the
+//!   [`ScriptRpcDispatcher`](crate::php_worker::rpc::dispatch::ScriptRpcDispatcher).
 
 use crate::php_worker::call::PhpCall;
 use crate::php_worker::installed_versions;
-use crate::php_worker::rpc::dispatch::ScriptRpcDispatcher;
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_rpc::{FromWire, PhpObjHandle, PluginValue};
 use shirabe_php_shim::bformat;
+
+pub(crate) mod autoloading;
+pub(crate) mod script;
 
 /// Makes the worker's script-class autoloader active, so class queries and script execution
 /// in the child can resolve classes through the Rust-side [`ClassLoader`]s registered on the
@@ -105,68 +104,6 @@ pub(crate) fn composer_require(file_identifier: &BStr, file: &BStr) -> anyhow::R
 /// `new $class(...$args)`, returning the P-table handle of the new entity.
 pub(crate) fn new_object(class: &BStr, args: Vec<PluginValue>) -> anyhow::Result<PhpObjHandle> {
     PhpCall::New(class).run(args)
-}
-
-/// `class_exists($class)` with the script autoloader active.
-pub(crate) fn autoloading_class_exists(class: &BStr) -> anyhow::Result<bool> {
-    ensure_script_autoloader()?;
-    PhpCall::Function(BStr::new("class_exists")).run(vec![PluginValue::string(class)])
-}
-
-/// `is_subclass_of($class, $parent, true)` with the script autoloader active.
-pub(crate) fn autoloading_is_subclass_of(class: &BStr, parent: &BStr) -> anyhow::Result<bool> {
-    ensure_script_autoloader()?;
-    PhpCall::Function(BStr::new("is_subclass_of")).run(vec![
-        PluginValue::string(class),
-        PluginValue::string(parent),
-        PluginValue::Bool(true),
-    ])
-}
-
-/// `new $class(...$args)` with the script autoloader active.
-pub(crate) fn autoloading_new_object(
-    class: &BStr,
-    args: Vec<PluginValue>,
-) -> anyhow::Result<PhpObjHandle> {
-    ensure_script_autoloader()?;
-    PhpCall::New(class).run(args)
-}
-
-/// Runs a boolean runtime query inside the PHP worker, with the script autoloader active so the
-/// query can trigger class loading.
-fn script_query(function: &BStr, args: Vec<PluginValue>) -> anyhow::Result<bool> {
-    ensure_script_autoloader()?;
-    PhpCall::Function(function).run_with(args, &mut ScriptRpcDispatcher)
-}
-
-/// `class_exists($class)` for a script.
-pub(crate) fn script_class_exists(class: &BStr) -> anyhow::Result<bool> {
-    script_query(BStr::new("class_exists"), vec![PluginValue::string(class)])
-}
-
-/// `is_callable($callable)` for a `Class::method` script.
-pub(crate) fn script_is_callable(callable: &BStr) -> anyhow::Result<bool> {
-    script_query(
-        BStr::new("is_callable"),
-        vec![PluginValue::string(callable)],
-    )
-}
-
-/// `is_a($class, $parent, true)` for a script.
-pub(crate) fn script_is_a_class(class: &BStr, parent: &BStr) -> anyhow::Result<bool> {
-    script_query(
-        BStr::new("is_a"),
-        vec![
-            PluginValue::string(class),
-            PluginValue::string(parent),
-            PluginValue::Bool(true),
-        ],
-    )
-}
-
-/// `defined($name)` for a script.
-pub(crate) fn script_defined(name: &BStr) -> anyhow::Result<bool> {
-    script_query(BStr::new("defined"), vec![PluginValue::string(name)])
 }
 
 /// The replacement `doRenderThrowable` writes for an anonymous class name found in a message:

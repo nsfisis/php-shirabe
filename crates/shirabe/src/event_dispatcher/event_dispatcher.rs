@@ -533,14 +533,14 @@ impl EventDispatcher {
                         let method_name = substr(callable_str, pos + 2, None);
 
                         self.make_autoloader(event, &Callable::String(callable_str.clone()))?;
-                        if !runtime::script_class_exists(class_name.as_bstr())? {
+                        if !runtime::script::class_exists(class_name.as_bstr())? {
                             self.io.write_error_with_verbosity(
                                 bformat!("<warning>Class {class_name} is not autoloadable, can not call {} script</warning>", event_name.as_bstr()),
                                 QUIET,
                             );
                             continue;
                         }
-                        if !runtime::script_is_callable(callable_str.as_bstr())? {
+                        if !runtime::script::is_callable(callable_str.as_bstr())? {
                             self.io.write_error_with_verbosity(
                                 bformat!("<warning>Method {callable_str} is not callable, can not call {} script</warning>", event_name.as_bstr()),
                                 QUIET,
@@ -581,21 +581,21 @@ impl EventDispatcher {
                         // process needs the real symfony/console classes before it can even
                         // autoload the user class.
                         runtime::ensure_composer_php_runtime(|| self.cache_dir())?;
-                        if !runtime::script_class_exists(class_name.as_bstr())? {
+                        if !runtime::script::class_exists(class_name.as_bstr())? {
                             self.io.write_error_with_verbosity(
                                 bformat!("<warning>Class {class_name} is not autoloadable, can not call {} script</warning>", event_name.as_bstr()),
                                 QUIET,
                             );
                             continue;
                         }
-                        if !runtime::script_is_a_class(
+                        if !runtime::script::is_a_class(
                             class_name.as_bstr(),
                             BStr::new("Symfony\\Component\\Console\\Command\\Command"),
                         )? {
                             self.io.write_error_with_verbosity(bformat!("<warning>Class {class_name} does not extend Symfony\\Component\\Console\\Command\\Command, can not call {} script</warning>", event_name.as_bstr()), QUIET);
                             continue;
                         }
-                        if runtime::script_defined(
+                        if runtime::script::defined(
                             bformat!(
                                 "Composer\\Script\\ScriptEvents::{}",
                                 str_replace("-", "_", strtoupper(event_name.as_bstr()))
