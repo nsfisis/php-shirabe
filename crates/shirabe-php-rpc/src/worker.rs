@@ -1,10 +1,10 @@
 use crate::frame::{self, Frame};
-use crate::{value, xdebug};
-use bstr::BStr;
-use shirabe_php_shim::{ToPhpString, os_str_from_bytes, path_from_bytes, php_str};
+use crate::value;
+use bstr::{BStr, BString};
+use shirabe_php_shim::{ToPhpString, bformat, os_str_from_bytes, path_from_bytes, php_str};
 use shirabe_symfony_process::PhpExecutableFinder;
 use std::os::unix::net::UnixStream;
-use std::sync::Mutex;
+use std::sync::{Mutex, OnceLock};
 
 const GLUE_SCRIPT: &[u8] = include_bytes!("../php/worker.php");
 
@@ -98,6 +98,33 @@ impl Worker {
     }
 }
 
+/// What the embedder adds to the worker's command line on top of what the protocol itself needs.
+#[derive(Debug, Clone, Default)]
+pub struct WorkerConfig {
+    /// `-d name=value` settings, in order.
+    pub ini_settings: Vec<(BString, BString)>,
+    /// Environment variables set in the worker's environment.
+    pub env: Vec<(std::ffi::OsString, std::ffi::OsString)>,
+}
+
+/// Builds the [`WorkerConfig`] a worker is spawned with.
+static WORKER_CONFIG_PROVIDER: OnceLock<fn() -> WorkerConfig> = OnceLock::new();
+
+/// Registers the function that builds the [`WorkerConfig`] the worker is spawned with. It is asked
+/// at spawn time, so a setting that depends on the environment sees the environment of that
+/// moment. Without one the worker is spawned with nothing added. A second registration is
+/// ignored.
+pub fn set_worker_config_provider(provider: fn() -> WorkerConfig) {
+    let _ = WORKER_CONFIG_PROVIDER.set(provider);
+}
+
+fn worker_config() -> WorkerConfig {
+    WORKER_CONFIG_PROVIDER
+        .get()
+        .map(|provider| provider())
+        .unwrap_or_default()
+}
+
 /// The PHP worker, spawned on first use.
 static WORKER: Mutex<Option<Worker>> = Mutex::new(None);
 
@@ -119,7 +146,8 @@ fn with_worker<T>(f: impl FnOnce(&mut Worker) -> T) -> anyhow::Result<T> {
     let worker = match &mut *guard {
         Some(worker) => worker,
         None => guard.insert(
-            spawn_worker().map_err(|e| anyhow::anyhow!("failed to spawn the PHP worker: {e:#}"))?,
+            spawn_worker(&worker_config())
+                .map_err(|e| anyhow::anyhow!("failed to spawn the PHP worker: {e:#}"))?,
         ),
     };
     Ok(f(worker))
@@ -158,7 +186,7 @@ pub(crate) fn recv_frame() -> anyhow::Result<Frame> {
 /// as long as it is above the three standard streams.
 const WORKER_SOCKET_FD: std::os::fd::RawFd = 3;
 
-fn spawn_worker() -> anyhow::Result<Worker> {
+fn spawn_worker(config: &WorkerConfig) -> anyhow::Result<Worker> {
     let php = PhpExecutableFinder::new()
         .find(false)
         .ok_or_else(|| anyhow::anyhow!("no PHP executable found"))?;
@@ -198,14 +226,12 @@ fn spawn_worker() -> anyhow::Result<Worker> {
         // The Composer runtime bundle has no phar signature.
         .arg("-d")
         .arg("phar.require_hash=0");
-    if xdebug::switches_xdebug_off() {
-        // The environment variable takes precedence over every ini setting, so switching the
-        // mode off takes both. See `docs/dev/xdebug.md`.
+    for (name, value) in &config.ini_settings {
         command
             .arg("-d")
-            .arg("xdebug.mode=off")
-            .env("XDEBUG_MODE", "off");
+            .arg(os_str_from_bytes(&bformat!("{name}={value}")));
     }
+    command.envs(config.env.iter().map(|(name, value)| (name, value)));
     command
         .arg(&script_path)
         .arg(os_str_from_bytes(&WORKER_SOCKET_FD.to_php_string()))
@@ -228,6 +254,33 @@ fn spawn_worker() -> anyhow::Result<Worker> {
         child,
         _tempdir: tempdir,
     })
+}
+
+/// For testing only: spawns a worker of its own with `config`, calls the PHP function
+/// `function_name` there, and ends the worker again.
+pub fn __call_function_in_new_worker(
+    config: &WorkerConfig,
+    function_name: &BStr,
+    args: Vec<value::PluginValue>,
+) -> anyhow::Result<value::PluginValue> {
+    let mut worker = spawn_worker(config)?;
+    let result = (|| {
+        frame::write_frame(
+            &mut worker.stream,
+            &Frame::CallFunction {
+                corr_id: 1,
+                function_name: function_name.to_owned(),
+                args,
+            },
+        )?;
+        match frame::read_frame(&mut worker.stream)? {
+            Frame::Return { value, .. } => Ok(value),
+            other => Err(anyhow::anyhow!("unexpected reply: {other:?}")),
+        }
+    })();
+    worker.child.kill()?;
+    worker.child.wait()?;
+    result
 }
 
 /// Moves the worker's end of the socket onto [`WORKER_SOCKET_FD`] in the freshly forked child.
@@ -262,7 +315,8 @@ mod tests {
 
     #[test]
     fn request_error_reports_dead_worker_exit_status() {
-        let mut worker = spawn_worker().expect("failed to spawn PHP worker");
+        let mut worker =
+            spawn_worker(&WorkerConfig::default()).expect("failed to spawn PHP worker");
         worker.child.kill().expect("failed to kill PHP worker");
         worker.child.wait().expect("failed to reap PHP worker");
 
@@ -281,31 +335,5 @@ mod tests {
             state.contains("PHP worker process already exited"),
             "unexpected worker state: {state}"
         );
-    }
-
-    #[test]
-    fn worker_starts_with_xdebug_switched_off() {
-        let mut worker = spawn_worker().expect("failed to spawn PHP worker");
-
-        // The `-d xdebug.mode=off` half is invisible from PHP while the extension is not loaded
-        // (an unregistered ini entry is not readable), so only the environment half — the one
-        // that overrides every ini setting — can be asserted here.
-        frame::write_frame(
-            &mut worker.stream,
-            &Frame::CallFunction {
-                corr_id: 1,
-                function_name: "getenv".into(),
-                args: vec![PluginValue::string("XDEBUG_MODE")],
-            },
-        )
-        .expect("failed to ask the worker for its Xdebug mode");
-        let reply = frame::read_frame(&mut worker.stream).expect("failed to read the worker reply");
-        match reply {
-            Frame::Return { value, .. } => assert_eq!(value, PluginValue::string("off")),
-            other => panic!("unexpected reply: {other:?}"),
-        }
-
-        worker.child.kill().expect("failed to kill PHP worker");
-        worker.child.wait().expect("failed to reap PHP worker");
     }
 }

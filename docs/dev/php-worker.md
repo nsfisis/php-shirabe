@@ -40,11 +40,12 @@ query, so the lists exist only there, and decodes the answer into a struct cache
 (`Diagnostics` for `__shirabe_diagnose`, `PlatformInfo` for `__shirabe_platform`) whose accessors
 panic on a name the list does not hold.
 
-The functions of `shirabe-php-rpc` that answer questions about the runtime — the two composite
-queries (`get_diagnostics`, `get_platform_info`), the PHP version and binary, and the few PHP
-functions whose answer depends on the worker (`phpversion`, `stream_resolve_include_path`, the
-loaded ini files, whether Xdebug is active) — return `anyhow::Result` like every other call into
-the worker: a worker that cannot be spawned or reached, and an exception the call throws, are
+The functions that answer questions about the runtime — the two composite queries
+(`php_worker::diagnostics::get_diagnostics`, `php_worker::platform_info::get_platform_info`), the
+loaded ini files and whether Xdebug is active (`php_worker::xdebug`), and in `shirabe-php-rpc` the
+PHP version and binary and the few PHP functions whose answer depends on the worker
+(`phpversion`, `stream_resolve_include_path`) — return `anyhow::Result` like every other call
+into the worker: a worker that cannot be spawned or reached, and an exception the call throws, are
 errors the caller propagates. An answer that does not decode is a protocol violation and panics,
 since only the worker's own code or a PHP builtin with a fixed return type writes it. A cached
 answer is cached only once it has arrived, so a failed query is asked again on the next call.

@@ -49,7 +49,8 @@ fn main() {
     }
 
     // Composer calls XdebugHandler::check() here to restart without Xdebug, which is intentionally
-    // unported. See `docs/dev/xdebug.md`.
+    // unported: the PHP worker is spawned without Xdebug instead. See `docs/dev/xdebug.md`.
+    shirabe::php_worker::install();
 
     // The single process-wide tokio Runtime drives `shirabe::run`, which is `async fn` down to
     // `Command::execute` and the installer. It is a multi-thread runtime because the synchronous

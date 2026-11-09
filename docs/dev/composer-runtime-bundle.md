@@ -10,7 +10,7 @@ Shirabe archives all PHP sources and resources of Composer and its dependencies,
 and embeds the resulting phar file into the binary. Shirabe also calculates a
 hash value over all included files and adds a file containing the hash,
 `shirabe/bundle-id`, to the archive. This file is used to verify the bundle. See
-`crates/shirabe-php-rpc/build.rs` for details.
+`crates/shirabe/build.rs` for details.
 
 ### Phar signature
 

@@ -52,7 +52,7 @@ fn constant<T: FromWire>(name: impl AsRef<[u8]>) -> anyhow::Result<T> {
 
 /// The value `cell` caches, computing it with `init` on first use. A failed `init` caches
 /// nothing, so the next call asks again.
-pub(crate) fn cached<T>(
+pub fn cached<T>(
     cell: &'static OnceLock<T>,
     init: impl FnOnce() -> anyhow::Result<T>,
 ) -> anyhow::Result<&'static T> {
@@ -67,10 +67,7 @@ pub(crate) fn cached<T>(
 /// questions about the runtime. A failure to reach the worker and an exception the call throws are
 /// errors; an answer that does not decode as `T` is a protocol violation, because only the
 /// worker's own code or a PHP builtin with a fixed return type writes it.
-pub(crate) fn query<T: FromWire>(
-    name: impl AsRef<[u8]>,
-    request: impl ToWire,
-) -> anyhow::Result<T> {
+pub fn query<T: FromWire>(name: impl AsRef<[u8]>, request: impl ToWire) -> anyhow::Result<T> {
     let name = name.as_ref().as_bstr();
     let value = call_internal_function(name, vec![request.to_wire()])??;
     Ok(protocol_value(&value, bformat!("the answer of {name}")))

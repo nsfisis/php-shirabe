@@ -54,7 +54,7 @@ fn composer_php_runtime_autoload(
 ) -> anyhow::Result<BString> {
     Ok(bformat!(
         "{}/vendor/autoload.php",
-        shirabe_php_rpc::composer_runtime::base_path(cache_dir)?
+        crate::php_worker::bundle::base_path(cache_dir)?
     ))
 }
 

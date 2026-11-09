@@ -59,7 +59,7 @@ $runner = new Runner($rootDir, [
         'crates/shirabe-spdx-licenses/src/spdx_licenses.rs',
     ]],
     [new NoHaltCompilerLiteral(), [
-        'crates/shirabe-php-rpc/build.rs',
+        'crates/shirabe/build.rs',
     ]],
     [new NoModRs(), []],
     [new NoPhpDocTag(), []],

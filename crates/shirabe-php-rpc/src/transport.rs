@@ -52,10 +52,10 @@ pub fn alloc_rhandle() -> u64 {
     NEXT_RHANDLE.fetch_add(1, Ordering::Relaxed)
 }
 
-/// Answers every `CallRustMethod` with an explicit error: the dispatcher of the calls this crate
-/// makes for itself, none of which runs code that calls back.
+/// Answers every `CallRustMethod` with an explicit error: the dispatcher of calls none of which runs
+/// code that calls back.
 #[derive(Debug)]
-pub(crate) struct RefuseCallbacks;
+pub struct RefuseCallbacks;
 
 impl RustMethodDispatcher for RefuseCallbacks {
     fn dispatch(
@@ -144,8 +144,8 @@ pub fn call_php_method(
     )
 }
 
-/// [`call_function`] for the calls this crate makes for itself.
-pub(crate) fn call_internal_function(
+/// [`call_function`] for a call that runs no code that calls back.
+pub fn call_internal_function(
     name: impl AsRef<[u8]>,
     args: Vec<PluginValue>,
 ) -> anyhow::Result<Result<PluginValue, PhpThrow>> {

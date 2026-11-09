@@ -15,7 +15,9 @@ The child is started with the following arguments:
 
 * `-d serialize_precision=-1` for stable float formatting of `serialize()`/`unserialize()`
 * `-d phar.require_hash=0` (see [docs/dev/composer-runtime-bundle.md](./composer-runtime-bundle.md))
-* `-d xdebug.mode=off`, together with `XDEBUG_MODE=off` in its environment, unless
+* the `-d` settings and environment variables of the `WorkerConfig` the embedder registers
+  with `set_worker_config_provider`, asked for at spawn time. The `shirabe` crate registers
+  `-d xdebug.mode=off`, together with `XDEBUG_MODE=off` in its environment, unless
   `COMPOSER_ALLOW_XDEBUG` is set (see [docs/dev/xdebug.md](./xdebug.md))
 
 ## Transport
