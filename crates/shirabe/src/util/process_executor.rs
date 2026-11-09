@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/Util/ProcessExecutor.php sha1:1852637f6e0380d92e650c6305e11f6c8cbc43ae
 
 use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface};
-use crate::plugin::job_registry::{JobOwner, record_internal_job};
+use crate::php_worker::job::{JobOwner, record_internal_job};
 use crate::signal::SignalSubscription;
 use crate::util::{GitHub, Platform};
 use bstr::{BStr, BString, ByteSlice};

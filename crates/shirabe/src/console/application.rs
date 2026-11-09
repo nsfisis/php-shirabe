@@ -24,15 +24,16 @@ use crate::io::{
     ConsoleIO, IOInterface, IOInterfaceImmutable, IOInterfaceWrite, NullIO, io_interface,
 };
 use crate::json::JsonValidationException;
-use crate::plugin::console_bridge::{
+use crate::php_worker::call::PhpCall;
+use crate::php_worker::console::{
     RustCommandMetadata, extend_console_application_commands,
     extend_console_application_rust_command, publish_console_application_context,
     reset_pending_plugin_command_handles, take_pending_plugin_command_handles,
 };
-use crate::plugin::php_call::PhpCall;
-use crate::plugin::proxy::{PhpCommandProxy, new_php_object, php_class_query};
-use crate::plugin::rpc::dispatch::find_file_in_registered_loaders;
-use crate::plugin::rpc::table::{composer_handle_value, io_handle_value};
+use crate::php_worker::proxy::PhpCommandProxy;
+use crate::php_worker::rpc::dispatch::find_file_in_registered_loaders;
+use crate::php_worker::rpc::table::{composer_handle_value, io_handle_value};
+use crate::php_worker::runtime::{new_php_object, php_class_query};
 use crate::util::sync_executor::block_on;
 use crate::util::{ErrorHandler, Filesystem, HttpDownloader, Platform, Silencer};
 use bstr::{B, BStr, BString, ByteSlice, ByteVec};

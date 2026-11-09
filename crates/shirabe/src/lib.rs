@@ -17,6 +17,7 @@ pub mod installer;
 pub mod io;
 pub mod json;
 pub mod package;
+pub mod php_worker;
 pub mod phpstan;
 pub mod platform;
 pub mod plugin;

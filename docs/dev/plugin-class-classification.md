@@ -392,7 +392,7 @@ Three, all versioned next to the tool, all expected to stay short:
 
 Next to them, `constructible.list` is not an exception but a mirror of the
 Rust side: the `rust-proxy` classes whose stub constructor reaches an arm of
-`construct_entity` (`crates/shirabe/src/plugin/rpc/dispatch.rs`), which
+`construct_entity` (`crates/shirabe/src/php_worker/rpc/dispatch.rs`), which
 "Unreachable types" above lets other classes construct. An entry that is
 not classified `rust-proxy` fails the run, and the
 `plugin_constructible_list` rule of `scripts/linters/lint` fails unless the

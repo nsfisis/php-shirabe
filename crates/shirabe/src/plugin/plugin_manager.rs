@@ -12,12 +12,13 @@ use crate::package::{
     BasePackageHandle, LockerInterface, PackageInterfaceHandle, RootPackageInterfaceHandle,
     base_package,
 };
-use crate::plugin::capability::Capability;
-use crate::plugin::php_call::PhpCall;
-use crate::plugin::proxy::{
-    PhpCapabilityProxy, PhpCommandProviderProxy, PhpPluginProxy, php_installer_proxy, php_is_a,
+use crate::php_worker::call::PhpCall;
+use crate::php_worker::proxy::{
+    PhpCapabilityProxy, PhpCommandProviderProxy, PhpPluginProxy, php_installer_proxy,
 };
-use crate::plugin::rpc::table::{composer_handle_value, io_handle_value, plugin_handle_value};
+use crate::php_worker::rpc::table::{composer_handle_value, io_handle_value, plugin_handle_value};
+use crate::php_worker::runtime::php_is_a;
+use crate::plugin::capability::Capability;
 use crate::plugin::{PluginBlockedException, PluginInterface, plugin_interface};
 use crate::repository::{
     InstalledRepository, RepositoryInterfaceHandle, RepositoryUtils, RootPackageRepository,

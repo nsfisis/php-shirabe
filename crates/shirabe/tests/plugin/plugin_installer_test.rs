@@ -21,8 +21,10 @@ use shirabe::package::loader::{ArrayLoader, JsonLoader, JsonLoaderInput};
 use shirabe::package::{
     CompletePackageHandle, Locker, LockerInterface, PackageInterfaceHandle, RootPackageHandle,
 };
-use shirabe::plugin::php_call::PhpCall;
-use shirabe::plugin::rpc::table::{composer_handle_value, io_handle_value, plugin_handle_value};
+use shirabe::php_worker::call::PhpCall;
+use shirabe::php_worker::rpc::table::{
+    composer_handle_value, io_handle_value, plugin_handle_value,
+};
 use shirabe::plugin::{Capable, PluginInterface, PluginManager};
 use shirabe::repository::{
     InstalledArrayRepository, InstalledRepositoryInterfaceHandle, RepositoryInterfaceHandle,

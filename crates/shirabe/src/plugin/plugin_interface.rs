@@ -3,8 +3,8 @@
 use crate::composer::ComposerHandle;
 use crate::event_dispatcher::EventSubscriberInterface;
 use crate::io::IOInterface;
+use crate::php_worker::proxy::PhpPluginProxy;
 use crate::plugin::Capable;
-use crate::plugin::proxy::PhpPluginProxy;
 use bstr::{BStr, BString};
 use shirabe_php_shim::php_str;
 

@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/Plugin/Capability/Capability.php sha1:bd10fce988e656db9373e45b72aca5feaa748265
 
+use crate::php_worker::proxy::PhpCapabilityProxy;
 use crate::plugin::capability::CommandProvider;
-use crate::plugin::proxy::PhpCapabilityProxy;
 
 /// Marker interface for Plugin capabilities. Every new Capability which is added to the
 /// Plugin API must implement this interface.

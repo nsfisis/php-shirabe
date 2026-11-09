@@ -5,7 +5,7 @@ use crate::json::JsonFile;
 use crate::package::dumper::ArrayDumper;
 use crate::package::loader::{ArrayLoader, LoaderInterface};
 use crate::package::{BasePackageHandle, PackageInterfaceHandle, RootPackageInterfaceHandle};
-use crate::plugin::php_call::PhpCall;
+use crate::php_worker::call::PhpCall;
 use crate::repository::{
     FindPackageConstraint, InvalidRepositoryException, LoadPackagesResult, PlatformRepository,
     ProviderInfo, RepositoryInterface, RepositoryInterfaceWeakHandle, SearchResult,

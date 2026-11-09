@@ -9,7 +9,7 @@ use Shirabe\PluginStubGenerator\GenerationError;
 use Shirabe\PluginStubGenerator\SurfaceManifest;
 
 $repoRoot = dirname(__DIR__, 2);
-$manifestPath = $repoRoot . '/crates/shirabe/src/plugin/rpc/surface.tsv';
+$manifestPath = $repoRoot . '/crates/shirabe/src/php_worker/rpc/surface.tsv';
 $check = false;
 
 foreach (array_slice($argv, 1) as $arg) {

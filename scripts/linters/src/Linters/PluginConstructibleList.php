@@ -13,7 +13,7 @@ use Shirabe\Lint\Linter;
  */
 final class PluginConstructibleList implements Linter
 {
-    private const DISPATCH = 'crates/shirabe/src/plugin/rpc/dispatch.rs';
+    private const DISPATCH = 'crates/shirabe/src/php_worker/rpc/dispatch.rs';
     private const LIST = 'scripts/plugin-class-classifier/lists/constructible.list';
 
     public function name(): string

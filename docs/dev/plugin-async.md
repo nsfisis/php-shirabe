@@ -172,7 +172,7 @@ Some things are out of scope here: an event loop in the worker, promises crossin
 
 ## Where it lives
 
-The Rust half of the job registry is `crates/shirabe/src/plugin/job_registry.rs`. The internal `block_on` bridges that keep a job from overlapping with its siblings (see "What this does not buy") are listed in `util/sync_executor.rs`. The reverse plumbing for Rust-owned surfaces that take a `Loop` does not exist, because nothing can reach it (see "Loop and SyncHelper are two-world").
+The Rust half of the job registry is `crates/shirabe/src/php_worker/job.rs`. The internal `block_on` bridges that keep a job from overlapping with its siblings (see "What this does not buy") are listed in `util/sync_executor.rs`. The reverse plumbing for Rust-owned surfaces that take a `Loop` does not exist, because nothing can reach it (see "Loop and SyncHelper are two-world").
 
 ## Deviations to record
 

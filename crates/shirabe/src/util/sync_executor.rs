@@ -9,7 +9,7 @@
 //! * the fan-outs of `ComposerRepository` (`load_async_packages`, `get_security_advisories`),
 //!   reached through the synchronous repository API by `PoolBuilder` and `Problem`
 //! * the parallel diffs of `VersionGuesser::guess_feature_version`
-//! * the RPC handlers that answer plugin code (`job_registry::tick`, `poll_once`,
+//! * the RPC handlers that answer plugin code (`job::tick`, `poll_once`,
 //!   `run_worker_reverse_command`), whose requests are synchronous
 //!
 //! With the process-wide runtime of `main.rs` ambient, `block_on` rides it via

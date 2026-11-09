@@ -9,8 +9,8 @@
 use crate::config::Config;
 use crate::event_dispatcher::EventDispatcher;
 use crate::io::IOInterface;
-use crate::plugin::php_call::PhpCall;
-use crate::plugin::rpc::table::{config_handle_value, io_handle_value};
+use crate::php_worker::call::PhpCall;
+use crate::php_worker::rpc::table::{config_handle_value, io_handle_value};
 use crate::util::StreamContextOptions;
 use bstr::{BStr, BString};
 use indexmap::IndexMap;

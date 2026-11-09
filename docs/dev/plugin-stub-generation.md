@@ -59,7 +59,7 @@ Inputs:
   fails the run.
 
 The same directory holds `surface-manifest`, which compares the forwards in the generated stubs
-with the dispatcher arms on the Rust side and writes `crates/shirabe/src/plugin/rpc/surface.tsv`;
+with the dispatcher arms on the Rust side and writes `crates/shirabe/src/php_worker/rpc/surface.tsv`;
 rerun it after regenerating the stubs or changing a dispatcher. The `plugin_surface_manifest` rule
 of `scripts/linters/lint` fails when the committed manifest is stale.
 

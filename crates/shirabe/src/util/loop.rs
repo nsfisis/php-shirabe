@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/Util/Loop.php sha1:54f0907047c3f5d67ef41b69d9696ed6a88804e2
 
-use crate::plugin::job_registry;
-use crate::plugin::job_registry::JobOwner;
+use crate::php_worker::job;
+use crate::php_worker::job::JobOwner;
 use crate::util::{HttpDownloader, ProcessExecutor};
 use futures::StreamExt;
 use futures::stream::FuturesUnordered;
@@ -52,7 +52,7 @@ impl Loop {
         let mut uncaught: Option<anyhow::Error> = None;
         let owners = self.job_owners();
         // The awaits a wait further up the stack is parked on are not this group's.
-        let parked_before = job_registry::parked_php_jobs();
+        let parked_before = job::parked_php_jobs();
         let mut progress_started = false;
         let mut last_update = 0.0;
         let mut progress_error: Option<anyhow::Error> = None;
@@ -71,7 +71,7 @@ impl Loop {
             // PHP's wait ends when the two services report no active job, which covers the jobs
             // plugin code started on them and never waited on. Those sit in the job registry; it
             // is empty in a run that never started the plugin worker.
-            let jobs_left = match job_registry::poll_jobs_in_wait(&owners, cx) {
+            let jobs_left = match job::poll_jobs_in_wait(&owners, cx) {
                 Ok(jobs_left) => jobs_left,
                 Err(e) => {
                     if uncaught.is_none() {
@@ -108,12 +108,12 @@ impl Loop {
             // push a settle and every remaining future parked on such a promise, nothing can run
             // that code any more; PHP spins in its wait loop forever at this point.
             if !jobs_left && !pending.is_empty() {
-                let parked: Vec<u64> = job_registry::parked_php_jobs()
+                let parked: Vec<u64> = job::parked_php_jobs()
                     .into_iter()
                     .filter(|id| !parked_before.contains(id))
                     .collect();
                 if parked.len() >= pending.len() {
-                    job_registry::fail_php_jobs(&parked);
+                    job::fail_php_jobs(&parked);
                 }
             }
 
@@ -136,7 +136,7 @@ impl Loop {
     fn count_active_jobs(&self) -> i64 {
         self.job_owners()
             .into_iter()
-            .map(job_registry::count_active_jobs)
+            .map(job::count_active_jobs)
             .sum()
     }
 
@@ -152,7 +152,7 @@ impl Loop {
         // TODO(async): only the requests the Rust side awaits on the downloader are cancelled.
         // PHP cancels every promise of the groups being waited on, which also reaches the
         // processes they started.
-        job_registry::abort_internal_jobs(Some(&self.job_owners()));
+        job::abort_internal_jobs(Some(&self.job_owners()));
     }
 }
 

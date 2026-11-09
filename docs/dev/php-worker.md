@@ -9,7 +9,7 @@ is split between the two worlds. Which treatment each Composer class receives is
 
 ## Calling into the worker
 
-The `shirabe` crate calls into the worker through `plugin::php_call::PhpCall` and nothing else: it
+The `shirabe` crate calls into the worker through `php_worker::call::PhpCall` and nothing else: it
 names what to run (a function or entry point, a method of a P-table entity, a static method, a
 constructor) and decodes the answer as the type the caller asks for (`FromWire`). The callbacks
 the worker makes while the call is in flight are served by `PluginRpcDispatcher` — the runtime
@@ -123,7 +123,7 @@ are an explicit error naming them.
 
 ## Materialized values
 
-The two halves of the materialized-value codec are `crates/shirabe/src/plugin/php_plugin_value.rs`
+The two halves of the materialized-value codec are `crates/shirabe/src/php_worker/codec.rs`
 (and, for the PHP built-in `\DateTimeInterface`, the `ToWire` / `FromWire` impls of
 `shirabe-php-rpc`) and `Shirabe\MaterializedValue`, whose `CLASSES` constant is the closed list of
 classes that may cross as object records.
@@ -211,7 +211,7 @@ double-release) one entity; entities with no clone semantics answer with an expl
 
 ## The R table
 
-`R_TABLE` in `crates/shirabe/src/plugin/rpc/table.rs` holds the Rust-side entities, as
+`R_TABLE` in `crates/shirabe/src/php_worker/rpc/table.rs` holds the Rust-side entities, as
 `RustEntity` with one variant per kind of entity that crosses. Interning scans the table for the
 same variant and shared-pointer address, with no separate reverse index. There is no per-plugin
 bookkeeping: an entry lives as long as a stub for it is reachable in the worker, which is also how

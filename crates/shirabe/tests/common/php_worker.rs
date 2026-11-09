@@ -5,7 +5,7 @@
 #![allow(dead_code)]
 
 use bstr::BStr;
-use shirabe::plugin::php_call::PhpCall;
+use shirabe::php_worker::call::PhpCall;
 use shirabe_php_rpc::PluginValue;
 
 /// All tests in one binary share the single PHP worker, whose loaded-class table and class statics

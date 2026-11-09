@@ -163,7 +163,7 @@ same dispatch while waiting for its own `Return`.
   exception had been thrown there, and reads the same state off it. A class the child does not
   know keeps the `RuntimeException` shape.
 - PHP to Rust, `parents` lists the superclasses of the class, nearest first, and
-  `plugin/throwable_bridge.rs` rebuilds the ported exception of the class, or of the nearest
+  `php_worker/throwable.rs` rebuilds the ported exception of the class, or of the nearest
   superclass the port has a type for, answering to the class it was thrown as
   (`UnportedThrowable`). The state the PHP side describes is that of the classes whose state the
   Rust side ports, listed in `MaterializedThrowable::PROPERTIES`.

@@ -6,7 +6,7 @@
 use crate::php_worker::lock_php_worker;
 use bstr::{BStr, ByteSlice};
 use shirabe::console::Application;
-use shirabe::plugin::php_call::PhpCall;
+use shirabe::php_worker::call::PhpCall;
 use shirabe_php_rpc::PluginValue;
 use shirabe_php_shim::path_to_bytes;
 use shirabe_symfony_console::output::{BufferedOutput, VERBOSITY_VERBOSE};
