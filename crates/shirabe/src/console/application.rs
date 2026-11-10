@@ -41,9 +41,9 @@ use indexmap::IndexMap;
 use shirabe_php_shim::{
     AnyThrowable, AsAny, Catch as _, Error, ExitException, InvalidArgumentException,
     LogicException as ShimLogicException, PHP_ENV, PHP_SERVER, PhpMixed, PregMatches,
-    RuntimeException, STDIN, STR_PAD_RIGHT, ToPhpString, basename, bformat, bin2hex, chdir,
-    defined, dirname, disk_free_space, display_to_bytes, error_message, exec, explode,
-    explode_limit, file_exists, file_get_contents, file_put_contents, function_exists,
+    RuntimeException, STDIN, STR_PAD_RIGHT, ToPhpString, basename, bformat, bin2hex, boolval,
+    chdir, defined, dirname, disk_free_space, display_to_bytes, empty, error_message, exec,
+    explode, explode_limit, file_exists, file_get_contents, file_put_contents, function_exists,
     get_debug_type_obj, getcwd, getenv, getmypid, glob, implode, intval, is_dir, is_file,
     is_numeric_string, is_string, json_decode_assoc, levenshtein, ltrim_chars, mb_convert_encoding,
     mb_convert_variables, mb_detect_encoding, mb_strwidth, microtime, os_str_from_bytes,
@@ -1861,7 +1861,7 @@ impl ApplicationHandle {
 
         let stdin = STDIN;
         if Platform::get_env("COMPOSER_TESTS_ARE_RUNNING").is_none_or(|v| v != "1")
-            && (Platform::get_env("COMPOSER_NO_INTERACTION").is_some()
+            && (boolval(&Platform::get_env("COMPOSER_NO_INTERACTION"))
                 || !Platform::is_tty(Some(stdin)))
         {
             input.borrow_mut().set_interactive(false);
@@ -1962,7 +1962,8 @@ impl ApplicationHandle {
         {
             let mut dir = dirname(path_to_bytes(&Platform::get_cwd(true).unwrap_or_default()));
             let home_value = Platform::get_env("HOME")
-                .or_else(|| Platform::get_env("USERPROFILE"))
+                .filter(boolval)
+                .or_else(|| Platform::get_env("USERPROFILE").filter(boolval))
                 .unwrap_or_else(|| "/".into());
             let home = realpath(path_from_bytes(&home_value))
                 .map(|p| BString::from(path_to_bytes(&p)))
@@ -1999,7 +2000,7 @@ impl ApplicationHandle {
         }
 
         let needs_sudo_check = !Platform::is_windows()
-            && Platform::get_env("COMPOSER_ALLOW_SUPERUSER").is_none()
+            && empty(&Platform::get_env("COMPOSER_ALLOW_SUPERUSER"))
             && !Platform::is_docker();
         let mut is_non_allowed_root = false;
 
@@ -2157,7 +2158,7 @@ impl ApplicationHandle {
                 io.write_error(bformat!("<warning>Shirabe supports PHP 7.2.5 and above, you will most likely encounter problems with your PHP {}. Upgrading is strongly recommended but you can use Composer 2.2.x LTS as a fallback.</warning>", shirabe_php_rpc::get_php_version()?.version));
             }
 
-            if is_xdebug_active()? && Platform::get_env("COMPOSER_DISABLE_XDEBUG_WARN").is_none() {
+            if is_xdebug_active()? && empty(&Platform::get_env("COMPOSER_DISABLE_XDEBUG_WARN")) {
                 io.write_error("<warning>Shirabe is operating slower than normal because you have Xdebug enabled. See https://getcomposer.org/xdebug</warning>");
             }
 

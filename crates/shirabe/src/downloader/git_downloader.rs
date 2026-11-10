@@ -12,10 +12,10 @@ use crate::util::{Filesystem, Git as GitUtil, Platform, ProcessExecutor, Url};
 use bstr::{B, BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    CmpOp, PhpMixed, RuntimeException, array_map, basename, bformat, dirname, impl_php_class,
-    implode, is_dir, path_from_bytes, path_to_bytes, php_regex, preg_is_match, preg_match,
-    preg_match_all, preg_quote, preg_replace, preg_split, realpath, rtrim_chars, strlen, strpos,
-    substr, trim, version_compare,
+    CmpOp, PhpMixed, RuntimeException, array_map, basename, bformat, boolval, dirname,
+    impl_php_class, implode, is_dir, path_from_bytes, path_to_bytes, php_regex, preg_is_match,
+    preg_match, preg_match_all, preg_quote, preg_replace, preg_split, realpath, rtrim_chars,
+    strlen, strpos, substr, trim, version_compare,
 };
 use shirabe_symfony_console::input::InputValue;
 
@@ -933,7 +933,7 @@ impl VcsDownloader for GitDownloader {
                     "%sanitizedUrl%".into(),
                 ],
             ];
-            if Platform::get_env("COMPOSER_DISABLE_NETWORK").is_some() {
+            if boolval(&Platform::get_env("COMPOSER_DISABLE_NETWORK")) {
                 return Err(RuntimeException::new(bformat!("The required git reference for {} is not in cache and network is disabled, aborting", package.get_name()))
                 .into());
             }
@@ -1008,7 +1008,7 @@ impl VcsDownloader for GitDownloader {
         } else {
             msg = bformat!("Checking out {}", self.get_short_hash(r#ref.as_bstr()));
             remote_url = "%url%".into();
-            if Platform::get_env("COMPOSER_DISABLE_NETWORK").is_some() {
+            if boolval(&Platform::get_env("COMPOSER_DISABLE_NETWORK")) {
                 return Err(RuntimeException::new(bformat!("The required git reference for {} is not in cache and network is disabled, aborting", target.get_name()))
                 .into());
             }

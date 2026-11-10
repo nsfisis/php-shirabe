@@ -9,7 +9,7 @@ use crate::output::{OUTPUT_NORMAL, OutputInterface};
 use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpDisplay, PhpMixed, ToPhpString, array_splice, bformat, explode, get_debug_type,
+    PhpDisplay, PhpMixed, ToPhpString, array_splice, bformat, boolval, explode, get_debug_type,
     http_build_query_mixed, implode, mb_detect_encoding, mb_str_split, mb_strwidth, php_regex,
     preg_is_match, sprintf, str_pad, str_repeat, str_replace, strlen, strstr, substr_count,
 };
@@ -67,7 +67,7 @@ impl Cell {
     fn is_truthy(&self) -> bool {
         match self {
             Cell::Null => false,
-            Cell::Value(s) => !s.is_empty() && s.as_slice() != b"0",
+            Cell::Value(s) => boolval(s),
             Cell::Cell(_) | Cell::Separator(_) => true,
         }
     }

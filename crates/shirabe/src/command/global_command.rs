@@ -9,8 +9,8 @@ use crate::io::IOInterfaceWrite;
 use crate::util::{Filesystem, Platform};
 use bstr::BString;
 use shirabe_php_shim::{
-    RuntimeException, ToPhpString, bformat, chdir, impl_php_class, path_from_bytes, php_regex,
-    preg_replace_with_limit_and_count, preg_split,
+    RuntimeException, ToPhpString, bformat, boolval, chdir, impl_php_class, path_from_bytes,
+    php_regex, preg_replace_with_limit_and_count, preg_split,
 };
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::completion::{
@@ -48,7 +48,7 @@ impl GlobalCommand {
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         quiet: bool,
     ) -> anyhow::Result<StringInput> {
-        if Platform::get_env("COMPOSER").is_some() {
+        if boolval(&Platform::get_env("COMPOSER")) {
             Platform::clear_env("COMPOSER")?;
         }
 

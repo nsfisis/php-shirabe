@@ -3,6 +3,7 @@
 ## Unreleased
 
 * PHP warnings and notices raised by plugins and scripts are turned into exceptions, and deprecation notices are reported, as in Composer.
+* Many bug fixes.
 
 
 ## v0.2.0 (based on Composer 2.9.7)

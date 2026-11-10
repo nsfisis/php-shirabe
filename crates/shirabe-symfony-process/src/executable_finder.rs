@@ -2,7 +2,7 @@
 
 use bstr::{BStr, BString};
 use shirabe_php_shim::{
-    PATHINFO_EXTENSION, PHP_EOL, basename, bformat, escapeshellarg, exec, getenv, is_dir,
+    PATHINFO_EXTENSION, PHP_EOL, basename, bformat, boolval, escapeshellarg, exec, getenv, is_dir,
     is_executable, is_file, path_from_bytes, path_to_bytes, pathinfo, php_str, strcspn, strpos,
     strtolower, substr,
 };
@@ -83,6 +83,7 @@ impl ExecutableFinder {
         }
 
         let path = getenv("PATH")
+            .filter(boolval)
             .or_else(|| getenv("Path"))
             .unwrap_or_default();
         let mut dirs: Vec<std::path::PathBuf> = std::env::split_paths(&path).collect();
@@ -97,7 +98,7 @@ impl ExecutableFinder {
             let path_ext = getenv("PATHEXT");
             suffixes = self.suffixes.clone();
             let exts = match path_ext {
-                Some(ref ext) if !ext.is_empty() => std::env::split_paths(ext)
+                Some(ref ext) if boolval(ext) => std::env::split_paths(ext)
                     .map(|e| BString::from(path_to_bytes(&e)))
                     .collect(),
                 _ => vec![".exe".into(), ".bat".into(), ".cmd".into(), ".com".into()],

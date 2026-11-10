@@ -9,7 +9,7 @@ use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_ca_bundle::CaBundle;
 use shirabe_php_shim::{
-    PhpMixed, TypeError, array_replace_recursive, bformat, explode, extension_loaded,
+    PhpMixed, TypeError, array_replace_recursive, bformat, boolval, explode, extension_loaded,
     get_debug_type, is_dir, path_from_bytes, path_to_bytes, php_uname, stream_context_create,
     stripos,
 };
@@ -151,7 +151,7 @@ impl StreamContextFactory {
                 platform_php_version
                     .map(|v| bformat!("; Platform-PHP {v}"))
                     .unwrap_or_default(),
-                if Platform::get_env("CI").is_some_and(|v| !v.is_empty() && v != "0") {
+                if boolval(&Platform::get_env("CI")) {
                     "; CI"
                 } else {
                     ""

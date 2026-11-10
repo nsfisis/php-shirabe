@@ -2,11 +2,11 @@
 
 use shirabe_php_shim::{
     E_USER_DEPRECATED, Error, PhpMixed, PregMatches, RuntimeException, ToPhpString, TypeError,
-    array_key_exists, array_merge, array_search_mixed, array_unique, bformat, canonical_int_key,
-    empty, filter_var_url, get_debug_type, implode, in_array_loose, in_array_strict, intval,
-    is_array, is_numeric_string, is_string, loose_eq, parse_url, php_regex, php_str, preg_is_match,
-    preg_match, preg_replace_callback, rtrim_chars, strtolower, strtoupper, strtr, substr,
-    trigger_error, utf8_text,
+    array_key_exists, array_merge, array_search_mixed, array_unique, bformat, boolval,
+    canonical_int_key, empty, filter_var_url, get_debug_type, implode, in_array_loose,
+    in_array_strict, intval, is_array, is_numeric_string, is_string, loose_eq, parse_url,
+    php_regex, php_str, preg_is_match, preg_match, preg_replace_callback, rtrim_chars, strtolower,
+    strtoupper, strtr, substr, trigger_error, utf8_text,
 };
 mod config_source_interface;
 mod json_config_source;
@@ -865,7 +865,7 @@ impl Config {
 
     fn bin_compat(&self) -> anyhow::Result<PhpMixed> {
         let value = match self.get_composer_env("COMPOSER_BIN_COMPAT") {
-            Some(env) if PhpMixed::string(env.clone()).to_bool() => PhpMixed::string(env),
+            Some(env) if boolval(&env) => PhpMixed::string(env),
             _ => self.raw_value(b"bin-compat"),
         };
 
@@ -916,9 +916,7 @@ impl Config {
             }
 
             // convert string value to bool
-            return Ok(DiscardChanges::Bool(
-                env != "false" && PhpMixed::string(env).to_bool(),
-            ));
+            return Ok(DiscardChanges::Bool(env != "false" && boolval(&env)));
         }
 
         match self.raw_value(b"discard-changes") {

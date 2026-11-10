@@ -12,9 +12,9 @@ use crate::util::{Platform, ProcessExecutor};
 use bstr::{B, BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    E_USER_DEPRECATED, PhpMixed, RuntimeException, UnexpectedValueException, bformat, implode,
-    php_regex, preg_is_match, preg_match, preg_replace, preg_split, strtolower, trigger_error,
-    trim,
+    E_USER_DEPRECATED, PhpMixed, RuntimeException, UnexpectedValueException, bformat, boolval,
+    implode, php_regex, preg_is_match, preg_match, preg_replace, preg_split, strtolower,
+    trigger_error, trim,
 };
 
 #[derive(Debug)]
@@ -82,7 +82,7 @@ impl RootPackageLoader {
         if !config.contains_key(B("version")) {
             let mut commit: Option<BString> = None;
 
-            if Platform::get_env("COMPOSER_ROOT_VERSION").is_some() {
+            if boolval(&Platform::get_env("COMPOSER_ROOT_VERSION")) {
                 let version = self.version_guesser.get_root_version_from_env()?;
                 config.insert("version".into(), PhpMixed::string(version));
             } else {

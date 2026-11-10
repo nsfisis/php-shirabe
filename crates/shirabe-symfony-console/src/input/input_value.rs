@@ -1,7 +1,7 @@
 //! ref: composer/vendor/symfony/console/Input/InputInterface.php sha1:7c0149e375832cad7933bbe51f11975bf856effb
 
 use bstr::{BStr, BString};
-use shirabe_php_shim::{PhpDisplay, PhpMixed};
+use shirabe_php_shim::{PhpDisplay, PhpMixed, boolval};
 
 /// The value an option or an argument can hold, which is also the value a question takes as its
 /// default and gives as its answer.
@@ -81,7 +81,7 @@ impl InputValue {
         match self {
             Self::Null => false,
             Self::Bool(b) => *b,
-            Self::String(s) => !s.is_empty() && s != "0",
+            Self::String(s) => boolval(s),
             Self::Array(items) => !items.is_empty(),
         }
     }

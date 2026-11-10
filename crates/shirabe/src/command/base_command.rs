@@ -18,7 +18,7 @@ use bstr::{B, BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpClass, PhpMixed, RuntimeException, ToPhpString,
-    UnexpectedValueException, bformat, count, explode, implode, in_array_strict,
+    UnexpectedValueException, bformat, boolval, count, explode, implode, in_array_strict,
 };
 use shirabe_symfony_console::Terminal;
 use shirabe_symfony_console::command::{Command, CommandData, SetDefinitionArg};
@@ -682,8 +682,7 @@ impl BaseCommand for BaseCommandData {
 
         let audit_config = AuditConfig::from_config(config, audit, audit_format.as_bstr())?;
 
-        if Platform::get_env("COMPOSER_NO_SECURITY_BLOCKING")
-            .is_some_and(|s| !s.is_empty() && s != "0")
+        if boolval(&Platform::get_env("COMPOSER_NO_SECURITY_BLOCKING"))
             || (input.borrow().has_option("no-security-blocking")
                 && input
                     .borrow()
@@ -882,7 +881,7 @@ pub fn base_command_initialize(
                     .get_option(option_name)?
                     .as_bool()
                     .unwrap_or(false)
-                && Platform::get_env(env_name).is_some_and(|s| !s.is_empty() && s != "0")
+                && boolval(&Platform::get_env(env_name))
             {
                 input
                     .borrow_mut()
@@ -897,8 +896,7 @@ pub fn base_command_initialize(
             .get_option("ignore-platform-reqs")?
             .as_bool()
             .unwrap_or(false)
-        && Platform::get_env("COMPOSER_IGNORE_PLATFORM_REQS")
-            .is_some_and(|s| !s.is_empty() && s != "0")
+        && boolval(&Platform::get_env("COMPOSER_IGNORE_PLATFORM_REQS"))
     {
         input
             .borrow_mut()

@@ -18,7 +18,7 @@ use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, PhpMixed, RuntimeException, ToPhpString, array_pop,
-    array_push, array_search_in_vec, array_splice, bformat, explode, explode_with_limit,
+    array_push, array_search_in_vec, array_splice, bformat, boolval, explode, explode_with_limit,
     file_exists, get_class, hash, implode, ini_get, is_callable, is_dir, is_object, krsort,
     os_str_from_bytes, path_from_bytes, path_to_bytes, php_regex, preg_is_match, preg_match,
     preg_quote, preg_replace, preg_replace_callback, realpath, str_replace, strlen, strpos,
@@ -286,7 +286,7 @@ impl EventDispatcher {
         &mut self,
         event: &std::rc::Rc<std::cell::RefCell<dyn EventInterface>>,
     ) -> anyhow::Result<i64> {
-        if Platform::get_env("COMPOSER_DEBUG_EVENTS").is_some() {
+        if boolval(&Platform::get_env("COMPOSER_DEBUG_EVENTS")) {
             // TODO(plugin): PackageEvent / CommandEvent / PreCommandRunEvent specialization
             // requires polymorphic dispatch; the simple Event branch is sufficient for now.
             let details: Option<BString> = None;
@@ -1254,19 +1254,6 @@ impl EventDispatcher {
         self.composer
             .upgrade()
             .expect("EventDispatcher must lives longer than Composer")
-    }
-
-    fn is_empty_value(value: &PhpMixed) -> bool {
-        match value {
-            PhpMixed::Null => true,
-            PhpMixed::Bool(false) => true,
-            PhpMixed::Int(0) => true,
-            PhpMixed::Float(f) if *f == 0.0 => true,
-            PhpMixed::String(s) => s.is_empty() || s == "0",
-            PhpMixed::Array(m) => m.is_empty(),
-            PhpMixed::List(l) => l.is_empty(),
-            _ => false,
-        }
     }
 }
 

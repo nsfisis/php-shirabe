@@ -16,9 +16,9 @@ use bstr::{B, BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, LogicException, PHP_EOL, PhpJson, PhpMixed, bformat,
-    empty, extension_loaded, implode, intval, is_numeric, path_to_bytes, pcre_check_utf8_subject,
-    php_regex, php_truthy, preg_is_match, preg_match, preg_replace, rawurldecode, stripos, strpos,
-    substr, ucfirst, utf8_text,
+    boolval, empty, extension_loaded, implode, intval, is_numeric, path_to_bytes,
+    pcre_check_utf8_subject, php_regex, php_truthy, preg_is_match, preg_match, preg_replace,
+    rawurldecode, stripos, strpos, substr, ucfirst, utf8_text,
 };
 use shirabe_semver::constraint::SimpleConstraint;
 
@@ -100,8 +100,7 @@ impl HttpDownloader {
         options: StreamContextOptions,
         disable_tls: bool,
     ) -> anyhow::Result<Self> {
-        let disabled = Platform::get_env("COMPOSER_DISABLE_NETWORK")
-            .is_some_and(|s| !s.is_empty() && s != "0");
+        let disabled = boolval(&Platform::get_env("COMPOSER_DISABLE_NETWORK"));
 
         // Setup TLS options
         // The cafile option can be set via config.json

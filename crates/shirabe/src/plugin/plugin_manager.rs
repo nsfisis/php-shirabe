@@ -28,9 +28,9 @@ use indexmap::IndexMap;
 use shirabe_php_rpc::PluginValue;
 use shirabe_php_shim::{
     CmpOp, E_USER_DEPRECATED, PhpMixed, RuntimeException, UnexpectedValueException, bformat,
-    dirname, empty, file_get_contents, implode, ksort, path_from_bytes, php_regex, preg_is_match,
-    preg_quote, preg_replace_with_limit_and_count, strrpos, strtr_array, substr, trigger_error,
-    trim_chars, var_export, var_export_str, version_compare,
+    boolval, dirname, empty, file_get_contents, implode, ksort, path_from_bytes, php_regex,
+    preg_is_match, preg_quote, preg_replace_with_limit_and_count, strrpos, strtr_array, substr,
+    trigger_error, trim_chars, var_export, var_export_str, version_compare,
 };
 use shirabe_semver::constraint::SimpleConstraint;
 use shirabe_symfony_console::input::InputValue;
@@ -291,18 +291,7 @@ impl PluginManager {
 
         let extra = package.get_extra();
         let class_value = extra.get(B("class"));
-        // PHP: empty($extra['class']) — true for null, false, 0, "", "0", [], or missing key.
-        let class_is_empty = match class_value {
-            None => true,
-            Some(PhpMixed::Null) => true,
-            Some(PhpMixed::Bool(false)) => true,
-            Some(PhpMixed::Int(0)) => true,
-            Some(PhpMixed::Float(f)) if *f == 0.0 => true,
-            Some(PhpMixed::String(s)) if s.is_empty() || s == "0" => true,
-            Some(PhpMixed::Array(a)) => a.is_empty(),
-            Some(PhpMixed::List(l)) => l.is_empty(),
-            _ => false,
-        };
+        let class_is_empty = empty(&class_value);
         if class_is_empty {
             return Err(UnexpectedValueException::new(bformat!("Error while installing {}, composer-plugin packages should have a class defined in their extra key to be usable.", package.get_pretty_name())).into());
         }
@@ -913,8 +902,7 @@ impl PluginManager {
             && let PhpMixed::String(s) = value
         {
             let trimmed = trim_chars(s, " \t\n\r\0\u{0B}");
-            // PHP evaluates trim(...) in boolean context: "" and "0" are falsy.
-            if !trimmed.is_empty() && trimmed != "0" {
+            if boolval(&trimmed) {
                 return Ok(Some(trimmed));
             }
         }

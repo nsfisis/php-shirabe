@@ -31,10 +31,10 @@ use crate::util::{
 use bstr::{B, BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PHP_EOL, PhpMixed, RuntimeException, ToPhpString, TypeError, bformat, display_to_bytes,
-    get_debug_type, in_array_loose, in_array_strict, intval, json_decode_assoc, parse_url,
-    path_from_bytes, path_to_bytes, php_regex, preg_is_match, preg_quote, preg_replace, rename,
-    stripos, strlen, strpos, strtolower, substr, trim, unlink_silent, utf8_text,
+    PHP_EOL, PhpMixed, RuntimeException, ToPhpString, TypeError, bformat, boolval,
+    display_to_bytes, get_debug_type, in_array_loose, in_array_strict, intval, json_decode_assoc,
+    parse_url, path_from_bytes, path_to_bytes, php_regex, preg_is_match, preg_quote, preg_replace,
+    rename, stripos, strlen, strpos, strtolower, substr, trim, unlink_silent, utf8_text,
 };
 
 #[derive(Debug)]
@@ -674,18 +674,18 @@ impl NativeHttpDownloader {
             && !location_header.is_empty()
         {
             let location_parsed = parse_url(&location_header);
-            if location_parsed
-                .as_ref()
-                .and_then(|parsed| parsed.scheme.as_ref())
-                .is_some_and(|scheme| !scheme.is_empty() && scheme != "0")
-            {
+            if boolval(
+                &location_parsed
+                    .as_ref()
+                    .and_then(|parsed| parsed.scheme.as_ref()),
+            ) {
                 // Absolute URL; e.g. https://example.com/composer
                 target_url = location_header;
-            } else if location_parsed
-                .as_ref()
-                .and_then(|parsed| parsed.host.as_ref())
-                .is_some_and(|host| !host.is_empty() && host != "0")
-            {
+            } else if boolval(
+                &location_parsed
+                    .as_ref()
+                    .and_then(|parsed| parsed.host.as_ref()),
+            ) {
                 // Scheme relative; e.g. //example.com/foo
                 target_url = bformat!(
                     "{}:{location_header}",

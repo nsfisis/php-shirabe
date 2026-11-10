@@ -2,17 +2,114 @@ use crate::{PhpDisplay, PhpMixed, ToPhpString, bwrite, utf8_text};
 use bstr::{BString, ByteSlice as _, ByteVec as _};
 use indexmap::IndexMap;
 
-pub fn empty(value: &PhpMixed) -> bool {
-    match value {
-        PhpMixed::Null => true,
-        PhpMixed::Bool(b) => !*b,
-        PhpMixed::Int(i) => *i == 0,
-        PhpMixed::Float(f) => *f == 0.0,
-        PhpMixed::String(s) => s.is_empty() || s == "0",
-        PhpMixed::List(v) => v.is_empty(),
-        PhpMixed::Array(m) => m.is_empty(),
-        PhpMixed::Object(_) => false,
+/// A value that PHP converts to `bool` with the loose `(bool)` cast, as in `if ($value)`.
+///
+/// `None` stands for PHP's `null` or `false` (e.g. what `getenv()` returns for an unset variable),
+/// and thus is falsy.
+pub trait PhpTruthy {
+    fn is_truthy(&self) -> bool;
+}
+
+impl PhpTruthy for PhpMixed {
+    fn is_truthy(&self) -> bool {
+        match self {
+            PhpMixed::Null => false,
+            PhpMixed::Bool(b) => *b,
+            PhpMixed::Int(i) => i.is_truthy(),
+            PhpMixed::Float(f) => f.is_truthy(),
+            PhpMixed::String(s) => s.is_truthy(),
+            PhpMixed::List(items) => !items.is_empty(),
+            PhpMixed::Array(entries) => entries.is_truthy(),
+            // Objects are always truthy.
+            PhpMixed::Object(_) => true,
+        }
     }
+}
+
+impl PhpTruthy for bool {
+    fn is_truthy(&self) -> bool {
+        *self
+    }
+}
+
+impl PhpTruthy for i64 {
+    fn is_truthy(&self) -> bool {
+        *self != 0
+    }
+}
+
+impl PhpTruthy for f64 {
+    fn is_truthy(&self) -> bool {
+        *self != 0.0
+    }
+}
+
+impl PhpTruthy for [u8] {
+    fn is_truthy(&self) -> bool {
+        !self.is_empty() && self != b"0"
+    }
+}
+
+impl PhpTruthy for Vec<u8> {
+    fn is_truthy(&self) -> bool {
+        self.as_slice().is_truthy()
+    }
+}
+
+impl PhpTruthy for bstr::BStr {
+    fn is_truthy(&self) -> bool {
+        self.as_bytes().is_truthy()
+    }
+}
+
+impl PhpTruthy for BString {
+    fn is_truthy(&self) -> bool {
+        self.as_bytes().is_truthy()
+    }
+}
+
+impl PhpTruthy for std::ffi::OsStr {
+    fn is_truthy(&self) -> bool {
+        self.as_encoded_bytes().is_truthy()
+    }
+}
+
+impl PhpTruthy for std::ffi::OsString {
+    fn is_truthy(&self) -> bool {
+        self.as_os_str().is_truthy()
+    }
+}
+
+impl<K, V> PhpTruthy for IndexMap<K, V> {
+    fn is_truthy(&self) -> bool {
+        !self.is_empty()
+    }
+}
+
+impl<T: PhpTruthy> PhpTruthy for Option<T> {
+    fn is_truthy(&self) -> bool {
+        self.as_ref().is_some_and(PhpTruthy::is_truthy)
+    }
+}
+
+impl<T: PhpTruthy + ?Sized> PhpTruthy for &T {
+    fn is_truthy(&self) -> bool {
+        (**self).is_truthy()
+    }
+}
+
+impl<T: PhpTruthy + ?Sized> PhpTruthy for Box<T> {
+    fn is_truthy(&self) -> bool {
+        (**self).is_truthy()
+    }
+}
+
+pub fn boolval(value: &(impl PhpTruthy + ?Sized)) -> bool {
+    value.is_truthy()
+}
+
+pub fn empty(value: &(impl PhpTruthy + ?Sized)) -> bool {
+    !value.is_truthy()
 }
 
 pub fn serialize(value: &PhpMixed) -> BString {
@@ -338,22 +435,11 @@ pub fn to_array(value: PhpMixed) -> IndexMap<BString, PhpMixed> {
 }
 
 pub fn to_bool(value: &PhpMixed) -> bool {
-    php_truthy(value)
+    value.is_truthy()
 }
 
 pub fn php_truthy(value: &PhpMixed) -> bool {
-    match value {
-        PhpMixed::Null => false,
-        PhpMixed::Bool(b) => *b,
-        PhpMixed::Int(i) => *i != 0,
-        PhpMixed::Float(f) => *f != 0.0,
-        // PHP treats only "" and "0" as falsy strings.
-        PhpMixed::String(s) => !s.is_empty() && s != "0",
-        PhpMixed::List(items) => !items.is_empty(),
-        PhpMixed::Array(entries) => !entries.is_empty(),
-        // Objects are always truthy.
-        PhpMixed::Object(_) => true,
-    }
+    value.is_truthy()
 }
 
 pub fn var_export(value: &PhpMixed, r#return: bool) -> BString {
@@ -492,6 +578,35 @@ fn var_export_float(f: f64) -> BString {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use bstr::BStr;
+
+    #[test]
+    fn boolval_follows_php_loose_cast() {
+        assert!(!boolval(BStr::new("")));
+        assert!(!boolval(BStr::new("0")));
+        assert!(boolval(BStr::new("00")));
+        assert!(boolval(BStr::new("0.0")));
+        assert!(boolval(BStr::new(" ")));
+        assert!(boolval(BStr::new("false")));
+        assert!(!boolval(&0_i64));
+        assert!(boolval(&-1_i64));
+        assert!(!boolval(&0.0_f64));
+        assert!(!boolval(&-0.0_f64));
+        assert!(boolval(&f64::NAN));
+        assert!(!boolval(&None::<BString>));
+        assert!(!boolval(&Some(BString::from("0"))));
+        assert!(boolval(&Some(BString::from("1"))));
+        assert!(!boolval(std::ffi::OsStr::new("0")));
+        assert!(!boolval(&IndexMap::<BString, PhpMixed>::new()));
+        assert!(!boolval(&PhpMixed::Null));
+        assert!(!boolval(&PhpMixed::String("0".into())));
+        assert!(!boolval(&PhpMixed::List(vec![])));
+        assert!(boolval(&PhpMixed::List(vec![PhpMixed::Null])));
+        assert!(boolval(&PhpMixed::Object(IndexMap::new())));
+        assert!(empty(&None::<BString>));
+        assert!(empty(BStr::new("0")));
+        assert!(!empty(BStr::new("a")));
+    }
 
     /// PHP 8.5.9 oracle: `(string) $v` with the default precision=14. The digits are rounded to 14
     /// significant places and the layout switches to exponent form once the decimal exponent

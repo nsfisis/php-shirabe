@@ -3,7 +3,7 @@
 use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::util::Platform;
 use bstr::{BStr, BString};
-use shirabe_php_shim::{bformat, str_replace};
+use shirabe_php_shim::{bformat, boolval, empty, str_replace};
 
 #[derive(Debug)]
 pub struct GithubActionError {
@@ -16,8 +16,8 @@ impl GithubActionError {
     }
 
     pub fn emit(&mut self, message: &BStr, file: Option<&BStr>, line: Option<i64>) {
-        if Platform::get_env("GITHUB_ACTIONS").is_some_and(|v| !v.is_empty())
-            && Platform::get_env("COMPOSER_TESTS_ARE_RUNNING").is_none_or(|v| v.is_empty())
+        if boolval(&Platform::get_env("GITHUB_ACTIONS"))
+            && empty(&Platform::get_env("COMPOSER_TESTS_ARE_RUNNING"))
         {
             let message = self.escape_data(message);
 

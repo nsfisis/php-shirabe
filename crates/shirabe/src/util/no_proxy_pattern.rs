@@ -3,9 +3,9 @@
 use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    RuntimeException, bformat, explode, filter_var_int_with_range, filter_var_ip, inet_pton,
-    ltrim_chars, parse_url, php_regex, preg_split, stripos, strlen, strpbrk, strpos, substr,
-    substr_count, utf8_text,
+    RuntimeException, bformat, boolval, explode, filter_var_int_with_range, filter_var_ip,
+    inet_pton, ltrim_chars, parse_url, php_regex, preg_split, stripos, strlen, strpbrk, strpos,
+    substr, substr_count, utf8_text,
 };
 
 /// Tests URLs against NO_PROXY patterns
@@ -72,7 +72,7 @@ impl NoProxyPattern {
         let Some(host_str) = parsed
             .as_ref()
             .and_then(|parsed| parsed.host.clone())
-            .filter(|host| !host.is_empty() && host != "0")
+            .filter(boolval)
         else {
             return Ok(None);
         };

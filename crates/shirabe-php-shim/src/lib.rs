@@ -427,7 +427,7 @@ impl PhpMixed {
 
     /// PHP loose boolean cast `(bool) $value`.
     pub fn to_bool(&self) -> bool {
-        php_truthy(self)
+        self.is_truthy()
     }
 
     pub fn get(&self, key: impl AsRef<[u8]>) -> Option<&PhpMixed> {

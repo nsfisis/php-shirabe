@@ -36,10 +36,10 @@ use bstr::{B, BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, PATHINFO_EXTENSION, PHP_EOL, PHP_OS, PHP_SERVER,
-    PhpMixed, RuntimeException, ToPhpString, UnexpectedValueException, bformat, dirname,
-    error_message, extension_loaded, file_exists, file_get_contents, file_put_contents, implode,
-    is_dir, is_file, json_decode_assoc, json_decode_obj, mkdir, path_from_bytes, path_to_bytes,
-    pathinfo, realpath, rename, rtrim_chars, strpos, strtr, substr, trim_chars,
+    PhpMixed, RuntimeException, ToPhpString, UnexpectedValueException, bformat, boolval, dirname,
+    empty, error_message, extension_loaded, file_exists, file_get_contents, file_put_contents,
+    implode, is_dir, is_file, json_decode_assoc, json_decode_obj, mkdir, path_from_bytes,
+    path_to_bytes, pathinfo, realpath, rename, rtrim_chars, strpos, strtr, substr, trim_chars,
 };
 use shirabe_symfony_console::{
     formatter::{OutputFormatter, OutputFormatterStyle, OutputFormatterStyleInterface},
@@ -79,16 +79,13 @@ impl Factory {
     fn get_home_dir() -> anyhow::Result<BString> {
         let home = Platform::get_env("COMPOSER_HOME");
         if let Some(h) = home
-            && !h.is_empty()
+            && boolval(&h)
         {
             return Ok(h);
         }
 
         if Platform::is_windows() {
-            if Platform::get_env("APPDATA")
-                .map(|s| s.is_empty())
-                .unwrap_or(true)
-            {
+            if empty(&Platform::get_env("APPDATA")) {
                 return Err(RuntimeException::new(BString::from("The APPDATA or COMPOSER_HOME environment variable must be set for composer to run correctly")).into());
             }
 
@@ -105,7 +102,7 @@ impl Factory {
         if Self::use_xdg() {
             // XDG Base Directory Specifications
             let mut xdg_config = Platform::get_env("XDG_CONFIG_HOME").unwrap_or_default();
-            if xdg_config.is_empty() {
+            if empty(&xdg_config) {
                 xdg_config = bformat!("{user_dir}/.config");
             }
 
@@ -127,18 +124,18 @@ impl Factory {
 
     fn get_cache_dir(home: &BStr) -> anyhow::Result<BString> {
         let cache_dir = Platform::get_env("COMPOSER_CACHE_DIR").unwrap_or_default();
-        if !cache_dir.is_empty() {
+        if boolval(&cache_dir) {
             return Ok(cache_dir);
         }
 
         let home_env = Platform::get_env("COMPOSER_HOME").unwrap_or_default();
-        if !home_env.is_empty() {
+        if boolval(&home_env) {
             return Ok(bformat!("{home_env}/cache"));
         }
 
         if Platform::is_windows() {
             let mut cache_dir = Platform::get_env("LOCALAPPDATA").unwrap_or_default();
-            if !cache_dir.is_empty() {
+            if boolval(&cache_dir) {
                 cache_dir = bformat!("{cache_dir}/Shirabe");
             } else {
                 cache_dir = bformat!("{home}/cache");
@@ -171,7 +168,7 @@ impl Factory {
 
         if Self::use_xdg() {
             let xdg_cache = Platform::get_env("XDG_CACHE_HOME").unwrap_or_default();
-            let xdg_cache = if xdg_cache.is_empty() {
+            let xdg_cache = if empty(&xdg_cache) {
                 bformat!("{user_dir}/.cache")
             } else {
                 xdg_cache
@@ -185,7 +182,7 @@ impl Factory {
 
     fn get_data_dir(home: &BStr) -> anyhow::Result<BString> {
         let home_env = Platform::get_env("COMPOSER_HOME").unwrap_or_default();
-        if !home_env.is_empty() {
+        if boolval(&home_env) {
             return Ok(home_env);
         }
 
@@ -196,7 +193,7 @@ impl Factory {
         let user_dir = Self::get_user_dir()?;
         if home != bformat!("{user_dir}/.shirabe") && Self::use_xdg() {
             let xdg_data = Platform::get_env("XDG_DATA_HOME").unwrap_or_default();
-            let xdg_data = if xdg_data.is_empty() {
+            let xdg_data = if empty(&xdg_data) {
                 bformat!("{user_dir}/.local/share")
             } else {
                 xdg_data
@@ -1485,7 +1482,7 @@ impl Factory {
 
     fn get_user_dir() -> anyhow::Result<BString> {
         let home = Platform::get_env("HOME").unwrap_or_default();
-        if home.is_empty() {
+        if empty(&home) {
             return Err(RuntimeException::new(BString::from("The HOME or COMPOSER_HOME environment variable must be set for composer to run correctly")).into());
         }
 

@@ -15,9 +15,9 @@ use crate::util::{Filesystem, Git as GitUtil, HttpDownloader, Platform, ProcessE
 use bstr::{B, BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    GLOB_BRACE, GLOB_MARK, GLOB_ONLYDIR, PhpMixed, RuntimeException, bformat, dirname, file_exists,
-    file_get_contents, glob_with_flags, hash, is_dir, path_from_bytes, path_to_bytes, php_regex,
-    preg_is_match, realpath, rtrim_chars, serialize, str_replace, trim,
+    GLOB_BRACE, GLOB_MARK, GLOB_ONLYDIR, PhpMixed, RuntimeException, bformat, boolval, dirname,
+    file_exists, file_get_contents, glob_with_flags, hash, is_dir, path_from_bytes, path_to_bytes,
+    php_regex, preg_is_match, realpath, rtrim_chars, serialize, str_replace, trim,
 };
 
 #[derive(Debug)]
@@ -244,7 +244,7 @@ impl PathRepository {
             // carry over the root package version if this path repo is in the same git repository as root package
             if !package.contains_key(B("version"))
                 && let Some(root_version) = Platform::get_env("COMPOSER_ROOT_VERSION")
-                && !root_version.is_empty()
+                && boolval(&root_version)
             {
                 let mut ref1 = PhpMixed::Null;
                 let mut ref2 = PhpMixed::Null;

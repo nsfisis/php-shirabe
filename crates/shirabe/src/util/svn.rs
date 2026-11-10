@@ -5,8 +5,8 @@ use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite};
 use crate::util::{Platform, ProcessExecutor};
 use bstr::{B, BStr, BString, ByteSlice as _, ByteVec as _};
 use shirabe_php_shim::{
-    LogicException, RuntimeException, bformat, implode, parse_url, path_to_bytes, php_regex,
-    preg_match, stripos, strpos, trim,
+    LogicException, RuntimeException, bformat, boolval, implode, parse_url, path_to_bytes,
+    php_regex, preg_match, stripos, strpos, trim,
 };
 use shirabe_symfony_console::input::InputValue;
 
@@ -340,17 +340,14 @@ impl Svn {
             self.has_auth = Some(false);
             return false;
         };
-        let Some(user) = uri.user.filter(|user| !user.is_empty() && user != "0") else {
+        let Some(user) = uri.user.filter(boolval) else {
             self.has_auth = Some(false);
             return false;
         };
 
         self.credentials = Some(SvnCredentials {
             username: user,
-            password: uri
-                .pass
-                .filter(|pass| !pass.is_empty() && pass != "0")
-                .unwrap_or_default(),
+            password: uri.pass.filter(boolval).unwrap_or_default(),
         });
 
         self.has_auth = Some(true);

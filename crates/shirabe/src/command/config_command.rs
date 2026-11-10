@@ -14,8 +14,8 @@ use bstr::{B, BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, RuntimeException, ToPhpString, array_is_list,
-    array_key_first, array_merge, array_values_mixed, bformat, chmod, escapeshellcmd, exec,
-    explode, file_exists, impl_php_class, implode, in_array_loose, in_array_strict, intval,
+    array_key_first, array_merge, array_values_mixed, bformat, boolval, chmod, escapeshellcmd,
+    exec, explode, file_exists, impl_php_class, implode, in_array_loose, in_array_strict, intval,
     is_array, is_bool, is_dir, is_numeric, is_object, is_string, json_encode, path_from_bytes,
     path_to_bytes, php_regex, php_str, preg_is_match, preg_match, preg_replace, str_replace,
     strpos, strtolower, system, touch, trim_chars, var_export,
@@ -842,7 +842,7 @@ impl Command for ConfigCommand {
         };
         let boolean_normalizer = |val: &PhpMixed| -> PhpMixed {
             let s = val.as_string().unwrap_or_default();
-            PhpMixed::Bool(s != "false" && !s.is_empty() && s != "0")
+            PhpMixed::Bool(s != "false" && boolval(&s))
         };
 
         // handle config values
@@ -1559,7 +1559,7 @@ fn boolean_validator(val: &PhpMixed) -> PhpMixed {
 
 fn boolean_normalizer(val: &PhpMixed) -> PhpMixed {
     let s = val.as_string().unwrap_or_default();
-    PhpMixed::Bool(s != "false" && !s.is_empty() && s != "0")
+    PhpMixed::Bool(s != "false" && boolval(&s))
 }
 
 fn build_unique_config_values() -> IndexMap<BString, (ValidatorFn, NormalizerFn)> {
@@ -1620,7 +1620,7 @@ fn build_unique_config_values() -> IndexMap<BString, (ValidatorFn, NormalizerFn)
                 if s == "prompt" {
                     PhpMixed::string(BString::from("prompt"))
                 } else {
-                    PhpMixed::Bool(s != "false" && !s.is_empty() && s != "0")
+                    PhpMixed::Bool(s != "false" && boolval(&s))
                 }
             }),
         ),
@@ -1749,7 +1749,7 @@ fn build_unique_config_values() -> IndexMap<BString, (ValidatorFn, NormalizerFn)
                 if s == "stash" {
                     PhpMixed::string(BString::from("stash"))
                 } else {
-                    PhpMixed::Bool(s != "false" && !s.is_empty() && s != "0")
+                    PhpMixed::Bool(s != "false" && boolval(&s))
                 }
             }),
         ),
@@ -1813,7 +1813,7 @@ fn build_unique_config_values() -> IndexMap<BString, (ValidatorFn, NormalizerFn)
                 if s == "dev" || s == "no-dev" {
                     val.clone()
                 } else {
-                    PhpMixed::Bool(s != "false" && !s.is_empty() && s != "0")
+                    PhpMixed::Bool(s != "false" && boolval(&s))
                 }
             }),
         ),
@@ -1888,7 +1888,7 @@ fn build_unique_config_values() -> IndexMap<BString, (ValidatorFn, NormalizerFn)
                 if s == "php-only" {
                     PhpMixed::string(BString::from("php-only"))
                 } else {
-                    PhpMixed::Bool(s != "false" && !s.is_empty() && s != "0")
+                    PhpMixed::Bool(s != "false" && boolval(&s))
                 }
             }),
         ),
@@ -1907,7 +1907,7 @@ fn build_unique_config_values() -> IndexMap<BString, (ValidatorFn, NormalizerFn)
                 if s == "prompt" {
                     PhpMixed::string(BString::from("prompt"))
                 } else {
-                    PhpMixed::Bool(s != "false" && !s.is_empty() && s != "0")
+                    PhpMixed::Bool(s != "false" && boolval(&s))
                 }
             }),
         ),

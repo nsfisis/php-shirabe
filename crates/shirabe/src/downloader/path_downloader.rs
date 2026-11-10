@@ -16,8 +16,8 @@ use crate::util::{Filesystem, HttpDownloader, Platform, ProcessExecutor};
 use bstr::{B, BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpMixed, RuntimeException, bformat, file_exists, impl_php_class, is_dir, path_from_bytes,
-    path_to_bytes, realpath,
+    PhpMixed, RuntimeException, bformat, boolval, file_exists, impl_php_class, is_dir,
+    path_from_bytes, path_to_bytes, realpath,
 };
 use shirabe_symfony_filesystem::Filesystem as SymfonyFilesystem;
 
@@ -128,7 +128,7 @@ impl PathDownloader {
         let mut allowed_strategies = vec![Self::STRATEGY_SYMLINK, Self::STRATEGY_MIRROR];
 
         let mirror_path_repos = Platform::get_env("COMPOSER_MIRROR_PATH_REPOS");
-        if mirror_path_repos.is_some_and(|v| PhpMixed::string(v).to_bool()) {
+        if boolval(&mirror_path_repos) {
             current_strategy = Self::STRATEGY_MIRROR;
         }
 

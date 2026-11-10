@@ -2,7 +2,7 @@
 
 use bstr::{BStr, BString};
 use shirabe_php_shim::{
-    bformat, hash, php_regex, preg_is_match, preg_match, preg_replace, str_replace_array,
+    bformat, boolval, hash, php_regex, preg_is_match, preg_match, preg_replace, str_replace_array,
     trim_chars,
 };
 
@@ -18,7 +18,7 @@ impl ComposerMirror {
         pretty_version: Option<&BStr>,
     ) -> BString {
         let reference = reference.map(|r| {
-            let truthy = !r.is_empty() && r != "0";
+            let truthy = boolval(r);
             if !truthy || preg_is_match(php_regex!(r"{^([a-f0-9]*|%reference%)$}"), r) {
                 BString::from(r)
             } else {

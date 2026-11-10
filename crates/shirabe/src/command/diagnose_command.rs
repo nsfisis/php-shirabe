@@ -31,9 +31,9 @@ use bstr::{B, BStr, BString, ByteSlice as _, ByteVec as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     AnyThrowable, Catch as _, CmpOp, Exception, InvalidArgumentException, PHP_EOL, PhpClass as _,
-    PhpMixed, bformat, bwrite, disk_free_space, error_message, file_exists, filter_var_boolean,
-    hash, impl_php_class, implode, path_from_bytes, php_regex, preg_match, rtrim_chars,
-    str_replace, strpos, strstr, strstr_with_before_needle, strtolower, trim_chars,
+    PhpMixed, bformat, boolval, bwrite, disk_free_space, empty, error_message, file_exists,
+    filter_var_boolean, hash, impl_php_class, implode, path_from_bytes, php_regex, preg_match,
+    rtrim_chars, str_replace, strpos, strstr, strstr_with_before_needle, strtolower, trim_chars,
     version_compare,
 };
 use shirabe_symfony_console::command::Command;
@@ -780,7 +780,7 @@ impl DiagnoseCommand {
             }
             CheckResult::Failed => vec![],
             // PHP treats '' and '0' as falsey, so such a message never reaches the output loop.
-            CheckResult::Message(message) if message.is_empty() || message == "0" => vec![],
+            CheckResult::Message(message) if empty(&message) => vec![],
             CheckResult::Message(message) => vec![message],
             CheckResult::Messages(messages) => messages,
         };
@@ -1079,7 +1079,7 @@ impl DiagnoseCommand {
     fn check_connectivity(&self) -> anyhow::Result<CheckResult> {
         // PHP: if (!ini_get('allow_url_fopen')) — a missing setting, "" and "0" are all falsey.
         let allow_url_fopen = get_diagnostics()?.ini_get("allow_url_fopen");
-        if !allow_url_fopen.is_some_and(|value| !value.is_empty() && value != "0") {
+        if empty(&allow_url_fopen) {
             return Ok(CheckResult::Message(BString::from(
                 "<info>SKIP</> <comment>Because allow_url_fopen is missing.</>",
             )));
@@ -1106,10 +1106,7 @@ impl DiagnoseCommand {
 
     /// Check if Composer network is enabled for HTTP/S
     fn check_composer_network_http_enablement(&self) -> CheckResult {
-        if Platform::get_env("COMPOSER_DISABLE_NETWORK")
-            .map(|v| !v.is_empty() && v != "0")
-            .unwrap_or(false)
-        {
+        if boolval(&Platform::get_env("COMPOSER_DISABLE_NETWORK")) {
             return CheckResult::Message(BString::from(
                 "<info>SKIP</> <comment>Network is disabled by COMPOSER_DISABLE_NETWORK.</>",
             ));

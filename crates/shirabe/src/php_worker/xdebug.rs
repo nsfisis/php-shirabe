@@ -5,7 +5,7 @@
 
 use bstr::{BStr, BString};
 use shirabe_php_rpc::{PluginValue, WorkerConfig, query};
-use shirabe_php_shim::{getenv, os_str_from_bytes, php_str};
+use shirabe_php_shim::{empty, getenv, os_str_from_bytes, php_str};
 
 /// `XdebugHandler::$name.XdebugHandler::SUFFIX_ALLOW`, where the name is the uppercased prefix of
 /// the one construction Composer makes: `new XdebugHandler('Composer')` in `bin/composer`.
@@ -32,8 +32,7 @@ fn switches_xdebug_off() -> bool {
     // PHP: `!((bool) explode('|', getenv($this->envAllowXdebug))[0])`, where the pipe-separated
     // form is the handoff to a process xdebug-handler restarted. Nothing restarts here, so what
     // is left is PHP's truthiness of the value.
-    let allow_xdebug = getenv(os_str_from_bytes(ALLOW)).unwrap_or_default();
-    allow_xdebug.is_empty() || allow_xdebug == std::ffi::OsStr::new("0")
+    empty(&getenv(os_str_from_bytes(ALLOW)))
 }
 
 /// The [`WorkerConfig`] the worker is spawned with: Xdebug switched off unless the user allows

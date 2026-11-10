@@ -2,7 +2,7 @@
 
 use crate::ExecutableFinder;
 use bstr::BString;
-use shirabe_php_shim::{getenv, is_dir, is_executable, path_from_bytes, path_to_bytes};
+use shirabe_php_shim::{boolval, getenv, is_dir, is_executable, path_from_bytes, path_to_bytes};
 
 #[derive(Debug)]
 pub struct PhpExecutableFinder {
@@ -24,7 +24,7 @@ impl PhpExecutableFinder {
 
     /// Finds The PHP executable.
     pub fn find(&self, _include_args: bool) -> Option<BString> {
-        if let Some(php) = getenv("PHP_BINARY").filter(|v| !v.is_empty()) {
+        if let Some(php) = getenv("PHP_BINARY").filter(boolval) {
             let mut php = BString::from(path_to_bytes(&php));
             if !is_executable(path_from_bytes(&php)) {
                 match self.executable_finder.find(&php, None, &[]) {
@@ -43,7 +43,7 @@ impl PhpExecutableFinder {
         // The original `\PHP_BINARY && \PHP_SAPI` branch describes the running PHP interpreter.
         // These constants cannot be obtained in Rust, the branch is skipped here.
 
-        if let Some(php) = getenv("PHP_PATH").filter(|v| !v.is_empty()) {
+        if let Some(php) = getenv("PHP_PATH").filter(boolval) {
             let php = BString::from(path_to_bytes(&php));
             if !is_executable(path_from_bytes(&php)) || is_dir(path_from_bytes(&php)) {
                 return None;
@@ -52,7 +52,7 @@ impl PhpExecutableFinder {
             return Some(php);
         }
 
-        if let Some(php) = getenv("PHP_PEAR_PHP_BIN").filter(|v| !v.is_empty()) {
+        if let Some(php) = getenv("PHP_PEAR_PHP_BIN").filter(boolval) {
             let php = BString::from(path_to_bytes(&php));
             if is_executable(path_from_bytes(&php)) && !is_dir(path_from_bytes(&php)) {
                 return Some(php);

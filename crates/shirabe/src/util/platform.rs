@@ -4,10 +4,10 @@ use crate::util::ProcessExecutor;
 use bstr::{BStr, BString, ByteSlice as _};
 use shirabe_php_shim::{
     PHP_ENV, PHP_SERVER, PhpMixed, PhpResource, PregMatches, RuntimeException, STDOUT, bformat,
-    defined, file_exists, file_get_contents, function_exists, getcwd, getenv, ini_get, is_readable,
-    mb_strlen, os_str_from_bytes, path_to_bytes, php_os_family, php_regex, posix_geteuid,
-    posix_getpwuid, posix_getuid, preg_is_match, preg_replace_callback, putenv, realpath,
-    stream_isatty, stripos, strlen, strtoupper, substr, usleep,
+    boolval, defined, file_exists, file_get_contents, function_exists, getcwd, getenv, ini_get,
+    is_readable, mb_strlen, os_str_from_bytes, path_to_bytes, php_os_family, php_regex,
+    posix_geteuid, posix_getpwuid, posix_getuid, preg_is_match, preg_replace_callback, putenv,
+    realpath, stream_isatty, stripos, strlen, strtoupper, substr, usleep,
 };
 
 /// Platform helper for uniform platform-specific tests.
@@ -113,8 +113,7 @@ impl Platform {
                 let path_part = matches.name("path").unwrap_or_default();
                 // Treat HOME as an alias for USERPROFILE on Windows for legacy reasons
                 if Platform::is_windows() && var == "HOME" {
-                    let home =
-                        Platform::get_env("HOME").filter(|v| PhpMixed::string(v.clone()).to_bool());
+                    let home = Platform::get_env("HOME").filter(boolval);
                     if let Some(home) = home {
                         return Ok(bformat!("{home}{path_part}"));
                     }

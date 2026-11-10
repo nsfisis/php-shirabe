@@ -4,9 +4,9 @@ use crate::io::{DEBUG, IOInterface, IOInterfaceImmutable, IOInterfaceWrite};
 use crate::util::{Filesystem, Platform};
 use bstr::{BStr, BString};
 use shirabe_php_shim::{
-    bformat, bin2hex, clearstatcache, dirname, disk_free_space, display_to_bytes, file_exists,
-    file_get_contents, file_put_contents, filemtime, hash_file, is_dir, is_writable, mkdir,
-    path_from_bytes, path_to_bytes, php_regex, preg_is_match, preg_match, preg_replace,
+    bformat, bin2hex, boolval, clearstatcache, dirname, disk_free_space, display_to_bytes,
+    file_exists, file_get_contents, file_put_contents, filemtime, hash_file, is_dir, is_writable,
+    mkdir, path_from_bytes, path_to_bytes, php_regex, preg_is_match, preg_match, preg_replace,
     random_bytes, random_int, rename, rtrim_chars, time, touch, touch_with_mtime_and_atime, unlink,
 };
 use shirabe_symfony_finder::Finder;
@@ -296,7 +296,7 @@ impl Cache {
         }
 
         *cache_collected = Some(true);
-        if Platform::get_env("COMPOSER_TEST_SUITE").is_some() {
+        if boolval(&Platform::get_env("COMPOSER_TEST_SUITE")) {
             return false;
         }
 

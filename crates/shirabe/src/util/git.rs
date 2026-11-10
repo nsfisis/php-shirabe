@@ -10,10 +10,10 @@ use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     AnyThrowable, CmpOp, InvalidArgumentException, PHP_EOL, PhpMixed, PregMatches,
-    RuntimeException, ToPhpString, TypeError, array_map, bformat, clearstatcache, error_message,
-    explode, explode_with_limit, get_debug_type, implode, in_array_loose, is_dir, path_to_bytes,
-    php_regex, preg_is_match, preg_match, preg_quote, preg_replace, rawurldecode, rawurlencode,
-    str_replace_array, strlen, strpos, substr, trim, version_compare,
+    RuntimeException, ToPhpString, TypeError, array_map, bformat, boolval, clearstatcache,
+    error_message, explode, explode_with_limit, get_debug_type, implode, in_array_loose, is_dir,
+    path_to_bytes, php_regex, preg_is_match, preg_match, preg_quote, preg_replace, rawurldecode,
+    rawurlencode, str_replace_array, strlen, strpos, substr, trim, version_compare,
 };
 use shirabe_symfony_console::input::InputValue;
 
@@ -697,10 +697,7 @@ impl Git {
 
     pub fn sync_mirror(&mut self, url: &BStr, dir: &std::path::Path) -> anyhow::Result<bool> {
         let composer_disable_network = Platform::get_env("COMPOSER_DISABLE_NETWORK");
-        if composer_disable_network
-            .as_ref()
-            .map(|v| !v.is_empty() && v != "0")
-            .unwrap_or(false)
+        if boolval(&composer_disable_network)
             && composer_disable_network
                 .as_ref()
                 .is_none_or(|v| v != "prime")
@@ -1030,10 +1027,7 @@ impl Git {
         dir: &std::path::Path,
         is_local_path_repository: bool,
     ) -> Option<BString> {
-        if Platform::get_env("COMPOSER_DISABLE_NETWORK")
-            .map(|v| !v.is_empty() && v != "0")
-            .unwrap_or(false)
-        {
+        if boolval(&Platform::get_env("COMPOSER_DISABLE_NETWORK")) {
             return None;
         }
 
@@ -1130,10 +1124,10 @@ impl Git {
         }
 
         // clean up rogue git env vars in case this is running in a git hook
-        if Platform::get_env("GIT_DIR").is_some() {
+        if boolval(&Platform::get_env("GIT_DIR")) {
             Platform::clear_env("GIT_DIR")?;
         }
-        if Platform::get_env("GIT_WORK_TREE").is_some() {
+        if boolval(&Platform::get_env("GIT_WORK_TREE")) {
             Platform::clear_env("GIT_WORK_TREE")?;
         }
 

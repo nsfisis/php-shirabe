@@ -18,8 +18,9 @@ use crate::util::{HttpOptions, Platform, StreamContextOptions};
 use bstr::{B, BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    InvalidArgumentException, PhpMixed, array_splice, array_unshift, bformat, http_build_query,
-    json_encode, path_from_bytes, str_replace, strip_tags, strpos, strtolower, ucfirst,
+    InvalidArgumentException, PhpMixed, array_splice, array_unshift, bformat, boolval,
+    http_build_query, json_encode, path_from_bytes, str_replace, strip_tags, strpos, strtolower,
+    ucfirst,
 };
 
 /// Package operation manager.
@@ -945,7 +946,7 @@ impl InstallationManager {
     ) -> anyhow::Result<()> {
         let mut progress = None;
         if self.output_progress
-            && !Platform::get_env("CI").is_some_and(|v| !v.is_empty() && v != "0")
+            && !boolval(&Platform::get_env("CI"))
             && !self.io.is_debug()
             && promises.len() > 1
         {

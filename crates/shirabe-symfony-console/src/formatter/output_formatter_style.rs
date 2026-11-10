@@ -3,7 +3,7 @@
 use crate::Color;
 use crate::formatter::OutputFormatterStyleInterface;
 use bstr::{BStr, BString, ByteSlice as _};
-use shirabe_php_shim::{PHP_SERVER, PhpMixed, array_search_in_vec, bformat, getenv, intval};
+use shirabe_php_shim::{PHP_SERVER, PhpMixed, array_search_in_vec, bformat, empty, getenv, intval};
 
 /// Formatter style class for defining styles.
 #[derive(Debug, Clone)]
@@ -87,7 +87,7 @@ impl OutputFormatterStyleInterface for OutputFormatterStyle {
             self.handles_href_gracefully = Some(
                 getenv("TERMINAL_EMULATOR").as_deref()
                     != Some(std::ffi::OsStr::new("JetBrains-JediTerm"))
-                    && (getenv("KONSOLE_VERSION").is_none_or(|v| v.is_empty())
+                    && (empty(&getenv("KONSOLE_VERSION"))
                         || getenv("KONSOLE_VERSION")
                             .map(|v| intval(&PhpMixed::string(v.as_encoded_bytes())))
                             .unwrap_or(0)

@@ -5,7 +5,7 @@ use crate::package::{BasePackageHandle, stability_priority};
 use crate::util::Platform;
 use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
-use shirabe_php_shim::{CmpOp, PhpMixed, ToPhpString, bformat, implode};
+use shirabe_php_shim::{CmpOp, ToPhpString, bformat, boolval, implode};
 use shirabe_semver::CompilingMatcher;
 use shirabe_semver::constraint::SimpleConstraint;
 
@@ -30,8 +30,9 @@ impl DefaultPolicy {
             prefer_stable,
             prefer_lowest,
             preferred_versions,
-            prefer_dev_over_prerelease: Platform::get_env("COMPOSER_PREFER_DEV_OVER_PRERELEASE")
-                .is_some_and(|v| PhpMixed::string(v).to_bool()),
+            prefer_dev_over_prerelease: boolval(&Platform::get_env(
+                "COMPOSER_PREFER_DEV_OVER_PRERELEASE",
+            )),
             preferred_package_result_cache_per_pool: std::cell::RefCell::new(IndexMap::new()),
             sorting_cache_per_pool: std::cell::RefCell::new(IndexMap::new()),
         }

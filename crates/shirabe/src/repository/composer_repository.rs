@@ -29,10 +29,11 @@ use indexmap::IndexMap;
 use shirabe_metadata_minifier::{ExpandedVersion, ExpandedVersions, MetadataMinifier};
 use shirabe_php_shim::{
     AnyThrowable, Catch as _, CmpOp, InvalidArgumentException, LogicException, PHP_EOL, PhpClass,
-    PhpMixed, RuntimeException, ToPhpString, UnexpectedValueException, bformat, error_message,
-    explode, extension_loaded, hash, http_build_query_mixed, implode, json_decode_assoc, parse_url,
-    path_from_bytes, php_regex, preg_grep, preg_is_match, preg_match, preg_replace, preg_split,
-    realpath, rtrim_chars, str_replace, strpos, strtolower, strtr, urlencode, var_export,
+    PhpMixed, RuntimeException, ToPhpString, UnexpectedValueException, bformat, empty,
+    error_message, explode, extension_loaded, hash, http_build_query_mixed, implode,
+    json_decode_assoc, parse_url, path_from_bytes, php_regex, preg_grep, preg_is_match, preg_match,
+    preg_replace, preg_split, realpath, rtrim_chars, str_replace, strpos, strtolower, strtr,
+    urlencode, var_export,
 };
 use shirabe_semver::CompilingMatcher;
 use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint, SimpleConstraint};
@@ -788,17 +789,7 @@ impl ComposerRepository {
                 };
                 // do not show virtual packages in results as they are not directly useful from a composer perspective
                 if let Some(v) = arr.get(B("virtual")) {
-                    // PHP's `empty()` is false when the value is truthy
-                    let is_empty = match v {
-                        PhpMixed::Null => true,
-                        PhpMixed::Bool(false) => true,
-                        PhpMixed::Int(0) => true,
-                        PhpMixed::Float(f) if *f == 0.0 => true,
-                        PhpMixed::String(s) if s.is_empty() || s == "0" => true,
-                        PhpMixed::List(l) if l.is_empty() => true,
-                        PhpMixed::Array(a) if a.is_empty() => true,
-                        _ => false,
-                    };
+                    let is_empty = empty(v);
                     if !is_empty {
                         continue;
                     }
