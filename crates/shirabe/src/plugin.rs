@@ -1,10 +1,6 @@
 pub mod capability;
 pub mod capable;
 pub mod command_event;
-pub(crate) mod console_bridge;
-pub(crate) mod job_registry;
-pub mod php_call;
-pub mod php_plugin_value;
 pub mod plugin_blocked_exception;
 pub mod plugin_events;
 pub mod plugin_interface;
@@ -13,9 +9,6 @@ pub mod post_file_download_event;
 pub mod pre_command_run_event;
 pub mod pre_file_download_event;
 pub mod pre_pool_create_event;
-pub mod proxy;
-pub mod rpc;
-pub(crate) mod throwable_bridge;
 
 pub use capable::*;
 pub use command_event::*;

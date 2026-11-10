@@ -1,13 +1,13 @@
 <?php
 
 // Shirabe's own definition of Composer\EventDispatcher\Event for the plugin worker. This class
-// lives in both worlds at once: an instance revived from a Rust handle proxies every call over
-// RPC (like a generated stub), while an instance constructed natively — real Composer code in
-// this process does `new PreCommandRunEvent(...)`, whose parent constructor lands here — is a
-// faithful in-process port of the real base class. Proxy revival binds the handle without
-// running the constructor, so the constructor below is the native mode alone;
-// `__shirabeRustHandleDescriptor()` returns null there so the wire codec registers the object in
-// the P table instead of treating it as a Rust handle.
+// lives in both worlds at once: an instance revived from a Rust handle proxies every call over RPC
+// (like a generated stub), while an instance constructed natively — real Composer code in this
+// process does `new PreCommandRunEvent(...)`, whose parent constructor lands here — is a faithful
+// in-process port of the real base class. Proxy revival binds the handle without running the
+// constructor, so the constructor below is the native mode alone; `__shirabeRustHandleDescriptor()`
+// returns null there so `ShirabeRpcRuntime::toPluginValue` registers the object in the P table
+// instead of treating it as a Rust handle.
 
 namespace Composer\EventDispatcher;
 

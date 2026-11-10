@@ -1,0 +1,233 @@
+//! The Composer PHP runtime the worker loads.
+//!
+//! See `docs/dev/composer-runtime-bundle.md`.
+
+use bstr::{BStr, BString};
+use shirabe_php_rpc::{PluginValue, call_internal_function};
+use shirabe_php_shim::{
+    AnyThrowable, Phar, RuntimeException, bformat, display_to_bytes, getenv, os_str_from_bytes,
+    path_from_bytes, path_to_bytes, php_str,
+};
+
+const BUNDLE: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/composer-runtime-bundle.phar"));
+
+/// Identifies the bundle by its contents; the sentinel entry holds the same string.
+const BUNDLE_ID: &BStr = php_str(env!("SHIRABE_COMPOSER_RUNTIME_BUNDLE_ID").as_bytes());
+
+/// The entry the worker reads back to tell a bundle it can use from one it cannot.
+const SENTINEL_PATH: &BStr = php_str(b"shirabe/bundle-id");
+
+/// The alias `Phar::loadPhar` maps the bundle to in the worker. The bundle stores no alias of
+/// its own, so this name is the only one its stream paths answer to.
+const ALIAS: &BStr = php_str(b"shirabe-composer-runtime.phar");
+
+/// Names the Composer checkout that stands in for the bundle, for development.
+const OVERRIDE_ENV: &BStr = php_str(b"SHIRABE_COMPOSER_PHP_DIR");
+
+/// The path the Composer PHP runtime's files sit under in the worker: the checkout `OVERRIDE_ENV`
+/// names, or else the bundle, either inside this executable or in the directory it was extracted
+/// to. A bundle the worker cannot read in place is unpacked under the directory `cache_dir`
+/// returns, Composer's cache directory, which is only looked up then; the process answers with
+/// the path it resolved first, so a later call's `cache_dir` no longer moves the runtime.
+pub fn base_path(
+    cache_dir: impl FnOnce() -> anyhow::Result<std::path::PathBuf>,
+) -> anyhow::Result<BString> {
+    static BASE: std::sync::OnceLock<Result<BString, BString>> = std::sync::OnceLock::new();
+    BASE.get_or_init(|| {
+        resolve(cache_dir).map_err(|e| match AnyThrowable::of(&e) {
+            Some(exception) => exception.get_message().to_owned(),
+            None => display_to_bytes(format_args!("{e:#}")),
+        })
+    })
+    .clone()
+    .map_err(|message| RuntimeException::new(message).into())
+}
+
+fn resolve(
+    cache_dir: impl FnOnce() -> anyhow::Result<std::path::PathBuf>,
+) -> anyhow::Result<BString> {
+    if let Some(directory) = override_directory()? {
+        return Ok(path_to_bytes(&directory).into());
+    }
+    if worker_opens_bundle()? {
+        return Ok(bformat!("phar://{ALIAS}"));
+    }
+    Ok(path_to_bytes(&extract_into(&cache_dir()?.join("runtime"))?).into())
+}
+
+/// The checkout that stands in for the bundle, if `OVERRIDE_ENV` names one. Both the worker and
+/// the Rust side read the runtime from there instead.
+fn override_directory() -> anyhow::Result<Option<std::path::PathBuf>> {
+    let Some(directory) = getenv(os_str_from_bytes(OVERRIDE_ENV)) else {
+        return Ok(None);
+    };
+    let directory = std::path::PathBuf::from(directory);
+    if !directory.join("vendor/autoload.php").is_file() {
+        return Err(RuntimeException::new(bformat!("{OVERRIDE_ENV} points at {directory}, which has no vendor/autoload.php; install the checkout's dependencies or unset it to use the runtime the executable carries"))
+        .into());
+    }
+    Ok(Some(directory))
+}
+
+/// Whether the worker can read the bundle straight out of this executable. It cannot when its
+/// PHP has no phar extension, no zlib to inflate the entries, or a restriction on the phar stream
+/// wrapper.
+fn worker_opens_bundle() -> anyhow::Result<bool> {
+    let executable = std::env::current_exe()?;
+    let opened = call_internal_function(
+        "__shirabe_open_runtime_bundle",
+        vec![
+            PluginValue::string(path_to_bytes(&executable)),
+            PluginValue::string(ALIAS),
+            PluginValue::string(SENTINEL_PATH),
+            PluginValue::string(BUNDLE_ID),
+        ],
+    )?
+    .map_err(|throw| {
+        RuntimeException::new(bformat!("{}: {}", throw.exception_class, throw.message))
+    })?;
+    match opened {
+        PluginValue::Bool(opened) => Ok(opened),
+        other => Err(anyhow::anyhow!(
+            "opening the Composer PHP runtime bundle did not answer with a bool: {other:?}"
+        )),
+    }
+}
+
+/// One of the runtime's files, at a path a reader in this process can open: the one in the
+/// checkout `OVERRIDE_ENV` names, or the file written out of the bundle on its own. `base_path()`
+/// answers for the worker and can name a path inside this executable that only its phar stream
+/// wrapper opens.
+pub fn local_file(path: impl AsRef<[u8]>) -> anyhow::Result<LocalFile> {
+    let path = path.as_ref();
+    if let Some(directory) = override_directory()? {
+        return Ok(LocalFile {
+            path: directory.join(path_from_bytes(path)),
+            _directory: None,
+        });
+    }
+
+    let directory = tempfile::tempdir()?;
+    let archive = directory.path().join("bundle.phar");
+    std::fs::write(&archive, BUNDLE)?;
+    let unpacked = directory.path().join("unpacked");
+    Phar::new(&archive)?.extract_to(&unpacked, Some(&[BStr::new(path)]), true)?;
+    std::fs::remove_file(&archive)?;
+
+    Ok(LocalFile {
+        path: unpacked.join(path_from_bytes(path)),
+        _directory: Some(directory),
+    })
+}
+
+/// A file of the Composer PHP runtime on the local filesystem. One written out of the bundle
+/// lives in a temporary directory that this handle removes again.
+#[derive(Debug)]
+pub struct LocalFile {
+    path: std::path::PathBuf,
+    _directory: Option<tempfile::TempDir>,
+}
+
+impl LocalFile {
+    pub fn path(&self) -> &std::path::Path {
+        &self.path
+    }
+}
+
+/// Unpacks the bundle into a content-addressed directory under `root`, so that a worker that
+/// cannot read the bundle in place gets the same files from the filesystem.
+fn extract_into(root: &std::path::Path) -> anyhow::Result<std::path::PathBuf> {
+    let destination = root.join(path_from_bytes(BUNDLE_ID));
+    if destination.is_dir() {
+        return Ok(destination);
+    }
+
+    std::fs::create_dir_all(root)?;
+    let staging = tempfile::tempdir_in(root)?;
+    let archive = staging.path().join("bundle.phar");
+    std::fs::write(&archive, BUNDLE)?;
+    let unpacked = staging.path().join("unpacked");
+    Phar::new(&archive)?.extract_to(&unpacked, None, true)?;
+    std::fs::remove_file(&archive)?;
+
+    if let Err(error) = std::fs::rename(&unpacked, &destination) {
+        // Losing the race against another process that unpacked the same bundle is not a
+        // failure: the directory is named after the contents that went into it.
+        if !destination.is_dir() {
+            return Err(error.into());
+        }
+    }
+    Ok(destination)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn sentinel_of(directory: &std::path::Path) -> BString {
+        std::fs::read(directory.join(path_from_bytes(SENTINEL_PATH)))
+            .expect("no sentinel in the bundle")
+            .into()
+    }
+
+    /// PHP takes the first occurrence of the stub token in the file it opens, so no other copy of
+    /// it may precede the bundle in the executable.
+    #[test]
+    fn the_first_phar_in_this_executable_is_the_bundle() {
+        let executable = std::env::current_exe().expect("no path for this executable");
+        let unpacked = tempfile::tempdir().unwrap();
+        Phar::new(&executable)
+            .expect("this executable does not read back as a phar")
+            .extract_to(unpacked.path(), None, true)
+            .unwrap();
+
+        assert_eq!(sentinel_of(unpacked.path()), BUNDLE_ID);
+    }
+
+    #[test]
+    fn extracting_the_bundle_names_the_directory_after_it() {
+        let root = tempfile::tempdir().unwrap();
+        let directory = extract_into(root.path()).unwrap();
+
+        assert_eq!(directory, root.path().join(path_from_bytes(BUNDLE_ID)));
+        assert_eq!(sentinel_of(&directory), BUNDLE_ID);
+        assert!(directory.join("vendor/autoload.php").is_file());
+        // A second call finds the unpacked bundle and leaves it alone.
+        assert_eq!(extract_into(root.path()).unwrap(), directory);
+    }
+
+    #[test]
+    fn the_worker_reads_the_bundle_out_of_this_executable() {
+        let cache = tempfile::tempdir().unwrap();
+        assert_eq!(
+            base_path(|| Ok(cache.path().to_path_buf())).unwrap(),
+            bformat!("phar://{ALIAS}")
+        );
+    }
+
+    /// The other half of `base_path`: a worker whose PHP cannot open the bundle is handed the
+    /// unpacked tree, and has to reach the same classes through it.
+    #[test]
+    fn the_worker_loads_the_composer_runtime_from_an_unpacked_bundle() {
+        let root = tempfile::tempdir().unwrap();
+        let autoload = extract_into(root.path())
+            .unwrap()
+            .join("vendor/autoload.php");
+        call_internal_function(
+            "__shirabe_require",
+            vec![PluginValue::string(path_to_bytes(&autoload))],
+        )
+        .unwrap()
+        .unwrap();
+
+        // A class with no proxy stub, so that the answer is about the runtime and not about the
+        // stub autoloader.
+        let exists = call_internal_function(
+            "class_exists",
+            vec![PluginValue::string(r"Composer\Util\Filesystem")],
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(exists, PluginValue::Bool(true));
+    }
+}

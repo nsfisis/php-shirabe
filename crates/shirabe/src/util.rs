@@ -1,3 +1,7 @@
+//! `Composer\Util\RemoteFilesystem` has no Rust port. Only PHP's stream layer can serve the
+//! requests it takes, so the real class runs in the PHP worker, and `RemoteFilesystem` is
+//! re-exported here from the adapter that forwards to it (`php_worker::proxy::remote_filesystem`).
+
 pub mod auth_helper;
 pub mod bitbucket;
 pub mod composer_mirror;
@@ -22,7 +26,6 @@ pub mod package_sorter;
 pub mod perforce;
 pub mod platform;
 pub mod process_executor;
-pub mod remote_filesystem;
 pub mod silencer;
 pub mod stream_context_factory;
 pub mod stream_context_options;
@@ -33,6 +36,7 @@ pub mod tar;
 pub mod url;
 pub mod zip;
 
+pub use crate::php_worker::proxy::remote_filesystem::*;
 pub use auth_helper::*;
 pub use bitbucket::*;
 pub use composer_mirror::*;
@@ -55,7 +59,6 @@ pub use package_sorter::*;
 pub use perforce::*;
 pub use platform::*;
 pub use process_executor::*;
-pub use remote_filesystem::*;
 pub use silencer::*;
 pub use stream_context_factory::*;
 pub use stream_context_options::*;

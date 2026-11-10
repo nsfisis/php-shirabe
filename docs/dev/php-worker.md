@@ -9,14 +9,17 @@ is split between the two worlds. Which treatment each Composer class receives is
 
 ## Calling into the worker
 
-The `shirabe` crate calls into the worker through `plugin::php_call::PhpCall` and nothing else: it
+The `shirabe` crate calls into the worker through `php_worker::call::PhpCall` and nothing else: it
 names what to run (a function or entry point, a method of a P-table entity, a static method, a
-constructor) and decodes the answer as the type the caller asks for (`FromWire`). The callbacks
-the worker makes while the call is in flight are served by `PluginRpcDispatcher` — the runtime
-service endpoint and the R table — unless the caller brings a dispatcher of its own, as script
-execution does to answer autoload lookups from the class loader it built. A PHP exception becomes the error of the ported
-exception it stands for (`try_run` keeps it apart for a caller that catches it), and an answer
-that does not decode is an error naming the call and the value it answered with.
+constructor) and decodes the answer as the type the caller asks for (`FromPluginValue`). The
+callbacks the worker makes while the call is in flight are served by `PluginRpcDispatcher` — the
+runtime service endpoint and the R table — unless the caller brings a dispatcher of its own. Script
+execution brings `ScriptRpcDispatcher`, which answers the same runtime service methods and R table
+except `__shirabe_run_rust_command`. Both dispatchers live in `php_worker/rpc/dispatch.rs`. The
+ported code reaches the worker through the named functions of `php_worker` (`runtime`, `callable`,
+`installed_versions`, the proxies) rather than building calls itself. A PHP exception becomes the
+error of the ported exception it stands for (`try_run` keeps it apart for a caller that catches it),
+and an answer that does not decode is an error naming the call and the value it answered with.
 
 ## Entry points
 
@@ -36,23 +39,25 @@ query, so the lists exist only there, and decodes the answer into a struct cache
 (`Diagnostics` for `__shirabe_diagnose`, `PlatformInfo` for `__shirabe_platform`) whose accessors
 panic on a name the list does not hold.
 
-The functions of `shirabe-php-rpc` that answer questions about the runtime — the two composite
-queries (`get_diagnostics`, `get_platform_info`), the PHP version and binary, and the few PHP
-functions whose answer depends on the worker (`phpversion`, `stream_resolve_include_path`, the
-loaded ini files, whether Xdebug is active) — return `anyhow::Result` like every other call into
-the worker: a worker that cannot be spawned or reached, and an exception the call throws, are
+The functions that answer questions about the runtime — the two composite queries
+(`php_worker::diagnostics::get_diagnostics`, `php_worker::platform_info::get_platform_info`), the
+loaded ini files and whether Xdebug is active (`php_worker::xdebug`), and in `shirabe-php-rpc` the
+PHP version and binary and the few PHP functions whose answer depends on the worker
+(`phpversion`, `stream_resolve_include_path`) — return `anyhow::Result` like every other call
+into the worker: a worker that cannot be spawned or reached, and an exception the call throws, are
 errors the caller propagates. An answer that does not decode is a protocol violation and panics,
 since only the worker's own code or a PHP builtin with a fixed return type writes it. A cached
 answer is cached only once it has arrived, so a failed query is asked again on the next call.
 
 ### Records
 
-A composite payload — the answer of a composite query, the console application handoff, a
-command definition read back, the facts of a terminated process, the result of a `scripts` Command
-class — is a PHP array whose keys are the field names of one Rust struct declared with
-`shirabe_php_rpc::wire_record!`, which derives its `ToWire` / `FromWire` from those fields. The
-worker code reading or writing such an array uses the same snake_case names. A missing key or a
-value of the wrong type is a decoding failure naming the record and the key, never a default.
+A composite payload — the answer of a composite query, the console application handoff, a command
+definition read back, the facts of a terminated process, the result of a `scripts` Command class —
+is a PHP array whose keys are the field names of one Rust struct declared with
+`shirabe_php_rpc::plugin_value_record!`, which derives its `ToPluginValue` / `FromPluginValue` from
+those fields. The worker code reading or writing such an array uses the same snake_case names. A
+missing key or a value of the wrong type is a decoding failure naming the record and the key, never
+a default.
 
 Notable internal helpers:
 
@@ -123,8 +128,8 @@ are an explicit error naming them.
 
 ## Materialized values
 
-The two halves of the materialized-value codec are `crates/shirabe/src/plugin/php_plugin_value.rs`
-(and, for the PHP built-in `\DateTimeInterface`, the `ToWire` / `FromWire` impls of
+The two halves of the materialized-value codec are `crates/shirabe/src/php_worker/codec.rs`
+(and, for the PHP built-in `\DateTimeInterface`, the `ToPluginValue` / `FromPluginValue` impls of
 `shirabe-php-rpc`) and `Shirabe\MaterializedValue`, whose `CLASSES` constant is the closed list of
 classes that may cross as object records.
 
@@ -211,11 +216,48 @@ double-release) one entity; entities with no clone semantics answer with an expl
 
 ## The R table
 
-`R_TABLE` in `crates/shirabe/src/plugin/rpc/table.rs` holds the Rust-side entities, as
-`RustEntity` with one variant per kind of entity that crosses. Interning scans the table for the
-same variant and shared-pointer address, with no separate reverse index. There is no per-plugin
-bookkeeping: an entry lives as long as a stub for it is reachable in the worker, which is also how
-long Composer keeps an object a plugin holds on to.
+`R_TABLE` in `crates/shirabe/src/php_worker/rpc/table.rs` holds the Rust-side entities. There is
+no per-plugin bookkeeping: an entry lives as long as a stub for it is reachable in the worker,
+which is also how long Composer keeps an object a plugin holds on to.
+
+A kind of entity is a handle type (`Rc<RefCell<dyn LockerInterface>>`, `PackageInterfaceHandle`,
+...) implementing `Entity` (`crates/shirabe/src/php_worker/rpc/entity.rs`): the allocation that
+is its identity, the class it crosses as, and optionally its clone and property semantics. An
+entity is handed to the child only through `entity_value`, which registers it and builds the Rust
+handle descriptor from the class `Entity::class` chose, and is read back as `EntityArg<H>`.
+
+The table interns by address, so the same shared instance always crosses as the same rhandle
+(`===` in the child); the address of one allocation registered as two kinds of entity is a bug and
+panics. The class is fixed when the entity is registered, as the child fixes the class of the stub
+it builds for an rhandle.
+
+### Forwarding classes
+
+Every proxy stub, runtime class and guard that forwards members to the Rust side has a module in
+`crates/shirabe/src/php_worker/rpc/forwarding.rs`, generated by `surface-manifest` (see
+`plugin-stub-generation.md`) and laid out by the class's namespace (`Composer\Package\Locker` is
+`forwarding::package::locker`). The module holds:
+
+- `PhpClass`, a marker type standing for the class;
+- `Forwarding`, a trait with one method per member the class itself declares and forwards, whose
+  default answers that the member is not available. The trait of a class whose parent forwards
+  nothing names the handle type (`type Handle`) every descendant takes;
+- `dispatch`, routing a method name to the `Forwarding` of the class declaring it, and `CROSSING`,
+  the class and its `dispatch` as the value `Entity::class` returns;
+- `construct` and `call_static` for a class forwarding its constructor or static methods, which
+  the top-level `construct` and `call_static` route `__shirabe_construct` and
+  `__shirabe_call_static` to.
+
+What the Rust side answers is written by hand, as `impl forwarding::<path>::Forwarding for
+forwarding::<path>::PhpClass` in `crates/shirabe/src/php_worker/rpc/entities/`. Only the members
+the impl overrides are answered; the rest keep the generated default, and the surface manifest
+records which is which. A member name the class does not forward is a protocol violation and
+panics.
+
+To serve a new class: add it to the stub generator's `targets.list`, regenerate the stubs and the
+manifest, and write its forwarding impl. A new kind of entity also needs an `Entity` impl for its
+handle type; a new class of an existing kind needs a branch in that impl's `class`. A missing impl
+does not compile.
 
 ## Two-world console application
 

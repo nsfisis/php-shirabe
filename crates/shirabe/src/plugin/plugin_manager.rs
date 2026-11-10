@@ -3,7 +3,6 @@
 use crate::autoload::ClassLoader;
 use crate::composer::{ComposerHandle, ComposerWeakHandle, PartialComposerHandle};
 use crate::config::{AllowPlugins, Config};
-use crate::event_dispatcher::EventDispatcher;
 use crate::factory::DisablePlugins;
 use crate::installer::InstallerInterface;
 use crate::io::{DEBUG, IOInterface, IOInterfaceImmutable, IOInterfaceWrite};
@@ -12,12 +11,13 @@ use crate::package::{
     BasePackageHandle, LockerInterface, PackageInterfaceHandle, RootPackageInterfaceHandle,
     base_package,
 };
-use crate::plugin::capability::Capability;
-use crate::plugin::php_call::PhpCall;
-use crate::plugin::proxy::{
-    PhpCapabilityProxy, PhpCommandProviderProxy, PhpPluginProxy, php_installer_proxy, php_is_a,
+use crate::php_worker::proxy::{
+    PhpCapabilityProxy, PhpCommandProviderProxy, PhpPluginProxy, new_capability_object,
+    php_installer_proxy,
 };
-use crate::plugin::rpc::table::{composer_handle_value, io_handle_value, plugin_handle_value};
+use crate::php_worker::rpc::entity::entity_value;
+use crate::php_worker::runtime;
+use crate::plugin::capability::Capability;
 use crate::plugin::{PluginBlockedException, PluginInterface, plugin_interface};
 use crate::repository::{
     InstalledRepository, RepositoryInterfaceHandle, RepositoryUtils, RootPackageRepository,
@@ -395,7 +395,7 @@ impl PluginManager {
 
         // The plugin code runs in the PHP worker: load the Composer PHP runtime (contracts like
         // PluginInterface) and the reverse-RPC autoloader before touching plugin classes there.
-        EventDispatcher::ensure_composer_php_runtime(|| {
+        runtime::ensure_composer_php_runtime(|| {
             let cache_dir = composer
                 .borrow()
                 .get_config()
@@ -403,7 +403,7 @@ impl PluginManager {
                 .get_path("cache-dir")?;
             Ok(path_from_bytes(&cache_dir).to_path_buf())
         })?;
-        EventDispatcher::ensure_script_autoloader()?;
+        runtime::ensure_script_autoloader()?;
 
         if let Some(files) = map.get(B("files")).and_then(|v| v.as_array()) {
             for (file_identifier, file) in files {
@@ -416,13 +416,13 @@ impl PluginManager {
                 let file = file.as_string().unwrap_or_else(|| {
                     panic!("autoload files entry {file_identifier:?} is not a string path")
                 });
-                self.php_runtime_composer_require(file_identifier.as_bstr(), file)?;
+                runtime::composer_require(file_identifier.as_bstr(), file)?;
             }
         }
 
         for class in classes {
             let mut class = class;
-            if self.php_runtime_class_exists(class.as_bstr(), false)? {
+            if runtime::class_exists(class.as_bstr(), false)? {
                 class = trim_chars(&class, "\\");
                 let path = class_loader
                     .borrow_mut()
@@ -468,13 +468,13 @@ impl PluginManager {
                 let code = strtr_array(&code, &replacements);
                 let code =
                     preg_replace_with_limit_and_count(r"/^\s*<\?(php)?/i", "", &code, 1, None);
-                self.php_runtime_eval(code)?;
+                runtime::eval(code)?;
                 class = bformat!("{class}_composer_tmp{class_counter}");
                 CLASS_COUNTER.store(class_counter + 1, std::sync::atomic::Ordering::Relaxed);
             }
 
             if old_installer_plugin {
-                if !self.php_runtime_is_a(
+                if !runtime::is_a_class(
                     class.as_bstr(),
                     BStr::new("Composer\\Installer\\InstallerInterface"),
                 )? {
@@ -487,9 +487,9 @@ impl PluginManager {
                         ""
                     }));
                 let composer = self.composer_full();
-                let handle = self.php_runtime_new_object_with_args(
+                let handle = runtime::new_object(
                     class.as_bstr(),
-                    vec![io_handle_value(&self.io)?, composer_handle_value(&composer)],
+                    vec![entity_value(&self.io)?, entity_value(&composer)?],
                 )?;
                 let installer = php_installer_proxy(handle);
                 composer
@@ -501,15 +501,15 @@ impl PluginManager {
                     .entry(package.get_name())
                     .or_default()
                     .push(PluginOrInstaller::Installer(installer));
-            } else if self.php_runtime_class_exists(class.as_bstr(), true)? {
-                if !self.php_runtime_is_a(
+            } else if runtime::class_exists(class.as_bstr(), true)? {
+                if !runtime::is_a_class(
                     class.as_bstr(),
                     BStr::new("Composer\\Plugin\\PluginInterface"),
                 )? {
                     return Err(RuntimeException::new(bformat!("Could not activate plugin \"{}\" as \"{class}\" does not implement Composer\\Plugin\\PluginInterface", package.get_name()))
                     .into());
                 }
-                let handle = self.php_runtime_new_object(class.as_bstr())?;
+                let handle = runtime::new_object(class.as_bstr(), vec![])?;
                 let plugin: std::rc::Rc<std::cell::RefCell<dyn PluginInterface>> =
                     std::rc::Rc::new(std::cell::RefCell::new(PhpPluginProxy::new(handle)));
                 self.add_plugin(plugin.clone(), is_global_plugin, Some(package.clone()))?;
@@ -526,55 +526,6 @@ impl PluginManager {
             }
         }
         Ok(())
-    }
-
-    fn php_runtime_class_exists(&self, class: &BStr, autoload: bool) -> anyhow::Result<bool> {
-        PhpCall::Function(BStr::new("class_exists")).run(vec![
-            PluginValue::string(class),
-            PluginValue::Bool(autoload),
-        ])
-    }
-
-    fn php_runtime_is_a(&self, class: &BStr, interface: &BStr) -> anyhow::Result<bool> {
-        PhpCall::Function(BStr::new("is_a")).run(vec![
-            PluginValue::string(class),
-            PluginValue::string(interface),
-            PluginValue::Bool(true),
-        ])
-    }
-
-    fn php_runtime_eval(&self, code: BString) -> anyhow::Result<()> {
-        PhpCall::Function(BStr::new("__shirabe_eval"))
-            .run::<PluginValue>(vec![PluginValue::string(code)])?;
-        Ok(())
-    }
-
-    fn php_runtime_composer_require(
-        &self,
-        file_identifier: &BStr,
-        file: &BStr,
-    ) -> anyhow::Result<()> {
-        PhpCall::Function(BStr::new("__shirabe_composer_require")).run::<PluginValue>(vec![
-            PluginValue::string(file_identifier),
-            PluginValue::string(file),
-        ])?;
-        Ok(())
-    }
-
-    /// PHP `new $class()` in the worker, returning the P-table handle of the new entity.
-    fn php_runtime_new_object(
-        &self,
-        class: &BStr,
-    ) -> anyhow::Result<shirabe_php_rpc::PhpObjHandle> {
-        self.php_runtime_new_object_with_args(class, vec![])
-    }
-
-    fn php_runtime_new_object_with_args(
-        &self,
-        class: &BStr,
-        args: Vec<PluginValue>,
-    ) -> anyhow::Result<shirabe_php_rpc::PhpObjHandle> {
-        PhpCall::New(class).run(args)
     }
 
     /// Deactivates a plugin package
@@ -997,33 +948,20 @@ impl PluginManager {
         };
 
         // PHP: if (!class_exists($capabilityClass))
-        let exists: bool = PhpCall::Function(BStr::new("class_exists"))
-            .run(vec![PluginValue::string(capability_class.clone())])?;
-        if !exists {
+        if !runtime::class_exists(capability_class.as_bstr(), true)? {
             return Err(RuntimeException::new(bformat!("Cannot instantiate Capability, as class {capability_class} from plugin {} does not exist.", plugin.borrow().get_class_name()))
             .into());
         }
 
-        // PHP: $ctorArgs['plugin'] = $plugin; the capability constructor receives the plugin
-        // instance itself. A PHP-implemented plugin already has an entity in the child's P
-        // table; a Rust-implemented one crosses as a handle to its R-table entity.
-        let plugin_value = match plugin.borrow().__as_php_plugin_proxy() {
-            Some(proxy) => PluginValue::PhpHandle(proxy.handle.clone()),
-            None => plugin_handle_value(plugin),
-        };
-        let mut ctor_args = ctor_args;
-        ctor_args.insert(BString::from("plugin"), plugin_value);
-        let args_value = PluginValue::Array(ctor_args.into_iter().collect());
-
+        // PHP: $ctorArgs['plugin'] = $plugin;
         // PHP: $capabilityObj = new $capabilityClass($ctorArgs);
-        let handle: shirabe_php_rpc::PhpObjHandle =
-            PhpCall::New(capability_class.as_bstr()).run(vec![args_value])?;
+        let handle = new_capability_object(capability_class.as_bstr(), ctor_args, plugin)?;
 
         // PHP: if (!$capabilityObj instanceof Capability || !$capabilityObj instanceof $capabilityClassName)
-        if !php_is_a(
+        if !runtime::is_a(
             &handle,
             BStr::new("Composer\\Plugin\\Capability\\Capability"),
-        )? || !php_is_a(&handle, capability_class_name)?
+        )? || !runtime::is_a(&handle, capability_class_name)?
         {
             return Err(RuntimeException::new(bformat!("Class {capability_class} must implement both Composer\\Plugin\\Capability\\Capability and {capability_class_name}."))
             .into());

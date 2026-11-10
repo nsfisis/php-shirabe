@@ -6,7 +6,7 @@ use crate::downloader::TransportException;
 use crate::exception::IrrecoverableDownloadException;
 use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite};
 use crate::package::version::VersionParser;
-use crate::plugin::job_registry::{JobOwner, record_internal_job};
+use crate::php_worker::job::{JobOwner, record_internal_job};
 use crate::util::http::{NativeHttpDownloader, Response};
 use crate::util::{
     GetResult, HttpOptions, LocalFilesystem, Platform, RemoteFilesystem, Silencer, SslOptions,

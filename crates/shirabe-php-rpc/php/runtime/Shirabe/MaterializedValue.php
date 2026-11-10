@@ -1,6 +1,6 @@
 <?php
 
-// The PHP half of the materialized-value codec (crates/shirabe/src/plugin/php_plugin_value.rs).
+// The PHP half of the materialized-value codec (crates/shirabe/src/php_worker/codec.rs).
 // An object whose entity lives on the Rust side crosses as a handle, but an immutable value
 // has no entity to point at: the child holds a genuine instance of the real class instead, and
 // the wire carries the object record `serialize()` writes for it, which `unserialize()` revives

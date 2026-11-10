@@ -26,6 +26,7 @@ use Shirabe\Lint\Linters\PhpSrcDerivationBoundary;
 use Shirabe\Lint\Linters\PluginConstructibleList;
 use Shirabe\Lint\Linters\PluginGeneratedStubs;
 use Shirabe\Lint\Linters\PluginSurfaceManifest;
+use Shirabe\Lint\Linters\RustHandleDescriptorConstruction;
 use Shirabe\Lint\Linters\SortedDependencies;
 use Shirabe\Lint\Linters\UpstreamFileHash;
 use Shirabe\Lint\Runner;
@@ -59,7 +60,7 @@ $runner = new Runner($rootDir, [
         'crates/shirabe-spdx-licenses/src/spdx_licenses.rs',
     ]],
     [new NoHaltCompilerLiteral(), [
-        'crates/shirabe-php-rpc/build.rs',
+        'crates/shirabe/build.rs',
     ]],
     [new NoModRs(), []],
     [new NoPhpDocTag(), []],
@@ -86,6 +87,10 @@ $runner = new Runner($rootDir, [
     [new PluginConstructibleList(), []],
     [new PluginGeneratedStubs(), []],
     [new PluginSurfaceManifest(), []],
+    [new RustHandleDescriptorConstruction(), [
+        // Defines `entity_value`, the one place the descriptor is built.
+        'crates/shirabe/src/php_worker/rpc/entity.rs',
+    ]],
     [new SortedDependencies(), []],
     [new UpstreamFileHash(), []],
 ]);

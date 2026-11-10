@@ -21,8 +21,8 @@ use shirabe::package::loader::{ArrayLoader, JsonLoader, JsonLoaderInput};
 use shirabe::package::{
     CompletePackageHandle, Locker, LockerInterface, PackageInterfaceHandle, RootPackageHandle,
 };
-use shirabe::plugin::php_call::PhpCall;
-use shirabe::plugin::rpc::table::{composer_handle_value, io_handle_value, plugin_handle_value};
+use shirabe::php_worker::call::PhpCall;
+use shirabe::php_worker::rpc::entity::entity_value;
 use shirabe::plugin::{Capable, PluginInterface, PluginManager};
 use shirabe::repository::{
     InstalledArrayRepository, InstalledRepositoryInterfaceHandle, RepositoryInterfaceHandle,
@@ -780,12 +780,9 @@ fn test_command_provider_capability() {
     let mut ctor_args = IndexMap::new();
     ctor_args.insert(
         BString::from("composer"),
-        composer_handle_value(&set_up.composer),
+        entity_value(&set_up.composer).unwrap(),
     );
-    ctor_args.insert(
-        BString::from("io"),
-        io_handle_value(&set_up.io_dyn).unwrap(),
-    );
+    ctor_args.insert(BString::from("io"), entity_value(&set_up.io_dyn).unwrap());
     let caps = set_up
         .pm
         .borrow()
@@ -922,7 +919,7 @@ fn test_capability_implements_composer_plugin_api_class_and_is_constructed_with_
         PluginValue::Array(IndexMap::from([
             ("a".into(), PluginValue::Int(1)),
             ("b".into(), PluginValue::Int(2)),
-            ("plugin".into(), plugin_handle_value(&plugin)),
+            ("plugin".into(), entity_value(&plugin).unwrap()),
         ])),
         capability.__get_property(BStr::new("args")).unwrap()
     );

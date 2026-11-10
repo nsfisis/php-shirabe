@@ -58,10 +58,21 @@ Inputs:
   and `Composer\Util\Http\Response`). An entry that needs no guard anyway
   fails the run.
 
-The same directory holds `surface-manifest`, which compares the forwards in the generated stubs
-with the dispatcher arms on the Rust side and writes `crates/shirabe/src/plugin/rpc/surface.tsv`;
-rerun it after regenerating the stubs or changing a dispatcher. The `plugin_surface_manifest` rule
-of `scripts/linters/lint` fails when the committed manifest is stale.
+The same directory holds `surface-manifest`, which reads the forwards in the stubs, the runtime
+classes and the guards, and writes two files:
+
+* `crates/shirabe/src/php_worker/rpc/forwarding.rs` — one Rust module per forwarding class: a
+  `Forwarding` trait with a defaulted method per member the class declares, and the generated
+  routing of method names, constructors and static calls to those traits (see the R table section
+  of `php-worker.md`).
+* `crates/shirabe/src/php_worker/rpc/surface.tsv` — every forwarded member, `supported` when the
+  hand-written forwarding impl of the class declaring it overrides the default, `unsupported`
+  otherwise. The impls are found as blocks of the form
+  `impl forwarding::<path>::Forwarding for forwarding::<path>::PhpClass`; each generated trait
+  needs exactly one, and an impl written in another form fails the run.
+
+Rerun it after regenerating the stubs or changing a forwarding impl. The `plugin_surface_manifest`
+rule of `scripts/linters/lint` fails when either file is stale.
 
 The freshness check for both sets is the `plugin_generated_stubs` rule of
 `scripts/linters/lint`; it fails when the generator's vendor directory or the
@@ -74,7 +85,7 @@ regenerates the report.
   target or a `php/runtime/` class inherits the boilerplate from it) carry the
   proxy boilerplate: the `__rhandle` property, the `__shirabeBind`
   binder the registry calls when reviving a stub for an existing entity, a
-  destructor releasing the Rust handle, and the wire descriptor helper. The
+  destructor releasing the Rust handle, and the Rust handle descriptor helper. The
   real `extends`/`implements` hierarchy is preserved and `\ShirabeRustStub` is
   appended to the interface list.
 * **Constructors** reproduce the real class's parameter list and forward to the

@@ -14,10 +14,9 @@
 
 use bstr::{B, BString};
 use indexmap::IndexMap;
-use shirabe_php_rpc::{FromWire, PhpThrow, PluginValue, ToWire};
 use shirabe_php_shim::{
-    PhpMixed, ToPhpString, TypeError, array_replace_recursive, bformat, error_message,
-    get_debug_type, implode_mixed,
+    PhpMixed, ToPhpString, TypeError, array_replace_recursive, bformat, get_debug_type,
+    implode_mixed,
 };
 
 #[derive(Debug, Clone, Default)]
@@ -223,19 +222,6 @@ impl TryFrom<IndexMap<BString, PhpMixed>> for StreamContextOptions {
     }
 }
 
-impl ToWire for StreamContextOptions {
-    fn to_wire(self) -> PluginValue {
-        PhpMixed::Array(self.into_array()).to_wire()
-    }
-}
-
-impl FromWire for StreamContextOptions {
-    fn from_wire(value: &PluginValue) -> Result<Self, PhpThrow> {
-        Self::from_array(IndexMap::<BString, PhpMixed>::from_wire(value)?)
-            .map_err(|error| PhpThrow::new("TypeError", error_message(&error), 0))
-    }
-}
-
 impl StreamContextOption {
     /// The entry `$options[$key] = $value` stores, `None` for a null or false `http`/`ssl` group.
     fn from_mixed(key: &[u8], value: PhpMixed) -> anyhow::Result<Option<Self>> {
@@ -422,6 +408,7 @@ impl SslOptions {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use shirabe_php_shim::error_message;
 
     fn array<K: AsRef<[u8]>>(entries: Vec<(K, PhpMixed)>) -> PhpMixed {
         PhpMixed::Array(

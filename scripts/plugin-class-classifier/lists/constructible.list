@@ -1,5 +1,5 @@
 # Proxied classes plugin code can construct: the stub constructor reaches an arm
-# of `construct_entity` in crates/shirabe/src/plugin/rpc/dispatch.rs, which
+# of `construct_entity` in crates/shirabe/src/php_worker/rpc/dispatch.rs, which
 # allocates a Rust-side entity of its own. Constructing one of these does not
 # demote the constructing class. One FQCN per line; every entry must be
 # classified rust-proxy, and the plugin_constructible_list rule of

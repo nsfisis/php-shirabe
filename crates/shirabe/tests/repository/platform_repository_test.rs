@@ -3,11 +3,11 @@
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe::package::{BasePackageHandle, Link};
+use shirabe::php_worker::platform_info::PlatformInfo;
 use shirabe::platform::HhvmDetectorInterface;
 use shirabe::repository::{
     FindPackageConstraint, PlatformRepository, RepositoryInterface, SEARCH_NAME,
 };
-use shirabe_php_rpc::PlatformInfo;
 use shirabe_php_shim::{PhpMixed, ToPhpString, bformat};
 use shirabe_semver::constraint::SimpleConstraint;
 

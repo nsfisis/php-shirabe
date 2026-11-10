@@ -406,7 +406,7 @@ final class ShirabeRpcRuntime
      * record on the wire never stands for an object of plugin code, even one of a descriptor
      * class.
      */
-    public static function toWire($value)
+    public static function toPluginValue($value)
     {
         if ($value instanceof ShirabeRustStub) {
             $descriptor = $value->__shirabeRustHandleDescriptor();
@@ -431,16 +431,16 @@ final class ShirabeRpcRuntime
             throw new RuntimeException('a PHP resource cannot cross the RPC boundary');
         }
         if (is_array($value)) {
-            return array_map([self::class, 'toWire'], $value);
+            return array_map([self::class, 'toPluginValue'], $value);
         }
         return $value;
     }
 
     /**
-     * Converts a decoded wire value: descriptors become live objects. A materialized value
+     * Converts a decoded plugin value: descriptors become live objects. A materialized value
      * arrives as a real instance already, revived by unserialize().
      */
-    public static function fromWire($value)
+    public static function fromPluginValue($value)
     {
         if ($value instanceof \Shirabe\Wire\RustHandle) {
             return ShirabeRustObjectRegistry::stubFor($value->rhandle, $value->class);
@@ -452,7 +452,7 @@ final class ShirabeRpcRuntime
             return ShirabeJobRegistry::promiseFor($value->id);
         }
         if (is_array($value)) {
-            return array_map([self::class, 'fromWire'], $value);
+            return array_map([self::class, 'fromPluginValue'], $value);
         }
         return $value;
     }
@@ -489,7 +489,7 @@ final class ShirabeRpcRuntime
         self::writeFrame(
             SHIRABE_TAG_CALL_RUST_METHOD,
             $corrId,
-            serialize([$rhandle, $method, self::toWire($args)])
+            serialize([$rhandle, $method, self::toPluginValue($args)])
         );
         while (true) {
             $frame = self::readFrame();
@@ -506,10 +506,10 @@ final class ShirabeRpcRuntime
                     self::fail('protocol violation: unparseable response payload');
                 }
                 if ($tag === SHIRABE_TAG_RETURN) {
-                    $outParams = self::fromWire($fields[1] ?? []);
-                    return self::fromWire($fields[0]);
+                    $outParams = self::fromPluginValue($fields[1] ?? []);
+                    return self::fromPluginValue($fields[0]);
                 }
-                throw \Shirabe\MaterializedThrowable::revive(self::fromWire($fields));
+                throw \Shirabe\MaterializedThrowable::revive(self::fromPluginValue($fields));
             }
             self::dispatchRequest($tag, $inId, $payload);
         }
@@ -534,7 +534,7 @@ final class ShirabeRpcRuntime
             case SHIRABE_TAG_CALL_FUNCTION:
                 [$name, $args] = $fields;
                 self::replyWith($corrId, static function () use ($name, $args) {
-                    $args = ShirabeRpcRuntime::fromWire($args);
+                    $args = ShirabeRpcRuntime::fromPluginValue($args);
                     if (isset(ShirabeRpcRuntime::$dispatch[$name])) {
                         return (ShirabeRpcRuntime::$dispatch[$name])($args);
                     }
@@ -547,7 +547,7 @@ final class ShirabeRpcRuntime
             case SHIRABE_TAG_CALL_STATIC_METHOD:
                 [$class, $method, $args] = $fields;
                 self::replyWith($corrId, static function () use ($class, $method, $args) {
-                    $args = ShirabeRpcRuntime::fromWire($args);
+                    $args = ShirabeRpcRuntime::fromPluginValue($args);
                     if (!is_callable([$class, $method])) {
                         throw new RuntimeException("{$class}::{$method} is not callable");
                     }
@@ -557,7 +557,7 @@ final class ShirabeRpcRuntime
             case SHIRABE_TAG_NEW_OBJECT:
                 [$class, $ctorArgs] = $fields;
                 self::replyWith($corrId, static function () use ($class, $ctorArgs) {
-                    $ctorArgs = ShirabeRpcRuntime::fromWire($ctorArgs);
+                    $ctorArgs = ShirabeRpcRuntime::fromPluginValue($ctorArgs);
                     if (!class_exists($class)) {
                         throw new RuntimeException("PHP class `{$class}` does not exist");
                     }
@@ -568,7 +568,7 @@ final class ShirabeRpcRuntime
                 [$phandle, $method, $args] = $fields;
                 self::replyWith($corrId, static function () use ($phandle, $method, $args) {
                     $obj = ShirabePhpObjectRegistry::get((int) $phandle);
-                    $args = ShirabeRpcRuntime::fromWire($args);
+                    $args = ShirabeRpcRuntime::fromPluginValue($args);
                     if (!is_callable([$obj, $method])) {
                         throw new RuntimeException(
                             get_class($obj) . "::{$method} is not callable"
@@ -594,13 +594,13 @@ final class ShirabeRpcRuntime
             self::writeFrame(
                 SHIRABE_TAG_RETURN,
                 $corrId,
-                serialize([self::toWire($result), []])
+                serialize([self::toPluginValue($result), []])
             );
         } catch (Throwable $e) {
             self::writeFrame(
                 SHIRABE_TAG_THROW,
                 $corrId,
-                serialize(self::toWire(\Shirabe\MaterializedThrowable::describe($e)))
+                serialize(self::toPluginValue(\Shirabe\MaterializedThrowable::describe($e)))
             );
         }
     }
@@ -1059,7 +1059,7 @@ ShirabeRpcRuntime::$dispatch = [
     // For testing: reads a public property of a P-table entity (PHPUnit asserts like
     // `$plugins[0]->version` have no method to call).
     '__shirabe_get_property' => static function ($args) {
-        $obj = ShirabeRpcRuntime::fromWire($args[0]);
+        $obj = ShirabeRpcRuntime::fromPluginValue($args[0]);
         if (!is_object($obj)) {
             throw new RuntimeException('__shirabe_get_property expects a handle argument');
         }

@@ -3,8 +3,9 @@
 namespace Shirabe\Wire;
 
 /**
- * The descriptor of a job (see docs/dev/plugin-async.md). Only the wire codec builds one, so a
- * record of this class on the wire is always a descriptor (see docs/dev/php-rpc.md).
+ * The descriptor of a job (see docs/dev/plugin-async.md). Only `ShirabeRpcRuntime::toPluginValue`
+ * builds one, so a record of this class on the wire is always a descriptor (see
+ * docs/dev/php-rpc.md).
  */
 final class Job
 {

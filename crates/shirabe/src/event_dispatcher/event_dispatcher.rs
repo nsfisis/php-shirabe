@@ -10,37 +10,19 @@ use crate::event_dispatcher::{
 };
 use crate::installer::{BinaryInstaller, InstallerEvent, PackageEvent};
 use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, QUIET, VERBOSE};
-use crate::plugin::php_call::PhpCall;
-use crate::plugin::rpc::dispatch::{
-    PluginRpcDispatcher, call_static_entity, construct_entity, dispatch_job_service_method,
-    dispatch_r_table_method, error_throw, find_file_in_registered_loaders, unavailable_method,
-};
-use crate::plugin::rpc::entities::events::{
-    dispatch_post_file_download_event_method, dispatch_pre_file_download_event_method,
-    dispatch_pre_pool_create_event_method,
-};
-use crate::plugin::rpc::table::{
-    RustEntity, io_stub_class, operation_handle_value, register_composer_entity, register_entity,
-    register_io_entity, repository_handle_value, rust_handle_value, transaction_handle_value,
-};
-use crate::plugin::throwable_bridge::throw_into_error;
-use crate::plugin::{
-    CommandEvent, PostFileDownloadEvent, PreCommandRunEvent, PreFileDownloadEvent,
-    PrePoolCreateEvent,
-};
-use crate::repository::{FilesystemRepository, InstalledRepositoryInterfaceHandle};
+use crate::php_worker::{callable, runtime};
+use crate::repository::InstalledRepositoryInterfaceHandle;
 use crate::script::Event as ScriptEvent;
 use crate::util::{Platform, ProcessExecutor};
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe_php_rpc::{PhpThrow, PluginValue, RustMethodDispatcher, ToWire};
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, PhpMixed, RuntimeException, ToPhpString, array_pop,
-    array_push, array_search_in_vec, array_splice, bformat, display_to_bytes, error_message,
-    explode, explode_with_limit, file_exists, get_class, hash, implode, ini_get, is_callable,
-    is_dir, is_object, krsort, os_str_from_bytes, path_from_bytes, path_to_bytes, php_regex,
-    preg_is_match, preg_match, preg_quote, preg_replace, preg_replace_callback, realpath,
-    str_replace, strlen, strpos, strtoupper, substr, trim_chars, var_export_str,
+    array_push, array_search_in_vec, array_splice, bformat, explode, explode_with_limit,
+    file_exists, get_class, hash, implode, ini_get, is_callable, is_dir, is_object, krsort,
+    os_str_from_bytes, path_from_bytes, path_to_bytes, php_regex, preg_is_match, preg_match,
+    preg_quote, preg_replace, preg_replace_callback, realpath, str_replace, strlen, strpos,
+    strtoupper, substr, trim_chars,
 };
 use shirabe_symfony_console::output::output_interface;
 use shirabe_symfony_process::{ExecutableFinder, PhpExecutableFinder};
@@ -375,14 +357,7 @@ impl EventDispatcher {
                 };
             } else if let Callable::PhpMethod(ref handle, ref method_name) = callable {
                 self.make_autoloader(event, &callable)?;
-                Self::ensure_script_autoloader()?;
-                let is_callable: bool =
-                    PhpCall::Function(BStr::new("is_callable")).run(vec![PluginValue::List(
-                        vec![
-                            PluginValue::PhpHandle(handle.clone()),
-                            PluginValue::String(method_name.clone()),
-                        ],
-                    )])?;
+                let is_callable = callable::is_callable_method(handle, method_name.as_bstr())?;
                 if !is_callable {
                     return Err(RuntimeException::new(bformat!("Subscriber {}::{method_name} for event {} is not callable, make sure the function is defined and public", handle.class(), event_name.as_bstr()))
                     .into());
@@ -394,24 +369,12 @@ impl EventDispatcher {
                     ),
                     VERBOSE,
                 );
-                let stub_class =
-                    Self::event_stub_class(&*event.borrow()).ok_or_else(|| -> anyhow::Error {
-                        // TODO(plugin): an event class without a proxy stub cannot cross the boundary.
-                        RuntimeException::new(bformat!("no proxy stub is available yet for the event `{}` dispatched to {}::{method_name}", event_name.as_bstr(), handle.class()))
-                        .into()
-                    })?;
-                let value: PluginValue = PhpCall::Method(handle, method_name.as_bstr()).run_with(
-                    vec![rust_handle_value(
-                        register_entity(RustEntity::Event(event.clone())),
-                        stub_class,
-                    )],
-                    &mut PluginRpcDispatcher,
-                )?;
-                r#return = if matches!(value, PluginValue::Bool(false)) {
-                    1
-                } else {
-                    0
-                };
+                r#return =
+                    if callable::call_method_with_event(handle, method_name.as_bstr(), event)? {
+                        1
+                    } else {
+                        0
+                    };
             } else if !is_string_callable {
                 // TODO(plugin): an ArrayCallable whose object half is a PhpMixed has no
                 // invocation path; only the is_callable error lane and the verbose echo of the
@@ -570,20 +533,14 @@ impl EventDispatcher {
                         let method_name = substr(callable_str, pos + 2, None);
 
                         self.make_autoloader(event, &Callable::String(callable_str.clone()))?;
-                        if !self.php_runtime_bool(
-                            BStr::new("class_exists"),
-                            vec![PluginValue::string(class_name.clone())],
-                        )? {
+                        if !runtime::script::class_exists(class_name.as_bstr())? {
                             self.io.write_error_with_verbosity(
                                 bformat!("<warning>Class {class_name} is not autoloadable, can not call {} script</warning>", event_name.as_bstr()),
                                 QUIET,
                             );
                             continue;
                         }
-                        if !self.php_runtime_bool(
-                            BStr::new("is_callable"),
-                            vec![PluginValue::string(callable_str.clone())],
-                        )? {
+                        if !runtime::script::is_callable(callable_str.as_bstr())? {
                             self.io.write_error_with_verbosity(
                                 bformat!("<warning>Method {callable_str} is not callable, can not call {} script</warning>", event_name.as_bstr()),
                                 QUIET,
@@ -623,36 +580,27 @@ impl EventDispatcher {
                         // The user's command class extends Symfony's Command, so the child
                         // process needs the real symfony/console classes before it can even
                         // autoload the user class.
-                        Self::ensure_composer_php_runtime(|| self.cache_dir())?;
-                        if !self.php_runtime_bool(
-                            BStr::new("class_exists"),
-                            vec![PluginValue::string(class_name.clone())],
-                        )? {
+                        runtime::ensure_composer_php_runtime(|| self.cache_dir())?;
+                        if !runtime::script::class_exists(class_name.as_bstr())? {
                             self.io.write_error_with_verbosity(
                                 bformat!("<warning>Class {class_name} is not autoloadable, can not call {} script</warning>", event_name.as_bstr()),
                                 QUIET,
                             );
                             continue;
                         }
-                        if !self.php_runtime_bool(
-                            BStr::new("is_a"),
-                            vec![
-                                PluginValue::string(class_name.clone()),
-                                PluginValue::string(
-                                    "Symfony\\Component\\Console\\Command\\Command",
-                                ),
-                                PluginValue::Bool(true),
-                            ],
+                        if !runtime::script::is_a_class(
+                            class_name.as_bstr(),
+                            BStr::new("Symfony\\Component\\Console\\Command\\Command"),
                         )? {
                             self.io.write_error_with_verbosity(bformat!("<warning>Class {class_name} does not extend Symfony\\Component\\Console\\Command\\Command, can not call {} script</warning>", event_name.as_bstr()), QUIET);
                             continue;
                         }
-                        if self.php_runtime_bool(
-                            BStr::new("defined"),
-                            vec![PluginValue::string(bformat!(
+                        if runtime::script::defined(
+                            bformat!(
                                 "Composer\\Script\\ScriptEvents::{}",
                                 str_replace("-", "_", strtoupper(event_name.as_bstr()))
-                            ))],
+                            )
+                            .as_bstr(),
                         )? {
                             self.io.write_error_with_verbosity(
                                 bformat!("<warning>You cannot bind {} to a Command class, use a non-reserved name</warning>", event_name.as_bstr()),
@@ -661,14 +609,6 @@ impl EventDispatcher {
                             continue;
                         }
 
-                        // PHP hosts the user's Command class in a throwaway, bare
-                        // `Symfony\Component\Console\Application` (NOT Composer's Application),
-                        // built by a generated snippet running inside the worker.
-                        //
-                        // TODO(plugin): the BufferedOutput has to go. The command has to run
-                        // against the real output stream, the way upstream hands the live output
-                        // object of `$this->io` to `$app->run()`; collecting the output and
-                        // writing the buffer back once the run has returned is not a substitute.
                         let args = implode(
                             " ",
                             &additional_args
@@ -691,22 +631,13 @@ impl EventDispatcher {
                         } else {
                             output_interface::VERBOSITY_NORMAL
                         };
-                        let snippet = bformat!(
-                            "\n$className = {};\n$app = new \\Symfony\\Component\\Console\\Application();\n$app->setCatchExceptions(false);\nif (method_exists($app, 'setCatchErrors')) {{\n    $app->setCatchErrors(false);\n}}\n$app->setAutoExit(false);\n$cmd = new $className({});\nif (method_exists($app, 'addCommand')) {{\n    $app->addCommand($cmd);\n}} else {{\n    $app->add($cmd);\n}}\n$app->setDefaultCommand((string) $cmd->getName(), true);\n$output = new \\Symfony\\Component\\Console\\Output\\BufferedOutput({verbosity}, {});\ntry {{\n    $status = $app->run(new \\Symfony\\Component\\Console\\Input\\StringInput({}), $output);\n    return ['status' => $status, 'output' => $output->fetch(), 'throw' => null, 'caught' => false];\n}} catch (\\Throwable $e) {{\n    return ['status' => null, 'output' => $output->fetch(), 'throw' => \\Shirabe\\MaterializedThrowable::describe($e), 'caught' => $e instanceof \\Exception];\n}}\n",
-                            var_export_str(&class_name, true),
-                            var_export_str(&event_name, true),
-                            if self.io.is_decorated() {
-                                "true"
-                            } else {
-                                "false"
-                            },
-                            var_export_str(&string_input, true)
-                        );
-                        Self::ensure_script_autoloader()?;
-                        let mut dispatcher = ScriptRpcDispatcher;
-                        let result: ScriptCommandResult =
-                            PhpCall::Function(BStr::new("__shirabe_eval"))
-                                .run_with(vec![PluginValue::string(snippet)], &mut dispatcher)?;
+                        let result = callable::run_command_script(
+                            class_name.as_bstr(),
+                            event_name.as_bstr(),
+                            verbosity,
+                            self.io.is_decorated(),
+                            string_input.as_bstr(),
+                        )?;
                         if !result.output.is_empty() {
                             self.io.write_no_newline(&result.output);
                         }
@@ -717,7 +648,7 @@ impl EventDispatcher {
                                     QUIET,
                                 );
                             }
-                            return Err(throw_into_error(PhpThrow::from_wire(throw)));
+                            return Err(throw);
                         }
                         r#return = result
                             .status
@@ -977,68 +908,7 @@ impl EventDispatcher {
                 .write_error(bformat!("> {class_name}::{method_name}"));
         }
 
-        let stub_class =
-            Self::event_stub_class(&*event.borrow()).ok_or_else(|| -> anyhow::Error {
-                // TODO(plugin): an event class without a proxy stub cannot cross the boundary.
-                RuntimeException::new(bformat!("no proxy stub is available yet for the event `{event_name}` dispatched to {class_name}::{method_name}"))
-                .into()
-            })?;
-
-        // The event stub the script receives hands out stubs of the Composer object graph, and
-        // those extend and implement the real Composer contracts (`PackageInterface` and the
-        // rest), which only the Composer PHP runtime carries.
-        Self::ensure_composer_php_runtime(|| self.cache_dir())?;
-        Self::ensure_script_autoloader()?;
-        let mut dispatcher = ScriptRpcDispatcher;
-        PhpCall::StaticMethod(class_name, method_name).run_with(
-            vec![rust_handle_value(
-                register_entity(RustEntity::Event(event.clone())),
-                stub_class,
-            )],
-            &mut dispatcher,
-        )
-    }
-
-    /// The proxy stub class (same FQCN as the real event class) an event crosses the RPC
-    /// boundary as, or `None` when no stub exists for it yet.
-    fn event_stub_class(event: &dyn EventInterface) -> Option<&'static BStr> {
-        if event.as_any().downcast_ref::<ScriptEvent>().is_some() {
-            Some(BStr::new("Composer\\Script\\Event"))
-        } else if event.as_any().downcast_ref::<PackageEvent>().is_some() {
-            Some(BStr::new("Composer\\Installer\\PackageEvent"))
-        } else if event.as_any().downcast_ref::<InstallerEvent>().is_some() {
-            Some(BStr::new("Composer\\Installer\\InstallerEvent"))
-        } else if event
-            .as_any()
-            .downcast_ref::<PreFileDownloadEvent>()
-            .is_some()
-        {
-            Some(BStr::new("Composer\\Plugin\\PreFileDownloadEvent"))
-        } else if event
-            .as_any()
-            .downcast_ref::<PostFileDownloadEvent>()
-            .is_some()
-        {
-            Some(BStr::new("Composer\\Plugin\\PostFileDownloadEvent"))
-        } else if event
-            .as_any()
-            .downcast_ref::<PrePoolCreateEvent>()
-            .is_some()
-        {
-            Some(BStr::new("Composer\\Plugin\\PrePoolCreateEvent"))
-        } else if event.as_any().downcast_ref::<CommandEvent>().is_some() {
-            Some(BStr::new("Composer\\Plugin\\CommandEvent"))
-        } else if event
-            .as_any()
-            .downcast_ref::<PreCommandRunEvent>()
-            .is_some()
-        {
-            Some(BStr::new("Composer\\Plugin\\PreCommandRunEvent"))
-        } else if event.as_any().downcast_ref::<Event>().is_some() {
-            Some(BStr::new("Composer\\EventDispatcher\\Event"))
-        } else {
-            None
-        }
+        callable::call_static_with_event(class_name, method_name, event, || self.cache_dir())
     }
 
     fn event_needs_to_output(&self, event: &dyn EventInterface) -> bool {
@@ -1366,51 +1236,6 @@ impl EventDispatcher {
         Ok(())
     }
 
-    /// Makes the worker's script-class autoloader active, so class queries and script execution
-    /// in the child can resolve classes through the Rust-side [`ClassLoader`] built by
-    /// [`Self::make_autoloader`].
-    pub(crate) fn ensure_script_autoloader() -> anyhow::Result<()> {
-        PhpCall::Function(BStr::new("__shirabe_enable_script_autoloader"))
-            .run::<PluginValue>(Vec::new())?;
-        Ok(())
-    }
-
-    /// Loads the Composer PHP runtime (symfony/console and friends) into the worker, needed
-    /// before a `scripts` Command class can be autoloaded and hosted.
-    pub(crate) fn ensure_composer_php_runtime(
-        cache_dir: impl FnOnce() -> anyhow::Result<std::path::PathBuf>,
-    ) -> anyhow::Result<()> {
-        let autoload = Self::composer_php_runtime_autoload(cache_dir)?;
-        PhpCall::Function(BStr::new("__shirabe_require"))
-            .run::<PluginValue>(vec![PluginValue::string(autoload)])?;
-        FilesystemRepository::load_pending_installed_versions()
-    }
-
-    /// For testing only: a test that never registers a plugin package still needs the Composer
-    /// PHP runtime in the worker before a class of its own can implement a Composer interface
-    /// there.
-    pub fn __ensure_composer_php_runtime(cache_dir: &std::path::Path) -> anyhow::Result<()> {
-        Self::ensure_composer_php_runtime(|| Ok(cache_dir.to_path_buf()))
-    }
-
-    /// The `vendor/autoload.php` of the Composer PHP runtime.
-    fn composer_php_runtime_autoload(
-        cache_dir: impl FnOnce() -> anyhow::Result<std::path::PathBuf>,
-    ) -> anyhow::Result<BString> {
-        Ok(bformat!(
-            "{}/vendor/autoload.php",
-            shirabe_php_rpc::composer_runtime::base_path(cache_dir)?
-        ))
-    }
-
-    /// Runs a boolean runtime query (`class_exists`, `is_a`, ...) inside the PHP worker, with
-    /// the script autoloader active so the query can trigger class loading.
-    fn php_runtime_bool(&self, function: &BStr, args: Vec<PluginValue>) -> anyhow::Result<bool> {
-        Self::ensure_script_autoloader()?;
-        let mut dispatcher = ScriptRpcDispatcher;
-        PhpCall::Function(function).run_with(args, &mut dispatcher)
-    }
-
     fn cache_dir(&self) -> anyhow::Result<std::path::PathBuf> {
         let cache_dir = self
             .composer()
@@ -1443,243 +1268,6 @@ impl EventDispatcher {
             _ => false,
         }
     }
-}
-
-shirabe_php_rpc::wire_record! {
-    /// What the snippet hosting a `scripts` Command class reports about its run: the exit status,
-    /// or the exception it ended with and whether Composer would have caught that exception.
-    #[derive(Debug)]
-    struct ScriptCommandResult {
-        status: Option<i64>,
-        output: BString,
-        throw: Option<PluginValue>,
-        caught: bool,
-    }
-}
-
-/// Serves `CallRustMethod` requests issued by the PHP worker while a script-related call is in
-/// flight: Rust handle 0 is the runtime service endpoint (autoload lookups against the
-/// Rust-side [`ClassLoader`]s on the autoload stack), every other rhandle resolves through the R
-/// table.
-#[derive(Debug)]
-struct ScriptRpcDispatcher;
-
-impl RustMethodDispatcher for ScriptRpcDispatcher {
-    fn dispatch(
-        &mut self,
-        rhandle: u64,
-        method_name: &BStr,
-        args: Vec<PluginValue>,
-        out_params: &mut IndexMap<u32, PluginValue>,
-    ) -> Result<PluginValue, PhpThrow> {
-        let method_name = method_name.to_owned();
-        let method_name = method_name.as_bstr();
-        if rhandle == 0 {
-            if method_name == "__shirabe_find_file" {
-                let class = match args.first() {
-                    Some(PluginValue::String(bytes)) => bytes,
-                    other => {
-                        return Err(PhpThrow::runtime(display_to_bytes(format_args!(
-                            "__shirabe_find_file expects a class name argument, got {other:?}"
-                        ))));
-                    }
-                };
-                let file = find_file_in_registered_loaders(class)
-                    .map_err(|error| error_throw(b"__shirabe_find_file failed", &error))?;
-                return Ok(match file {
-                    Some(file) => PluginValue::string(file),
-                    None => PluginValue::Null,
-                });
-            }
-            if method_name == "__shirabe_construct" {
-                return construct_entity(&args);
-            }
-            if method_name == "__shirabe_call_static" {
-                return call_static_entity(&args);
-            }
-            if let Some(answer) = dispatch_job_service_method(method_name, &args) {
-                return answer;
-            }
-            return Err(PhpThrow::runtime(bformat!(
-                "unknown runtime service method `{method_name}`"
-            )));
-        }
-        dispatch_r_table_method(rhandle, method_name, &args, out_params)
-    }
-}
-
-/// Serves a method call on an event entity of the R table.
-pub(crate) fn dispatch_event_method(
-    event: &mut dyn EventInterface,
-    method_name: &BStr,
-    args: &[PluginValue],
-) -> Result<PluginValue, PhpThrow> {
-    match method_name.as_bytes() {
-        b"getName" => Ok(PluginValue::string(event.get_name())),
-        b"getArguments" => Ok(PluginValue::List(
-            event
-                .get_arguments()
-                .iter()
-                .map(|arg| PluginValue::string(arg.clone()))
-                .collect(),
-        )),
-        b"getFlags" => Ok(PhpMixed::Array(event.get_flags().to_php_array()).to_wire()),
-        b"isPropagationStopped" => Ok(PluginValue::Bool(event.is_propagation_stopped())),
-        b"stopPropagation" => {
-            event.stop_propagation();
-            Ok(PluginValue::Null)
-        }
-        b"isDevMode" => match (
-            script_event(event),
-            package_event(event),
-            installer_event(event),
-        ) {
-            (Some(event), _, _) => Ok(PluginValue::Bool(event.is_dev_mode())),
-            (_, Some(event), _) => Ok(PluginValue::Bool(event.is_dev_mode())),
-            (_, _, Some(event)) => Ok(PluginValue::Bool(event.is_dev_mode())),
-            _ => Err(PhpThrow::runtime(BString::from(
-                "isDevMode is only available on script, package and installer events",
-            ))),
-        },
-        b"getComposer" => {
-            let composer = match (
-                script_event(event),
-                package_event(event),
-                installer_event(event),
-            ) {
-                (Some(event), _, _) => event.get_composer().upgrade(),
-                (_, Some(event), _) => event.get_composer().upgrade(),
-                (_, _, Some(event)) => event.get_composer().upgrade(),
-                _ => {
-                    return Err(PhpThrow::runtime(BString::from(
-                        "getComposer is only available on script, package and installer events",
-                    )));
-                }
-            };
-            let composer = composer.ok_or_else(|| {
-                PhpThrow::runtime(BString::from("the Composer instance of this event is gone"))
-            })?;
-            let rhandle = register_composer_entity(&composer);
-            Ok(rust_handle_value(rhandle, BStr::new("Composer\\Composer")))
-        }
-        b"getIO" => {
-            let io = match (
-                script_event(event),
-                package_event(event),
-                installer_event(event),
-            ) {
-                (Some(event), _, _) => event.get_io(),
-                (_, Some(event), _) => event.get_io(),
-                (_, _, Some(event)) => event.get_io(),
-                _ => {
-                    return Err(PhpThrow::runtime(BString::from(
-                        "getIO is only available on script, package and installer events",
-                    )));
-                }
-            };
-            let class =
-                io_stub_class(&io).map_err(|error| PhpThrow::runtime(error_message(&error)))?;
-            let rhandle = register_io_entity(&io);
-            Ok(rust_handle_value(rhandle, class))
-        }
-        b"getLocalRepo" => match package_event(event) {
-            Some(event) => repository_handle_value(&event.get_local_repo().as_repository_handle()),
-            None => Err(PhpThrow::runtime(BString::from(
-                "getLocalRepo is only available on package events",
-            ))),
-        },
-        b"getOperations" => match package_event(event) {
-            Some(event) => Ok(PluginValue::List(
-                event
-                    .get_operations()
-                    .iter()
-                    .map(operation_handle_value)
-                    .collect(),
-            )),
-            None => Err(PhpThrow::runtime(BString::from(
-                "getOperations is only available on package events",
-            ))),
-        },
-        b"getOperation" => match package_event(event) {
-            Some(event) => Ok(operation_handle_value(event.get_operation())),
-            None => Err(PhpThrow::runtime(BString::from(
-                "getOperation is only available on package events",
-            ))),
-        },
-        b"getCommandName" => match event.as_any().downcast_ref::<CommandEvent>() {
-            Some(event) => Ok(PluginValue::string(event.get_command_name())),
-            None => Err(PhpThrow::runtime(BString::from(
-                "getCommandName is only available on command events",
-            ))),
-        },
-        b"getCommand" => match event.as_any().downcast_ref::<PreCommandRunEvent>() {
-            Some(event) => Ok(PluginValue::string(event.get_command())),
-            None => Err(PhpThrow::runtime(BString::from(
-                "getCommand is only available on pre-command-run events",
-            ))),
-        },
-        // TODO(plugin): symfony/console lives in both worlds independently, and nothing hands
-        // the Rust-side console input and output to the plugin process yet.
-        b"getInput" | b"getOutput"
-            if event.as_any().downcast_ref::<CommandEvent>().is_some()
-                || event
-                    .as_any()
-                    .downcast_ref::<PreCommandRunEvent>()
-                    .is_some() =>
-        {
-            Err(PhpThrow::runtime(bformat!(
-                "the console {} of a command event is not available over RPC yet",
-                match method_name.as_bytes() {
-                    b"getInput" => "input",
-                    b"getOutput" => "output",
-                    _ => unreachable!(),
-                }
-            )))
-        }
-        b"isExecutingOperations" => match installer_event(event) {
-            Some(event) => Ok(PluginValue::Bool(event.is_executing_operations())),
-            None => Err(PhpThrow::runtime(BString::from(
-                "isExecutingOperations is only available on installer events",
-            ))),
-        },
-        b"getTransaction" => match installer_event(event) {
-            Some(event) => match event.get_transaction() {
-                Some(transaction) => Ok(transaction_handle_value(transaction)),
-                None => Ok(PluginValue::Null),
-            },
-            None => Err(PhpThrow::runtime(BString::from(
-                "getTransaction is only available on installer events",
-            ))),
-        },
-        other => {
-            if let Some(event) = event.as_any().downcast_ref::<PostFileDownloadEvent>() {
-                return dispatch_post_file_download_event_method(event, BStr::new(other));
-            }
-            if let Some(event) = event.as_any_mut().downcast_mut::<PrePoolCreateEvent>() {
-                return dispatch_pre_pool_create_event_method(event, BStr::new(other), args);
-            }
-            match event.as_any_mut().downcast_mut::<PreFileDownloadEvent>() {
-                Some(event) => {
-                    dispatch_pre_file_download_event_method(event, BStr::new(other), args)
-                }
-                // TODO(plugin): the rest need full proxying of the object graph an event exposes,
-                // which does not exist yet.
-                None => Err(unavailable_method("Event", other)),
-            }
-        }
-    }
-}
-
-fn script_event(event: &dyn EventInterface) -> Option<&ScriptEvent> {
-    event.as_any().downcast_ref::<ScriptEvent>()
-}
-
-fn package_event(event: &dyn EventInterface) -> Option<&PackageEvent> {
-    event.as_any().downcast_ref::<PackageEvent>()
-}
-
-fn installer_event(event: &dyn EventInterface) -> Option<&InstallerEvent> {
-    event.as_any().downcast_ref::<InstallerEvent>()
 }
 
 // Composer's PartialComposer::setEventDispatcher() accepts any EventDispatcher subclass, so plugins

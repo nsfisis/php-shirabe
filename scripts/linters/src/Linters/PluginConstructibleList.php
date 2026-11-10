@@ -8,12 +8,12 @@ use Shirabe\Lint\Linter;
 
 /**
  * The plugin class classifier exempts the classes on its constructible list from the
- * dual-instantiation demotion, so that list has to name exactly the classes `construct_entity`
- * builds: one per `b"FQCN" =>` arm of its body.
+ * dual-instantiation demotion, so that list has to name exactly the classes the Rust side builds
+ * an entity for: the `constructor supported` rows of the plugin surface manifest.
  */
 final class PluginConstructibleList implements Linter
 {
-    private const DISPATCH = 'crates/shirabe/src/plugin/rpc/dispatch.rs';
+    private const MANIFEST = 'crates/shirabe/src/php_worker/rpc/surface.tsv';
     private const LIST = 'scripts/plugin-class-classifier/lists/constructible.list';
 
     public function name(): string
@@ -24,7 +24,7 @@ final class PluginConstructibleList implements Linter
     public function failureIntro(): string
     {
         return 'Found a mismatch between ' . self::LIST . " and the classes\n"
-            . '`construct_entity` in ' . self::DISPATCH . ' builds:';
+            . 'the constructors ' . self::MANIFEST . ' records as supported:';
     }
 
     public function check(string $rootDir, array $excludes): array
@@ -32,10 +32,7 @@ final class PluginConstructibleList implements Linter
         $errors = [];
 
         $built = [];
-        foreach ($this->constructEntityArms("{$rootDir}/" . self::DISPATCH, $errors) as $fqcn) {
-            if (isset($built[$fqcn])) {
-                $errors[] = self::DISPATCH . ": `{$fqcn}` has more than one arm in `construct_entity`";
-            }
+        foreach ($this->supportedConstructors("{$rootDir}/" . self::MANIFEST, $errors) as $fqcn) {
             $built[$fqcn] = true;
         }
 
@@ -49,12 +46,12 @@ final class PluginConstructibleList implements Linter
 
         foreach (array_keys($built) as $fqcn) {
             if (!isset($listed[$fqcn])) {
-                $errors[] = self::LIST . ": `{$fqcn}` is built by `construct_entity` but not listed";
+                $errors[] = self::LIST . ": `{$fqcn}` is constructible but not listed";
             }
         }
         foreach (array_keys($listed) as $fqcn) {
             if (!isset($built[$fqcn])) {
-                $errors[] = self::LIST . ": `{$fqcn}` is listed but `construct_entity` does not build it";
+                $errors[] = self::LIST . ": `{$fqcn}` is listed but its constructor is not supported";
             }
         }
 
@@ -65,51 +62,27 @@ final class PluginConstructibleList implements Linter
      * @param list<string> $errors
      * @return list<string>
      */
-    private function constructEntityArms(string $path, array &$errors): array
+    private function supportedConstructors(string $path, array &$errors): array
     {
         $lines = @file($path, FILE_IGNORE_NEW_LINES);
         if ($lines === false) {
-            $errors[] = self::DISPATCH . ': cannot be read';
+            $errors[] = self::MANIFEST . ': cannot be read';
 
             return [];
         }
 
-        $start = null;
-        foreach ($lines as $idx => $line) {
-            if (preg_match('/^pub\(crate\) fn construct_entity\(/', $line)) {
-                $start = $idx;
-                break;
-            }
-        }
-        if ($start === null) {
-            $errors[] = self::DISPATCH . ': no top-level `pub(crate) fn construct_entity(`';
-
-            return [];
-        }
-
-        $arms = [];
-        for ($idx = $start + 1; $idx < count($lines); $idx++) {
-            $line = $lines[$idx];
-            if ($line === '}') {
-                if ($arms === []) {
-                    $errors[] = self::DISPATCH . ': `construct_entity` has no `b"FQCN" =>` arm';
-                }
-
-                return $arms;
-            }
-            if (!preg_match('/^\s*b"((?:[^"\\\\]|\\\\.)*)"\s*=>/', $line, $m)) {
+        $classes = [];
+        foreach ($lines as $line) {
+            if (str_starts_with($line, '#')) {
                 continue;
             }
-            if (!preg_match('/^(?:\w|\\\\\\\\)+$/', $m[1])) {
-                $errors[] = self::DISPATCH . ':' . ($idx + 1) . ": cannot read the arm pattern `b\"{$m[1]}\"`";
-                continue;
+            $fields = explode("\t", $line);
+            if (count($fields) === 3 && $fields[1] === 'constructor' && $fields[2] === 'supported') {
+                $classes[] = substr($fields[0], 0, -strlen('::__construct'));
             }
-            $arms[] = str_replace('\\\\', '\\', $m[1]);
         }
 
-        $errors[] = self::DISPATCH . ': `construct_entity` has no closing `}` at column 0';
-
-        return [];
+        return $classes;
     }
 
     /**
