@@ -3,9 +3,133 @@
 //! entity crosses as still has its `CROSSING`, which nothing refers to.
 #![allow(dead_code)]
 
+use crate::php_worker::rpc::entity::{Call, protocol_violation};
+use crate::php_worker::rpc::forwarding;
+use bstr::{BStr, ByteSlice};
+use shirabe_php_rpc::{PhpThrow, PluginValue};
+
+/// `__shirabe_construct`: builds the entity, registers it and answers its rhandle. A stub's
+/// constructor sends `static::class`, so a plugin's subclass of a proxied class reaches the
+/// last arm.
+pub(crate) fn construct(class: &BStr, call: &mut Call<'_>) -> Result<u64, PhpThrow> {
+    match class.as_bytes() {
+        b"Composer\\Autoload\\AutoloadGenerator" => {
+            forwarding::autoload::autoload_generator::construct(call)
+        }
+        b"Composer\\Composer" => forwarding::composer::construct(call),
+        b"Composer\\Config" => forwarding::config::construct(call),
+        b"Composer\\DependencyResolver\\LocalRepoTransaction" => {
+            forwarding::dependency_resolver::local_repo_transaction::construct(call)
+        }
+        b"Composer\\DependencyResolver\\Operation\\InstallOperation" => {
+            forwarding::dependency_resolver::operation::install_operation::construct(call)
+        }
+        b"Composer\\DependencyResolver\\Operation\\MarkAliasInstalledOperation" => {
+            forwarding::dependency_resolver::operation::mark_alias_installed_operation::construct(
+                call,
+            )
+        }
+        b"Composer\\DependencyResolver\\Operation\\MarkAliasUninstalledOperation" => {
+            forwarding::dependency_resolver::operation::mark_alias_uninstalled_operation::construct(
+                call,
+            )
+        }
+        b"Composer\\DependencyResolver\\Operation\\UninstallOperation" => {
+            forwarding::dependency_resolver::operation::uninstall_operation::construct(call)
+        }
+        b"Composer\\DependencyResolver\\Operation\\UpdateOperation" => {
+            forwarding::dependency_resolver::operation::update_operation::construct(call)
+        }
+        b"Composer\\DependencyResolver\\Transaction" => {
+            forwarding::dependency_resolver::transaction::construct(call)
+        }
+        b"Composer\\Downloader\\DownloadManager" => {
+            forwarding::downloader::download_manager::construct(call)
+        }
+        b"Composer\\EventDispatcher\\EventDispatcher" => {
+            forwarding::event_dispatcher::event_dispatcher::construct(call)
+        }
+        b"Composer\\IO\\BufferIO" => forwarding::io::buffer_io::construct(call),
+        b"Composer\\IO\\ConsoleIO" => forwarding::io::console_io::construct(call),
+        b"Composer\\IO\\NullIO" => forwarding::io::null_io::construct(call),
+        b"Composer\\Installer\\InstallationManager" => {
+            forwarding::installer::installation_manager::construct(call)
+        }
+        b"Composer\\Installer\\InstallerEvent" => {
+            forwarding::installer::installer_event::construct(call)
+        }
+        b"Composer\\Installer\\PackageEvent" => {
+            forwarding::installer::package_event::construct(call)
+        }
+        b"Composer\\Package\\AliasPackage" => forwarding::package::alias_package::construct(call),
+        b"Composer\\Package\\CompleteAliasPackage" => {
+            forwarding::package::complete_alias_package::construct(call)
+        }
+        b"Composer\\Package\\CompletePackage" => {
+            forwarding::package::complete_package::construct(call)
+        }
+        b"Composer\\Package\\Locker" => forwarding::package::locker::construct(call),
+        b"Composer\\Package\\Package" => forwarding::package::package::construct(call),
+        b"Composer\\Package\\RootAliasPackage" => {
+            forwarding::package::root_alias_package::construct(call)
+        }
+        b"Composer\\Package\\RootPackage" => forwarding::package::root_package::construct(call),
+        b"Composer\\PartialComposer" => forwarding::partial_composer::construct(call),
+        b"Composer\\Plugin\\CommandEvent" => forwarding::plugin::command_event::construct(call),
+        b"Composer\\Plugin\\PostFileDownloadEvent" => {
+            forwarding::plugin::post_file_download_event::construct(call)
+        }
+        b"Composer\\Plugin\\PreFileDownloadEvent" => {
+            forwarding::plugin::pre_file_download_event::construct(call)
+        }
+        b"Composer\\Plugin\\PrePoolCreateEvent" => {
+            forwarding::plugin::pre_pool_create_event::construct(call)
+        }
+        b"Composer\\Repository\\ArrayRepository" => {
+            forwarding::repository::array_repository::construct(call)
+        }
+        b"Composer\\Repository\\FilesystemRepository" => {
+            forwarding::repository::filesystem_repository::construct(call)
+        }
+        b"Composer\\Repository\\InstalledArrayRepository" => {
+            forwarding::repository::installed_array_repository::construct(call)
+        }
+        b"Composer\\Repository\\InstalledFilesystemRepository" => {
+            forwarding::repository::installed_filesystem_repository::construct(call)
+        }
+        b"Composer\\Repository\\LockArrayRepository" => {
+            forwarding::repository::lock_array_repository::construct(call)
+        }
+        b"Composer\\Repository\\RepositoryManager" => {
+            forwarding::repository::repository_manager::construct(call)
+        }
+        b"Composer\\Repository\\WritableArrayRepository" => {
+            forwarding::repository::writable_array_repository::construct(call)
+        }
+        b"Composer\\Script\\Event" => forwarding::script::event::construct(call),
+        b"Composer\\Util\\Filesystem" => forwarding::util::filesystem::construct(call),
+        b"Composer\\Util\\HttpDownloader" => forwarding::util::http_downloader::construct(call),
+        b"Composer\\Util\\ProcessExecutor" => forwarding::util::process_executor::construct(call),
+        _ => Err(call.unconstructible()),
+    }
+}
+
+/// `__shirabe_call_static`. A static forwarder sends `self::class`, so the class is always
+/// one that declares the method.
+pub(crate) fn call_static(class: &BStr, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+    match class.as_bytes() {
+        b"Composer\\Factory" => forwarding::factory::call_static(call),
+        b"Composer\\Package\\Locker" => forwarding::package::locker::call_static(call),
+        b"Composer\\Util\\ProcessExecutor" => forwarding::util::process_executor::call_static(call),
+        _ => protocol_violation(call),
+    }
+}
+
 pub(crate) mod autoload {
     pub(crate) mod autoload_generator {
-        use crate::php_worker::rpc::entity::{Call, Crossing, Entity, protocol_violation};
+        use crate::php_worker::rpc::entity::{
+            Call, Crossing, Entity, constructed, protocol_violation,
+        };
         use bstr::ByteSlice;
         use shirabe_php_rpc::{PhpThrow, PluginValue};
 
@@ -100,7 +224,7 @@ pub(crate) mod autoload {
             }
 
             fn __construct(call: &mut Call<'_>) -> Result<Self::Handle, PhpThrow> {
-                Err(call.unsupported())
+                Err(call.unconstructible())
             }
         }
 
@@ -134,11 +258,16 @@ pub(crate) mod autoload {
             name: b"Composer\\Autoload\\AutoloadGenerator",
             dispatch,
         };
+
+        pub(crate) fn construct(call: &mut Call<'_>) -> Result<u64, PhpThrow> {
+            let entity = <PhpClass as Forwarding>::__construct(call)?;
+            constructed(call.class(), entity)
+        }
     }
 }
 
 pub(crate) mod composer {
-    use crate::php_worker::rpc::entity::{Call, Crossing, protocol_violation};
+    use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
     use crate::php_worker::rpc::forwarding;
     use bstr::ByteSlice;
     use shirabe_php_rpc::{PhpThrow, PluginValue};
@@ -229,7 +358,7 @@ pub(crate) mod composer {
         }
 
         fn __construct(call: &mut Call<'_>) -> Result<<forwarding::partial_composer::PhpClass as forwarding::partial_composer::Forwarding>::Handle, PhpThrow>{
-            Err(call.unsupported())
+            Err(call.unconstructible())
         }
     }
 
@@ -269,10 +398,15 @@ _ => protocol_violation(call),
 name: b"Composer\\Composer",
 dispatch,
 };
+
+    pub(crate) fn construct(call: &mut Call<'_>) -> Result<u64, PhpThrow> {
+        let entity = <PhpClass as Forwarding>::__construct(call)?;
+        constructed(call.class(), entity)
+    }
 }
 
 pub(crate) mod config {
-    use crate::php_worker::rpc::entity::{Call, Crossing, Entity, protocol_violation};
+    use crate::php_worker::rpc::entity::{Call, Crossing, Entity, constructed, protocol_violation};
     use bstr::ByteSlice;
     use shirabe_php_rpc::{PhpThrow, PluginValue};
 
@@ -387,7 +521,7 @@ pub(crate) mod config {
         }
 
         fn __construct(call: &mut Call<'_>) -> Result<Self::Handle, PhpThrow> {
-            Err(call.unsupported())
+            Err(call.unconstructible())
         }
     }
 
@@ -423,11 +557,16 @@ pub(crate) mod config {
         name: b"Composer\\Config",
         dispatch,
     };
+
+    pub(crate) fn construct(call: &mut Call<'_>) -> Result<u64, PhpThrow> {
+        let entity = <PhpClass as Forwarding>::__construct(call)?;
+        constructed(call.class(), entity)
+    }
 }
 
 pub(crate) mod dependency_resolver {
     pub(crate) mod local_repo_transaction {
-        use crate::php_worker::rpc::entity::{Call, Crossing, protocol_violation};
+        use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
         use crate::php_worker::rpc::forwarding;
         use bstr::ByteSlice;
         use shirabe_php_rpc::{PhpThrow, PluginValue};
@@ -438,7 +577,7 @@ pub(crate) mod dependency_resolver {
 
         pub(crate) trait Forwarding {
             fn __construct(call: &mut Call<'_>) -> Result<<forwarding::dependency_resolver::transaction::PhpClass as forwarding::dependency_resolver::transaction::Forwarding>::Handle, PhpThrow>{
-                Err(call.unsupported())
+                Err(call.unconstructible())
             }
         }
 
@@ -456,10 +595,15 @@ _ => protocol_violation(call),
 name: b"Composer\\DependencyResolver\\LocalRepoTransaction",
 dispatch,
 };
+
+        pub(crate) fn construct(call: &mut Call<'_>) -> Result<u64, PhpThrow> {
+            let entity = <PhpClass as Forwarding>::__construct(call)?;
+            constructed(call.class(), entity)
+        }
     }
     pub(crate) mod operation {
         pub(crate) mod install_operation {
-            use crate::php_worker::rpc::entity::{Call, Crossing, protocol_violation};
+            use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
             use crate::php_worker::rpc::forwarding;
             use bstr::ByteSlice;
             use shirabe_php_rpc::{PhpThrow, PluginValue};
@@ -478,7 +622,7 @@ dispatch,
                 }
 
                 fn __construct(call: &mut Call<'_>) -> Result<<forwarding::dependency_resolver::operation::solver_operation::PhpClass as forwarding::dependency_resolver::operation::solver_operation::Forwarding>::Handle, PhpThrow>{
-                    Err(call.unsupported())
+                    Err(call.unconstructible())
                 }
             }
 
@@ -499,9 +643,14 @@ _ => protocol_violation(call),
 name: b"Composer\\DependencyResolver\\Operation\\InstallOperation",
 dispatch,
 };
+
+            pub(crate) fn construct(call: &mut Call<'_>) -> Result<u64, PhpThrow> {
+                let entity = <PhpClass as Forwarding>::__construct(call)?;
+                constructed(call.class(), entity)
+            }
         }
         pub(crate) mod mark_alias_installed_operation {
-            use crate::php_worker::rpc::entity::{Call, Crossing, protocol_violation};
+            use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
             use crate::php_worker::rpc::forwarding;
             use bstr::ByteSlice;
             use shirabe_php_rpc::{PhpThrow, PluginValue};
@@ -520,7 +669,7 @@ dispatch,
                 }
 
                 fn __construct(call: &mut Call<'_>) -> Result<<forwarding::dependency_resolver::operation::solver_operation::PhpClass as forwarding::dependency_resolver::operation::solver_operation::Forwarding>::Handle, PhpThrow>{
-                    Err(call.unsupported())
+                    Err(call.unconstructible())
                 }
             }
 
@@ -541,9 +690,14 @@ _ => protocol_violation(call),
 name: b"Composer\\DependencyResolver\\Operation\\MarkAliasInstalledOperation",
 dispatch,
 };
+
+            pub(crate) fn construct(call: &mut Call<'_>) -> Result<u64, PhpThrow> {
+                let entity = <PhpClass as Forwarding>::__construct(call)?;
+                constructed(call.class(), entity)
+            }
         }
         pub(crate) mod mark_alias_uninstalled_operation {
-            use crate::php_worker::rpc::entity::{Call, Crossing, protocol_violation};
+            use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
             use crate::php_worker::rpc::forwarding;
             use bstr::ByteSlice;
             use shirabe_php_rpc::{PhpThrow, PluginValue};
@@ -562,7 +716,7 @@ dispatch,
                 }
 
                 fn __construct(call: &mut Call<'_>) -> Result<<forwarding::dependency_resolver::operation::solver_operation::PhpClass as forwarding::dependency_resolver::operation::solver_operation::Forwarding>::Handle, PhpThrow>{
-                    Err(call.unsupported())
+                    Err(call.unconstructible())
                 }
             }
 
@@ -583,6 +737,11 @@ _ => protocol_violation(call),
 name: b"Composer\\DependencyResolver\\Operation\\MarkAliasUninstalledOperation",
 dispatch,
 };
+
+            pub(crate) fn construct(call: &mut Call<'_>) -> Result<u64, PhpThrow> {
+                let entity = <PhpClass as Forwarding>::__construct(call)?;
+                constructed(call.class(), entity)
+            }
         }
         pub(crate) mod solver_operation {
             use crate::php_worker::rpc::entity::{Call, Crossing, Entity, protocol_violation};
@@ -637,7 +796,7 @@ dispatch,
             };
         }
         pub(crate) mod uninstall_operation {
-            use crate::php_worker::rpc::entity::{Call, Crossing, protocol_violation};
+            use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
             use crate::php_worker::rpc::forwarding;
             use bstr::ByteSlice;
             use shirabe_php_rpc::{PhpThrow, PluginValue};
@@ -656,7 +815,7 @@ dispatch,
                 }
 
                 fn __construct(call: &mut Call<'_>) -> Result<<forwarding::dependency_resolver::operation::solver_operation::PhpClass as forwarding::dependency_resolver::operation::solver_operation::Forwarding>::Handle, PhpThrow>{
-                    Err(call.unsupported())
+                    Err(call.unconstructible())
                 }
             }
 
@@ -677,9 +836,14 @@ _ => protocol_violation(call),
 name: b"Composer\\DependencyResolver\\Operation\\UninstallOperation",
 dispatch,
 };
+
+            pub(crate) fn construct(call: &mut Call<'_>) -> Result<u64, PhpThrow> {
+                let entity = <PhpClass as Forwarding>::__construct(call)?;
+                constructed(call.class(), entity)
+            }
         }
         pub(crate) mod update_operation {
-            use crate::php_worker::rpc::entity::{Call, Crossing, protocol_violation};
+            use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
             use crate::php_worker::rpc::forwarding;
             use bstr::ByteSlice;
             use shirabe_php_rpc::{PhpThrow, PluginValue};
@@ -706,7 +870,7 @@ dispatch,
                 }
 
                 fn __construct(call: &mut Call<'_>) -> Result<<forwarding::dependency_resolver::operation::solver_operation::PhpClass as forwarding::dependency_resolver::operation::solver_operation::Forwarding>::Handle, PhpThrow>{
-                    Err(call.unsupported())
+                    Err(call.unconstructible())
                 }
             }
 
@@ -728,10 +892,17 @@ _ => protocol_violation(call),
 name: b"Composer\\DependencyResolver\\Operation\\UpdateOperation",
 dispatch,
 };
+
+            pub(crate) fn construct(call: &mut Call<'_>) -> Result<u64, PhpThrow> {
+                let entity = <PhpClass as Forwarding>::__construct(call)?;
+                constructed(call.class(), entity)
+            }
         }
     }
     pub(crate) mod transaction {
-        use crate::php_worker::rpc::entity::{Call, Crossing, Entity, protocol_violation};
+        use crate::php_worker::rpc::entity::{
+            Call, Crossing, Entity, constructed, protocol_violation,
+        };
         use bstr::ByteSlice;
         use shirabe_php_rpc::{PhpThrow, PluginValue};
 
@@ -752,7 +923,7 @@ dispatch,
             }
 
             fn __construct(call: &mut Call<'_>) -> Result<Self::Handle, PhpThrow> {
-                Err(call.unsupported())
+                Err(call.unconstructible())
             }
         }
 
@@ -770,12 +941,19 @@ dispatch,
             name: b"Composer\\DependencyResolver\\Transaction",
             dispatch,
         };
+
+        pub(crate) fn construct(call: &mut Call<'_>) -> Result<u64, PhpThrow> {
+            let entity = <PhpClass as Forwarding>::__construct(call)?;
+            constructed(call.class(), entity)
+        }
     }
 }
 
 pub(crate) mod downloader {
     pub(crate) mod download_manager {
-        use crate::php_worker::rpc::entity::{Call, Crossing, Entity, protocol_violation};
+        use crate::php_worker::rpc::entity::{
+            Call, Crossing, Entity, constructed, protocol_violation,
+        };
         use bstr::ByteSlice;
         use shirabe_php_rpc::{PhpThrow, PluginValue};
 
@@ -874,7 +1052,7 @@ pub(crate) mod downloader {
             }
 
             fn __construct(call: &mut Call<'_>) -> Result<Self::Handle, PhpThrow> {
-                Err(call.unsupported())
+                Err(call.unconstructible())
             }
         }
 
@@ -906,12 +1084,91 @@ pub(crate) mod downloader {
             name: b"Composer\\Downloader\\DownloadManager",
             dispatch,
         };
+
+        pub(crate) fn construct(call: &mut Call<'_>) -> Result<u64, PhpThrow> {
+            let entity = <PhpClass as Forwarding>::__construct(call)?;
+            constructed(call.class(), entity)
+        }
     }
 }
 
 pub(crate) mod event_dispatcher {
-    pub(crate) mod event_dispatcher {
+    pub(crate) mod event {
         use crate::php_worker::rpc::entity::{Call, Crossing, Entity, protocol_violation};
+        use bstr::ByteSlice;
+        use shirabe_php_rpc::{PhpThrow, PluginValue};
+
+        /// `Composer\EventDispatcher\Event`.
+        #[derive(Debug)]
+        pub(crate) struct PhpClass;
+
+        pub(crate) trait Forwarding {
+            /// The handle type of the entities crossing as this class or a subclass.
+            type Handle: Entity;
+
+            fn get_name(this: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_arguments(
+                this: &Self::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_flags(
+                this: &Self::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn is_propagation_stopped(
+                this: &Self::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn stop_propagation(
+                this: &Self::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+        }
+
+        pub(crate) fn dispatch(
+            this: &<PhpClass as Forwarding>::Handle,
+            call: &mut Call<'_>,
+        ) -> Result<PluginValue, PhpThrow> {
+            match call.method().as_bytes() {
+                b"getName" => <PhpClass as Forwarding>::get_name(this, call),
+                b"getArguments" => <PhpClass as Forwarding>::get_arguments(this, call),
+                b"getFlags" => <PhpClass as Forwarding>::get_flags(this, call),
+                b"isPropagationStopped" => {
+                    <PhpClass as Forwarding>::is_propagation_stopped(this, call)
+                }
+                b"stopPropagation" => <PhpClass as Forwarding>::stop_propagation(this, call),
+                _ => protocol_violation(call),
+            }
+        }
+
+        pub(crate) static CROSSING: Crossing<<PhpClass as Forwarding>::Handle> = Crossing {
+            name: b"Composer\\EventDispatcher\\Event",
+            dispatch,
+        };
+    }
+    pub(crate) mod event_dispatcher {
+        use crate::php_worker::rpc::entity::{
+            Call, Crossing, Entity, constructed, protocol_violation,
+        };
         use bstr::ByteSlice;
         use shirabe_php_rpc::{PhpThrow, PluginValue};
 
@@ -993,7 +1250,7 @@ pub(crate) mod event_dispatcher {
             }
 
             fn __construct(call: &mut Call<'_>) -> Result<Self::Handle, PhpThrow> {
-                Err(call.unsupported())
+                Err(call.unconstructible())
             }
         }
 
@@ -1023,6 +1280,34 @@ pub(crate) mod event_dispatcher {
             name: b"Composer\\EventDispatcher\\EventDispatcher",
             dispatch,
         };
+
+        pub(crate) fn construct(call: &mut Call<'_>) -> Result<u64, PhpThrow> {
+            let entity = <PhpClass as Forwarding>::__construct(call)?;
+            constructed(call.class(), entity)
+        }
+    }
+}
+
+pub(crate) mod factory {
+    use crate::php_worker::rpc::entity::{Call, protocol_violation};
+    use bstr::ByteSlice;
+    use shirabe_php_rpc::{PhpThrow, PluginValue};
+
+    /// `Composer\Factory`, whose static methods are forwarded.
+    #[derive(Debug)]
+    pub(crate) struct PhpClass;
+
+    pub(crate) trait Forwarding {
+        fn get_composer_file(call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+            Err(call.unsupported())
+        }
+    }
+
+    pub(crate) fn call_static(call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+        match call.method().as_bytes() {
+            b"getComposerFile" => <PhpClass as Forwarding>::get_composer_file(call),
+            _ => protocol_violation(call),
+        }
     }
 }
 
@@ -1301,7 +1586,7 @@ pub(crate) mod io {
         };
     }
     pub(crate) mod buffer_io {
-        use crate::php_worker::rpc::entity::{Call, Crossing, protocol_violation};
+        use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
         use crate::php_worker::rpc::forwarding;
         use bstr::ByteSlice;
         use shirabe_php_rpc::{PhpThrow, PluginValue};
@@ -1333,7 +1618,7 @@ pub(crate) mod io {
                 <forwarding::io::base_io::PhpClass as forwarding::io::base_io::Forwarding>::Handle,
                 PhpThrow,
             > {
-                Err(call.unsupported())
+                Err(call.unconstructible())
             }
         }
 
@@ -1388,9 +1673,14 @@ _ => protocol_violation(call),
             name: b"Composer\\IO\\BufferIO",
             dispatch,
         };
+
+        pub(crate) fn construct(call: &mut Call<'_>) -> Result<u64, PhpThrow> {
+            let entity = <PhpClass as Forwarding>::__construct(call)?;
+            constructed(call.class(), entity)
+        }
     }
     pub(crate) mod console_io {
-        use crate::php_worker::rpc::entity::{Call, Crossing, protocol_violation};
+        use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
         use crate::php_worker::rpc::forwarding;
         use bstr::ByteSlice;
         use shirabe_php_rpc::{PhpThrow, PluginValue};
@@ -1430,7 +1720,7 @@ _ => protocol_violation(call),
                 <forwarding::io::base_io::PhpClass as forwarding::io::base_io::Forwarding>::Handle,
                 PhpThrow,
             > {
-                Err(call.unsupported())
+                Err(call.unconstructible())
             }
         }
 
@@ -1483,9 +1773,14 @@ _ => protocol_violation(call),
             name: b"Composer\\IO\\ConsoleIO",
             dispatch,
         };
+
+        pub(crate) fn construct(call: &mut Call<'_>) -> Result<u64, PhpThrow> {
+            let entity = <PhpClass as Forwarding>::__construct(call)?;
+            constructed(call.class(), entity)
+        }
     }
     pub(crate) mod null_io {
-        use crate::php_worker::rpc::entity::{Call, Crossing, protocol_violation};
+        use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
         use crate::php_worker::rpc::forwarding;
         use bstr::ByteSlice;
         use shirabe_php_rpc::{PhpThrow, PluginValue};
@@ -1501,7 +1796,7 @@ _ => protocol_violation(call),
                 <forwarding::io::base_io::PhpClass as forwarding::io::base_io::Forwarding>::Handle,
                 PhpThrow,
             > {
-                Err(call.unsupported())
+                Err(call.unconstructible())
             }
         }
 
@@ -1551,12 +1846,19 @@ _ => protocol_violation(call),
             name: b"Composer\\IO\\NullIO",
             dispatch,
         };
+
+        pub(crate) fn construct(call: &mut Call<'_>) -> Result<u64, PhpThrow> {
+            let entity = <PhpClass as Forwarding>::__construct(call)?;
+            constructed(call.class(), entity)
+        }
     }
 }
 
 pub(crate) mod installer {
     pub(crate) mod installation_manager {
-        use crate::php_worker::rpc::entity::{Call, Crossing, Entity, protocol_violation};
+        use crate::php_worker::rpc::entity::{
+            Call, Crossing, Entity, constructed, protocol_violation,
+        };
         use bstr::ByteSlice;
         use shirabe_php_rpc::{PhpThrow, PluginValue};
 
@@ -1690,7 +1992,7 @@ pub(crate) mod installer {
             }
 
             fn __construct(call: &mut Call<'_>) -> Result<Self::Handle, PhpThrow> {
-                Err(call.unsupported())
+                Err(call.unconstructible())
             }
         }
 
@@ -1728,12 +2030,196 @@ pub(crate) mod installer {
             name: b"Composer\\Installer\\InstallationManager",
             dispatch,
         };
+
+        pub(crate) fn construct(call: &mut Call<'_>) -> Result<u64, PhpThrow> {
+            let entity = <PhpClass as Forwarding>::__construct(call)?;
+            constructed(call.class(), entity)
+        }
+    }
+    pub(crate) mod installer_event {
+        use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
+        use crate::php_worker::rpc::forwarding;
+        use bstr::ByteSlice;
+        use shirabe_php_rpc::{PhpThrow, PluginValue};
+
+        /// `Composer\Installer\InstallerEvent`.
+        #[derive(Debug)]
+        pub(crate) struct PhpClass;
+
+        pub(crate) trait Forwarding {
+            fn get_composer(
+                this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_io(
+                this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn is_dev_mode(
+                this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn is_executing_operations(
+                this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_transaction(
+                this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn __construct(call: &mut Call<'_>) -> Result<<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle, PhpThrow>{
+                Err(call.unconstructible())
+            }
+        }
+
+        pub(crate) fn dispatch(
+            this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
+            call: &mut Call<'_>,
+        ) -> Result<PluginValue, PhpThrow> {
+            match call.method().as_bytes() {
+b"getComposer" => <PhpClass as Forwarding>::get_composer(this, call),
+b"getIO" => <PhpClass as Forwarding>::get_io(this, call),
+b"isDevMode" => <PhpClass as Forwarding>::is_dev_mode(this, call),
+b"isExecutingOperations" => <PhpClass as Forwarding>::is_executing_operations(this, call),
+b"getTransaction" => <PhpClass as Forwarding>::get_transaction(this, call),
+b"getName" => <forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::get_name(this, call),
+b"getArguments" => <forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::get_arguments(this, call),
+b"getFlags" => <forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::get_flags(this, call),
+b"isPropagationStopped" => <forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::is_propagation_stopped(this, call),
+b"stopPropagation" => <forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::stop_propagation(this, call),
+_ => protocol_violation(call),
+}
+        }
+
+        pub(crate) static CROSSING: Crossing<<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle> = Crossing {
+name: b"Composer\\Installer\\InstallerEvent",
+dispatch,
+};
+
+        pub(crate) fn construct(call: &mut Call<'_>) -> Result<u64, PhpThrow> {
+            let entity = <PhpClass as Forwarding>::__construct(call)?;
+            constructed(call.class(), entity)
+        }
+    }
+    pub(crate) mod package_event {
+        use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
+        use crate::php_worker::rpc::forwarding;
+        use bstr::ByteSlice;
+        use shirabe_php_rpc::{PhpThrow, PluginValue};
+
+        /// `Composer\Installer\PackageEvent`.
+        #[derive(Debug)]
+        pub(crate) struct PhpClass;
+
+        pub(crate) trait Forwarding {
+            fn get_composer(
+                this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_io(
+                this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn is_dev_mode(
+                this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_local_repo(
+                this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_operations(
+                this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_operation(
+                this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn __construct(call: &mut Call<'_>) -> Result<<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle, PhpThrow>{
+                Err(call.unconstructible())
+            }
+        }
+
+        pub(crate) fn dispatch(
+            this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
+            call: &mut Call<'_>,
+        ) -> Result<PluginValue, PhpThrow> {
+            match call.method().as_bytes() {
+b"getComposer" => <PhpClass as Forwarding>::get_composer(this, call),
+b"getIO" => <PhpClass as Forwarding>::get_io(this, call),
+b"isDevMode" => <PhpClass as Forwarding>::is_dev_mode(this, call),
+b"getLocalRepo" => <PhpClass as Forwarding>::get_local_repo(this, call),
+b"getOperations" => <PhpClass as Forwarding>::get_operations(this, call),
+b"getOperation" => <PhpClass as Forwarding>::get_operation(this, call),
+b"getName" => <forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::get_name(this, call),
+b"getArguments" => <forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::get_arguments(this, call),
+b"getFlags" => <forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::get_flags(this, call),
+b"isPropagationStopped" => <forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::is_propagation_stopped(this, call),
+b"stopPropagation" => <forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::stop_propagation(this, call),
+_ => protocol_violation(call),
+}
+        }
+
+        pub(crate) static CROSSING: Crossing<<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle> = Crossing {
+name: b"Composer\\Installer\\PackageEvent",
+dispatch,
+};
+
+        pub(crate) fn construct(call: &mut Call<'_>) -> Result<u64, PhpThrow> {
+            let entity = <PhpClass as Forwarding>::__construct(call)?;
+            constructed(call.class(), entity)
+        }
     }
 }
 
 pub(crate) mod package {
     pub(crate) mod alias_package {
-        use crate::php_worker::rpc::entity::{Call, Crossing, protocol_violation};
+        use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
         use crate::php_worker::rpc::forwarding;
         use bstr::ByteSlice;
         use shirabe_php_rpc::{PhpThrow, PluginValue};
@@ -1776,7 +2262,7 @@ pub(crate) mod package {
             }
 
             fn __construct(call: &mut Call<'_>) -> Result<<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle, PhpThrow>{
-                Err(call.unsupported())
+                Err(call.unconstructible())
             }
         }
 
@@ -1854,6 +2340,11 @@ _ => protocol_violation(call),
 name: b"Composer\\Package\\AliasPackage",
 dispatch,
 };
+
+        pub(crate) fn construct(call: &mut Call<'_>) -> Result<u64, PhpThrow> {
+            let entity = <PhpClass as Forwarding>::__construct(call)?;
+            constructed(call.class(), entity)
+        }
     }
     pub(crate) mod base_package {
         use crate::php_worker::rpc::entity::{Call, Crossing, Entity, protocol_violation};
@@ -2395,7 +2886,7 @@ dispatch,
         };
     }
     pub(crate) mod complete_alias_package {
-        use crate::php_worker::rpc::entity::{Call, Crossing, protocol_violation};
+        use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
         use crate::php_worker::rpc::forwarding;
         use bstr::ByteSlice;
         use shirabe_php_rpc::{PhpThrow, PluginValue};
@@ -2606,7 +3097,7 @@ dispatch,
             }
 
             fn __construct(call: &mut Call<'_>) -> Result<<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle, PhpThrow>{
-                Err(call.unsupported())
+                Err(call.unconstructible())
             }
         }
 
@@ -2709,9 +3200,14 @@ _ => protocol_violation(call),
 name: b"Composer\\Package\\CompleteAliasPackage",
 dispatch,
 };
+
+        pub(crate) fn construct(call: &mut Call<'_>) -> Result<u64, PhpThrow> {
+            let entity = <PhpClass as Forwarding>::__construct(call)?;
+            constructed(call.class(), entity)
+        }
     }
     pub(crate) mod complete_package {
-        use crate::php_worker::rpc::entity::{Call, Crossing, protocol_violation};
+        use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
         use crate::php_worker::rpc::forwarding;
         use bstr::ByteSlice;
         use shirabe_php_rpc::{PhpThrow, PluginValue};
@@ -2922,7 +3418,7 @@ dispatch,
             }
 
             fn __construct(call: &mut Call<'_>) -> Result<<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle, PhpThrow>{
-                Err(call.unsupported())
+                Err(call.unconstructible())
             }
         }
 
@@ -3042,9 +3538,16 @@ _ => protocol_violation(call),
 name: b"Composer\\Package\\CompletePackage",
 dispatch,
 };
+
+        pub(crate) fn construct(call: &mut Call<'_>) -> Result<u64, PhpThrow> {
+            let entity = <PhpClass as Forwarding>::__construct(call)?;
+            constructed(call.class(), entity)
+        }
     }
     pub(crate) mod locker {
-        use crate::php_worker::rpc::entity::{Call, Crossing, Entity, protocol_violation};
+        use crate::php_worker::rpc::entity::{
+            Call, Crossing, Entity, constructed, protocol_violation,
+        };
         use bstr::ByteSlice;
         use shirabe_php_rpc::{PhpThrow, PluginValue};
 
@@ -3190,7 +3693,7 @@ dispatch,
             }
 
             fn __construct(call: &mut Call<'_>) -> Result<Self::Handle, PhpThrow> {
-                Err(call.unsupported())
+                Err(call.unconstructible())
             }
 
             fn get_content_hash(call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
@@ -3240,9 +3743,21 @@ dispatch,
             name: b"Composer\\Package\\Locker",
             dispatch,
         };
+
+        pub(crate) fn construct(call: &mut Call<'_>) -> Result<u64, PhpThrow> {
+            let entity = <PhpClass as Forwarding>::__construct(call)?;
+            constructed(call.class(), entity)
+        }
+
+        pub(crate) fn call_static(call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+            match call.method().as_bytes() {
+                b"getContentHash" => <PhpClass as Forwarding>::get_content_hash(call),
+                _ => protocol_violation(call),
+            }
+        }
     }
     pub(crate) mod package {
-        use crate::php_worker::rpc::entity::{Call, Crossing, protocol_violation};
+        use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
         use crate::php_worker::rpc::forwarding;
         use bstr::ByteSlice;
         use shirabe_php_rpc::{PhpThrow, PluginValue};
@@ -3421,7 +3936,7 @@ dispatch,
             }
 
             fn __construct(call: &mut Call<'_>) -> Result<<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle, PhpThrow>{
-                Err(call.unsupported())
+                Err(call.unconstructible())
             }
         }
 
@@ -3516,9 +4031,14 @@ _ => protocol_violation(call),
 name: b"Composer\\Package\\Package",
 dispatch,
 };
+
+        pub(crate) fn construct(call: &mut Call<'_>) -> Result<u64, PhpThrow> {
+            let entity = <PhpClass as Forwarding>::__construct(call)?;
+            constructed(call.class(), entity)
+        }
     }
     pub(crate) mod root_alias_package {
-        use crate::php_worker::rpc::entity::{Call, Crossing, protocol_violation};
+        use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
         use crate::php_worker::rpc::forwarding;
         use bstr::ByteSlice;
         use shirabe_php_rpc::{PhpThrow, PluginValue};
@@ -3697,7 +4217,7 @@ dispatch,
             }
 
             fn __construct(call: &mut Call<'_>) -> Result<<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle, PhpThrow>{
-                Err(call.unsupported())
+                Err(call.unconstructible())
             }
         }
 
@@ -3821,9 +4341,14 @@ _ => protocol_violation(call),
 name: b"Composer\\Package\\RootAliasPackage",
 dispatch,
 };
+
+        pub(crate) fn construct(call: &mut Call<'_>) -> Result<u64, PhpThrow> {
+            let entity = <PhpClass as Forwarding>::__construct(call)?;
+            constructed(call.class(), entity)
+        }
     }
     pub(crate) mod root_package {
-        use crate::php_worker::rpc::entity::{Call, Crossing, protocol_violation};
+        use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
         use crate::php_worker::rpc::forwarding;
         use bstr::ByteSlice;
         use shirabe_php_rpc::{PhpThrow, PluginValue};
@@ -3930,7 +4455,7 @@ dispatch,
             }
 
             fn __construct(call: &mut Call<'_>) -> Result<<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle, PhpThrow>{
-                Err(call.unsupported())
+                Err(call.unconstructible())
             }
         }
 
@@ -4062,11 +4587,16 @@ _ => protocol_violation(call),
 name: b"Composer\\Package\\RootPackage",
 dispatch,
 };
+
+        pub(crate) fn construct(call: &mut Call<'_>) -> Result<u64, PhpThrow> {
+            let entity = <PhpClass as Forwarding>::__construct(call)?;
+            constructed(call.class(), entity)
+        }
     }
 }
 
 pub(crate) mod partial_composer {
-    use crate::php_worker::rpc::entity::{Call, Crossing, Entity, protocol_violation};
+    use crate::php_worker::rpc::entity::{Call, Crossing, Entity, constructed, protocol_violation};
     use bstr::ByteSlice;
     use shirabe_php_rpc::{PhpThrow, PluginValue};
 
@@ -4162,7 +4692,7 @@ pub(crate) mod partial_composer {
         }
 
         fn __construct(call: &mut Call<'_>) -> Result<Self::Handle, PhpThrow> {
-            Err(call.unsupported())
+            Err(call.unconstructible())
         }
     }
 
@@ -4196,11 +4726,482 @@ pub(crate) mod partial_composer {
         name: b"Composer\\PartialComposer",
         dispatch,
     };
+
+    pub(crate) fn construct(call: &mut Call<'_>) -> Result<u64, PhpThrow> {
+        let entity = <PhpClass as Forwarding>::__construct(call)?;
+        constructed(call.class(), entity)
+    }
+}
+
+pub(crate) mod plugin {
+    pub(crate) mod command_event {
+        use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
+        use crate::php_worker::rpc::forwarding;
+        use bstr::ByteSlice;
+        use shirabe_php_rpc::{PhpThrow, PluginValue};
+
+        /// `Composer\Plugin\CommandEvent`.
+        #[derive(Debug)]
+        pub(crate) struct PhpClass;
+
+        pub(crate) trait Forwarding {
+            fn get_input(
+                this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_output(
+                this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_command_name(
+                this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn __construct(call: &mut Call<'_>) -> Result<<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle, PhpThrow>{
+                Err(call.unconstructible())
+            }
+        }
+
+        pub(crate) fn dispatch(
+            this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
+            call: &mut Call<'_>,
+        ) -> Result<PluginValue, PhpThrow> {
+            match call.method().as_bytes() {
+b"getInput" => <PhpClass as Forwarding>::get_input(this, call),
+b"getOutput" => <PhpClass as Forwarding>::get_output(this, call),
+b"getCommandName" => <PhpClass as Forwarding>::get_command_name(this, call),
+b"getName" => <forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::get_name(this, call),
+b"getArguments" => <forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::get_arguments(this, call),
+b"getFlags" => <forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::get_flags(this, call),
+b"isPropagationStopped" => <forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::is_propagation_stopped(this, call),
+b"stopPropagation" => <forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::stop_propagation(this, call),
+_ => protocol_violation(call),
+}
+        }
+
+        pub(crate) static CROSSING: Crossing<<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle> = Crossing {
+name: b"Composer\\Plugin\\CommandEvent",
+dispatch,
+};
+
+        pub(crate) fn construct(call: &mut Call<'_>) -> Result<u64, PhpThrow> {
+            let entity = <PhpClass as Forwarding>::__construct(call)?;
+            constructed(call.class(), entity)
+        }
+    }
+    pub(crate) mod post_file_download_event {
+        use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
+        use crate::php_worker::rpc::forwarding;
+        use bstr::ByteSlice;
+        use shirabe_php_rpc::{PhpThrow, PluginValue};
+
+        /// `Composer\Plugin\PostFileDownloadEvent`.
+        #[derive(Debug)]
+        pub(crate) struct PhpClass;
+
+        pub(crate) trait Forwarding {
+            fn get_file_name(
+                this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_checksum(
+                this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_url(
+                this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_context(
+                this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_package(
+                this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_type(
+                this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn __construct(call: &mut Call<'_>) -> Result<<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle, PhpThrow>{
+                Err(call.unconstructible())
+            }
+        }
+
+        pub(crate) fn dispatch(
+            this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
+            call: &mut Call<'_>,
+        ) -> Result<PluginValue, PhpThrow> {
+            match call.method().as_bytes() {
+b"getFileName" => <PhpClass as Forwarding>::get_file_name(this, call),
+b"getChecksum" => <PhpClass as Forwarding>::get_checksum(this, call),
+b"getUrl" => <PhpClass as Forwarding>::get_url(this, call),
+b"getContext" => <PhpClass as Forwarding>::get_context(this, call),
+b"getPackage" => <PhpClass as Forwarding>::get_package(this, call),
+b"getType" => <PhpClass as Forwarding>::get_type(this, call),
+b"getName" => <forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::get_name(this, call),
+b"getArguments" => <forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::get_arguments(this, call),
+b"getFlags" => <forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::get_flags(this, call),
+b"isPropagationStopped" => <forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::is_propagation_stopped(this, call),
+b"stopPropagation" => <forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::stop_propagation(this, call),
+_ => protocol_violation(call),
+}
+        }
+
+        pub(crate) static CROSSING: Crossing<<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle> = Crossing {
+name: b"Composer\\Plugin\\PostFileDownloadEvent",
+dispatch,
+};
+
+        pub(crate) fn construct(call: &mut Call<'_>) -> Result<u64, PhpThrow> {
+            let entity = <PhpClass as Forwarding>::__construct(call)?;
+            constructed(call.class(), entity)
+        }
+    }
+    pub(crate) mod pre_command_run_event {
+        use crate::php_worker::rpc::entity::{Call, Crossing, protocol_violation};
+        use crate::php_worker::rpc::forwarding;
+        use bstr::ByteSlice;
+        use shirabe_php_rpc::{PhpThrow, PluginValue};
+
+        /// `Composer\Plugin\PreCommandRunEvent`.
+        #[derive(Debug)]
+        pub(crate) struct PhpClass;
+
+        pub(crate) trait Forwarding {
+            fn get_input(
+                this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_command(
+                this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+        }
+
+        pub(crate) fn dispatch(
+            this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
+            call: &mut Call<'_>,
+        ) -> Result<PluginValue, PhpThrow> {
+            match call.method().as_bytes() {
+b"getInput" => <PhpClass as Forwarding>::get_input(this, call),
+b"getCommand" => <PhpClass as Forwarding>::get_command(this, call),
+b"getName" => <forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::get_name(this, call),
+b"getArguments" => <forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::get_arguments(this, call),
+b"getFlags" => <forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::get_flags(this, call),
+b"isPropagationStopped" => <forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::is_propagation_stopped(this, call),
+b"stopPropagation" => <forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::stop_propagation(this, call),
+_ => protocol_violation(call),
+}
+        }
+
+        pub(crate) static CROSSING: Crossing<<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle> = Crossing {
+name: b"Composer\\Plugin\\PreCommandRunEvent",
+dispatch,
+};
+    }
+    pub(crate) mod pre_file_download_event {
+        use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
+        use crate::php_worker::rpc::forwarding;
+        use bstr::ByteSlice;
+        use shirabe_php_rpc::{PhpThrow, PluginValue};
+
+        /// `Composer\Plugin\PreFileDownloadEvent`.
+        #[derive(Debug)]
+        pub(crate) struct PhpClass;
+
+        pub(crate) trait Forwarding {
+            fn get_http_downloader(
+                this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_processed_url(
+                this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_processed_url(
+                this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_custom_cache_key(
+                this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_custom_cache_key(
+                this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_type(
+                this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_context(
+                this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_transport_options(
+                this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_transport_options(
+                this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn __construct(call: &mut Call<'_>) -> Result<<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle, PhpThrow>{
+                Err(call.unconstructible())
+            }
+        }
+
+        pub(crate) fn dispatch(
+            this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
+            call: &mut Call<'_>,
+        ) -> Result<PluginValue, PhpThrow> {
+            match call.method().as_bytes() {
+b"getHttpDownloader" => <PhpClass as Forwarding>::get_http_downloader(this, call),
+b"getProcessedUrl" => <PhpClass as Forwarding>::get_processed_url(this, call),
+b"setProcessedUrl" => <PhpClass as Forwarding>::set_processed_url(this, call),
+b"getCustomCacheKey" => <PhpClass as Forwarding>::get_custom_cache_key(this, call),
+b"setCustomCacheKey" => <PhpClass as Forwarding>::set_custom_cache_key(this, call),
+b"getType" => <PhpClass as Forwarding>::get_type(this, call),
+b"getContext" => <PhpClass as Forwarding>::get_context(this, call),
+b"getTransportOptions" => <PhpClass as Forwarding>::get_transport_options(this, call),
+b"setTransportOptions" => <PhpClass as Forwarding>::set_transport_options(this, call),
+b"getName" => <forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::get_name(this, call),
+b"getArguments" => <forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::get_arguments(this, call),
+b"getFlags" => <forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::get_flags(this, call),
+b"isPropagationStopped" => <forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::is_propagation_stopped(this, call),
+b"stopPropagation" => <forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::stop_propagation(this, call),
+_ => protocol_violation(call),
+}
+        }
+
+        pub(crate) static CROSSING: Crossing<<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle> = Crossing {
+name: b"Composer\\Plugin\\PreFileDownloadEvent",
+dispatch,
+};
+
+        pub(crate) fn construct(call: &mut Call<'_>) -> Result<u64, PhpThrow> {
+            let entity = <PhpClass as Forwarding>::__construct(call)?;
+            constructed(call.class(), entity)
+        }
+    }
+    pub(crate) mod pre_pool_create_event {
+        use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
+        use crate::php_worker::rpc::forwarding;
+        use bstr::ByteSlice;
+        use shirabe_php_rpc::{PhpThrow, PluginValue};
+
+        /// `Composer\Plugin\PrePoolCreateEvent`.
+        #[derive(Debug)]
+        pub(crate) struct PhpClass;
+
+        pub(crate) trait Forwarding {
+            fn get_repositories(
+                this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_request(
+                this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_acceptable_stabilities(
+                this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_stability_flags(
+                this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_root_aliases(
+                this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_root_references(
+                this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_packages(
+                this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_unacceptable_fixed_packages(
+                this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_packages(
+                this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_unacceptable_fixed_packages(
+                this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn __construct(call: &mut Call<'_>) -> Result<<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle, PhpThrow>{
+                Err(call.unconstructible())
+            }
+        }
+
+        pub(crate) fn dispatch(
+            this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
+            call: &mut Call<'_>,
+        ) -> Result<PluginValue, PhpThrow> {
+            match call.method().as_bytes() {
+b"getRepositories" => <PhpClass as Forwarding>::get_repositories(this, call),
+b"getRequest" => <PhpClass as Forwarding>::get_request(this, call),
+b"getAcceptableStabilities" => <PhpClass as Forwarding>::get_acceptable_stabilities(this, call),
+b"getStabilityFlags" => <PhpClass as Forwarding>::get_stability_flags(this, call),
+b"getRootAliases" => <PhpClass as Forwarding>::get_root_aliases(this, call),
+b"getRootReferences" => <PhpClass as Forwarding>::get_root_references(this, call),
+b"getPackages" => <PhpClass as Forwarding>::get_packages(this, call),
+b"getUnacceptableFixedPackages" => <PhpClass as Forwarding>::get_unacceptable_fixed_packages(this, call),
+b"setPackages" => <PhpClass as Forwarding>::set_packages(this, call),
+b"setUnacceptableFixedPackages" => <PhpClass as Forwarding>::set_unacceptable_fixed_packages(this, call),
+b"getName" => <forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::get_name(this, call),
+b"getArguments" => <forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::get_arguments(this, call),
+b"getFlags" => <forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::get_flags(this, call),
+b"isPropagationStopped" => <forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::is_propagation_stopped(this, call),
+b"stopPropagation" => <forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::stop_propagation(this, call),
+_ => protocol_violation(call),
+}
+        }
+
+        pub(crate) static CROSSING: Crossing<<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle> = Crossing {
+name: b"Composer\\Plugin\\PrePoolCreateEvent",
+dispatch,
+};
+
+        pub(crate) fn construct(call: &mut Call<'_>) -> Result<u64, PhpThrow> {
+            let entity = <PhpClass as Forwarding>::__construct(call)?;
+            constructed(call.class(), entity)
+        }
+    }
 }
 
 pub(crate) mod repository {
     pub(crate) mod array_repository {
-        use crate::php_worker::rpc::entity::{Call, Crossing, Entity, protocol_violation};
+        use crate::php_worker::rpc::entity::{
+            Call, Crossing, Entity, constructed, protocol_violation,
+        };
         use bstr::ByteSlice;
         use shirabe_php_rpc::{PhpThrow, PluginValue};
 
@@ -4295,7 +5296,7 @@ pub(crate) mod repository {
             }
 
             fn __construct(call: &mut Call<'_>) -> Result<Self::Handle, PhpThrow> {
-                Err(call.unsupported())
+                Err(call.unconstructible())
             }
         }
 
@@ -4323,9 +5324,14 @@ pub(crate) mod repository {
             name: b"Composer\\Repository\\ArrayRepository",
             dispatch,
         };
+
+        pub(crate) fn construct(call: &mut Call<'_>) -> Result<u64, PhpThrow> {
+            let entity = <PhpClass as Forwarding>::__construct(call)?;
+            constructed(call.class(), entity)
+        }
     }
     pub(crate) mod filesystem_repository {
-        use crate::php_worker::rpc::entity::{Call, Crossing, protocol_violation};
+        use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
         use crate::php_worker::rpc::forwarding;
         use bstr::ByteSlice;
         use shirabe_php_rpc::{PhpThrow, PluginValue};
@@ -4336,7 +5342,7 @@ pub(crate) mod repository {
 
         pub(crate) trait Forwarding {
             fn __construct(call: &mut Call<'_>) -> Result<<forwarding::repository::array_repository::PhpClass as forwarding::repository::array_repository::Forwarding>::Handle, PhpThrow>{
-                Err(call.unsupported())
+                Err(call.unconstructible())
             }
         }
 
@@ -4370,9 +5376,14 @@ _ => protocol_violation(call),
 name: b"Composer\\Repository\\FilesystemRepository",
 dispatch,
 };
+
+        pub(crate) fn construct(call: &mut Call<'_>) -> Result<u64, PhpThrow> {
+            let entity = <PhpClass as Forwarding>::__construct(call)?;
+            constructed(call.class(), entity)
+        }
     }
     pub(crate) mod installed_array_repository {
-        use crate::php_worker::rpc::entity::{Call, Crossing, protocol_violation};
+        use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
         use crate::php_worker::rpc::forwarding;
         use bstr::ByteSlice;
         use shirabe_php_rpc::{PhpThrow, PluginValue};
@@ -4391,7 +5402,7 @@ dispatch,
             }
 
             fn __construct(call: &mut Call<'_>) -> Result<<forwarding::repository::array_repository::PhpClass as forwarding::repository::array_repository::Forwarding>::Handle, PhpThrow>{
-                Err(call.unsupported())
+                Err(call.unconstructible())
             }
         }
 
@@ -4426,9 +5437,14 @@ _ => protocol_violation(call),
 name: b"Composer\\Repository\\InstalledArrayRepository",
 dispatch,
 };
+
+        pub(crate) fn construct(call: &mut Call<'_>) -> Result<u64, PhpThrow> {
+            let entity = <PhpClass as Forwarding>::__construct(call)?;
+            constructed(call.class(), entity)
+        }
     }
     pub(crate) mod installed_filesystem_repository {
-        use crate::php_worker::rpc::entity::{Call, Crossing, protocol_violation};
+        use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
         use crate::php_worker::rpc::forwarding;
         use bstr::ByteSlice;
         use shirabe_php_rpc::{PhpThrow, PluginValue};
@@ -4447,7 +5463,7 @@ dispatch,
             }
 
             fn __construct(call: &mut Call<'_>) -> Result<<forwarding::repository::array_repository::PhpClass as forwarding::repository::array_repository::Forwarding>::Handle, PhpThrow>{
-                Err(call.unsupported())
+                Err(call.unconstructible())
             }
         }
 
@@ -4482,9 +5498,14 @@ _ => protocol_violation(call),
 name: b"Composer\\Repository\\InstalledFilesystemRepository",
 dispatch,
 };
+
+        pub(crate) fn construct(call: &mut Call<'_>) -> Result<u64, PhpThrow> {
+            let entity = <PhpClass as Forwarding>::__construct(call)?;
+            constructed(call.class(), entity)
+        }
     }
     pub(crate) mod lock_array_repository {
-        use crate::php_worker::rpc::entity::{Call, Crossing, protocol_violation};
+        use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
         use crate::php_worker::rpc::forwarding;
         use bstr::ByteSlice;
         use shirabe_php_rpc::{PhpThrow, PluginValue};
@@ -4495,7 +5516,7 @@ dispatch,
 
         pub(crate) trait Forwarding {
             fn __construct(call: &mut Call<'_>) -> Result<<forwarding::repository::array_repository::PhpClass as forwarding::repository::array_repository::Forwarding>::Handle, PhpThrow>{
-                Err(call.unsupported())
+                Err(call.unconstructible())
             }
         }
 
@@ -4523,9 +5544,16 @@ _ => protocol_violation(call),
 name: b"Composer\\Repository\\LockArrayRepository",
 dispatch,
 };
+
+        pub(crate) fn construct(call: &mut Call<'_>) -> Result<u64, PhpThrow> {
+            let entity = <PhpClass as Forwarding>::__construct(call)?;
+            constructed(call.class(), entity)
+        }
     }
     pub(crate) mod repository_manager {
-        use crate::php_worker::rpc::entity::{Call, Crossing, Entity, protocol_violation};
+        use crate::php_worker::rpc::entity::{
+            Call, Crossing, Entity, constructed, protocol_violation,
+        };
         use bstr::ByteSlice;
         use shirabe_php_rpc::{PhpThrow, PluginValue};
 
@@ -4610,7 +5638,7 @@ dispatch,
             }
 
             fn __construct(call: &mut Call<'_>) -> Result<Self::Handle, PhpThrow> {
-                Err(call.unsupported())
+                Err(call.unconstructible())
             }
         }
 
@@ -4636,9 +5664,14 @@ dispatch,
             name: b"Composer\\Repository\\RepositoryManager",
             dispatch,
         };
+
+        pub(crate) fn construct(call: &mut Call<'_>) -> Result<u64, PhpThrow> {
+            let entity = <PhpClass as Forwarding>::__construct(call)?;
+            constructed(call.class(), entity)
+        }
     }
     pub(crate) mod writable_array_repository {
-        use crate::php_worker::rpc::entity::{Call, Crossing, protocol_violation};
+        use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
         use crate::php_worker::rpc::forwarding;
         use bstr::ByteSlice;
         use shirabe_php_rpc::{PhpThrow, PluginValue};
@@ -4697,7 +5730,7 @@ dispatch,
             }
 
             fn __construct(call: &mut Call<'_>) -> Result<<forwarding::repository::array_repository::PhpClass as forwarding::repository::array_repository::Forwarding>::Handle, PhpThrow>{
-                Err(call.unsupported())
+                Err(call.unconstructible())
             }
         }
 
@@ -4731,12 +5764,107 @@ _ => protocol_violation(call),
 name: b"Composer\\Repository\\WritableArrayRepository",
 dispatch,
 };
+
+        pub(crate) fn construct(call: &mut Call<'_>) -> Result<u64, PhpThrow> {
+            let entity = <PhpClass as Forwarding>::__construct(call)?;
+            constructed(call.class(), entity)
+        }
+    }
+}
+
+pub(crate) mod script {
+    pub(crate) mod event {
+        use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
+        use crate::php_worker::rpc::forwarding;
+        use bstr::ByteSlice;
+        use shirabe_php_rpc::{PhpThrow, PluginValue};
+
+        /// `Composer\Script\Event`.
+        #[derive(Debug)]
+        pub(crate) struct PhpClass;
+
+        pub(crate) trait Forwarding {
+            fn get_composer(
+                this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_io(
+                this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn is_dev_mode(
+                this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_originating_event(
+                this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_originating_event(
+                this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn __construct(call: &mut Call<'_>) -> Result<<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle, PhpThrow>{
+                Err(call.unconstructible())
+            }
+        }
+
+        pub(crate) fn dispatch(
+            this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
+            call: &mut Call<'_>,
+        ) -> Result<PluginValue, PhpThrow> {
+            match call.method().as_bytes() {
+b"getComposer" => <PhpClass as Forwarding>::get_composer(this, call),
+b"getIO" => <PhpClass as Forwarding>::get_io(this, call),
+b"isDevMode" => <PhpClass as Forwarding>::is_dev_mode(this, call),
+b"getOriginatingEvent" => <PhpClass as Forwarding>::get_originating_event(this, call),
+b"setOriginatingEvent" => <PhpClass as Forwarding>::set_originating_event(this, call),
+b"getName" => <forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::get_name(this, call),
+b"getArguments" => <forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::get_arguments(this, call),
+b"getFlags" => <forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::get_flags(this, call),
+b"isPropagationStopped" => <forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::is_propagation_stopped(this, call),
+b"stopPropagation" => <forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::stop_propagation(this, call),
+_ => protocol_violation(call),
+}
+        }
+
+        pub(crate) static CROSSING: Crossing<<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle> = Crossing {
+name: b"Composer\\Script\\Event",
+dispatch,
+};
+
+        pub(crate) fn construct(call: &mut Call<'_>) -> Result<u64, PhpThrow> {
+            let entity = <PhpClass as Forwarding>::__construct(call)?;
+            constructed(call.class(), entity)
+        }
     }
 }
 
 pub(crate) mod util {
     pub(crate) mod filesystem {
-        use crate::php_worker::rpc::entity::{Call, Crossing, Entity, protocol_violation};
+        use crate::php_worker::rpc::entity::{
+            Call, Crossing, Entity, constructed, protocol_violation,
+        };
         use bstr::ByteSlice;
         use shirabe_php_rpc::{PhpThrow, PluginValue};
 
@@ -4920,7 +6048,7 @@ pub(crate) mod util {
             }
 
             fn __construct(call: &mut Call<'_>) -> Result<Self::Handle, PhpThrow> {
-                Err(call.unsupported())
+                Err(call.unconstructible())
             }
         }
 
@@ -4971,9 +6099,16 @@ pub(crate) mod util {
             name: b"Composer\\Util\\Filesystem",
             dispatch,
         };
+
+        pub(crate) fn construct(call: &mut Call<'_>) -> Result<u64, PhpThrow> {
+            let entity = <PhpClass as Forwarding>::__construct(call)?;
+            constructed(call.class(), entity)
+        }
     }
     pub(crate) mod http_downloader {
-        use crate::php_worker::rpc::entity::{Call, Crossing, Entity, protocol_violation};
+        use crate::php_worker::rpc::entity::{
+            Call, Crossing, Entity, constructed, protocol_violation,
+        };
         use bstr::ByteSlice;
         use shirabe_php_rpc::{PhpThrow, PluginValue};
 
@@ -5043,7 +6178,7 @@ pub(crate) mod util {
             }
 
             fn __construct(call: &mut Call<'_>) -> Result<Self::Handle, PhpThrow> {
-                Err(call.unsupported())
+                Err(call.unconstructible())
             }
         }
 
@@ -5069,9 +6204,16 @@ pub(crate) mod util {
             name: b"Composer\\Util\\HttpDownloader",
             dispatch,
         };
+
+        pub(crate) fn construct(call: &mut Call<'_>) -> Result<u64, PhpThrow> {
+            let entity = <PhpClass as Forwarding>::__construct(call)?;
+            constructed(call.class(), entity)
+        }
     }
     pub(crate) mod process_executor {
-        use crate::php_worker::rpc::entity::{Call, Crossing, Entity, protocol_violation};
+        use crate::php_worker::rpc::entity::{
+            Call, Crossing, Entity, constructed, protocol_violation,
+        };
         use bstr::ByteSlice;
         use shirabe_php_rpc::{PhpThrow, PluginValue};
 
@@ -5166,7 +6308,7 @@ pub(crate) mod util {
             }
 
             fn __construct(call: &mut Call<'_>) -> Result<Self::Handle, PhpThrow> {
-                Err(call.unsupported())
+                Err(call.unconstructible())
             }
 
             fn get_timeout(call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
@@ -5202,6 +6344,19 @@ pub(crate) mod util {
             name: b"Composer\\Util\\ProcessExecutor",
             dispatch,
         };
+
+        pub(crate) fn construct(call: &mut Call<'_>) -> Result<u64, PhpThrow> {
+            let entity = <PhpClass as Forwarding>::__construct(call)?;
+            constructed(call.class(), entity)
+        }
+
+        pub(crate) fn call_static(call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+            match call.method().as_bytes() {
+                b"getTimeout" => <PhpClass as Forwarding>::get_timeout(call),
+                b"setTimeout" => <PhpClass as Forwarding>::set_timeout(call),
+                _ => protocol_violation(call),
+            }
+        }
     }
 }
 

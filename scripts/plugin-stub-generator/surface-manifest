@@ -22,30 +22,10 @@ foreach (array_slice($argv, 1) as $arg) {
     }
 }
 
-$dispatchers = [];
-foreach (file(__DIR__ . '/dispatchers.list', FILE_IGNORE_NEW_LINES) as $line) {
-    $line = trim($line);
-    if ($line === '' || str_starts_with($line, '#')) {
-        continue;
-    }
-    $fields = preg_split('/\s+/', $line);
-    $fqcn = array_shift($fields);
-    if ($fields === [] || isset($dispatchers[$fqcn])) {
-        fwrite(STDERR, "error: malformed or duplicate entry in dispatchers.list: $line\n");
-        exit(1);
-    }
-    $dispatchers[$fqcn] = match ($fields) {
-        ['-'] => [],
-        ['forwarding'] => null,
-        default => $fields,
-    };
-}
-
 $phpDir = $repoRoot . '/crates/shirabe-php-rpc/php';
 $manifest = new SurfaceManifest(
     [$phpDir . '/stubs', $phpDir . '/runtime'],
     $repoRoot . '/crates/shirabe/src',
-    $dispatchers,
     [$phpDir . '/guards'],
 );
 try {

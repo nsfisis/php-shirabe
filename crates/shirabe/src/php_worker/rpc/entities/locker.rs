@@ -1,6 +1,6 @@
 //! The methods a `Composer\Package\Locker` entity answers over RPC.
 
-use crate::package::{LockerInterface, PackageInterfaceHandle};
+use crate::package::{Locker, LockerInterface, PackageInterfaceHandle};
 use crate::php_worker::rpc::entities::autoload_generator::root_package;
 use crate::php_worker::rpc::entity::{Call, Crossing, Entity, entity_value};
 use crate::php_worker::rpc::forwarding;
@@ -180,6 +180,12 @@ impl forwarding::package::locker::Forwarding for forwarding::package::locker::Ph
             .get_missing_requirement_info(package, include_dev)
             .map_err(call.failed())?
             .to_wire())
+    }
+
+    fn get_content_hash(call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+        Locker::get_content_hash(call.arg::<BString>(0)?)
+            .map(PluginValue::string)
+            .map_err(call.failed())
     }
 
     // TODO(plugin): `JsonFile` has no proxy stub, so the lock file cannot be handed out.

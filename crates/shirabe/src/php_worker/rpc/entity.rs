@@ -192,6 +192,16 @@ impl<'a> Call<'a> {
         ))
     }
 
+    /// The answer of a forwarded constructor the Rust side does not serve. Each class has to
+    /// decide what a plugin-built instance means for the Rust-side graph, which is why none is
+    /// answered generically.
+    pub fn unconstructible(&self) -> PhpThrow {
+        PhpThrow::runtime(bformat!(
+            "Shirabe does not support constructing {} inside the plugin process yet",
+            self.class
+        ))
+    }
+
     /// The answer of a forwarded member the Rust side declines to serve, for `reason`.
     pub fn unavailable(&self, reason: impl AsRef<[u8]>) -> PhpThrow {
         PhpThrow::runtime(bformat!(
@@ -212,6 +222,17 @@ pub fn protocol_violation(call: &Call<'_>) -> ! {
         call.class(),
         call.method()
     )
+}
+
+/// Registers an entity a forwarded constructor of `class` built, and answers its rhandle.
+pub(crate) fn constructed<H: Entity>(class: &BStr, entity: H) -> Result<u64, PhpThrow> {
+    let (rhandle, crossing) = table::register(entity)?;
+    assert_eq!(
+        class,
+        BStr::new(crossing.name),
+        "a constructor builds an entity of its own class"
+    );
+    Ok(rhandle)
 }
 
 /// Registers `entity` in the R table and answers the descriptor the child builds its stub from.

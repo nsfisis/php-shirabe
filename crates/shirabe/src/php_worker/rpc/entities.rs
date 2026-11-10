@@ -6,6 +6,7 @@ pub(crate) mod config;
 pub(crate) mod download_manager;
 pub(crate) mod event_dispatcher;
 pub(crate) mod events;
+pub(crate) mod factory;
 pub(crate) mod filesystem;
 pub(crate) mod http_downloader;
 pub(crate) mod installation_manager;

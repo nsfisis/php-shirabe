@@ -4,9 +4,7 @@
 use crate::event_dispatcher::EventInterface;
 use crate::php_worker::call::PhpCall;
 use crate::php_worker::rpc::dispatch::{PluginRpcDispatcher, ScriptRpcDispatcher};
-use crate::php_worker::rpc::table::{
-    RustEntity, event_stub_class, register_entity, rust_handle_value,
-};
+use crate::php_worker::rpc::entity::entity_value;
 use crate::php_worker::runtime::{ensure_composer_php_runtime, ensure_script_autoloader};
 use crate::php_worker::throwable::throw_into_error;
 use bstr::{BStr, BString};
@@ -18,18 +16,14 @@ fn event_argument(
     event: &std::rc::Rc<std::cell::RefCell<dyn EventInterface>>,
     callee: BString,
 ) -> anyhow::Result<PluginValue> {
-    let stub_class = event_stub_class(&*event.borrow()).ok_or_else(|| -> anyhow::Error {
-        // TODO(plugin): an event class without a proxy stub cannot cross the boundary.
+    // TODO(plugin): an event class without a proxy stub cannot cross the boundary.
+    entity_value(event).map_err(|_| -> anyhow::Error {
         RuntimeException::new(bformat!(
             "no proxy stub is available yet for the event `{}` dispatched to {callee}",
             event.borrow().get_name()
         ))
         .into()
-    })?;
-    Ok(rust_handle_value(
-        register_entity(RustEntity::Event(event.clone())),
-        stub_class,
-    ))
+    })
 }
 
 /// `is_callable([$object, $method])` for a subscriber's listener, with the script autoloader

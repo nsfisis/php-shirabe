@@ -7,9 +7,9 @@ namespace Shirabe\Lint\Linters;
 use Shirabe\Lint\Linter;
 
 /**
- * `crates/shirabe/src/php_worker/rpc/surface.tsv` has to match what
- * `scripts/plugin-stub-generator/surface-manifest` derives from the committed stubs and runtime
- * classes and from the match arms of the Rust dispatchers.
+ * `crates/shirabe/src/php_worker/rpc/surface.tsv` and `crates/shirabe/src/php_worker/rpc/forwarding.rs`
+ * have to match what `scripts/plugin-stub-generator/surface-manifest` derives from the committed
+ * stubs, runtime classes and guards, and from the hand-written forwarding impls.
  */
 final class PluginSurfaceManifest implements Linter
 {

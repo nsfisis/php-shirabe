@@ -1,33 +1,13 @@
 //! The R table: the Rust-side entities a PHP proxy stub points back to, and the handles that name
 //! them on the wire.
 
-use crate::event_dispatcher::{Event, EventInterface};
-use crate::installer::{InstallerEvent, PackageEvent};
 use crate::package::PackageInterfaceHandle;
-use crate::php_worker::rpc::dispatch::dispatch_legacy_entity;
 use crate::php_worker::rpc::entity::{Call, Crossing, Entity, EntityArg, PropertyAccess};
-use crate::plugin::{
-    CommandEvent, PostFileDownloadEvent, PreCommandRunEvent, PreFileDownloadEvent,
-    PrePoolCreateEvent,
-};
 use crate::repository::RepositoryInterfaceHandle;
-use crate::script::Event as ScriptEvent;
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe_php_rpc::{FromWire, PhpThrow, PluginValue, RustObjHandle, wire};
+use shirabe_php_rpc::{FromWire, PhpThrow, PluginValue, wire};
 use shirabe_php_shim::bformat;
-
-/// A Rust-side entity of a kind still routed by hand.
-#[derive(Debug, Clone)]
-pub(crate) enum RustEntity {
-    Event(std::rc::Rc<std::cell::RefCell<dyn EventInterface>>),
-}
-
-fn entity_ptr_id(entity: &RustEntity) -> usize {
-    match entity {
-        RustEntity::Event(event) => std::rc::Rc::as_ptr(event) as *const () as usize,
-    }
-}
 
 /// An R-table entry: one registered entity, whatever its kind.
 trait Slot: std::fmt::Debug {
@@ -92,29 +72,6 @@ impl<H: Entity> Slot for Registered<H> {
                 None => (self.class.dispatch)(&self.entity, &mut call),
             },
         }
-    }
-
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
-}
-
-/// An entity of a kind still served by the `RustEntity` routing.
-#[derive(Debug)]
-struct Legacy(RustEntity);
-
-impl Slot for Legacy {
-    fn address(&self) -> *const () {
-        entity_ptr_id(&self.0) as *const ()
-    }
-
-    fn call(
-        &self,
-        method: &BStr,
-        args: &[PluginValue],
-        out_params: &mut IndexMap<u32, PluginValue>,
-    ) -> Result<PluginValue, PhpThrow> {
-        dispatch_legacy_entity(&self.0, method, args, out_params)
     }
 
     fn as_any(&self) -> &dyn std::any::Any {
@@ -234,73 +191,6 @@ pub(crate) fn call(
     match slot {
         Some(slot) => slot.call(method, args, out_params),
         None => Err(PhpThrow::runtime(bformat!("unknown Rust handle {rhandle}"))),
-    }
-}
-
-/// Registers an entity in the R table, interned by shared-pointer identity.
-pub(crate) fn register_entity(entity: RustEntity) -> u64 {
-    let discriminant = std::mem::discriminant(&entity);
-    let slot: std::rc::Rc<dyn Slot> = std::rc::Rc::new(Legacy(entity));
-    R_TABLE.with(|table| {
-        table
-            .borrow_mut()
-            .intern(slot, |existing| {
-                existing
-                    .as_any()
-                    .downcast_ref::<Legacy>()
-                    .is_some_and(|legacy| std::mem::discriminant(&legacy.0) == discriminant)
-            })
-            .0
-    })
-}
-
-/// A `RustHandle` wire descriptor for a freshly registered (or re-interned) entity.
-pub(crate) fn rust_handle_value(rhandle: u64, class: impl AsRef<[u8]>) -> PluginValue {
-    PluginValue::RustHandle(RustObjHandle {
-        rhandle,
-        class: BString::from(class.as_ref()),
-    })
-}
-
-/// The proxy stub class (same FQCN as the real event class) an event crosses the RPC
-/// boundary as, or `None` when no stub exists for it yet.
-pub(crate) fn event_stub_class(event: &dyn EventInterface) -> Option<&'static BStr> {
-    if event.as_any().downcast_ref::<ScriptEvent>().is_some() {
-        Some(BStr::new("Composer\\Script\\Event"))
-    } else if event.as_any().downcast_ref::<PackageEvent>().is_some() {
-        Some(BStr::new("Composer\\Installer\\PackageEvent"))
-    } else if event.as_any().downcast_ref::<InstallerEvent>().is_some() {
-        Some(BStr::new("Composer\\Installer\\InstallerEvent"))
-    } else if event
-        .as_any()
-        .downcast_ref::<PreFileDownloadEvent>()
-        .is_some()
-    {
-        Some(BStr::new("Composer\\Plugin\\PreFileDownloadEvent"))
-    } else if event
-        .as_any()
-        .downcast_ref::<PostFileDownloadEvent>()
-        .is_some()
-    {
-        Some(BStr::new("Composer\\Plugin\\PostFileDownloadEvent"))
-    } else if event
-        .as_any()
-        .downcast_ref::<PrePoolCreateEvent>()
-        .is_some()
-    {
-        Some(BStr::new("Composer\\Plugin\\PrePoolCreateEvent"))
-    } else if event.as_any().downcast_ref::<CommandEvent>().is_some() {
-        Some(BStr::new("Composer\\Plugin\\CommandEvent"))
-    } else if event
-        .as_any()
-        .downcast_ref::<PreCommandRunEvent>()
-        .is_some()
-    {
-        Some(BStr::new("Composer\\Plugin\\PreCommandRunEvent"))
-    } else if event.as_any().downcast_ref::<Event>().is_some() {
-        Some(BStr::new("Composer\\EventDispatcher\\Event"))
-    } else {
-        None
     }
 }
 
