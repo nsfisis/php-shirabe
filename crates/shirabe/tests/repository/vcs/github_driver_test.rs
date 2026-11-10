@@ -601,7 +601,6 @@ otechie: userName",
     ]
 }
 
-#[ignore = "funding/archived parsing differs from PHP; not date-related"]
 #[test]
 fn test_funding_format() {
     for (funding, expected) in funding_url_provider() {
