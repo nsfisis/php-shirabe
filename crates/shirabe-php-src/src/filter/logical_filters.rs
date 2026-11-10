@@ -719,7 +719,7 @@ pub fn php_filter_validate_ip(value: &[u8], flags: i64) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bstr::ByteSlice;
+    use bstr::ByteSlice as _;
 
     #[test]
     fn boolean() {

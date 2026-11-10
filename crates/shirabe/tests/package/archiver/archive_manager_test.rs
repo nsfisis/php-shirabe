@@ -14,14 +14,13 @@ use shirabe_php_shim::{
     path_from_bytes, path_to_bytes, realpath, sys_get_temp_dir, unlink,
 };
 use shirabe_symfony_process::Process;
-use tempfile::TempDir;
 
 // ref: ArchiverTestCase::setUp + ArchiveManagerTest::setUp.
 struct TestCase {
     manager: ArchiveManager,
     test_dir: std::path::PathBuf,
     target_dir: std::path::PathBuf,
-    _test_dir_guard: TempDir,
+    _test_dir_guard: tempfile::TempDir,
 }
 
 impl TestCase {

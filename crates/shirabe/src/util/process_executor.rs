@@ -4,7 +4,7 @@ use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interfac
 use crate::php_worker::job::{JobOwner, record_internal_job};
 use crate::signal::SignalSubscription;
 use crate::util::{GitHub, Platform};
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, LogicException, PHP_EOL, PhpMixed, PregMatches, RuntimeException, array_intersect,
@@ -18,13 +18,12 @@ use shirabe_symfony_process::{
     ExecutableFinder, Process, ProcessMock,
     exception::{ProcessSignaledException, RuntimeException as SymfonyProcessRuntimeException},
 };
-use std::path::Path;
-use std::sync::{LazyLock, Mutex};
 
-static EXECUTABLES: LazyLock<Mutex<IndexMap<BString, BString>>> =
-    LazyLock::new(|| Mutex::new(IndexMap::new()));
+static EXECUTABLES: std::sync::LazyLock<std::sync::Mutex<IndexMap<BString, BString>>> =
+    std::sync::LazyLock::new(|| std::sync::Mutex::new(IndexMap::new()));
 
-static TIMEOUT: LazyLock<Mutex<i64>> = LazyLock::new(|| Mutex::new(300));
+static TIMEOUT: std::sync::LazyLock<std::sync::Mutex<i64>> =
+    std::sync::LazyLock::new(|| std::sync::Mutex::new(300));
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CommandLine {
@@ -189,7 +188,7 @@ impl ProcessExecutor {
         &self,
         command: C,
         output: O,
-        cwd: Option<&Path>,
+        cwd: Option<&std::path::Path>,
     ) -> anyhow::Result<i64>
     where
         C: IntoExecCommand,
@@ -200,7 +199,7 @@ impl ProcessExecutor {
     }
 
     /// runs a process on the commandline in TTY mode
-    pub fn execute_tty<C>(&self, command: C, cwd: Option<&Path>) -> anyhow::Result<i64>
+    pub fn execute_tty<C>(&self, command: C, cwd: Option<&std::path::Path>) -> anyhow::Result<i64>
     where
         C: IntoExecCommand,
     {
@@ -215,7 +214,7 @@ impl ProcessExecutor {
     fn run_process<'o, O>(
         &self,
         command: CommandLine,
-        cwd: Option<&Path>,
+        cwd: Option<&std::path::Path>,
         env: Option<IndexMap<BString, BString>>,
         tty: bool,
         output: O,
@@ -257,7 +256,7 @@ impl ProcessExecutor {
 
                 Process::new(
                     command,
-                    cwd.map(Path::to_path_buf),
+                    cwd.map(std::path::Path::to_path_buf),
                     None,
                     PhpMixed::Null,
                     Some(Self::get_timeout() as f64),
@@ -340,7 +339,7 @@ impl ProcessExecutor {
     fn do_execute<'o, O>(
         &self,
         command: CommandLine,
-        cwd: Option<&Path>,
+        cwd: Option<&std::path::Path>,
         tty: bool,
         output: O,
     ) -> anyhow::Result<i64>
@@ -404,7 +403,7 @@ impl ProcessExecutor {
     fn mock_match(
         &self,
         command: &CommandLine,
-        cwd: Option<&Path>,
+        cwd: Option<&std::path::Path>,
     ) -> anyhow::Result<(BString, BString, i64)> {
         let command_string = match command {
             CommandLine::Args(args) => implode(" ", args),
@@ -451,7 +450,7 @@ impl ProcessExecutor {
             // `GitDriver::supports`) treat a mismatch as an ordinary recoverable failure. Using
             // the same `RuntimeException` type here keeps `catch::<RuntimeException>()` checks
             // working the same way against a mismatch.
-            return Err(RuntimeException::new(bformat!("Received unexpected command {} in \"{}\"{PHP_EOL}{expected}{PHP_EOL}Received calls:{PHP_EOL}{received}", display_to_bytes(format_args!("{:?}", command)), cwd.unwrap_or(Path::new(""))))
+            return Err(RuntimeException::new(bformat!("Received unexpected command {} in \"{}\"{PHP_EOL}{expected}{PHP_EOL}Received calls:{PHP_EOL}{received}", display_to_bytes(format_args!("{:?}", command)), cwd.unwrap_or(std::path::Path::new(""))))
             .into());
         }
 
@@ -469,7 +468,7 @@ impl ProcessExecutor {
     fn mock_do_execute<'o, O>(
         &self,
         command: CommandLine,
-        cwd: Option<&Path>,
+        cwd: Option<&std::path::Path>,
         output: O,
     ) -> anyhow::Result<i64>
     where
@@ -573,7 +572,7 @@ impl ProcessExecutor {
     pub fn execute_async<C>(
         &self,
         command: C,
-        cwd: Option<&Path>,
+        cwd: Option<&std::path::Path>,
     ) -> std::pin::Pin<Box<dyn std::future::Future<Output = anyhow::Result<Process>>>>
     where
         C: IntoExecCommand,
@@ -592,7 +591,7 @@ impl ProcessExecutor {
     pub(crate) fn execute_async_job<C>(
         &self,
         command: C,
-        cwd: Option<&Path>,
+        cwd: Option<&std::path::Path>,
         started: Option<std::rc::Rc<std::cell::Cell<bool>>>,
     ) -> std::pin::Pin<Box<dyn std::future::Future<Output = anyhow::Result<Process>>>>
     where
@@ -621,7 +620,7 @@ impl ProcessExecutor {
         let allow_async = self.allow_async.get();
         let semaphore = self.semaphore.borrow().clone();
         let io = self.io.clone();
-        let cwd = cwd.map(Path::to_path_buf);
+        let cwd = cwd.map(std::path::Path::to_path_buf);
 
         Box::pin(async move {
             if !allow_async {
@@ -752,14 +751,19 @@ impl ProcessExecutor {
         Self::escape_argument(argument.as_ref())
     }
 
-    fn output_command_run(&self, command: &CommandLine, cwd: Option<&Path>, r#async: bool) {
+    fn output_command_run(
+        &self,
+        command: &CommandLine,
+        cwd: Option<&std::path::Path>,
+        r#async: bool,
+    ) {
         Self::output_command_run_with(&self.io, command, cwd, r#async);
     }
 
     fn output_command_run_with(
         io: &Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
         command: &CommandLine,
-        cwd: Option<&Path>,
+        cwd: Option<&std::path::Path>,
         r#async: bool,
     ) {
         if io.is_none() || !io.as_ref().unwrap().is_debug() {

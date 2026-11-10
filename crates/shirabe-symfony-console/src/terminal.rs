@@ -7,12 +7,11 @@ use shirabe_php_shim::{
     sapi_windows_cp_get, sapi_windows_cp_set, sapi_windows_vt100_support, shell_exec,
     stream_get_contents, trim,
 };
-use std::cell::Cell;
 
 thread_local! {
-    static WIDTH: Cell<Option<i64>> = const { Cell::new(None) };
-    static HEIGHT: Cell<Option<i64>> = const { Cell::new(None) };
-    static STTY: Cell<Option<bool>> = const { Cell::new(None) };
+    static WIDTH: std::cell::Cell<Option<i64>> = const { std::cell::Cell::new(None) };
+    static HEIGHT: std::cell::Cell<Option<i64>> = const { std::cell::Cell::new(None) };
+    static STTY: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
 }
 
 #[derive(Debug)]

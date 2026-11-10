@@ -16,7 +16,7 @@ use crate::repository::{
     RepositoryInterfaceWeakHandle, SearchResult, VersionCacheInterface, VersionCacheResult,
 };
 use crate::util::{HttpDownloader, Platform, ProcessExecutor, Url};
-use bstr::{B, BStr, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, PhpClass, PhpMixed, ToPhpString, bformat, error_message,

@@ -8,7 +8,7 @@
 //! Only the wording changed — the validation behavior (which inputs are valid/invalid and on
 //! which property) is identical to upstream.
 
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use shirabe::json::{JsonFile, JsonValidationException};
 use shirabe_php_shim::{Catch as _, bformat, json_decode_obj, php_str};
 

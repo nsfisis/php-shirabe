@@ -36,7 +36,7 @@ use crate::php_worker::rpc::entity::entity_value;
 use crate::php_worker::runtime;
 use crate::php_worker::xdebug::is_xdebug_active;
 use crate::util::{ErrorHandler, Filesystem, HttpDownloader, Platform};
-use bstr::{B, BStr, BString, ByteSlice, ByteVec};
+use bstr::{B, BStr, BString, ByteSlice as _, ByteVec as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     AnyThrowable, AsAny, Catch as _, Error, ExitException, InvalidArgumentException,
@@ -77,7 +77,6 @@ use shirabe_symfony_console::output::{
 use shirabe_symfony_console::style::{StyleInterface, SymfonyStyle};
 use shirabe_symfony_console::{Application as BaseApplication, Terminal};
 use shirabe_symfony_process::exception::ProcessTimedOutException;
-use std::path::PathBuf;
 
 /// The PHP `Composer\Console\Application` and `Symfony\Component\Console\Application` are
 /// flattened into a single struct. Methods that are overridden by subclass and called via
@@ -188,7 +187,7 @@ impl Application {
     fn get_new_working_dir(
         &self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
-    ) -> anyhow::Result<Option<PathBuf>> {
+    ) -> anyhow::Result<Option<std::path::PathBuf>> {
         let working_dir = input
             .borrow()
             .get_parameter_option(&["--working-dir", "-d"], InputValue::Null, true)
@@ -1894,7 +1893,7 @@ impl ApplicationHandle {
 
         // switch working dir
         let new_work_dir = application.borrow().get_new_working_dir(input.clone())?;
-        let mut old_working_dir: Option<PathBuf> = None;
+        let mut old_working_dir: Option<std::path::PathBuf> = None;
         if let Some(ref nwd) = new_work_dir {
             old_working_dir = Some(Platform::get_cwd(true).unwrap_or_default());
             chdir(nwd);

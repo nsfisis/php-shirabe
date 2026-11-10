@@ -9,7 +9,6 @@ use shirabe::io::{IOInterface, NullIO};
 use shirabe::repository::vcs::PerforceDriver;
 use shirabe::util::{Filesystem, HttpDownloader, MockHandler};
 use shirabe_php_shim::{PhpMixed, ToPhpString, bformat, path_to_bytes, php_str};
-use tempfile::TempDir;
 
 const TEST_URL: &BStr = php_str(b"TEST_PERFORCE_URL");
 const TEST_DEPOT: &BStr = php_str(b"TEST_DEPOT_CONFIG");
@@ -52,7 +51,7 @@ mod mock_perforce {
 use mock_perforce::MockPerforce;
 
 struct SetUp {
-    test_path: TempDir,
+    test_path: tempfile::TempDir,
     config: Config,
     repo_config: IndexMap<BString, PhpMixed>,
 }

@@ -15,13 +15,12 @@ use crate::repository::{InstalledRepositoryInterface, InstalledRepositoryInterfa
 use crate::signal::SignalSubscription;
 use crate::util::r#loop::Loop;
 use crate::util::{HttpOptions, Platform, StreamContextOptions};
-use bstr::{B, BStr, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, array_splice, array_unshift, bformat, http_build_query,
     json_encode, path_from_bytes, str_replace, strip_tags, strpos, strtolower, ucfirst,
 };
-use std::path::PathBuf;
 
 /// Package operation manager.
 #[derive(Debug)]
@@ -811,10 +810,10 @@ impl InstallationManager {
     }
 
     /// Returns the installation path of a package
-    pub fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<PathBuf> {
+    pub fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<std::path::PathBuf> {
         // For testing only (ref InstallationManagerMock::getInstallPath).
         if self.mock.is_some() {
-            return Some(PathBuf::from(path_from_bytes(&bformat!(
+            return Some(std::path::PathBuf::from(path_from_bytes(&bformat!(
                 "vendor/{}",
                 package.get_name()
             ))));
@@ -1060,7 +1059,7 @@ pub trait InstallationManagerInterface: std::fmt::Debug {
         run_scripts: bool,
         download_only: bool,
     ) -> anyhow::Result<()>;
-    fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<PathBuf>;
+    fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<std::path::PathBuf>;
     fn set_output_progress(&mut self, output_progress: bool);
     async fn notify_installs(&mut self, io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>);
 }
@@ -1107,7 +1106,7 @@ impl InstallationManagerInterface for InstallationManager {
             .await
     }
 
-    fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<PathBuf> {
+    fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<std::path::PathBuf> {
         self.get_install_path(package)
     }
 

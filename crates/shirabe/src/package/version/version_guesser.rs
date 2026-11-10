@@ -8,14 +8,13 @@ use crate::util::{
     Git as GitUtil, HttpDownloader, Platform, ProcessExecutor, StreamContextOptions,
     Svn as SvnUtil, sync_executor,
 };
-use bstr::{B, BStr, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     PhpMixed, RuntimeException, array_map, bformat, empty, implode, is_string, json_encode,
     path_to_bytes, php_regex, preg_is_match, preg_match, preg_quote, preg_replace, str_replace,
     strlen, strnatcasecmp, strpos, substr, trim, usort,
 };
-use std::path::Path;
 
 /// Seam over the parts of [`VersionGuesser`] that consumers depend on, so they can be exercised
 /// with a test double. PHP has no such interface; this exists only to allow mocking the
@@ -24,7 +23,7 @@ pub trait VersionGuesserInterface: std::fmt::Debug {
     fn guess_version(
         &mut self,
         package_config: &IndexMap<BString, PhpMixed>,
-        path: &Path,
+        path: &std::path::Path,
     ) -> anyhow::Result<Option<VersionData>>;
 
     fn get_root_version_from_env(&self) -> anyhow::Result<BString>;
@@ -88,7 +87,7 @@ impl VersionGuesser {
     pub fn guess_version(
         &mut self,
         package_config: &IndexMap<BString, PhpMixed>,
-        path: &Path,
+        path: &std::path::Path,
     ) -> anyhow::Result<Option<VersionData>> {
         // For testing only (ref VersionGuesserMock::guessVersion returns null).
         if self.mock {
@@ -199,7 +198,7 @@ impl VersionGuesser {
     fn guess_git_version(
         &mut self,
         package_config: &IndexMap<BString, PhpMixed>,
-        path: &Path,
+        path: &std::path::Path,
     ) -> anyhow::Result<VersionData> {
         GitUtil::clean_env(&self.process);
         let mut commit: Option<BString> = None;
@@ -329,7 +328,10 @@ impl VersionGuesser {
         })
     }
 
-    fn version_from_git_tags(&mut self, path: &Path) -> anyhow::Result<Option<(BString, BString)>> {
+    fn version_from_git_tags(
+        &mut self,
+        path: &std::path::Path,
+    ) -> anyhow::Result<Option<(BString, BString)>> {
         // try to fetch current version from git tags
         let mut output = BString::default();
         if 0 == self.process.borrow_mut().execute(
@@ -351,7 +353,7 @@ impl VersionGuesser {
     fn guess_hg_version(
         &mut self,
         package_config: &IndexMap<BString, PhpMixed>,
-        path: &Path,
+        path: &std::path::Path,
     ) -> anyhow::Result<Option<VersionData>> {
         // try to fetch current version from hg branch
         let mut output = BString::default();
@@ -443,7 +445,7 @@ impl VersionGuesser {
         version: Option<BString>,
         mut branches: Vec<BString>,
         scm_cmdline: Vec<BString>,
-        path: &Path,
+        path: &std::path::Path,
     ) -> anyhow::Result<FeatureVersionResult> {
         let mut pretty_version: Option<BString> = version.clone();
         let mut version = version;
@@ -587,7 +589,7 @@ impl VersionGuesser {
         )
     }
 
-    fn guess_fossil_version(&mut self, path: &Path) -> anyhow::Result<VersionData> {
+    fn guess_fossil_version(&mut self, path: &std::path::Path) -> anyhow::Result<VersionData> {
         let mut version: Option<BString> = None;
         let mut pretty_version: Option<BString> = None;
 
@@ -631,7 +633,7 @@ impl VersionGuesser {
     fn guess_svn_version(
         &mut self,
         package_config: &IndexMap<BString, PhpMixed>,
-        path: &Path,
+        path: &std::path::Path,
     ) -> anyhow::Result<Option<VersionData>> {
         SvnUtil::clean_env()?;
 
@@ -727,7 +729,7 @@ impl VersionGuesserInterface for VersionGuesser {
     fn guess_version(
         &mut self,
         package_config: &IndexMap<BString, PhpMixed>,
-        path: &Path,
+        path: &std::path::Path,
     ) -> anyhow::Result<Option<VersionData>> {
         VersionGuesser::guess_version(self, package_config, path)
     }

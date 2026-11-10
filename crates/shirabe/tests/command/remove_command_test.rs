@@ -4,9 +4,8 @@ use crate::test_case::{
     RunOptions, create_composer_lock, create_installed_json, get_application_tester, get_package,
     init_temp_composer,
 };
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
-use serial_test::serial;
 use shirabe::json::JsonFile;
 use shirabe::package::{Link, PackageInterfaceHandle};
 use shirabe_php_shim::{error_message, path_from_bytes, trim};
@@ -43,7 +42,7 @@ fn is_empty_json(value: &serde_json::Value) -> bool {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_exception_running_with_no_remove_packages() {
     let mut app_tester = get_application_tester();
     let err = app_tester
@@ -60,7 +59,7 @@ fn test_exception_running_with_no_remove_packages() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_exception_when_running_unused_without_lock_file() {
     let tear_down = init_temp_composer(None, None, None, true);
 
@@ -86,7 +85,7 @@ fn test_exception_when_running_unused_without_lock_file() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_warning_when_removing_non_existent_package() {
     let tear_down = init_temp_composer(None, None, None, true);
     create_installed_json(&[], &[], true);
@@ -116,7 +115,7 @@ fn test_warning_when_removing_non_existent_package() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_warning_when_removing_package_from_wrong_type() {
     let tear_down = init_temp_composer(
         Some(&serde_json::json!({
@@ -158,7 +157,7 @@ fn test_warning_when_removing_package_from_wrong_type() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_warning_when_removing_package_with_deprecated_dependencies_flag() {
     let tear_down = init_temp_composer(
         Some(&serde_json::json!({
@@ -204,7 +203,7 @@ fn test_warning_when_removing_package_with_deprecated_dependencies_flag() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_message_output_when_no_unused_packages_to_remove() {
     let tear_down = init_temp_composer(
         Some(&serde_json::json!({
@@ -265,7 +264,7 @@ fn test_message_output_when_no_unused_packages_to_remove() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_remove_unused_package() {
     let tear_down = init_temp_composer(
         Some(&serde_json::json!({
@@ -329,7 +328,7 @@ fn test_remove_unused_package() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_remove_package_by_name() {
     let tear_down = init_temp_composer(
         Some(&serde_json::json!({
@@ -415,7 +414,7 @@ fn test_remove_package_by_name() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_remove_package_by_name_with_dry_run() {
     let tear_down = init_temp_composer(
         Some(&serde_json::json!({
@@ -503,7 +502,7 @@ fn test_remove_package_by_name_with_dry_run() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_remove_allowed_plugin_package_with_no_other_allowed_plugins() {
     let tear_down = init_temp_composer(
         Some(&serde_json::json!({
@@ -562,7 +561,7 @@ fn test_remove_allowed_plugin_package_with_no_other_allowed_plugins() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_remove_allowed_plugin_package_with_other_allowed_plugins() {
     let tear_down = init_temp_composer(
         Some(&serde_json::json!({
@@ -616,7 +615,7 @@ fn test_remove_allowed_plugin_package_with_other_allowed_plugins() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_remove_packages_by_vendor() {
     let tear_down = init_temp_composer(
         Some(&serde_json::json!({
@@ -701,7 +700,7 @@ fn test_remove_packages_by_vendor() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_remove_packages_by_vendor_with_dry_run() {
     let tear_down = init_temp_composer(
         Some(&serde_json::json!({
@@ -780,7 +779,7 @@ Lock file operations: 0 installs, 0 updates, 2 removals
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_warning_when_removing_packages_by_vendor_from_wrong_type() {
     let tear_down = init_temp_composer(
         Some(&serde_json::json!({
@@ -825,7 +824,7 @@ fn test_warning_when_removing_packages_by_vendor_from_wrong_type() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_package_still_present_error_when_no_install_flag_used() {
     let tear_down = init_temp_composer(
         Some(&serde_json::json!({
@@ -995,7 +994,7 @@ fn run_update_inherited_dependencies_flag_case(
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_update_inherited_dependencies_flag_is_passed_to_post_remove_installer() {
     // 'update with all dependencies'
     run_update_inherited_dependencies_flag_case(

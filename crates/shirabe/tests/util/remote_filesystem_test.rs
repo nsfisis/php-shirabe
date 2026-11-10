@@ -2,7 +2,7 @@
 
 use crate::config_stub::ConfigStubBuilder;
 use crate::io_stub::IOStub;
-use bstr::{B, BStr, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe::io::IOInterface;
 use shirabe::util::{GetResult, RemoteFilesystem};

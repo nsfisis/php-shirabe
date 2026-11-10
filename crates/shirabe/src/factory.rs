@@ -45,11 +45,10 @@ use shirabe_symfony_console::{
     formatter::{OutputFormatter, OutputFormatterStyle, OutputFormatterStyleInterface},
     output::ConsoleOutput,
 };
-use std::path::{Path, PathBuf};
 
 /// Either a configuration array or a filename to read from. PHP's `$localConfig` accepts both.
 pub enum LocalConfigInput {
-    Path(PathBuf),
+    Path(std::path::PathBuf),
     Data(IndexMap<BString, PhpMixed>),
 }
 
@@ -211,7 +210,7 @@ impl Factory {
 
     pub fn create_config(
         io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
-        cwd: Option<&Path>,
+        cwd: Option<&std::path::Path>,
     ) -> anyhow::Result<Config> {
         let cwd = match cwd {
             Some(cwd) => cwd.to_path_buf(),
@@ -325,7 +324,7 @@ impl Factory {
         Ok(config)
     }
 
-    pub fn get_composer_file() -> anyhow::Result<PathBuf> {
+    pub fn get_composer_file() -> anyhow::Result<std::path::PathBuf> {
         let env = Platform::get_env("COMPOSER");
         if let Some(env_str) = env {
             let env_trimmed = trim_chars(&env_str, " \t\n\r\0\u{0B}");
@@ -339,10 +338,10 @@ impl Factory {
             }
         }
 
-        Ok(PathBuf::from("./composer.json"))
+        Ok(std::path::PathBuf::from("./composer.json"))
     }
 
-    pub fn get_lock_file(composer_file: &Path) -> PathBuf {
+    pub fn get_lock_file(composer_file: &std::path::Path) -> std::path::PathBuf {
         let composer_file = path_to_bytes(composer_file);
         let ext = pathinfo(composer_file, PATHINFO_EXTENSION);
         let lock_file = if ext == "json" {
@@ -394,13 +393,13 @@ impl Factory {
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         local_config: Option<LocalConfigInput>,
         disable_plugins: DisablePlugins,
-        cwd: Option<&Path>,
+        cwd: Option<&std::path::Path>,
         full_load: bool,
         disable_scripts: bool,
     ) -> anyhow::Result<PartialComposerHandle> {
         // if a custom composer.json path is given, we change the default cwd to be that file's directory
         let mut local_config = local_config;
-        let mut cwd = cwd.map(Path::to_path_buf);
+        let mut cwd = cwd.map(std::path::Path::to_path_buf);
         if let Some(LocalConfigInput::Path(ref s)) = local_config
             && is_file(s)
             && cwd.is_none()
@@ -419,7 +418,7 @@ impl Factory {
         }
 
         let mut local_config_source = BString::from(Config::SOURCE_UNKNOWN);
-        let mut composer_file: Option<PathBuf> = None;
+        let mut composer_file: Option<std::path::PathBuf> = None;
         let mut local_config_data: IndexMap<BString, PhpMixed> = IndexMap::new();
         if let Some(LocalConfigInput::Path(path)) = &local_config {
             composer_file = Some(path.clone());
@@ -478,9 +477,10 @@ impl Factory {
             Self::create_config(Some(io.clone()), Some(&cwd))?
         };
         let is_global = local_config_source != Config::SOURCE_UNKNOWN
-            && realpath(path_from_bytes(&config.get_home()?)).map(PathBuf::into_os_string)
+            && realpath(path_from_bytes(&config.get_home()?))
+                .map(std::path::PathBuf::into_os_string)
                 == realpath(path_from_bytes(&dirname(&local_config_source)))
-                    .map(PathBuf::into_os_string);
+                    .map(std::path::PathBuf::into_os_string);
         config.merge(&local_config_data, &local_config_source);
 
         if let Some(ref composer_file_path) = composer_file {
@@ -1343,16 +1343,15 @@ impl Factory {
 
     /// For testing only: equivalent of `FactoryMock::createConfig`. Builds a `Config` with a unique
     /// temp home and packagist disabled, without loading the global config/auth files.
-    pub fn __create_config_mock(cwd: Option<&Path>) -> anyhow::Result<Config> {
-        use std::sync::atomic::{AtomicU64, Ordering};
-        static NEXT: AtomicU64 = AtomicU64::new(0);
+    pub fn __create_config_mock(cwd: Option<&std::path::Path>) -> anyhow::Result<Config> {
+        static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
         let mut config = Config::new(true, cwd.map(|cwd| path_to_bytes(cwd).into()));
 
         let home = std::env::temp_dir().join(path_from_bytes(&bformat!(
             "shirabe-test-{}-{}",
             std::process::id(),
-            NEXT.fetch_add(1, Ordering::Relaxed)
+            NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
         )));
         let _ = std::fs::create_dir_all(&home);
 

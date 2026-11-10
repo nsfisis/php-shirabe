@@ -7,8 +7,6 @@ use shirabe::config::{ConfigSourceInterface, JsonConfigSource};
 use shirabe::json::JsonFile;
 use shirabe::util::Filesystem;
 use shirabe_php_shim::{PhpMixed, bformat, path_from_bytes};
-use std::path::PathBuf;
-use tempfile::TempDir;
 
 fn set_up() -> TearDown {
     let fs = Filesystem::new(None);
@@ -18,11 +16,11 @@ fn set_up() -> TearDown {
 
 struct TearDown {
     fs: Filesystem,
-    working_dir: TempDir,
+    working_dir: tempfile::TempDir,
 }
 
 impl TearDown {
-    fn working_dir(&self) -> PathBuf {
+    fn working_dir(&self) -> std::path::PathBuf {
         self.working_dir.path().to_path_buf()
     }
 }
@@ -36,8 +34,8 @@ impl Drop for TearDown {
     }
 }
 
-fn fixture_path(name: impl AsRef<std::path::Path>) -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+fn fixture_path(name: impl AsRef<std::path::Path>) -> std::path::PathBuf {
+    std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../composer/tests/Composer/Test/Config/Fixtures")
         .join(name)
 }
@@ -183,11 +181,11 @@ fn test_remove_packagist() {
 
 /// Mirror of provideAddLinkData(): (sourceFile, type, name, value, compareAgainst).
 fn provide_add_link_data() -> Vec<(
-    PathBuf,
+    std::path::PathBuf,
     &'static BStr,
     &'static BStr,
     &'static BStr,
-    PathBuf,
+    std::path::PathBuf,
 )> {
     let empty = fixture_path("composer-empty.json");
     let one_of_everything = fixture_path("composer-one-of-everything.json");
@@ -197,7 +195,7 @@ fn provide_add_link_data() -> Vec<(
                                    name: &'static BStr,
                                    value: &'static BStr,
                                    fixture_basename: &BStr,
-                                   before: &PathBuf| {
+                                   before: &std::path::PathBuf| {
         (
             before.clone(),
             r#type,
@@ -360,7 +358,12 @@ fn test_add_link() {
 }
 
 /// Mirror of provideRemoveLinkData(): (sourceFile, type, name, compareAgainst).
-fn provide_remove_link_data() -> Vec<(PathBuf, &'static BStr, &'static BStr, PathBuf)> {
+fn provide_remove_link_data() -> Vec<(
+    std::path::PathBuf,
+    &'static BStr,
+    &'static BStr,
+    std::path::PathBuf,
+)> {
     let one_of_everything = fixture_path("composer-one-of-everything.json");
     let two_of_everything = fixture_path("composer-two-of-everything.json");
 
@@ -368,7 +371,7 @@ fn provide_remove_link_data() -> Vec<(PathBuf, &'static BStr, &'static BStr, Pat
         |r#type: &'static BStr,
          name: &'static BStr,
          fixture_basename: &BStr,
-         after: Option<&PathBuf>| {
+         after: Option<&std::path::PathBuf>| {
             let after = after.cloned().unwrap_or_else(|| {
                 fixture_path(path_from_bytes(&bformat!(
                     "removeLink/{fixture_basename}-after.json"

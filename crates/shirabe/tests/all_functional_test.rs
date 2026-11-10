@@ -11,23 +11,21 @@ mod bootstrap;
 mod test_case;
 
 use crate::test_case::get_unique_tmp_directory;
-use bstr::{B, BStr, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
-use serial_test::serial;
 use shirabe::util::Filesystem;
 use shirabe_php_shim::{
     PhpMixed, ToPhpString, bformat, intval, os_str_from_bytes, path_from_bytes, php_regex,
     preg_match, preg_split_delim_capture, trim, utf8_text,
 };
-use std::path::{Path, PathBuf};
 
 /// ref: AllFunctionalTest's `$oldcwd` / `$testDir` instance state plus its `setUp`/`tearDown`.
 ///
 /// `setUp` stores the previous cwd and chdir()s into Fixtures/functional; `tearDown` restores the
 /// cwd and removes the unique temp dir created by `testIntegration`. Modelled as an RAII guard.
 struct TearDown {
-    old_cwd: PathBuf,
-    test_dir: std::cell::RefCell<Option<PathBuf>>,
+    old_cwd: std::path::PathBuf,
+    test_dir: std::cell::RefCell<Option<std::path::PathBuf>>,
 }
 
 impl Drop for TearDown {
@@ -55,15 +53,15 @@ fn set_up() -> TearDown {
 }
 
 /// The `__DIR__.'/Fixtures/functional'` directory, reused from the Composer source tree.
-fn fixtures_dir() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
+fn fixtures_dir() -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../composer/tests/Composer/Test/Fixtures/functional")
         .canonicalize()
         .unwrap()
 }
 
 // ref: AllFunctionalTest::parseTestFile
-fn parse_test_file(file: &Path) -> IndexMap<BString, BString> {
+fn parse_test_file(file: &std::path::Path) -> IndexMap<BString, BString> {
     let contents = std::fs::read(file).unwrap();
     let tokens = preg_split_delim_capture(php_regex!(r"#(?:^|\n*)--([A-Z-]+)--\n#"), &contents);
     let mut data: IndexMap<BString, BString> = IndexMap::new();
@@ -269,13 +267,13 @@ fn test_build_phar() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_integration_create_project_command() {
     run_integration(BStr::new("create-project-command.test"));
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_integration_create_project_shows_full_hash_for_dev_packages() {
     run_integration(BStr::new(
         "create-project-shows-full-hash-for-dev-packages.test",
@@ -283,21 +281,21 @@ fn test_integration_create_project_shows_full_hash_for_dev_packages() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 #[ignore = "the fixture's Hooks read Composer\\InstalledVersions, which is not autoloadable in the plugin worker (the fixture ships no vendor/ directory), so the pre-update hook aborts with `Class \"Composer\\InstalledVersions\" not found`"]
 fn test_integration_installed_versions() {
     run_integration(BStr::new("installed-versions.test"));
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 #[ignore = "the plugin worker's Composer\\InstalledVersions is only reloaded on a repository write, never seeded from the project's installed.php at boot, so the fixture's plugins fail with `Package \"plugin/a\" is not installed`"]
 fn test_integration_installed_versions2() {
     run_integration(BStr::new("installed-versions2.test"));
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_integration_plugin_autoloading_only_loads_dependencies() {
     run_integration(BStr::new("plugin-autoloading-only-loads-dependencies.test"));
 }

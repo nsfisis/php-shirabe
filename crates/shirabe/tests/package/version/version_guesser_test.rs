@@ -1,9 +1,8 @@
 //! ref: composer/tests/Composer/Test/Package/Version/VersionGuesserTest.php sha1:8c118f239fac2151952ca2d79e621e2f0f568313
 
 use crate::process_executor_mock::{cmd, cmd_full, get_process_executor_mock};
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
-use serial_test::serial;
 use shirabe::config::Config;
 use shirabe::package::version::{VersionGuesser, VersionParser};
 use shirabe::util::{Git as GitUtil, MockExpectation, MockHandler, Platform, ProcessExecutor};
@@ -60,7 +59,7 @@ fn string_list(items: &[&BStr]) -> PhpMixed {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_hg_guess_version_returns_data() {
     set_up();
     let _td = TearDown;
@@ -116,7 +115,7 @@ fn test_hg_guess_version_returns_data() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_guess_version_returns_data() {
     set_up();
     let _td = TearDown;
@@ -151,7 +150,7 @@ fn test_guess_version_returns_data() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_guess_version_does_not_see_custom_default_branch_as_non_feature_branch() {
     set_up();
     let _td = TearDown;
@@ -190,7 +189,7 @@ fn test_guess_version_does_not_see_custom_default_branch_as_non_feature_branch()
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_guess_version_reads_and_respects_non_feature_branches_configuration_for_arbitrary_naming() {
     set_up();
     let _td = TearDown;
@@ -252,7 +251,7 @@ fn test_guess_version_reads_and_respects_non_feature_branches_configuration_for_
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_guess_version_reads_and_respects_non_feature_branches_configuration_for_arbitrary_naming_regex()
  {
     set_up();
@@ -315,7 +314,7 @@ fn test_guess_version_reads_and_respects_non_feature_branches_configuration_for_
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_guess_version_reads_and_respects_non_feature_branches_configuration_for_arbitrary_naming_when_on_non_feature_branch()
  {
     set_up();
@@ -362,7 +361,7 @@ fn test_guess_version_reads_and_respects_non_feature_branches_configuration_for_
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_detached_head_becomes_dev_hash() {
     set_up();
     let _td = TearDown;
@@ -391,7 +390,7 @@ fn test_detached_head_becomes_dev_hash() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_detached_fetch_head_becomes_dev_hash_git2() {
     set_up();
     let _td = TearDown;
@@ -420,7 +419,7 @@ fn test_detached_fetch_head_becomes_dev_hash_git2() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_detached_commit_head_becomes_dev_hash_git2() {
     set_up();
     let _td = TearDown;
@@ -449,7 +448,7 @@ fn test_detached_commit_head_becomes_dev_hash_git2() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_tag_becomes_version() {
     set_up();
     let _td = TearDown;
@@ -482,7 +481,7 @@ fn test_tag_becomes_version() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_tag_becomes_pretty_version() {
     set_up();
     let _td = TearDown;
@@ -516,7 +515,7 @@ fn test_tag_becomes_pretty_version() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_invalid_tag_becomes_version() {
     set_up();
     let _td = TearDown;
@@ -543,7 +542,7 @@ fn test_invalid_tag_becomes_version() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_numeric_branches_show_nicely() {
     set_up();
     let _td = TearDown;
@@ -571,7 +570,7 @@ fn test_numeric_branches_show_nicely() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_remote_branches_are_selected() {
     set_up();
     let _td = TearDown;
@@ -612,7 +611,7 @@ fn test_remote_branches_are_selected() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_get_root_version_from_env() {
     let root_env_versions: Vec<(&BStr, &BStr)> = vec![
         (BStr::new("1.0-dev"), BStr::new("1.0.x-dev")),

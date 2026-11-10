@@ -12,7 +12,7 @@ use crate::repository::{
     WritableArrayRepository,
 };
 use crate::util::{Filesystem, Platform};
-use bstr::{B, BStr, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     AnyThrowable, InvalidArgumentException, LogicException, PhpClass as _, PhpMixed, ToPhpString,
@@ -21,7 +21,6 @@ use shirabe_php_shim::{
     path_from_bytes, path_to_bytes, realpath, str_repeat, strcmp, strnatcmp, usort, var_export,
 };
 use shirabe_semver::constraint::AnyConstraint;
-use std::path::Path;
 
 /// Filesystem repository.
 #[derive(Debug)]
@@ -436,7 +435,7 @@ impl FilesystemRepository {
         installation_manager: &dyn InstallationManagerInterface,
         install_paths: &IndexMap<BString, Option<BString>>,
         dev_mode: bool,
-        repo_dir: &Path,
+        repo_dir: &std::path::Path,
     ) -> anyhow::Result<IndexMap<BString, PhpMixed>> {
         let dev_packages = array_flip(&PhpMixed::List(
             self.inner
@@ -595,7 +594,7 @@ impl FilesystemRepository {
         &self,
         package: PackageInterfaceHandle,
         install_paths: &IndexMap<BString, Option<BString>>,
-        repo_dir: &Path,
+        repo_dir: &std::path::Path,
         dev_packages: &PhpMixed,
     ) -> anyhow::Result<IndexMap<BString, PhpMixed>> {
         let mut reference: Option<BString> = None;
@@ -677,7 +676,7 @@ impl FilesystemRepository {
         package: RootPackageInterfaceHandle,
         install_paths: &IndexMap<BString, Option<BString>>,
         dev_mode: bool,
-        repo_dir: &Path,
+        repo_dir: &std::path::Path,
         dev_packages: &PhpMixed,
     ) -> anyhow::Result<IndexMap<BString, PhpMixed>> {
         let data = self.dump_installed_package(

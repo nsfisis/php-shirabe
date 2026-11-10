@@ -3,7 +3,6 @@
 use crate::advisory::{AnySecurityAdvisory, SecurityAdvisory};
 use crate::package::version::VersionParser;
 use bstr::{B, BStr, BString};
-use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
 use shirabe_php_shim::{PhpMixed, date_create, json_bytes, php_regex, preg_replace};
 use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
@@ -59,7 +58,7 @@ impl PartialSecurityAdvisory {
             && data.contains_key(B("reportedAt"));
 
         if has_full_data {
-            let reported_at: DateTime<Utc> =
+            let reported_at: chrono::DateTime<chrono::Utc> =
                 date_create(data[B("reportedAt")].as_string().unwrap_or_default())
                     .unwrap_or_default();
             let sources: Vec<IndexMap<BString, BString>> = data[B("sources")]

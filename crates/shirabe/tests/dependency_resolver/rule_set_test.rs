@@ -1,7 +1,7 @@
 //! ref: composer/tests/Composer/Test/DependencyResolver/RuleSetTest.php sha1:05301cf8e1ecb7df75cd43339bf6926c34edd2b1
 
 use crate::test_case::get_package;
-use bstr::ByteSlice;
+use bstr::ByteSlice as _;
 use indexmap::IndexMap;
 use shirabe::dependency_resolver::{
     GenericRule, Pool, RULE_LEARNED, RULE_ROOT_REQUIRE, ReasonData, Request, Rule, RuleSet,

@@ -13,14 +13,13 @@ use crate::package::archiver::ArchivableFilesFinder;
 use crate::package::dumper::ArrayDumper;
 use crate::package::version::{VersionGuesser, VersionParser};
 use crate::util::{Filesystem, HttpDownloader, Platform, ProcessExecutor};
-use bstr::{B, BStr, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     PhpMixed, RuntimeException, bformat, file_exists, impl_php_class, is_dir, path_from_bytes,
     path_to_bytes, realpath,
 };
 use shirabe_symfony_filesystem::Filesystem as SymfonyFilesystem;
-use std::path::{Path, PathBuf};
 
 #[derive(Debug)]
 pub struct PathDownloader {
@@ -58,7 +57,7 @@ impl PathDownloader {
     pub fn get_vcs_reference(
         &self,
         package: PackageInterfaceHandle,
-        path: &Path,
+        path: &std::path::Path,
     ) -> anyhow::Result<Option<bstr::BString>> {
         let path = Filesystem::trim_trailing_slash(path);
         let parser = VersionParser::new();
@@ -82,7 +81,7 @@ impl PathDownloader {
     fn get_install_operation_appendix(
         &self,
         package: PackageInterfaceHandle,
-        path: &Path,
+        path: &std::path::Path,
     ) -> anyhow::Result<BString> {
         let url = package.get_dist_url().ok_or_else(|| {
             RuntimeException::new(bformat!(
@@ -93,7 +92,7 @@ impl PathDownloader {
         let real_url = realpath(path_from_bytes(&url))
             .ok_or_else(|| RuntimeException::new(bformat!("Failed to realpath {url}")))?;
 
-        if realpath(path).as_deref().map(Path::as_os_str) == Some(real_url.as_os_str()) {
+        if realpath(path).as_deref().map(std::path::Path::as_os_str) == Some(real_url.as_os_str()) {
             return Ok(BString::from(": Source already present"));
         }
 
@@ -178,7 +177,7 @@ impl VcsCapableDownloaderInterface for PathDownloader {
     fn get_vcs_reference(
         &self,
         package: PackageInterfaceHandle,
-        path: &Path,
+        path: &std::path::Path,
     ) -> anyhow::Result<Option<bstr::BString>> {
         PathDownloader::get_vcs_reference(self, package, path)
     }
@@ -189,7 +188,7 @@ impl ChangeReportInterface for PathDownloader {
     async fn get_local_changes(
         &self,
         package: PackageInterfaceHandle,
-        path: &Path,
+        path: &std::path::Path,
     ) -> anyhow::Result<Option<bstr::BString>> {
         self.inner.base_get_local_changes(self, package, path).await
     }
@@ -212,7 +211,7 @@ impl DownloaderInterface for PathDownloader {
     async fn download_with_output(
         &self,
         package: PackageInterfaceHandle,
-        path: &Path,
+        path: &std::path::Path,
         prev_package: Option<PackageInterfaceHandle>,
         output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -225,8 +224,8 @@ impl DownloaderInterface for PathDownloader {
         })?;
         let real_url = realpath(path_from_bytes(&url));
         if real_url.is_none()
-            || !file_exists(real_url.as_deref().unwrap_or(Path::new("")))
-            || !is_dir(real_url.as_deref().unwrap_or(Path::new("")))
+            || !file_exists(real_url.as_deref().unwrap_or(std::path::Path::new("")))
+            || !is_dir(real_url.as_deref().unwrap_or(std::path::Path::new("")))
         {
             return Err(RuntimeException::new(bformat!(
                 "Source path \"{url}\" is not found for package {}",
@@ -236,7 +235,8 @@ impl DownloaderInterface for PathDownloader {
         }
         let real_url = real_url.unwrap();
 
-        if realpath(&path).as_deref().map(Path::as_os_str) == Some(real_url.as_os_str()) {
+        if realpath(&path).as_deref().map(std::path::Path::as_os_str) == Some(real_url.as_os_str())
+        {
             return Ok(None);
         }
 
@@ -266,7 +266,7 @@ impl DownloaderInterface for PathDownloader {
         &self,
         r#type: &BStr,
         package: PackageInterfaceHandle,
-        path: &Path,
+        path: &std::path::Path,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         self.inner
@@ -277,7 +277,7 @@ impl DownloaderInterface for PathDownloader {
     async fn install_with_output(
         &self,
         package: PackageInterfaceHandle,
-        path: &Path,
+        path: &std::path::Path,
         output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
         let path = Filesystem::trim_trailing_slash(path);
@@ -290,7 +290,8 @@ impl DownloaderInterface for PathDownloader {
         let real_url = realpath(path_from_bytes(&url))
             .ok_or_else(|| RuntimeException::new(bformat!("Failed to realpath {url}")))?;
 
-        if realpath(&path).as_deref().map(Path::as_os_str) == Some(real_url.as_os_str()) {
+        if realpath(&path).as_deref().map(std::path::Path::as_os_str) == Some(real_url.as_os_str())
+        {
             if output {
                 let appendix = self.get_install_operation_appendix(package.clone(), &path)?;
                 self.inner.io.borrow().write_error(bformat!(
@@ -422,7 +423,7 @@ impl DownloaderInterface for PathDownloader {
         &self,
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
-        path: &Path,
+        path: &std::path::Path,
     ) -> anyhow::Result<Option<PhpMixed>> {
         let appendix = self.get_install_operation_appendix(target.clone(), path)?;
         self.inner
@@ -433,7 +434,7 @@ impl DownloaderInterface for PathDownloader {
     async fn remove_with_output(
         &self,
         package: PackageInterfaceHandle,
-        path: &Path,
+        path: &std::path::Path,
         output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
         let path = Filesystem::trim_trailing_slash(path);
@@ -479,7 +480,7 @@ impl DownloaderInterface for PathDownloader {
         let abs_path = if fs.is_absolute_path(&path) {
             path.clone()
         } else {
-            PathBuf::from(path_from_bytes(&bformat!(
+            std::path::PathBuf::from(path_from_bytes(&bformat!(
                 "{}/{path}",
                 Platform::get_cwd(false)?
             )))
@@ -511,7 +512,7 @@ impl DownloaderInterface for PathDownloader {
         &self,
         r#type: &BStr,
         package: PackageInterfaceHandle,
-        path: &Path,
+        path: &std::path::Path,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         self.inner

@@ -15,8 +15,6 @@ use shirabe::package::PackageInterfaceHandle;
 use shirabe::repository::{InstalledArrayRepository, InstalledRepositoryInterfaceHandle};
 use shirabe::util::Filesystem;
 use shirabe_php_shim::{PhpMixed, path_from_bytes, path_to_bytes};
-use std::fs;
-use tempfile::TempDir;
 
 // PHP mocks `Composer\Downloader\DownloadManager` with getMockBuilder and asserts its
 // install/update/remove calls; here the equivalent mock is injected into the Composer via
@@ -111,7 +109,7 @@ use mock_binary_installer::MockBinaryInstaller;
 /// LibraryInstaller only holds a weak handle, and lets tests swap in a configured DownloadManager
 /// mock before constructing the installer.
 struct SetUp {
-    root: TempDir,
+    root: tempfile::TempDir,
     vendor_dir: std::path::PathBuf,
     bin_dir: std::path::PathBuf,
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
@@ -136,10 +134,10 @@ fn set_up() -> SetUp {
     let root_dir = root.path().to_path_buf();
 
     let vendor_dir = root_dir.join("vendor");
-    fs::create_dir_all(&vendor_dir).unwrap();
+    std::fs::create_dir_all(&vendor_dir).unwrap();
 
     let bin_dir = root_dir.join("bin");
-    fs::create_dir_all(&bin_dir).unwrap();
+    std::fs::create_dir_all(&bin_dir).unwrap();
 
     let mut config = Config::new(false, None);
     let mut config_section: IndexMap<BString, PhpMixed> = IndexMap::new();
@@ -230,7 +228,7 @@ fn test_is_installed() {
     let pkg_dir = setup
         .vendor_dir
         .join(path_from_bytes(&package.get_pretty_name()));
-    fs::create_dir_all(&pkg_dir).unwrap();
+    std::fs::create_dir_all(&pkg_dir).unwrap();
     assert!(library.is_installed(&repository, package.clone()).unwrap());
 
     repository
@@ -293,7 +291,7 @@ fn test_update() {
     // the package is named vendor/package1 and lives under vendorDir.
     let old_target_dir = setup.vendor_dir.join("vendor/package1/oldtarget");
     let new_target_dir = setup.vendor_dir.join("vendor/package1/newtarget");
-    fs::create_dir_all(&old_target_dir).unwrap();
+    std::fs::create_dir_all(&old_target_dir).unwrap();
 
     // PHP asserts the DownloadManager mock's update() is called once with
     // ($initial, $target, vendorDir/vendor/package1/newtarget).

@@ -3,14 +3,12 @@
 use crate::config::Config;
 use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite};
 use crate::util::{Platform, ProcessExecutor};
-use bstr::{B, BStr, BString, ByteSlice, ByteVec};
+use bstr::{B, BStr, BString, ByteSlice as _, ByteVec as _};
 use shirabe_php_shim::{
     LogicException, RuntimeException, bformat, implode, parse_url, path_to_bytes, php_regex,
     preg_match, stripos, strpos, trim,
 };
 use shirabe_symfony_console::input::InputValue;
-use std::path::Path;
-use std::sync::Mutex;
 
 #[derive(Debug, Clone)]
 pub struct SvnCredentials {
@@ -30,7 +28,7 @@ pub struct Svn {
     config: std::rc::Rc<std::cell::RefCell<Config>>,
 }
 
-static VERSION: Mutex<Option<BString>> = Mutex::new(None);
+static VERSION: std::sync::Mutex<Option<BString>> = std::sync::Mutex::new(None);
 
 impl Svn {
     const MAX_QTY_AUTH_TRIES: i64 = 5;
@@ -69,8 +67,8 @@ impl Svn {
         &mut self,
         command: Vec<BString>,
         url: &BStr,
-        cwd: Option<&Path>,
-        path: Option<&Path>,
+        cwd: Option<&std::path::Path>,
+        path: Option<&std::path::Path>,
         verbose: bool,
     ) -> anyhow::Result<BString> {
         // Ensure we are allowed to use this URL by config
@@ -89,8 +87,8 @@ impl Svn {
     pub fn execute_local(
         &mut self,
         command: Vec<BString>,
-        path: &Path,
-        cwd: Option<&Path>,
+        path: &std::path::Path,
+        cwd: Option<&std::path::Path>,
         verbose: bool,
     ) -> anyhow::Result<BString> {
         // A local command has no remote url
@@ -101,9 +99,9 @@ impl Svn {
     fn execute_with_auth_retry(
         &mut self,
         svn_command: Vec<BString>,
-        cwd: Option<&Path>,
+        cwd: Option<&std::path::Path>,
         url: &BStr,
-        path: Option<&Path>,
+        path: Option<&std::path::Path>,
         verbose: bool,
     ) -> anyhow::Result<Option<BString>> {
         // Regenerate the command at each try, to use the newly user-provided credentials
@@ -211,7 +209,7 @@ impl Svn {
         &mut self,
         mut cmd: Vec<BString>,
         url: &BStr,
-        path: Option<&Path>,
+        path: Option<&std::path::Path>,
     ) -> anyhow::Result<Vec<BString>> {
         cmd.push("--non-interactive".into());
         cmd.extend(self.get_credential_args()?);
@@ -246,7 +244,7 @@ impl Svn {
         &mut self,
         cmd: Vec<BString>,
         url: &BStr,
-        path: Option<&Path>,
+        path: Option<&std::path::Path>,
     ) -> anyhow::Result<Vec<BString>> {
         self.get_command(cmd, url, path)
     }

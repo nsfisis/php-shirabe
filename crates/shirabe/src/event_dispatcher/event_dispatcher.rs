@@ -14,7 +14,7 @@ use crate::php_worker::{callable, runtime};
 use crate::repository::InstalledRepositoryInterfaceHandle;
 use crate::script::Event as ScriptEvent;
 use crate::util::{Platform, ProcessExecutor};
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, PhpMixed, RuntimeException, ToPhpString, array_pop,

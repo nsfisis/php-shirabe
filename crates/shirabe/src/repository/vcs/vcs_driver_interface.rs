@@ -3,7 +3,6 @@
 use crate::config::Config;
 use crate::io::IOInterface;
 use bstr::{BStr, BString};
-use chrono::{DateTime, FixedOffset};
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 
@@ -24,7 +23,7 @@ pub trait VcsDriverInterface: std::fmt::Debug {
     fn get_change_date(
         &mut self,
         identifier: &BStr,
-    ) -> anyhow::Result<Option<DateTime<FixedOffset>>>;
+    ) -> anyhow::Result<Option<chrono::DateTime<chrono::FixedOffset>>>;
 
     fn get_root_identifier(&mut self) -> anyhow::Result<BString>;
 

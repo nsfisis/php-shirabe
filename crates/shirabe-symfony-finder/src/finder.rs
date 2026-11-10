@@ -7,15 +7,13 @@
 //! private `Entry` struct so the path/exclude filters keep their exact behavior.
 
 use crate::Glob;
-use bstr::{BStr, BString, ByteSlice};
-use chrono::{DateTime, TimeZone};
+use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::IndexSet;
 use shirabe_php_shim::{
     GLOB_BRACE, GLOB_ONLYDIR, bformat, file_exists, fileatime, filemtime, glob_with_flags, implode,
     is_dir, loosely_compare, path_from_bytes, path_to_bytes, php_regex, php_str, preg_is_match,
     preg_match, preg_quote, realpath, rtrim_chars, str_replace,
 };
-use std::path::{Path, PathBuf};
 
 const IGNORE_VCS_FILES: i64 = 1;
 const IGNORE_DOT_FILES: i64 = 2;
@@ -77,12 +75,12 @@ enum Sort {
     None,
     ByName,
     ByAccessedTime,
-    Closure(std::cell::RefCell<Box<dyn FnMut(&PathBuf, &PathBuf) -> i64>>),
+    Closure(std::cell::RefCell<Box<dyn FnMut(&std::path::PathBuf, &std::path::PathBuf) -> i64>>),
 }
 
 /// One traversal result, replacing `Symfony\Component\Finder\SplFileInfo`.
 struct Entry {
-    pathname: PathBuf,
+    pathname: std::path::PathBuf,
     /// `getRelativePath()`: the directory of the entry relative to the search root.
     relative_path: BString,
     /// `getRelativePathname()`: the full path of the entry relative to the search root.
@@ -99,7 +97,7 @@ pub struct Finder {
     names: Vec<BString>,
     not_names: Vec<BString>,
     exclude: Vec<BString>,
-    filters: Vec<std::cell::RefCell<Box<dyn FnMut(&Path) -> bool>>>,
+    filters: Vec<std::cell::RefCell<Box<dyn FnMut(&std::path::Path) -> bool>>>,
     depths: Vec<(BString, i64)>,
     follow_links: bool,
     reverse_sorting: bool,
@@ -178,7 +176,7 @@ impl Finder {
         self
     }
 
-    pub fn r#in(&mut self, dirs: impl AsRef<Path>) -> &mut Self {
+    pub fn r#in(&mut self, dirs: impl AsRef<std::path::Path>) -> &mut Self {
         let dir = path_to_bytes(&dirs);
         let mut resolved_dirs: Vec<BString> = Vec::new();
 
@@ -267,7 +265,7 @@ impl Finder {
 
     pub fn sort<F>(&mut self, comparator: F) -> &mut Self
     where
-        F: FnMut(&PathBuf, &PathBuf) -> i64 + 'static,
+        F: FnMut(&std::path::PathBuf, &std::path::PathBuf) -> i64 + 'static,
     {
         self.sort = Sort::Closure(std::cell::RefCell::new(Box::new(comparator)));
 
@@ -288,7 +286,7 @@ impl Finder {
 
     /// `date('until '.$date->format('Y-m-d H:i:s'))`, taking the date as a value instead of a
     /// string to parse. Symfony's Finder has no such method.
-    pub fn date_until<Tz: TimeZone>(&mut self, date: &DateTime<Tz>) -> &mut Self {
+    pub fn date_until<Tz: chrono::TimeZone>(&mut self, date: &chrono::DateTime<Tz>) -> &mut Self {
         self.dates.push((BString::from("<"), date.timestamp()));
 
         self
@@ -301,7 +299,7 @@ impl Finder {
         }
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = PathBuf> {
+    pub fn iter(&self) -> impl Iterator<Item = std::path::PathBuf> {
         self.get_iterator()
     }
 
@@ -326,7 +324,7 @@ impl Finder {
         dir
     }
 
-    fn collect_paths(&self) -> Vec<PathBuf> {
+    fn collect_paths(&self) -> Vec<std::path::PathBuf> {
         if self.dirs.is_empty() {
             panic!("You must call one of in() or append() methods before iterating over a Finder.");
         }
@@ -467,7 +465,7 @@ impl Finder {
     #[allow(clippy::too_many_arguments)]
     fn walk(
         &self,
-        dir: &Path,
+        dir: &std::path::Path,
         relative_dir: &[u8],
         depth: i64,
         max_depth: i64,
@@ -566,7 +564,8 @@ impl Finder {
                 // TODO(error-model): SplFileInfo::getATime() throws a RuntimeException when stat
                 // fails; the sort comparator cannot propagate it.
                 entries.sort_by(|a, b| {
-                    let atime = |path: &Path| fileatime(path).expect("fileatime() failed");
+                    let atime =
+                        |path: &std::path::Path| fileatime(path).expect("fileatime() failed");
                     apply_order((atime(&a.pathname) - atime(&b.pathname)).cmp(&0), order)
                 });
             }
@@ -725,7 +724,7 @@ fn apply_order(ordering: std::cmp::Ordering, order: i64) -> std::cmp::Ordering {
 
 #[derive(Debug)]
 pub struct FinderIterator {
-    items: Vec<PathBuf>,
+    items: Vec<std::path::PathBuf>,
     pos: usize,
 }
 
@@ -734,15 +733,15 @@ impl FinderIterator {
         self.pos < self.items.len()
     }
 
-    pub fn current(&self) -> PathBuf {
+    pub fn current(&self) -> std::path::PathBuf {
         self.items[self.pos].clone()
     }
 }
 
 impl Iterator for FinderIterator {
-    type Item = PathBuf;
+    type Item = std::path::PathBuf;
 
-    fn next(&mut self) -> Option<PathBuf> {
+    fn next(&mut self) -> Option<std::path::PathBuf> {
         if self.pos < self.items.len() {
             let item = self.items[self.pos].clone();
             self.pos += 1;
@@ -754,8 +753,8 @@ impl Iterator for FinderIterator {
 }
 
 impl IntoIterator for &Finder {
-    type Item = PathBuf;
-    type IntoIter = std::vec::IntoIter<PathBuf>;
+    type Item = std::path::PathBuf;
+    type IntoIter = std::vec::IntoIter<std::path::PathBuf>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.collect_paths().into_iter()
@@ -763,8 +762,8 @@ impl IntoIterator for &Finder {
 }
 
 impl IntoIterator for Finder {
-    type Item = PathBuf;
-    type IntoIter = std::vec::IntoIter<PathBuf>;
+    type Item = std::path::PathBuf;
+    type IntoIter = std::vec::IntoIter<std::path::PathBuf>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.collect_paths().into_iter()
@@ -772,8 +771,8 @@ impl IntoIterator for Finder {
 }
 
 impl IntoIterator for &mut Finder {
-    type Item = PathBuf;
-    type IntoIter = std::vec::IntoIter<PathBuf>;
+    type Item = std::path::PathBuf;
+    type IntoIter = std::vec::IntoIter<std::path::PathBuf>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.collect_paths().into_iter()
@@ -785,7 +784,7 @@ mod tests {
     use super::*;
     use shirabe_php_shim::{time, touch_with_mtime};
 
-    fn relative_names(finder: &Finder, root: &Path) -> Vec<BString> {
+    fn relative_names(finder: &Finder, root: &std::path::Path) -> Vec<BString> {
         let mut names: Vec<BString> = finder
             .iter()
             .map(|path| BString::from(path_to_bytes(path.strip_prefix(root).unwrap())))

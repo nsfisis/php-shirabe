@@ -9,7 +9,7 @@ use crate::output::{
 };
 use crate::question::{ChoiceQuestion, QuestionInterface};
 use crate::{Cursor, Terminal};
-use bstr::{B, BStr, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice as _};
 use shirabe_php_shim::{
     Exception, PHP_EOL, PhpResource, SEEK_SET, ToPhpString, bformat, copy, dir, explode, feof,
     fgetc, fgets, fopen, fread, fseek, ftell, function_exists, mb_detect_encoding, mb_strlen, ord,

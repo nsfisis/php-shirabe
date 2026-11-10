@@ -1,8 +1,7 @@
 //! ref: composer/tests/Composer/Test/Command/ConfigCommandTest.php sha1:8ce0a50b7daa739dbb09c9460556d5b63a2db11d
 
 use crate::test_case::{RunOptions, get_application_tester, init_temp_composer};
-use bstr::{BStr, ByteSlice};
-use serial_test::serial;
+use bstr::{BStr, ByteSlice as _};
 use shirabe_php_shim::{error_message, trim};
 use shirabe_symfony_console::input::{InputValue, ParameterName};
 
@@ -45,7 +44,7 @@ struct UpdateCase {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_config_updates() {
     let cases: Vec<UpdateCase> = vec![
         UpdateCase {
@@ -368,7 +367,7 @@ struct ReadCase {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_config_reads() {
     let cases: Vec<ReadCase> = vec![
         ReadCase {
@@ -444,7 +443,7 @@ fn test_config_reads() {
 /// repository through RepositoryFactory, which instantiates a repository and reaches
 /// shirabe-php-shim stream_set_blocking (stream.rs todo!(), requires fcntl(2)).
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_config_reads_repos_by_numeric_index() {
     let composer_json = serde_json::json!({"repositories": [{"type": "vcs", "url": "https://example.org"}, {"type": "composer", "url": "https://repo.packagist.org"}]});
     let _tear_down = init_temp_composer(Some(&composer_json), None, None, false);
@@ -465,7 +464,7 @@ fn test_config_reads_repos_by_numeric_index() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_config_throws_for_invalid_arg_combination() {
     let mut app_tester = get_application_tester();
     let result = app_tester.run(
@@ -488,7 +487,7 @@ fn test_config_throws_for_invalid_arg_combination() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_config_throws_for_invalid_severity() {
     let _tear_down = init_temp_composer(Some(&serde_json::json!({})), None, None, false);
 
@@ -510,7 +509,7 @@ fn test_config_throws_for_invalid_severity() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_config_throws_when_merging_array_with_object() {
     let _tear_down = init_temp_composer(
         Some(&serde_json::json!({"config": {"audit": {"ignore": ["CVE-2024-1234"]}}})),

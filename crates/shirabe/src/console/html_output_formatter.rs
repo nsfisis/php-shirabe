@@ -1,6 +1,6 @@
 //! ref: composer/src/Composer/Console/HtmlOutputFormatter.php sha1:033297416ea8bcf048b614e1c206f2f5b973f5d8
 
-use bstr::{BStr, BString, ByteSlice, ByteVec};
+use bstr::{BStr, BString, ByteSlice as _, ByteVec as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     PhpMixed, PregMatches, bformat, bwrite, explode, intval, php_str, preg_replace_callback,

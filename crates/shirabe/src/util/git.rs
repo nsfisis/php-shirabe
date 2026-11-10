@@ -6,7 +6,7 @@ use crate::util::{
     AuthHelper, Bitbucket, CommandLine, Filesystem, GitHub, GitLab, HttpDownloader, Platform,
     ProcessExecutor, StoreAuth, Url,
 };
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     AnyThrowable, CmpOp, InvalidArgumentException, PHP_EOL, PhpMixed, PregMatches,
@@ -16,8 +16,6 @@ use shirabe_php_shim::{
     str_replace_array, strlen, strpos, substr, trim, version_compare,
 };
 use shirabe_symfony_console::input::InputValue;
-use std::path::{Path, PathBuf};
-use std::sync::Mutex;
 
 #[derive(Debug)]
 pub struct Git {
@@ -28,7 +26,7 @@ pub struct Git {
     http_downloader: Option<std::rc::Rc<std::cell::RefCell<HttpDownloader>>>,
 }
 
-static VERSION: Mutex<Option<Option<BString>>> = Mutex::new(None);
+static VERSION: std::sync::Mutex<Option<Option<BString>>> = std::sync::Mutex::new(None);
 
 impl Git {
     pub fn new(
@@ -48,7 +46,7 @@ impl Git {
 
     pub fn check_for_repo_ownership_error(
         output: &BStr,
-        path: &Path,
+        path: &std::path::Path,
         io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
     ) -> anyhow::Result<()> {
         if output.contains_str("fatal: detected dubious ownership") {
@@ -84,7 +82,7 @@ impl Git {
         &mut self,
         commands: Vec<Vec<BString>>,
         url: &BStr,
-        cwd: Option<&Path>,
+        cwd: Option<&std::path::Path>,
         initial_clone: bool,
         command_output: impl RunCommandOutput,
     ) -> anyhow::Result<()> {
@@ -114,7 +112,7 @@ impl Git {
         &mut self,
         command_callable: Vec<Box<dyn Fn(&BStr) -> CommandLine>>,
         url: &BStr,
-        cwd: Option<&Path>,
+        cwd: Option<&std::path::Path>,
         initial_clone: bool,
         command_output: impl RunCommandOutput,
     ) -> anyhow::Result<()> {
@@ -125,7 +123,7 @@ impl Git {
         &mut self,
         command_callable: Vec<Box<dyn Fn(&BStr) -> CommandLine>>,
         url: &BStr,
-        cwd: Option<&Path>,
+        cwd: Option<&std::path::Path>,
         initial_clone: bool,
         mut command_output: impl RunCommandOutput,
     ) -> anyhow::Result<()> {
@@ -139,8 +137,8 @@ impl Git {
             &IndexMap::new(),
         )?;
 
-        let orig_cwd: Option<PathBuf> = if initial_clone {
-            cwd.map(Path::to_path_buf)
+        let orig_cwd: Option<std::path::PathBuf> = if initial_clone {
+            cwd.map(std::path::Path::to_path_buf)
         } else {
             None
         };
@@ -697,7 +695,7 @@ impl Git {
         Ok(())
     }
 
-    pub fn sync_mirror(&mut self, url: &BStr, dir: &Path) -> anyhow::Result<bool> {
+    pub fn sync_mirror(&mut self, url: &BStr, dir: &std::path::Path) -> anyhow::Result<bool> {
         let composer_disable_network = Platform::get_env("COMPOSER_DISABLE_NETWORK");
         if composer_disable_network
             .as_ref()
@@ -832,7 +830,7 @@ impl Git {
     pub fn fetch_ref_or_sync_mirror(
         &mut self,
         url: &BStr,
-        dir: &Path,
+        dir: &std::path::Path,
         r#ref: &BStr,
         pretty_version: Option<&BStr>,
     ) -> anyhow::Result<bool> {
@@ -966,7 +964,11 @@ impl Git {
         ))
     }
 
-    fn check_ref_is_in_mirror(&mut self, dir: &Path, r#ref: &BStr) -> anyhow::Result<bool> {
+    fn check_ref_is_in_mirror(
+        &mut self,
+        dir: &std::path::Path,
+        r#ref: &BStr,
+    ) -> anyhow::Result<bool> {
         let mut output = BString::default();
         if is_dir(dir)
             && self.process.borrow_mut().execute(
@@ -1025,7 +1027,7 @@ impl Git {
     pub fn get_mirror_default_branch(
         &mut self,
         url: &BStr,
-        dir: &Path,
+        dir: &std::path::Path,
         is_local_path_repository: bool,
     ) -> Option<BString> {
         if Platform::get_env("COMPOSER_DISABLE_NETWORK")

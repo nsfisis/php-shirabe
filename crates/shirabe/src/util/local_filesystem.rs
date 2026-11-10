@@ -9,7 +9,7 @@ use crate::downloader::{MaxFileSizeExceededException, TransportException};
 use crate::io::{DEBUG, IOInterface, IOInterfaceWrite};
 use crate::util::http::ProxyManager;
 use crate::util::{GetResult, Platform, StreamContextOptions, Url};
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     RuntimeException, ToPhpString, bformat, file_get_contents, file_get_contents_with_max_length,

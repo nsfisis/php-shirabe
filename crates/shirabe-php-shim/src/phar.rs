@@ -9,7 +9,7 @@ use crate::{
     impl_php_exception, os_str_from_bytes, path_from_bytes, path_to_bytes, rtrim_chars,
     start_directory, trim_chars,
 };
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use std::io::{Read as _, Write as _};
 
 #[derive(Debug, Clone)]
@@ -303,7 +303,7 @@ fn extract_entries(
             }
         }
         if let Some(mode) = entry.mode {
-            use std::os::unix::fs::PermissionsExt;
+            use std::os::unix::fs::PermissionsExt as _;
             std::fs::set_permissions(&dest, std::fs::Permissions::from_mode(mode & 0o7777))
                 .map_err(|e| extract_error(display_to_bytes(e)))?;
         }
@@ -881,7 +881,7 @@ impl PharData {
             header.set_gid(0);
             match &entry.data {
                 PharEntryData::Disk(source) => {
-                    use std::os::unix::fs::PermissionsExt;
+                    use std::os::unix::fs::PermissionsExt as _;
                     let metadata = std::fs::metadata(source).map_err(write_error)?;
                     header.set_entry_type(tar::EntryType::Regular);
                     header.set_size(metadata.len());
@@ -952,7 +952,7 @@ impl PharData {
             let localname = entry.localname.as_bstr();
             match &entry.data {
                 PharEntryData::Disk(source) => {
-                    use std::os::unix::fs::PermissionsExt;
+                    use std::os::unix::fs::PermissionsExt as _;
                     let metadata =
                         std::fs::metadata(source).map_err(|e| write_error(display_to_bytes(e)))?;
                     writer

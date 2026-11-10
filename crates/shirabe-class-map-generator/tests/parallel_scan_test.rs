@@ -3,7 +3,6 @@ use indexmap::IndexMap;
 use shirabe_class_map_generator::class_map_generator::ClassMapGenerator;
 use shirabe_class_map_generator::file_list::FileList;
 use shirabe_php_shim::{bformat, display_to_bytes, path_from_bytes, path_to_bytes};
-use std::os::unix::fs::PermissionsExt;
 
 #[derive(Debug, PartialEq)]
 struct ScanOutcome {
@@ -92,7 +91,11 @@ fn parallel_scan_matches_sequential_scan() {
     for i in 0..4usize {
         let path = bformat!("{root}/unreadable/Locked{i}.php");
         write(path.as_ref(), "<?php class Locked {}".into());
-        std::fs::set_permissions(path_from_bytes(&path), PermissionsExt::from_mode(0o000)).unwrap();
+        std::fs::set_permissions(
+            path_from_bytes(&path),
+            std::os::unix::fs::PermissionsExt::from_mode(0o000),
+        )
+        .unwrap();
         // Permissions do not restrict a privileged user.
         locked &= std::fs::read(path_from_bytes(&path)).is_err();
     }

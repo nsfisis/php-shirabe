@@ -9,7 +9,7 @@ use crate::pipes::pipes_interface::PipesInterface;
 use crate::pipes::unix_pipes::UnixPipes;
 use crate::pipes::windows_pipes::WindowsPipes;
 use crate::process_utils::ProcessUtils;
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Descriptor, PHP_ENV, PHP_SERVER, PhpMixed, PhpResource, PregMatches, ProcStatus, SEEK_END,
@@ -18,7 +18,6 @@ use shirabe_php_shim::{
     preg_is_match, preg_replace, preg_replace_callback, proc_close, proc_get_status, proc_open,
     proc_terminate, stream_get_contents_with_length_and_offset, strpbrk, uniqid, usleep,
 };
-use std::sync::OnceLock;
 
 /// A user-supplied callback invoked with the output type ("out"/"err") and a chunk of output. An
 /// error it returns is the exception PHP lets unwind out of `readPipes()`.
@@ -705,7 +704,7 @@ impl Process {
 
     /// Returns whether TTY is supported on the current operating system.
     pub fn is_tty_supported() -> bool {
-        static IS_TTY_SUPPORTED: OnceLock<bool> = OnceLock::new();
+        static IS_TTY_SUPPORTED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
 
         *IS_TTY_SUPPORTED.get_or_init(|| {
             let mut pipes = IndexMap::new();
@@ -1016,7 +1015,7 @@ impl Process {
             cmd,
         )?;
 
-        static COM_SPEC: OnceLock<Option<BString>> = OnceLock::new();
+        static COM_SPEC: std::sync::OnceLock<Option<BString>> = std::sync::OnceLock::new();
         let com_spec = COM_SPEC
             .get_or_init(|| {
                 ExecutableFinder::new()

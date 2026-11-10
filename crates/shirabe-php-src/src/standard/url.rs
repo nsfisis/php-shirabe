@@ -1,4 +1,4 @@
-use bstr::{BString, ByteSlice};
+use bstr::{BString, ByteSlice as _};
 
 /// php-src: ext/standard/url.h `php_url` (PHP 8.5.5)
 ///

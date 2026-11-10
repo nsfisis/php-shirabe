@@ -6,7 +6,6 @@ use crate::test_case::{
 };
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
-use serial_test::serial;
 use shirabe::package::{CompletePackageHandle, Link, PackageInterfaceHandle};
 use shirabe_php_shim::{ToPhpString, trim};
 use shirabe_symfony_console::input::{InputValue, ParameterName};
@@ -61,7 +60,7 @@ fn link(source: &BStr, target: &BStr, description: &bstr::BStr) -> Link {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_installed_packages_with_no_suggestions() {
     let tear_down = init_temp_composer(
         Some(&serde_json::json!({
@@ -243,7 +242,7 @@ fn run_suggest_case(has_lock_file: bool, command: &[(&BStr, InputValue)], expect
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_suggest() {
     let t = InputValue::from(true);
     let by_package = (BStr::new("--by-package"), t.clone());

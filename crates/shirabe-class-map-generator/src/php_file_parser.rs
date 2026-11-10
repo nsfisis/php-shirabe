@@ -1,13 +1,12 @@
 //! ref: composer/vendor/composer/class-map-generator/src/PhpFileParser.php sha1:1821ab732459e48071a256712448da79e66cb2c8
 
 use crate::php_file_cleaner::PhpFileCleaner;
-use bstr::{BStr, BString, ByteSlice, ByteVec};
+use bstr::{BStr, BString, ByteSlice as _, ByteVec as _};
 use shirabe_php_shim::{
     PHP_EOL, RuntimeException, bformat, display_to_bytes, file_exists, file_get_contents, is_file,
     is_readable, ltrim_chars, path_from_bytes, php_strip_whitespace, preg_match_all,
     str_replace_array, strrpos, strtolower, substr, trim,
 };
-use std::sync::OnceLock;
 
 pub struct PhpFileParser;
 
@@ -126,7 +125,7 @@ impl PhpFileParser {
     }
 
     pub(crate) fn get_extra_types() -> anyhow::Result<&'static BStr> {
-        static EXTRA_TYPES: OnceLock<BString> = OnceLock::new();
+        static EXTRA_TYPES: std::sync::OnceLock<BString> = std::sync::OnceLock::new();
         if let Some(extra_types) = EXTRA_TYPES.get() {
             return Ok(extra_types.as_bstr());
         }

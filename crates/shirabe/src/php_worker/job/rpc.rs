@@ -6,7 +6,7 @@ use crate::php_worker::job;
 use crate::php_worker::job::JobOwner;
 use crate::php_worker::rpc::args::arg;
 use crate::util::sync_executor::block_on;
-use bstr::{BStr, ByteSlice};
+use bstr::{BStr, ByteSlice as _};
 use shirabe_php_rpc::{PhpThrow, PluginValue};
 use shirabe_php_shim::{bformat, error_chain_message};
 

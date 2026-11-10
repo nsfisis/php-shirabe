@@ -1,6 +1,6 @@
 //! ref: composer/vendor/symfony/finder/Glob.php sha1:c3790810cef503a99d883b9353bc7fa278b5b04f
 
-use bstr::{BStr, BString, ByteSlice, ByteVec};
+use bstr::{BStr, BString, ByteSlice as _, ByteVec as _};
 use shirabe_php_shim::{ToPhpString, bformat, implode};
 
 // Regex pattern compatibility:

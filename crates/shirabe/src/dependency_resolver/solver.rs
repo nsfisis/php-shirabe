@@ -11,7 +11,7 @@ use crate::filter::platform_requirement_filter::{
 };
 use crate::io::{DEBUG, IOInterface, IOInterfaceWrite, VERBOSE};
 use crate::package::BasePackageHandle;
-use bstr::{BString, ByteSlice};
+use bstr::{BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     PhpMixed, ToPhpString, array_shift, array_unshift, bformat, microtime, spl_object_hash, sprintf,

@@ -4,8 +4,7 @@ use crate::test_case::{
     RunOptions, TearDown, get_application_tester, get_complete_package, get_package,
     get_version_constraint, init_temp_composer,
 };
-use bstr::{BStr, BString, ByteSlice};
-use serial_test::serial;
+use bstr::{BStr, BString, ByteSlice as _};
 use shirabe::package::{Link, PackageInterfaceHandle};
 use shirabe::repository::PlatformRepository;
 use shirabe_php_shim::{
@@ -86,7 +85,7 @@ use crate::test_case::{create_composer_lock, create_installed_json};
 use shirabe_symfony_console::input::{InputValue, ParameterName};
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_show_default_shows_installed_with_version_and_description() {
     run_show_case(
         input(vec![(BStr::new("command"), InputValue::from("show"))]),
@@ -101,7 +100,7 @@ vendor/package 1.0.0 description of installed package",
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_show_with_installed_and_self() {
     run_show_case(
         input(vec![
@@ -121,7 +120,7 @@ vendor/package 1.0.0 description of installed package",
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_show_with_locked_and_self() {
     run_show_case(
         input(vec![
@@ -138,7 +137,7 @@ vendor/locked 3.0.0 description of locked package",
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_show_with_available() {
     run_show_case(
         input(vec![
@@ -156,7 +155,7 @@ vendor/package generic description",
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_show_with_direct_shows_nothing_if_no_deps() {
     run_show_case(
         input(vec![
@@ -169,7 +168,7 @@ fn test_show_with_direct_shows_nothing_if_no_deps() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_show_with_direct_shows_only_root_deps() {
     run_show_case(
         input(vec![
@@ -182,7 +181,7 @@ fn test_show_with_direct_shows_only_root_deps() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_show_outdated_deps() {
     run_show_case(
         input(vec![(BStr::new("command"), InputValue::from("outdated"))]),
@@ -204,7 +203,7 @@ outdated/patch 1.0.0 <highlight>! 1.0.1</highlight>",
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 // TODO(php-semantics): ShowCommand::get_relative_time formats the release date in UTC but takes
 // "today" from date(), which renders in the system default timezone, so a release date set to the
 // current instant is not recognised as today whenever the two dates differ.
@@ -234,7 +233,7 @@ outdated/major 1.0.0 ~ 2.0.0 from today",
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_show_outdated_deps_with_direct_only_show_direct_deps_with_updated() {
     run_show_case(
         input(vec![
@@ -255,7 +254,7 @@ outdated/major 1.0.0 ~ 2.0.0",
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_show_outdated_deps_with_direct_show_msg_if_all_up_to_date() {
     run_show_case(
         input(vec![
@@ -268,7 +267,7 @@ fn test_show_outdated_deps_with_direct_show_msg_if_all_up_to_date() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_show_outdated_deps_with_major_only() {
     run_show_case(
         input(vec![
@@ -291,7 +290,7 @@ outdated/major 1.0.0 ~ 2.0.0",
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_show_outdated_deps_with_minor_only() {
     run_show_case(
         input(vec![
@@ -315,7 +314,7 @@ outdated/patch 1.0.0 <highlight>! 1.0.1</highlight>",
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_show_outdated_deps_with_patch_only() {
     run_show_case(
         input(vec![
@@ -340,7 +339,7 @@ outdated/patch 1.0.0 <highlight>! 1.0.1</highlight>",
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_outdated_filters_according_to_platform_reqs_and_warns() {
     let _tear_down = init_temp_composer(
         Some(&serde_json::json!({
@@ -412,7 +411,7 @@ vendor/package 1.1.0 ~ 1.0.0",
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_outdated_filters_according_to_platform_reqs_without_warning_for_higher_versions() {
     let _tear_down = init_temp_composer(
         Some(&serde_json::json!({
@@ -457,7 +456,7 @@ vendor/package 1.1.0 <highlight>! 1.2.0</highlight>",
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_show_direct_with_name_does_not_show_transient_dependencies() {
     // NOTE: PHP also wires `direct/dependent` -> `vendor/package` via configureLinks, which has no
     // public handle API. It is omitted: vendor/package is installed but not a direct root dependency
@@ -504,7 +503,7 @@ fn test_show_direct_with_name_does_not_show_transient_dependencies() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_show_direct_with_name_only_shows_direct_dependents() {
     let _tear_down = init_temp_composer(
         Some(&serde_json::json!({
@@ -591,7 +590,7 @@ fn assert_all_platform_packages(output: &[u8]) {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_show_platform_only_shows_platform_packages() {
     let _tear_down = init_temp_composer(
         Some(&serde_json::json!({
@@ -626,7 +625,7 @@ fn test_show_platform_only_shows_platform_packages() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_show_platform_works_without_composer_json() {
     let _tear_down = init_temp_composer(Some(&serde_json::json!({})), None, None, true);
     let _ = std::fs::remove_file("./composer.json");
@@ -674,7 +673,7 @@ fn test_show_platform_works_without_composer_json() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_outdated_with_zero_major() {
     let _tear_down = init_temp_composer(
         Some(&serde_json::json!({
@@ -777,7 +776,7 @@ zerozero/major 0.0.1 ~ 0.0.2",
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_show_all_shows_all_sections() {
     let _tear_down = init_temp_composer(
         Some(&serde_json::json!({
@@ -834,7 +833,7 @@ installed:
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_locked_requires_valid_lock_file() {
     let _tear_down = init_temp_composer(None, None, None, true);
 
@@ -858,7 +857,7 @@ fn test_locked_requires_valid_lock_file() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_locked_shows_all_locked() {
     let _tear_down = init_temp_composer(None, None, None, true);
 
@@ -903,7 +902,7 @@ vendor/locked2 2.0.0 description of locked2 package",
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_invalid_option_combinations() {
     let combos: Vec<Vec<(&BStr, InputValue)>> = vec![
         vec![
@@ -964,7 +963,7 @@ fn test_invalid_option_combinations() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_ignored_option_combinations() {
     let _tear_down = init_temp_composer(None, None, None, true);
 
@@ -1005,7 +1004,7 @@ fn test_ignored_option_combinations() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_self_and_name_only() {
     let _tear_down = init_temp_composer(
         Some(&serde_json::json!({"name": "vendor/package", "version": "1.2.3"})),
@@ -1029,7 +1028,7 @@ fn test_self_and_name_only() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_self_and_package_combination() {
     let _tear_down = init_temp_composer(
         Some(&serde_json::json!({"name": "vendor/package"})),
@@ -1055,7 +1054,7 @@ fn test_self_and_package_combination() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_self() {
     let today = date_local("Y-m-d", None);
     let _tear_down = init_temp_composer(
@@ -1103,7 +1102,7 @@ fn test_self() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_not_installed_error() {
     let _tear_down = init_temp_composer(
         Some(&serde_json::json!({
@@ -1130,7 +1129,7 @@ fn test_not_installed_error() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_no_dev_option() {
     let _tear_down = init_temp_composer(
         Some(&serde_json::json!({
@@ -1164,7 +1163,7 @@ fn test_no_dev_option() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_package_filter() {
     let _tear_down = init_temp_composer(
         Some(&serde_json::json!({
@@ -1263,7 +1262,7 @@ fn run_not_existing_package_case(
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_not_existing_package_with_no_options() {
     run_not_existing_package_case(
         BStr::new("not/existing"),
@@ -1275,7 +1274,7 @@ fn test_not_existing_package_with_no_options() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_not_existing_package_with_all_option() {
     run_not_existing_package_case(
         BStr::new("not/existing"),
@@ -1285,7 +1284,7 @@ fn test_not_existing_package_with_all_option() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_not_existing_package_with_locked_option() {
     run_not_existing_package_case(
         BStr::new("not/existing"),
@@ -1297,7 +1296,7 @@ fn test_not_existing_package_with_locked_option() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_not_existing_platform_with_platform_option() {
     run_not_existing_package_case(
         BStr::new("ext-nonexisting"),
@@ -1309,7 +1308,7 @@ fn test_not_existing_platform_with_platform_option() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_not_existing_platform_without_platform_option() {
     run_not_existing_package_case(
         BStr::new("ext-nonexisting"),
@@ -1321,7 +1320,7 @@ fn test_not_existing_platform_without_platform_option() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_not_existing_package_with_working_dir() {
     let tear_down = init_temp_composer(
         Some(&serde_json::json!({
@@ -1392,14 +1391,14 @@ fn run_specific_package_and_tree_case(
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_specific_package_and_tree_just_package() {
     let pkg = get_package("vendor/package", "1.0.0");
     run_specific_package_and_tree_case(vec![pkg], vec![], BStr::new("vendor/package 1.0.0"));
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_specific_package_and_tree_with_one_package_requirement() {
     let pkg = get_complete_package("vendor/package", "1.0.0");
     let mut requires = indexmap::IndexMap::new();
@@ -1425,7 +1424,7 @@ fn test_specific_package_and_tree_with_one_package_requirement() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_specific_package_and_tree_with_platform_requirement() {
     let pkg = get_complete_package("vendor/package", "1.0.0");
     let mut requires = indexmap::IndexMap::new();
@@ -1451,7 +1450,7 @@ fn test_specific_package_and_tree_with_platform_requirement() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_specific_package_and_tree_with_json_format() {
     let pkg = get_package("vendor/package", "1.0.0");
     run_specific_package_and_tree_case(
@@ -1472,7 +1471,7 @@ fn test_specific_package_and_tree_with_json_format() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_name_only_prints_no_trailing_whitespace() {
     let _tear_down = init_temp_composer(
         Some(&serde_json::json!({
@@ -1640,7 +1639,7 @@ fn init_temp_composer_with_linked_package() -> TearDown {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_show_package_prints_every_link_section() {
     let _tear_down = init_temp_composer_with_linked_package();
 
@@ -1681,7 +1680,7 @@ vendor/replaced 3.0.0";
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_show_package_as_json_includes_every_link_type() {
     let _tear_down = init_temp_composer_with_linked_package();
 

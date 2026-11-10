@@ -9,23 +9,21 @@
 //! everything from local repositories.
 
 use crate::php_worker::lock_php_worker;
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{bformat, getenv, os_str_from_bytes, path_to_bytes};
-use std::path::{Path, PathBuf};
-use tempfile::TempDir;
 
-fn fixture_dir() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/plugin/fixtures/e2e")
+fn fixture_dir() -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/plugin/fixtures/e2e")
 }
 
 /// The upstream Composer checkout used as the comparison oracle (and as the PHP runtime of
 /// the worker). Absent checkout means the oracle cannot run; the test returns early,
 /// following the convention of the non-mock tests in `shirabe-php-rpc`.
-pub(crate) fn upstream_composer_bin() -> Option<PathBuf> {
+pub(crate) fn upstream_composer_bin() -> Option<std::path::PathBuf> {
     let root = match getenv("SHIRABE_COMPOSER_PHP_DIR") {
-        Some(dir) => PathBuf::from(dir),
-        None => Path::new(env!("CARGO_MANIFEST_DIR")).join("../../composer"),
+        Some(dir) => std::path::PathBuf::from(dir),
+        None => std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../composer"),
     };
     let bin = root.join("bin/composer");
     if bin.is_file() && root.join("vendor/autoload.php").is_file() {
@@ -35,7 +33,7 @@ pub(crate) fn upstream_composer_bin() -> Option<PathBuf> {
     }
 }
 
-pub(crate) fn copy_dir(from: &Path, to: &Path) {
+pub(crate) fn copy_dir(from: &std::path::Path, to: &std::path::Path) {
     std::fs::create_dir_all(to).unwrap();
     for entry in std::fs::read_dir(from).unwrap() {
         let entry = entry.unwrap();
@@ -49,9 +47,9 @@ pub(crate) fn copy_dir(from: &Path, to: &Path) {
 }
 
 /// Every file under `dir` as relative path => contents.
-fn snapshot_tree(dir: &Path) -> IndexMap<BString, Vec<u8>> {
+fn snapshot_tree(dir: &std::path::Path) -> IndexMap<BString, Vec<u8>> {
     let mut files = IndexMap::new();
-    fn walk(root: &Path, dir: &Path, files: &mut IndexMap<BString, Vec<u8>>) {
+    fn walk(root: &std::path::Path, dir: &std::path::Path, files: &mut IndexMap<BString, Vec<u8>>) {
         for entry in std::fs::read_dir(dir).unwrap() {
             let entry = entry.unwrap();
             if entry.file_type().unwrap().is_dir() {
@@ -75,7 +73,7 @@ struct InstallRun {
     artifacts: IndexMap<BString, Vec<u8>>,
 }
 
-fn run_install(work: &Path, program: &BStr, args: &[&std::ffi::OsStr]) -> InstallRun {
+fn run_install(work: &std::path::Path, program: &BStr, args: &[&std::ffi::OsStr]) -> InstallRun {
     let project = work.join("project");
     copy_dir(&fixture_dir(), work);
     let output = std::process::Command::new(os_str_from_bytes(&program))
@@ -128,7 +126,7 @@ fn test_extension_installer_install_matches_upstream_composer() {
     }
     let _worker = lock_php_worker();
 
-    let work = TempDir::new().unwrap();
+    let work = tempfile::TempDir::new().unwrap();
     let upstream = run_install(work.path(), BStr::new("php"), &[composer_bin.as_os_str()]);
     let shirabe = run_install(work.path(), BStr::new(env!("CARGO_BIN_EXE_shirabe")), &[]);
 

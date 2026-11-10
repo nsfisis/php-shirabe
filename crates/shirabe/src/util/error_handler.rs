@@ -1,19 +1,18 @@
 //! ref: composer/src/Composer/Util/ErrorHandler.php sha1:f6945f00fd097a36ed223e0c527ff1b7fe1cd0ac
 
 use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite};
-use bstr::{BString, ByteSlice, ByteVec};
+use bstr::{BString, ByteSlice as _, ByteVec as _};
 use shirabe_php_shim::{
     E_ALL, E_DEPRECATED, E_USER_DEPRECATED, E_USER_WARNING, E_WARNING, ErrorException, PHP_EOL,
     STDERR, bformat, debug_backtrace, error_reporting, filter_var_boolean, fwrite, ini_get,
     set_error_handler,
 };
-use std::cell::Cell;
 
 // PHP keeps `$io` / `$hasShownDeprecationNotice` as process-global statics. Composer runs
 // single-threaded, so thread-locals on the main thread reproduce that faithfully.
 thread_local! {
     static IO: std::cell::RefCell<Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>> = const { std::cell::RefCell::new(None) };
-    static HAS_SHOWN_DEPRECATION_NOTICE: Cell<i64> = const { Cell::new(0) };
+    static HAS_SHOWN_DEPRECATION_NOTICE: std::cell::Cell<i64> = const { std::cell::Cell::new(0) };
 }
 
 pub struct ErrorHandler;

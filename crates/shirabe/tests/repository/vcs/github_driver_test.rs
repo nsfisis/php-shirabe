@@ -6,9 +6,8 @@ use crate::process_executor_mock::{
     ProcessExecutorMockGuard, cmd, cmd_full, get_process_executor_mock,
 };
 use crate::test_case::{GitVersionGuard, get_unique_tmp_directory};
-use bstr::{B, BStr, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
-use serial_test::serial;
 use shirabe::config::{Config, ConfigSourceInterface};
 use shirabe::io::{IOInterface, NullIO};
 use shirabe::repository::vcs::GitHubDriver;
@@ -16,10 +15,9 @@ use shirabe::util::{
     Filesystem, Git as GitUtil, HttpDownloaderMockHandler, MockHandler, ProcessExecutor,
 };
 use shirabe_php_shim::{PhpMixed, ToPhpString, base64_encode, bformat, path_to_bytes};
-use tempfile::TempDir;
 
 struct SetUp {
-    home: TempDir,
+    home: tempfile::TempDir,
     config: Config,
 }
 
@@ -790,7 +788,7 @@ fn test_public_repository_archived() {
 // invoking the real `git --version`) and the mock expectation list below never needs to include it.
 // Rust test execution order isn't guaranteed the same way, so the cache is seeded explicitly here.
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_private_repository_no_interaction() {
     GitUtil::__set_version(Some("2.52.0".into()));
     let _git_guard = GitVersionGuard;

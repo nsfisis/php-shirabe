@@ -17,7 +17,6 @@ use shirabe_php_shim::{
     preg_split, strtolower,
 };
 use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
-use std::rc::Weak;
 
 /// A repository implementation that simply stores packages in an array
 #[derive(Debug)]
@@ -129,7 +128,12 @@ impl ArrayRepository {
         // PHP: $package->setRepository($this). The back-reference is wired only once this
         // repository (or its outermost wrapper) has been put behind a RepositoryInterfaceHandle;
         // packages added during construction are wired later in set_self_handle.
-        if let Some(handle) = self.self_weak.borrow().as_ref().and_then(Weak::upgrade) {
+        if let Some(handle) = self
+            .self_weak
+            .borrow()
+            .as_ref()
+            .and_then(std::rc::Weak::upgrade)
+        {
             package.set_repository(RepositoryInterfaceHandle::from_rc(handle))?;
         }
 

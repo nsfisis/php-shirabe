@@ -7,7 +7,7 @@ use crate::delegate_base_command_trait_impls_to_inner;
 use crate::factory::Factory;
 use crate::io::IOInterfaceWrite;
 use crate::json::JsonFile;
-use bstr::{B, BString, ByteSlice};
+use bstr::{B, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, RuntimeException, ToPhpString, bformat, impl_php_class,

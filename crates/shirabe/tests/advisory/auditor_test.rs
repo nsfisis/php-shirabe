@@ -2,8 +2,7 @@
 
 use crate::io_mock::{Expectation, get_io_mock};
 use crate::test_case::{get_complete_package, get_package};
-use bstr::{BStr, BString, ByteSlice};
-use chrono::Utc;
+use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe::advisory::{AnySecurityAdvisory, Auditor, PartialSecurityAdvisory, SecurityAdvisory};
 use shirabe::downloader::TransportException;
@@ -33,7 +32,7 @@ fn full_advisory() -> std::rc::Rc<AnySecurityAdvisory> {
         constraint(BStr::new("="), BStr::new("1.0.0.0")),
         BString::from("test"),
         vec![source.into_iter().collect::<indexmap::IndexMap<_, _>>()],
-        Utc::now(),
+        chrono::Utc::now(),
         None,
         None,
         None,
@@ -50,7 +49,7 @@ fn full_advisory_with_id(advisory_id: &BStr) -> std::rc::Rc<AnySecurityAdvisory>
         constraint(BStr::new("="), BStr::new("1.0.0.0")),
         BString::from("test"),
         vec![source.into_iter().collect::<indexmap::IndexMap<_, _>>()],
-        Utc::now(),
+        chrono::Utc::now(),
         None,
         None,
         None,
@@ -352,7 +351,7 @@ fn mock_advisory(
         VersionParser.parse_constraints(affected_versions).unwrap(),
         title.to_php_string(),
         vec![source.into_iter().collect::<indexmap::IndexMap<_, _>>()],
-        date_create::<Utc>(reported_at).unwrap(),
+        date_create::<chrono::Utc>(reported_at).unwrap(),
         Some(cve.to_php_string()),
         Some(link.to_php_string()),
         Some(severity.to_php_string()),
@@ -866,7 +865,7 @@ fn test_audit_with_ignore_unreachable() {
                         s.insert(BString::from("remoteId"), BString::from("1"));
                         s.into_iter().collect::<indexmap::IndexMap<_, _>>()
                     }],
-                    date_create::<Utc>("2023-01-01").unwrap(),
+                    date_create::<chrono::Utc>("2023-01-01").unwrap(),
                     Some(BString::from("CVE-2023-12345")),
                     Some(BString::from("https://example.com/advisory/1")),
                     Some(BString::from("medium")),
@@ -882,7 +881,7 @@ fn test_audit_with_ignore_unreachable() {
                         s.insert(BString::from("remoteId"), BString::from("3"));
                         s.into_iter().collect::<indexmap::IndexMap<_, _>>()
                     }],
-                    date_create::<Utc>("2023-01-01").unwrap(),
+                    date_create::<chrono::Utc>("2023-01-01").unwrap(),
                     Some(BString::from("CVE-2023-67890")),
                     Some(BString::from("https://example.com/advisory/3")),
                     Some(BString::from("high")),

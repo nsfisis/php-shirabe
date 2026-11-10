@@ -2,11 +2,10 @@
 //! `Composer\Platform\Runtime` itself has no Rust counterpart: its work belongs to the running
 //! PHP interpreter, so it is ported as PHP into the worker (`ShirabePlatformRuntime`).
 
-use bstr::{B, BStr, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_rpc::{cached, query};
 use shirabe_php_shim::{PhpMixed, bformat, php_str};
-use std::sync::OnceLock;
 
 /// The constants `PlatformInfo::has_constant` can be asked about.
 const PLATFORM_CONSTANTS: &[&BStr] = &[
@@ -257,7 +256,7 @@ impl PlatformInfo {
     }
 }
 
-static PLATFORM_INFO: OnceLock<PlatformInfo> = OnceLock::new();
+static PLATFORM_INFO: std::sync::OnceLock<PlatformInfo> = std::sync::OnceLock::new();
 
 /// PHP runtime information for `PlatformRepository`. The worker is queried once per process;
 /// subsequent calls reuse the cached payload.

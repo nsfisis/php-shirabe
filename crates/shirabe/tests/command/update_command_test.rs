@@ -4,8 +4,7 @@ use crate::test_case::{
     RunOptions, create_composer_lock, create_installed_json, get_application_tester, get_package,
     init_temp_composer,
 };
-use bstr::{BStr, BString, ByteSlice};
-use serial_test::serial;
+use bstr::{BStr, BString, ByteSlice as _};
 use shirabe::package::Link;
 use shirabe_php_shim::{ToPhpString, error_message, trim, utf8_text};
 use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint};
@@ -240,7 +239,7 @@ Your requirements could not be resolved to an installable set of packages.
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_update() {
     for (label, composer_json, command, expected, create_lock) in provide_updates() {
         let _tear_down = init_temp_composer(Some(&composer_json), None, None, true);
@@ -264,7 +263,7 @@ fn test_update() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_update_with_patch_only() {
     let composer_json = serde_json::json!({
         "repositories": { "packages": { "type": "package", "package": [
@@ -354,7 +353,7 @@ Lock file operations: 0 installs, 2 updates, 0 removals
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_interactive_mode_throws_if_no_package_to_update() {
     let composer_json = serde_json::json!({
         "repositories": { "packages": { "type": "package", "package": [
@@ -383,7 +382,7 @@ fn test_interactive_mode_throws_if_no_package_to_update() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_interactive_mode_throws_if_no_package_entered() {
     let composer_json = serde_json::json!({
         "repositories": { "packages": { "type": "package", "package": [
@@ -444,7 +443,7 @@ Package operations: 0 installs, 1 update, 0 removals
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_interactive_tmp() {
     for (package_names, expected) in provide_interactive_updates() {
         let composer_json = serde_json::json!({
@@ -524,7 +523,7 @@ fn test_interactive_tmp() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_no_security_blocking_allows_insecure_packages() {
     let composer_json = serde_json::json!({
         "repositories": { "packages": {
@@ -609,7 +608,7 @@ fn test_no_security_blocking_allows_insecure_packages() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_bump_after_update_without_lockfile() {
     let composer_json = serde_json::json!({
         "repositories": { "packages": { "type": "package", "package": [

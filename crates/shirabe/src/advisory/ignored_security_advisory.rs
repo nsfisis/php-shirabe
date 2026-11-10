@@ -2,7 +2,6 @@
 
 use crate::advisory::SecurityAdvisory;
 use bstr::BString;
-use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
 use shirabe_semver::constraint::AnyConstraint;
 
@@ -26,7 +25,7 @@ impl IgnoredSecurityAdvisory {
         affected_versions: AnyConstraint,
         title: BString,
         sources: Vec<IndexMap<BString, BString>>,
-        reported_at: DateTime<Utc>,
+        reported_at: chrono::DateTime<chrono::Utc>,
         cve: Option<BString>,
         link: Option<BString>,
         ignore_reason: Option<BString>,

@@ -6,8 +6,7 @@
 //! constraint decides how many versions survive that filter, which is what the lazy expansion is
 //! meant to exploit.
 
-use bstr::{BStr, BString, ByteSlice};
-use criterion::{BatchSize, BenchmarkId, Criterion, criterion_group, criterion_main};
+use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe::config::Config;
 use shirabe::io::{IOInterface, NullIO};
@@ -18,7 +17,6 @@ use shirabe::repository::ComposerRepository;
 use shirabe::util::{HttpDownloader, HttpDownloaderMockExpectation, HttpDownloaderMockHandler};
 use shirabe_php_shim::{PhpMixed, path_to_bytes, php_str, str_replace};
 use shirabe_semver::constraint::AnyConstraint;
-use tempfile::TempDir;
 
 #[path = "packagist_fixture.rs"]
 mod packagist_fixture;
@@ -50,7 +48,7 @@ fn root_file() -> BString {
 }
 
 /// A config whose cache is read-only, so the measurement stays off the filesystem.
-fn config(home: &TempDir) -> Config {
+fn config(home: &tempfile::TempDir) -> Config {
     let mut config = Config::new(true, None);
     let mut settings: IndexMap<BString, PhpMixed> = IndexMap::new();
     settings.insert("home".into(), PhpMixed::string(path_to_bytes(home.path())));
@@ -138,8 +136,8 @@ fn version_count(package: &BStr, metadata: &BStr) -> usize {
         .len()
 }
 
-fn bench_load_packages(c: &mut Criterion) {
-    let home = TempDir::new().expect("failed to create the config home");
+fn bench_load_packages(c: &mut criterion::Criterion) {
+    let home = tempfile::TempDir::new().expect("failed to create the config home");
     let config = config(&home);
     let root = root_file();
     let version_parser = VersionParser::new();
@@ -169,7 +167,7 @@ fn bench_load_packages(c: &mut Criterion) {
             )]
             let parameter = format!("{}/{loaded}of{total}", label.display_lossy());
 
-            group.bench_function(BenchmarkId::from_parameter(parameter), |b| {
+            group.bench_function(criterion::BenchmarkId::from_parameter(parameter), |b| {
                 b.iter_batched(
                     || repository(package, root.as_ref(), metadata.as_bstr(), &config),
                     |mut repository| {
@@ -180,7 +178,7 @@ fn bench_load_packages(c: &mut Criterion) {
                             &acceptable_stabilities,
                         )
                     },
-                    BatchSize::PerIteration,
+                    criterion::BatchSize::PerIteration,
                 );
             });
         }
@@ -189,5 +187,5 @@ fn bench_load_packages(c: &mut Criterion) {
     }
 }
 
-criterion_group!(benches, bench_load_packages);
-criterion_main!(benches);
+criterion::criterion_group!(benches, bench_load_packages);
+criterion::criterion_main!(benches);

@@ -1,6 +1,6 @@
 use crate::{display_to_bytes, getenv, os_str_from_bytes, trim, utf8_text};
 use bstr::BString;
-use std::net::{IpAddr, SocketAddr, ToSocketAddrs};
+use std::net::ToSocketAddrs as _;
 
 pub fn gethostname() -> std::ffi::OsString {
     // PHP's gethostname() wraps gethostname(2). On Linux the kernel exposes the
@@ -26,8 +26,8 @@ pub fn gethostbyname(hostname: impl AsRef<[u8]>) -> BString {
     match (text, 0u16).to_socket_addrs() {
         Ok(addrs) => addrs
             .filter_map(|addr| match addr {
-                SocketAddr::V4(v4) => Some(display_to_bytes(v4.ip())),
-                SocketAddr::V6(_) => None,
+                std::net::SocketAddr::V4(v4) => Some(display_to_bytes(v4.ip())),
+                std::net::SocketAddr::V6(_) => None,
             })
             .next()
             .unwrap_or_else(|| BString::from(hostname)),
@@ -37,9 +37,9 @@ pub fn gethostbyname(hostname: impl AsRef<[u8]>) -> BString {
 
 pub fn inet_pton(host: impl AsRef<[u8]>) -> Option<Vec<u8>> {
     // Every address PHP accepts is ASCII.
-    match utf8_text(host.as_ref())?.parse::<IpAddr>() {
-        Ok(IpAddr::V4(v4)) => Some(v4.octets().to_vec()),
-        Ok(IpAddr::V6(v6)) => Some(v6.octets().to_vec()),
+    match utf8_text(host.as_ref())?.parse::<std::net::IpAddr>() {
+        Ok(std::net::IpAddr::V4(v4)) => Some(v4.octets().to_vec()),
+        Ok(std::net::IpAddr::V6(v6)) => Some(v6.octets().to_vec()),
         Err(_) => None,
     }
 }

@@ -10,12 +10,9 @@ use crate::e2e_extension_installer_test::{copy_dir, upstream_composer_bin};
 use crate::e2e_script_command_test::{CommandRun, lines_starting_with, run_command};
 use crate::php_worker::lock_php_worker;
 use bstr::BStr;
-use std::ffi::OsStr;
-use std::path::{Path, PathBuf};
-use tempfile::TempDir;
 
-fn fixture_dir() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/plugin/fixtures/e2e-script-find")
+fn fixture_dir() -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/plugin/fixtures/e2e-script-find")
 }
 
 #[test]
@@ -24,14 +21,14 @@ fn test_script_command_finds_later_script_alias_command_like_upstream_composer()
         return;
     };
     let _worker = lock_php_worker();
-    let implementations: [(&BStr, Vec<&OsStr>); 2] = [
+    let implementations: [(&BStr, Vec<&std::ffi::OsStr>); 2] = [
         (BStr::new("php"), vec![composer_bin.as_os_str()]),
         (BStr::new(env!("CARGO_BIN_EXE_shirabe")), vec![]),
     ];
 
     let mut results: Vec<CommandRun> = Vec::new();
     for (program, prefix) in &implementations {
-        let work = TempDir::new().unwrap();
+        let work = tempfile::TempDir::new().unwrap();
         copy_dir(&fixture_dir(), work.path());
         let install = run_command(work.path(), program, prefix, &[BStr::new("install")]);
         assert_eq!(

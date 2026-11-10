@@ -2,7 +2,7 @@
 
 use crate::config_stub::ConfigStubBuilder;
 use crate::io_mock::{Expectation, IOMock, IOMockGuard, get_io_mock};
-use bstr::{B, BStr, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe::config::ConfigSourceInterface;
 use shirabe::io::{IOInterface, io_interface};

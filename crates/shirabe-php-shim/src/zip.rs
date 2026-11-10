@@ -3,17 +3,14 @@
 
 use crate::{ErrorException, PhpResource, StreamBacking, StreamState, bformat};
 use bstr::{BStr, BString};
-use zip::read::{ExtractOptions, SymlinkExtractAction};
-use zip::result::ZipResult;
-use zip::write::SimpleFileOptions;
 
 /// Starts a directory entry whose name may hold any bytes, which `ZipWriter::add_directory` does
 /// not accept. A name without a trailing separator gets a `/`, as `add_directory` does.
 pub(crate) fn start_directory<W: std::io::Write + std::io::Seek>(
     writer: &mut zip::ZipWriter<W>,
     name: &BStr,
-    options: SimpleFileOptions,
-) -> ZipResult<()> {
+    options: zip::write::SimpleFileOptions,
+) -> zip::result::ZipResult<()> {
     let mut name = BString::from(name);
     if !matches!(name.last(), Some(b'/' | b'\\')) {
         name.push(b'/');
@@ -164,7 +161,8 @@ impl ZipArchive {
         let ZipState::Reader(archive) = &mut *state else {
             return Ok(false);
         };
-        let options = ExtractOptions::default().symlink_action(SymlinkExtractAction::ExtractAsFile);
+        let options = zip::read::ExtractOptions::default()
+            .symlink_action(zip::read::SymlinkExtractAction::ExtractAsFile);
         Ok(archive.extract_with_options(path.as_ref(), options).is_ok())
     }
 
@@ -265,12 +263,12 @@ impl ZipArchive {
     /// `opsys` and `attr` carry what PHP passes to `setExternalAttributesName`, which
     /// amends an entry after `addFile`. The `zip` crate fixes external attributes when
     /// the entry is started, so they are taken up front instead.
-    fn entry_options(opsys: i64, attr: u32) -> SimpleFileOptions {
+    fn entry_options(opsys: i64, attr: u32) -> zip::write::SimpleFileOptions {
         let system = match opsys {
             Self::OPSYS_UNIX => zip::System::Unix,
             _ => todo!(),
         };
-        SimpleFileOptions::default()
+        zip::write::SimpleFileOptions::default()
             .system(system)
             .external_attributes(attr)
     }
@@ -346,7 +344,8 @@ mod tests {
         writer
             .start_file(
                 "secret.txt",
-                SimpleFileOptions::default().with_aes_encryption(zip::AesMode::Aes256, "password"),
+                zip::write::SimpleFileOptions::default()
+                    .with_aes_encryption(zip::AesMode::Aes256, "password"),
             )
             .unwrap();
         writer.write_all(b"secret").unwrap();
@@ -364,10 +363,14 @@ mod tests {
         let target = dir.path().join("archive.zip");
         let mut writer = zip::ZipWriter::new(std::fs::File::create(&target).unwrap());
         writer
-            .add_symlink("link", "../outside", SimpleFileOptions::default())
+            .add_symlink(
+                "link",
+                "../outside",
+                zip::write::SimpleFileOptions::default(),
+            )
             .unwrap();
         writer
-            .start_file("after.txt", SimpleFileOptions::default())
+            .start_file("after.txt", zip::write::SimpleFileOptions::default())
             .unwrap();
         writer.write_all(b"after").unwrap();
         writer.finish().unwrap();

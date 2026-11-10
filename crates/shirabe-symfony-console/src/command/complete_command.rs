@@ -6,14 +6,13 @@ use crate::completion::{CompletionInput, CompletionSuggestions, StringOrSuggesti
 use crate::delegate_command_trait_impls_to_inner;
 use crate::input::{InputInterface, InputInterfaceByName, InputOption, InputValue};
 use crate::output::OutputInterface;
-use bstr::{B, BStr, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     FILE_APPEND, PHP_EOL, PHP_SERVER, PhpMixed, RuntimeException, ToPhpString, basename, bformat,
     ctype_digit, date_utc, error_message, file_put_contents_with_flags, filter_var_boolean, getenv,
     impl_php_class, implode, intval, path_from_bytes, php_str, sys_get_temp_dir,
 };
-use std::ops::{Deref, DerefMut};
 
 /// Responsible for providing the values to the shell completion.
 #[derive(Debug)]
@@ -28,7 +27,7 @@ impl_php_class!(
     r"Symfony\Component\Console\Command\CompleteCommand"
 );
 
-impl Deref for CompleteCommand {
+impl std::ops::Deref for CompleteCommand {
     type Target = CommandData;
 
     fn deref(&self) -> &Self::Target {
@@ -36,7 +35,7 @@ impl Deref for CompleteCommand {
     }
 }
 
-impl DerefMut for CompleteCommand {
+impl std::ops::DerefMut for CompleteCommand {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.inner
     }

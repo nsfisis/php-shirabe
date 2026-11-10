@@ -15,7 +15,7 @@ pub use config_source_interface::*;
 pub use json_config_source::*;
 
 use crate::io::{IOInterface, IOInterfaceWrite};
-use bstr::{B, BStr, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 
 use crate::advisory::Auditor;

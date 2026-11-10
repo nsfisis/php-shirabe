@@ -2,12 +2,11 @@
 
 use bstr::BString;
 use shirabe_php_shim::{RuntimeException, impl_php_exception};
-use std::path::PathBuf;
 
 #[derive(Debug)]
 pub struct IOException {
     inner: RuntimeException,
-    pub path: Option<PathBuf>,
+    pub path: Option<std::path::PathBuf>,
 }
 
 impl IOException {
@@ -16,7 +15,7 @@ impl IOException {
         message: impl Into<BString>,
         code: i64,
         previous: Option<std::sync::Arc<anyhow::Error>>,
-        path: Option<PathBuf>,
+        path: Option<std::path::PathBuf>,
     ) -> Self {
         Self {
             inner: RuntimeException::with_code_and_previous(message, code, previous),

@@ -14,10 +14,9 @@ use shirabe::repository::{
 };
 use shirabe::util::{Filesystem, HttpDownloader};
 use shirabe_php_shim::{PhpMixed, ToPhpString, path_to_bytes};
-use tempfile::TempDir;
 
 struct SetUp {
-    tmpdir: TempDir,
+    tmpdir: tempfile::TempDir,
 }
 
 fn set_up() -> SetUp {

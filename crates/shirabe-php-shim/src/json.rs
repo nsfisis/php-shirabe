@@ -1,8 +1,7 @@
 use crate::{PhpJson, PhpMixed, str_replace, utf8_text};
 use bstr::BString;
 use indexmap::IndexMap;
-use serde::de::{DeserializeSeed, MapAccess, SeqAccess, Visitor};
-use std::fmt;
+use serde::de::DeserializeSeed as _;
 use std::io::Write as _;
 
 pub trait JsonSerializable {
@@ -101,7 +100,7 @@ struct PhpMixedSeed {
     assoc: bool,
 }
 
-impl<'de> DeserializeSeed<'de> for PhpMixedSeed {
+impl<'de> serde::de::DeserializeSeed<'de> for PhpMixedSeed {
     type Value = PhpMixed;
 
     fn deserialize<D>(self, deserializer: D) -> Result<PhpMixed, D::Error>
@@ -112,10 +111,10 @@ impl<'de> DeserializeSeed<'de> for PhpMixedSeed {
     }
 }
 
-impl<'de> Visitor<'de> for PhpMixedSeed {
+impl<'de> serde::de::Visitor<'de> for PhpMixedSeed {
     type Value = PhpMixed;
 
-    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
         formatter.write_str("a JSON value")
     }
 
@@ -156,7 +155,7 @@ impl<'de> Visitor<'de> for PhpMixedSeed {
 
     fn visit_seq<A>(self, mut seq: A) -> Result<PhpMixed, A::Error>
     where
-        A: SeqAccess<'de>,
+        A: serde::de::SeqAccess<'de>,
     {
         let mut items = Vec::new();
         while let Some(item) = seq.next_element_seed(self)? {
@@ -171,7 +170,7 @@ impl<'de> Visitor<'de> for PhpMixedSeed {
     )]
     fn visit_map<A>(self, mut map: A) -> Result<PhpMixed, A::Error>
     where
-        A: MapAccess<'de>,
+        A: serde::de::MapAccess<'de>,
     {
         let mut data = IndexMap::new();
         while let Some(key) = map.next_key::<String>()? {

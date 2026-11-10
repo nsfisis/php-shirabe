@@ -4,12 +4,10 @@ use crate::test_case::{
     RunOptions, create_composer_lock, create_installed_json, get_application_tester,
     get_complete_package, get_package, get_unique_tmp_directory, init_temp_composer,
 };
-use bstr::{BString, ByteSlice};
-use serial_test::serial;
+use bstr::{BString, ByteSlice as _};
 use shirabe::util::Platform;
 use shirabe_php_shim::{bformat, error_message, path_to_bytes};
 use shirabe_symfony_console::input::{InputValue, ParameterName};
-use std::path::PathBuf;
 
 /// ref: GlobalCommandTest::tearDown (the COMPOSER part; COMPOSER_HOME is restored by the
 /// `init_temp_composer` guard).
@@ -22,7 +20,7 @@ impl Drop for EnvGuard {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_global() {
     let _env_guard = EnvGuard;
 
@@ -38,7 +36,7 @@ fn test_global() {
         None,
         true,
     );
-    let composer_home: PathBuf = tear_down.working_dir();
+    let composer_home: std::path::PathBuf = tear_down.working_dir();
     let composer_home_str = composer_home.to_path_buf();
 
     Platform::put_env("COMPOSER_HOME", path_to_bytes(&composer_home_str)).unwrap();
@@ -74,7 +72,7 @@ fn test_global() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_cannot_create_home() {
     let _env_guard = EnvGuard;
 
@@ -113,7 +111,7 @@ fn test_cannot_create_home() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_global_show() {
     let _env_guard = EnvGuard;
 
@@ -172,7 +170,7 @@ fn test_global_show() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_global_show_without_packages() {
     let _env_guard = EnvGuard;
 
@@ -204,7 +202,7 @@ fn test_global_show_without_packages() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 #[ignore = "installs a package via the global command's require sub-dispatch, which panics inside the event dispatcher: \"Subscriber ?::? for event pre-operations-exec is not callable\""]
 fn test_global_require() {
     let _env_guard = EnvGuard;
@@ -267,7 +265,7 @@ fn test_global_require() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_global_update() {
     let _env_guard = EnvGuard;
 
@@ -321,7 +319,7 @@ fn test_global_update() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_global_changes_directory() {
     let _env_guard = EnvGuard;
 
@@ -365,7 +363,7 @@ fn test_global_changes_directory() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_global_missing_command_name() {
     let _env_guard = EnvGuard;
 

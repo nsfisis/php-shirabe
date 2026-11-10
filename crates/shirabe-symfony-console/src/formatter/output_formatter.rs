@@ -5,7 +5,7 @@ use crate::formatter::{
     OutputFormatterInterface, OutputFormatterStyle, OutputFormatterStyleInterface,
     OutputFormatterStyleStack, WrappableOutputFormatterInterface,
 };
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use shirabe_php_shim::{
     PregMatches, bformat, byte_at, explode, implode, ltrim, mb_detect_encoding, php_regex,
     preg_match, preg_match_all, preg_replace, rtrim_chars, str_repeat, str_replace, strlen,

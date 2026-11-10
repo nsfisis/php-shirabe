@@ -5,13 +5,11 @@
 //! `keep` parameter is that acceptance rate, which is what decides how much of the expansion has
 //! to be copied out.
 
-use bstr::{BStr, BString, ByteSlice};
-use criterion::{BatchSize, BenchmarkId, Criterion, criterion_group, criterion_main};
+use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe::json::JsonFile;
 use shirabe_metadata_minifier::MetadataMinifier;
 use shirabe_php_shim::{PhpMixed, php_str};
-use std::hint::black_box;
 
 #[path = "packagist_fixture.rs"]
 mod packagist_fixture;
@@ -68,7 +66,7 @@ fn consume(
     let first_kept = expanded.len() - keep;
     let mut kept: Vec<IndexMap<BString, PhpMixed>> = Vec::with_capacity(keep);
     for index in 0..expanded.len() {
-        black_box(expanded.version(index).get("version_normalized"));
+        std::hint::black_box(expanded.version(index).get("version_normalized"));
         if index >= first_kept {
             kept.push(expanded.materialize(index));
         }
@@ -76,7 +74,7 @@ fn consume(
     kept
 }
 
-fn bench_expand(c: &mut Criterion) {
+fn bench_expand(c: &mut criterion::Criterion) {
     for package in PACKAGES {
         let versions = minified_versions(package);
         #[expect(
@@ -93,11 +91,11 @@ fn bench_expand(c: &mut Criterion) {
             )]
             let parameter = format!("keep{keep_percent}%/{}of{}", keep, versions.len());
 
-            group.bench_function(BenchmarkId::from_parameter(parameter), |b| {
+            group.bench_function(criterion::BenchmarkId::from_parameter(parameter), |b| {
                 b.iter_batched(
                     || versions.clone(),
                     |versions| consume(versions, keep),
-                    BatchSize::PerIteration,
+                    criterion::BatchSize::PerIteration,
                 );
             });
         }
@@ -106,5 +104,5 @@ fn bench_expand(c: &mut Criterion) {
     }
 }
 
-criterion_group!(benches, bench_expand);
-criterion_main!(benches);
+criterion::criterion_group!(benches, bench_expand);
+criterion::criterion_main!(benches);

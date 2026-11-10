@@ -4,7 +4,7 @@ use crate::config::Config;
 use crate::downloader::TransportException;
 use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface};
 use crate::util::{Bitbucket, GitHub, GitLab, HttpOptions, StreamContextOptions};
-use bstr::{B, BStr, BString, ByteSlice, ByteVec};
+use bstr::{B, BStr, BString, ByteSlice as _, ByteVec as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     E_USER_DEPRECATED, PhpMixed, RuntimeException, ToPhpString, TypeError, array_merge,

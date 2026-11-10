@@ -3,7 +3,7 @@
 use crate::io::{BufferIO, ConsoleIO, IOInterface, NORMAL, NullIO};
 use crate::php_worker::rpc::entity::{Call, Crossing, Entity};
 use crate::php_worker::rpc::forwarding;
-use bstr::{BString, ByteSlice};
+use bstr::{BString, ByteSlice as _};
 use shirabe_php_rpc::{PhpThrow, PluginValue, ToPluginValue};
 use shirabe_symfony_console::output::VERBOSITY_NORMAL;
 

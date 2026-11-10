@@ -5,7 +5,6 @@ use crate::test_case::{
     init_temp_composer,
 };
 use bstr::{BStr, BString};
-use serial_test::serial;
 use shirabe_php_shim::trim;
 use shirabe_symfony_console::input::{InputValue, ParameterName};
 
@@ -70,7 +69,7 @@ fn cases() -> Vec<(
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_reinstall_command() {
     for (label, options, expected) in cases() {
         let composer_json = serde_json::json!({

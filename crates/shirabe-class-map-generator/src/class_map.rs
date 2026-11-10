@@ -1,6 +1,6 @@
 //! ref: composer/vendor/composer/class-map-generator/src/ClassMap.php sha1:59ee0a8e6b101420a60b859f75c950c97990585c
 
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{OutOfBoundsException, bformat, preg_is_match, rtrim_chars, strpos, strtr};
 

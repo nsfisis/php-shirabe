@@ -8,8 +8,7 @@ use crate::json::{JsonEncodeOptions, JsonFile};
 use crate::repository::vcs::{GitDriver, VcsDriverBase, VcsDriverInterface};
 use crate::util::http::Response;
 use crate::util::{GitHub, HttpDownloader, ProcessExecutor, StreamContextOptions};
-use bstr::{B, BStr, BString, ByteSlice};
-use chrono::{DateTime, FixedOffset};
+use bstr::{B, BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, PhpMixed, RuntimeException, ToPhpString, array_diff,
@@ -736,7 +735,7 @@ impl GitHubDriver {
     pub fn get_change_date(
         &mut self,
         identifier: &BStr,
-    ) -> anyhow::Result<Option<DateTime<FixedOffset>>> {
+    ) -> anyhow::Result<Option<chrono::DateTime<chrono::FixedOffset>>> {
         if let Some(ref mut git_driver) = self.git_driver {
             return git_driver.get_change_date(identifier);
         }
@@ -765,7 +764,7 @@ impl GitHubDriver {
             _ => BString::default(),
         };
 
-        let date: DateTime<FixedOffset> = date_create(&date_str)?;
+        let date: chrono::DateTime<chrono::FixedOffset> = date_create(&date_str)?;
         Ok(Some(date))
     }
 
@@ -1255,7 +1254,7 @@ impl VcsDriverInterface for GitHubDriver {
     fn get_change_date(
         &mut self,
         identifier: &BStr,
-    ) -> anyhow::Result<Option<DateTime<FixedOffset>>> {
+    ) -> anyhow::Result<Option<chrono::DateTime<chrono::FixedOffset>>> {
         GitHubDriver::get_change_date(self, identifier)
     }
 

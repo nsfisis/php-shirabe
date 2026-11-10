@@ -6,7 +6,6 @@ use crate::package::{
 };
 use crate::repository::RepositoryInterfaceHandle;
 use bstr::{BStr, BString};
-use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
 use shirabe_php_shim::{PhpDisplay, PhpMixed, php_str};
 
@@ -41,7 +40,7 @@ impl RootPackage {
         self.inner.replace_version(version, pretty_version);
     }
 
-    pub fn set_release_date(&mut self, release_date: Option<DateTime<Utc>>) {
+    pub fn set_release_date(&mut self, release_date: Option<chrono::DateTime<chrono::Utc>>) {
         self.inner.set_release_date(release_date);
     }
 }
@@ -329,7 +328,7 @@ impl PackageInterface for RootPackage {
     fn get_full_pretty_version(&self, truncate: bool, display_mode: DisplayMode) -> BString {
         self.inner.get_full_pretty_version(truncate, display_mode)
     }
-    fn get_release_date(&self) -> Option<DateTime<Utc>> {
+    fn get_release_date(&self) -> Option<chrono::DateTime<chrono::Utc>> {
         self.inner.get_release_date()
     }
     fn get_stability(&self) -> &BStr {

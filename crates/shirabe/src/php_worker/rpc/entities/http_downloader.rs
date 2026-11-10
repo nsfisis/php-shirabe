@@ -16,7 +16,7 @@ use crate::php_worker::rpc::dispatch::error_throw;
 use crate::php_worker::rpc::entity::{Call, Crossing, Entity};
 use crate::php_worker::rpc::forwarding;
 use crate::util::{HttpDownloader, HttpDownloaderJob, StreamContextOptions};
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use shirabe_php_rpc::{PhpThrow, PluginValue, ToPluginValue};
 use shirabe_php_shim::{bformat, path_from_bytes};
 

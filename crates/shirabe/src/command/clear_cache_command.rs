@@ -14,7 +14,6 @@ use shirabe_php_shim::{bformat, impl_php_class, path_from_bytes, realpath};
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::{InputInterface, InputInterfaceByName};
 use shirabe_symfony_console::output::OutputInterface;
-use std::path::PathBuf;
 
 #[derive(Debug)]
 pub struct ClearCacheCommand {
@@ -88,7 +87,7 @@ impl Command for ClearCacheCommand {
 
         let gc = input.borrow().get_option("gc")?.as_bool().unwrap_or(false);
 
-        let mut cache_paths: Vec<(&BStr, PathBuf)> = Vec::new();
+        let mut cache_paths: Vec<(&BStr, std::path::PathBuf)> = Vec::new();
         for key in [
             "cache-vcs-dir",
             "cache-repo-dir",

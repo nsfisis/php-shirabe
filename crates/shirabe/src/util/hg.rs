@@ -3,12 +3,10 @@
 use crate::config::Config;
 use crate::io::{IOInterface, IOInterfaceImmutable};
 use crate::util::{ProcessExecutor, Url};
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use shirabe_php_shim::{RuntimeException, bformat, php_regex, preg_match, rawurlencode};
-use std::path::Path;
-use std::sync::Mutex;
 
-static VERSION: Mutex<Option<Option<BString>>> = Mutex::new(None);
+static VERSION: std::sync::Mutex<Option<Option<BString>>> = std::sync::Mutex::new(None);
 
 #[derive(Debug)]
 pub struct Hg {
@@ -34,7 +32,7 @@ impl Hg {
         &self,
         command_callable: impl Fn(BString) -> Vec<BString>,
         url: &BStr,
-        cwd: Option<&Path>,
+        cwd: Option<&std::path::Path>,
     ) -> anyhow::Result<()> {
         self.config.borrow_mut().prohibit_url_by_config(
             url,

@@ -14,7 +14,7 @@ use crate::repository::{
     RepositoryInterfaceHandle, RepositorySet, SEARCH_FULLTEXT, SearchResult,
 };
 use crate::util::Filesystem;
-use bstr::{B, BStr, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, Exception, InvalidArgumentException, LogicException, PHP_EOL, PhpMixed,

@@ -6,8 +6,7 @@ use crate::downloader::TransportException;
 use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::repository::vcs::{VcsDriverBase, VcsDriverInterface};
 use crate::util::{Filesystem, Hg as HgUtils, HttpDownloader, ProcessExecutor, Url};
-use bstr::{BStr, BString, ByteSlice};
-use chrono::{DateTime, FixedOffset, Utc};
+use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, PhpMixed, RuntimeException, ToPhpString, bformat, date_create, dirname, is_dir,
@@ -194,7 +193,7 @@ impl HgDriver {
     pub fn get_change_date(
         &self,
         identifier: &BStr,
-    ) -> anyhow::Result<Option<DateTime<FixedOffset>>> {
+    ) -> anyhow::Result<Option<chrono::DateTime<chrono::FixedOffset>>> {
         if identifier.starts_with(b"-") {
             return Err(RuntimeException::new(bformat!("Invalid hg identifier detected. Identifier must not start with a -, given: {identifier}"))
             .into());
@@ -214,7 +213,7 @@ impl HgDriver {
             Some(path_from_bytes(&self.repo_dir)),
         )?;
 
-        let date: DateTime<Utc> = date_create(trim(&output))?;
+        let date: chrono::DateTime<chrono::Utc> = date_create(trim(&output))?;
         Ok(Some(date.fixed_offset()))
     }
 
@@ -388,7 +387,7 @@ impl VcsDriverInterface for HgDriver {
     fn get_change_date(
         &mut self,
         identifier: &BStr,
-    ) -> anyhow::Result<Option<DateTime<FixedOffset>>> {
+    ) -> anyhow::Result<Option<chrono::DateTime<chrono::FixedOffset>>> {
         HgDriver::get_change_date(self, identifier)
     }
 

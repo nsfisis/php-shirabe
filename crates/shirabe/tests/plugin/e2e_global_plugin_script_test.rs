@@ -8,14 +8,12 @@
 
 use crate::e2e_extension_installer_test::{copy_dir, upstream_composer_bin};
 use crate::php_worker::lock_php_worker;
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use shirabe_php_shim::os_str_from_bytes;
-use std::ffi::OsStr;
-use std::path::{Path, PathBuf};
-use tempfile::TempDir;
 
-fn fixture_dir() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/plugin/fixtures/e2e-global-plugin-script")
+fn fixture_dir() -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/plugin/fixtures/e2e-global-plugin-script")
 }
 
 struct Run {
@@ -23,7 +21,11 @@ struct Run {
     trace: BString,
 }
 
-fn command(program: &BStr, prefix_args: &[&OsStr], work: &Path) -> std::process::Command {
+fn command(
+    program: &BStr,
+    prefix_args: &[&std::ffi::OsStr],
+    work: &std::path::Path,
+) -> std::process::Command {
     let mut command = std::process::Command::new(os_str_from_bytes(program));
     command
         .args(prefix_args)
@@ -37,8 +39,12 @@ fn command(program: &BStr, prefix_args: &[&OsStr], work: &Path) -> std::process:
 
 /// Installs the global plugin with upstream Composer, runs `install` in the project with
 /// `program`, and returns the exit code with the trace.
-fn install(composer_bin: &Path, program: &BStr, prefix_args: &[&OsStr]) -> Run {
-    let work = TempDir::new().unwrap();
+fn install(
+    composer_bin: &std::path::Path,
+    program: &BStr,
+    prefix_args: &[&std::ffi::OsStr],
+) -> Run {
+    let work = tempfile::TempDir::new().unwrap();
     copy_dir(&fixture_dir(), work.path());
 
     let global = command(BStr::new("php"), &[composer_bin.as_os_str()], work.path())

@@ -1,6 +1,6 @@
 //! ref: composer/tests/Composer/Test/Repository/ArtifactRepositoryTest.php sha1:2f0f2b004082db7001b8e29d32d177289b1e19dc
 
-use bstr::{BString, ByteSlice};
+use bstr::{BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe::io::{IOInterface, NullIO};
 use shirabe::repository::ArtifactRepository;

@@ -3,7 +3,6 @@
 use crate::test_case::get_package;
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
-use serial_test::serial;
 use shirabe::dependency_resolver::{DefaultPolicy, PolicyInterface};
 use shirabe::package::{CompleteAliasPackageHandle, CompletePackageHandle, Link};
 use shirabe::repository::{
@@ -56,7 +55,7 @@ impl Drop for TearDown {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_select_single() {
     let _tear_down = TearDown;
     let mut fixtures = set_up();
@@ -84,7 +83,7 @@ fn test_select_single() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_select_newest() {
     let _tear_down = TearDown;
     let mut fixtures = set_up();
@@ -114,7 +113,7 @@ fn test_select_newest() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_select_newest_picks_latest() {
     let _tear_down = TearDown;
     let mut fixtures = set_up();
@@ -144,7 +143,7 @@ fn test_select_newest_picks_latest() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_select_newest_picks_latest_stable_with_prefer_stable() {
     let _tear_down = TearDown;
     let mut fixtures = set_up();
@@ -173,7 +172,7 @@ fn test_select_newest_picks_latest_stable_with_prefer_stable() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_select_lowest_with_prefer_dev_over_prerelease() {
     let _tear_down = TearDown;
 
@@ -209,7 +208,7 @@ fn test_select_lowest_with_prefer_dev_over_prerelease() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_select_lowest_prefers_prerelease_over_dev() {
     let _tear_down = TearDown;
 
@@ -244,7 +243,7 @@ fn test_select_lowest_prefers_prerelease_over_dev() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_select_lowest_with_prefer_stable_still_prefers_stable() {
     let _tear_down = TearDown;
     let mut fixtures = set_up();
@@ -274,7 +273,7 @@ fn test_select_lowest_with_prefer_stable_still_prefers_stable() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_select_newest_with_dev_picks_non_dev() {
     let _tear_down = TearDown;
     let mut fixtures = set_up();
@@ -304,7 +303,7 @@ fn test_select_newest_with_dev_picks_non_dev() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_select_newest_with_preferred_version_picks_preferred_version_if_available() {
     let _tear_down = TearDown;
     let mut fixtures = set_up();
@@ -348,7 +347,7 @@ fn test_select_newest_with_preferred_version_picks_preferred_version_if_availabl
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_select_newest_with_preferred_version_picks_newest_otherwise() {
     let _tear_down = TearDown;
     let mut fixtures = set_up();
@@ -383,7 +382,7 @@ fn test_select_newest_with_preferred_version_picks_newest_otherwise() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_select_newest_with_preferred_version_picks_lowest_if_prefer_lowest() {
     let _tear_down = TearDown;
     let mut fixtures = set_up();
@@ -418,7 +417,7 @@ fn test_select_newest_with_preferred_version_picks_lowest_if_prefer_lowest() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_repository_ordering_affects_priority() {
     let _tear_down = TearDown;
     let mut fixtures = set_up();
@@ -489,7 +488,7 @@ fn test_repository_ordering_affects_priority() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_select_local_repos_first() {
     let _tear_down = TearDown;
     let mut fixtures = set_up();
@@ -593,7 +592,7 @@ fn constraint(operator: &BStr, version: &BStr) -> AnyConstraint {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_select_all_providers() {
     let _tear_down = TearDown;
     let mut fixtures = set_up();
@@ -652,7 +651,7 @@ fn test_select_all_providers() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_prefer_non_replacing_from_same_repo() {
     let _tear_down = TearDown;
     let mut fixtures = set_up();
@@ -699,7 +698,7 @@ fn test_prefer_non_replacing_from_same_repo() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_prefer_replacing_package_from_same_vendor() {
     let _tear_down = TearDown;
     let mut fixtures = set_up();
@@ -803,7 +802,7 @@ fn test_prefer_replacing_package_from_same_vendor() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_select_lowest() {
     let _tear_down = TearDown;
     let mut fixtures = set_up();

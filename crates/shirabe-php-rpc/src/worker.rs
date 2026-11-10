@@ -3,8 +3,6 @@ use crate::value;
 use bstr::{BStr, BString};
 use shirabe_php_shim::{ToPhpString, bformat, os_str_from_bytes, path_from_bytes, php_str};
 use shirabe_symfony_process::PhpExecutableFinder;
-use std::os::unix::net::UnixStream;
-use std::sync::{Mutex, OnceLock};
 
 const GLUE_SCRIPT: &[u8] = include_bytes!("../php/worker.php");
 
@@ -27,7 +25,7 @@ const RUNTIME_FILES: &[(&BStr, &[u8])] = include!(concat!(env!("OUT_DIR"), "/run
 const GUARD_FILES: &[(&BStr, &[u8])] = include!(concat!(env!("OUT_DIR"), "/guard-files.rs"));
 
 struct Worker {
-    stream: UnixStream,
+    stream: std::os::unix::net::UnixStream,
     // Also queried for its exit status when a socket read/write fails, to tell a dead worker
     // apart from a framing bug. Kept alive for the process lifetime along with the temp dir
     // holding the socket and glue script; neither is dropped because the worker lives in a
@@ -108,7 +106,8 @@ pub struct WorkerConfig {
 }
 
 /// Builds the [`WorkerConfig`] a worker is spawned with.
-static WORKER_CONFIG_PROVIDER: OnceLock<fn() -> WorkerConfig> = OnceLock::new();
+static WORKER_CONFIG_PROVIDER: std::sync::OnceLock<fn() -> WorkerConfig> =
+    std::sync::OnceLock::new();
 
 /// Registers the function that builds the [`WorkerConfig`] the worker is spawned with. It is asked
 /// at spawn time, so a setting that depends on the environment sees the environment of that
@@ -126,7 +125,7 @@ fn worker_config() -> WorkerConfig {
 }
 
 /// The PHP worker, spawned on first use.
-static WORKER: Mutex<Option<Worker>> = Mutex::new(None);
+static WORKER: std::sync::Mutex<Option<Worker>> = std::sync::Mutex::new(None);
 
 /// Whether the PHP worker process has been spawned by this process. Callers that only need to
 /// mirror state into an already-running worker (e.g. `InstalledVersions::reload` pushes) use
@@ -213,7 +212,7 @@ fn spawn_worker(config: &WorkerConfig) -> anyhow::Result<Worker> {
     // inherit its end instead of connecting to one. The pair is connected from the start, so
     // there is no accept to wait for either — a child that dies before reading shows up as EOF
     // on the first call, with its exit status attached by `worker_state`.
-    let (stream, child_end) = UnixStream::pair()?;
+    let (stream, child_end) = std::os::unix::net::UnixStream::pair()?;
     let child_end = std::os::fd::OwnedFd::from(child_end);
 
     let mut command = std::process::Command::new(path_from_bytes(&php));

@@ -12,7 +12,6 @@ use shirabe_php_shim::{
 };
 use shirabe_symfony_console::input::{InputInterface, InputInterfaceByName};
 use shirabe_symfony_console::output::OutputInterface;
-use std::path::PathBuf;
 
 pub trait BaseConfigCommand: BaseCommand {
     fn config(&self) -> Option<std::rc::Rc<std::cell::RefCell<Config>>>;
@@ -121,7 +120,7 @@ pub trait BaseConfigCommand: BaseCommand {
         &self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         config: &Config,
-    ) -> anyhow::Result<PathBuf> {
+    ) -> anyhow::Result<std::path::PathBuf> {
         if input
             .borrow()
             .get_option("global")?
@@ -148,7 +147,7 @@ pub trait BaseConfigCommand: BaseCommand {
         &self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         config: &Config,
-    ) -> anyhow::Result<PathBuf> {
+    ) -> anyhow::Result<std::path::PathBuf> {
         if input
             .borrow()
             .get_option("global")?

@@ -2,7 +2,7 @@
 
 use crate::Color;
 use crate::formatter::OutputFormatterStyleInterface;
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use shirabe_php_shim::{PHP_SERVER, PhpMixed, array_search_in_vec, bformat, getenv, intval};
 
 /// Formatter style class for defining styles.

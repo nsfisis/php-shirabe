@@ -1,8 +1,7 @@
 //! ref: composer/tests/Composer/Test/Command/ClearCacheCommandTest.php sha1:a97e8743c57def78525051f4cb4a8ea6edfee4b4
 
 use crate::test_case::{RunOptions, get_application_tester};
-use bstr::ByteSlice;
-use serial_test::serial;
+use bstr::ByteSlice as _;
 use shirabe::util::Platform;
 use shirabe_symfony_console::input::{InputValue, ParameterName};
 
@@ -20,7 +19,7 @@ impl Drop for TearDown {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_clear_cache_command_success() {
     let _tear_down = TearDown;
 
@@ -46,7 +45,7 @@ fn test_clear_cache_command_success() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_clear_cache_command_with_option_garbage_collection() {
     let _tear_down = TearDown;
 
@@ -75,7 +74,7 @@ fn test_clear_cache_command_with_option_garbage_collection() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_clear_cache_command_with_option_no_cache() {
     let _tear_down = TearDown;
 

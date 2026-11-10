@@ -9,12 +9,10 @@ use crate::e2e_extension_installer_test::{copy_dir, upstream_composer_bin};
 use crate::php_worker::lock_php_worker;
 use bstr::{BStr, BString};
 use shirabe_php_shim::os_str_from_bytes;
-use std::ffi::OsStr;
-use std::path::{Path, PathBuf};
-use tempfile::TempDir;
 
-fn fixture_dir() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/plugin/fixtures/e2e-autoload-generator")
+fn fixture_dir() -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/plugin/fixtures/e2e-autoload-generator")
 }
 
 struct Run {
@@ -23,8 +21,8 @@ struct Run {
 }
 
 /// Runs `install` in a fresh copy of the fixture and returns the exit code with the plugin's trace.
-fn install(program: &BStr, prefix_args: &[&OsStr]) -> Run {
-    let work = TempDir::new().unwrap();
+fn install(program: &BStr, prefix_args: &[&std::ffi::OsStr]) -> Run {
+    let work = tempfile::TempDir::new().unwrap();
     copy_dir(&fixture_dir(), work.path());
     let project = work.path().join("project");
     let output = std::process::Command::new(os_str_from_bytes(&program))

@@ -1,6 +1,6 @@
 //! ref: composer/src/Composer/Util/Zip.php sha1:d6b1e4700db652c170f1317e805db1ed05a5d570
 
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     RuntimeException, ZipArchive, bformat, dirname, extension_loaded, implode, stream_get_contents,

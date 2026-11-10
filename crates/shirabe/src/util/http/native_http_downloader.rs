@@ -28,7 +28,7 @@ use crate::util::{
     AuthHelper, HttpDownloader, HttpOptions, Platform, PromptAuthResult, StoreAuth,
     StreamContextFactory, StreamContextOptions, Url,
 };
-use bstr::{B, BStr, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     PHP_EOL, PhpMixed, RuntimeException, ToPhpString, TypeError, bformat, display_to_bytes,
@@ -36,7 +36,6 @@ use shirabe_php_shim::{
     path_from_bytes, path_to_bytes, php_regex, preg_is_match, preg_quote, preg_replace, rename,
     stripos, strlen, strpos, strtolower, substr, trim, unlink_silent, utf8_text,
 };
-use std::sync::atomic::{AtomicBool, Ordering};
 
 #[derive(Debug)]
 pub struct NativeHttpDownloader {
@@ -52,7 +51,7 @@ pub struct NativeHttpDownloader {
 }
 
 /// Function-static `$timeoutWarning` from `tick()`.
-static TIMEOUT_WARNING: AtomicBool = AtomicBool::new(false);
+static TIMEOUT_WARNING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 /// The outcome of one send attempt, decided by `decide()`. Replaces the PHP promise
 /// resolve/reject callbacks (and this crate's former restart_job/resolve_job/reject_job side
@@ -294,8 +293,10 @@ impl NativeHttpDownloader {
             Err(transport_err) => {
                 // CURLE_OPERATION_TIMEDOUT one-time warning (errno 28). reqwest cannot report
                 // the curl errno, so this fires on the is_timeout() branch instead.
-                if transport_err.was_timeout && !TIMEOUT_WARNING.load(Ordering::Relaxed) {
-                    TIMEOUT_WARNING.store(true, Ordering::Relaxed);
+                if transport_err.was_timeout
+                    && !TIMEOUT_WARNING.load(std::sync::atomic::Ordering::Relaxed)
+                {
+                    TIMEOUT_WARNING.store(true, std::sync::atomic::Ordering::Relaxed);
                     self.io.write_error("<warning>A connection timeout was encountered. If you intend to run Composer without connecting to the internet, run the command again prefixed with COMPOSER_DISABLE_NETWORK=1 to make Composer run in offline mode.</warning>");
                 }
 

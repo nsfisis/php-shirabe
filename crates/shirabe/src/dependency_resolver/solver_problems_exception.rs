@@ -3,7 +3,7 @@
 use crate::dependency_resolver::{Pool, Problem, Request, Rule};
 use crate::repository::RepositorySet;
 use crate::util::IniHelper;
-use bstr::{BString, ByteSlice, ByteVec};
+use bstr::{BString, ByteSlice as _, ByteVec as _};
 use shirabe_php_shim::{
     RuntimeException, array_unique, bformat, bwrite, impl_php_exception, implode, path_to_bytes,
 };

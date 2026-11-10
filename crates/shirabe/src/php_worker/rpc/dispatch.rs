@@ -8,7 +8,7 @@ use crate::php_worker::rpc::args::arg;
 use crate::php_worker::rpc::entity::Call;
 use crate::php_worker::rpc::{forwarding, table};
 use crate::php_worker::throwable::exception_into_throw;
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_rpc::{PhpThrow, PluginValue, RustMethodDispatcher, ToPluginValue};
 use shirabe_php_shim::{AnyThrowable, ToPhpString, bformat, error_chain_message};

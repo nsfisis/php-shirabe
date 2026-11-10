@@ -7,9 +7,8 @@
 use crate::async_runtime::run;
 use crate::io_stub::IOStub;
 use crate::test_case::get_unique_tmp_directory;
-use bstr::{BString, ByteSlice};
+use bstr::{BString, ByteSlice as _};
 use indexmap::IndexMap;
-use serial_test::serial;
 use shirabe::config::Config;
 use shirabe::downloader::{ArchiveDownloader, DownloaderInterface, ZipDownloader};
 use shirabe::io::IOInterface;
@@ -20,10 +19,9 @@ use shirabe_php_shim::{
     PhpMixed, ZipArchive, ZipArchiveMock, bformat, error_message, path_to_bytes,
 };
 use shirabe_semver::VersionParser;
-use tempfile::TempDir;
 
 struct SetUp {
-    test_dir: TempDir,
+    test_dir: tempfile::TempDir,
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     config: std::rc::Rc<std::cell::RefCell<Config>>,
     http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
@@ -116,7 +114,7 @@ fn make_downloader_with_process(
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_error_messages() {
     // class_exists('ZipArchive') is always true in Shirabe, which implements ZipArchive natively, so
     // the zip-extension-missing skip never applies here.
@@ -209,7 +207,7 @@ fn test_error_messages() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_zip_archive_only_failed() {
     let set_up = set_up();
     let _tear_down = TearDown::new(set_up.test_dir.path().to_path_buf());
@@ -237,7 +235,7 @@ fn test_zip_archive_only_failed() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_zip_archive_extract_only_failed() {
     let set_up = set_up();
     let _tear_down = TearDown::new(set_up.test_dir.path().to_path_buf());
@@ -268,7 +266,7 @@ fn test_zip_archive_extract_only_failed() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_zip_archive_only_good() {
     let set_up = set_up();
     let _tear_down = TearDown::new(set_up.test_dir.path().to_path_buf());
@@ -302,7 +300,7 @@ fn unzip_command_spec() -> Vec<Vec<bstr::BString>> {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_non_windows_fallback_good() {
     let set_up = set_up();
     let _tear_down = TearDown::new(set_up.test_dir.path().to_path_buf());
@@ -339,7 +337,7 @@ fn test_non_windows_fallback_good() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_non_windows_fallback_failed() {
     let set_up = set_up();
     let _tear_down = TearDown::new(set_up.test_dir.path().to_path_buf());

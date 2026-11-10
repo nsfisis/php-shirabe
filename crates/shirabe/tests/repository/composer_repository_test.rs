@@ -12,7 +12,6 @@ use shirabe::repository::{
 use shirabe::util::HttpDownloaderMockHandler;
 use shirabe_php_shim::{PhpMixed, ToPhpString, bformat, hash, path_to_bytes, uniqid};
 use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
-use tempfile::TempDir;
 
 // Mirrors PHP's `['url' => .., 'body' => ..]` mock entry (status defaults to 200,
 // options match any executed options).
@@ -25,7 +24,7 @@ fn http_body(
 
 // Equivalent to FactoryMock::createConfig(): a real Config with a writable, unique
 // home directory.
-fn create_config() -> (Config, TempDir) {
+fn create_config() -> (Config, tempfile::TempDir) {
     let home = get_unique_tmp_directory();
     let mut config = Config::new(true, None);
     let mut top: IndexMap<BString, PhpMixed> = IndexMap::new();
@@ -39,7 +38,7 @@ fn create_config() -> (Config, TempDir) {
     (config, home)
 }
 
-fn create_config_read_only() -> (Config, TempDir) {
+fn create_config_read_only() -> (Config, tempfile::TempDir) {
     let (mut config, home) = create_config();
     let mut top: IndexMap<BString, PhpMixed> = IndexMap::new();
     let mut config_section: IndexMap<BString, PhpMixed> = IndexMap::new();

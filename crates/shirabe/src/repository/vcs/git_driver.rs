@@ -6,8 +6,8 @@ use crate::downloader::TransportException;
 use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::repository::vcs::{VcsDriverBase, VcsDriverInterface};
 use crate::util::{Filesystem, Git as GitUtil, HttpDownloader, ProcessExecutor, Url};
-use bstr::{BStr, BString, ByteSlice};
-use chrono::{DateTime, FixedOffset, TimeZone, Utc};
+use bstr::{BStr, BString, ByteSlice as _};
+use chrono::TimeZone as _;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, PhpMixed, RuntimeException, bformat, dirname, is_dir,
@@ -236,7 +236,7 @@ impl GitDriver {
     pub fn get_change_date(
         &mut self,
         identifier: &BStr,
-    ) -> anyhow::Result<Option<DateTime<FixedOffset>>> {
+    ) -> anyhow::Result<Option<chrono::DateTime<chrono::FixedOffset>>> {
         if identifier.starts_with(b"-") {
             return Err(RuntimeException::new(bformat!("Invalid git identifier detected. Identifier must not start with a -, given: {identifier}"))
             .into());
@@ -265,7 +265,10 @@ impl GitDriver {
             .and_then(|s| s.parse().ok())
             .unwrap_or(0);
         Ok(Some(
-            Utc.timestamp_opt(timestamp, 0).unwrap().fixed_offset(),
+            chrono::Utc
+                .timestamp_opt(timestamp, 0)
+                .unwrap()
+                .fixed_offset(),
         ))
     }
 
@@ -463,7 +466,7 @@ impl VcsDriverInterface for GitDriver {
     fn get_change_date(
         &mut self,
         identifier: &BStr,
-    ) -> anyhow::Result<Option<DateTime<FixedOffset>>> {
+    ) -> anyhow::Result<Option<chrono::DateTime<chrono::FixedOffset>>> {
         GitDriver::get_change_date(self, identifier)
     }
 

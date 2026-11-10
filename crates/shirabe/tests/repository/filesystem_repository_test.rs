@@ -2,9 +2,8 @@
 
 use crate::php_worker::{load_composer_php_runtime, php_call_static};
 use crate::test_case::{get_alias_package, get_package, get_unique_tmp_directory};
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
-use serial_test::serial;
 use shirabe::dependency_resolver::operation::AnyOperation;
 use shirabe::installer::{InstallationManagerInterface, InstallerInterface};
 use shirabe::io::IOInterface;
@@ -207,7 +206,7 @@ fn configure_links(
 #[test]
 // Serialized because CwdGuard changes the process-global cwd, which would race with the
 // cwd-sensitive path_repository_test::test_url_remains_relative in this binary.
-#[serial]
+#[serial_test::serial]
 fn test_repository_writes_installed_php() {
     let guard = CwdGuard::new();
     let dir = guard.path();
@@ -335,7 +334,7 @@ fn test_repository_writes_installed_php() {
 #[test]
 // Serialized because test_repository_writes_installed_php pushes InstalledVersions::reload into
 // the same worker, which would replace the state asserted here.
-#[serial]
+#[serial_test::serial]
 fn test_safely_load_installed_versions() {
     load_composer_php_runtime();
 

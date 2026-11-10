@@ -3,14 +3,13 @@
 use crate::http_downloader_mock::{HttpDownloaderMockGuard, expect_full, get_http_downloader_mock};
 use crate::process_executor_mock::{ProcessExecutorMockGuard, get_process_executor_mock};
 use crate::test_case::get_unique_tmp_directory;
-use bstr::{B, BStr, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe::config::Config;
 use shirabe::io::{IOInterface, NullIO};
 use shirabe::repository::vcs::GitLabDriver;
 use shirabe::util::{HttpDownloader, HttpDownloaderMockHandler, MockHandler, ProcessExecutor};
 use shirabe_php_shim::{PhpMixed, ToPhpString, bformat, extension_loaded, path_to_bytes};
-use tempfile::TempDir;
 
 // Mirrors GitLabDriverTest::setUp's configuration.
 fn make_config(home: &std::path::Path) -> Config {
@@ -38,7 +37,7 @@ fn make_config(home: &std::path::Path) -> Config {
 // bare `getMock()` ProcessExecutor; none of these tests invoke git, so an empty
 // strict expectation set both matches PHP and catches unexpected process calls.
 struct Fixtures {
-    home: TempDir,
+    home: tempfile::TempDir,
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     config: std::rc::Rc<std::cell::RefCell<Config>>,
     process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,

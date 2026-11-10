@@ -4,7 +4,7 @@ use crate::input::{
     ArgumentName, ArgvInput, InputDefinition, InputInterface, InputOption, InputValue,
     StreamableInputInterface,
 };
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use shirabe_php_shim::{
     PhpDisplay, ToPhpString, explode_with_limit, ltrim_chars, php_regex, php_str, preg_match_all,
     rtrim, substr, trim_chars,

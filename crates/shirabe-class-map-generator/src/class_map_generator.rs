@@ -3,7 +3,7 @@
 use crate::class_map::ClassMap;
 use crate::file_list::FileList;
 use crate::php_file_parser::PhpFileParser;
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PATHINFO_EXTENSION, RuntimeException, bformat,
     explode, getcwd, implode, is_dir, is_file, path_from_bytes, path_to_bytes, pathinfo, php_regex,
@@ -11,7 +11,6 @@ use shirabe_php_shim::{
     str_replace, stream_get_wrappers, strlen, strpos, strrpos, strtr, substr,
 };
 use shirabe_symfony_finder::Finder;
-use std::path::PathBuf;
 
 #[derive(Debug)]
 pub struct ClassMapGenerator {
@@ -469,7 +468,7 @@ impl ClassMapGenerator {
         bformat!("{prefix}{absolute}{}", bstr::join("/", &parts))
     }
 
-    fn get_cwd() -> anyhow::Result<PathBuf> {
+    fn get_cwd() -> anyhow::Result<std::path::PathBuf> {
         getcwd().ok_or_else(|| {
             RuntimeException::new(BString::from(
                 "Could not determine the current working directory",

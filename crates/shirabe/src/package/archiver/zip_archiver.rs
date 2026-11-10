@@ -2,12 +2,11 @@
 
 use crate::package::archiver::{ArchivableFilesFinder, ArchiverInterface};
 use crate::util::{Filesystem, Platform};
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     RuntimeException, ZipArchive, bformat, fileperms, path_to_bytes, realpath, strtr,
 };
-use std::path::{Path, PathBuf};
 
 #[derive(Debug)]
 pub struct ZipArchiver;
@@ -39,12 +38,12 @@ impl ZipArchiver {
 impl ArchiverInterface for ZipArchiver {
     fn archive(
         &self,
-        sources: &Path,
-        target: &Path,
+        sources: &std::path::Path,
+        target: &std::path::Path,
         _format: &BStr,
         excludes: Vec<BString>,
         ignore_filters: bool,
-    ) -> anyhow::Result<PathBuf> {
+    ) -> anyhow::Result<std::path::PathBuf> {
         let fs = Filesystem::new(None);
         let sources = realpath(sources).unwrap_or_else(|| sources.to_path_buf());
         let sources = fs.normalize_path(&sources);

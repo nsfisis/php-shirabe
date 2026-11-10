@@ -23,9 +23,8 @@ use crate::repository::{
 use crate::util::http::Response;
 use crate::util::r#loop::Loop;
 use crate::util::{HttpDownloader, StreamContextOptions, Url, sync_executor};
-use bstr::{B, BStr, BString, ByteSlice};
-use futures::StreamExt;
-use futures::stream::FuturesOrdered;
+use bstr::{B, BStr, BString, ByteSlice as _};
+use futures::StreamExt as _;
 use indexmap::IndexMap;
 use shirabe_metadata_minifier::{ExpandedVersion, ExpandedVersions, MetadataMinifier};
 use shirabe_php_shim::{
@@ -1005,7 +1004,7 @@ impl ComposerRepository {
             // awaited by the caller (see util/sync_executor.rs).
             let this: &ComposerRepository = &*self;
             let specs: Vec<anyhow::Result<PhpMixed>> = sync_executor::block_on(async {
-                let downloads: FuturesOrdered<_> = names
+                let downloads: futures::stream::FuturesOrdered<_> = names
                     .iter()
                     .map(|name| {
                         let name = name.clone();
@@ -1762,7 +1761,7 @@ impl ComposerRepository {
         // than awaited by the caller (see util/sync_executor.rs).
         let this: &ComposerRepository = &*self;
         let specs: Vec<anyhow::Result<PhpMixed>> = sync_executor::block_on(async {
-            let downloads: FuturesOrdered<_> = download_targets
+            let downloads: futures::stream::FuturesOrdered<_> = download_targets
                 .iter()
                 .map(|(name, real_name, _)| {
                     let name = name.clone();

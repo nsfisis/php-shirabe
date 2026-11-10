@@ -2,7 +2,7 @@
 
 use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::util::{CommandLine, Filesystem, Platform, ProcessExecutor};
-use bstr::{B, BStr, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Exception, PHP_EOL, PhpMixed, PhpResource, bformat, chdir, date_local, explode, fclose, feof,
@@ -12,11 +12,10 @@ use shirabe_php_shim::{
 };
 use shirabe_symfony_console::input::InputValue;
 use shirabe_symfony_process::{ExecutableFinder, Process};
-use std::path::{Path, PathBuf};
 
 #[derive(Debug)]
 pub struct Perforce {
-    path: PathBuf,
+    path: std::path::PathBuf,
     p4_depot: Option<BString>,
     p4_client: Option<BString>,
     p4_user: Option<BString>,
@@ -38,13 +37,13 @@ impl Perforce {
     pub fn new(
         repo_config: IndexMap<BString, PhpMixed>,
         port: BString,
-        path: PathBuf,
+        path: std::path::PathBuf,
         process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
         is_windows: bool,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     ) -> Self {
         let mut this = Self {
-            path: PathBuf::new(),
+            path: std::path::PathBuf::new(),
             p4_depot: None,
             p4_client: None,
             p4_user: None,
@@ -69,7 +68,7 @@ impl Perforce {
     pub fn create(
         repo_config: IndexMap<BString, PhpMixed>,
         port: BString,
-        path: PathBuf,
+        path: std::path::PathBuf,
         process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     ) -> Self {
@@ -168,11 +167,11 @@ impl Perforce {
         self.p4_client.clone().unwrap_or_default()
     }
 
-    fn get_path(&self) -> &Path {
+    fn get_path(&self) -> &std::path::Path {
         &self.path
     }
 
-    pub fn initialize_path(&mut self, path: &Path) {
+    pub fn initialize_path(&mut self, path: &std::path::Path) {
         self.path = path.to_path_buf();
         let fs = self.get_filesystem();
         fs.borrow_mut().ensure_directory_exists(path);
@@ -222,7 +221,7 @@ impl Perforce {
         }
     }
 
-    pub fn get_p4_client_spec(&mut self) -> PathBuf {
+    pub fn get_p4_client_spec(&mut self) -> std::path::PathBuf {
         let client = self.get_client();
         path_from_bytes(&bformat!("{}/{client}.p4.spec", &self.path)).to_path_buf()
     }
@@ -751,7 +750,7 @@ impl Perforce {
 
 /// Seam over `Perforce` so consumers can be exercised with a mock in tests.
 pub trait PerforceInterface: std::fmt::Debug {
-    fn initialize_path(&mut self, path: &Path);
+    fn initialize_path(&mut self, path: &std::path::Path);
     fn set_stream(&mut self, stream: &BStr);
     fn p4_login(&mut self) -> anyhow::Result<()>;
     fn check_stream(&mut self) -> bool;
@@ -771,7 +770,7 @@ pub trait PerforceInterface: std::fmt::Debug {
 }
 
 impl PerforceInterface for Perforce {
-    fn initialize_path(&mut self, path: &Path) {
+    fn initialize_path(&mut self, path: &std::path::Path) {
         Perforce::initialize_path(self, path)
     }
 

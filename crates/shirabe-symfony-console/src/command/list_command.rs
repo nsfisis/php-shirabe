@@ -10,7 +10,6 @@ use crate::input::{
 };
 use crate::output::OutputInterface;
 use shirabe_php_shim::{ToPhpString, impl_php_class};
-use std::ops::{Deref, DerefMut};
 
 /// ListCommand displays the list of all available commands for the application.
 #[derive(Debug)]
@@ -23,7 +22,7 @@ impl_php_class!(
     r"Symfony\Component\Console\Command\ListCommand"
 );
 
-impl Deref for ListCommand {
+impl std::ops::Deref for ListCommand {
     type Target = CommandData;
 
     fn deref(&self) -> &Self::Target {
@@ -31,7 +30,7 @@ impl Deref for ListCommand {
     }
 }
 
-impl DerefMut for ListCommand {
+impl std::ops::DerefMut for ListCommand {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.inner
     }

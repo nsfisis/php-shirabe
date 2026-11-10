@@ -10,7 +10,6 @@ use crate::input::{
 };
 use crate::output::OutputInterface;
 use shirabe_php_shim::{ToPhpString, impl_php_class};
-use std::ops::{Deref, DerefMut};
 
 /// HelpCommand displays the help for a given command.
 #[derive(Debug)]
@@ -24,7 +23,7 @@ impl_php_class!(
     r"Symfony\Component\Console\Command\HelpCommand"
 );
 
-impl Deref for HelpCommand {
+impl std::ops::Deref for HelpCommand {
     type Target = CommandData;
 
     fn deref(&self) -> &Self::Target {
@@ -32,7 +31,7 @@ impl Deref for HelpCommand {
     }
 }
 
-impl DerefMut for HelpCommand {
+impl std::ops::DerefMut for HelpCommand {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.inner
     }

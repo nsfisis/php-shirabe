@@ -2,9 +2,8 @@
 
 use crate::config_stub::ConfigStubBuilder;
 use crate::test_case::get_unique_tmp_directory;
-use bstr::{B, BStr, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
-use serial_test::serial;
 use shirabe::autoload::AutoloadGenerator;
 use shirabe::composer::{ComposerHandle, PartialOrFullComposer};
 use shirabe::config::Config;
@@ -27,7 +26,6 @@ use shirabe_php_shim::{
 use shirabe_semver::VersionParser;
 use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint, SimpleConstraint};
 use shirabe_symfony_console::output::output_interface;
-use tempfile::TempDir;
 
 /// The mock `InstallationManager::getInstallPath` used throughout the test: metapackages return
 /// null, every other package returns `vendorDir/<name>(/<targetDir>)`. Registered as an installer
@@ -122,7 +120,7 @@ impl InstallerInterface for InstallPathStubInstaller {
 /// vendor dir inside it, `chdir`ed into the working dir, plus the mocked Config/InstallationManager/
 /// repository/EventDispatcher and BufferIO. The temp tree is removed and the cwd restored on drop.
 struct SetUp {
-    _temp_dir: TempDir,
+    _temp_dir: tempfile::TempDir,
     prev_cwd: std::path::PathBuf,
     working_dir: std::path::PathBuf,
     vendor_dir: std::path::PathBuf,
@@ -416,7 +414,7 @@ fn dump(
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_root_package_autoloading() {
     let mut s = set_up();
     let package = new_root_pkg(BStr::new("root/a"));
@@ -482,7 +480,7 @@ fn test_root_package_autoloading() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_root_package_dev_autoloading() {
     let mut s = set_up();
     let package = new_root_pkg(BStr::new("root/a"));
@@ -523,7 +521,7 @@ fn test_root_package_dev_autoloading() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_root_package_dev_autoloading_disabled_by_default() {
     let mut s = set_up();
     let package = new_root_pkg(BStr::new("root/a"));
@@ -557,7 +555,7 @@ fn test_root_package_dev_autoloading_disabled_by_default() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_vendor_dir_same_as_working_dir() {
     let mut s = set_up();
     s.vendor_dir = s.working_dir.clone();
@@ -612,7 +610,7 @@ fn test_vendor_dir_same_as_working_dir() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_root_package_autoloading_alternative_vendor_dir() {
     let mut s = set_up();
     let package = new_root_pkg(BStr::new("root/a"));
@@ -662,7 +660,7 @@ fn test_root_package_autoloading_alternative_vendor_dir() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_root_package_autoloading_with_target_dir() {
     let mut s = set_up();
     let package = new_root_pkg(BStr::new("root/a"));
@@ -730,7 +728,7 @@ fn test_root_package_autoloading_with_target_dir() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_duplicate_files_warning() {
     let mut s = set_up();
     let package = new_root_pkg(BStr::new("root/a"));
@@ -769,7 +767,7 @@ fn test_duplicate_files_warning() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_vendors_autoloading() {
     let mut s = set_up();
     let package = new_root_pkg(BStr::new("root/a"));
@@ -819,7 +817,7 @@ fn test_vendors_autoloading() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_vendors_autoloading_with_metapackages() {
     let mut s = set_up();
     let package = new_root_pkg(BStr::new("root/a"));
@@ -876,7 +874,7 @@ fn test_vendors_autoloading_with_metapackages() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_non_dev_autoload_exclusion_with_recursion() {
     let mut s = set_up();
     let package = new_root_pkg(BStr::new("root/a"));
@@ -935,7 +933,7 @@ fn test_non_dev_autoload_exclusion_with_recursion() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_non_dev_autoload_should_include_replaced_packages() {
     let mut s = set_up();
     let package = new_root_pkg(BStr::new("root/a"));
@@ -1004,7 +1002,7 @@ fn test_non_dev_autoload_should_include_replaced_packages() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_non_dev_autoload_exclusion_with_recursion_replace() {
     let mut s = set_up();
     let package = new_root_pkg(BStr::new("root/a"));
@@ -1063,7 +1061,7 @@ fn test_non_dev_autoload_exclusion_with_recursion_replace() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_non_dev_autoload_replaces_nested_requirements() {
     let mut s = set_up();
     let package = new_root_pkg(BStr::new("root/a"));
@@ -1161,7 +1159,7 @@ fn test_non_dev_autoload_replaces_nested_requirements() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_phar_autoload() {
     let mut s = set_up();
     let package = new_root_pkg(BStr::new("root/a"));
@@ -1220,7 +1218,7 @@ fn test_phar_autoload() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_psr_to_class_map_ignores_non_existing_dir() {
     let mut s = set_up();
     let package = new_root_pkg(BStr::new("root/a"));
@@ -1257,7 +1255,7 @@ fn test_psr_to_class_map_ignores_non_existing_dir() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_psr_to_class_map_ignores_non_psr_classes() {
     let mut s = set_up();
     let package = new_root_pkg(BStr::new("root/a"));
@@ -1305,7 +1303,7 @@ fn test_psr_to_class_map_ignores_non_psr_classes() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_vendors_class_map_autoloading() {
     let mut s = set_up();
     let package = new_root_pkg(BStr::new("root/a"));
@@ -1384,7 +1382,7 @@ fn test_vendors_class_map_autoloading() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_vendors_class_map_autoloading_with_target_dir() {
     let mut s = set_up();
     let package = new_root_pkg(BStr::new("root/a"));
@@ -1464,7 +1462,7 @@ fn test_vendors_class_map_autoloading_with_target_dir() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 #[ignore = "the `classmap => ['./']` rule yields a scanned path containing `/./` (e.g. c/c/./foo/test.php) that the ClassMapGenerator port does not collapse the way PHP's normalizePath does; needs production path-normalization fix"]
 fn test_class_map_autoloading_empty_dir_and_exact_file() {
     let mut s = set_up();
@@ -1558,7 +1556,7 @@ fn test_class_map_autoloading_empty_dir_and_exact_file() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_class_map_autoloading_authoritative_and_apcu() {
     let mut s = set_up();
     let package = new_root_pkg(BStr::new("root/a"));
@@ -1653,7 +1651,7 @@ fn test_class_map_autoloading_authoritative_and_apcu() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_class_map_autoloading_authoritative_and_apcu_prefix() {
     let mut s = set_up();
     let package = new_root_pkg(BStr::new("root/a"));
@@ -1748,7 +1746,7 @@ fn test_class_map_autoloading_authoritative_and_apcu_prefix() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_files_autoload_generation() {
     let mut s = set_up();
     let package = new_root_pkg(BStr::new("root/a"));
@@ -1843,7 +1841,7 @@ fn test_files_autoload_generation() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_override_vendors_autoloading() {
     let mut s = set_up();
     let working_dir = s.working_dir.clone();
@@ -1946,7 +1944,7 @@ fn test_override_vendors_autoloading() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_include_path_file_generation() {
     let mut s = set_up();
     let package = new_root_pkg(BStr::new("root/a"));
@@ -1972,7 +1970,7 @@ fn test_include_path_file_generation() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_include_path_file_without_paths_is_skipped() {
     let mut s = set_up();
     let package = new_root_pkg(BStr::new("root/a"));
@@ -1988,7 +1986,7 @@ fn test_include_path_file_without_paths_is_skipped() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_vendor_substring_path() {
     let mut s = set_up();
     let package = new_root_pkg(BStr::new("root/a"));
@@ -2028,7 +2026,7 @@ fn test_vendor_substring_path() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_empty_paths() {
     let mut s = set_up();
     let package = new_root_pkg(BStr::new("root/a"));
@@ -2076,7 +2074,7 @@ fn test_empty_paths() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_exclude_from_classmap() {
     let mut s = set_up();
     let package = new_root_pkg(BStr::new("root/a"));
@@ -2184,7 +2182,7 @@ fn test_files_autoload_order_by_dependencies() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_files_autoload_generation_remove_extra_entities_from_autoload_files() {
     let mut s = set_up();
     let autoload_package = new_root_pkg(BStr::new("root/a"));
@@ -2387,7 +2385,7 @@ fn test_include_paths_in_root_package() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_pre_and_post_events_are_dispatched_during_autoload_dump() {
     let mut s = set_up();
 
@@ -2424,7 +2422,7 @@ fn test_pre_and_post_events_are_dispatched_during_autoload_dump() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_use_global_include_path() {
     let mut s = set_up();
     let package = new_root_pkg(BStr::new("root/a"));
@@ -2455,7 +2453,7 @@ fn test_use_global_include_path() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_vendor_dir_excluded_from_working_dir() {
     let mut s = set_up();
     let working_dir = s.vendor_dir.join("working-dir");
@@ -2587,7 +2585,7 @@ fn test_vendor_dir_excluded_from_working_dir() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_up_level_relative_paths() {
     let mut s = set_up();
     let working_dir = s.working_dir.join("working-dir");
@@ -2697,7 +2695,7 @@ fn test_up_level_relative_paths() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_autoload_rules_in_package_that_does_not_exist_on_disk() {
     let mut s = set_up();
     let package = new_root_pkg(BStr::new("root/a"));
@@ -2853,7 +2851,7 @@ fn platform_links(
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 #[ignore = "get_platform_check: an extension whose provider/replacer constraint does NOT satisfy the requirement (ext-pdo 7.1.* vs ^7.2) is still skipped, so platform_check.php is not generated where Composer generates it"]
 fn test_generates_platform_check() {
     let vp = VersionParser;
@@ -3118,7 +3116,7 @@ fn test_generates_platform_check() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_absolute_symlink_with_psr4_does_not_generate_warnings() {
     let mut s = set_up();
     let package = new_root_pkg(BStr::new("test/package"));
@@ -3159,7 +3157,7 @@ fn test_absolute_symlink_with_psr4_does_not_generate_warnings() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_absolute_symlink_with_classmap_exclude_from_classmap() {
     let mut s = set_up();
     let package = new_root_pkg(BStr::new("test/package"));

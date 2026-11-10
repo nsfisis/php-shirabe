@@ -7,14 +7,12 @@ use bstr::{BStr, BString};
 use shirabe_php_shim::{
     PHP_SERVER, bformat, error_message, parse_url, path_from_bytes, strtolower, strtoupper,
 };
-use std::sync::Mutex;
-use std::sync::atomic::{AtomicU64, Ordering};
 
-static INSTANCE: Mutex<Option<ProxyManager>> = Mutex::new(None);
+static INSTANCE: std::sync::Mutex<Option<ProxyManager>> = std::sync::Mutex::new(None);
 
 // Distinguishes ProxyManager instances so tests can mirror PHP `===` identity of the singleton,
 // which the Rust value-based singleton does not otherwise expose.
-static NEXT_GENERATION: AtomicU64 = AtomicU64::new(0);
+static NEXT_GENERATION: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
 #[derive(Debug)]
 pub struct ProxyManager {
@@ -32,7 +30,7 @@ impl ProxyManager {
             http_proxy: None,
             https_proxy: None,
             no_proxy_handler: std::cell::RefCell::new(None),
-            generation: NEXT_GENERATION.fetch_add(1, Ordering::Relaxed),
+            generation: NEXT_GENERATION.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
         };
         if let Err(e) = instance.get_proxy_data() {
             instance.error = Some(error_message(&e));

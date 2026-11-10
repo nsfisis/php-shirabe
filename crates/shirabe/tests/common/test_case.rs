@@ -31,15 +31,13 @@ use shirabe_symfony_console::input::{
 use shirabe_symfony_console::output::{
     ConsoleOutput, ConsoleOutputInterface, OutputInterface, StreamOutput,
 };
-use std::path::PathBuf;
-use tempfile::TempDir;
 
 /// ref: TestCase::getUniqueTmpDirectory
 ///
 /// The directory is created under the realpath of the system temp dir, so its path is a realpath
 /// as in PHP. The returned guard removes the tree on drop, standing in for the removal each PHP
 /// caller does in `tearDown`; use `TempDir::keep` where the caller removes it explicitly.
-pub fn get_unique_tmp_directory() -> TempDir {
+pub fn get_unique_tmp_directory() -> tempfile::TempDir {
     let root = realpath(sys_get_temp_dir()).expect("the system temp dir exists");
     tempfile::Builder::new()
         .prefix("composer-test-")
@@ -105,14 +103,14 @@ pub fn get_version_constraint(
 /// `composer.json`/`auth.json` (and `composer.lock` when given). The returned guard restores the
 /// previous cwd / `COMPOSER_HOME` and removes the temp tree on drop, mirroring PHPUnit's `tearDown`.
 pub struct TearDown {
-    temp_dir: TempDir,
-    prev_cwd: PathBuf,
+    temp_dir: tempfile::TempDir,
+    prev_cwd: std::path::PathBuf,
     prev_composer_home: Option<bstr::BString>,
 }
 
 impl TearDown {
     /// The temp directory created by `init_temp_composer`. Equivalent to the `$dir` returned by PHP.
-    pub fn working_dir(&self) -> PathBuf {
+    pub fn working_dir(&self) -> std::path::PathBuf {
         self.temp_dir.path().to_path_buf()
     }
 }

@@ -1,6 +1,6 @@
 //! ref: composer/tests/Composer/Test/Question/StrictConfirmationQuestionTest.php sha1:4183e14821c5bc6a4e1f61eb7c879051d0039071
 
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use shirabe::question::StrictConfirmationQuestion;
 use shirabe_php_shim::{
     PhpResource, ToPhpString, bformat, error_message, fwrite_resource, php_fopen_resource, php_str,

@@ -1,9 +1,8 @@
 //! ref: composer/tests/Composer/Test/Repository/PathRepositoryTest.php sha1:07002f7c81985331ff41fa16bc1c8ecf69b80151
 
 use crate::test_case::get_package;
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
-use serial_test::serial;
 use shirabe::config::Config;
 use shirabe::io::{IOInterface, NullIO};
 use shirabe::repository::PathRepository;
@@ -13,7 +12,6 @@ use shirabe_php_shim::{
     PhpMixed, ToPhpString, file_get_contents, hash, path_from_bytes, path_to_bytes, realpath,
     serialize, str_replace,
 };
-use std::path::Path;
 
 fn fixtures_dir() -> std::path::PathBuf {
     std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -54,7 +52,9 @@ fn coordinates(pairs: Vec<(&BStr, PhpMixed)>) -> IndexMap<BString, PhpMixed> {
 
 #[test]
 fn test_load_package_from_file_system_with_incorrect_path() {
-    let repository_url = Path::new(&fixtures_dir()).join("path").join("missing");
+    let repository_url = std::path::Path::new(&fixtures_dir())
+        .join("path")
+        .join("missing");
     let mut repository = create_path_repo(coordinates(vec![(
         BStr::new("url"),
         PhpMixed::string(path_to_bytes(&repository_url)),
@@ -64,7 +64,9 @@ fn test_load_package_from_file_system_with_incorrect_path() {
 
 #[test]
 fn test_load_package_from_file_system_with_version() {
-    let repository_url = Path::new(&fixtures_dir()).join("path").join("with-version");
+    let repository_url = std::path::Path::new(&fixtures_dir())
+        .join("path")
+        .join("with-version");
     let mut repository = create_path_repo(coordinates(vec![(
         BStr::new("url"),
         PhpMixed::string(path_to_bytes(&repository_url)),
@@ -81,7 +83,7 @@ fn test_load_package_from_file_system_with_version() {
 
 #[test]
 fn test_load_package_from_file_system_without_version() {
-    let repository_url = Path::new(&fixtures_dir())
+    let repository_url = std::path::Path::new(&fixtures_dir())
         .join("path")
         .join("without-version");
     let mut repository = create_path_repo(coordinates(vec![(
@@ -101,7 +103,7 @@ fn test_load_package_from_file_system_without_version() {
 
 #[test]
 fn test_load_package_from_file_system_with_wildcard() {
-    let repository_url = Path::new(&fixtures_dir()).join("path").join("*");
+    let repository_url = std::path::Path::new(&fixtures_dir()).join("path").join("*");
     let mut repository = create_path_repo(coordinates(vec![(
         BStr::new("url"),
         PhpMixed::string(path_to_bytes(&repository_url)),
@@ -140,7 +142,7 @@ fn test_load_package_with_explicit_versions() {
     );
     let options = coordinates(vec![(BStr::new("versions"), PhpMixed::Array(versions))]);
 
-    let repository_url = Path::new(&fixtures_dir()).join("path").join("*");
+    let repository_url = std::path::Path::new(&fixtures_dir()).join("path").join("*");
     let mut repository = create_path_repo(coordinates(vec![
         (
             BStr::new("url"),
@@ -183,7 +185,7 @@ struct CwdGuard {
 }
 
 impl CwdGuard {
-    fn new(dir: &Path) -> Self {
+    fn new(dir: &std::path::Path) -> Self {
         let prev_cwd = std::env::current_dir().unwrap();
         std::env::set_current_dir(dir).unwrap();
         Self { prev_cwd }
@@ -198,7 +200,7 @@ impl Drop for CwdGuard {
 
 /// Verify relative repository URLs remain relative, see #4439
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_url_remains_relative() {
     // PHP runs under phpunit with the process cwd inside the composer checkout, an ancestor of
     // __DIR__, so stripping the cwd prefix yields a valid relative path; cargo runs tests from the
@@ -258,7 +260,7 @@ fn test_reference_none() {
         BStr::new("reference"),
         PhpMixed::string(BString::from("none")),
     )]);
-    let repository_url = Path::new(&fixtures_dir()).join("path").join("*");
+    let repository_url = std::path::Path::new(&fixtures_dir()).join("path").join("*");
     let mut repository = create_path_repo(coordinates(vec![
         (
             BStr::new("url"),
@@ -284,7 +286,7 @@ fn test_reference_config() {
         ),
         (BStr::new("relative"), PhpMixed::Bool(true)),
     ]);
-    let repository_url = Path::new(&fixtures_dir()).join("path").join("*");
+    let repository_url = std::path::Path::new(&fixtures_dir()).join("path").join("*");
     let mut repository = create_path_repo(coordinates(vec![
         (
             BStr::new("url"),

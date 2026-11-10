@@ -8,7 +8,6 @@ use crate::process_executor_mock::{cmd, cmd_full, get_process_executor_mock};
 use crate::test_case::GitVersionGuard;
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
-use serial_test::serial;
 use shirabe::config::Config;
 use shirabe::io::{IOInterface, NullIO};
 use shirabe::package::loader::RootPackageLoader;
@@ -200,7 +199,7 @@ fn test_stability_flags_parsing() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_no_version_is_visible_in_pretty_version() {
     GitUtil::__reset_version();
     let _git_guard = GitVersionGuard;
@@ -238,7 +237,7 @@ fn test_no_version_is_visible_in_pretty_version() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_pretty_version_for_root_package_in_version_branch() {
     // see #6845
     let io = null_io();
@@ -274,7 +273,7 @@ fn test_pretty_version_for_root_package_in_version_branch() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_feature_branch_pretty_version() {
     // proc_open() is always available; the PHP markTestSkipped guard does not apply here.
     GitUtil::__set_version(Some("2.52.0".into()));
@@ -315,7 +314,7 @@ fn test_feature_branch_pretty_version() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_non_feature_branch_pretty_version() {
     // proc_open() is always available; the PHP markTestSkipped guard does not apply here.
     GitUtil::__set_version(Some("2.52.0".into()));

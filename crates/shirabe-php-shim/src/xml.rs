@@ -2,7 +2,6 @@
 
 use crate::bformat;
 use bstr::{BStr, BString};
-use std::rc::Weak;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum NodeType {
@@ -21,7 +20,7 @@ struct NodeInner {
     /// Character data for text nodes.
     value: BString,
     children: Vec<std::rc::Rc<std::cell::RefCell<NodeInner>>>,
-    owner_document: Weak<std::cell::RefCell<NodeInner>>,
+    owner_document: std::rc::Weak<std::cell::RefCell<NodeInner>>,
     /// Document-only fields.
     version: BString,
     encoding: BString,
@@ -50,7 +49,7 @@ impl DOMDocument {
             attributes: Vec::new(),
             value: BString::default(),
             children: Vec::new(),
-            owner_document: Weak::new(),
+            owner_document: std::rc::Weak::new(),
             version: BString::from(version),
             encoding: BString::from(encoding),
             format_output: false,
@@ -215,7 +214,7 @@ impl IntoIterator for DOMNodeList {
 
 fn deep_clone(
     node: &std::rc::Rc<std::cell::RefCell<NodeInner>>,
-    owner: &Weak<std::cell::RefCell<NodeInner>>,
+    owner: &std::rc::Weak<std::cell::RefCell<NodeInner>>,
     deep: bool,
 ) -> std::rc::Rc<std::cell::RefCell<NodeInner>> {
     let source = node.borrow();

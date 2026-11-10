@@ -5,14 +5,13 @@ use crate::downloader::{DownloaderInterface, FileDownloader};
 use crate::io::IOInterfaceWrite;
 use crate::package::PackageInterfaceHandle;
 use crate::util::{Filesystem, Platform};
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, PhpMixed, RuntimeException, ToPhpString, bformat, bin2hex, file_exists, is_dir,
     path_from_bytes, path_to_bytes, random_bytes, realpath,
 };
 use shirabe_symfony_finder::Finder;
-use std::path::{Path, PathBuf};
 
 pub trait ArchiveDownloader {
     fn inner(&self) -> &FileDownloader;
@@ -21,15 +20,15 @@ pub trait ArchiveDownloader {
     async fn extract(
         &self,
         package: PackageInterfaceHandle,
-        file: &Path,
-        path: &Path,
+        file: &std::path::Path,
+        path: &std::path::Path,
     ) -> anyhow::Result<Option<PhpMixed>>;
 
     async fn prepare(
         &self,
         r#type: &BStr,
         package: PackageInterfaceHandle,
-        path: &Path,
+        path: &std::path::Path,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         self.cleanup_executed()
@@ -44,7 +43,7 @@ pub trait ArchiveDownloader {
         &self,
         r#type: &BStr,
         package: PackageInterfaceHandle,
-        path: &Path,
+        path: &std::path::Path,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         self.cleanup_executed()
@@ -58,7 +57,7 @@ pub trait ArchiveDownloader {
     async fn install(
         &self,
         package: PackageInterfaceHandle,
-        path: &Path,
+        path: &std::path::Path,
         output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
         if output {
@@ -98,7 +97,7 @@ pub trait ArchiveDownloader {
         }
 
         let temporary_dir = loop {
-            let candidate = PathBuf::from(path_from_bytes(&bformat!(
+            let candidate = std::path::PathBuf::from(path_from_bytes(&bformat!(
                 "{vendor_dir}/composer/{}",
                 bin2hex(random_bytes(4))
             )));
@@ -112,7 +111,7 @@ pub trait ArchiveDownloader {
         // avoid cleaning up $path if installing in "." for eg create-project as we can not
         // delete the directory we are currently in on windows
         if !is_dir(path)
-            || realpath(path).as_deref().map(Path::as_os_str)
+            || realpath(path).as_deref().map(std::path::Path::as_os_str)
                 != Some(Platform::get_cwd(false).unwrap_or_default().as_os_str())
         {
             self.inner().add_cleanup_path(package.clone(), path);
@@ -166,7 +165,7 @@ pub trait ArchiveDownloader {
 
                 if rename_as_one {
                     // if the target $path is clear, we can rename the whole package in one go instead of looping over the contents
-                    let extracted_dir: PathBuf = if single_dir_at_top_level {
+                    let extracted_dir: std::path::PathBuf = if single_dir_at_top_level {
                         content_dir.first().unwrap().clone()
                     } else {
                         temporary_dir.clone()
@@ -199,7 +198,7 @@ pub trait ArchiveDownloader {
     fn get_install_operation_appendix(
         &self,
         _package: PackageInterfaceHandle,
-        _path: &Path,
+        _path: &std::path::Path,
     ) -> &BStr {
         BStr::new(": Extracting archive")
     }
@@ -208,8 +207,8 @@ pub trait ArchiveDownloader {
 fn install_cleanup(
     inner: &FileDownloader,
     package: PackageInterfaceHandle,
-    path: &Path,
-    temporary_dir: &Path,
+    path: &std::path::Path,
+    temporary_dir: &std::path::Path,
 ) -> anyhow::Result<()> {
     // remove cache if the file was corrupted
     inner.clear_last_cache_write(package.clone());
@@ -220,7 +219,7 @@ fn install_cleanup(
         .borrow_mut()
         .remove_directory(temporary_dir)?;
     if is_dir(path)
-        && realpath(path).as_deref().map(Path::as_os_str)
+        && realpath(path).as_deref().map(std::path::Path::as_os_str)
             != Some(Platform::get_cwd(false).unwrap_or_default().as_os_str())
     {
         inner.filesystem.borrow_mut().remove_directory(path)?;
@@ -235,7 +234,7 @@ fn install_cleanup(
 }
 
 /// Returns the folder content, excluding .DS_Store
-fn get_folder_content(dir: impl AsRef<Path>) -> Vec<PathBuf> {
+fn get_folder_content(dir: impl AsRef<std::path::Path>) -> Vec<std::path::PathBuf> {
     let mut finder = Finder::create();
     finder
         .ignore_vcs(false)
@@ -255,8 +254,8 @@ fn get_folder_content(dir: impl AsRef<Path>) -> Vec<PathBuf> {
 fn rename_recursively(
     filesystem: &std::rc::Rc<std::cell::RefCell<Filesystem>>,
     package: PackageInterfaceHandle,
-    from: &Path,
-    to: &Path,
+    from: &std::path::Path,
+    to: &std::path::Path,
 ) -> anyhow::Result<()> {
     let content_dir = get_folder_content(from);
 

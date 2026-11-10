@@ -8,12 +8,7 @@
     reason = "the crate generates Rust source, which rustc reads as text"
 )]
 
-use proc_macro2::{Literal, Span, TokenStream};
-use quote::{quote, quote_spanned};
-use syn::parse::{Parse, ParseStream};
-use syn::punctuated::Punctuated;
-use syn::spanned::Spanned;
-use syn::{Expr, Ident, Lit, Token};
+use syn::spanned::Spanned as _;
 
 /// PHP's string interpolation and `.` operator: `bformat!("Package {name} not found")` is
 /// `"Package $name not found"`, and evaluates to a `BString` holding the bytes of every argument
@@ -81,27 +76,27 @@ pub fn bwrite(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 /// `[<out>,] <format literal> [, <arg>]* [,]`. `WITH_OUT` selects `bwrite!`, whose
 /// first operand is the buffer to append to.
 struct FormatInput<const WITH_OUT: bool> {
-    out: Option<Expr>,
+    out: Option<syn::Expr>,
     format: Vec<u8>,
-    format_span: Span,
-    positional: Vec<Expr>,
-    named: Vec<(Ident, Expr)>,
+    format_span: proc_macro2::Span,
+    positional: Vec<syn::Expr>,
+    named: Vec<(syn::Ident, syn::Expr)>,
 }
 
-impl<const WITH_OUT: bool> Parse for FormatInput<WITH_OUT> {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
+impl<const WITH_OUT: bool> syn::parse::Parse for FormatInput<WITH_OUT> {
+    fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         let out = if WITH_OUT {
-            let out = input.parse::<Expr>()?;
-            input.parse::<Token![,]>()?;
+            let out = input.parse::<syn::Expr>()?;
+            input.parse::<syn::Token![,]>()?;
             Some(out)
         } else {
             None
         };
 
-        let lit = input.parse::<Lit>()?;
+        let lit = input.parse::<syn::Lit>()?;
         let format = match &lit {
-            Lit::Str(s) => s.value().into_bytes(),
-            Lit::ByteStr(s) => s.value(),
+            syn::Lit::Str(s) => s.value().into_bytes(),
+            syn::Lit::ByteStr(s) => s.value(),
             _ => {
                 return Err(syn::Error::new(
                     lit.span(),
@@ -111,10 +106,10 @@ impl<const WITH_OUT: bool> Parse for FormatInput<WITH_OUT> {
         };
 
         let mut positional = Vec::new();
-        let mut named: Vec<(Ident, Expr)> = Vec::new();
+        let mut named: Vec<(syn::Ident, syn::Expr)> = Vec::new();
         if !input.is_empty() {
-            input.parse::<Token![,]>()?;
-            let args = Punctuated::<Arg, Token![,]>::parse_terminated(input)?;
+            input.parse::<syn::Token![,]>()?;
+            let args = syn::punctuated::Punctuated::<Arg, syn::Token![,]>::parse_terminated(input)?;
             for arg in args {
                 match arg {
                     Arg::Positional(expr) => {
@@ -150,15 +145,15 @@ impl<const WITH_OUT: bool> Parse for FormatInput<WITH_OUT> {
 }
 
 enum Arg {
-    Positional(Expr),
-    Named(Ident, Expr),
+    Positional(syn::Expr),
+    Named(syn::Ident, syn::Expr),
 }
 
-impl Parse for Arg {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
-        if input.peek(Ident) && input.peek2(Token![=]) && !input.peek2(Token![==]) {
-            let name = input.parse::<Ident>()?;
-            input.parse::<Token![=]>()?;
+impl syn::parse::Parse for Arg {
+    fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+        if input.peek(syn::Ident) && input.peek2(syn::Token![=]) && !input.peek2(syn::Token![==]) {
+            let name = input.parse::<syn::Ident>()?;
+            input.parse::<syn::Token![=]>()?;
             Ok(Arg::Named(name, input.parse()?))
         } else {
             Ok(Arg::Positional(input.parse()?))
@@ -184,7 +179,7 @@ enum Piece {
 /// Splits a format string into literal bytes and placeholders. A placeholder is `{}`, `{<index>}`
 /// or `{<identifier>}`; format specs are rejected, since their widths and precisions would have to
 /// count either bytes or characters.
-fn parse_format(format: &[u8], span: Span) -> syn::Result<Vec<Piece>> {
+fn parse_format(format: &[u8], span: proc_macro2::Span) -> syn::Result<Vec<Piece>> {
     let mut pieces = Vec::new();
     let mut bytes = Vec::new();
     let mut i = 0;
@@ -233,7 +228,7 @@ fn parse_format(format: &[u8], span: Span) -> syn::Result<Vec<Piece>> {
     Ok(pieces)
 }
 
-fn parse_placeholder(content: &[u8], span: Span) -> syn::Result<Piece> {
+fn parse_placeholder(content: &[u8], span: proc_macro2::Span) -> syn::Result<Piece> {
     if content.contains(&b':') {
         return Err(syn::Error::new(
             span,
@@ -270,7 +265,9 @@ fn parse_placeholder(content: &[u8], span: Span) -> syn::Result<Piece> {
     ))
 }
 
-fn expand<const WITH_OUT: bool>(input: FormatInput<WITH_OUT>) -> syn::Result<TokenStream> {
+fn expand<const WITH_OUT: bool>(
+    input: FormatInput<WITH_OUT>,
+) -> syn::Result<proc_macro2::TokenStream> {
     let FormatInput {
         out,
         format,
@@ -282,7 +279,7 @@ fn expand<const WITH_OUT: bool>(input: FormatInput<WITH_OUT>) -> syn::Result<Tok
 
     // Every argument is evaluated once, in the order it is written, and captured identifiers
     // after them; each placeholder then refers to one of these.
-    let mut args: Vec<Expr> = positional;
+    let mut args: Vec<syn::Expr> = positional;
     let positional_len = args.len();
     let mut names: Vec<String> = Vec::new();
     for (name, expr) in named {
@@ -306,7 +303,7 @@ fn expand<const WITH_OUT: bool>(input: FormatInput<WITH_OUT>) -> syn::Result<Tok
             Piece::Name(name) => match names.iter().position(|n| *n == name) {
                 Some(n) => positional_len + n,
                 None => {
-                    let ident = Ident::new(&name, format_span);
+                    let ident = syn::Ident::new(&name, format_span);
                     names.push(name);
                     args.push(syn::parse_quote!(#ident));
                     used.push(false);
@@ -326,41 +323,46 @@ fn expand<const WITH_OUT: bool>(input: FormatInput<WITH_OUT>) -> syn::Result<Tok
         return Err(syn::Error::new(args[index].span(), message));
     }
 
-    let out_ident = Ident::new("__bformat_out", Span::mixed_site());
-    let binds: Vec<Ident> = (0..args.len())
-        .map(|i| Ident::new(&format!("__bformat_arg{i}"), Span::mixed_site()))
+    let out_ident = syn::Ident::new("__bformat_out", proc_macro2::Span::mixed_site());
+    let binds: Vec<syn::Ident> = (0..args.len())
+        .map(|i| {
+            syn::Ident::new(
+                &format!("__bformat_arg{i}"),
+                proc_macro2::Span::mixed_site(),
+            )
+        })
         .collect();
     let mut capacity = 0;
-    let stmts: Vec<TokenStream> = steps
+    let stmts: Vec<proc_macro2::TokenStream> = steps
         .into_iter()
         .map(|step| match step {
             Step::Bytes(bytes) => {
                 capacity += bytes.len();
-                let lit = Literal::byte_string(&bytes);
-                quote!(#out_ident.extend_from_slice(#lit);)
+                let lit = proc_macro2::Literal::byte_string(&bytes);
+                quote::quote!(#out_ident.extend_from_slice(#lit);)
             }
             Step::Arg(index) => {
                 // A call whose tokens all sit at the argument, so that an argument that does not
                 // implement `PhpDisplay` is reported there.
-                let span = Span::mixed_site().located_at(args[index].span());
+                let span = proc_macro2::Span::mixed_site().located_at(args[index].span());
                 let mut bind = binds[index].clone();
                 bind.set_span(span);
                 let mut out_ident = out_ident.clone();
                 out_ident.set_span(span);
-                quote_spanned!(span=>
+                quote::quote_spanned!(span=>
                     ::shirabe_php_shim::PhpDisplay::fmt(#bind, #out_ident);
                 )
             }
         })
         .collect();
-    let body = quote! {
+    let body = quote::quote! {
         match (#(&(#args), )*) {
             (#(#binds, )*) => { #(#stmts)* }
         }
     };
 
     Ok(match out {
-        Some(out) => quote! {{
+        Some(out) => quote::quote! {{
             let #out_ident: &mut ::bstr::BString = {
                 use ::core::borrow::BorrowMut as _;
                 (#out).borrow_mut()
@@ -368,8 +370,8 @@ fn expand<const WITH_OUT: bool>(input: FormatInput<WITH_OUT>) -> syn::Result<Tok
             #body
         }},
         None => {
-            let buffer = Ident::new("__bformat_buffer", Span::mixed_site());
-            quote! {{
+            let buffer = syn::Ident::new("__bformat_buffer", proc_macro2::Span::mixed_site());
+            quote::quote! {{
                 let mut #buffer = ::bstr::BString::from(::std::vec::Vec::with_capacity(#capacity));
                 {
                     let #out_ident = &mut #buffer;
@@ -381,7 +383,7 @@ fn expand<const WITH_OUT: bool>(input: FormatInput<WITH_OUT>) -> syn::Result<Tok
     })
 }
 
-fn check_positional(index: usize, len: usize, span: Span) -> syn::Result<usize> {
+fn check_positional(index: usize, len: usize, span: proc_macro2::Span) -> syn::Result<usize> {
     if index < len {
         Ok(index)
     } else {

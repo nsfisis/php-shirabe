@@ -1,6 +1,6 @@
 //! ref: composer/src/Composer/Autoload/ClassLoader.php sha1:7f146de662b0599355b3b049a161e23cbdbbdaeb
 
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_rpc::stream_resolve_include_path;
 use shirabe_php_shim::{

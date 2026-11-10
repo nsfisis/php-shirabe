@@ -7,9 +7,8 @@ mod config_stub;
 #[path = "common/test_case.rs"]
 mod test_case;
 
-use bstr::{B, BStr, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice as _};
 use config_stub::ConfigStubBuilder;
-use serial_test::serial;
 use shirabe_php_shim::{
     PHP_EOL, PhpJson, PhpMixed, ToPhpString, bformat, error_message, implode, path_to_bytes,
     php_fopen_resource, php_regex, preg_is_match, preg_match, preg_replace,
@@ -387,7 +386,7 @@ fn make_packages_comparable(
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_installer() {
     bootstrap::bootstrap();
     let _tear_down = TearDown::new();
@@ -1339,7 +1338,7 @@ fn php_mixed_map_to_json(map: &IndexMap<BString, PhpMixed>) -> serde_json::Value
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_slow_integration() {
     let _tear_down = TearDown::new();
     for case in load_integration_tests("installer-slow/") {
@@ -1364,7 +1363,7 @@ fn test_slow_integration() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_integration_with_pool_optimizer() {
     let _tear_down = TearDown::new();
     for case in load_integration_tests("installer/") {
@@ -1380,7 +1379,7 @@ fn test_integration_with_pool_optimizer() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_integration_with_raw_pool() {
     let _tear_down = TearDown::new();
     for case in load_integration_tests("installer/") {

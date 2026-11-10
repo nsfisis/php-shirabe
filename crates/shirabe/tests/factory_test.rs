@@ -1,6 +1,5 @@
 //! ref: composer/tests/Composer/Test/FactoryTest.php sha1:42dc812351ccb668ee5a90d7f8b96d15b1ef1ce5
 
-use serial_test::serial;
 use shirabe::factory::Factory;
 use shirabe::io::{IOInterface, io_interface};
 use shirabe::util::Platform;
@@ -27,7 +26,7 @@ impl Drop for TearDown {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_default_values_are_as_expected() {
     let _tear_down = TearDown;
 
@@ -52,7 +51,7 @@ fn test_default_values_are_as_expected() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_get_composer_json_path() {
     let _tear_down = TearDown;
 
@@ -63,7 +62,7 @@ fn test_get_composer_json_path() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_get_composer_json_path_fails_if_dir() {
     let _tear_down = TearDown;
 
@@ -79,7 +78,7 @@ fn test_get_composer_json_path_fails_if_dir() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_get_composer_json_path_from_env() {
     let _tear_down = TearDown;
 

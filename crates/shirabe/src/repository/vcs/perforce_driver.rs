@@ -6,7 +6,7 @@ use crate::io::IOInterface;
 use crate::repository::vcs::{VcsDriverBase, VcsDriverInterface};
 use crate::util::http::Response;
 use crate::util::{HttpDownloader, Perforce, PerforceInterface, ProcessExecutor};
-use bstr::{B, BStr, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     BadMethodCallException, PhpMixed, RuntimeException, bformat, path_from_bytes, php_regex,

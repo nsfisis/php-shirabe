@@ -9,13 +9,13 @@ use crate::delegate_base_command_trait_impls_to_inner;
 use crate::factory::Factory;
 use crate::io::IOInterfaceWrite;
 use crate::json::{JsonFile, JsonValidationException};
-use crate::package::base_package::{self};
+use crate::package::base_package;
 use crate::repository::{
     CompositeRepository, PlatformRepository, PlatformRepositoryHandle, RepositoryFactory,
     RepositoryInterfaceHandle, RepositorySet,
 };
 use crate::util::{Filesystem, ProcessExecutor};
-use bstr::{B, BStr, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, FILE_IGNORE_NEW_LINES, InvalidArgumentException, PHP_EOL, PHP_SERVER, PhpMixed,
@@ -32,7 +32,6 @@ use shirabe_symfony_console::input::{
     ArrayInput, InputInterface, InputInterfaceByName, InputValue,
 };
 use shirabe_symfony_console::output::OutputInterface;
-use std::path::Path;
 
 #[derive(Debug)]
 pub struct InitCommand {
@@ -199,7 +198,7 @@ impl InitCommand {
     ///  "/$vendor/"
     ///  "/$vendor/*"
     ///  "$vendor/*"
-    fn has_vendor_ignore(&self, ignore_file: impl AsRef<Path>, vendor: &BStr) -> bool {
+    fn has_vendor_ignore(&self, ignore_file: impl AsRef<std::path::Path>, vendor: &BStr) -> bool {
         let ignore_file = ignore_file.as_ref();
         if !file_exists(ignore_file) {
             return false;
@@ -217,7 +216,7 @@ impl InitCommand {
         false
     }
 
-    fn add_vendor_ignore(&self, ignore_file: impl AsRef<Path>, vendor: &BStr) {
+    fn add_vendor_ignore(&self, ignore_file: impl AsRef<std::path::Path>, vendor: &BStr) {
         let ignore_file = ignore_file.as_ref();
         let mut contents: Vec<u8> = vec![];
         if file_exists(ignore_file) {
@@ -253,12 +252,16 @@ impl InitCommand {
     }
 
     /// For testing only: invoke the crate-private `has_vendor_ignore`.
-    pub fn __has_vendor_ignore(&self, ignore_file: impl AsRef<Path>, vendor: &BStr) -> bool {
+    pub fn __has_vendor_ignore(
+        &self,
+        ignore_file: impl AsRef<std::path::Path>,
+        vendor: &BStr,
+    ) -> bool {
         self.has_vendor_ignore(ignore_file, vendor)
     }
 
     /// For testing only: invoke the crate-private `add_vendor_ignore`.
-    pub fn __add_vendor_ignore(&self, ignore_file: impl AsRef<Path>, vendor: &BStr) {
+    pub fn __add_vendor_ignore(&self, ignore_file: impl AsRef<std::path::Path>, vendor: &BStr) {
         self.add_vendor_ignore(ignore_file, vendor)
     }
 

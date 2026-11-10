@@ -6,8 +6,7 @@ use crate::downloader::TransportException;
 use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::repository::vcs::{VcsDriverBase, VcsDriverInterface};
 use crate::util::{Filesystem, HttpDownloader, ProcessExecutor};
-use bstr::{BStr, BString, ByteSlice};
-use chrono::{DateTime, FixedOffset, Utc};
+use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, PhpMixed, RuntimeException, ToPhpString, bformat, date_create, dirname,
@@ -252,7 +251,7 @@ impl FossilDriver {
     pub fn get_change_date(
         &self,
         _identifier: &BStr,
-    ) -> anyhow::Result<Option<DateTime<FixedOffset>>> {
+    ) -> anyhow::Result<Option<chrono::DateTime<chrono::FixedOffset>>> {
         let mut output = BString::default();
         self.inner.process.borrow_mut().execute(
             ["fossil", "finfo", "-b", "-n", "1", "composer.json"]
@@ -264,7 +263,7 @@ impl FossilDriver {
         let parts = explode_with_limit(" ", trim(&output), 3);
         let date = parts.get(1).cloned().unwrap_or_default();
 
-        let date: DateTime<Utc> = date_create(date)?;
+        let date: chrono::DateTime<chrono::Utc> = date_create(date)?;
         Ok(Some(date.fixed_offset()))
     }
 
@@ -388,7 +387,7 @@ impl VcsDriverInterface for FossilDriver {
     fn get_change_date(
         &mut self,
         identifier: &BStr,
-    ) -> anyhow::Result<Option<DateTime<FixedOffset>>> {
+    ) -> anyhow::Result<Option<chrono::DateTime<chrono::FixedOffset>>> {
         FossilDriver::get_change_date(self, identifier)
     }
 

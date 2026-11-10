@@ -3,7 +3,7 @@
 use crate::config::ConfigSourceInterface;
 use crate::json::{JsonFile, JsonManipulator, JsonValidationException};
 use crate::util::Filesystem;
-use bstr::{B, BStr, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, PHP_EOL, PhpMixed, RuntimeException, ToPhpString, bformat, chmod, explode,

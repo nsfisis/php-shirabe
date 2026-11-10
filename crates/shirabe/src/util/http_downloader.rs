@@ -12,7 +12,7 @@ use crate::util::{
     GetResult, HttpOptions, LocalFilesystem, Platform, RemoteFilesystem, SslOptions,
     StreamContextFactory, StreamContextOptions, Url, sync_executor,
 };
-use bstr::{B, BStr, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, LogicException, PHP_EOL, PhpJson, PhpMixed, bformat,

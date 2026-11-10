@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/Util/Filesystem.php sha1:3792e765baeceda1cb9bf3998d12a2b3037d50b1
 
 use crate::util::{Platform, ProcessExecutor};
-use bstr::{BString, ByteVec};
+use bstr::{BString, ByteVec as _};
 use shirabe_php_shim::{
     CHILD_FIRST, InvalidArgumentException, LogicException, PhpMixed, PregMatches, RuntimeException,
     SELF_FIRST, SKIP_DOTS, array_pop, basename, bformat, chdir, clearstatcache,
@@ -15,7 +15,6 @@ use shirabe_php_shim::{
 };
 use shirabe_symfony_filesystem::exception::IOException;
 use shirabe_symfony_finder::Finder;
-use std::path::{Path, PathBuf};
 
 #[derive(Debug)]
 pub struct Filesystem {
@@ -29,7 +28,7 @@ pub struct Filesystem {
 pub struct FilesystemMock {
     /// When `Some`, `remove_directory_async` returns it without touching disk and records the call.
     pub remove_directory_async_result: Option<bool>,
-    pub remove_directory_async_paths: Vec<PathBuf>,
+    pub remove_directory_async_paths: Vec<std::path::PathBuf>,
     /// When true, `normalize_path` returns its argument unchanged.
     pub normalize_path_identity: bool,
 }
@@ -54,14 +53,14 @@ impl Filesystem {
 
     /// For testing only: the directories passed to `remove_directory_async` calls intercepted by
     /// the seam, in call order (ref PHPUnit's `->with($this->equalTo($this->workingDir))`).
-    pub fn __remove_directory_async_paths(&self) -> Vec<PathBuf> {
+    pub fn __remove_directory_async_paths(&self) -> Vec<std::path::PathBuf> {
         self.mock
             .as_ref()
             .map(|m| m.remove_directory_async_paths.clone())
             .unwrap_or_default()
     }
 
-    pub fn remove(&mut self, file: impl AsRef<Path>) -> anyhow::Result<bool> {
+    pub fn remove(&mut self, file: impl AsRef<std::path::Path>) -> anyhow::Result<bool> {
         let file = file.as_ref();
         if is_dir(file) {
             return self.remove_directory(file);
@@ -75,7 +74,7 @@ impl Filesystem {
     }
 
     /// Checks if a directory is empty
-    pub fn is_dir_empty(&self, dir: impl AsRef<Path>) -> bool {
+    pub fn is_dir_empty(&self, dir: impl AsRef<std::path::Path>) -> bool {
         let mut finder = Finder::create();
         finder
             .ignore_vcs(false)
@@ -88,7 +87,7 @@ impl Filesystem {
 
     pub fn empty_directory(
         &mut self,
-        dir: impl AsRef<Path>,
+        dir: impl AsRef<std::path::Path>,
         ensure_directory_exists: bool,
     ) -> anyhow::Result<()> {
         let dir = dir.as_ref();
@@ -116,7 +115,10 @@ impl Filesystem {
     }
 
     /// Recursively remove a directory
-    pub fn remove_directory(&mut self, directory: impl AsRef<Path>) -> anyhow::Result<bool> {
+    pub fn remove_directory(
+        &mut self,
+        directory: impl AsRef<std::path::Path>,
+    ) -> anyhow::Result<bool> {
         let directory = directory.as_ref();
         let edge_case_result = self.remove_edge_cases(directory)?;
         if let Some(r) = edge_case_result {
@@ -155,7 +157,7 @@ impl Filesystem {
     /// Recursively remove a directory asynchronously
     pub async fn remove_directory_async_via(
         this: &std::rc::Rc<std::cell::RefCell<Filesystem>>,
-        directory: impl AsRef<Path>,
+        directory: impl AsRef<std::path::Path>,
     ) -> anyhow::Result<bool> {
         let directory = directory.as_ref();
         {
@@ -205,7 +207,7 @@ impl Filesystem {
     }
 
     /// Returns null when no edge case was hit. Otherwise a bool whether removal was successful
-    fn remove_edge_cases(&mut self, directory: &Path) -> anyhow::Result<Option<bool>> {
+    fn remove_edge_cases(&mut self, directory: &std::path::Path) -> anyhow::Result<Option<bool>> {
         if self.is_symlinked_directory(directory) {
             return Ok(Some(self.unlink_symlinked_directory(directory)?));
         }
@@ -238,7 +240,10 @@ impl Filesystem {
     /// Uses a CHILD_FIRST RecursiveIteratorIterator to sort files
     /// before directories, creating a single non-recursive loop
     /// to delete files/directories in the correct order.
-    pub fn remove_directory_php(&mut self, directory: impl AsRef<Path>) -> anyhow::Result<bool> {
+    pub fn remove_directory_php(
+        &mut self,
+        directory: impl AsRef<std::path::Path>,
+    ) -> anyhow::Result<bool> {
         let directory = directory.as_ref();
         let edge_case_result = self.remove_edge_cases(directory)?;
         if let Some(r) = edge_case_result {
@@ -274,7 +279,10 @@ impl Filesystem {
         self.rmdir(directory)
     }
 
-    pub fn ensure_directory_exists(&mut self, directory: impl AsRef<Path>) -> anyhow::Result<()> {
+    pub fn ensure_directory_exists(
+        &mut self,
+        directory: impl AsRef<std::path::Path>,
+    ) -> anyhow::Result<()> {
         let directory = directory.as_ref();
         if !is_dir(directory) {
             if file_exists(directory) {
@@ -319,7 +327,7 @@ impl Filesystem {
     }
 
     /// Attempts to unlink a file and in case of failure retries after 350ms on windows
-    pub fn unlink(&self, path: impl AsRef<Path>) -> anyhow::Result<bool> {
+    pub fn unlink(&self, path: impl AsRef<std::path::Path>) -> anyhow::Result<bool> {
         let path = path.as_ref();
         let mut unlinked = self.unlink_implementation(path);
         if unlinked.is_err() {
@@ -344,7 +352,7 @@ impl Filesystem {
     }
 
     /// Attempts to rmdir a file and in case of failure retries after 350ms on windows
-    pub fn rmdir(&self, path: impl AsRef<Path>) -> anyhow::Result<bool> {
+    pub fn rmdir(&self, path: impl AsRef<std::path::Path>) -> anyhow::Result<bool> {
         let path = path.as_ref();
         let mut deleted = rmdir(path);
         if deleted.is_err() {
@@ -374,8 +382,8 @@ impl Filesystem {
     /// which requires this solution.
     pub fn copy_then_remove(
         &mut self,
-        source: impl AsRef<Path>,
-        target: impl AsRef<Path>,
+        source: impl AsRef<std::path::Path>,
+        target: impl AsRef<std::path::Path>,
     ) -> anyhow::Result<()> {
         let source = source.as_ref();
         self.copy(source, target)?;
@@ -392,8 +400,8 @@ impl Filesystem {
     /// Copies a file or directory from $source to $target.
     pub fn copy(
         &mut self,
-        source: impl AsRef<Path>,
-        target: impl AsRef<Path>,
+        source: impl AsRef<std::path::Path>,
+        target: impl AsRef<std::path::Path>,
     ) -> anyhow::Result<bool> {
         let source = source.as_ref();
         // refs https://github.com/composer/composer/issues/11864
@@ -453,8 +461,8 @@ impl Filesystem {
 
     pub fn rename(
         &mut self,
-        source: impl AsRef<Path>,
-        target: impl AsRef<Path>,
+        source: impl AsRef<std::path::Path>,
+        target: impl AsRef<std::path::Path>,
     ) -> anyhow::Result<()> {
         let source = source.as_ref();
         let target = target.as_ref();
@@ -514,11 +522,11 @@ impl Filesystem {
     /// Returns the shortest path from $from to $to
     pub fn find_shortest_path(
         &self,
-        from: impl AsRef<Path>,
-        to: impl AsRef<Path>,
+        from: impl AsRef<std::path::Path>,
+        to: impl AsRef<std::path::Path>,
         directories: bool,
         prefer_relative: bool,
-    ) -> anyhow::Result<PathBuf> {
+    ) -> anyhow::Result<std::path::PathBuf> {
         let (from, to) = (from.as_ref(), to.as_ref());
         if !self.is_absolute_path(from) || !self.is_absolute_path(to) {
             return Err(InvalidArgumentException::new(bformat!(
@@ -565,7 +573,7 @@ impl Filesystem {
             substr(&to, strlen(&common_path), None)
         );
         if strlen(&result) == 0 {
-            return Ok(PathBuf::from("./"));
+            return Ok(std::path::PathBuf::from("./"));
         }
 
         Ok(path_from_bytes(&result).to_path_buf())
@@ -574,8 +582,8 @@ impl Filesystem {
     /// Returns PHP code that, when executed in $from, will return the path to $to
     pub fn find_shortest_path_code(
         &self,
-        from: impl AsRef<Path>,
-        to: impl AsRef<Path>,
+        from: impl AsRef<std::path::Path>,
+        to: impl AsRef<std::path::Path>,
         directories: bool,
         static_code: bool,
         prefer_relative: bool,
@@ -653,7 +661,7 @@ impl Filesystem {
     }
 
     /// Checks if the given path is absolute
-    pub fn is_absolute_path(&self, path: impl AsRef<Path>) -> bool {
+    pub fn is_absolute_path(&self, path: impl AsRef<std::path::Path>) -> bool {
         // std::path::Path::is_absolute() is environment-dependent, while PHP's
         // Filesystem::isAbsolutePath() returns the same result in any platforms.
         let path = path.as_ref().as_os_str().as_encoded_bytes();
@@ -662,7 +670,7 @@ impl Filesystem {
 
     /// Returns size of a file or directory specified by path. If a directory is
     /// given, its size will be computed recursively.
-    pub fn size(&self, path: impl AsRef<Path>) -> anyhow::Result<i64> {
+    pub fn size(&self, path: impl AsRef<std::path::Path>) -> anyhow::Result<i64> {
         let path = path.as_ref();
         if !file_exists(path) {
             return Err(RuntimeException::new(bformat!("{path} does not exist.")).into());
@@ -676,7 +684,7 @@ impl Filesystem {
 
     /// Normalize a path. This replaces backslashes with slashes, removes ending
     /// slash and collapses redundant separators and up-level references.
-    pub fn normalize_path(&self, path: impl AsRef<Path>) -> PathBuf {
+    pub fn normalize_path(&self, path: impl AsRef<std::path::Path>) -> std::path::PathBuf {
         let path = path.as_ref();
         if let Some(mock) = &self.mock
             && mock.normalize_path_identity
@@ -736,7 +744,7 @@ impl Filesystem {
     /// Remove trailing slashes if present to avoid issues with symlinks
     ///
     /// And other possible unforeseen disasters, see https://github.com/composer/composer/pull/9422
-    pub fn trim_trailing_slash(path: impl AsRef<Path>) -> PathBuf {
+    pub fn trim_trailing_slash(path: impl AsRef<std::path::Path>) -> std::path::PathBuf {
         let mut path = BString::from(path_to_bytes(path.as_ref()));
         if !preg_is_match(php_regex!("{^[/\\\\]+$}"), &path) {
             path = rtrim_chars(&path, "/\\");
@@ -765,7 +773,7 @@ impl Filesystem {
         )
     }
 
-    pub fn get_platform_path(path: impl AsRef<[u8]>) -> PathBuf {
+    pub fn get_platform_path(path: impl AsRef<[u8]>) -> std::path::PathBuf {
         let mut path = BString::from(path.as_ref());
         if Platform::is_windows() {
             path = preg_replace(
@@ -782,7 +790,7 @@ impl Filesystem {
     ///
     /// This will also check for readability by reading the file as is_readable can not be trusted on network-mounts
     /// and \\\\wsl$ paths. See https://github.com/composer/composer/issues/8231 and https://bugs.php.net/bug.php?id=68926
-    pub fn is_readable(path: impl AsRef<Path>) -> bool {
+    pub fn is_readable(path: impl AsRef<std::path::Path>) -> bool {
         let path = path.as_ref();
         if is_readable(path) {
             return true;
@@ -800,7 +808,7 @@ impl Filesystem {
         false
     }
 
-    fn directory_size(&self, directory: &Path) -> anyhow::Result<i64> {
+    fn directory_size(&self, directory: &std::path::Path) -> anyhow::Result<i64> {
         let it = recursive_directory_iterator(directory, SKIP_DOTS)?;
         let ri = recursive_iterator_iterator(it, CHILD_FIRST);
 
@@ -835,7 +843,7 @@ impl Filesystem {
     /// delete symbolic link implementation (commonly known as "unlink()")
     ///
     /// symbolic links on windows which link to directories need rmdir instead of unlink
-    fn unlink_implementation(&self, path: &Path) -> Result<(), std::io::Error> {
+    fn unlink_implementation(&self, path: &std::path::Path) -> Result<(), std::io::Error> {
         if Platform::is_windows() && is_dir(path) && is_link(path) {
             return rmdir(path);
         }
@@ -846,8 +854,8 @@ impl Filesystem {
     /// Creates a relative symlink from $link to $target
     pub fn relative_symlink(
         &self,
-        target: impl AsRef<Path>,
-        link: impl AsRef<Path>,
+        target: impl AsRef<std::path::Path>,
+        link: impl AsRef<std::path::Path>,
     ) -> anyhow::Result<bool> {
         let (target, link) = (target.as_ref(), link.as_ref());
         let cwd = Platform::get_cwd(false).unwrap_or_default();
@@ -862,7 +870,7 @@ impl Filesystem {
     }
 
     /// return true if that directory is a symlink.
-    pub fn is_symlinked_directory(&self, directory: impl AsRef<Path>) -> bool {
+    pub fn is_symlinked_directory(&self, directory: impl AsRef<std::path::Path>) -> bool {
         let directory = directory.as_ref();
         if !is_dir(directory) {
             return false;
@@ -873,14 +881,17 @@ impl Filesystem {
         is_link(&resolved)
     }
 
-    fn unlink_symlinked_directory(&self, directory: &Path) -> anyhow::Result<bool> {
+    fn unlink_symlinked_directory(&self, directory: &std::path::Path) -> anyhow::Result<bool> {
         let resolved = self.resolve_symlinked_directory_symlink(directory);
 
         self.unlink(&resolved)
     }
 
     /// resolve pathname to symbolic link of a directory
-    fn resolve_symlinked_directory_symlink(&self, pathname: &Path) -> PathBuf {
+    fn resolve_symlinked_directory_symlink(
+        &self,
+        pathname: &std::path::Path,
+    ) -> std::path::PathBuf {
         if !is_dir(pathname) {
             return pathname.to_path_buf();
         }
@@ -897,8 +908,8 @@ impl Filesystem {
     /// Creates an NTFS junction.
     pub fn junction(
         &mut self,
-        target: impl AsRef<Path>,
-        junction: impl AsRef<Path>,
+        target: impl AsRef<std::path::Path>,
+        junction: impl AsRef<std::path::Path>,
     ) -> anyhow::Result<()> {
         let (target, junction) = (target.as_ref(), junction.as_ref());
         if !Platform::is_windows() {
@@ -957,7 +968,7 @@ impl Filesystem {
     /// detected and a recursive delete operation could lead to loss of data in
     /// the target directory. Note that Windows rmdir can handle this situation
     /// and will only delete the junction (from Windows 7 onwards).
-    pub fn is_junction(&self, junction: impl AsRef<Path>) -> bool {
+    pub fn is_junction(&self, junction: impl AsRef<std::path::Path>) -> bool {
         let junction = junction.as_ref();
         if !Platform::is_windows() {
             return false;
@@ -980,7 +991,10 @@ impl Filesystem {
     }
 
     /// Removes a Windows NTFS junction.
-    pub fn remove_junction(&mut self, junction: impl AsRef<Path>) -> anyhow::Result<bool> {
+    pub fn remove_junction(
+        &mut self,
+        junction: impl AsRef<std::path::Path>,
+    ) -> anyhow::Result<bool> {
         if !Platform::is_windows() {
             return Ok(false);
         }
@@ -1008,7 +1022,7 @@ impl Filesystem {
 
     pub fn file_put_contents_if_modified(
         &self,
-        path: impl AsRef<Path>,
+        path: impl AsRef<std::path::Path>,
         content: impl AsRef<[u8]>,
     ) -> anyhow::Result<i64> {
         let (path, content) = (path.as_ref(), content.as_ref());
@@ -1023,8 +1037,8 @@ impl Filesystem {
     /// Copy file using stream_copy_to_stream to work around https://bugs.php.net/bug.php?id=6463
     pub fn safe_copy(
         &self,
-        source: impl AsRef<Path>,
-        target: impl AsRef<Path>,
+        source: impl AsRef<std::path::Path>,
+        target: impl AsRef<std::path::Path>,
     ) -> anyhow::Result<()> {
         let (source, target) = (source.as_ref(), target.as_ref());
         if !file_exists(target) || !file_exists(source) || !self.files_are_equal(source, target) {
@@ -1060,7 +1074,7 @@ impl Filesystem {
 
     /// compare 2 files
     /// https://stackoverflow.com/questions/3060125/can-i-use-file-get-contents-to-compare-two-files
-    fn files_are_equal(&self, a: &Path, b: &Path) -> bool {
+    fn files_are_equal(&self, a: &std::path::Path, b: &std::path::Path) -> bool {
         // Check if filesize is different
         if filesize(a) != filesize(b) {
             return false;
@@ -1098,14 +1112,14 @@ impl Filesystem {
 /// Unlike `rm -rf`, this stops at the first entry it cannot remove instead of removing the rest of
 /// the tree first. Callers fall back to `Filesystem::remove_directory_php` on failure, which walks
 /// the remainder and surfaces the error.
-fn remove_directory_recursively(path: &Path) -> std::io::Result<()> {
+fn remove_directory_recursively(path: &std::path::Path) -> std::io::Result<()> {
     match std::fs::remove_dir_all(path) {
         Err(e) if e.kind() != std::io::ErrorKind::NotFound => Err(e),
         _ => Ok(()),
     }
 }
 
-async fn remove_directory_recursively_async(path: &Path) -> std::io::Result<()> {
+async fn remove_directory_recursively_async(path: &std::path::Path) -> std::io::Result<()> {
     match tokio::fs::remove_dir_all(path).await {
         Err(e) if e.kind() != std::io::ErrorKind::NotFound => Err(e),
         _ => Ok(()),

@@ -10,10 +10,9 @@ use shirabe_php_shim::{
     preg_quote, preg_replace,
 };
 use shirabe_symfony_process::Process;
-use tempfile::TempDir;
 
 struct SetUp {
-    _sources_dir: TempDir,
+    _sources_dir: tempfile::TempDir,
     sources: std::path::PathBuf,
     fs: Filesystem,
 }

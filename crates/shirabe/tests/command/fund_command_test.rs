@@ -6,7 +6,6 @@ use crate::test_case::{
 };
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
-use serial_test::serial;
 use shirabe::package::{CompletePackageHandle, PackageInterfaceHandle};
 use shirabe_php_shim::{PhpMixed, trim};
 use shirabe_symfony_console::input::{InputValue, ParameterName};
@@ -65,7 +64,7 @@ fn run_fund_case(
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_fund_command() {
     // 'no funding links present, locally or remotely'
     run_fund_case(

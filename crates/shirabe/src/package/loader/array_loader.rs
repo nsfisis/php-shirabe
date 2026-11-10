@@ -7,8 +7,7 @@ use crate::package::{
     Link, Mirror, Package, PackageInterface, PackageInterfaceHandle, RootAliasPackageHandle,
     RootPackage, RootPackageHandle, SUPPORTED_LINK_TYPES,
 };
-use bstr::{B, BStr, BString, ByteSlice};
-use chrono::Utc;
+use bstr::{B, BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     AnyThrowable, E_USER_DEPRECATED, PhpMixed, TypeError, UnexpectedValueException, bformat,
@@ -381,7 +380,7 @@ impl ArrayLoader {
                 BString::from(time_str)
             };
 
-            if let Ok(date) = date_create::<Utc>(&time) {
+            if let Ok(date) = date_create::<chrono::Utc>(&time) {
                 package.package_mut().set_release_date(Some(date));
             }
         }

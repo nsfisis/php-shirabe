@@ -4,8 +4,7 @@ use crate::test_case::{
     RunOptions, create_composer_lock, create_installed_json, get_application_tester,
     get_complete_package, get_package, init_temp_composer,
 };
-use bstr::{BStr, BString, ByteSlice};
-use serial_test::serial;
+use bstr::{BStr, BString, ByteSlice as _};
 use shirabe::package::PackageInterfaceHandle;
 use shirabe_php_shim::{ToPhpString, path_from_bytes, trim};
 use shirabe_symfony_console::input::{InputValue, ParameterName};
@@ -18,7 +17,7 @@ fn input(pairs: Vec<(&BStr, InputValue)>) -> Vec<(ParameterName, InputValue)> {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_no_local_changes() {
     let tear_down = init_temp_composer(
         Some(&serde_json::json!({ "require": { "root/req": "1.*" } })),
@@ -116,7 +115,7 @@ fn run_locally_modified_packages_case(
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_locally_modified_packages_from_source() {
     run_locally_modified_packages_case(
         serde_json::json!({ "require": { "composer/class-map-generator": "^1.0" } }),
@@ -133,7 +132,7 @@ fn test_locally_modified_packages_from_source() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_locally_modified_packages_from_dist() {
     run_locally_modified_packages_case(
         serde_json::json!({ "require": { "smarty/smarty": "^3.1" } }),

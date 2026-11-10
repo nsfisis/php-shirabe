@@ -5,7 +5,7 @@ use crate::delegate_base_command_trait_impls_to_inner;
 use crate::php_worker::call::PhpCall;
 use crate::php_worker::console::{CONSOLE_APP_CONTEXT, PENDING_COMMAND_HANDLES};
 use crate::php_worker::runtime;
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use shirabe_php_rpc::{FromPluginValue, PhpObjHandle, PluginValue};
 use shirabe_php_shim::{PhpClass, PhpMixed, RuntimeException, ToPhpString, bformat};
 use shirabe_symfony_console::command::Command;

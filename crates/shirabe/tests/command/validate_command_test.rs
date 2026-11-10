@@ -4,7 +4,6 @@ use crate::test_case::{
     RunOptions, create_composer_lock, get_application_tester, init_temp_composer,
 };
 use bstr::BStr;
-use serial_test::serial;
 use shirabe::util::Platform;
 use shirabe_php_shim::{chmod, function_exists, posix_getuid, trim};
 use shirabe_symfony_console::input::{InputValue, ParameterName};
@@ -104,7 +103,7 @@ fn provide_validate_tests() -> Vec<ValidateCase> {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_validate() {
     for case in provide_validate_tests() {
         let _tear_down = init_temp_composer(Some(&case.composer_json), None, None, true);
@@ -124,7 +123,7 @@ fn test_validate() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_validate_on_file_issues() {
     let tear_down = init_temp_composer(Some(&minimal_valid_configuration()), None, None, true);
     std::fs::remove_file(tear_down.working_dir().join("composer.json")).unwrap();
@@ -140,7 +139,7 @@ fn test_validate_on_file_issues() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_with_composer_lock() {
     let tear_down = init_temp_composer(Some(&minimal_valid_configuration()), None, None, true);
     create_composer_lock(&[], &[]);
@@ -158,7 +157,7 @@ fn test_with_composer_lock() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_unaccessible_file() {
     if Platform::is_windows() {
         // ref: $this->markTestSkipped('Does not run on windows');

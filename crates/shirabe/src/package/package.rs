@@ -4,8 +4,7 @@ use crate::package::version::VersionParser;
 use crate::package::{BasePackage, DisplayMode, Link, PackageInterface};
 use crate::repository::{RepositoryInterfaceHandle, RepositoryInterfaceWeakHandle};
 use crate::util::ComposerMirror;
-use bstr::{BStr, BString, ByteSlice};
-use chrono::{DateTime, Utc};
+use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::{IndexMap, IndexSet};
 use shirabe_php_shim::{
     E_USER_DEPRECATED, LogicException, PhpDisplay, PhpMixed, PregMatches, bformat, ltrim_chars,
@@ -680,7 +679,7 @@ impl PackageInterface for Package {
     fn get_full_pretty_version(&self, truncate: bool, display_mode: DisplayMode) -> BString {
         BasePackage::get_full_pretty_version(self, truncate, display_mode)
     }
-    fn get_release_date(&self) -> Option<DateTime<Utc>> {
+    fn get_release_date(&self) -> Option<chrono::DateTime<chrono::Utc>> {
         self.release_date
     }
     fn get_stability(&self) -> &BStr {

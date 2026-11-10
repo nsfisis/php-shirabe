@@ -3,7 +3,6 @@
 use crate::constraint::SimpleConstraint;
 use crate::{Comparator, VersionParser};
 use bstr::BString;
-use std::sync::OnceLock;
 
 pub struct Semver;
 
@@ -12,7 +11,7 @@ impl Semver {
     pub const SORT_DESC: i64 = -1;
 
     fn version_parser() -> &'static VersionParser {
-        static VERSION_PARSER: OnceLock<VersionParser> = OnceLock::new();
+        static VERSION_PARSER: std::sync::OnceLock<VersionParser> = std::sync::OnceLock::new();
         VERSION_PARSER.get_or_init(|| VersionParser)
     }
 

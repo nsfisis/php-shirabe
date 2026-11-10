@@ -5,7 +5,7 @@ use crate::json::{JsonFile, JsonValidationException};
 use crate::package::loader::{
     ArrayLoader, InvalidPackageException, LoaderInterface, ValidatingArrayLoader,
 };
-use bstr::{B, BString, ByteSlice};
+use bstr::{B, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use serde::de::Error as _;
 use shirabe_php_shim::{
@@ -13,7 +13,6 @@ use shirabe_php_shim::{
     preg_replace, str_replace, strtolower,
 };
 use shirabe_spdx_licenses::SpdxLicenses;
-use std::path::Path;
 
 #[derive(Debug)]
 pub struct ConfigValidator {
@@ -29,7 +28,7 @@ impl ConfigValidator {
 
     pub fn validate(
         &self,
-        file: &Path,
+        file: &std::path::Path,
         array_loader_validation_flags: i64,
         flags: i64,
     ) -> (Vec<BString>, Vec<BString>, Vec<BString>) {

@@ -3,7 +3,7 @@
 use crate::config::Config;
 use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::util::{HttpDownloader, StreamContextOptions};
-use bstr::{B, BStr, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     InvalidArgumentException, PHP_EOL, PhpMixed, ToPhpString, UnexpectedValueException, bformat,

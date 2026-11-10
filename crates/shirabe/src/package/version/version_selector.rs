@@ -10,7 +10,7 @@ use crate::package::loader::ArrayLoader;
 use crate::package::version::VersionParser;
 use crate::package::{PackageInterfaceHandle, base_package};
 use crate::repository::{PlatformRepository, RepositoryInterface, RepositorySetInterface};
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     CmpOp, UnexpectedValueException, bformat, explode, explode_with_limit, implode, php_regex,

@@ -18,7 +18,6 @@
 )]
 
 use std::io::Write as _;
-use std::path::{Path, PathBuf};
 
 /// The directory names Symfony's `Finder::ignoreVCS(true)` excludes.
 const VCS_DIRECTORIES: &[&str] = &[
@@ -203,8 +202,8 @@ fn main() {
 
 /// Builds the Composer PHP runtime bundle into `out_dir` and names it in
 /// `SHIRABE_COMPOSER_RUNTIME_BUNDLE_ID`.
-fn build_bundle(out_dir: &Path) {
-    let manifest_dir = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap());
+fn build_bundle(out_dir: &std::path::Path) {
+    let manifest_dir = std::path::PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap());
     let composer = manifest_dir
         .parent()
         .unwrap()
@@ -239,7 +238,7 @@ fn build_bundle(out_dir: &Path) {
 }
 
 /// Every file the bundle holds, in the order `Compiler::compile` adds them.
-fn collect_entries(composer: &Path) -> Vec<Entry> {
+fn collect_entries(composer: &std::path::Path) -> Vec<Entry> {
     let mut entries = Vec::new();
 
     // Add Composer sources. Compiler.php excludes ClassLoader.php and InstalledVersions.php from
@@ -315,7 +314,7 @@ fn collect_entries(composer: &Path) -> Vec<Entry> {
 /// Reads one file the way `Compiler::addFile` does, minus its whitespace stripping: the bundle
 /// keeps the sources byte for byte, so a class the worker loads from here is the same file the
 /// Rust side embeds elsewhere.
-fn read_entry(composer: &Path, file: &Path, strip: bool) -> Entry {
+fn read_entry(composer: &std::path::Path, file: &std::path::Path, strip: bool) -> Entry {
     let mut content = std::fs::read(file).unwrap();
     if !strip && file_name(file) == "LICENSE" {
         content.insert(0, b'\n');
@@ -481,14 +480,14 @@ fn crc32(data: &[u8]) -> u32 {
 
 /// The files under `root`, sorted by path, with the entries Symfony's `Finder` skips by default
 /// (dot files and VCS directories) left out.
-fn find_files(root: &Path) -> Vec<PathBuf> {
+fn find_files(root: &std::path::Path) -> Vec<std::path::PathBuf> {
     let mut files = Vec::new();
     walk(root, &mut files);
     files.sort();
     files
 }
 
-fn walk(dir: &Path, files: &mut Vec<PathBuf>) {
+fn walk(dir: &std::path::Path, files: &mut Vec<std::path::PathBuf>) {
     for entry in std::fs::read_dir(dir).unwrap() {
         let entry = entry.unwrap();
         let path = entry.path();
@@ -507,10 +506,10 @@ fn walk(dir: &Path, files: &mut Vec<PathBuf>) {
     }
 }
 
-fn file_name(path: &Path) -> String {
+fn file_name(path: &std::path::Path) -> String {
     path.file_name().unwrap().display().to_string()
 }
 
-fn relative_path(root: &Path, file: &Path) -> String {
+fn relative_path(root: &std::path::Path, file: &std::path::Path) -> String {
     file.strip_prefix(root).unwrap().display().to_string()
 }

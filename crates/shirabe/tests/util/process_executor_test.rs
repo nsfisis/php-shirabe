@@ -4,7 +4,7 @@
 // password hiding, line splitting and argument escaping. A few data points remain unportable —
 // see the individual `// TODO(async)` comments below.
 
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use shirabe::io::{BufferIO, ConsoleIO, IOInterface};
 use shirabe::util::ProcessExecutor;
 use shirabe_php_shim::{PHP_EOL, bformat, trim};

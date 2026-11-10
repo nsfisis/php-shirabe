@@ -1,8 +1,7 @@
 //! ref: composer/tests/Composer/Test/Command/RunScriptCommandTest.php sha1:44e03da3d598f41319e50a07e29a659d0d8b4010
 
 use crate::test_case::{RunOptions, get_application_tester, init_temp_composer};
-use bstr::ByteSlice;
-use serial_test::serial;
+use bstr::ByteSlice as _;
 use shirabe_php_shim::{bformat, str_replace};
 use shirabe_symfony_console::input::{InputValue, ParameterName};
 
@@ -30,7 +29,7 @@ fn test_detect_and_pass_dev_mode_to_event_and_to_dispatching() {
 
 /// ref: RunScriptCommandTest::testCanListScripts
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_can_list_scripts() {
     let tear_down = init_temp_composer(
         Some(&serde_json::json!({
@@ -75,7 +74,7 @@ fn test_can_list_scripts() {
 
 /// ref: RunScriptCommandTest::testCanDefineAliases
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_can_define_aliases() {
     let expected_aliases = vec!["one", "two", "three"];
 
@@ -125,7 +124,7 @@ fn test_can_define_aliases() {
 
 /// ref: RunScriptCommandTest::testExecutionOfSimpleSymfonyCommand
 #[test]
-#[serial]
+#[serial_test::serial]
 #[ignore = "PhpCommandProxy::run hands the whole run to the worker-side console application, so the \
             user's Command writes to the stdio the worker inherited and the in-process application \
             tester's buffer stays empty. The worker is also a per-process singleton that keeps the \
@@ -253,7 +252,7 @@ class MyCommand extends Command
 
 /// ref: RunScriptCommandTest::testExecutionOfSymfonyCommandWithConfiguration
 #[test]
-#[serial]
+#[serial_test::serial]
 #[ignore = "PhpCommandProxy::run hands the whole run to the worker-side console application, so the \
             user's Command writes to the stdio the worker inherited and the in-process application \
             tester's buffer stays empty. The worker is also a per-process singleton that keeps the \

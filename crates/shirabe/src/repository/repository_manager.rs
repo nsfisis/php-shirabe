@@ -9,7 +9,7 @@ use crate::repository::{
     PackageRepository, PathRepository, RepositoryInterfaceHandle, VcsRepository,
 };
 use crate::util::{HttpDownloader, ProcessExecutor};
-use bstr::{B, BStr, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, RuntimeException, ToPhpString, bformat, json_encode,

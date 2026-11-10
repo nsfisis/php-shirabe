@@ -7,13 +7,11 @@ use shirabe::installer::BinaryInstaller;
 use shirabe::io::{IOInterface, NullIO};
 use shirabe::util::{Filesystem, ProcessExecutor};
 use shirabe_php_shim::bformat;
-use std::fs;
-use tempfile::TempDir;
 
 /// Mirror of setUp(): builds temp root/vendor/bin dirs plus a mocked IO. PHP uses a
 /// PHPUnit IOInterface mock with no expectations; a NullIO is the closest analogue.
 struct SetUp {
-    root: TempDir,
+    root: tempfile::TempDir,
     vendor_dir: std::path::PathBuf,
     bin_dir: std::path::PathBuf,
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
@@ -27,10 +25,10 @@ fn set_up() -> SetUp {
     let root_dir = root.path().to_path_buf();
 
     let vendor_dir = root_dir.join("vendor");
-    fs::create_dir_all(&vendor_dir).unwrap();
+    std::fs::create_dir_all(&vendor_dir).unwrap();
 
     let bin_dir = root_dir.join("bin");
-    fs::create_dir_all(&bin_dir).unwrap();
+    std::fs::create_dir_all(&bin_dir).unwrap();
 
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
@@ -83,8 +81,8 @@ fn run_install_and_exec_binary_with_full_compat(contents: &[u8]) {
     package.__set_binaries(vec![BString::from("binary")]);
 
     let pkg_dir = setup.vendor_dir.join("foo/bar");
-    fs::create_dir_all(&pkg_dir).unwrap();
-    fs::write(pkg_dir.join("binary"), contents).unwrap();
+    std::fs::create_dir_all(&pkg_dir).unwrap();
+    std::fs::write(pkg_dir.join("binary"), contents).unwrap();
 
     let mut installer = BinaryInstaller::new(
         setup.io.clone(),

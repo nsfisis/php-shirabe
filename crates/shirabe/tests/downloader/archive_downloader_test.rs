@@ -6,7 +6,7 @@
 // real Config merged with `vendor-dir`, and real CompletePackage instances with dist
 // url/reference set.
 
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe::config::Config;
 use shirabe::downloader::FileDownloader;

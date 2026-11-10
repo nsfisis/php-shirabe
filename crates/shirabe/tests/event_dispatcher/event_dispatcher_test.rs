@@ -4,9 +4,8 @@ use crate::io_mock::{Expectation, get_io_mock};
 use crate::io_stub::IOStub;
 use crate::php_worker::{load_composer_php_runtime, php_eval};
 use crate::process_executor_mock::{ProcessExecutorMockGuard, cmd, get_process_executor_mock};
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
-use serial_test::serial;
 use shirabe::autoload::{AutoloadGenerator, AutoloadGeneratorInterface, ClassLoader};
 use shirabe::composer::{ComposerHandle, PartialOrFullComposer};
 use shirabe::config::Config;
@@ -189,7 +188,7 @@ fn listeners_const(listeners: Vec<&BStr>) -> Box<dyn Fn(&dyn EventInterface) -> 
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_dispatcher_can_execute_single_command_line_script() {
     let _tear_down = TearDown;
     ensure_php_binary();
@@ -217,7 +216,7 @@ fn test_dispatcher_can_execute_single_command_line_script() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_dispatcher_can_execute_composer_script_groups() {
     let _tear_down = TearDown;
     ensure_php_binary();
@@ -266,7 +265,7 @@ fn test_dispatcher_can_execute_composer_script_groups() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_recursion_in_scripts_names() {
     let _tear_down = TearDown;
     ensure_php_binary();
@@ -314,7 +313,7 @@ fn test_recursion_in_scripts_names() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_dispatcher_detect_infinite_recursion() {
     let _tear_down = TearDown;
     let (process, _process_guard) =
@@ -351,7 +350,7 @@ fn test_dispatcher_detect_infinite_recursion() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_dispatcher_installer_events() {
     let _tear_down = TearDown;
     let (process, _process_guard) =
@@ -377,7 +376,7 @@ fn test_dispatcher_installer_events() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_dispatcher_doesnt_return_skipped_scripts() {
     let _tear_down = TearDown;
     Platform::put_env("COMPOSER_SKIP_SCRIPTS", "scriptName").unwrap();
@@ -415,7 +414,7 @@ fn test_dispatcher_doesnt_return_skipped_scripts() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_listener_exceptions_are_caught() {
     let _tear_down = TearDown;
     load_php_listener_class();
@@ -582,7 +581,7 @@ use mock_installation_manager::MockInstallationManager;
 
 /// ref: EventDispatcherTest::testDispatcherPassDevModeToAutoloadGeneratorForScriptEvents
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_dispatcher_pass_dev_mode_to_autoload_generator_for_script_events() {
     let _tear_down = TearDown;
     ensure_php_binary();
@@ -678,7 +677,7 @@ fn test_dispatcher_pass_dev_mode_to_autoload_generator_for_script_events() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_dispatcher_remove_listener() {
     let _tear_down = TearDown;
     load_php_listener_class();
@@ -730,7 +729,7 @@ fn test_dispatcher_remove_listener() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_dispatcher_can_execute_cli_and_php_in_same_event_script_stack() {
     let _tear_down = TearDown;
     ensure_php_binary();
@@ -773,7 +772,7 @@ fn test_dispatcher_can_execute_cli_and_php_in_same_event_script_stack() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_dispatcher_can_put_env() {
     let _tear_down = TearDown;
     load_php_listener_class();
@@ -811,7 +810,7 @@ fn test_dispatcher_can_put_env() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_dispatcher_appends_dir_bin_on_path_for_every_listener() {
     let _tear_down = TearDown;
     load_php_listener_class();
@@ -867,7 +866,7 @@ fn test_dispatcher_appends_dir_bin_on_path_for_every_listener() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_dispatcher_support_for_additional_args() {
     let _tear_down = TearDown;
     ensure_php_binary();
@@ -927,7 +926,7 @@ fn test_dispatcher_support_for_additional_args() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_dispatcher_outputs_command() {
     let _tear_down = TearDown;
 
@@ -971,7 +970,7 @@ fn test_dispatcher_outputs_command() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_dispatcher_outputs_error_on_failed_command() {
     let _tear_down = TearDown;
 
@@ -1006,7 +1005,7 @@ fn test_dispatcher_outputs_error_on_failed_command() {
 /// the script, taken from COMPOSER_BINARY. That binary is a native executable, so it is run
 /// directly rather than being passed to a PHP interpreter.
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_dispatcher_runs_composer_scripts_through_the_running_binary() {
     let _tear_down = TearDown;
 
@@ -1052,7 +1051,7 @@ fn test_dispatcher_runs_composer_scripts_through_the_running_binary() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_listeners_are_keyed_by_the_bytes_of_the_event_name() {
     let _tear_down = TearDown;
     let composer = create_composer_instance();

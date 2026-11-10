@@ -3,7 +3,7 @@
 use crate::Application;
 use crate::command::Command;
 use crate::exception::CommandNotFoundException;
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{bformat, json_bytes, php_str};
 

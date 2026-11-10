@@ -5,7 +5,7 @@ use crate::repository::{
     AdvisoryProviderInterface, FindPackageConstraint, LoadPackagesResult, ProviderInfo,
     RepositoryInterface, RepositoryInterfaceHandle, SearchResult, SecurityAdvisoryResult,
 };
-use bstr::{B, BStr, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{InvalidArgumentException, PhpMixed, bformat, preg_is_match};
 use shirabe_semver::constraint::AnyConstraint;

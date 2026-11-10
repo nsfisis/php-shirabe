@@ -1,5 +1,5 @@
 use crate::{PhpClass, display_to_bytes, impl_php_class};
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 
 /// The fields a PHP `\Throwable` carries: its message and code, and the error it wraps. Ported
 /// exception types embed this, either directly or through the parent exception they extend.

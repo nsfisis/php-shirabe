@@ -9,22 +9,21 @@ use bstr::{BStr, BString};
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, bformat, path_from_bytes, path_to_bytes, rtrim_chars, strtr,
 };
-use std::path::{Path, PathBuf};
 
 #[derive(Debug)]
 pub struct ProjectInstaller {
-    install_path: PathBuf,
+    install_path: std::path::PathBuf,
     download_manager: std::rc::Rc<std::cell::RefCell<dyn DownloadManagerInterface>>,
     filesystem: std::rc::Rc<std::cell::RefCell<Filesystem>>,
 }
 
 impl ProjectInstaller {
     pub fn new(
-        install_path: &Path,
+        install_path: &std::path::Path,
         dm: std::rc::Rc<std::cell::RefCell<dyn DownloadManagerInterface>>,
         fs: std::rc::Rc<std::cell::RefCell<Filesystem>>,
     ) -> Self {
-        let install_path = PathBuf::from(path_from_bytes(&bformat!(
+        let install_path = std::path::PathBuf::from(path_from_bytes(&bformat!(
             "{}/",
             rtrim_chars(strtr(path_to_bytes(install_path), "\\", "/"), "/")
         )));
@@ -124,7 +123,7 @@ impl InstallerInterface for ProjectInstaller {
         Err(InvalidArgumentException::new(BString::from("not supported")).into())
     }
 
-    fn get_install_path(&self, _package: PackageInterfaceHandle) -> Option<PathBuf> {
+    fn get_install_path(&self, _package: PackageInterfaceHandle) -> Option<std::path::PathBuf> {
         Some(self.install_path.clone())
     }
 }

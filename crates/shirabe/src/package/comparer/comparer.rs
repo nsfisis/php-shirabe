@@ -1,15 +1,14 @@
 //! ref: composer/src/Composer/Package/Comparer/Comparer.php sha1:1865cc72cd2b3be711187fdb382c6c56041c6e2c
 
 use crate::util::Platform;
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{bformat, chdir, hash_file, implode, path_from_bytes, path_to_bytes, trim};
-use std::path::PathBuf;
 
 #[derive(Debug)]
 pub struct Comparer {
-    source: PathBuf,
-    update: PathBuf,
+    source: std::path::PathBuf,
+    update: std::path::PathBuf,
     changed: IndexMap<BString, Vec<BString>>,
 }
 
@@ -22,17 +21,17 @@ impl Default for Comparer {
 impl Comparer {
     pub fn new() -> Self {
         Self {
-            source: PathBuf::new(),
-            update: PathBuf::new(),
+            source: std::path::PathBuf::new(),
+            update: std::path::PathBuf::new(),
             changed: IndexMap::new(),
         }
     }
 
-    pub fn set_source(&mut self, source: PathBuf) {
+    pub fn set_source(&mut self, source: std::path::PathBuf) {
         self.source = source;
     }
 
-    pub fn set_update(&mut self, update: PathBuf) {
+    pub fn set_update(&mut self, update: std::path::PathBuf) {
         self.update = update;
     }
 

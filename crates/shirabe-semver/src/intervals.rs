@@ -10,7 +10,6 @@ use shirabe_php_shim::{
     CmpOp, ToPhpString, UnexpectedValueException, array_unique, version_compare,
     version_compare_ordering,
 };
-use std::sync::{Arc, Mutex, OnceLock};
 
 #[derive(Debug, Clone)]
 pub struct IntervalCollection {
@@ -18,17 +17,20 @@ pub struct IntervalCollection {
     pub branches: DevConstraintSet,
 }
 
-static INTERVALS_CACHE: OnceLock<Mutex<IndexMap<BString, Arc<IntervalCollection>>>> =
-    OnceLock::new();
+static INTERVALS_CACHE: std::sync::OnceLock<
+    std::sync::Mutex<IndexMap<BString, std::sync::Arc<IntervalCollection>>>,
+> = std::sync::OnceLock::new();
 
-fn intervals_cache() -> &'static Mutex<IndexMap<BString, Arc<IntervalCollection>>> {
-    INTERVALS_CACHE.get_or_init(|| Mutex::new(IndexMap::new()))
+fn intervals_cache()
+-> &'static std::sync::Mutex<IndexMap<BString, std::sync::Arc<IntervalCollection>>> {
+    INTERVALS_CACHE.get_or_init(|| std::sync::Mutex::new(IndexMap::new()))
 }
 
-static SUBSET_CACHE: OnceLock<Mutex<IndexMap<(BString, BString), bool>>> = OnceLock::new();
+static SUBSET_CACHE: std::sync::OnceLock<std::sync::Mutex<IndexMap<(BString, BString), bool>>> =
+    std::sync::OnceLock::new();
 
-fn subset_cache() -> &'static Mutex<IndexMap<(BString, BString), bool>> {
-    SUBSET_CACHE.get_or_init(|| Mutex::new(IndexMap::new()))
+fn subset_cache() -> &'static std::sync::Mutex<IndexMap<(BString, BString), bool>> {
+    SUBSET_CACHE.get_or_init(|| std::sync::Mutex::new(IndexMap::new()))
 }
 
 fn op_sort_order(op: CmpOp) -> i64 {
@@ -319,21 +321,21 @@ impl Intervals {
         Ok(MatchNoneConstraint::new(None).into())
     }
 
-    pub fn get(constraint: &AnyConstraint) -> anyhow::Result<Arc<IntervalCollection>> {
+    pub fn get(constraint: &AnyConstraint) -> anyhow::Result<std::sync::Arc<IntervalCollection>> {
         let key = constraint.to_php_string();
 
         {
             let cache = intervals_cache().lock().unwrap();
             if let Some(cached) = cache.get(&key) {
-                return Ok(Arc::clone(cached));
+                return Ok(std::sync::Arc::clone(cached));
             }
         }
 
-        let result = Arc::new(Self::generate_intervals(constraint, false)?);
+        let result = std::sync::Arc::new(Self::generate_intervals(constraint, false)?);
 
         {
             let mut cache = intervals_cache().lock().unwrap();
-            cache.insert(key, Arc::clone(&result));
+            cache.insert(key, std::sync::Arc::clone(&result));
         }
 
         Ok(result)

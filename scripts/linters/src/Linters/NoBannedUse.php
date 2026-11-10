@@ -16,13 +16,20 @@ final class NoBannedUse implements Linter
      * e.g. `foo::.*` bans every item under `foo`.
      */
     private const BANNED_USE_PATHS = [
-        'anyhow::Result',
-        'std::any::Any',
-        'std::cell::RefCell',
-        'std::io::Read',
-        'std::io::Write',
-        'std::process::Command',
-        'std::rc::Rc',
+        'anyhow::.*',
+        'bstr::ByteSlice',
+        'bstr::ByteVec',
+        'chrono::.*',
+        'criterion::.*',
+        'futures::.*',
+        'proc_macro2::.*',
+        'quote::.*',
+        'serde::.*',
+        'serial_test::.*',
+        'std::.*',
+        'syn::.*',
+        'tempfile::.*',
+        'zip::.*',
     ];
 
     private const USE_START_RE = '/\A(?:pub(?:\([^)]*\))?\s+)?use\b/';
@@ -61,8 +68,10 @@ final class NoBannedUse implements Linter
         $errors = [];
         $buffer = null;
         $startIdx = null;
+        $lines = file($path);
+        $localModules = $this->findLocalModules($lines);
 
-        foreach (file($path) as $idx => $raw) {
+        foreach ($lines as $idx => $raw) {
             $code = explode('//', $raw, 2)[0];
             $stripped = trim($code);
 
@@ -83,7 +92,7 @@ final class NoBannedUse implements Linter
             $tree = $m[1] ?? null;
 
             foreach ($this->expandUseTree($tree) as $full) {
-                if (!$this->isBanned($full)) {
+                if (!$this->isBanned($full, $localModules)) {
                     continue;
                 }
                 $errors[] = "{$relative}:" . ($startIdx + 1) . ": `use {$full}` is banned (fully qualify as `{$full}` instead)";
@@ -95,8 +104,33 @@ final class NoBannedUse implements Linter
         return array_values(array_unique($errors));
     }
 
-    private function isBanned(string $path): bool
+    /**
+     * Names of the modules declared in this file. A `use` path starting with one of them refers to
+     * that module, not to an external crate of the same name.
+     *
+     * @param list<string> $lines
+     * @return list<string>
+     */
+    private function findLocalModules(array $lines): array
     {
+        $modules = [];
+        foreach ($lines as $raw) {
+            $code = trim(explode('//', $raw, 2)[0]);
+            if (preg_match('/\A(?:pub(?:\([^)]*\))?\s+)?mod\s+(\w+)\b/', $code, $m)) {
+                $modules[] = $m[1];
+            }
+        }
+
+        return $modules;
+    }
+
+    /** @param list<string> $localModules */
+    private function isBanned(string $path, array $localModules): bool
+    {
+        if (in_array(explode('::', $path, 2)[0], $localModules, true)) {
+            return false;
+        }
+
         foreach (self::BANNED_USE_PATHS as $pattern) {
             if (preg_match('~\\A(?:' . $pattern . ')\\z~', $path)) {
                 return true;

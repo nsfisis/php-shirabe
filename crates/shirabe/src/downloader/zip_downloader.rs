@@ -9,7 +9,7 @@ use crate::event_dispatcher::EventDispatcher;
 use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::package::PackageInterfaceHandle;
 use crate::util::{Filesystem, HttpDownloader, Platform, ProcessExecutor};
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, CmpOp, ErrorException, PhpMixed, RuntimeException, ToPhpString,
@@ -19,10 +19,9 @@ use shirabe_php_shim::{
     version_compare,
 };
 use shirabe_symfony_process::ExecutableFinder;
-use std::sync::Mutex;
 
-static UNZIP_COMMANDS: Mutex<Option<Vec<Vec<BString>>>> = Mutex::new(None);
-static IS_WINDOWS: Mutex<Option<bool>> = Mutex::new(None);
+static UNZIP_COMMANDS: std::sync::Mutex<Option<Vec<Vec<BString>>>> = std::sync::Mutex::new(None);
+static IS_WINDOWS: std::sync::Mutex<Option<bool>> = std::sync::Mutex::new(None);
 
 #[derive(Debug)]
 pub struct ZipDownloader {
@@ -64,7 +63,7 @@ impl ZipDownloader {
         file: &std::path::Path,
         path: &std::path::Path,
     ) -> anyhow::Result<Option<PhpMixed>> {
-        static WARNED_7ZIP_LINUX: Mutex<bool> = Mutex::new(false);
+        static WARNED_7ZIP_LINUX: std::sync::Mutex<bool> = std::sync::Mutex::new(false);
 
         // PHP throws the unzip error instead of falling back when class_exists('ZipArchive') is
         // false. Shirabe implements ZipArchive natively, so the fallback is always available.

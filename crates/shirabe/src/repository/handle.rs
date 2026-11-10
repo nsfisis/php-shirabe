@@ -8,15 +8,13 @@ use crate::repository::{
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe_semver::constraint::AnyConstraint;
-use std::cell::{Ref, RefMut};
-use std::rc::Weak;
 
 /// Shared reference to a repository. Corresponds to PHP `RepositoryInterface`.
 #[derive(Debug, Clone)]
 pub struct RepositoryInterfaceHandle(std::rc::Rc<std::cell::RefCell<dyn RepositoryInterface>>);
 
 /// Weak back-reference held by packages to the repository that owns them.
-pub type RepositoryInterfaceWeakHandle = Weak<std::cell::RefCell<dyn RepositoryInterface>>;
+pub type RepositoryInterfaceWeakHandle = std::rc::Weak<std::cell::RefCell<dyn RepositoryInterface>>;
 
 impl RepositoryInterfaceHandle {
     /// Wraps a concrete repository in a shared handle and injects its own weak reference so that
@@ -40,11 +38,11 @@ impl RepositoryInterfaceHandle {
         std::rc::Rc::downgrade(&self.0)
     }
 
-    pub fn borrow(&self) -> Ref<'_, dyn RepositoryInterface> {
+    pub fn borrow(&self) -> std::cell::Ref<'_, dyn RepositoryInterface> {
         self.0.borrow()
     }
 
-    pub fn borrow_mut(&self) -> RefMut<'_, dyn RepositoryInterface> {
+    pub fn borrow_mut(&self) -> std::cell::RefMut<'_, dyn RepositoryInterface> {
         self.0.borrow_mut()
     }
 
@@ -218,15 +216,15 @@ impl InstalledRepositoryInterfaceHandle {
         RepositoryInterfaceHandle::from_rc(self.0.clone())
     }
 
-    pub fn borrow(&self) -> Ref<'_, dyn InstalledRepositoryInterface> {
-        Ref::map(self.0.borrow(), |r| {
+    pub fn borrow(&self) -> std::cell::Ref<'_, dyn InstalledRepositoryInterface> {
+        std::cell::Ref::map(self.0.borrow(), |r| {
             r.as_installed_repository_interface()
                 .expect("checked at handle construction")
         })
     }
 
-    pub fn borrow_mut(&self) -> RefMut<'_, dyn InstalledRepositoryInterface> {
-        RefMut::map(self.0.borrow_mut(), |r| {
+    pub fn borrow_mut(&self) -> std::cell::RefMut<'_, dyn InstalledRepositoryInterface> {
+        std::cell::RefMut::map(self.0.borrow_mut(), |r| {
             r.as_installed_repository_interface_mut()
                 .expect("checked at handle construction")
         })
@@ -278,11 +276,11 @@ impl LockArrayRepositoryHandle {
         &self.0
     }
 
-    pub fn borrow(&self) -> Ref<'_, LockArrayRepository> {
+    pub fn borrow(&self) -> std::cell::Ref<'_, LockArrayRepository> {
         self.0.borrow()
     }
 
-    pub fn borrow_mut(&self) -> RefMut<'_, LockArrayRepository> {
+    pub fn borrow_mut(&self) -> std::cell::RefMut<'_, LockArrayRepository> {
         self.0.borrow_mut()
     }
 
@@ -341,11 +339,11 @@ impl PlatformRepositoryHandle {
         &self.0
     }
 
-    pub fn borrow(&self) -> Ref<'_, PlatformRepository> {
+    pub fn borrow(&self) -> std::cell::Ref<'_, PlatformRepository> {
         self.0.borrow()
     }
 
-    pub fn borrow_mut(&self) -> RefMut<'_, PlatformRepository> {
+    pub fn borrow_mut(&self) -> std::cell::RefMut<'_, PlatformRepository> {
         self.0.borrow_mut()
     }
 

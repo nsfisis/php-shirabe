@@ -3,13 +3,12 @@
 use crate::constraint::{AnyConstraint, Bound, MatchAllConstraint};
 use bstr::BString;
 use shirabe_php_shim::{CmpOp, PhpDisplay, ToPhpString, bformat, implode};
-use std::sync::OnceLock;
 
 #[derive(Debug, Clone)]
 pub struct MultiConstraint {
     pub(crate) constraints: Vec<AnyConstraint>,
     pub(crate) pretty_string: Option<BString>,
-    string: OnceLock<BString>,
+    string: std::sync::OnceLock<BString>,
     pub(crate) conjunctive: bool,
 }
 
@@ -29,7 +28,7 @@ impl MultiConstraint {
         Self {
             constraints,
             pretty_string,
-            string: OnceLock::new(),
+            string: std::sync::OnceLock::new(),
             conjunctive,
         }
     }

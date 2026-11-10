@@ -8,8 +8,8 @@
 
 use crate::value::PluginValue;
 use crate::{PhpObjHandle, PhpObject, PhpThrow, RustObjHandle};
-use bstr::{BStr, BString, ByteSlice};
-use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
+use bstr::{BStr, BString, ByteSlice as _};
+use chrono::TimeZone as _;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     PhpMixed, ToPhpString, bformat, display_to_bytes, path_from_bytes, path_to_bytes, php_str,
@@ -396,7 +396,7 @@ const TIMEZONE_UTC: &BStr = php_str(b"UTC");
 
 /// A `\DateTimeInterface` crosses as the object record `serialize()` writes for a
 /// `\DateTimeImmutable`.
-impl ToPluginValue for DateTime<Utc> {
+impl ToPluginValue for chrono::DateTime<chrono::Utc> {
     fn to_plugin_value(self) -> PluginValue {
         let mut object = PhpObject::new(DATE_TIME_IMMUTABLE_CLASS);
         object.set_public(
@@ -409,7 +409,7 @@ impl ToPluginValue for DateTime<Utc> {
     }
 }
 
-impl FromPluginValue for DateTime<Utc> {
+impl FromPluginValue for chrono::DateTime<chrono::Utc> {
     fn from_plugin_value(value: &PluginValue) -> Result<Self, PhpThrow> {
         let PluginValue::PhpObject(object) = value else {
             return Err(unexpected("a date", value));
@@ -437,13 +437,13 @@ impl FromPluginValue for DateTime<Utc> {
                 display_to_bytes(format_args!("{rendered:?}"))
             ))
         })?;
-        let parsed = NaiveDateTime::parse_from_str(rendered, DATE_FORMAT).map_err(|e| {
+        let parsed = chrono::NaiveDateTime::parse_from_str(rendered, DATE_FORMAT).map_err(|e| {
             PhpThrow::runtime(bformat!(
                 "the date `{rendered}` from the plugin is not in the expected format: {}",
                 display_to_bytes(e)
             ))
         })?;
-        Ok(Utc.from_utc_datetime(&parsed))
+        Ok(chrono::Utc.from_utc_datetime(&parsed))
     }
 }
 
@@ -454,7 +454,7 @@ pub const NULL: PluginValue = PluginValue::Null;
 mod tests {
     use super::*;
     use crate::value::serialize;
-    use chrono::Timelike;
+    use chrono::Timelike as _;
 
     #[test]
     fn php_mixed_conversions() {
@@ -487,7 +487,7 @@ mod tests {
     /// `new DateTimeImmutable('2026-08-07 12:34:56.123456', new DateTimeZone('UTC'))`.
     #[test]
     fn a_date_is_written_as_php_writes_it() {
-        let date = Utc
+        let date = chrono::Utc
             .with_ymd_and_hms(2026, 8, 7, 12, 34, 56)
             .unwrap()
             .with_nanosecond(123_456_000)
@@ -500,14 +500,14 @@ mod tests {
 
     #[test]
     fn a_date_round_trips_with_microseconds() {
-        let date = Utc
+        let date = chrono::Utc
             .with_ymd_and_hms(2024, 3, 3, 20, 6, 7)
             .unwrap()
             .with_nanosecond(123_456_000)
             .unwrap();
         assert_eq!(
             date,
-            DateTime::<Utc>::from_plugin_value(&date.to_plugin_value()).unwrap()
+            chrono::DateTime::<chrono::Utc>::from_plugin_value(&date.to_plugin_value()).unwrap()
         );
     }
 
@@ -517,7 +517,9 @@ mod tests {
         object.set_public("date", PluginValue::string("2024-03-04 05:06:07.123456"));
         object.set_public("timezone_type", PluginValue::Int(3));
         object.set_public("timezone", PluginValue::string("Asia/Tokyo"));
-        let err = DateTime::<Utc>::from_plugin_value(&PluginValue::PhpObject(object)).unwrap_err();
+        let err =
+            chrono::DateTime::<chrono::Utc>::from_plugin_value(&PluginValue::PhpObject(object))
+                .unwrap_err();
         assert!(
             err.message.contains_str("Asia/Tokyo"),
             "{}",

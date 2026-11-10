@@ -21,13 +21,12 @@ use shirabe_php_rpc::{PluginValue, ToPluginValue};
 use shirabe_php_shim::{
     PhpMixed, bformat, path_from_bytes, path_to_bytes, php_str, realpath, var_export_str,
 };
-use tempfile::TempDir;
 
 const INSTALLED_VERSIONS: &BStr = php_str(b"Composer\\InstalledVersions");
 
 /// `$this->root` of the upstream test class, kept alive for the duration of one test.
 struct SetUp {
-    root: TempDir,
+    root: tempfile::TempDir,
 }
 
 impl SetUp {

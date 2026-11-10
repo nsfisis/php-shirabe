@@ -2,7 +2,7 @@ use crate::{
     ChildPipe, PhpMixed, PhpResource, StreamBacking, StreamState, bformat, fopen,
     os_str_from_bytes, path_from_bytes,
 };
-use bstr::{BString, ByteSlice};
+use bstr::{BString, ByteSlice as _};
 use indexmap::IndexMap;
 pub use shirabe_php_src::standard::exec::escapeshellcmd;
 
@@ -339,7 +339,7 @@ pub struct ProcStatus {
 
 /// PHP `proc_get_status`. Reports the live status of the process behind the resource.
 pub fn proc_get_status(process: &PhpResource) -> ProcStatus {
-    use std::os::unix::process::ExitStatusExt;
+    use std::os::unix::process::ExitStatusExt as _;
 
     let PhpResource::Process(state) = process else {
         panic!("proc_get_status(): supplied resource is not a valid process resource");
@@ -439,7 +439,7 @@ pub fn posix_getpwuid(uid: u32) -> Option<PasswdEntry> {
 }
 
 pub fn posix_isatty(stream: PhpResource) -> bool {
-    use std::io::IsTerminal;
+    use std::io::IsTerminal as _;
     match stream {
         PhpResource::Stdin => std::io::stdin().is_terminal(),
         PhpResource::Stdout => std::io::stdout().is_terminal(),

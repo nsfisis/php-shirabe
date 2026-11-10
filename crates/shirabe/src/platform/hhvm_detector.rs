@@ -4,10 +4,9 @@ use crate::util::{Platform, ProcessExecutor};
 use bstr::BString;
 use shirabe_php_shim::PhpMixed;
 use shirabe_symfony_process::ExecutableFinder;
-use std::sync::Mutex;
 
 // None = null (uninitialized), Some(None) = false (not found), Some(Some(v)) = version
-static HHVM_VERSION_CACHE: Mutex<Option<Option<BString>>> = Mutex::new(None);
+static HHVM_VERSION_CACHE: std::sync::Mutex<Option<Option<BString>>> = std::sync::Mutex::new(None);
 
 /// Seam over HHVM detection so PlatformRepository can be tested with a mocked version.
 /// PHP mocks the concrete `Composer\Platform\HhvmDetector` directly; the trait is

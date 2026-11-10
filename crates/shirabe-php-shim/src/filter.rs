@@ -1,4 +1,4 @@
-use bstr::ByteSlice;
+use bstr::ByteSlice as _;
 use shirabe_php_src::filter::logical_filters::{
     php_filter_boolean, php_filter_int, php_filter_validate_ip, php_filter_validate_url,
 };

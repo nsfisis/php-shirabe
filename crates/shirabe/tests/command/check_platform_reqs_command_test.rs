@@ -4,8 +4,7 @@ use crate::test_case::{
     RunOptions, create_composer_lock, create_installed_json, get_application_tester,
     get_complete_package, init_temp_composer,
 };
-use bstr::{BStr, ByteSlice};
-use serial_test::serial;
+use bstr::{BStr, ByteSlice as _};
 use shirabe::package::PackageInterfaceHandle;
 use shirabe_php_shim::{error_message, trim};
 use shirabe_symfony_console::input::{InputValue, ParameterName};
@@ -54,7 +53,7 @@ fn run_platform_reqs_are_satisfied_case(
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_platform_reqs_are_satisfied() {
     // 'Disables checking of require-dev packages requirements.'
     run_platform_reqs_are_satisfied_case(
@@ -85,7 +84,7 @@ ext-foobar 2.3.4   success",
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_exception_thrown_if_no_lockfile_found() {
     let tear_down = init_temp_composer(Some(&serde_json::json!({})), None, None, false);
 
@@ -109,7 +108,7 @@ fn test_exception_thrown_if_no_lockfile_found() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_failed_platform_requirement() {
     let tear_down = init_temp_composer(
         Some(&serde_json::json!({

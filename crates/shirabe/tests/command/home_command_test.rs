@@ -5,7 +5,6 @@ use crate::test_case::{
     init_temp_composer,
 };
 use bstr::BStr;
-use serial_test::serial;
 use shirabe::package::PackageInterfaceHandle;
 use shirabe_php_shim::{ToPhpString, trim};
 use shirabe_symfony_console::input::{InputValue, ParameterName};
@@ -49,7 +48,7 @@ fn run_use_case(
 
 /// ref: useCaseProvider 'Invalid or missing repository URL'
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_home_command_with_show_flag_invalid_or_missing_repository_url() {
     run_use_case(
         serde_json::json!({
@@ -76,7 +75,7 @@ fn test_home_command_with_show_flag_invalid_or_missing_repository_url() {
 
 /// ref: useCaseProvider 'No Packages Provided'
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_home_command_with_show_flag_no_packages_provided() {
     run_use_case(
         serde_json::json!({ "repositories": [] }),
@@ -91,7 +90,7 @@ fn test_home_command_with_show_flag_no_packages_provided() {
 
 /// ref: useCaseProvider 'Package not found'
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_home_command_with_show_flag_package_not_found() {
     run_use_case(
         serde_json::json!({ "repositories": [] }),
@@ -109,7 +108,7 @@ fn test_home_command_with_show_flag_package_not_found() {
 
 /// ref: useCaseProvider 'A valid package URL'
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_home_command_with_show_flag_a_valid_package_url() {
     run_use_case(
         serde_json::json!({ "repositories": [] }),
@@ -127,7 +126,7 @@ fn test_home_command_with_show_flag_a_valid_package_url() {
 
 /// ref: useCaseProvider 'A valid dev package URL'
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_home_command_with_show_flag_a_valid_dev_package_url() {
     run_use_case(
         serde_json::json!({ "repositories": [] }),

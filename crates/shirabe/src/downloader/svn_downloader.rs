@@ -9,7 +9,7 @@ use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite};
 use crate::package::PackageInterfaceHandle;
 use crate::repository::VcsRepository;
 use crate::util::{Filesystem, ProcessExecutor, Svn as SvnUtil};
-use bstr::{B, BStr, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     CmpOp, PhpMixed, RuntimeException, bformat, error_message, impl_php_class, implode, is_dir,
@@ -17,7 +17,6 @@ use shirabe_php_shim::{
     version_compare,
 };
 use shirabe_symfony_console::input::InputValue;
-use std::path::Path;
 
 #[derive(Debug)]
 pub struct SvnDownloader {
@@ -46,8 +45,8 @@ impl SvnDownloader {
         base_url: &BStr,
         command: Vec<BString>,
         url: &BStr,
-        cwd: Option<&Path>,
-        path: Option<&Path>,
+        cwd: Option<&std::path::Path>,
+        path: Option<&std::path::Path>,
     ) -> anyhow::Result<BString> {
         let mut util = SvnUtil::new(
             base_url.to_owned(),
@@ -67,7 +66,7 @@ impl SvnDownloader {
             })
     }
 
-    async fn discard_changes(&self, path: &Path) -> anyhow::Result<Option<PhpMixed>> {
+    async fn discard_changes(&self, path: &std::path::Path) -> anyhow::Result<Option<PhpMixed>> {
         let mut output = BString::default();
         if self.inner.process.borrow_mut().execute(
             &["svn", "revert", "-R", "."],
@@ -90,7 +89,7 @@ impl SvnDownloader {
     async fn fail_on_local_changes(
         &self,
         package: PackageInterfaceHandle,
-        path: &Path,
+        path: &std::path::Path,
     ) -> anyhow::Result<()> {
         if self.get_local_changes(package, path).await?.is_some() {
             return Err(RuntimeException::new(bformat!(
@@ -127,7 +126,7 @@ impl VcsDownloader for SvnDownloader {
     async fn do_download(
         &self,
         _package: PackageInterfaceHandle,
-        _path: &Path,
+        _path: &std::path::Path,
         url: &bstr::BStr,
         _prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -151,7 +150,7 @@ impl VcsDownloader for SvnDownloader {
     async fn do_install(
         &self,
         package: PackageInterfaceHandle,
-        path: &Path,
+        path: &std::path::Path,
         url: &bstr::BStr,
     ) -> anyhow::Result<Option<PhpMixed>> {
         SvnUtil::clean_env()?;
@@ -190,7 +189,7 @@ impl VcsDownloader for SvnDownloader {
         &self,
         _initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
-        path: &Path,
+        path: &std::path::Path,
         url: &bstr::BStr,
     ) -> anyhow::Result<Option<PhpMixed>> {
         SvnUtil::clean_env()?;
@@ -237,7 +236,7 @@ impl VcsDownloader for SvnDownloader {
     async fn clean_changes(
         &self,
         package: PackageInterfaceHandle,
-        path: &Path,
+        path: &std::path::Path,
         update: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
         let changes = self.get_local_changes(package.clone(), path).await?;
@@ -324,7 +323,7 @@ impl VcsDownloader for SvnDownloader {
         &self,
         from_reference: &bstr::BStr,
         to_reference: &bstr::BStr,
-        path: &Path,
+        path: &std::path::Path,
     ) -> anyhow::Result<bstr::BString> {
         if preg_is_match(php_regex!(r"{@(\d+)$}"), from_reference)
             && preg_is_match(php_regex!(r"{@(\d+)$}"), to_reference)
@@ -399,7 +398,7 @@ impl VcsDownloader for SvnDownloader {
         }
     }
 
-    fn has_metadata_repository(&self, path: &Path) -> bool {
+    fn has_metadata_repository(&self, path: &std::path::Path) -> bool {
         is_dir(path_from_bytes(&bformat!("{path}/.svn")))
     }
 }
@@ -409,7 +408,7 @@ impl ChangeReportInterface for SvnDownloader {
     async fn get_local_changes(
         &self,
         _package: PackageInterfaceHandle,
-        path: &Path,
+        path: &std::path::Path,
     ) -> anyhow::Result<Option<bstr::BString>> {
         if !self.has_metadata_repository(path) {
             return Ok(None);
@@ -434,7 +433,7 @@ impl VcsCapableDownloaderInterface for SvnDownloader {
     fn get_vcs_reference(
         &self,
         package: PackageInterfaceHandle,
-        path: &Path,
+        path: &std::path::Path,
     ) -> anyhow::Result<Option<bstr::BString>> {
         self.inner.get_vcs_reference(package, path)
     }
@@ -457,7 +456,7 @@ impl DownloaderInterface for SvnDownloader {
     async fn download_with_output(
         &self,
         package: PackageInterfaceHandle,
-        path: &Path,
+        path: &std::path::Path,
         prev_package: Option<PackageInterfaceHandle>,
         _output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -468,7 +467,7 @@ impl DownloaderInterface for SvnDownloader {
         &self,
         r#type: &BStr,
         package: PackageInterfaceHandle,
-        path: &Path,
+        path: &std::path::Path,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as VcsDownloader>::prepare(self, r#type, package, path, prev_package).await
@@ -477,7 +476,7 @@ impl DownloaderInterface for SvnDownloader {
     async fn install_with_output(
         &self,
         package: PackageInterfaceHandle,
-        path: &Path,
+        path: &std::path::Path,
         _output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as VcsDownloader>::install(self, package, path).await
@@ -487,7 +486,7 @@ impl DownloaderInterface for SvnDownloader {
         &self,
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
-        path: &Path,
+        path: &std::path::Path,
     ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as VcsDownloader>::update(self, initial, target, path).await
     }
@@ -495,7 +494,7 @@ impl DownloaderInterface for SvnDownloader {
     async fn remove_with_output(
         &self,
         package: PackageInterfaceHandle,
-        path: &Path,
+        path: &std::path::Path,
         _output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as VcsDownloader>::remove(self, package, path).await
@@ -505,7 +504,7 @@ impl DownloaderInterface for SvnDownloader {
         &self,
         r#type: &BStr,
         package: PackageInterfaceHandle,
-        path: &Path,
+        path: &std::path::Path,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as VcsDownloader>::cleanup(self, r#type, package, path, prev_package).await

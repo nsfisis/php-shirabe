@@ -4,7 +4,7 @@
 use crate::package::PackageInterfaceHandle;
 use crate::php_worker::rpc::entity::{Call, Crossing, Entity, EntityArg, PropertyAccess};
 use crate::repository::RepositoryInterfaceHandle;
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_rpc::{FromPluginValue, PhpThrow, PluginValue, codec};
 use shirabe_php_shim::bformat;

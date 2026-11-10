@@ -27,7 +27,7 @@ use crate::util::{
     StreamContextOptions,
 };
 use crate::{composer, delegate_base_command_trait_impls_to_inner};
-use bstr::{B, BStr, BString, ByteSlice, ByteVec};
+use bstr::{B, BStr, BString, ByteSlice as _, ByteVec as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     AnyThrowable, Catch as _, CmpOp, Exception, InvalidArgumentException, PHP_EOL, PhpClass as _,

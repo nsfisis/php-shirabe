@@ -1,5 +1,5 @@
 use crate::{PhpMixed, PhpResource, bformat, php_str};
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use shirabe_php_src::standard::versioning::php_version_compare;
 
 pub const E_ALL: i64 = 32767;

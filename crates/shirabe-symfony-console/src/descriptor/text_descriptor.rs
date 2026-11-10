@@ -9,7 +9,7 @@ use crate::formatter::OutputFormatter;
 use crate::helper::Helper;
 use crate::input::{InputArgument, InputDefinition, InputOption};
 use crate::output::OutputInterface;
-use bstr::{BString, ByteSlice};
+use bstr::{BString, ByteSlice as _};
 use shirabe_php_shim::{
     JSON_UNESCAPED_SLASHES, JSON_UNESCAPED_UNICODE, PhpMixed, STR_PAD_RIGHT, bformat, count,
     implode, json_encode_ex, preg_replace, str_pad, str_repeat, str_replace, strip_tags, strlen,

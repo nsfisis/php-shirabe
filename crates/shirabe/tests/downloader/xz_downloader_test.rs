@@ -12,7 +12,6 @@ use shirabe::util::r#loop::Loop;
 use shirabe::util::{Filesystem, HttpDownloader, Platform, ProcessExecutor};
 use shirabe_php_shim::{PhpMixed, ToPhpString, bformat, error_message, path_to_bytes};
 use shirabe_semver::VersionParser;
-use tempfile::TempDir;
 
 /// ref: TestCase::getPackage (default class CompletePackage)
 fn get_package(name: &BStr, version: &BStr) -> PackageInterfaceHandle {
@@ -22,7 +21,7 @@ fn get_package(name: &BStr, version: &BStr) -> PackageInterfaceHandle {
 
 /// ref: setUp markTestSkipped on Windows / 32bit, expressed as a compile-time
 /// cfg gate on the test function below.
-fn set_up() -> TempDir {
+fn set_up() -> tempfile::TempDir {
     get_unique_tmp_directory()
 }
 

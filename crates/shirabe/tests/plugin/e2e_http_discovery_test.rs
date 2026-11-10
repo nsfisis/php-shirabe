@@ -11,13 +11,12 @@
 use crate::e2e_extension_installer_test::{copy_dir, upstream_composer_bin};
 use crate::e2e_installers_test::{implementations, run_command, tree};
 use crate::php_worker::lock_php_worker;
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use shirabe_php_shim::php_str;
-use std::path::{Path, PathBuf};
-use tempfile::TempDir;
 
-fn fixture_dir() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/plugin/fixtures/e2e-http-discovery")
+fn fixture_dir() -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/plugin/fixtures/e2e-http-discovery")
 }
 
 fn plugin_fetched() -> bool {
@@ -26,7 +25,7 @@ fn plugin_fetched() -> bool {
         .is_file()
 }
 
-fn edit(path: &Path, from: &BStr, to: &BStr) {
+fn edit(path: &std::path::Path, from: &BStr, to: &BStr) {
     let text = BString::from(std::fs::read(path).unwrap());
     assert!(
         text.contains_str(from),
@@ -59,7 +58,7 @@ fn test_http_discovery_matches_upstream_composer() {
 
     let mut results = Vec::new();
     for (program, prefix) in &implementations(composer_bin.as_os_str()) {
-        let work = TempDir::new().unwrap();
+        let work = tempfile::TempDir::new().unwrap();
         copy_dir(&fixture_dir(), work.path());
         let update = run_command(work.path(), program, prefix, &[BStr::new("update")]);
         let update_tree = tree(&work.path().join("project"));
@@ -128,7 +127,7 @@ fn test_http_discovery_auto_install_matches_upstream_composer() {
 
     let mut results = Vec::new();
     for (program, prefix) in &implementations(composer_bin.as_os_str()) {
-        let work = TempDir::new().unwrap();
+        let work = tempfile::TempDir::new().unwrap();
         copy_dir(&fixture_dir(), work.path());
         let composer_json = work.path().join("project/composer.json");
         edit(&composer_json, PINNED_EXTRA, BStr::new(""));

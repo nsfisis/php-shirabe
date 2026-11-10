@@ -3,8 +3,7 @@
 use crate::php_worker::job;
 use crate::php_worker::job::JobOwner;
 use crate::util::{HttpDownloader, ProcessExecutor};
-use futures::StreamExt;
-use futures::stream::FuturesUnordered;
+use futures::StreamExt as _;
 use shirabe_php_shim::microtime;
 use shirabe_symfony_console::helper::ProgressBar;
 
@@ -48,7 +47,7 @@ impl Loop {
         >,
         mut progress: Option<&mut ProgressBar>,
     ) -> anyhow::Result<()> {
-        let mut pending: FuturesUnordered<_> = promises.into_iter().collect();
+        let mut pending: futures::stream::FuturesUnordered<_> = promises.into_iter().collect();
         let mut uncaught: Option<anyhow::Error> = None;
         let owners = self.job_owners();
         // The awaits a wait further up the stack is parked on are not this group's.

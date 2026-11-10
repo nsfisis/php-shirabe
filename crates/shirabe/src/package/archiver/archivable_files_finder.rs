@@ -7,11 +7,10 @@ use shirabe_php_shim::{
     RuntimeException, bformat, path_to_bytes, preg_quote, preg_replace, realpath,
 };
 use shirabe_symfony_finder::Finder;
-use std::path::{Path, PathBuf};
 
 pub struct ArchivableFilesFinder {
     finder: Finder,
-    inner_iter: Box<dyn Iterator<Item = PathBuf>>,
+    inner_iter: Box<dyn Iterator<Item = std::path::PathBuf>>,
 }
 
 impl std::fmt::Debug for ArchivableFilesFinder {
@@ -24,7 +23,7 @@ impl std::fmt::Debug for ArchivableFilesFinder {
 
 impl ArchivableFilesFinder {
     pub fn new(
-        sources: impl AsRef<Path>,
+        sources: impl AsRef<std::path::Path>,
         excludes: Vec<BString>,
         ignore_filters: bool,
     ) -> anyhow::Result<Self> {
@@ -52,7 +51,7 @@ impl ArchivableFilesFinder {
         let mut finder = Finder::new();
 
         let sources_clone = sources.clone();
-        let filter = move |file: &Path| -> bool {
+        let filter = move |file: &std::path::Path| -> bool {
             let Ok(realpath) = file.canonicalize() else {
                 return false;
             };
@@ -86,12 +85,13 @@ impl ArchivableFilesFinder {
             .ignore_dot_files(false)
             .sort_by_name();
 
-        let inner_iter: Box<dyn Iterator<Item = PathBuf>> = Box::new(finder.get_iterator());
+        let inner_iter: Box<dyn Iterator<Item = std::path::PathBuf>> =
+            Box::new(finder.get_iterator());
 
         Ok(Self { finder, inner_iter })
     }
 
-    pub fn accept(&self, current: &Path) -> bool {
+    pub fn accept(&self, current: &std::path::Path) -> bool {
         if !current.is_dir() {
             return true;
         }
@@ -104,7 +104,7 @@ impl ArchivableFilesFinder {
 }
 
 impl Iterator for ArchivableFilesFinder {
-    type Item = PathBuf;
+    type Item = std::path::PathBuf;
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {

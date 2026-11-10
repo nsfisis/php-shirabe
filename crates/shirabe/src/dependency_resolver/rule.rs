@@ -6,7 +6,7 @@ use crate::dependency_resolver::{
 use crate::package::version::VersionParser;
 use crate::package::{BasePackageHandle, Link};
 use crate::repository::{PlatformRepository, RepositoryInterface, RepositorySet};
-use bstr::{BStr, BString, ByteSlice, ByteVec};
+use bstr::{BStr, BString, ByteSlice as _, ByteVec as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     LogicException, PhpDisplay, PhpMixed, RuntimeException, ToPhpString, array_keys, array_shift,

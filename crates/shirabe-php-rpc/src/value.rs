@@ -10,11 +10,9 @@
 //! Strings and array keys are byte strings (`BString`), matching PHP's string semantics: the
 //! codec must round-trip non-UTF-8 byte sequences losslessly.
 
-use anyhow::bail;
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{ToPhpString, canonical_int_key, utf8_text};
-use std::sync::{Arc, LazyLock, Mutex, MutexGuard, Weak};
 
 /// A handle to an object whose entity lives on the Rust side. PHP holds a thin proxy stub.
 #[derive(Debug, Clone, PartialEq)]
@@ -30,7 +28,7 @@ pub struct RustObjHandle {
 /// the last clone queues a `ReleasePhpHandle`, which goes out ahead of the next frame sent to the
 /// worker. Handles compare equal exactly when they name the same entity.
 #[derive(Debug, Clone)]
-pub struct PhpObjHandle(Arc<PhpObjHandleEntry>);
+pub struct PhpObjHandle(std::sync::Arc<PhpObjHandleEntry>);
 
 #[derive(Debug)]
 struct PhpObjHandleEntry {
@@ -42,13 +40,14 @@ struct PhpObjHandleEntry {
 
 #[derive(Debug, Default)]
 struct PhpHandleTable {
-    live: IndexMap<u64, Weak<PhpObjHandleEntry>>,
+    live: IndexMap<u64, std::sync::Weak<PhpObjHandleEntry>>,
     released: Vec<u64>,
 }
 
-static PHP_HANDLES: LazyLock<Mutex<PhpHandleTable>> = LazyLock::new(Mutex::default);
+static PHP_HANDLES: std::sync::LazyLock<std::sync::Mutex<PhpHandleTable>> =
+    std::sync::LazyLock::new(std::sync::Mutex::default);
 
-fn php_handles() -> MutexGuard<'static, PhpHandleTable> {
+fn php_handles() -> std::sync::MutexGuard<'static, PhpHandleTable> {
     PHP_HANDLES
         .lock()
         .unwrap_or_else(|e| panic!("PHP RPC: P handle table mutex poisoned: {e}"))
@@ -57,18 +56,20 @@ fn php_handles() -> MutexGuard<'static, PhpHandleTable> {
 impl PhpObjHandle {
     pub(crate) fn intern(phandle: u64, class: BString, implements: Vec<BString>) -> PhpObjHandle {
         let mut table = php_handles();
-        if let Some(entry) = table.live.get(&phandle).and_then(Weak::upgrade) {
+        if let Some(entry) = table.live.get(&phandle).and_then(std::sync::Weak::upgrade) {
             return PhpObjHandle(entry);
         }
         // A release still queued for this phandle has not reached the worker, so its P-table
         // entry is intact and this handle takes it over.
         table.released.retain(|&released| released != phandle);
-        let entry = Arc::new(PhpObjHandleEntry {
+        let entry = std::sync::Arc::new(PhpObjHandleEntry {
             phandle,
             class,
             implements,
         });
-        table.live.insert(phandle, Arc::downgrade(&entry));
+        table
+            .live
+            .insert(phandle, std::sync::Arc::downgrade(&entry));
         PhpObjHandle(entry)
     }
 
@@ -87,7 +88,7 @@ impl PhpObjHandle {
 
 impl PartialEq for PhpObjHandle {
     fn eq(&self, other: &PhpObjHandle) -> bool {
-        Arc::ptr_eq(&self.0, &other.0)
+        std::sync::Arc::ptr_eq(&self.0, &other.0)
     }
 }
 
@@ -364,7 +365,7 @@ pub fn unserialize(payload: &[u8]) -> anyhow::Result<PluginValue> {
     let mut pos = 0;
     let value = parse_value(payload, &mut pos)?;
     if pos != payload.len() {
-        bail!("trailing garbage after serialized value at byte {pos}");
+        anyhow::bail!("trailing garbage after serialized value at byte {pos}");
     }
     Ok(value)
 }
@@ -427,7 +428,7 @@ fn parse_value(payload: &[u8], pos: &mut usize) -> anyhow::Result<PluginValue> {
         {
             if frame.parsed == frame.count {
                 if payload.get(*pos) != Some(&b'}') {
-                    bail!("expected closing brace at byte {}", *pos);
+                    anyhow::bail!("expected closing brace at byte {}", *pos);
                 }
                 *pos += 1;
                 let frame = stack.pop().expect("frame was just observed");
@@ -450,9 +451,11 @@ fn parse_value(payload: &[u8], pos: &mut usize) -> anyhow::Result<PluginValue> {
                     frame.is_list = false;
                     frame.pending_key = Some(bytes);
                 }
-                Lex::Value(other) => bail!("array key is neither int nor string: {other:?}"),
+                Lex::Value(other) => {
+                    anyhow::bail!("array key is neither int nor string: {other:?}")
+                }
                 Lex::ContainerOpen(..) | Lex::BackReference(_) => {
-                    bail!("array key is neither int nor string")
+                    anyhow::bail!("array key is neither int nor string")
                 }
             }
             continue;
@@ -465,7 +468,7 @@ fn parse_value(payload: &[u8], pos: &mut usize) -> anyhow::Result<PluginValue> {
                 // An immutable value has no identity to preserve on this side, so a repeated
                 // instance decodes as a copy of the one it names.
                 Some(value) => completed = Some(value.clone()),
-                None => bail!(
+                None => anyhow::bail!(
                     "back-reference r:{number} at byte {} does not name a completed object; a \
                      cyclic object graph cannot cross the plugin boundary",
                     *pos
@@ -473,7 +476,7 @@ fn parse_value(payload: &[u8], pos: &mut usize) -> anyhow::Result<PluginValue> {
             },
             Lex::ContainerOpen(count, class) => {
                 if stack.len() >= MAX_DECODE_DEPTH {
-                    bail!(
+                    anyhow::bail!(
                         "serialized value exceeds the maximum nesting depth of {MAX_DECODE_DEPTH}"
                     );
                 }
@@ -497,7 +500,7 @@ fn parse_value(payload: &[u8], pos: &mut usize) -> anyhow::Result<PluginValue> {
 )]
 fn lex(payload: &[u8], pos: &mut usize) -> anyhow::Result<Lex> {
     let Some(tag) = payload.get(*pos..*pos + 2) else {
-        bail!("truncated serialized value at byte {}", *pos);
+        anyhow::bail!("truncated serialized value at byte {}", *pos);
     };
     *pos += 2;
     match tag {
@@ -505,14 +508,14 @@ fn lex(payload: &[u8], pos: &mut usize) -> anyhow::Result<Lex> {
         b"b:" => match take_until(payload, pos, b';')? {
             b"0" => Ok(Lex::Value(PluginValue::Bool(false))),
             b"1" => Ok(Lex::Value(PluginValue::Bool(true))),
-            other => bail!("malformed bool payload: {:?}", BStr::new(other)),
+            other => anyhow::bail!("malformed bool payload: {:?}", BStr::new(other)),
         },
         b"i:" => {
             let bytes = take_until(payload, pos, b';')?;
             let n = utf8_text(bytes).and_then(|s| s.parse().ok());
             match n {
                 Some(n) => Ok(Lex::Value(PluginValue::Int(n))),
-                None => bail!("malformed int payload: {:?}", BStr::new(bytes)),
+                None => anyhow::bail!("malformed int payload: {:?}", BStr::new(bytes)),
             }
         }
         b"d:" => {
@@ -527,7 +530,7 @@ fn lex(payload: &[u8], pos: &mut usize) -> anyhow::Result<Lex> {
             });
             match f {
                 Some(f) => Ok(Lex::Value(PluginValue::Float(f))),
-                None => bail!("malformed float payload: {:?}", BStr::new(bytes)),
+                None => anyhow::bail!("malformed float payload: {:?}", BStr::new(bytes)),
             }
         }
         b"s:" => Ok(Lex::Value(PluginValue::String(parse_string_body(
@@ -545,16 +548,16 @@ fn lex(payload: &[u8], pos: &mut usize) -> anyhow::Result<Lex> {
             let bytes = take_until(payload, pos, b';')?;
             match utf8_text(bytes).and_then(|s| s.parse().ok()) {
                 Some(number) => Ok(Lex::BackReference(number)),
-                None => bail!("malformed back-reference: {:?}", BStr::new(bytes)),
+                None => anyhow::bail!("malformed back-reference: {:?}", BStr::new(bytes)),
             }
         }
         // A PHP reference aliases a variable; nothing on this side can carry that aliasing, and
         // no value the boundary produces is written by reference.
-        b"R:" => bail!(
+        b"R:" => anyhow::bail!(
             "a PHP reference (`R:`) at byte {} cannot cross the plugin boundary",
             *pos - 2
         ),
-        _ => bail!(
+        _ => anyhow::bail!(
             "unknown serialized type tag {:?} at byte {}",
             BStr::new(tag),
             *pos - 2
@@ -584,7 +587,7 @@ fn parse_entry_count(payload: &[u8], pos: &mut usize) -> anyhow::Result<usize> {
         .and_then(|s| s.parse().ok())
         .ok_or_else(|| anyhow::anyhow!("malformed entry count: {:?}", BStr::new(count_bytes)))?;
     if payload.get(*pos) != Some(&b'{') {
-        bail!("expected opening brace at byte {}", *pos);
+        anyhow::bail!("expected opening brace at byte {}", *pos);
     }
     *pos += 1;
     Ok(count)
@@ -605,15 +608,15 @@ fn parse_quoted(payload: &[u8], pos: &mut usize, terminator: u8) -> anyhow::Resu
         .and_then(|s| s.parse().ok())
         .ok_or_else(|| anyhow::anyhow!("malformed string length: {:?}", BStr::new(len_bytes)))?;
     if payload.get(*pos) != Some(&b'"') {
-        bail!("expected opening quote at byte {}", *pos);
+        anyhow::bail!("expected opening quote at byte {}", *pos);
     }
     *pos += 1;
     let Some(bytes) = payload.get(*pos..*pos + len) else {
-        bail!("truncated string body at byte {}", *pos);
+        anyhow::bail!("truncated string body at byte {}", *pos);
     };
     *pos += len;
     if payload.get(*pos) != Some(&b'"') || payload.get(*pos + 1) != Some(&terminator) {
-        bail!("expected closing quote at byte {}", *pos);
+        anyhow::bail!("expected closing quote at byte {}", *pos);
     }
     *pos += 2;
     Ok(bytes.into())
@@ -627,7 +630,7 @@ fn decode_object(
 ) -> anyhow::Result<PluginValue> {
     let expect_props = |names: &[&[u8]]| -> anyhow::Result<()> {
         if props.len() != names.len() || !names.iter().all(|name| props.contains_key(*name)) {
-            bail!("malformed {class:?} record: {props:?}");
+            anyhow::bail!("malformed {class:?} record: {props:?}");
         }
         Ok(())
     };
@@ -646,10 +649,10 @@ fn decode_object(
                     .iter()
                     .map(|item| match item {
                         PluginValue::String(name) => Ok(name.clone()),
-                        other => bail!("{class:?} implements a non-string: {other:?}"),
+                        other => anyhow::bail!("{class:?} implements a non-string: {other:?}"),
                     })
                     .collect::<anyhow::Result<_>>()?,
-                other => bail!("{class:?} implements is not a list: {other:?}"),
+                other => anyhow::bail!("{class:?} implements is not a list: {other:?}"),
             };
             Ok(PluginValue::PhpHandle(PhpObjHandle::intern(
                 descriptor_id(&props[b"phandle".as_slice()], &class)?,
@@ -672,14 +675,14 @@ fn descriptor_id(value: &PluginValue, record: &BString) -> anyhow::Result<u64> {
     match value {
         PluginValue::Int(n) => u64::try_from(*n)
             .map_err(|_| anyhow::anyhow!("{record:?} record holds a negative id: {n}")),
-        other => bail!("{record:?} record id is not an int: {other:?}"),
+        other => anyhow::bail!("{record:?} record id is not an int: {other:?}"),
     }
 }
 
 fn descriptor_class(value: &PluginValue, record: &BString) -> anyhow::Result<BString> {
     match value {
         PluginValue::String(class) => Ok(class.clone()),
-        other => bail!("{record:?} record class is not a string: {other:?}"),
+        other => anyhow::bail!("{record:?} record class is not a string: {other:?}"),
     }
 }
 
@@ -689,7 +692,7 @@ fn take_until<'a>(payload: &'a [u8], pos: &mut usize, terminator: u8) -> anyhow:
         .get(start..)
         .and_then(|rest| rest.iter().position(|&b| b == terminator))
     else {
-        bail!("unterminated field at byte {start}");
+        anyhow::bail!("unterminated field at byte {start}");
     };
     let bytes = &payload[start..start + offset];
     *pos = start + offset + 1;

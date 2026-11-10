@@ -820,7 +820,7 @@ impl ProgressBar {
 mod tests {
     use super::*;
     use crate::output::BufferedOutput;
-    use bstr::ByteSlice;
+    use bstr::ByteSlice as _;
 
     #[test]
     fn format_message_and_characters_keep_their_bytes() {

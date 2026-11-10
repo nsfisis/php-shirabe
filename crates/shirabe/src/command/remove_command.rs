@@ -16,7 +16,7 @@ use crate::json::JsonFile;
 use crate::package::base_package;
 use crate::plugin::{CommandEvent, PluginEvents};
 use crate::repository::RepositoryInterface;
-use bstr::{B, BStr, BString, ByteSlice, ByteVec};
+use bstr::{B, BStr, BString, ByteSlice as _, ByteVec as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     PhpMixed, ToPhpString, UnexpectedValueException, bformat, impl_php_class, implode, preg_grep,

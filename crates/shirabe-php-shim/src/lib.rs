@@ -54,7 +54,7 @@ pub use var::*;
 pub use xml::*;
 pub use zip::*;
 
-use bstr::{BString, ByteSlice};
+use bstr::{BString, ByteSlice as _};
 use indexmap::IndexMap;
 
 #[derive(Debug, Clone, Default)]
@@ -89,31 +89,30 @@ pub mod json_bytes {
     use crate::ByteString;
     use bstr::BString;
     use indexmap::IndexMap;
-    use serde::ser::{SerializeMap, SerializeSeq};
-    use serde::{Serialize, Serializer};
-    use std::borrow::Borrow;
+    use serde::Serialize as _;
+    use serde::ser::{SerializeMap as _, SerializeSeq as _};
 
     struct StrMap<'a>(&'a IndexMap<BString, BString>);
 
     struct StrVec<'a>(&'a [BString]);
 
-    impl Serialize for StrVec<'_> {
-        fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+    impl serde::Serialize for StrVec<'_> {
+        fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
             str_vec(self.0, serializer)
         }
     }
 
-    impl Serialize for StrMap<'_> {
-        fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+    impl serde::Serialize for StrMap<'_> {
+        fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
             str_map(self.0, serializer)
         }
     }
 
-    pub fn str<S: Serializer>(value: &BString, serializer: S) -> Result<S::Ok, S::Error> {
+    pub fn str<S: serde::Serializer>(value: &BString, serializer: S) -> Result<S::Ok, S::Error> {
         ByteString(value).serialize(serializer)
     }
 
-    pub fn option_str<S: Serializer>(
+    pub fn option_str<S: serde::Serializer>(
         value: &Option<BString>,
         serializer: S,
     ) -> Result<S::Ok, S::Error> {
@@ -124,14 +123,17 @@ pub mod json_bytes {
     }
 
     /// Like [`option_str`], for a field whose value is itself nullable: `Some(None)` writes `null`.
-    pub fn option_option_str<S: Serializer>(
+    pub fn option_option_str<S: serde::Serializer>(
         value: &Option<Option<BString>>,
         serializer: S,
     ) -> Result<S::Ok, S::Error> {
         option_str(value.as_ref().unwrap_or(&None), serializer)
     }
 
-    pub fn str_vec<S: Serializer>(value: &[BString], serializer: S) -> Result<S::Ok, S::Error> {
+    pub fn str_vec<S: serde::Serializer>(
+        value: &[BString],
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
         let mut seq = serializer.serialize_seq(Some(value.len()))?;
         for item in value {
             seq.serialize_element(&ByteString(item))?;
@@ -139,7 +141,7 @@ pub mod json_bytes {
         seq.end()
     }
 
-    pub fn str_map<S: Serializer>(
+    pub fn str_map<S: serde::Serializer>(
         value: &IndexMap<BString, BString>,
         serializer: S,
     ) -> Result<S::Ok, S::Error> {
@@ -150,7 +152,7 @@ pub mod json_bytes {
         map.end()
     }
 
-    pub fn option_str_vec<S: Serializer, V: AsRef<[BString]>>(
+    pub fn option_str_vec<S: serde::Serializer, V: AsRef<[BString]>>(
         value: &Option<V>,
         serializer: S,
     ) -> Result<S::Ok, S::Error> {
@@ -160,7 +162,10 @@ pub mod json_bytes {
         }
     }
 
-    pub fn option_str_map<S: Serializer, M: Borrow<IndexMap<BString, BString>>>(
+    pub fn option_str_map<
+        S: serde::Serializer,
+        M: std::borrow::Borrow<IndexMap<BString, BString>>,
+    >(
         value: &Option<M>,
         serializer: S,
     ) -> Result<S::Ok, S::Error> {
@@ -170,7 +175,7 @@ pub mod json_bytes {
         }
     }
 
-    pub fn str_map_vec<S: Serializer>(
+    pub fn str_map_vec<S: serde::Serializer>(
         value: &[IndexMap<BString, BString>],
         serializer: S,
     ) -> Result<S::Ok, S::Error> {
@@ -182,7 +187,7 @@ pub mod json_bytes {
     }
 
     /// A map keyed by PHP strings. PHP's `json_encode()` writes an empty array as `[]`.
-    pub fn keyed<S: Serializer, V: Serialize>(
+    pub fn keyed<S: serde::Serializer, V: serde::Serialize>(
         value: &IndexMap<BString, V>,
         serializer: S,
     ) -> Result<S::Ok, S::Error> {
@@ -196,7 +201,11 @@ pub mod json_bytes {
         map.end()
     }
 
-    pub fn option_keyed<S: Serializer, V: Serialize, M: Borrow<IndexMap<BString, V>>>(
+    pub fn option_keyed<
+        S: serde::Serializer,
+        V: serde::Serialize,
+        M: std::borrow::Borrow<IndexMap<BString, V>>,
+    >(
         value: &Option<M>,
         serializer: S,
     ) -> Result<S::Ok, S::Error> {
@@ -207,7 +216,7 @@ pub mod json_bytes {
     }
 
     /// Like [`keyed`], for values that are lists of PHP strings.
-    pub fn keyed_str_vec<S: Serializer>(
+    pub fn keyed_str_vec<S: serde::Serializer>(
         value: &IndexMap<BString, Vec<BString>>,
         serializer: S,
     ) -> Result<S::Ok, S::Error> {
@@ -222,7 +231,7 @@ pub mod json_bytes {
     }
 
     /// Like [`keyed`], for values that are themselves optional PHP strings.
-    pub fn keyed_option_str<S: Serializer>(
+    pub fn keyed_option_str<S: serde::Serializer>(
         value: &IndexMap<BString, Option<BString>>,
         serializer: S,
     ) -> Result<S::Ok, S::Error> {
@@ -242,7 +251,7 @@ impl serde::Serialize for PhpMixed {
     where
         S: serde::Serializer,
     {
-        use serde::ser::{SerializeMap, SerializeSeq};
+        use serde::ser::{SerializeMap as _, SerializeSeq as _};
         match self {
             PhpMixed::Null => serializer.serialize_none(),
             PhpMixed::Bool(b) => serializer.serialize_bool(*b),
@@ -599,7 +608,7 @@ impl PhpResource {
     /// Used by `stream_set_blocking`/`stream_select` to drive `fcntl(2)`/`select(2)`. In-memory
     /// streams (`php://memory`/`php://temp`) and process handles have no fd and return `None`.
     fn raw_fd(&self) -> Option<std::os::unix::io::RawFd> {
-        use std::os::unix::io::AsRawFd;
+        use std::os::unix::io::AsRawFd as _;
         match self {
             PhpResource::Stdin => Some(std::io::stdin().as_raw_fd()),
             PhpResource::Stdout => Some(std::io::stdout().as_raw_fd()),

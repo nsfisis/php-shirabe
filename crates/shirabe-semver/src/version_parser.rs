@@ -1,7 +1,7 @@
 //! ref: composer/vendor/composer/semver/src/VersionParser.php sha1:97feef6b409ee997ebbff1c03f9e44181990fa92
 
 use crate::constraint::{AnyConstraint, MatchAllConstraint, MultiConstraint, SimpleConstraint};
-use bstr::{BStr, BString, ByteVec};
+use bstr::{BStr, BString, ByteVec as _};
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, PregMatches, UnexpectedValueException, bformat, bwrite,
     error_message, intval, ltrim_chars, php_regex, php_str, preg_is_match, preg_match, preg_quote,

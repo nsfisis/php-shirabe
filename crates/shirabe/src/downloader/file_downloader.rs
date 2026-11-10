@@ -21,7 +21,7 @@ use crate::plugin::{
 use crate::util::{
     Filesystem, HttpDownloader, Platform, ProcessExecutor, StreamContextOptions, Url as UrlUtil,
 };
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, PATHINFO_BASENAME, PATHINFO_EXTENSION, PhpMixed,
@@ -30,15 +30,14 @@ use shirabe_php_shim::{
     impl_php_class, is_dir, is_executable, parse_url, path_from_bytes, path_to_bytes, pathinfo,
     realpath, rtrim_chars, spl_object_hash, strlen, strpos, strtr, trim, umask, usleep,
 };
-use std::path::{Path, PathBuf};
-use std::sync::{LazyLock, Mutex};
 
-pub static DOWNLOAD_METADATA: LazyLock<Mutex<IndexMap<BString, PhpMixed>>> =
-    LazyLock::new(|| Mutex::new(IndexMap::new()));
+pub static DOWNLOAD_METADATA: std::sync::LazyLock<std::sync::Mutex<IndexMap<BString, PhpMixed>>> =
+    std::sync::LazyLock::new(|| std::sync::Mutex::new(IndexMap::new()));
 
 /// Collects response headers when running on GH Actions
-pub static RESPONSE_HEADERS: LazyLock<Mutex<IndexMap<BString, Vec<BString>>>> =
-    LazyLock::new(|| Mutex::new(IndexMap::new()));
+pub static RESPONSE_HEADERS: std::sync::LazyLock<
+    std::sync::Mutex<IndexMap<BString, Vec<BString>>>,
+> = std::sync::LazyLock::new(|| std::sync::Mutex::new(IndexMap::new()));
 
 /// Base downloader for files
 #[derive(Debug)]
@@ -50,8 +49,8 @@ pub struct FileDownloader {
     cache: Option<std::rc::Rc<std::cell::RefCell<Cache>>>,
     event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
     pub(crate) process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
-    last_cache_writes: Mutex<IndexMap<BString, BString>>,
-    additional_cleanup_paths: std::cell::RefCell<IndexMap<BString, Vec<PathBuf>>>,
+    last_cache_writes: std::sync::Mutex<IndexMap<BString, BString>>,
+    additional_cleanup_paths: std::cell::RefCell<IndexMap<BString, Vec<std::path::PathBuf>>>,
 }
 
 impl_php_class!(FileDownloader, r"Composer\Downloader\FileDownloader");
@@ -94,7 +93,7 @@ impl FileDownloader {
             cache,
             process,
             filesystem,
-            last_cache_writes: Mutex::new(IndexMap::new()),
+            last_cache_writes: std::sync::Mutex::new(IndexMap::new()),
             additional_cleanup_paths: std::cell::RefCell::new(IndexMap::new()),
         };
 
@@ -122,7 +121,7 @@ impl FileDownloader {
         &self,
         this: &dyn DownloaderInterface,
         package: PackageInterfaceHandle,
-        path: &Path,
+        path: &std::path::Path,
     ) -> anyhow::Result<Option<bstr::BString>> {
         let prev_io = std::mem::replace(
             &mut *self.io.borrow_mut(),
@@ -137,7 +136,8 @@ impl FileDownloader {
         // PHP attaches an onRejected handler to capture the error and drives the promise via
         // httpDownloader->wait() / process->wait(); awaiting the download/install futures
         // surfaces a rejection directly as the Err captured below.
-        let compare_dir = PathBuf::from(path_from_bytes(&bformat!("{target_dir}_compare")));
+        let compare_dir =
+            std::path::PathBuf::from(path_from_bytes(&bformat!("{target_dir}_compare")));
         let result: anyhow::Result<BString> = async {
             if is_dir(&compare_dir) {
                 self.filesystem
@@ -199,7 +199,7 @@ impl FileDownloader {
         install_operation_appendix: &BStr,
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
-        path: &Path,
+        path: &std::path::Path,
     ) -> anyhow::Result<Option<PhpMixed>> {
         self.io.borrow().write_error(bformat!(
             "  - {}{install_operation_appendix}",
@@ -234,7 +234,7 @@ impl FileDownloader {
         }
     }
 
-    pub(crate) fn add_cleanup_path(&self, package: PackageInterfaceHandle, path: &Path) {
+    pub(crate) fn add_cleanup_path(&self, package: PackageInterfaceHandle, path: &std::path::Path) {
         self.additional_cleanup_paths
             .borrow_mut()
             .entry(package.get_name())
@@ -242,7 +242,11 @@ impl FileDownloader {
             .push(path.to_path_buf());
     }
 
-    pub(crate) fn remove_cleanup_path(&self, package: PackageInterfaceHandle, path: &Path) {
+    pub(crate) fn remove_cleanup_path(
+        &self,
+        package: PackageInterfaceHandle,
+        path: &std::path::Path,
+    ) {
         if let Some(paths) = self
             .additional_cleanup_paths
             .borrow_mut()
@@ -260,8 +264,8 @@ impl FileDownloader {
     pub(crate) fn get_file_name(
         &self,
         package: PackageInterfaceHandle,
-        _path: &Path,
-    ) -> anyhow::Result<PathBuf> {
+        _path: &std::path::Path,
+    ) -> anyhow::Result<std::path::PathBuf> {
         let extension = self.get_dist_path(package.clone(), PATHINFO_EXTENSION);
         let extension = if extension.is_empty() {
             package.get_dist_type().unwrap_or_default()
@@ -269,7 +273,7 @@ impl FileDownloader {
             extension
         };
 
-        Ok(PathBuf::from(path_from_bytes(&rtrim_chars(
+        Ok(std::path::PathBuf::from(path_from_bytes(&rtrim_chars(
             bformat!(
                 "{}/composer/tmp-{}.{extension}",
                 self.config.borrow().get_path("vendor-dir")?,
@@ -290,7 +294,7 @@ impl FileDownloader {
     fn get_install_operation_appendix(
         &self,
         _package: PackageInterfaceHandle,
-        _path: &Path,
+        _path: &std::path::Path,
     ) -> BString {
         BString::default()
     }
@@ -299,8 +303,8 @@ impl FileDownloader {
     pub fn __get_file_name(
         &self,
         package: PackageInterfaceHandle,
-        path: &Path,
-    ) -> anyhow::Result<PathBuf> {
+        path: &std::path::Path,
+    ) -> anyhow::Result<std::path::PathBuf> {
         self.get_file_name(package, path)
     }
 
@@ -349,7 +353,7 @@ impl DownloaderInterface for FileDownloader {
     async fn download_with_output(
         &self,
         package: PackageInterfaceHandle,
-        path: &Path,
+        path: &std::path::Path,
         _prev_package: Option<PackageInterfaceHandle>,
         output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -644,7 +648,7 @@ impl DownloaderInterface for FileDownloader {
         &self,
         _type: &BStr,
         _package: PackageInterfaceHandle,
-        _path: &Path,
+        _path: &std::path::Path,
         _prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         Ok(Some(PhpMixed::Null))
@@ -654,7 +658,7 @@ impl DownloaderInterface for FileDownloader {
         &self,
         _type: &BStr,
         package: PackageInterfaceHandle,
-        path: &Path,
+        path: &std::path::Path,
         _prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         let file_name = self.get_file_name(package.clone(), path)?;
@@ -667,11 +671,11 @@ impl DownloaderInterface for FileDownloader {
             .first()
             .cloned()
             .unwrap_or_default();
-        let dirs_to_clean_up: Vec<PathBuf> = vec![
+        let dirs_to_clean_up: Vec<std::path::PathBuf> = vec![
             path.to_path_buf(),
-            PathBuf::from(path_from_bytes(&bformat!("{vendor_dir}/{first_segment}"))),
-            PathBuf::from(path_from_bytes(&bformat!("{vendor_dir}/composer/"))),
-            PathBuf::from(path_from_bytes(&vendor_dir)),
+            std::path::PathBuf::from(path_from_bytes(&bformat!("{vendor_dir}/{first_segment}"))),
+            std::path::PathBuf::from(path_from_bytes(&bformat!("{vendor_dir}/composer/"))),
+            std::path::PathBuf::from(path_from_bytes(&vendor_dir)),
         ];
 
         if let Some(paths) = self
@@ -688,7 +692,7 @@ impl DownloaderInterface for FileDownloader {
         for dir in &dirs_to_clean_up {
             if is_dir(dir)
                 && self.filesystem.borrow_mut().is_dir_empty(dir)
-                && realpath(dir).as_deref().map(Path::as_os_str)
+                && realpath(dir).as_deref().map(std::path::Path::as_os_str)
                     != Some(Platform::get_cwd(false).unwrap_or_default().as_os_str())
             {
                 self.filesystem.borrow_mut().remove_directory_php(dir)?;
@@ -701,7 +705,7 @@ impl DownloaderInterface for FileDownloader {
     async fn install_with_output(
         &self,
         package: PackageInterfaceHandle,
-        path: &Path,
+        path: &std::path::Path,
         output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
         if output {
@@ -748,7 +752,7 @@ impl DownloaderInterface for FileDownloader {
         // Single files can not have a mode set like files in archives
         // so we make sure if the file is a binary that it is executable
         for bin in package.get_binaries() {
-            let bin_path = PathBuf::from(path_from_bytes(&bformat!("{path}/{bin}")));
+            let bin_path = std::path::PathBuf::from(path_from_bytes(&bformat!("{path}/{bin}")));
             if file_exists(&bin_path) && !is_executable(&bin_path) {
                 chmod(&bin_path, 0o777 & !umask());
             }
@@ -761,7 +765,7 @@ impl DownloaderInterface for FileDownloader {
         &self,
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
-        path: &Path,
+        path: &std::path::Path,
     ) -> anyhow::Result<Option<PhpMixed>> {
         let appendix = self.get_install_operation_appendix(target.clone(), path);
         self.base_update(self, appendix.as_bstr(), initial, target, path)
@@ -771,7 +775,7 @@ impl DownloaderInterface for FileDownloader {
     async fn remove_with_output(
         &self,
         package: PackageInterfaceHandle,
-        path: &Path,
+        path: &std::path::Path,
         output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
         if output {
@@ -797,7 +801,7 @@ impl ChangeReportInterface for FileDownloader {
     async fn get_local_changes(
         &self,
         package: PackageInterfaceHandle,
-        path: &Path,
+        path: &std::path::Path,
     ) -> anyhow::Result<Option<bstr::BString>> {
         self.base_get_local_changes(self, package, path).await
     }

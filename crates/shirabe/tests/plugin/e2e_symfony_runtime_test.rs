@@ -10,11 +10,10 @@ use crate::e2e_extension_installer_test::{copy_dir, upstream_composer_bin};
 use crate::e2e_installers_test::{implementations, run_command, tree};
 use crate::php_worker::lock_php_worker;
 use bstr::BStr;
-use std::path::{Path, PathBuf};
-use tempfile::TempDir;
 
-fn fixture_dir() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/plugin/fixtures/e2e-symfony-runtime")
+fn fixture_dir() -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/plugin/fixtures/e2e-symfony-runtime")
 }
 
 fn plugin_fetched() -> bool {
@@ -37,7 +36,7 @@ fn test_symfony_runtime_matches_upstream_composer() {
 
     let mut results = Vec::new();
     for (program, prefix) in &implementations(composer_bin.as_os_str()) {
-        let work = TempDir::new().unwrap();
+        let work = tempfile::TempDir::new().unwrap();
         copy_dir(&fixture_dir(), work.path());
         let install = run_command(work.path(), program, prefix, &[BStr::new("install")]);
         let install_tree = tree(&work.path().join("project"));

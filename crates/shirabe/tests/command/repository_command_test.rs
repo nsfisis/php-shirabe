@@ -1,8 +1,7 @@
 //! ref: composer/tests/Composer/Test/Command/RepositoryCommandTest.php sha1:29030250e53ef210167608eff8b87ce67e9e25a9
 
 use crate::test_case::{RunOptions, get_application_tester, init_temp_composer};
-use bstr::{BStr, ByteSlice};
-use serial_test::serial;
+use bstr::{BStr, ByteSlice as _};
 use shirabe::json::JsonFile;
 use shirabe_php_shim::{error_message, trim, utf8_text};
 use shirabe_symfony_console::input::{InputValue, ParameterName};
@@ -15,7 +14,7 @@ fn read_composer_json() -> serde_json::Value {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_list_with_no_repositories() {
     let tear_down = init_temp_composer(Some(&serde_json::json!({})), None, None, true);
 
@@ -42,7 +41,7 @@ fn test_list_with_no_repositories() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_list_with_repositories_as_list() {
     let tear_down = init_temp_composer(
         Some(&serde_json::json!({
@@ -81,7 +80,7 @@ fn test_list_with_repositories_as_list() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_list_with_repositories_as_assoc() {
     let tear_down = init_temp_composer(
         Some(&serde_json::json!({
@@ -120,7 +119,7 @@ fn test_list_with_repositories_as_assoc() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_add_repository_with_type_and_url() {
     let tear_down = init_temp_composer(Some(&serde_json::json!({})), None, None, true);
 
@@ -160,7 +159,7 @@ fn test_add_repository_with_type_and_url() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_add_repository_with_json() {
     let tear_down = init_temp_composer(Some(&serde_json::json!({})), None, None, true);
 
@@ -194,7 +193,7 @@ fn test_add_repository_with_json() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_remove_repository() {
     let tear_down = init_temp_composer(
         Some(&serde_json::json!({
@@ -289,7 +288,7 @@ fn run_set_and_get_url_assoc_case(name: &BStr, index: &BStr, new_url: &BStr) {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_set_and_get_url_in_repository_assoc() {
     // change first of three
     run_set_and_get_url_assoc_case(
@@ -376,7 +375,7 @@ fn run_set_and_get_url_list_case(name: &BStr, index: usize, new_url: &BStr) {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_set_and_get_url_in_repository_list() {
     // change first of three
     run_set_and_get_url_list_case(BStr::new("first"), 0, BStr::new("https://new.example.org"));
@@ -387,7 +386,7 @@ fn test_set_and_get_url_in_repository_list() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_disable_and_enable_packagist() {
     let tear_down = init_temp_composer(Some(&serde_json::json!({})), None, None, true);
 
@@ -427,7 +426,7 @@ fn test_disable_and_enable_packagist() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_invalid_arg_combination_throws() {
     let mut app_tester = get_application_tester();
     let err = app_tester
@@ -451,7 +450,7 @@ fn test_invalid_arg_combination_throws() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_prepend_repository_by_name_list_to_assoc() {
     let tear_down = init_temp_composer(
         Some(&serde_json::json!({
@@ -496,7 +495,7 @@ fn test_prepend_repository_by_name_list_to_assoc() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_append_repository_by_name_list_to_assoc() {
     let tear_down = init_temp_composer(
         Some(&serde_json::json!({
@@ -542,7 +541,7 @@ fn test_append_repository_by_name_list_to_assoc() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_prepend_repository_assoc_with_packagist_disabled() {
     let tear_down = init_temp_composer(
         Some(&serde_json::json!({
@@ -588,7 +587,7 @@ fn test_prepend_repository_assoc_with_packagist_disabled() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_append_repository_assoc_with_packagist_disabled() {
     let tear_down = init_temp_composer(
         Some(&serde_json::json!({
@@ -635,7 +634,7 @@ fn test_append_repository_assoc_with_packagist_disabled() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_add_before_and_after_by_name() {
     // Start with two repos as named-list and a disabled packagist boolean
     let tear_down = init_temp_composer(
@@ -719,7 +718,7 @@ fn test_add_before_and_after_by_name() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_add_same_name_replaces_existing() {
     let tear_down = init_temp_composer(Some(&serde_json::json!({})), None, None, true);
 

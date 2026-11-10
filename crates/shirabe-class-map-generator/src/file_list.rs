@@ -1,6 +1,6 @@
 //! ref: composer/vendor/composer/class-map-generator/src/FileList.php sha1:f78accfa4fe937704bd5faee443e7659e6cb344c
 
-use bstr::{BString, ByteSlice};
+use bstr::{BString, ByteSlice as _};
 use indexmap::IndexMap;
 
 /// Contains a list of files which were scanned to generate a classmap

@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/Util/Http/Response.php sha1:03cbb36fbfd3c9aa1dce23627100c2de3bc6a8db
 
 use crate::json::JsonFile;
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use shirabe_php_shim::{PhpMixed, bformat, php_regex, preg_is_match, preg_match, preg_quote};
 
 #[derive(Debug)]

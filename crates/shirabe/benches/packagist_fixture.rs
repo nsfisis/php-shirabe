@@ -3,10 +3,9 @@
 
 use bstr::{BStr, BString};
 use shirabe_php_shim::{bformat, bwrite, path_from_bytes, str_replace, utf8_text};
-use std::path::PathBuf;
 
 pub fn fetch(package: &BStr) -> BString {
-    let dir = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("packagist-p2");
+    let dir = std::path::PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("packagist-p2");
     std::fs::create_dir_all(&dir).expect("failed to create the fixture directory");
     let path = dir.join(path_from_bytes(&bformat!(
         "{}.json",

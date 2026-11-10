@@ -1,7 +1,7 @@
 //! ref: composer/tests/Composer/Test/Package/Version/VersionSelectorTest.php sha1:ac392ad967c22aed7bc8ace70fe179b33e1e0179
 
 use crate::test_case::get_package;
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe::filter::platform_requirement_filter::PlatformRequirementFilterFactory;
 use shirabe::io::{BufferIO, IOInterface};

@@ -3,7 +3,6 @@
 use crate::package::{AliasPackage, CompletePackageInterface, Link, Mirror, RootPackageInterface};
 use crate::repository::RepositoryInterfaceHandle;
 use bstr::{BStr, BString};
-use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
 use shirabe_php_shim::{PhpDisplay, PhpMixed};
 
@@ -108,7 +107,7 @@ pub trait PackageInterface: std::fmt::Debug + PhpDisplay {
     fn get_full_pretty_version(&self, truncate: bool, display_mode: DisplayMode) -> BString;
 
     /// Returns the release date of the package
-    fn get_release_date(&self) -> Option<DateTime<Utc>>;
+    fn get_release_date(&self) -> Option<chrono::DateTime<chrono::Utc>>;
 
     /// Returns the stability of this package: one of (dev, alpha, beta, RC, stable)
     fn get_stability(&self) -> &BStr;

@@ -14,7 +14,7 @@ use crate::repository::{
     RepositoryInterfaceHandle, RootPackageRepository,
 };
 use crate::util::PackageInfo;
-use bstr::{B, BStr, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, ToPhpString, UnexpectedValueException, bformat, php_str,

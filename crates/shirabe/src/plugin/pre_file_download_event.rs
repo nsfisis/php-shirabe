@@ -3,7 +3,7 @@
 use crate::event_dispatcher::{Event, EventFlags, delegate_event_interface_to_inner};
 use crate::package::PackageInterfaceHandle;
 use crate::util::{HttpDownloader, StreamContextOptions};
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 
 /// The `$context` a file download event carries: the package a dist download is for, or the
 /// array a repository passes along with a metadata download.

@@ -16,7 +16,7 @@ use crate::package::{LockerInterface, PackageInterfaceHandle, RootPackageInterfa
 use crate::repository::RepositoryInterfaceHandle;
 use crate::script::ScriptEvents;
 use crate::util::{Filesystem, PackageSorter, Platform};
-use bstr::{B, BStr, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_class_map_generator::class_map::ClassMap;
 use shirabe_class_map_generator::class_map_generator::ClassMapGenerator;
@@ -31,7 +31,6 @@ use shirabe_php_shim::{
 };
 use shirabe_semver::constraint::Bound;
 use shirabe_symfony_console::formatter::OutputFormatter;
-use std::path::{Path, PathBuf};
 
 #[derive(Debug)]
 pub struct AutoloadGenerator {
@@ -205,7 +204,8 @@ impl AutoloadGenerator {
         } else {
             BStr::new("false")
         };
-        let target_dir = PathBuf::from(path_from_bytes(&bformat!("{vendor_path}/{target_dir}")));
+        let target_dir =
+            std::path::PathBuf::from(path_from_bytes(&bformat!("{vendor_path}/{target_dir}")));
         filesystem.ensure_directory_exists(&target_dir)?;
 
         let vendor_path_code = filesystem.find_shortest_path_code(
@@ -511,7 +511,7 @@ impl AutoloadGenerator {
 
             // carry over existing autoload.php's suffix if possible and none is configured
             let autoload_file =
-                PathBuf::from(path_from_bytes(&bformat!("{vendor_path}/autoload.php")));
+                std::path::PathBuf::from(path_from_bytes(&bformat!("{vendor_path}/autoload.php")));
             if suffix.is_none() && Filesystem::is_readable(&autoload_file) {
                 let content = file_get_contents(&autoload_file).unwrap_or_default();
                 if let Some(matches) =
@@ -545,8 +545,9 @@ impl AutoloadGenerator {
             return Ok(class_map);
         }
 
-        let target_file =
-            |name: &BStr| PathBuf::from(path_from_bytes(&bformat!("{target_dir}/{name}")));
+        let target_file = |name: &BStr| {
+            std::path::PathBuf::from(path_from_bytes(&bformat!("{target_dir}/{name}")))
+        };
         filesystem.file_put_contents_if_modified(
             target_file(BStr::new("autoload_namespaces.php")),
             &namespaces_file,
@@ -747,11 +748,11 @@ impl AutoloadGenerator {
         installation_manager: std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>,
         root_package: RootPackageInterfaceHandle,
         packages: Vec<PackageInterfaceHandle>,
-    ) -> anyhow::Result<Vec<(PackageInterfaceHandle, Option<PathBuf>)>> {
+    ) -> anyhow::Result<Vec<(PackageInterfaceHandle, Option<std::path::PathBuf>)>> {
         // build package => install path map
         let root_package_handle: PackageInterfaceHandle = root_package.into();
-        let mut package_map: Vec<(PackageInterfaceHandle, Option<PathBuf>)> =
-            vec![(root_package_handle, Some(PathBuf::new()))];
+        let mut package_map: Vec<(PackageInterfaceHandle, Option<std::path::PathBuf>)> =
+            vec![(root_package_handle, Some(std::path::PathBuf::new()))];
 
         for package in packages {
             if package.as_alias().is_some() {
@@ -795,7 +796,7 @@ impl AutoloadGenerator {
     /// Compiles an ordered list of namespace => path mappings
     pub fn parse_autoloads(
         &self,
-        package_map: Vec<(PackageInterfaceHandle, Option<PathBuf>)>,
+        package_map: Vec<(PackageInterfaceHandle, Option<std::path::PathBuf>)>,
         root_package: RootPackageInterfaceHandle,
         filtered_dev_packages: PhpMixed,
     ) -> IndexMap<BString, PhpMixed> {
@@ -821,7 +822,7 @@ impl AutoloadGenerator {
         };
         let mut sorted_package_map = self.sort_package_map(package_map);
         sorted_package_map.push(root_package_map);
-        let reverse_sorted_map: Vec<(PackageInterfaceHandle, Option<PathBuf>)> =
+        let reverse_sorted_map: Vec<(PackageInterfaceHandle, Option<std::path::PathBuf>)> =
             sorted_package_map.iter().rev().cloned().collect();
 
         // reverse-sorted means root first, then dependents, then their dependents, etc.
@@ -944,10 +945,10 @@ impl AutoloadGenerator {
 
     fn get_include_paths_file(
         &self,
-        package_map: &Vec<(PackageInterfaceHandle, Option<PathBuf>)>,
+        package_map: &Vec<(PackageInterfaceHandle, Option<std::path::PathBuf>)>,
         filesystem: &Filesystem,
-        base_path: &Path,
-        vendor_path: &Path,
+        base_path: &std::path::Path,
+        vendor_path: &std::path::Path,
         vendor_path_code: &BStr,
         app_base_dir_code: &BStr,
     ) -> anyhow::Result<Option<BString>> {
@@ -1000,8 +1001,8 @@ impl AutoloadGenerator {
         &self,
         files: &IndexMap<BString, BString>,
         filesystem: &Filesystem,
-        base_path: &Path,
-        vendor_path: &Path,
+        base_path: &std::path::Path,
+        vendor_path: &std::path::Path,
         vendor_path_code: &BStr,
         app_base_dir_code: &BStr,
     ) -> anyhow::Result<Option<BString>> {
@@ -1060,8 +1061,8 @@ impl AutoloadGenerator {
     fn get_path_code(
         &self,
         filesystem: &Filesystem,
-        base_path: &Path,
-        vendor_path: &Path,
+        base_path: &std::path::Path,
+        vendor_path: &std::path::Path,
         path: &BStr,
     ) -> anyhow::Result<BString> {
         let mut path = if !filesystem.is_absolute_path(path_from_bytes(path)) {
@@ -1099,7 +1100,7 @@ impl AutoloadGenerator {
 
     fn get_platform_check(
         &self,
-        package_map: &Vec<(PackageInterfaceHandle, Option<PathBuf>)>,
+        package_map: &Vec<(PackageInterfaceHandle, Option<std::path::PathBuf>)>,
         check_platform: PlatformCheck,
         dev_package_names: &[BString],
     ) -> Option<BString> {
@@ -1403,17 +1404,18 @@ if (PHP_INT_SIZE !== 8) {
     fn get_static_file(
         &self,
         suffix: &BStr,
-        target_dir: &Path,
-        vendor_path: &Path,
-        base_path: &Path,
+        target_dir: &std::path::Path,
+        vendor_path: &std::path::Path,
+        base_path: &std::path::Path,
     ) -> anyhow::Result<BString> {
         let mut file = bformat!(
             "<?php\n\n// autoload_static.php @generated by Composer\n\nnamespace Composer\\Autoload;\n\nclass ComposerStaticInit{suffix}\n{{\n"
         );
 
         let mut loader = ClassLoader::new(None);
-        let target_file =
-            |name: &BStr| PathBuf::from(path_from_bytes(&bformat!("{target_dir}/{name}")));
+        let target_file = |name: &BStr| {
+            std::path::PathBuf::from(path_from_bytes(&bformat!("{target_dir}/{name}")))
+        };
         let path_list = |path: &PhpMixed| -> Vec<BString> {
             if let PhpMixed::List(items) = path {
                 items
@@ -1544,7 +1546,7 @@ if (PHP_INT_SIZE !== 8) {
 
     fn parse_autoloads_type(
         &self,
-        package_map: &Vec<(PackageInterfaceHandle, Option<PathBuf>)>,
+        package_map: &Vec<(PackageInterfaceHandle, Option<std::path::PathBuf>)>,
         r#type: &BStr,
         root_package: RootPackageInterfaceHandle,
     ) -> IndexMap<BString, PhpMixed> {
@@ -1773,9 +1775,9 @@ if (PHP_INT_SIZE !== 8) {
     /// Filters out dev-dependencies
     fn filter_package_map(
         &self,
-        package_map: Vec<(PackageInterfaceHandle, Option<PathBuf>)>,
+        package_map: Vec<(PackageInterfaceHandle, Option<std::path::PathBuf>)>,
         root_package: RootPackageInterfaceHandle,
-    ) -> Vec<(PackageInterfaceHandle, Option<PathBuf>)> {
+    ) -> Vec<(PackageInterfaceHandle, Option<std::path::PathBuf>)> {
         let mut packages: IndexMap<BString, PackageInterfaceHandle> = IndexMap::new();
         let mut include: IndexMap<BString, bool> = IndexMap::new();
         let mut replaced_by: IndexMap<BString, BString> = IndexMap::new();
@@ -1830,10 +1832,10 @@ if (PHP_INT_SIZE !== 8) {
     /// Packages of equal weight are sorted alphabetically
     fn sort_package_map(
         &self,
-        package_map: Vec<(PackageInterfaceHandle, Option<PathBuf>)>,
-    ) -> Vec<(PackageInterfaceHandle, Option<PathBuf>)> {
+        package_map: Vec<(PackageInterfaceHandle, Option<std::path::PathBuf>)>,
+    ) -> Vec<(PackageInterfaceHandle, Option<std::path::PathBuf>)> {
         let mut packages: IndexMap<BString, PackageInterfaceHandle> = IndexMap::new();
-        let mut paths: IndexMap<BString, Option<PathBuf>> = IndexMap::new();
+        let mut paths: IndexMap<BString, Option<std::path::PathBuf>> = IndexMap::new();
 
         for item in &package_map {
             let (package, path) = item;
@@ -1845,7 +1847,8 @@ if (PHP_INT_SIZE !== 8) {
         let sorted_packages =
             PackageSorter::sort_packages(packages.values().cloned().collect(), IndexMap::new());
 
-        let mut sorted_package_map: Vec<(PackageInterfaceHandle, Option<PathBuf>)> = vec![];
+        let mut sorted_package_map: Vec<(PackageInterfaceHandle, Option<std::path::PathBuf>)> =
+            vec![];
 
         for package in sorted_packages {
             let name = package.get_name();
@@ -1890,10 +1893,10 @@ pub trait AutoloadGeneratorInterface: std::fmt::Debug {
         installation_manager: std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>,
         root_package: RootPackageInterfaceHandle,
         packages: Vec<PackageInterfaceHandle>,
-    ) -> anyhow::Result<Vec<(PackageInterfaceHandle, Option<PathBuf>)>>;
+    ) -> anyhow::Result<Vec<(PackageInterfaceHandle, Option<std::path::PathBuf>)>>;
     fn parse_autoloads(
         &self,
-        package_map: Vec<(PackageInterfaceHandle, Option<PathBuf>)>,
+        package_map: Vec<(PackageInterfaceHandle, Option<std::path::PathBuf>)>,
         root_package: RootPackageInterfaceHandle,
         filtered_dev_packages: PhpMixed,
     ) -> IndexMap<BString, PhpMixed>;
@@ -1963,13 +1966,13 @@ impl AutoloadGeneratorInterface for AutoloadGenerator {
         installation_manager: std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>,
         root_package: RootPackageInterfaceHandle,
         packages: Vec<PackageInterfaceHandle>,
-    ) -> anyhow::Result<Vec<(PackageInterfaceHandle, Option<PathBuf>)>> {
+    ) -> anyhow::Result<Vec<(PackageInterfaceHandle, Option<std::path::PathBuf>)>> {
         self.build_package_map(installation_manager, root_package, packages)
     }
 
     fn parse_autoloads(
         &self,
-        package_map: Vec<(PackageInterfaceHandle, Option<PathBuf>)>,
+        package_map: Vec<(PackageInterfaceHandle, Option<std::path::PathBuf>)>,
         root_package: RootPackageInterfaceHandle,
         filtered_dev_packages: PhpMixed,
     ) -> IndexMap<BString, PhpMixed> {
@@ -1993,7 +1996,7 @@ impl AutoloadGeneratorInterface for AutoloadGenerator {
 /// values are either a single path expression or `array(<expr>, ...)`. Each expression is a ` . `
 /// joined chain of `'literal'`, `$vendorDir`, `$baseDir`, `__DIR__`, and `dirname(...)` terms.
 /// Returns `PhpMixed::Bool(false)` when the file is absent (mirroring a failed `require`).
-fn require_generated_php_array(file: &Path) -> PhpMixed {
+fn require_generated_php_array(file: &std::path::Path) -> PhpMixed {
     let contents = match std::fs::read(file) {
         Ok(c) => BString::from(c),
         Err(_) => return PhpMixed::Bool(false),

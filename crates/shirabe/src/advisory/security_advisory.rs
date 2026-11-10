@@ -1,14 +1,13 @@
 //! ref: composer/src/Composer/Advisory/SecurityAdvisory.php sha1:739e9f98d2a018b965a8c75aa97140787cf3b6b2
 
 use crate::advisory::{IgnoredSecurityAdvisory, PartialSecurityAdvisory};
-use bstr::{BStr, BString, ByteSlice};
-use chrono::{DateTime, Utc};
+use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::DATE_RFC3339;
 use shirabe_semver::constraint::AnyConstraint;
 
 fn serialize_date_rfc3339<S: serde::Serializer>(
-    dt: &DateTime<Utc>,
+    dt: &chrono::DateTime<chrono::Utc>,
     serializer: S,
 ) -> Result<S::Ok, S::Error> {
     serializer.collect_str(&dt.format(DATE_RFC3339))
@@ -26,7 +25,7 @@ pub struct SecurityAdvisory {
     #[serde(serialize_with = "shirabe_php_shim::json_bytes::option_str")]
     pub link: Option<BString>,
     #[serde(serialize_with = "serialize_date_rfc3339")]
-    pub reported_at: DateTime<Utc>,
+    pub reported_at: chrono::DateTime<chrono::Utc>,
     #[serde(serialize_with = "shirabe_php_shim::json_bytes::str_map_vec")]
     pub sources: Vec<IndexMap<BString, BString>>,
     #[serde(serialize_with = "shirabe_php_shim::json_bytes::option_str")]
@@ -41,7 +40,7 @@ impl SecurityAdvisory {
         affected_versions: AnyConstraint,
         title: BString,
         sources: Vec<IndexMap<BString, BString>>,
-        reported_at: DateTime<Utc>,
+        reported_at: chrono::DateTime<chrono::Utc>,
         cve: Option<BString>,
         link: Option<BString>,
         severity: Option<BString>,

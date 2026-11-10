@@ -12,7 +12,7 @@
 // execution), every test here is also tagged `#[serial_test::serial]` to avoid racing other
 // serial-tagged tests in this binary that touch the same global state (see
 // util/http/proxy_manager_test.rs and http_downloader_test.rs).
-use bstr::{B, BStr, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe::util::http::ProxyManager;
 use shirabe::util::{Platform, StreamContextFactory};

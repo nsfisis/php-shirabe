@@ -1,13 +1,12 @@
 //! ref: composer/tests/Composer/Test/Command/DiagnoseCommandTest.php sha1:cf8a331c625edf5bcd528b5e6f87bdfb786b73ee
 
 use crate::test_case::{RunOptions, get_application_tester, init_temp_composer};
-use bstr::ByteSlice;
-use serial_test::serial;
+use bstr::ByteSlice as _;
 use shirabe::util::Platform;
 use shirabe_symfony_console::input::{InputValue, ParameterName};
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_cmd_fail() {
     let tear_down = init_temp_composer(
         Some(&serde_json::json!({ "name": "foo/bar", "description": "test pkg" })),
@@ -46,7 +45,7 @@ Checking github.com rate limit: "
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 #[ignore = "the audit covers composer/composer at the version reported by Composer::VERSION, and \
             packagist has advisories against 2.9.7, so whenever the advisories API answers, \
             diagnose warns and exits 1 where the test expects 0; upstream Composer 2.9.7 reports \

@@ -62,7 +62,7 @@ use crate::repository::{
 };
 use crate::script::ScriptEvents;
 use crate::util::Platform;
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, PhpMixed, RuntimeException, ToPhpString, array_map, array_unique, bformat, implode,

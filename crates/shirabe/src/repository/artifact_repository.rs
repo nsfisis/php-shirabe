@@ -9,7 +9,7 @@ use crate::repository::{
     ProviderInfo, RepositoryInterface, RepositoryInterfaceWeakHandle, SearchResult,
 };
 use crate::util::{Platform, Tar, Zip};
-use bstr::{B, BStr, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     PATHINFO_EXTENSION, PhpMixed, RuntimeException, ToPhpString, UnexpectedValueException,
@@ -17,7 +17,6 @@ use shirabe_php_shim::{
     pathinfo, php_regex, preg_is_match, realpath, strtr,
 };
 use shirabe_semver::constraint::AnyConstraint;
-use std::path::Path;
 
 pub struct ArtifactRepository {
     inner: ArrayRepository,
@@ -86,7 +85,7 @@ impl ArtifactRepository {
         Ok(())
     }
 
-    fn scan_directory(&self, path: &Path) -> anyhow::Result<()> {
+    fn scan_directory(&self, path: &std::path::Path) -> anyhow::Result<()> {
         let entries = std::fs::read_dir(path)?;
         for entry in entries {
             let entry = entry?;
@@ -141,7 +140,7 @@ impl ArtifactRepository {
 
     fn get_composer_information(
         &self,
-        file: &Path,
+        file: &std::path::Path,
     ) -> anyhow::Result<Option<PackageInterfaceHandle>> {
         let mut json: Option<BString> = None;
         let pathname = path_to_bytes(file).as_bstr();

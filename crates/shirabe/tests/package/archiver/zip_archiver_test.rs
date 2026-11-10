@@ -1,9 +1,8 @@
 //! ref: composer/tests/Composer/Test/Package/Archiver/ZipArchiverTest.php sha1:0c48cf2bc2810e10439d89b1d11ec8c133635320
 
 use crate::test_case::get_unique_tmp_directory;
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
-use serial_test::serial;
 use shirabe::package::CompletePackageHandle;
 use shirabe::package::archiver::{ArchiverInterface, ZipArchiver};
 use shirabe::util::Platform;
@@ -11,12 +10,11 @@ use shirabe_php_shim::{
     ZipArchive, bformat, dirname, file_exists, file_put_contents, mkdir, path_from_bytes,
     path_to_bytes, realpath, sys_get_temp_dir, unlink,
 };
-use tempfile::TempDir;
 
 // ref: ArchiverTestCase. Holds the unique tmp testDir plus the ZipArchiverTest cleanup list.
 struct ArchiverTestCase {
     test_dir: std::path::PathBuf,
-    _test_dir_guard: TempDir,
+    _test_dir_guard: tempfile::TempDir,
     files_to_cleanup: Vec<std::path::PathBuf>,
 }
 
@@ -128,7 +126,7 @@ impl ArchiverTestCase {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_simple_files() {
     let mut test_case = ArchiverTestCase::set_up();
 
@@ -149,7 +147,7 @@ fn test_simple_files() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_gitignore_exclude_negation() {
     for include in ["!/docs", "!/docs/"] {
         let mut test_case = ArchiverTestCase::set_up();
@@ -169,7 +167,7 @@ fn test_gitignore_exclude_negation() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_folder_with_backslashes() {
     if Platform::is_windows() {
         // markTestSkipped('Folder names cannot contain backslashes on Windows.')

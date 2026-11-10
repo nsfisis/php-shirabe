@@ -2,7 +2,7 @@
 
 use crate::formatter::OutputFormatterInterface;
 use crate::helper::HelperSet;
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use shirabe_php_shim::{
     PhpMixed, ToPhpString, bformat, mb_detect_encoding, mb_strlen, mb_strwidth, mb_substr,
     php_regex, preg_is_match, preg_replace, sprintf, strlen, substr, trigger_deprecation,

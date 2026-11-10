@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/Package/Link.php sha1:85708b20ed9db407c25ea041133020dd22222b01
 
 use crate::package::PackageInterfaceHandle;
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use shirabe_php_shim::{
     PhpDisplay, ToPhpString, UnexpectedValueException, bformat, bwrite, php_str, strtolower,
 };

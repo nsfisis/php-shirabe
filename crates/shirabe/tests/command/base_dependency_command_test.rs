@@ -4,8 +4,7 @@ use crate::test_case::{
     RunOptions, create_composer_lock, create_installed_json, get_application_tester, get_package,
     get_version_constraint, init_temp_composer,
 };
-use bstr::{BStr, BString, ByteSlice};
-use serial_test::serial;
+use bstr::{BStr, BString, ByteSlice as _};
 use shirabe::package::{Link, PackageInterfaceHandle};
 use shirabe_php_shim::{bformat, error_message, trim};
 use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint, MultiConstraint};
@@ -26,7 +25,7 @@ fn match_all() -> AnyConstraint {
 
 /// ref: BaseDependencyCommandTest::testExceptionWhenNoRequiredParameters (data provider rolled in).
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_exception_when_no_required_parameters() {
     // noParametersCaseProvider
     let cases: Vec<(&BStr, Vec<(&BStr, InputValue)>, &BStr)> = vec![
@@ -74,7 +73,7 @@ fn test_exception_when_no_required_parameters() {
 
 /// ref: BaseDependencyCommandTest::testExceptionWhenRunningLockedWithoutLockFile.
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_exception_when_running_locked_without_lock_file() {
     // caseProvider
     let cases: Vec<(&BStr, Vec<(&BStr, InputValue)>)> = vec![
@@ -119,7 +118,7 @@ fn test_exception_when_running_locked_without_lock_file() {
 
 /// ref: BaseDependencyCommandTest::testExceptionWhenItCouldNotFoundThePackage.
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_exception_when_it_could_not_found_the_package() {
     // caseProvider
     let cases: Vec<(&BStr, Vec<(&BStr, InputValue)>)> = vec![
@@ -166,7 +165,7 @@ fn test_exception_when_it_could_not_found_the_package() {
 
 /// ref: BaseDependencyCommandTest::testExceptionWhenPackageWasNotFoundInProject.
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_exception_when_package_was_not_found_in_project() {
     // caseProvider
     let cases: Vec<(&BStr, Vec<(&BStr, InputValue)>)> = vec![
@@ -233,7 +232,7 @@ fn test_exception_when_package_was_not_found_in_project() {
 
 /// ref: BaseDependencyCommandTest::testWarningWhenDependenciesAreNotInstalled.
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_warning_when_dependencies_are_not_installed() {
     let expected_warning_message = "<warning>No dependencies installed. Try running shirabe install or update, or use --locked.</warning>";
 
@@ -292,7 +291,7 @@ fn test_warning_when_dependencies_are_not_installed() {
 
 /// ref: BaseDependencyCommandTest::testWhyCommandOutputs (caseWhyProvider rolled in).
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_why_command_outputs() {
     // caseWhyProvider: (package, --tree, --recursive, expected_output, expected_status_code)
     let cases: Vec<(&BStr, bool, bool, &BStr, i32)> = vec![
@@ -460,7 +459,7 @@ fn test_why_command_outputs() {
 
 /// ref: BaseDependencyCommandTest::testWhyNotCommandOutputs (caseWhyNotProvider rolled in).
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_why_not_command_outputs() {
     // caseWhyNotProvider: (package, version, expected_output, expected_status_code)
     let cases: Vec<(&BStr, &BStr, &BStr, i32)> = vec![

@@ -8,14 +8,11 @@
 
 use crate::e2e_extension_installer_test::{copy_dir, upstream_composer_bin};
 use crate::php_worker::lock_php_worker;
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use shirabe_php_shim::{os_str_from_bytes, path_to_bytes};
-use std::ffi::OsStr;
-use std::path::{Path, PathBuf};
-use tempfile::TempDir;
 
-fn fixture_dir() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/plugin/fixtures/e2e-installer")
+fn fixture_dir() -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/plugin/fixtures/e2e-installer")
 }
 
 struct CommandRun {
@@ -23,7 +20,12 @@ struct CommandRun {
     stdout: BString,
 }
 
-fn run_command(work: &Path, program: &BStr, prefix_args: &[&OsStr], args: &[&BStr]) -> CommandRun {
+fn run_command(
+    work: &std::path::Path,
+    program: &BStr,
+    prefix_args: &[&std::ffi::OsStr],
+    args: &[&BStr],
+) -> CommandRun {
     let output = std::process::Command::new(os_str_from_bytes(&program))
         .args(prefix_args)
         .args(args.iter().map(os_str_from_bytes))
@@ -42,14 +44,14 @@ fn run_command(work: &Path, program: &BStr, prefix_args: &[&OsStr], args: &[&BSt
 }
 
 /// Every file under `dir` as (relative path, contents), so two project trees compare as a whole.
-fn tree(dir: &Path) -> Vec<(BString, BString)> {
+fn tree(dir: &std::path::Path) -> Vec<(BString, BString)> {
     let mut files = Vec::new();
     collect(dir, dir, &mut files);
     files.sort();
     files
 }
 
-fn collect(root: &Path, dir: &Path, files: &mut Vec<(BString, BString)>) {
+fn collect(root: &std::path::Path, dir: &std::path::Path, files: &mut Vec<(BString, BString)>) {
     for entry in std::fs::read_dir(dir).unwrap() {
         let entry = entry.unwrap();
         let path = entry.path();
@@ -73,13 +75,16 @@ fn installer_lines(stdout: &[u8]) -> Vec<&BStr> {
     stdout
         .lines()
         .filter(|line| line.starts_with(b"asset-installer:"))
-        .map(ByteSlice::as_bstr)
+        .map(bstr::ByteSlice::as_bstr)
         .collect()
 }
 
 /// Runs `install` in a fresh copy of the fixture and returns the run plus the resulting tree.
-fn install(program: &BStr, prefix: &[&OsStr]) -> (CommandRun, Vec<(BString, BString)>, TempDir) {
-    let work = TempDir::new().unwrap();
+fn install(
+    program: &BStr,
+    prefix: &[&std::ffi::OsStr],
+) -> (CommandRun, Vec<(BString, BString)>, tempfile::TempDir) {
+    let work = tempfile::TempDir::new().unwrap();
     copy_dir(&fixture_dir(), work.path());
     let run = run_command(work.path(), program, prefix, &[BStr::new("install")]);
     let tree = tree(&work.path().join("project"));
@@ -128,14 +133,14 @@ fn test_plugin_provided_installer_call_order_matches_upstream_composer() {
         return;
     };
     let _worker = lock_php_worker();
-    let implementations: [(&BStr, Vec<&OsStr>); 2] = [
+    let implementations: [(&BStr, Vec<&std::ffi::OsStr>); 2] = [
         (BStr::new("php"), vec![composer_bin.as_os_str()]),
         (BStr::new(env!("CARGO_BIN_EXE_shirabe")), vec![]),
     ];
 
     let mut results = Vec::new();
     for (program, prefix) in &implementations {
-        let work = TempDir::new().unwrap();
+        let work = tempfile::TempDir::new().unwrap();
         copy_dir(&fixture_dir(), work.path());
         let first = run_command(work.path(), program, prefix, &[BStr::new("install")]);
         let second = run_command(work.path(), program, prefix, &[BStr::new("install")]);

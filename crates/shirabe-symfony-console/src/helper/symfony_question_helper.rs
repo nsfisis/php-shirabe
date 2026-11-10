@@ -7,7 +7,6 @@ use crate::question::QuestionInterface;
 use crate::style::{StyleInterface, SymfonyStyle};
 use bstr::{B, BString};
 use shirabe_php_shim::{Exception, ToPhpString, bformat, explode, implode, php_os_family, trim};
-use std::ops::{Deref, DerefMut};
 
 /// Symfony Style Guide compliant question helper.
 #[derive(Debug, Default)]
@@ -129,7 +128,7 @@ impl QuestionHelperInterface for SymfonyQuestionHelper {
     }
 }
 
-impl Deref for SymfonyQuestionHelper {
+impl std::ops::Deref for SymfonyQuestionHelper {
     type Target = QuestionHelper;
 
     fn deref(&self) -> &Self::Target {
@@ -137,7 +136,7 @@ impl Deref for SymfonyQuestionHelper {
     }
 }
 
-impl DerefMut for SymfonyQuestionHelper {
+impl std::ops::DerefMut for SymfonyQuestionHelper {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.inner
     }

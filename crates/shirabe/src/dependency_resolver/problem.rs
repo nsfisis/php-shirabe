@@ -6,7 +6,7 @@ use crate::package::{BasePackageHandle, Link};
 use crate::repository::{
     LockArrayRepository, PlatformRepository, ProviderInfo, RepositoryInterfaceHandle, RepositorySet,
 };
-use bstr::{B, BStr, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     CmpOp, LogicException, PhpMixed, ToPhpString, bformat, bwrite, extension_loaded, implode,

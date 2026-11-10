@@ -11,7 +11,7 @@ use crate::output::{
 };
 use crate::question::{ConfirmationQuestion, QuestionInterface};
 use crate::style::{OutputStyle, StyleInterface};
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use shirabe_php_shim::{
     AsAny, PHP_EOL, array_unshift, bformat, explode, str_repeat, str_replace, strlen, substr,
     substr_count, wordwrap,

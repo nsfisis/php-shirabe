@@ -2,7 +2,7 @@
 
 use crate::exception::{InvalidArgumentException, LogicException};
 use crate::input::InputValue;
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use shirabe_php_shim::{bformat, implode, ltrim_chars, php_regex, preg_split};
 
 #[derive(Debug, Clone)]

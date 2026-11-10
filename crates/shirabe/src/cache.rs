@@ -3,7 +3,6 @@
 use crate::io::{DEBUG, IOInterface, IOInterfaceImmutable, IOInterfaceWrite};
 use crate::util::{Filesystem, Platform};
 use bstr::{BStr, BString};
-use chrono::{DateTime, Utc};
 use shirabe_php_shim::{
     bformat, bin2hex, clearstatcache, dirname, disk_free_space, display_to_bytes, file_exists,
     file_get_contents, file_put_contents, filemtime, hash_file, is_dir, is_writable, mkdir,
@@ -11,14 +10,12 @@ use shirabe_php_shim::{
     random_bytes, random_int, rename, rtrim_chars, time, touch, touch_with_mtime_and_atime, unlink,
 };
 use shirabe_symfony_finder::Finder;
-use std::path::{Path, PathBuf};
-use std::sync::Mutex;
 
 /// Reads/writes to a filesystem cache
 #[derive(Debug)]
 pub struct Cache {
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-    root: PathBuf,
+    root: std::path::PathBuf,
     enabled: Option<bool>,
     allowlist: BString,
     filesystem: std::rc::Rc<std::cell::RefCell<Filesystem>>,
@@ -48,12 +45,12 @@ pub struct GcFinderMock {
     pub by_accessed_time: Vec<std::path::PathBuf>,
 }
 
-static CACHE_COLLECTED: Mutex<Option<bool>> = Mutex::new(None);
+static CACHE_COLLECTED: std::sync::Mutex<Option<bool>> = std::sync::Mutex::new(None);
 
 impl Cache {
     pub fn new(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        cache_dir: impl AsRef<Path>,
+        cache_dir: impl AsRef<std::path::Path>,
         allowlist: Option<&BStr>,
         filesystem: Option<std::rc::Rc<std::cell::RefCell<Filesystem>>>,
         read_only: bool,
@@ -92,7 +89,7 @@ impl Cache {
         self.read_only
     }
 
-    pub fn is_usable(path: impl AsRef<Path>) -> bool {
+    pub fn is_usable(path: impl AsRef<std::path::Path>) -> bool {
         !preg_is_match(
             php_regex!(r"{(^|[\\\\/])(\$null|nul|NUL|/dev/null)([\\\\/]|$)}"),
             path_to_bytes(path.as_ref()),
@@ -115,12 +112,12 @@ impl Cache {
         self.enabled.unwrap_or(false)
     }
 
-    pub fn get_root(&self) -> &Path {
+    pub fn get_root(&self) -> &std::path::Path {
         &self.root
     }
 
     /// `$this->root . Preg::replace('{[^'.$this->allowlist.']}i', '-', $file)`
-    fn full_path(&self, file: impl AsRef<[u8]>) -> PathBuf {
+    fn full_path(&self, file: impl AsRef<[u8]>) -> std::path::PathBuf {
         let file = preg_replace(bformat!("{{[^{}]}}i", self.allowlist), "-", file);
         path_from_bytes(&bformat!("{}{file}", path_to_bytes(&self.root))).to_path_buf()
     }
@@ -222,7 +219,11 @@ impl Cache {
     }
 
     /// Copy a file into the cache
-    pub fn copy_from(&mut self, file: impl AsRef<[u8]>, source: impl AsRef<Path>) -> bool {
+    pub fn copy_from(
+        &mut self,
+        file: impl AsRef<[u8]>,
+        source: impl AsRef<std::path::Path>,
+    ) -> bool {
         let source = source.as_ref();
         if self.is_enabled() && !self.read_only {
             let full_path = self.full_path(file);
@@ -254,7 +255,7 @@ impl Cache {
     pub fn copy_to(
         &mut self,
         file: impl AsRef<[u8]>,
-        target: impl AsRef<Path>,
+        target: impl AsRef<std::path::Path>,
     ) -> anyhow::Result<bool> {
         if self.is_enabled() {
             let full_path = self.full_path(file);
@@ -356,7 +357,7 @@ impl Cache {
         }
 
         if self.is_enabled() && !self.read_only {
-            let expire = Utc::now() - chrono::Duration::seconds(ttl);
+            let expire = chrono::Utc::now() - chrono::Duration::seconds(ttl);
 
             for file in self.gc_outdated_files(&expire) {
                 let _ = self.filesystem.borrow_mut().unlink(&file);
@@ -382,7 +383,7 @@ impl Cache {
     }
 
     /// The cache files last modified before `expire`. Honours the [`CacheMock`] seam when set.
-    fn gc_outdated_files(&self, expire: &DateTime<Utc>) -> Vec<std::path::PathBuf> {
+    fn gc_outdated_files(&self, expire: &chrono::DateTime<chrono::Utc>) -> Vec<std::path::PathBuf> {
         if let Some(mock) = &self.mock
             && let Some(finder) = &mock.finder
         {
@@ -423,7 +424,7 @@ impl Cache {
 
     pub fn gc_vcs_cache(&mut self, ttl: i64) -> bool {
         if self.is_enabled() {
-            let expire = Utc::now() - chrono::Duration::seconds(ttl);
+            let expire = chrono::Utc::now() - chrono::Duration::seconds(ttl);
 
             let mut finder = Finder::create();
             finder

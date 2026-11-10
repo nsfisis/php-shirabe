@@ -24,7 +24,7 @@ use crate::repository::{
 };
 use crate::signal::SignalSubscription;
 use crate::util::{Filesystem, PackageSorter};
-use bstr::{B, BStr, BString, ByteSlice, ByteVec};
+use bstr::{B, BStr, BString, ByteSlice as _, ByteVec as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     PhpMixed, RuntimeException, array_fill_keys, array_intersect, array_keys, array_merge,
@@ -34,7 +34,6 @@ use shirabe_php_shim::{
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::{InputInterface, InputInterfaceByName, InputValue};
 use shirabe_symfony_console::output::OutputInterface;
-use std::path::PathBuf;
 
 #[derive(Debug)]
 pub struct RequireCommand {
@@ -43,10 +42,10 @@ pub struct RequireCommand {
     newly_created: std::cell::Cell<bool>,
     first_require: std::cell::Cell<bool>,
     json: std::cell::RefCell<Option<std::rc::Rc<std::cell::RefCell<JsonFile>>>>,
-    file: std::cell::RefCell<PathBuf>,
+    file: std::cell::RefCell<std::path::PathBuf>,
     composer_backup: std::cell::RefCell<Vec<u8>>,
     /// file name
-    lock: std::cell::RefCell<PathBuf>,
+    lock: std::cell::RefCell<std::path::PathBuf>,
     /// contents before modification if the lock file exists
     lock_backup: std::cell::RefCell<Option<Vec<u8>>>,
     dependency_resolution_completed: std::rc::Rc<std::cell::Cell<bool>>,
@@ -70,9 +69,9 @@ impl RequireCommand {
             newly_created: std::cell::Cell::new(false),
             first_require: std::cell::Cell::new(false),
             json: std::cell::RefCell::new(None),
-            file: std::cell::RefCell::new(PathBuf::new()),
+            file: std::cell::RefCell::new(std::path::PathBuf::new()),
             composer_backup: std::cell::RefCell::new(Vec::new()),
-            lock: std::cell::RefCell::new(PathBuf::new()),
+            lock: std::cell::RefCell::new(std::path::PathBuf::new()),
             lock_backup: std::cell::RefCell::new(None),
             dependency_resolution_completed: std::rc::Rc::new(std::cell::Cell::new(false)),
             repos: std::cell::RefCell::new(None),

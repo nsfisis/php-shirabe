@@ -1,6 +1,6 @@
 //! ref: composer/tests/Composer/Test/Package/Version/VersionParserTest.php sha1:ae8b539ae640cfcdbe5f182da498ebf1516da2b9
 
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe::package::version::VersionParser;
 use shirabe_php_shim::ToPhpString;

@@ -1,6 +1,6 @@
 //! ref: composer/vendor/composer/semver/src/Constraint/Bound.php sha1:7106e51a8b7f25dc36ed4550d0b3c0e337e3c94b
 
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use shirabe_php_shim::{
     InvalidArgumentException, PhpDisplay, bformat, bwrite, version_compare_ordering,
 };

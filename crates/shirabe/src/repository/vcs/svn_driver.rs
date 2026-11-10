@@ -7,8 +7,7 @@ use crate::io::IOInterface;
 use crate::json::{JsonEncodeOptions, JsonFile};
 use crate::repository::vcs::{VcsDriverBase, VcsDriverInterface};
 use crate::util::{Filesystem, HttpDownloader, ProcessExecutor, Svn as SvnUtil, Url};
-use bstr::{B, BStr, BString, ByteSlice};
-use chrono::{DateTime, FixedOffset, Utc};
+use bstr::{B, BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, PhpMixed, RuntimeException, bformat, date_create, error_message, intval,
@@ -274,7 +273,7 @@ impl SvnDriver {
     pub fn get_change_date(
         &mut self,
         identifier: &BStr,
-    ) -> anyhow::Result<Option<DateTime<FixedOffset>>> {
+    ) -> anyhow::Result<Option<chrono::DateTime<chrono::FixedOffset>>> {
         let identifier = bformat!("/{}/", trim_chars(identifier, "/"));
 
         let (path, rev) = if let Some(m) = preg_match(php_regex!(r"{^(.+?)(@\d+)?/$}"), &identifier)
@@ -297,7 +296,7 @@ impl SvnDriver {
                 && let Some(m) = preg_match(php_regex!(r"{^Last Changed Date: ([^(]+)}"), &line)
             {
                 let date_str = BString::from(m.get(1).unwrap_or_default());
-                return Ok(date_create::<Utc>(trim(&date_str))
+                return Ok(date_create::<chrono::Utc>(trim(&date_str))
                     .ok()
                     .map(|d| d.fixed_offset()));
             }
@@ -565,7 +564,7 @@ impl VcsDriverInterface for SvnDriver {
     fn get_change_date(
         &mut self,
         identifier: &BStr,
-    ) -> anyhow::Result<Option<DateTime<FixedOffset>>> {
+    ) -> anyhow::Result<Option<chrono::DateTime<chrono::FixedOffset>>> {
         SvnDriver::get_change_date(self, identifier)
     }
 

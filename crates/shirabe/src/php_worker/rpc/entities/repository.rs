@@ -9,7 +9,7 @@ use crate::repository::{
     FindPackageConstraint, InstalledArrayRepository, InstalledFilesystemRepository,
     LockArrayRepository, RepositoryInterfaceHandle, WritableRepositoryInterface,
 };
-use bstr::{BString, ByteSlice};
+use bstr::{BString, ByteSlice as _};
 use shirabe_php_rpc::{PhpThrow, PluginValue, ToPluginValue};
 use shirabe_php_shim::bformat;
 

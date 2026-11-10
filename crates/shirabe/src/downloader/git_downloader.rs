@@ -9,7 +9,7 @@ use crate::downloader::{
 use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface};
 use crate::package::{DisplayMode, PackageInterfaceHandle};
 use crate::util::{Filesystem, Git as GitUtil, Platform, ProcessExecutor, Url};
-use bstr::{B, BStr, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     CmpOp, PhpMixed, RuntimeException, array_map, basename, bformat, dirname, impl_php_class,
@@ -18,7 +18,6 @@ use shirabe_php_shim::{
     substr, trim, version_compare,
 };
 use shirabe_symfony_console::input::InputValue;
-use std::path::{Path, PathBuf};
 
 #[derive(Debug)]
 pub struct GitDownloader {
@@ -57,7 +56,7 @@ impl GitDownloader {
     pub fn get_unpushed_changes(
         &self,
         _package: PackageInterfaceHandle,
-        path: &Path,
+        path: &std::path::Path,
     ) -> anyhow::Result<Option<BString>> {
         GitUtil::clean_env(&self.inner.process);
         let path = self.normalize_path(path);
@@ -246,7 +245,7 @@ impl GitDownloader {
     fn update_to_commit(
         &self,
         package: PackageInterfaceHandle,
-        path: &Path,
+        path: &std::path::Path,
         reference: &BStr,
         pretty_version: &BStr,
     ) -> anyhow::Result<Option<BString>> {
@@ -473,7 +472,7 @@ impl GitDownloader {
         .into())
     }
 
-    fn update_origin_url(&self, path: &Path, url: &BStr) -> anyhow::Result<()> {
+    fn update_origin_url(&self, path: &std::path::Path, url: &BStr) -> anyhow::Result<()> {
         let mut output = BString::default();
         self.inner.process.borrow_mut().execute(
             &[
@@ -490,7 +489,7 @@ impl GitDownloader {
         self.set_push_url(path, url)
     }
 
-    fn set_push_url(&self, path: &Path, url: &BStr) -> anyhow::Result<()> {
+    fn set_push_url(&self, path: &std::path::Path, url: &BStr) -> anyhow::Result<()> {
         // set push url for github projects
         if let Some(match_) = preg_match(
             bformat!(
@@ -526,7 +525,7 @@ impl GitDownloader {
         Ok(())
     }
 
-    async fn discard_changes(&self, path: &Path) -> anyhow::Result<Option<PhpMixed>> {
+    async fn discard_changes(&self, path: &std::path::Path) -> anyhow::Result<Option<PhpMixed>> {
         let path = self.normalize_path(path);
         let mut output = BString::default();
         if self.inner.process.borrow_mut().execute(
@@ -558,7 +557,7 @@ impl GitDownloader {
         Ok(None)
     }
 
-    async fn stash_changes(&self, path: &Path) -> anyhow::Result<Option<PhpMixed>> {
+    async fn stash_changes(&self, path: &std::path::Path) -> anyhow::Result<Option<PhpMixed>> {
         let path = self.normalize_path(path);
         let mut output = BString::default();
         if self.inner.process.borrow_mut().execute(
@@ -579,7 +578,7 @@ impl GitDownloader {
         Ok(None)
     }
 
-    fn view_diff(&self, path: &Path) -> anyhow::Result<()> {
+    fn view_diff(&self, path: &std::path::Path) -> anyhow::Result<()> {
         let path = self.normalize_path(path);
         let mut output = BString::default();
         if self.inner.process.borrow_mut().execute(
@@ -596,7 +595,7 @@ impl GitDownloader {
         Ok(())
     }
 
-    fn normalize_path(&self, path: &Path) -> PathBuf {
+    fn normalize_path(&self, path: &std::path::Path) -> std::path::PathBuf {
         let mut path = BString::from(path_to_bytes(path));
         if Platform::is_windows() && strlen(&path) > 0 {
             let mut base_path = path.clone();
@@ -610,7 +609,7 @@ impl GitDownloader {
             }
 
             if base_path == "\\" {
-                return PathBuf::from(path_from_bytes(&path));
+                return std::path::PathBuf::from(path_from_bytes(&path));
             }
 
             path = rtrim_chars(
@@ -623,7 +622,7 @@ impl GitDownloader {
             );
         }
 
-        PathBuf::from(path_from_bytes(&path))
+        std::path::PathBuf::from(path_from_bytes(&path))
     }
 
     fn get_short_hash(&self, reference: &BStr) -> BString {
@@ -639,7 +638,7 @@ impl GitDownloader {
         &self,
         commands: Vec<Vec<BString>>,
         url: &BStr,
-        cwd: &Path,
+        cwd: &std::path::Path,
         initial_clone: bool,
     ) -> anyhow::Result<()> {
         self.git_util
@@ -652,7 +651,7 @@ impl GitDownloader {
     async fn fail_on_local_changes(
         &self,
         package: PackageInterfaceHandle,
-        path: &Path,
+        path: &std::path::Path,
     ) -> anyhow::Result<()> {
         if self.get_local_changes(package, path).await?.is_some() {
             return Err(RuntimeException::new(bformat!(
@@ -669,7 +668,7 @@ impl DvcsDownloaderInterface for GitDownloader {
     fn get_unpushed_changes(
         &self,
         package: PackageInterfaceHandle,
-        path: &Path,
+        path: &std::path::Path,
     ) -> anyhow::Result<Option<bstr::BString>> {
         GitDownloader::get_unpushed_changes(self, package, path)
     }
@@ -680,7 +679,7 @@ impl ChangeReportInterface for GitDownloader {
     async fn get_local_changes(
         &self,
         _package: PackageInterfaceHandle,
-        path: &Path,
+        path: &std::path::Path,
     ) -> anyhow::Result<Option<bstr::BString>> {
         GitUtil::clean_env(&self.inner.process);
         if !self.has_metadata_repository(path) {
@@ -723,7 +722,7 @@ impl VcsCapableDownloaderInterface for GitDownloader {
     fn get_vcs_reference(
         &self,
         package: PackageInterfaceHandle,
-        path: &Path,
+        path: &std::path::Path,
     ) -> anyhow::Result<Option<bstr::BString>> {
         self.inner.get_vcs_reference(package, path)
     }
@@ -753,7 +752,7 @@ impl VcsDownloader for GitDownloader {
     async fn do_download(
         &self,
         package: PackageInterfaceHandle,
-        path: &Path,
+        path: &std::path::Path,
         url: &bstr::BStr,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -764,7 +763,7 @@ impl VcsDownloader for GitDownloader {
 
         GitUtil::clean_env(&self.inner.process);
 
-        let cache_path = PathBuf::from(path_from_bytes(&bformat!(
+        let cache_path = std::path::PathBuf::from(path_from_bytes(&bformat!(
             "{}/{}/",
             self.inner
                 .config
@@ -823,7 +822,7 @@ impl VcsDownloader for GitDownloader {
     async fn do_install(
         &self,
         package: PackageInterfaceHandle,
-        path: &Path,
+        path: &std::path::Path,
         url: &bstr::BStr,
     ) -> anyhow::Result<Option<PhpMixed>> {
         GitUtil::clean_env(&self.inner.process);
@@ -970,7 +969,7 @@ impl VcsDownloader for GitDownloader {
         &self,
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
-        path: &Path,
+        path: &std::path::Path,
         url: &bstr::BStr,
     ) -> anyhow::Result<Option<PhpMixed>> {
         GitUtil::clean_env(&self.inner.process);
@@ -1105,7 +1104,7 @@ impl VcsDownloader for GitDownloader {
     async fn clean_changes(
         &self,
         package: PackageInterfaceHandle,
-        path: &Path,
+        path: &std::path::Path,
         update: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
         GitUtil::clean_env(&self.inner.process);
@@ -1236,7 +1235,7 @@ impl VcsDownloader for GitDownloader {
         Ok(None)
     }
 
-    fn reapply_changes(&self, path: &Path) -> anyhow::Result<()> {
+    fn reapply_changes(&self, path: &std::path::Path) -> anyhow::Result<()> {
         let path = self.normalize_path(path);
         let path_key = path_to_bytes(&path).as_bstr();
         if self
@@ -1275,7 +1274,7 @@ impl VcsDownloader for GitDownloader {
         &self,
         from_reference: &bstr::BStr,
         to_reference: &bstr::BStr,
-        path: &Path,
+        path: &std::path::Path,
     ) -> anyhow::Result<bstr::BString> {
         let path = self.normalize_path(path);
         let mut args: Vec<BString> = vec![
@@ -1304,7 +1303,7 @@ impl VcsDownloader for GitDownloader {
         GitUtil::parse_rev_list_output(&output, &self.inner.process)
     }
 
-    fn has_metadata_repository(&self, path: &Path) -> bool {
+    fn has_metadata_repository(&self, path: &std::path::Path) -> bool {
         let path = self.normalize_path(path);
 
         is_dir(path_from_bytes(&bformat!("{path}/.git")))
@@ -1332,7 +1331,7 @@ impl DownloaderInterface for GitDownloader {
     async fn download_with_output(
         &self,
         package: PackageInterfaceHandle,
-        path: &Path,
+        path: &std::path::Path,
         prev_package: Option<PackageInterfaceHandle>,
         _output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -1343,7 +1342,7 @@ impl DownloaderInterface for GitDownloader {
         &self,
         r#type: &BStr,
         package: PackageInterfaceHandle,
-        path: &Path,
+        path: &std::path::Path,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as VcsDownloader>::prepare(self, r#type, package, path, prev_package).await
@@ -1352,7 +1351,7 @@ impl DownloaderInterface for GitDownloader {
     async fn install_with_output(
         &self,
         package: PackageInterfaceHandle,
-        path: &Path,
+        path: &std::path::Path,
         _output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as VcsDownloader>::install(self, package, path).await
@@ -1362,7 +1361,7 @@ impl DownloaderInterface for GitDownloader {
         &self,
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
-        path: &Path,
+        path: &std::path::Path,
     ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as VcsDownloader>::update(self, initial, target, path).await
     }
@@ -1370,7 +1369,7 @@ impl DownloaderInterface for GitDownloader {
     async fn remove_with_output(
         &self,
         package: PackageInterfaceHandle,
-        path: &Path,
+        path: &std::path::Path,
         _output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as VcsDownloader>::remove(self, package, path).await
@@ -1380,7 +1379,7 @@ impl DownloaderInterface for GitDownloader {
         &self,
         r#type: &BStr,
         package: PackageInterfaceHandle,
-        path: &Path,
+        path: &std::path::Path,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as VcsDownloader>::cleanup(self, r#type, package, path, prev_package).await

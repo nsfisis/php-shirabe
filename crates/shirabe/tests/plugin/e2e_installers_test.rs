@@ -7,14 +7,11 @@
 
 use crate::e2e_extension_installer_test::{copy_dir, upstream_composer_bin};
 use crate::php_worker::lock_php_worker;
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use shirabe_php_shim::{os_str_from_bytes, path_to_bytes};
-use std::ffi::OsStr;
-use std::path::{Path, PathBuf};
-use tempfile::TempDir;
 
-fn fixture_dir() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/plugin/fixtures/e2e-installers")
+fn fixture_dir() -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/plugin/fixtures/e2e-installers")
 }
 
 fn plugin_fetched() -> bool {
@@ -24,7 +21,9 @@ fn plugin_fetched() -> bool {
 }
 
 /// The two implementations under comparison: upstream Composer first, Shirabe second.
-pub(crate) fn implementations(composer_bin: &OsStr) -> [(&BStr, Vec<&OsStr>); 2] {
+pub(crate) fn implementations(
+    composer_bin: &std::ffi::OsStr,
+) -> [(&BStr, Vec<&std::ffi::OsStr>); 2] {
     [
         (BStr::new("php"), vec![composer_bin]),
         (BStr::new(env!("CARGO_BIN_EXE_shirabe")), vec![]),
@@ -37,9 +36,9 @@ pub(crate) struct CommandRun {
 }
 
 pub(crate) fn run_command(
-    work: &Path,
+    work: &std::path::Path,
     program: &BStr,
-    prefix_args: &[&OsStr],
+    prefix_args: &[&std::ffi::OsStr],
     args: &[&BStr],
 ) -> CommandRun {
     let output = std::process::Command::new(os_str_from_bytes(&program))
@@ -67,7 +66,7 @@ pub(crate) fn run_command(
     clippy::disallowed_methods,
     reason = "the test splits a child process's output into lines, which no PHP code does"
 )]
-fn normalize_output(stdout: &[u8], work: &Path) -> Vec<BString> {
+fn normalize_output(stdout: &[u8], work: &std::path::Path) -> Vec<BString> {
     let work = path_to_bytes(work);
     stdout
         .lines()
@@ -80,14 +79,14 @@ fn normalize_output(stdout: &[u8], work: &Path) -> Vec<BString> {
 }
 
 /// Every file under `dir` as (relative path, contents), so two project trees compare as a whole.
-pub(crate) fn tree(dir: &Path) -> Vec<(BString, BString)> {
+pub(crate) fn tree(dir: &std::path::Path) -> Vec<(BString, BString)> {
     let mut files = Vec::new();
     collect(dir, dir, &mut files);
     files.sort();
     files
 }
 
-fn collect(root: &Path, dir: &Path, files: &mut Vec<(BString, BString)>) {
+fn collect(root: &std::path::Path, dir: &std::path::Path, files: &mut Vec<(BString, BString)>) {
     for entry in std::fs::read_dir(dir).unwrap() {
         let entry = entry.unwrap();
         let path = entry.path();
@@ -103,7 +102,7 @@ fn collect(root: &Path, dir: &Path, files: &mut Vec<(BString, BString)>) {
     }
 }
 
-fn edit(path: &Path, from: &BStr, to: &BStr) {
+fn edit(path: &std::path::Path, from: &BStr, to: &BStr) {
     let text = BString::from(std::fs::read(path).unwrap());
     assert!(
         text.contains_str(from),
@@ -124,7 +123,7 @@ fn test_composer_installers_matches_upstream_composer() {
 
     let mut results = Vec::new();
     for (program, prefix) in &implementations(composer_bin.as_os_str()) {
-        let work = TempDir::new().unwrap();
+        let work = tempfile::TempDir::new().unwrap();
         copy_dir(&fixture_dir(), work.path());
         let run = run_command(work.path(), program, prefix, &[BStr::new("install")]);
         let tree = tree(&work.path().join("project"));
@@ -163,7 +162,7 @@ fn test_composer_installers_update_and_remove_match_upstream_composer() {
 
     let mut results = Vec::new();
     for (program, prefix) in &implementations(composer_bin.as_os_str()) {
-        let work = TempDir::new().unwrap();
+        let work = tempfile::TempDir::new().unwrap();
         copy_dir(&fixture_dir(), work.path());
         let install = run_command(work.path(), program, prefix, &[BStr::new("install")]);
 
@@ -226,7 +225,7 @@ fn test_composer_installers_custom_paths_match_upstream_composer() {
 
     let mut results = Vec::new();
     for (program, prefix) in &implementations(composer_bin.as_os_str()) {
-        let work = TempDir::new().unwrap();
+        let work = tempfile::TempDir::new().unwrap();
         copy_dir(&fixture_dir(), work.path());
         edit(
             &work.path().join("project/composer.json"),

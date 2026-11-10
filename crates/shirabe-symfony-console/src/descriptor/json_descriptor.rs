@@ -10,7 +10,6 @@ use crate::input::{InputArgument, InputDefinition, InputOption, InputValue};
 use crate::output::OutputInterface;
 use bstr::BString;
 use indexmap::IndexMap;
-use serde::Serialize;
 use shirabe_php_shim::{bformat, json_bytes, json_encode_ex, php_regex, preg_replace, str_replace};
 
 /// JSON descriptor.
@@ -20,7 +19,7 @@ pub struct JsonDescriptor {
 }
 
 /// The array `getInputArgumentData()` returns.
-#[derive(Debug, Serialize)]
+#[derive(Debug, serde::Serialize)]
 struct InputArgumentData {
     #[serde(serialize_with = "json_bytes::str")]
     name: BString,
@@ -33,7 +32,7 @@ struct InputArgumentData {
 }
 
 /// The array `getInputOptionData()` returns.
-#[derive(Debug, Serialize)]
+#[derive(Debug, serde::Serialize)]
 struct InputOptionData {
     #[serde(serialize_with = "json_bytes::str")]
     name: BString,
@@ -49,7 +48,7 @@ struct InputOptionData {
 }
 
 /// The array `getInputDefinitionData()` returns.
-#[derive(Debug, Serialize)]
+#[derive(Debug, serde::Serialize)]
 struct InputDefinitionData {
     #[serde(serialize_with = "json_bytes::keyed")]
     arguments: IndexMap<BString, InputArgumentData>,
@@ -59,7 +58,7 @@ struct InputDefinitionData {
 
 /// The array `getCommandData()` returns. `help` and `definition` are present unless the data is
 /// short.
-#[derive(Debug, Serialize)]
+#[derive(Debug, serde::Serialize)]
 struct CommandData {
     #[serde(serialize_with = "json_bytes::option_str")]
     name: Option<BString>,
@@ -78,7 +77,7 @@ struct CommandData {
 }
 
 /// `$data['application']` in `describeApplication()`.
-#[derive(Debug, Serialize)]
+#[derive(Debug, serde::Serialize)]
 struct ApplicationData {
     #[serde(serialize_with = "json_bytes::str")]
     name: BString,
@@ -91,7 +90,7 @@ struct ApplicationData {
 
 /// The array `describeApplication()` writes. It holds `namespace` when a namespace is described
 /// and `namespaces` otherwise.
-#[derive(Debug, Serialize)]
+#[derive(Debug, serde::Serialize)]
 struct ApplicationDescriptionData {
     #[serde(skip_serializing_if = "Option::is_none")]
     application: Option<ApplicationData>,
@@ -199,7 +198,11 @@ impl JsonDescriptor {
     }
 
     /// Writes data as json.
-    fn write_data(&self, data: &impl Serialize, options: &DescriptorOptions) -> anyhow::Result<()> {
+    fn write_data(
+        &self,
+        data: &impl serde::Serialize,
+        options: &DescriptorOptions,
+    ) -> anyhow::Result<()> {
         let flags = options.json_encoding;
 
         self.write(json_encode_ex(data, flags).unwrap_or_default(), false);

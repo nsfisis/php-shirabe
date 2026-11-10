@@ -4,7 +4,7 @@ use crate::exception::RuntimeException;
 use crate::input::{
     ArgumentName, Input, InputDefinition, InputInterface, InputValue, StreamableInputInterface,
 };
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     PhpDisplay, PhpResource, ToPhpString, bformat, implode, mb_detect_encoding, mb_substr,

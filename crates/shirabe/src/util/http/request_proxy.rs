@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/Util/Http/RequestProxy.php sha1:1beec93773cdfefc2959a00847f9c5519e879119
 
 use crate::downloader::TransportException;
-use bstr::{B, BStr, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     CURLAUTH_BASIC, CURLOPT_NOPROXY, CURLOPT_PROXY, CURLOPT_PROXY_CAINFO, CURLOPT_PROXY_CAPATH,

@@ -1,10 +1,9 @@
 //! What the `diagnose` command asks the PHP runtime, answered by the worker in one round trip.
 
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_rpc::{cached, query};
 use shirabe_php_shim::php_str;
-use std::sync::OnceLock;
 
 shirabe_php_rpc::plugin_value_record! {
     /// `curl_version()`, together with the `CURL_*` constants the `diagnose` command consults.
@@ -128,7 +127,7 @@ impl Diagnostics {
     }
 }
 
-static DIAGNOSTICS: OnceLock<Diagnostics> = OnceLock::new();
+static DIAGNOSTICS: std::sync::OnceLock<Diagnostics> = std::sync::OnceLock::new();
 
 /// PHP runtime information for the `diagnose` command. The worker is queried once per process;
 /// subsequent calls reuse the cached payload.

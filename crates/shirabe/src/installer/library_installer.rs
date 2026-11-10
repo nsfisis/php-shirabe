@@ -9,19 +9,18 @@ use crate::io::IOInterface;
 use crate::package::PackageInterfaceHandle;
 use crate::repository::InstalledRepositoryInterfaceHandle;
 use crate::util::{Filesystem, Platform};
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpMixed, ToPhpString, bformat, dirname, is_dir,
     is_link, path_from_bytes, path_to_bytes, preg_quote, preg_replace, realpath, rmdir,
     rtrim_chars, str_replace, strpos,
 };
-use std::path::PathBuf;
 
 /// Package installation manager.
 #[derive(Debug)]
 pub struct LibraryInstaller {
     pub(crate) composer: PartialComposerWeakHandle,
-    vendor_dir: std::cell::RefCell<PathBuf>,
+    vendor_dir: std::cell::RefCell<std::path::PathBuf>,
     download_manager: Option<std::rc::Rc<std::cell::RefCell<dyn DownloadManagerInterface>>>,
     pub(crate) io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     r#type: Option<BString>,
@@ -50,7 +49,7 @@ impl LibraryInstaller {
 
         let filesystem = filesystem
             .unwrap_or_else(|| std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(None))));
-        let vendor_dir = PathBuf::from(path_from_bytes(&rtrim_chars(
+        let vendor_dir = std::path::PathBuf::from(path_from_bytes(&rtrim_chars(
             composer_ref.get_config().borrow().get_path("vendor-dir")?,
             "/",
         )));
@@ -58,7 +57,7 @@ impl LibraryInstaller {
             match binary_installer {
                 Some(binary_installer) => binary_installer,
                 None => {
-                    let bin_dir = PathBuf::from(path_from_bytes(&rtrim_chars(
+                    let bin_dir = std::path::PathBuf::from(path_from_bytes(&rtrim_chars(
                         composer_ref.get_config().borrow().get_path("bin-dir")?,
                         "/",
                     )));
@@ -105,14 +104,14 @@ impl LibraryInstaller {
     ///
     /// It is used for BC as getInstallPath tends to be overridden by
     /// installer plugins but not getPackageBasePath
-    fn get_package_base_path(&self, package: PackageInterfaceHandle) -> PathBuf {
+    fn get_package_base_path(&self, package: PackageInterfaceHandle) -> std::path::PathBuf {
         let install_path = self.get_install_path(package.clone()).unwrap();
         let target_dir = package.get_target_dir();
 
         if let Some(target_dir) = target_dir
             && !target_dir.is_empty()
         {
-            return PathBuf::from(path_from_bytes(&preg_replace(
+            return std::path::PathBuf::from(path_from_bytes(&preg_replace(
                 bformat!(
                     "{{/*{}/?$}}",
                     str_replace("/", "/+", preg_quote(&target_dir, None))
@@ -389,7 +388,7 @@ impl InstallerInterface for LibraryInstaller {
         Ok(None)
     }
 
-    fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<PathBuf> {
+    fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<std::path::PathBuf> {
         self.initialize_vendor_dir();
 
         let vendor_dir = self.vendor_dir.borrow();
@@ -413,7 +412,7 @@ impl InstallerInterface for LibraryInstaller {
         } else {
             base_path
         };
-        Some(PathBuf::from(path_from_bytes(&install_path)))
+        Some(std::path::PathBuf::from(path_from_bytes(&install_path)))
     }
 
     fn as_binary_presence_interface(&self) -> Option<&dyn BinaryPresenceInterface> {

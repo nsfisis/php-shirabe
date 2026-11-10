@@ -1,6 +1,6 @@
 //! ref: composer/tests/Composer/Test/DependencyResolver/PoolBuilderTest.php sha1:7d7dab74920d7704bf7f062e0fee6186abbb9c61
 
-use bstr::{B, BStr, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe::config::Config;
 use shirabe::dependency_resolver::{
@@ -19,7 +19,6 @@ use shirabe_php_shim::{
     PhpMixed, ToPhpString, bformat, display_to_bytes, file_get_contents, path_to_bytes, php_regex,
     preg_is_match, preg_split_delim_capture, str_replace, utf8_text,
 };
-use std::path::PathBuf;
 
 /// Maps the PHP `$loadPackage` closure: pops the optional `id` from the data, loads the
 /// package and records it in `package_ids` keyed by that id (erroring on duplicates).
@@ -106,7 +105,7 @@ fn read_test_file(
     data
 }
 
-fn collect_test_files(dir: &std::path::Path, out: &mut Vec<PathBuf>) {
+fn collect_test_files(dir: &std::path::Path, out: &mut Vec<std::path::PathBuf>) {
     for entry in std::fs::read_dir(dir).unwrap() {
         let entry = entry.unwrap();
         let path = entry.path();
@@ -130,7 +129,7 @@ struct IntegrationTest {
 }
 
 fn get_integration_tests(fixtures_dir: &std::path::Path) -> IndexMap<BString, IntegrationTest> {
-    let mut files: Vec<PathBuf> = Vec::new();
+    let mut files: Vec<std::path::PathBuf> = Vec::new();
     collect_test_files(fixtures_dir, &mut files);
 
     let mut tests: IndexMap<BString, IntegrationTest> = IndexMap::new();
@@ -186,7 +185,6 @@ fn get_integration_tests(fixtures_dir: &std::path::Path) -> IndexMap<BString, In
 /// compare numerically; otherwise both are compared as strings.
 fn php_sort_mixed(values: &mut [PhpMixed]) {
     fn cmp(a: &PhpMixed, b: &PhpMixed) -> std::cmp::Ordering {
-        use std::cmp::Ordering;
         let num = |m: &PhpMixed| -> Option<f64> {
             match m {
                 PhpMixed::Int(i) => Some(*i as f64),
@@ -206,7 +204,7 @@ fn php_sort_mixed(values: &mut [PhpMixed]) {
         match (a, b) {
             (PhpMixed::Int(x), PhpMixed::Int(y)) => x.cmp(y),
             _ => match (num(a), num(b)) {
-                (Some(x), Some(y)) => x.partial_cmp(&y).unwrap_or(Ordering::Equal),
+                (Some(x), Some(y)) => x.partial_cmp(&y).unwrap_or(std::cmp::Ordering::Equal),
                 _ => str_of(a).cmp(&str_of(b)),
             },
         }
@@ -616,7 +614,7 @@ fn run_test_pool_builder(
 
 #[test]
 fn test_pool_builder() {
-    let fixtures_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+    let fixtures_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../composer/tests/Composer/Test/DependencyResolver/Fixtures/poolbuilder");
     let fixtures_dir = std::fs::canonicalize(&fixtures_dir).unwrap();
 

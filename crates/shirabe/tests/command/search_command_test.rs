@@ -1,8 +1,7 @@
 //! ref: composer/tests/Composer/Test/Command/SearchCommandTest.php sha1:94362ef761078fdebc57ef6dfaaf2f902d3231b8
 
 use crate::test_case::{RunOptions, get_application_tester, init_temp_composer};
-use bstr::{BStr, ByteSlice};
-use serial_test::serial;
+use bstr::{BStr, ByteSlice as _};
 use shirabe_php_shim::{error_message, trim};
 use shirabe_symfony_console::input::{InputValue, ParameterName};
 
@@ -37,7 +36,7 @@ fn run_search_case(command: Vec<(ParameterName, InputValue)>, expected: &BStr) {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_search() {
     // 'by name and description'
     run_search_case(
@@ -122,7 +121,7 @@ fn test_search() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_invalid_format() {
     let _tear_down = init_temp_composer(
         Some(&serde_json::json!({ "repositories": { "packagist.org": false } })),
@@ -156,7 +155,7 @@ fn test_invalid_format() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_invalid_flags() {
     let _tear_down = init_temp_composer(
         Some(&serde_json::json!({ "repositories": { "packagist.org": false } })),

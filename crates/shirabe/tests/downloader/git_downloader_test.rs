@@ -6,9 +6,8 @@ use crate::io_mock::{Expectation, get_io_mock};
 use crate::io_stub::IOStub;
 use crate::process_executor_mock::{cmd, cmd_full, get_process_executor_mock};
 use crate::test_case::get_unique_tmp_directory;
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
-use serial_test::serial;
 use shirabe::config::Config;
 use shirabe::downloader::{GitDownloader, VcsDownloader};
 use shirabe::io::{IOInterface, io_interface};
@@ -18,9 +17,8 @@ use shirabe_php_shim::{
     PhpMixed, ToPhpString, bformat, error_message, path_from_bytes, path_to_bytes,
 };
 use shirabe_semver::VersionParser;
-use tempfile::TempDir;
 
-fn set_up() -> TempDir {
+fn set_up() -> tempfile::TempDir {
     // skipIfNotExecutable('git') is irrelevant because every git invocation is mocked.
 
     // initGitVersion('1.0.0'): seed the Composer\Util\Git static version cache.
@@ -83,7 +81,7 @@ fn get_package(
 fn setup_config(config: Config) -> Config {
     let mut config = config;
     if !config.has("home") {
-        let tmp_dir = TempDir::new().unwrap().keep();
+        let tmp_dir = tempfile::TempDir::new().unwrap().keep();
         let mut top: IndexMap<BString, PhpMixed> = IndexMap::new();
         let mut section: IndexMap<BString, PhpMixed> = IndexMap::new();
         section.insert("home".into(), PhpMixed::string(path_to_bytes(&tmp_dir)));
@@ -110,7 +108,7 @@ fn get_downloader_mock(
     GitDownloader::new(io, config, Some(process), filesystem)
 }
 
-#[serial]
+#[serial_test::serial]
 #[test]
 fn test_download_for_package_without_source_reference() {
     let working_dir = set_up();
@@ -150,7 +148,7 @@ fn test_download_for_package_without_source_reference() {
     assert!(error_message(&e).contains_str("missing reference information"));
 }
 
-#[serial]
+#[serial_test::serial]
 #[test]
 fn test_download() {
     let working_dir = set_up();
@@ -247,7 +245,7 @@ fn test_download() {
     });
 }
 
-#[serial]
+#[serial_test::serial]
 #[test]
 fn test_download_with_cache() {
     let working_dir = set_up();
@@ -407,7 +405,7 @@ fn test_download_with_cache() {
     fs.remove_directory(path_from_bytes(&cache_path)).ok();
 }
 
-#[serial]
+#[serial_test::serial]
 #[test]
 fn test_download_uses_various_protocols_and_sets_push_url_for_github() {
     let working_dir = set_up();
@@ -535,7 +533,7 @@ fn test_download_uses_various_protocols_and_sets_push_url_for_github() {
     });
 }
 
-#[serial]
+#[serial_test::serial]
 #[test]
 fn test_download_and_set_push_url_use_custom_various_protocols_for_github() {
     // ref: pushUrlProvider — (github-protocols, fetch url, push url).
@@ -670,7 +668,7 @@ fn test_download_and_set_push_url_use_custom_various_protocols_for_github() {
     }
 }
 
-#[serial]
+#[serial_test::serial]
 #[test]
 fn test_download_throws_runtime_exception_if_git_command_fails() {
     let working_dir = set_up();
@@ -737,7 +735,7 @@ fn test_download_throws_runtime_exception_if_git_command_fails() {
     )));
 }
 
-#[serial]
+#[serial_test::serial]
 #[test]
 fn test_updatefor_package_without_source_reference() {
     let working_dir = set_up();
@@ -791,7 +789,7 @@ fn test_updatefor_package_without_source_reference() {
     assert!(error_message(&e).contains_str("missing reference information"));
 }
 
-#[serial]
+#[serial_test::serial]
 #[test]
 fn test_update() {
     let working_dir = set_up();
@@ -890,7 +888,7 @@ fn test_update() {
     });
 }
 
-#[serial]
+#[serial_test::serial]
 #[test]
 fn test_update_with_new_repo_url() {
     let working_dir = set_up();
@@ -1002,7 +1000,7 @@ fn test_update_with_new_repo_url() {
     });
 }
 
-#[serial]
+#[serial_test::serial]
 #[test]
 fn test_update_throws_runtime_exception_if_git_command_fails() {
     let working_dir = set_up();
@@ -1103,7 +1101,7 @@ fn test_update_throws_runtime_exception_if_git_command_fails() {
     assert!(error_message(&e).contains_str("git@github.com:composer/composer"));
 }
 
-#[serial]
+#[serial_test::serial]
 #[test]
 fn test_update_doesnt_throws_runtime_exception_if_git_command_fails_at_first_but_is_able_to_recover()
  {
@@ -1222,7 +1220,7 @@ fn test_update_doesnt_throws_runtime_exception_if_git_command_fails_at_first_but
     });
 }
 
-#[serial]
+#[serial_test::serial]
 #[test]
 fn test_downgrade_shows_appropriate_message() {
     let working_dir = set_up();
@@ -1301,7 +1299,7 @@ fn test_downgrade_shows_appropriate_message() {
     });
 }
 
-#[serial]
+#[serial_test::serial]
 #[test]
 fn test_not_using_downgrading_with_references() {
     let working_dir = set_up();
@@ -1388,7 +1386,7 @@ fn test_not_using_downgrading_with_references() {
     });
 }
 
-#[serial]
+#[serial_test::serial]
 #[test]
 fn test_remove() {
     let working_dir = set_up();
@@ -1448,7 +1446,7 @@ fn test_remove() {
     );
 }
 
-#[serial]
+#[serial_test::serial]
 #[test]
 fn test_get_installation_source() {
     let working_dir = set_up();

@@ -4,7 +4,7 @@ use crate::async_runtime::run;
 use crate::io_stub::IOStub;
 use crate::process_executor_mock::{cmd, get_process_executor_mock};
 use crate::test_case::get_unique_tmp_directory;
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use shirabe::config::Config;
 use shirabe::downloader::{HgDownloader, VcsDownloader};
 use shirabe::io::IOInterface;
@@ -12,9 +12,8 @@ use shirabe::package::{CompletePackageHandle, PackageInterfaceHandle};
 use shirabe::util::{Filesystem, FilesystemMock, ProcessExecutor};
 use shirabe_php_shim::{ToPhpString, error_message, path_from_bytes};
 use shirabe_semver::VersionParser;
-use tempfile::TempDir;
 
-fn set_up() -> TempDir {
+fn set_up() -> tempfile::TempDir {
     get_unique_tmp_directory()
 }
 

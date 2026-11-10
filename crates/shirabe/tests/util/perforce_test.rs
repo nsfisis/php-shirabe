@@ -2,9 +2,8 @@
 
 use crate::io_stub::IOStub;
 use crate::process_executor_mock::{cmd, cmd_full, get_process_executor_mock};
-use bstr::{B, BStr, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
-use serial_test::serial;
 use shirabe::io::{IOInterface, NullIO};
 use shirabe::util::{Filesystem, MockHandler, Perforce, ProcessExecutor};
 use shirabe_php_shim::{
@@ -747,7 +746,7 @@ fn test_get_composer_information_with_label_with_stream() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_sync_code_base_without_stream() {
     let (process, _guard) = get_process_executor_mock(
         vec![cmd(vec![
@@ -773,7 +772,7 @@ fn test_sync_code_base_without_stream() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_sync_code_base_with_stream() {
     let (process, _guard) = get_process_executor_mock(
         vec![cmd(vec![

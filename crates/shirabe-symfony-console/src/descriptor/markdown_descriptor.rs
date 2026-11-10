@@ -8,7 +8,7 @@ use crate::descriptor::{
 use crate::helper::Helper;
 use crate::input::{InputArgument, InputDefinition, InputOption};
 use crate::output::{OUTPUT_NORMAL, OUTPUT_RAW, OutputInterface};
-use bstr::{BString, ByteSlice};
+use bstr::{BString, ByteSlice as _};
 use shirabe_php_shim::{bformat, implode, preg_replace, str_repeat, str_replace, var_export};
 
 /// Markdown descriptor.

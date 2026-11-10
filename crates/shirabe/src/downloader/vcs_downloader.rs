@@ -12,14 +12,13 @@ use crate::package::PackageInterfaceHandle;
 use crate::package::dumper::ArrayDumper;
 use crate::package::version::{VersionGuesser, VersionParser};
 use crate::util::{Filesystem, ProcessExecutor};
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     AnyThrowable, InvalidArgumentException, PhpClass as _, PhpMixed, RuntimeException, array_map,
     array_shift, bformat, error_message, explode, implode, path_from_bytes, path_to_bytes,
     rawurldecode, realpath, str_replace, strlen, strpos, substr, trim,
 };
-use std::path::Path;
 
 #[derive(Debug)]
 pub struct VcsDownloaderBase {
@@ -54,7 +53,7 @@ impl VcsDownloaderBase {
     pub fn get_vcs_reference(
         &self,
         package: PackageInterfaceHandle,
-        path: &Path,
+        path: &std::path::Path,
     ) -> anyhow::Result<Option<bstr::BString>> {
         let parser = VersionParser::new();
         let mut guesser = VersionGuesser::new(
@@ -87,7 +86,7 @@ pub trait VcsDownloader:
     async fn do_download(
         &self,
         package: PackageInterfaceHandle,
-        path: &Path,
+        path: &std::path::Path,
         url: &bstr::BStr,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>>;
@@ -96,7 +95,7 @@ pub trait VcsDownloader:
     async fn do_install(
         &self,
         package: PackageInterfaceHandle,
-        path: &Path,
+        path: &std::path::Path,
         url: &bstr::BStr,
     ) -> anyhow::Result<Option<PhpMixed>>;
 
@@ -105,7 +104,7 @@ pub trait VcsDownloader:
         &self,
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
-        path: &Path,
+        path: &std::path::Path,
         url: &bstr::BStr,
     ) -> anyhow::Result<Option<PhpMixed>>;
 
@@ -114,12 +113,12 @@ pub trait VcsDownloader:
         &self,
         from_reference: &bstr::BStr,
         to_reference: &bstr::BStr,
-        path: &Path,
+        path: &std::path::Path,
     ) -> anyhow::Result<bstr::BString>;
 
     /// Checks if VCS metadata repository has been initialized
     /// repository example: .git|.svn|.hg
-    fn has_metadata_repository(&self, path: &Path) -> bool;
+    fn has_metadata_repository(&self, path: &std::path::Path) -> bool;
 
     fn get_installation_source(&self) -> BString {
         BString::from("source")
@@ -128,7 +127,7 @@ pub trait VcsDownloader:
     async fn download(
         &self,
         package: PackageInterfaceHandle,
-        path: &Path,
+        path: &std::path::Path,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         if package.get_source_reference().is_none() {
@@ -180,7 +179,7 @@ pub trait VcsDownloader:
         &self,
         r#type: &BStr,
         package: PackageInterfaceHandle,
-        path: &Path,
+        path: &std::path::Path,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         if r#type == "update" {
@@ -202,7 +201,7 @@ pub trait VcsDownloader:
         &self,
         r#type: &BStr,
         _package: PackageInterfaceHandle,
-        path: &Path,
+        path: &std::path::Path,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         if r#type == "update"
@@ -227,7 +226,7 @@ pub trait VcsDownloader:
     async fn install(
         &self,
         package: PackageInterfaceHandle,
-        path: &Path,
+        path: &std::path::Path,
     ) -> anyhow::Result<Option<PhpMixed>> {
         if package.get_source_reference().is_none() {
             return Err(InvalidArgumentException::new(bformat!(
@@ -281,7 +280,7 @@ pub trait VcsDownloader:
         &self,
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
-        path: &Path,
+        path: &std::path::Path,
     ) -> anyhow::Result<Option<PhpMixed>> {
         if target.get_source_reference().is_none() {
             return Err(InvalidArgumentException::new(bformat!(
@@ -373,7 +372,7 @@ pub trait VcsDownloader:
     async fn remove(
         &self,
         package: PackageInterfaceHandle,
-        path: &Path,
+        path: &std::path::Path,
     ) -> anyhow::Result<Option<PhpMixed>> {
         self.io().write_error(bformat!(
             "  - {}",
@@ -394,7 +393,7 @@ pub trait VcsDownloader:
     fn get_vcs_reference(
         &self,
         package: PackageInterfaceHandle,
-        path: &Path,
+        path: &std::path::Path,
     ) -> anyhow::Result<Option<bstr::BString>> {
         let parser = VersionParser::new();
         let guesser = VersionGuesser::new(
@@ -418,7 +417,7 @@ pub trait VcsDownloader:
     async fn clean_changes(
         &self,
         package: PackageInterfaceHandle,
-        path: &Path,
+        path: &std::path::Path,
         _update: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
         // the default implementation just fails if there are any changes, override in child classes to provide stash-ability
@@ -433,7 +432,7 @@ pub trait VcsDownloader:
     }
 
     /// Reapply previously stashed changes if applicable, only called after an update (regardless if successful or not)
-    fn reapply_changes(&self, _path: &Path) -> anyhow::Result<()> {
+    fn reapply_changes(&self, _path: &std::path::Path) -> anyhow::Result<()> {
         Ok(())
     }
 

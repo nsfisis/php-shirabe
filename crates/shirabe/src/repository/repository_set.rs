@@ -16,7 +16,7 @@ use crate::repository::{
     CompositeRepository, FindPackageConstraint, InstalledRepository, LockArrayRepositoryHandle,
     PlatformRepository, ProviderInfo, RepositoryInterfaceHandle,
 };
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{Catch as _, LogicException, RuntimeException, ksort, strtolower};
 use shirabe_semver::constraint::{

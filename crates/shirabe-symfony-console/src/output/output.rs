@@ -5,7 +5,7 @@ use crate::output::{
     OUTPUT_NORMAL, OUTPUT_PLAIN, OUTPUT_RAW, VERBOSITY_DEBUG, VERBOSITY_NORMAL, VERBOSITY_QUIET,
     VERBOSITY_VERBOSE, VERBOSITY_VERY_VERBOSE,
 };
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use shirabe_php_shim::strip_tags;
 
 /// Base class for output classes.

@@ -1,5 +1,5 @@
 use crate::advisory::{IgnoredSecurityAdvisory, PartialSecurityAdvisory, SecurityAdvisory};
-use bstr::{BStr, ByteSlice};
+use bstr::{BStr, ByteSlice as _};
 use shirabe_semver::constraint::AnyConstraint;
 
 #[derive(Debug, Clone, serde::Serialize)]

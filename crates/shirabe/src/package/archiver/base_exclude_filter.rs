@@ -1,18 +1,17 @@
 //! ref: composer/src/Composer/Package/Archiver/BaseExcludeFilter.php sha1:16a9cbcc09a710ac828d7dd91d2b1812411fdb9d
 
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use shirabe_php_shim::{bformat, ltrim_chars, preg_is_match, trim, trim_chars};
 use shirabe_symfony_finder::Glob;
-use std::path::{Path, PathBuf};
 
 #[derive(Debug)]
 pub struct BaseExcludeFilterBase {
-    pub source_path: PathBuf,
+    pub source_path: std::path::PathBuf,
     pub exclude_patterns: Vec<(BString, bool, bool)>,
 }
 
 impl BaseExcludeFilterBase {
-    pub fn new(source_path: PathBuf) -> Self {
+    pub fn new(source_path: std::path::PathBuf) -> Self {
         Self {
             source_path,
             exclude_patterns: Vec::new(),
@@ -73,7 +72,7 @@ impl BaseExcludeFilterBase {
 }
 
 pub trait BaseExcludeFilter {
-    fn source_path(&self) -> &Path;
+    fn source_path(&self) -> &std::path::Path;
     fn exclude_patterns(&self) -> &[(BString, bool, bool)];
     fn exclude_patterns_mut(&mut self) -> &mut Vec<(BString, bool, bool)>;
 

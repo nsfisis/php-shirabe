@@ -3,7 +3,7 @@
 use crate::exception::{InvalidArgumentException, LogicException};
 use crate::input::InputValue;
 use crate::question::{Question, QuestionInterface};
-use bstr::{B, BStr, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     PhpMixed, ToPhpString, bformat, explode, implode, loose_eq, php_regex, preg_is_match, sprintf,

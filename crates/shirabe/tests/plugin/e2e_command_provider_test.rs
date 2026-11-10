@@ -8,14 +8,11 @@
 
 use crate::e2e_extension_installer_test::{copy_dir, upstream_composer_bin};
 use crate::php_worker::lock_php_worker;
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use shirabe_php_shim::{bformat, os_str_from_bytes};
-use std::ffi::OsStr;
-use std::path::{Path, PathBuf};
-use tempfile::TempDir;
 
-fn fixture_dir() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/plugin/fixtures/e2e-command")
+fn fixture_dir() -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/plugin/fixtures/e2e-command")
 }
 
 struct CommandRun {
@@ -24,7 +21,12 @@ struct CommandRun {
 }
 
 /// One composer-CLI invocation inside the prepared project.
-fn run_command(work: &Path, program: &BStr, prefix_args: &[&OsStr], args: &[&BStr]) -> CommandRun {
+fn run_command(
+    work: &std::path::Path,
+    program: &BStr,
+    prefix_args: &[&std::ffi::OsStr],
+    args: &[&BStr],
+) -> CommandRun {
     let output = std::process::Command::new(os_str_from_bytes(&program))
         .args(prefix_args)
         .args(args.iter().map(os_str_from_bytes))
@@ -51,7 +53,7 @@ fn greet_lines(stdout: &[u8]) -> Vec<&BStr> {
     stdout
         .lines()
         .filter(|line| line.starts_with(b"greet:"))
-        .map(ByteSlice::as_bstr)
+        .map(bstr::ByteSlice::as_bstr)
         .collect()
 }
 
@@ -63,7 +65,7 @@ fn list_lines_mentioning_greet(stdout: &[u8]) -> Vec<&BStr> {
     stdout
         .lines()
         .filter(|line| line.contains_str("greet"))
-        .map(ByteSlice::as_bstr)
+        .map(bstr::ByteSlice::as_bstr)
         .collect()
 }
 
@@ -73,7 +75,7 @@ fn test_command_provider_execution_matches_upstream_composer() {
         return;
     };
     let _worker = lock_php_worker();
-    let implementations: [(&BStr, Vec<&OsStr>); 2] = [
+    let implementations: [(&BStr, Vec<&std::ffi::OsStr>); 2] = [
         (BStr::new("php"), vec![composer_bin.as_os_str()]),
         (BStr::new(env!("CARGO_BIN_EXE_shirabe")), vec![]),
     ];
@@ -87,7 +89,7 @@ fn test_command_provider_execution_matches_upstream_composer() {
         BString,
     )> = Vec::new();
     for (program, prefix) in &implementations {
-        let work = TempDir::new().unwrap();
+        let work = tempfile::TempDir::new().unwrap();
         copy_dir(&fixture_dir(), work.path());
         let install = run_command(work.path(), program, prefix, &[BStr::new("install")]);
         assert_eq!(

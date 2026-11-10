@@ -104,7 +104,7 @@ pub enum FormatBlockMessages {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bstr::ByteSlice;
+    use bstr::ByteSlice as _;
 
     #[test]
     fn block_messages_keep_their_bytes() {

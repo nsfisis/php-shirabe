@@ -10,7 +10,7 @@ use crate::io::IOInterfaceWrite;
 use crate::json::JsonFile;
 use crate::package::{CompletePackageInterfaceHandle, base_package};
 use crate::repository::{CompositeRepository, RepositoryInterface};
-use bstr::{B, BString, ByteSlice};
+use bstr::{B, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{bformat, impl_php_class, implode, json_bytes, php_regex, preg_match};
 use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint};

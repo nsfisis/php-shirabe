@@ -9,12 +9,12 @@ use crate::package::{
 };
 use crate::php_worker::platform_info::{PlatformInfo, get_platform_info};
 use crate::platform::{HhvmDetector, HhvmDetectorInterface, Version};
-use crate::plugin::plugin_interface::{self};
+use crate::plugin::plugin_interface;
 use crate::repository::{
     ArrayRepository, FindPackageConstraint, LoadPackagesResult, ProviderInfo, RepositoryInterface,
     RepositoryInterfaceWeakHandle, SEARCH_VENDOR, SearchResult,
 };
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, ToPhpString, UnexpectedValueException, array_slice_strs,
@@ -22,13 +22,12 @@ use shirabe_php_shim::{
     preg_is_match, preg_match, preg_replace, str_replace, strpos, strtolower, var_export,
 };
 use shirabe_semver::constraint::SimpleConstraint;
-use std::sync::{LazyLock, Mutex};
 
-static LAST_SEEN_PLATFORM_PHP: LazyLock<Mutex<Option<BString>>> =
-    LazyLock::new(|| Mutex::new(None));
+static LAST_SEEN_PLATFORM_PHP: std::sync::LazyLock<std::sync::Mutex<Option<BString>>> =
+    std::sync::LazyLock::new(|| std::sync::Mutex::new(None));
 
-static IS_PLATFORM_PACKAGE_CACHE: LazyLock<Mutex<IndexMap<BString, bool>>> =
-    LazyLock::new(|| Mutex::new(IndexMap::new()));
+static IS_PLATFORM_PACKAGE_CACHE: std::sync::LazyLock<std::sync::Mutex<IndexMap<BString, bool>>> =
+    std::sync::LazyLock::new(|| std::sync::Mutex::new(IndexMap::new()));
 
 #[derive(Debug)]
 pub struct PlatformOverride {

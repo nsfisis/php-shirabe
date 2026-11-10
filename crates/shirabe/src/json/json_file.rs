@@ -4,7 +4,7 @@ use crate::downloader::TransportException;
 use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite};
 use crate::json::JsonValidationException;
 use crate::util::{Filesystem, HttpDownloader, StreamContextOptions};
-use bstr::{BStr, BString, ByteSlice, ByteVec};
+use bstr::{BStr, BString, ByteSlice as _, ByteVec as _};
 use shirabe_php_shim::{
     Catch as _, Error, InvalidArgumentException, JSON_PRETTY_PRINT, JSON_UNESCAPED_SLASHES,
     JSON_UNESCAPED_UNICODE, PhpJson, PhpMixed, RuntimeException, UnexpectedValueException, bformat,
@@ -15,7 +15,6 @@ use shirabe_php_shim::{
     usleep, utf8_text,
 };
 use shirabe_seld_json_lint::{ParsingException, ParsingExceptionDetails};
-use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone)]
 pub struct JsonEncodeOptions {
@@ -64,7 +63,7 @@ impl JsonEncodeOptions {
 /// Reads/writes json files.
 #[derive(Debug)]
 pub struct JsonFile {
-    path: PathBuf,
+    path: std::path::PathBuf,
     http_downloader: Option<std::rc::Rc<std::cell::RefCell<HttpDownloader>>>,
     io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
     indent: std::cell::RefCell<BString>,
@@ -93,7 +92,7 @@ impl JsonFile {
 
     /// Initializes json file reader/parser.
     pub fn new(
-        path: impl AsRef<Path>,
+        path: impl AsRef<std::path::Path>,
         http_downloader: Option<std::rc::Rc<std::cell::RefCell<HttpDownloader>>>,
         io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
     ) -> anyhow::Result<Self> {
@@ -114,7 +113,7 @@ impl JsonFile {
         })
     }
 
-    pub fn get_path(&self) -> &Path {
+    pub fn get_path(&self) -> &std::path::Path {
         &self.path
     }
 
@@ -264,7 +263,7 @@ impl JsonFile {
     /// Modify file properties only if content modified
     fn file_put_contents_if_modified(
         &self,
-        path: &Path,
+        path: &std::path::Path,
         content: &BStr,
     ) -> anyhow::Result<Option<i64>> {
         let current_content = file_get_contents(path).ok();

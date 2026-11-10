@@ -2,8 +2,6 @@
 
 use bstr::{BStr, BString};
 pub use shirabe_php_shim_macros::{bformat, bwrite};
-use std::ffi::OsStr;
-use std::path::Path;
 
 /// A PHP string constant: `const NAME: &'static BStr = php_str(b"value");`. `BStr::new` is not a
 /// `const fn`.
@@ -38,11 +36,11 @@ pub fn utf8_text(bytes: &(impl AsRef<[u8]> + ?Sized)) -> Option<&str> {
 
 /// The OS string PHP passes to the system (a path, a command line, an environment variable) for
 /// the byte string `bytes`.
-pub fn os_str_from_bytes(bytes: &(impl AsRef<[u8]> + ?Sized)) -> &OsStr {
+pub fn os_str_from_bytes(bytes: &(impl AsRef<[u8]> + ?Sized)) -> &std::ffi::OsStr {
     #[cfg(unix)]
     {
-        use std::os::unix::ffi::OsStrExt;
-        OsStr::from_bytes(bytes.as_ref())
+        use std::os::unix::ffi::OsStrExt as _;
+        std::ffi::OsStr::from_bytes(bytes.as_ref())
     }
     #[cfg(windows)]
     {
@@ -53,12 +51,12 @@ pub fn os_str_from_bytes(bytes: &(impl AsRef<[u8]> + ?Sized)) -> &OsStr {
 }
 
 /// The path PHP's filesystem functions open for the byte string `bytes`.
-pub fn path_from_bytes(bytes: &(impl AsRef<[u8]> + ?Sized)) -> &Path {
-    Path::new(os_str_from_bytes(bytes))
+pub fn path_from_bytes(bytes: &(impl AsRef<[u8]> + ?Sized)) -> &std::path::Path {
+    std::path::Path::new(os_str_from_bytes(bytes))
 }
 
 /// The byte string PHP holds for `path`.
-pub fn path_to_bytes(path: &(impl AsRef<Path> + ?Sized)) -> &[u8] {
+pub fn path_to_bytes(path: &(impl AsRef<std::path::Path> + ?Sized)) -> &[u8] {
     path.as_ref().as_os_str().as_encoded_bytes()
 }
 
@@ -113,7 +111,7 @@ impl PhpDisplay for str {
     }
 }
 
-impl PhpDisplay for Path {
+impl PhpDisplay for std::path::Path {
     fn fmt(&self, out: &mut BString) {
         out.extend_from_slice(path_to_bytes(self));
     }

@@ -1,6 +1,6 @@
 //! ref: composer/src/Composer/Util/NoProxyPattern.php sha1:97892c888dbc5712de7e494d83e561b2fffff3a6
 
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     RuntimeException, bformat, explode, filter_var_int_with_range, filter_var_ip, inet_pton,

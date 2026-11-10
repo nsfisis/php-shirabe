@@ -128,7 +128,7 @@ final class ForwardingModules
             . "//! entity crosses as still has its `CROSSING`, which nothing refers to.\n"
             . "#![allow(dead_code)]\n\n"
             . "use crate::php_worker::rpc::entity::{Call, protocol_violation};\nuse crate::php_worker::rpc::forwarding;\n"
-            . "use bstr::{BStr, ByteSlice};\n"
+            . "use bstr::{BStr, ByteSlice as _};\n"
             . "use shirabe_php_rpc::{PhpThrow, PluginValue};\n\n"
             . $this->construct() . "\n" . $this->callStatic();
         foreach ($tree['children'] ?? [] as $segment => $child) {
@@ -198,7 +198,7 @@ final class ForwardingModules
             $items[] = "fn $name(call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {\nErr(call.unsupported())\n}\n";
         }
 
-        return "use crate::php_worker::rpc::entity::{Call, protocol_violation};\nuse bstr::ByteSlice;\nuse shirabe_php_rpc::{PhpThrow, PluginValue};\n\n"
+        return "use crate::php_worker::rpc::entity::{Call, protocol_violation};\nuse bstr::ByteSlice as _;\nuse shirabe_php_rpc::{PhpThrow, PluginValue};\n\n"
             . "/// `$fqcn`, whose static methods are forwarded.\n#[derive(Debug)]\npub(crate) struct PhpClass;\n\n"
             . "pub(crate) trait Forwarding {\n" . implode("\n", $items) . "}\n\n"
             . $this->staticRouter($fqcn);
@@ -229,7 +229,7 @@ final class ForwardingModules
         if (!$isRoot) {
             $code .= "use crate::php_worker::rpc::forwarding;\n";
         }
-        $code .= "use bstr::ByteSlice;\nuse shirabe_php_rpc::{PhpThrow, PluginValue};\n\n";
+        $code .= "use bstr::ByteSlice as _;\nuse shirabe_php_rpc::{PhpThrow, PluginValue};\n\n";
 
         $code .= "/// `$fqcn`.\n#[derive(Debug)]\npub(crate) struct PhpClass;\n\n";
 

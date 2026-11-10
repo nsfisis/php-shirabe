@@ -3,8 +3,7 @@
 use crate::package::version::VersionParser;
 use crate::package::{BasePackage, DisplayMode, Link, Mirror, PackageHandle, PackageInterface};
 use crate::repository::{RepositoryInterfaceHandle, RepositoryInterfaceWeakHandle};
-use bstr::{BStr, BString, ByteSlice};
-use chrono::{DateTime, Utc};
+use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::{IndexMap, IndexSet};
 use shirabe_php_shim::{
     LogicException, PhpDisplay, PhpMixed, ToPhpString, bformat, bwrite, strtolower,
@@ -342,7 +341,7 @@ impl PackageInterface for AliasPackage {
         self.alias_of.get_php_ext()
     }
 
-    fn get_release_date(&self) -> Option<DateTime<Utc>> {
+    fn get_release_date(&self) -> Option<chrono::DateTime<chrono::Utc>> {
         self.alias_of.get_release_date()
     }
 

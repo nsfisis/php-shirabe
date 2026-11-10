@@ -2,7 +2,7 @@
 
 use crate::dependency_resolver::{Pool, Request, Rule, RuleSetIterator};
 use crate::repository::RepositorySet;
-use bstr::{BStr, BString, ByteVec};
+use bstr::{BStr, BString, ByteVec as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     OutOfBoundsException, PhpDisplay, STR_PAD_RIGHT, ToPhpString, bformat, bwrite, str_pad,

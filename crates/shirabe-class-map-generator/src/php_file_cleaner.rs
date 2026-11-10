@@ -1,9 +1,8 @@
 //! ref: composer/vendor/composer/class-map-generator/src/PhpFileCleaner.php sha1:ba515660a7328fb03f89aeba8e77450280a67619
 
-use bstr::{BStr, BString, ByteSlice, ByteVec};
+use bstr::{BStr, BString, ByteSlice as _, ByteVec as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{PregMatches, bformat, preg_match};
-use std::sync::Mutex;
 
 #[derive(Debug, Clone)]
 struct TypeConfigEntry {
@@ -12,8 +11,9 @@ struct TypeConfigEntry {
     pattern: BString,
 }
 
-static TYPE_CONFIG: Mutex<Option<IndexMap<u8, TypeConfigEntry>>> = Mutex::new(None);
-static REST_PATTERN: Mutex<Option<BString>> = Mutex::new(None);
+static TYPE_CONFIG: std::sync::Mutex<Option<IndexMap<u8, TypeConfigEntry>>> =
+    std::sync::Mutex::new(None);
+static REST_PATTERN: std::sync::Mutex<Option<BString>> = std::sync::Mutex::new(None);
 
 #[derive(Debug)]
 pub struct PhpFileCleaner {

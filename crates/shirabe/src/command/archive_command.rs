@@ -20,7 +20,7 @@ use crate::repository::{
 use crate::script::ScriptEvents;
 use crate::util::r#loop::Loop;
 use crate::util::{Filesystem, Platform, ProcessExecutor, StreamContextOptions};
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     LogicException, PhpMixed, bformat, get_debug_type, impl_php_class, implode, path_from_bytes,

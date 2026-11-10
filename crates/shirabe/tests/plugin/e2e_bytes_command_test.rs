@@ -7,27 +7,24 @@
 
 use crate::e2e_extension_installer_test::{copy_dir, upstream_composer_bin};
 use crate::php_worker::lock_php_worker;
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use shirabe_php_shim::os_str_from_bytes;
-use std::ffi::OsStr;
-use std::os::unix::ffi::OsStrExt;
-use std::path::{Path, PathBuf};
-use tempfile::TempDir;
+use std::os::unix::ffi::OsStrExt as _;
 
-fn fixture_dir() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/plugin/fixtures/e2e-bytes-command")
+fn fixture_dir() -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/plugin/fixtures/e2e-bytes-command")
 }
 
 /// One composer-CLI invocation inside the prepared project, returning its exit code and stdout.
 fn run_command(
-    work: &Path,
+    work: &std::path::Path,
     program: &BStr,
-    prefix_args: &[&OsStr],
+    prefix_args: &[&std::ffi::OsStr],
     args: &[&[u8]],
 ) -> (i32, BString) {
     let output = std::process::Command::new(os_str_from_bytes(&program))
         .args(prefix_args)
-        .args(args.iter().map(|arg| OsStr::from_bytes(arg)))
+        .args(args.iter().map(|arg| std::ffi::OsStr::from_bytes(arg)))
         .current_dir(work)
         .env("COMPOSER_HOME", work.join("home"))
         .env("COMPOSER_CACHE_DIR", work.join("cache"))
@@ -61,7 +58,7 @@ fn test_non_utf8_command_metadata_matches_upstream_composer() {
         return;
     };
     let _worker = lock_php_worker();
-    let implementations: [(&BStr, Vec<&OsStr>); 2] = [
+    let implementations: [(&BStr, Vec<&std::ffi::OsStr>); 2] = [
         (BStr::new("php"), vec![composer_bin.as_os_str()]),
         (BStr::new(env!("CARGO_BIN_EXE_shirabe")), vec![]),
     ];
@@ -83,7 +80,7 @@ fn test_non_utf8_command_metadata_matches_upstream_composer() {
 
     let mut results: Vec<Vec<(i32, BString)>> = Vec::new();
     for (program, prefix) in &implementations {
-        let work = TempDir::new().unwrap();
+        let work = tempfile::TempDir::new().unwrap();
         copy_dir(&fixture_dir(), work.path());
         let (install, _) = run_command(work.path(), program, prefix, &[b"install"]);
         assert_eq!(

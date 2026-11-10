@@ -7,7 +7,7 @@ use crate::repository::{
     PlatformRepository, ProviderInfo, RepositoryInterface, RepositoryInterfaceHandle,
     RootPackageRepository, SearchResult,
 };
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{array_merge_map, bformat, implode, strtolower};
 use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint, SimpleConstraint};

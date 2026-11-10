@@ -8,14 +8,12 @@
 //! `async_runtime.rs`) keep the cwd of whichever thread spawned them.
 //!
 //! Other platforms have no per-thread cwd, so tests using this helper must stay serial there:
-//! annotate them with `#[cfg_attr(not(target_os = "linux"), serial)]`.
+//! annotate them with `#[cfg_attr(not(target_os = "linux"), serial_test::serial)]`.
 //!
 //! Included via `#[path = "common/isolated_cwd.rs"] mod isolated_cwd;`.
 #![allow(dead_code)]
 
-use std::path::{Path, PathBuf};
-
-pub struct RestoreCwd(PathBuf);
+pub struct RestoreCwd(std::path::PathBuf);
 
 impl Drop for RestoreCwd {
     fn drop(&mut self) {
@@ -27,7 +25,7 @@ impl Drop for RestoreCwd {
 ///
 /// The restore matters under `--test-threads=1`, where libtest runs tests on the main thread and
 /// the unshared fs struct carries over from one test to the next.
-pub fn set_current_dir(dir: impl AsRef<Path>) -> RestoreCwd {
+pub fn set_current_dir(dir: impl AsRef<std::path::Path>) -> RestoreCwd {
     #[cfg(target_os = "linux")]
     nix::sched::unshare(nix::sched::CloneFlags::CLONE_FS).unwrap();
 

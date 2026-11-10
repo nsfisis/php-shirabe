@@ -1,15 +1,14 @@
 //! ref: composer/tests/Composer/Test/Command/DumpAutoloadCommandTest.php sha1:41bb20c0bf948d9748398ec32689cbe462bdce89
 
 use crate::test_case::{RunOptions, get_application_tester, init_temp_composer};
-use bstr::ByteSlice;
+use bstr::ByteSlice as _;
 use regex::bytes::Regex;
-use serial_test::serial;
 use shirabe_php_shim::error_message;
 use shirabe_symfony_console::input::{InputValue, ParameterName};
 
 /// ref: DumpAutoloadCommandTest::testDumpAutoload
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_dump_autoload() {
     let tear_down = init_temp_composer(None, None, None, true);
 
@@ -34,7 +33,7 @@ fn test_dump_autoload() {
 
 /// ref: DumpAutoloadCommandTest::testDumpDevAutoload
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_dump_dev_autoload() {
     let tear_down = init_temp_composer(None, None, None, true);
 
@@ -62,7 +61,7 @@ fn test_dump_dev_autoload() {
 
 /// ref: DumpAutoloadCommandTest::testDumpNoDevAutoload
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_dump_no_dev_autoload() {
     let tear_down = init_temp_composer(None, None, None, true);
 
@@ -90,7 +89,7 @@ fn test_dump_no_dev_autoload() {
 
 /// ref: DumpAutoloadCommandTest::testUsingOptimizeAndStrictPsr
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_using_optimize_and_strict_psr() {
     let tear_down = init_temp_composer(None, None, None, true);
 
@@ -120,7 +119,7 @@ fn test_using_optimize_and_strict_psr() {
 
 /// ref: DumpAutoloadCommandTest::testFailsUsingStrictPsrIfClassMapViolationsAreFound
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_fails_using_strict_psr_if_class_map_violations_are_found() {
     let tear_down = init_temp_composer(
         Some(&serde_json::json!({
@@ -170,7 +169,7 @@ fn test_fails_using_strict_psr_if_class_map_violations_are_found() {
 
 /// ref: DumpAutoloadCommandTest::testUsingClassmapAuthoritative
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_using_classmap_authoritative() {
     let tear_down = init_temp_composer(None, None, None, true);
 
@@ -204,7 +203,7 @@ fn test_using_classmap_authoritative() {
 
 /// ref: DumpAutoloadCommandTest::testUsingClassmapAuthoritativeAndStrictPsr
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_using_classmap_authoritative_and_strict_psr() {
     let tear_down = init_temp_composer(None, None, None, true);
 
@@ -239,7 +238,7 @@ fn test_using_classmap_authoritative_and_strict_psr() {
 
 /// ref: DumpAutoloadCommandTest::testStrictPsrDoesNotWorkWithoutOptimizedAutoloader
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_strict_psr_does_not_work_without_optimized_autoloader() {
     let tear_down = init_temp_composer(None, None, None, true);
 
@@ -265,7 +264,7 @@ fn test_strict_psr_does_not_work_without_optimized_autoloader() {
 
 /// ref: DumpAutoloadCommandTest::testDevAndNoDevCannotBeCombined
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_dev_and_no_dev_cannot_be_combined() {
     let tear_down = init_temp_composer(None, None, None, true);
 
@@ -294,7 +293,7 @@ fn test_dev_and_no_dev_cannot_be_combined() {
 
 /// ref: DumpAutoloadCommandTest::testWithCustomAutoloaderSuffix
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_with_custom_autoloader_suffix() {
     let tear_down = init_temp_composer(
         Some(&serde_json::json!({
@@ -329,7 +328,7 @@ fn test_with_custom_autoloader_suffix() {
 
 /// ref: DumpAutoloadCommandTest::testWithExistingComposerLockAndAutoloaderSuffix
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_with_existing_composer_lock_and_autoloader_suffix() {
     let tear_down = init_temp_composer(
         Some(&serde_json::json!({
@@ -381,7 +380,7 @@ fn test_with_existing_composer_lock_and_autoloader_suffix() {
 
 /// ref: DumpAutoloadCommandTest::testWithExistingComposerLockWithoutAutoloaderSuffix
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_with_existing_composer_lock_without_autoloader_suffix() {
     let tear_down = init_temp_composer(
         Some(&serde_json::json!({

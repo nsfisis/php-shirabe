@@ -9,12 +9,9 @@ use crate::e2e_extension_installer_test::{copy_dir, upstream_composer_bin};
 use crate::php_worker::lock_php_worker;
 use bstr::{BStr, BString};
 use shirabe_php_shim::{os_str_from_bytes, path_from_bytes};
-use std::ffi::OsStr;
-use std::path::{Path, PathBuf};
-use tempfile::TempDir;
 
-fn fixture_dir() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/plugin/fixtures/e2e-command-event")
+fn fixture_dir() -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/plugin/fixtures/e2e-command-event")
 }
 
 struct Run {
@@ -25,8 +22,8 @@ struct Run {
 
 /// Runs `install` and then the commands whose events the plugin records in a fresh copy of the
 /// fixture: the plugin is only active once the first command has installed it.
-fn run_commands(program: &BStr, prefix_args: &[&OsStr]) -> Run {
-    let work = TempDir::new().unwrap();
+fn run_commands(program: &BStr, prefix_args: &[&std::ffi::OsStr]) -> Run {
+    let work = tempfile::TempDir::new().unwrap();
     copy_dir(&fixture_dir(), work.path());
     let project = work.path().join("project");
     let commands: [&[&BStr]; 5] = [

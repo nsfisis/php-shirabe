@@ -3,8 +3,7 @@
 use crate::test_case::{
     RestoreEnv, RunOptions, get_application_tester, get_unique_tmp_directory, init_temp_composer,
 };
-use bstr::{BStr, BString, ByteSlice};
-use serial_test::serial;
+use bstr::{BStr, BString, ByteSlice as _};
 use shirabe::command::InitCommand;
 use shirabe::json::JsonFile;
 use shirabe::util::Platform;
@@ -12,7 +11,6 @@ use shirabe_php_shim::{
     PHP_SERVER, PhpJson, PhpMixed, error_chain_message, path_to_bytes, utf8_text,
 };
 use shirabe_symfony_console::input::{InputValue, ParameterName};
-use tempfile::TempDir;
 
 fn set_up() {
     let mut server = PHP_SERVER.lock().unwrap();
@@ -399,7 +397,7 @@ fn run_data_provider() -> Vec<(serde_json::Value, Vec<(ParameterName, InputValue
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_run_command() {
     set_up();
 
@@ -494,7 +492,7 @@ fn run_invalid_data_provider() -> Vec<(InvalidExpectation, Vec<(ParameterName, I
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_run_command_invalid() {
     set_up();
 
@@ -541,7 +539,7 @@ fn test_run_command_invalid() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_run_guess_name_from_dir_sanitizes_dir() {
     set_up();
 
@@ -578,7 +576,7 @@ fn test_run_guess_name_from_dir_sanitizes_dir() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_interactive_run() {
     set_up();
 
@@ -656,11 +654,11 @@ fn test_format_authors() {
 /// its own `.gitconfig` with those keys so the test doesn't depend on (or mutate) the real user's
 /// global git config.
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_get_git_config() {
     set_up();
 
-    let home = TempDir::new().unwrap();
+    let home = tempfile::TempDir::new().unwrap();
     std::fs::write(
         home.path().join(".gitconfig"),
         "[user]\n\tname = Test User\n\temail = test-user@example.com\n",

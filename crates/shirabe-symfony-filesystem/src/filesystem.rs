@@ -9,7 +9,6 @@ use shirabe_php_shim::{
     realpath, rename, rmdir, rtrim_chars, stream_is_local, stripos, strpos, strrev, strtr, symlink,
     touch_with_mtime, umask, unlink,
 };
-use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone)]
 pub struct Filesystem;
@@ -25,7 +24,11 @@ impl Filesystem {
         Filesystem
     }
 
-    fn copy(&self, origin_file: &Path, target_file: &Path) -> anyhow::Result<()> {
+    fn copy(
+        &self,
+        origin_file: &std::path::Path,
+        target_file: &std::path::Path,
+    ) -> anyhow::Result<()> {
         // PHP: stream_is_local($originFile) || 0 === stripos($originFile, 'file://')
         let origin_is_local = stream_is_local(path_to_bytes(origin_file))
             || stripos(path_to_bytes(origin_file), "file://") == Some(0);
@@ -107,7 +110,7 @@ impl Filesystem {
         Ok(())
     }
 
-    fn mkdir(&self, dir: &Path, mode: u32) -> anyhow::Result<()> {
+    fn mkdir(&self, dir: &std::path::Path, mode: u32) -> anyhow::Result<()> {
         if is_dir(dir) {
             return Ok(());
         }
@@ -124,7 +127,7 @@ impl Filesystem {
         Ok(())
     }
 
-    fn exists(&self, file: &Path) -> anyhow::Result<bool> {
+    fn exists(&self, file: &std::path::Path) -> anyhow::Result<bool> {
         let max_path_length = PHP_MAXPATHLEN - 2;
 
         if path_to_bytes(file).len() as i64 > max_path_length {
@@ -140,11 +143,11 @@ impl Filesystem {
         Ok(file_exists(file))
     }
 
-    fn remove(&self, file: &Path) -> anyhow::Result<()> {
+    fn remove(&self, file: &std::path::Path) -> anyhow::Result<()> {
         Self::do_remove(vec![file.to_path_buf()], false)
     }
 
-    fn do_remove(files: Vec<PathBuf>, is_recursive: bool) -> anyhow::Result<()> {
+    fn do_remove(files: Vec<std::path::PathBuf>, is_recursive: bool) -> anyhow::Result<()> {
         // PHP reverses the list so that directory contents are removed before the directory itself.
         let mut files = files;
         files.reverse();
@@ -229,8 +232,8 @@ impl Filesystem {
 
     pub fn symlink(
         &self,
-        origin_dir: impl AsRef<Path>,
-        target_dir: impl AsRef<Path>,
+        origin_dir: impl AsRef<std::path::Path>,
+        target_dir: impl AsRef<std::path::Path>,
     ) -> anyhow::Result<()> {
         let mut origin_dir = origin_dir.as_ref().to_path_buf();
         let mut target_dir = target_dir.as_ref().to_path_buf();
@@ -267,9 +270,9 @@ impl Filesystem {
 
     pub fn mirror(
         &self,
-        origin_dir: impl AsRef<Path>,
-        target_dir: impl AsRef<Path>,
-        iterator: Vec<PathBuf>,
+        origin_dir: impl AsRef<std::path::Path>,
+        target_dir: impl AsRef<std::path::Path>,
+        iterator: Vec<std::path::PathBuf>,
     ) -> anyhow::Result<()> {
         let target_dir = rtrim_chars(path_to_bytes(target_dir.as_ref()), "/\\");
         let origin_dir = rtrim_chars(path_to_bytes(origin_dir.as_ref()), "/\\");

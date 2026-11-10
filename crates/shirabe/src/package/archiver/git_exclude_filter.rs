@@ -1,16 +1,15 @@
 //! ref: composer/src/Composer/Package/Archiver/GitExcludeFilter.php sha1:f49884ce2fd5ab13e64dc4c89f38bafce1946657
 
 use crate::package::archiver::{BaseExcludeFilter, BaseExcludeFilterBase};
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use shirabe_php_shim::{bformat, file, file_exists, path_from_bytes, php_regex, preg_split};
-use std::path::{Path, PathBuf};
 
 pub struct GitExcludeFilter {
     inner: BaseExcludeFilterBase,
 }
 
 impl GitExcludeFilter {
-    pub fn new(source_path: impl Into<PathBuf>) -> Self {
+    pub fn new(source_path: impl Into<std::path::PathBuf>) -> Self {
         let source_path = source_path.into();
         let gitattributes_path = bformat!("{source_path}/.gitattributes");
         let inner = BaseExcludeFilterBase::new(source_path);
@@ -53,7 +52,7 @@ impl GitExcludeFilter {
 }
 
 impl BaseExcludeFilter for GitExcludeFilter {
-    fn source_path(&self) -> &Path {
+    fn source_path(&self) -> &std::path::Path {
         &self.inner.source_path
     }
 

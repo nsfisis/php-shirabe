@@ -3,17 +3,16 @@
 use crate::http_downloader_mock::{HttpDownloaderMockGuard, expect_full, get_http_downloader_mock};
 use crate::process_executor_mock::{ProcessExecutorMockGuard, get_process_executor_mock};
 use crate::test_case::get_unique_tmp_directory;
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe::config::Config;
 use shirabe::io::{IOInterface, NullIO};
 use shirabe::repository::vcs::ForgejoDriver;
 use shirabe::util::{Filesystem, HttpDownloader, HttpDownloaderMockHandler, MockHandler};
 use shirabe_php_shim::{PhpMixed, ToPhpString, path_to_bytes};
-use tempfile::TempDir;
 
 struct SetUp {
-    home: TempDir,
+    home: tempfile::TempDir,
     config: std::rc::Rc<std::cell::RefCell<Config>>,
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
 }

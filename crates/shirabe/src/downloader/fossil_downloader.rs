@@ -14,7 +14,6 @@ use shirabe_php_shim::{
     PhpMixed, RuntimeException, bformat, impl_php_class, implode, path_from_bytes, php_regex,
     preg_is_match, preg_split, realpath, trim,
 };
-use std::path::{Path, PathBuf};
 
 #[derive(Debug)]
 pub struct FossilDownloader {
@@ -38,7 +37,7 @@ impl FossilDownloader {
     fn execute(
         &self,
         command: Vec<BString>,
-        cwd: Option<&Path>,
+        cwd: Option<&std::path::Path>,
         output: &mut BString,
     ) -> anyhow::Result<()> {
         if self
@@ -83,7 +82,7 @@ impl VcsDownloader for FossilDownloader {
     async fn do_download(
         &self,
         _package: PackageInterfaceHandle,
-        _path: &Path,
+        _path: &std::path::Path,
         _url: &bstr::BStr,
         _prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -93,7 +92,7 @@ impl VcsDownloader for FossilDownloader {
     async fn do_install(
         &self,
         package: PackageInterfaceHandle,
-        path: &Path,
+        path: &std::path::Path,
         url: &bstr::BStr,
     ) -> anyhow::Result<Option<PhpMixed>> {
         self.inner.config.borrow_mut().prohibit_url_by_config(
@@ -103,7 +102,7 @@ impl VcsDownloader for FossilDownloader {
         )?;
 
         let repo_file = bformat!("{path}.fossil");
-        let real_path: Option<PathBuf> = realpath(path);
+        let real_path: Option<std::path::PathBuf> = realpath(path);
 
         self.inner.io.write_error(bformat!(
             "Cloning {}",
@@ -151,7 +150,7 @@ impl VcsDownloader for FossilDownloader {
         &self,
         _initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
-        path: &Path,
+        path: &std::path::Path,
         url: &bstr::BStr,
     ) -> anyhow::Result<Option<PhpMixed>> {
         self.inner.config.borrow_mut().prohibit_url_by_config(
@@ -170,7 +169,7 @@ impl VcsDownloader for FossilDownloader {
             .into());
         }
 
-        let real_path: Option<PathBuf> = realpath(path);
+        let real_path: Option<std::path::PathBuf> = realpath(path);
         let mut output = BString::default();
         self.execute(
             vec!["fossil".into(), "pull".into()],
@@ -195,7 +194,7 @@ impl VcsDownloader for FossilDownloader {
         &self,
         _from_reference: &bstr::BStr,
         to_reference: &bstr::BStr,
-        path: &Path,
+        path: &std::path::Path,
     ) -> anyhow::Result<bstr::BString> {
         let mut output = BString::default();
         self.execute(
@@ -235,7 +234,7 @@ impl VcsDownloader for FossilDownloader {
         Ok(log)
     }
 
-    fn has_metadata_repository(&self, path: &Path) -> bool {
+    fn has_metadata_repository(&self, path: &std::path::Path) -> bool {
         path_from_bytes(&bformat!("{path}/.fslckout")).is_file()
             || path_from_bytes(&bformat!("{path}/_FOSSIL_")).is_file()
     }
@@ -246,7 +245,7 @@ impl ChangeReportInterface for FossilDownloader {
     async fn get_local_changes(
         &self,
         _package: PackageInterfaceHandle,
-        path: &Path,
+        path: &std::path::Path,
     ) -> anyhow::Result<Option<bstr::BString>> {
         if !self.has_metadata_repository(path) {
             return Ok(None);
@@ -273,7 +272,7 @@ impl VcsCapableDownloaderInterface for FossilDownloader {
     fn get_vcs_reference(
         &self,
         package: PackageInterfaceHandle,
-        path: &Path,
+        path: &std::path::Path,
     ) -> anyhow::Result<Option<bstr::BString>> {
         self.inner.get_vcs_reference(package, path)
     }
@@ -296,7 +295,7 @@ impl DownloaderInterface for FossilDownloader {
     async fn download_with_output(
         &self,
         package: PackageInterfaceHandle,
-        path: &Path,
+        path: &std::path::Path,
         prev_package: Option<PackageInterfaceHandle>,
         _output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -307,7 +306,7 @@ impl DownloaderInterface for FossilDownloader {
         &self,
         r#type: &BStr,
         package: PackageInterfaceHandle,
-        path: &Path,
+        path: &std::path::Path,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as VcsDownloader>::prepare(self, r#type, package, path, prev_package).await
@@ -316,7 +315,7 @@ impl DownloaderInterface for FossilDownloader {
     async fn install_with_output(
         &self,
         package: PackageInterfaceHandle,
-        path: &Path,
+        path: &std::path::Path,
         _output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as VcsDownloader>::install(self, package, path).await
@@ -326,7 +325,7 @@ impl DownloaderInterface for FossilDownloader {
         &self,
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
-        path: &Path,
+        path: &std::path::Path,
     ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as VcsDownloader>::update(self, initial, target, path).await
     }
@@ -334,7 +333,7 @@ impl DownloaderInterface for FossilDownloader {
     async fn remove_with_output(
         &self,
         package: PackageInterfaceHandle,
-        path: &Path,
+        path: &std::path::Path,
         _output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as VcsDownloader>::remove(self, package, path).await
@@ -344,7 +343,7 @@ impl DownloaderInterface for FossilDownloader {
         &self,
         r#type: &BStr,
         package: PackageInterfaceHandle,
-        path: &Path,
+        path: &std::path::Path,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as VcsDownloader>::cleanup(self, r#type, package, path, prev_package).await

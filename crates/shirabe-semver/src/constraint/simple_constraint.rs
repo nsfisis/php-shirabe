@@ -1,7 +1,7 @@
 //! ref: composer/vendor/composer/semver/src/Constraint/Constraint.php sha1:2e43c3fc693a454e0409be204ad2c962fe4dc227
 
 use crate::constraint::Bound;
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use shirabe_php_shim::{
     CmpOp, PhpDisplay, ToPhpString, bformat, implode, str_replace, var_export_str, version_compare,
 };

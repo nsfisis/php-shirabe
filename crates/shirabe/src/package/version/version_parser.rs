@@ -1,17 +1,16 @@
 //! ref: composer/src/Composer/Package/Version/VersionParser.php sha1:8efacea5e04fc1097a89257f2bf85fce8393a160
 
 use crate::repository::PlatformRepository;
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     bformat, explode_with_limit, php_regex, php_str, preg_is_match, preg_replace, strpos, trim,
 };
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::{Semver, VersionParser as SemverVersionParser};
-use std::sync::{LazyLock, Mutex};
 
-static CONSTRAINTS: LazyLock<Mutex<IndexMap<BString, AnyConstraint>>> =
-    LazyLock::new(|| Mutex::new(IndexMap::new()));
+static CONSTRAINTS: std::sync::LazyLock<std::sync::Mutex<IndexMap<BString, AnyConstraint>>> =
+    std::sync::LazyLock::new(|| std::sync::Mutex::new(IndexMap::new()));
 
 #[derive(Debug, Clone)]
 pub struct VersionParser {

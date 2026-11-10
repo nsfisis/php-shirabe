@@ -1,9 +1,8 @@
 //! ref: composer/tests/Composer/Test/Repository/VcsRepositoryTest.php sha1:628daae845b6a291274618b8cd28d0fd8069a6a9
 
 use crate::test_case::get_unique_tmp_directory;
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::{IndexMap, IndexSet};
-use serial_test::serial;
 use shirabe::config::Config;
 use shirabe::io::{IOInterface, NullIO};
 use shirabe::repository::VcsRepository;
@@ -12,11 +11,10 @@ use shirabe::util::{Filesystem, HttpDownloader, ProcessExecutor};
 use shirabe_php_shim::{
     PhpMixed, ToPhpString, implode, os_str_from_bytes, path_from_bytes, path_to_bytes,
 };
-use tempfile::TempDir;
 
 struct SetUp {
-    composer_home: TempDir,
-    git_repo: TempDir,
+    composer_home: tempfile::TempDir,
+    git_repo: tempfile::TempDir,
 }
 
 // ref: VcsRepositoryTest::initialize. Builds a fixture git repository on disk by shelling out to
@@ -200,7 +198,7 @@ impl Drop for TearDown {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_load_versions() {
     let Some(set_up) = set_up() else {
         // git binary unavailable; skip like markTestSkipped.

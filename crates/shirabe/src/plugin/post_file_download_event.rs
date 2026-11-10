@@ -3,13 +3,12 @@
 use crate::event_dispatcher::{Event, EventFlags, delegate_event_interface_to_inner};
 use crate::package::PackageInterfaceHandle;
 use crate::plugin::FileDownloadContext;
-use bstr::{BStr, BString, ByteSlice};
-use std::path::{Path, PathBuf};
+use bstr::{BStr, BString, ByteSlice as _};
 
 #[derive(Debug)]
 pub struct PostFileDownloadEvent {
     inner: Event,
-    file_name: Option<PathBuf>,
+    file_name: Option<std::path::PathBuf>,
     checksum: Option<BString>,
     url: BString,
     context: Option<FileDownloadContext>,
@@ -19,7 +18,7 @@ pub struct PostFileDownloadEvent {
 impl PostFileDownloadEvent {
     pub fn new(
         name: impl Into<BString>,
-        file_name: Option<PathBuf>,
+        file_name: Option<std::path::PathBuf>,
         checksum: Option<BString>,
         url: BString,
         r#type: BString,
@@ -39,7 +38,7 @@ impl PostFileDownloadEvent {
         self.inner.get_name()
     }
 
-    pub fn get_file_name(&self) -> Option<&Path> {
+    pub fn get_file_name(&self) -> Option<&std::path::Path> {
         self.file_name.as_deref()
     }
 

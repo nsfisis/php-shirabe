@@ -4,8 +4,7 @@ use crate::test_case::{
     RunOptions, TearDown, create_composer_lock, create_installed_json, get_application_tester,
     get_complete_package, init_temp_composer,
 };
-use bstr::{BString, ByteSlice};
-use serial_test::serial;
+use bstr::{BString, ByteSlice as _};
 use shirabe::package::PackageInterfaceHandle;
 use shirabe_php_shim::{bformat, error_message, trim, utf8_text};
 use shirabe_symfony_console::input::{InputValue, ParameterName};
@@ -80,7 +79,7 @@ fn assert_lines(display: &[u8], expected: &[Vec<impl AsRef<[u8]>>]) {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_basic_run() {
     let _tear_down = set_up();
 
@@ -109,7 +108,7 @@ fn test_basic_run() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_no_dev() {
     let _tear_down = set_up();
 
@@ -140,7 +139,7 @@ fn test_no_dev() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_format_json() {
     let _tear_down = set_up();
 
@@ -176,7 +175,7 @@ fn test_format_json() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_format_summary() {
     let _tear_down = set_up();
 
@@ -222,7 +221,7 @@ fn test_format_summary() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_format_unknown() {
     let _tear_down = set_up();
 
@@ -242,7 +241,7 @@ fn test_format_unknown() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_locked() {
     let _tear_down = set_up();
 
@@ -274,7 +273,7 @@ fn test_locked() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_locked_no_dev() {
     let _tear_down = set_up();
 
@@ -306,7 +305,7 @@ fn test_locked_no_dev() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_locked_without_lock_file() {
     let _tear_down = set_up();
 

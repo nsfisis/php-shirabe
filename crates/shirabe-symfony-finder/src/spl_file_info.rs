@@ -1,11 +1,10 @@
 //! ref: composer/vendor/symfony/finder/SplFileInfo.php sha1:0f6a7fd778c5a770c81ff68a72e1ce2f795b5d2d
 
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use shirabe_php_shim::{
     RuntimeException, basename, basename_with_suffix, bformat, dirname, filesize, is_dir, is_file,
     is_link, path_from_bytes, realpath,
 };
-use std::path::PathBuf;
 
 #[derive(Debug)]
 pub struct SplFileInfo {
@@ -76,7 +75,7 @@ impl SplFileInfo {
         is_link(path_from_bytes(&self.pathname))
     }
 
-    pub fn get_real_path(&self) -> Option<PathBuf> {
+    pub fn get_real_path(&self) -> Option<std::path::PathBuf> {
         // \SplFileInfo::getRealPath() returns the canonicalized absolute path, or false on failure.
         realpath(path_from_bytes(&self.pathname))
     }

@@ -8,7 +8,7 @@ use crate::console::input::{InputArgument, InputOption};
 use crate::delegate_base_command_trait_impls_to_inner;
 use crate::event_dispatcher::EventFlags;
 use crate::util::Platform;
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, ToPhpString, bformat, impl_php_class, is_string, php_regex,
     preg_replace_with_limit_and_count,

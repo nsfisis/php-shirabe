@@ -4,9 +4,8 @@ use crate::async_runtime::run;
 use crate::http_downloader_mock::{HttpDownloaderMockGuard, get_http_downloader_mock};
 use crate::io_mock::{Expectation, get_io_mock};
 use crate::test_case::get_unique_tmp_directory;
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
-use serial_test::serial;
 use shirabe::cache::{Cache, CacheMock};
 use shirabe::config::Config;
 use shirabe::downloader::{DownloaderInterface, FileDownloader};
@@ -72,7 +71,7 @@ fn get_downloader(
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_download_for_package_without_dist_reference() {
     let package = get_package(BStr::new("dummy/pkg"), BStr::new("1.0.0"));
 
@@ -88,7 +87,7 @@ fn test_download_for_package_without_dist_reference() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_download_to_existing_file() {
     let package = get_package(BStr::new("dummy/pkg"), BStr::new("1.0.0"));
     package.set_dist_url(Some(BString::from("url")));
@@ -116,7 +115,7 @@ fn test_download_to_existing_file() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_get_file_name() {
     let package = get_package(BStr::new("dummy/pkg"), BStr::new("1.0.0"));
     package.set_dist_url(Some(BString::from("http://example.com/script.js")));
@@ -142,7 +141,7 @@ fn test_get_file_name() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_download_but_file_is_unsaved() {
     let package = get_package(BStr::new("dummy/pkg"), BStr::new("1.0.0"));
     package.set_dist_url(Some(BString::from("http://example.com/script.js")));
@@ -204,7 +203,7 @@ fn test_download_with_custom_cache_key() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_cache_garbage_collection_is_called() {
     let expected_ttl: i64 = 99999999;
 
@@ -264,7 +263,7 @@ fn test_cache_garbage_collection_is_called() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_download_file_with_invalid_checksum() {
     let package = get_package(BStr::new("dummy/pkg"), BStr::new("1.0.0"));
     package.set_dist_url(Some(BString::from("http://example.com/script.js")));
@@ -312,7 +311,7 @@ fn test_download_file_with_invalid_checksum() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_downgrade_shows_appropriate_message() {
     let old_package = get_package(BStr::new("dummy/pkg"), BStr::new("1.2.0"));
     let new_package = get_package(BStr::new("dummy/pkg"), BStr::new("1.0.0"));

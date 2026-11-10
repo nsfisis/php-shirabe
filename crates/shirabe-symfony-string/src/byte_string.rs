@@ -2,7 +2,7 @@
 
 use crate::CodePointString;
 use crate::exception::InvalidArgumentException;
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use shirabe_php_shim::{bformat, mb_convert_encoding, mb_detect_encoding, utf8_text};
 
 #[derive(Debug, Clone)]

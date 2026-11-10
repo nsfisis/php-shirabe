@@ -2,7 +2,7 @@ use crate::{
     PhpResource, RuntimeException, StreamBacking, StreamState, UnexpectedValueException, bformat,
     path_from_bytes, path_to_bytes, php_str, utf8_text,
 };
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use std::io::{Read as _, Write as _};
 
 pub const PHP_EOL: &BStr = php_str(b"\n");
@@ -669,9 +669,9 @@ pub fn fstat(stream: &PhpResource) -> Option<FileStat> {
                     ..FileStat::default()
                 }),
                 StreamBacking::Pipe(p) => {
-                    use std::os::fd::{AsRawFd as _, BorrowedFd};
+                    use std::os::fd::AsRawFd as _;
                     // SAFETY: the pipe end is owned by the stream state, which is borrowed here.
-                    fstat_fd(unsafe { BorrowedFd::borrow_raw(p.as_raw_fd()) })
+                    fstat_fd(unsafe { std::os::fd::BorrowedFd::borrow_raw(p.as_raw_fd()) })
                 }
             }
         }
@@ -787,12 +787,12 @@ pub fn touch_with_mtime_and_atime(
 }
 
 pub fn chmod(path: impl AsRef<std::path::Path>, mode: u32) -> bool {
-    use std::os::unix::fs::PermissionsExt;
+    use std::os::unix::fs::PermissionsExt as _;
     std::fs::set_permissions(path.as_ref(), std::fs::Permissions::from_mode(mode)).is_ok()
 }
 
 pub fn fileperms(path: impl AsRef<std::path::Path>) -> Result<u32, std::io::Error> {
-    use std::os::unix::fs::MetadataExt;
+    use std::os::unix::fs::MetadataExt as _;
     std::fs::metadata(path.as_ref()).map(|m| m.mode())
 }
 
@@ -982,7 +982,7 @@ pub fn mkdir(
     mode: u32,
     recursive: bool,
 ) -> Result<(), std::io::Error> {
-    use std::os::unix::fs::DirBuilderExt;
+    use std::os::unix::fs::DirBuilderExt as _;
     // DirBuilder::mode passes the mode to mkdir(2), which applies the process umask, matching PHP.
     let mut builder = std::fs::DirBuilder::new();
     builder.mode(mode).recursive(recursive);

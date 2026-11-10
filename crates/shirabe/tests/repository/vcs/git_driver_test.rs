@@ -4,18 +4,16 @@ use crate::http_downloader_mock::{HttpDownloaderMockGuard, get_http_downloader_m
 use crate::io_stub::IOStub;
 use crate::process_executor_mock::{ProcessExecutorMockGuard, cmd_full, get_process_executor_mock};
 use crate::test_case::get_unique_tmp_directory;
-use bstr::{BString, ByteSlice};
+use bstr::{BString, ByteSlice as _};
 use indexmap::IndexMap;
-use serial_test::serial;
 use shirabe::config::Config;
 use shirabe::io::IOInterface;
 use shirabe::repository::vcs::GitDriver;
 use shirabe::util::{Filesystem, HttpDownloaderMockHandler, MockHandler, Platform};
 use shirabe_php_shim::{Catch as _, PhpMixed, RuntimeException, path_to_bytes};
-use tempfile::TempDir;
 
 struct SetUp {
-    home: TempDir,
+    home: tempfile::TempDir,
     config: Config,
     network_env: Option<bstr::BString>,
 }
@@ -64,7 +62,7 @@ impl Drop for TearDown {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_get_root_identifier_from_remote_local_repository() {
     let SetUp {
         home,
@@ -99,7 +97,7 @@ fn test_get_root_identifier_from_remote_local_repository() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_get_root_identifier_from_remote() {
     let SetUp {
         home,
@@ -166,7 +164,7 @@ fn test_get_root_identifier_from_remote() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_get_root_identifier_from_local_with_network_disabled() {
     let SetUp {
         home,

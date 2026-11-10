@@ -3,7 +3,7 @@
 use crate::config::Config;
 use crate::io::{BaseIO, IOInterface, IOInterfaceImmutable, IOInterfaceMutable, io_interface};
 use crate::question::StrictConfirmationQuestion;
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::{IndexMap, indexmap};
 use shirabe_php_shim::{
     bformat, canonical_int_key, display_to_bytes, error_message, mb_check_encoding,

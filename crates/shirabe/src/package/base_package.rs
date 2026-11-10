@@ -5,15 +5,14 @@ use crate::repository::{PlatformRepository, RepositoryInterfaceHandle};
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{bformat, implode, preg_quote, str_replace};
-use std::sync::LazyLock;
 
 pub struct SupportedLinkType {
     pub description: &'static BStr,
     pub method: &'static BStr,
 }
 
-pub static SUPPORTED_LINK_TYPES: LazyLock<IndexMap<&'static BStr, SupportedLinkType>> =
-    LazyLock::new(|| {
+pub static SUPPORTED_LINK_TYPES: std::sync::LazyLock<IndexMap<&'static BStr, SupportedLinkType>> =
+    std::sync::LazyLock::new(|| {
         let mut m = IndexMap::new();
         m.insert(
             BStr::new("require"),
@@ -53,15 +52,16 @@ pub static SUPPORTED_LINK_TYPES: LazyLock<IndexMap<&'static BStr, SupportedLinkT
         m
     });
 
-pub static STABILITIES: LazyLock<IndexMap<&'static BStr, i64>> = LazyLock::new(|| {
-    let mut m = IndexMap::new();
-    m.insert(BStr::new("stable"), 0i64);
-    m.insert(BStr::new("RC"), 5i64);
-    m.insert(BStr::new("beta"), 10i64);
-    m.insert(BStr::new("alpha"), 15i64);
-    m.insert(BStr::new("dev"), 20i64);
-    m
-});
+pub static STABILITIES: std::sync::LazyLock<IndexMap<&'static BStr, i64>> =
+    std::sync::LazyLock::new(|| {
+        let mut m = IndexMap::new();
+        m.insert(BStr::new("stable"), 0i64);
+        m.insert(BStr::new("RC"), 5i64);
+        m.insert(BStr::new("beta"), 10i64);
+        m.insert(BStr::new("alpha"), 15i64);
+        m.insert(BStr::new("dev"), 20i64);
+        m
+    });
 
 /// `self::STABILITIES[$stability]` for a stability name held as bytes.
 pub fn stability_priority(stability: impl AsRef<[u8]>) -> Option<i64> {

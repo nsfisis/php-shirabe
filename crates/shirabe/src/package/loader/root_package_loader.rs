@@ -9,7 +9,7 @@ use crate::package::{
 };
 use crate::repository::{RepositoryFactory, RepositoryManager};
 use crate::util::{Platform, ProcessExecutor};
-use bstr::{B, BStr, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     E_USER_DEPRECATED, PhpMixed, RuntimeException, UnexpectedValueException, bformat, implode,

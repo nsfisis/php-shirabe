@@ -4,14 +4,13 @@ use crate::test_case::{
     RunOptions, create_composer_lock, create_installed_json, get_application_tester, get_package,
     init_temp_composer,
 };
-use bstr::ByteSlice;
-use serial_test::serial;
+use bstr::ByteSlice as _;
 use shirabe::package::PackageInterfaceHandle;
 use shirabe_php_shim::{error_message, trim};
 use shirabe_symfony_console::input::{InputValue, ParameterName};
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_successful_response_code_when_no_packages_are_required() {
     let tear_down = init_temp_composer(None, None, None, true);
 
@@ -33,7 +32,7 @@ fn test_successful_response_code_when_no_packages_are_required() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_error_auditing_lock_file_when_it_is_missing() {
     let tear_down = init_temp_composer(None, None, None, true);
     let packages: Vec<PackageInterfaceHandle> = vec![get_package("dummy/pkg", "1.0.0")];
@@ -60,7 +59,7 @@ fn test_error_auditing_lock_file_when_it_is_missing() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_audit_package_with_no_security_vulnerabilities() {
     let tear_down = init_temp_composer(None, None, None, true);
     let packages: Vec<PackageInterfaceHandle> = vec![get_package("dummy/pkg", "1.0.0")];
@@ -88,7 +87,7 @@ fn test_audit_package_with_no_security_vulnerabilities() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_audit_package_with_no_dev_option_passed() {
     let tear_down = init_temp_composer(None, None, None, true);
     let dev_package: Vec<PackageInterfaceHandle> = vec![get_package("dummy/pkg", "1.0.0")];

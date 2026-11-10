@@ -1,14 +1,13 @@
 //! ref: composer/src/Composer/Package/Archiver/PharArchiver.php sha1:70cb485566b274a87c4bf5ed4e47e1b9a35f0851
 
 use crate::package::archiver::{ArchivableFilesFilter, ArchivableFilesFinder, ArchiverInterface};
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, FilesystemIterator, Phar, PharData, RuntimeException, UnexpectedValueException,
     bformat, bzcompress, file_exists, file_put_contents, gzcompress, path_from_bytes,
     path_to_bytes, realpath, str_repeat, strrpos, unlink,
 };
-use std::path::{Path, PathBuf};
 
 fn formats() -> IndexMap<&'static [u8], i64> {
     let mut m: IndexMap<&'static [u8], i64> = IndexMap::new();
@@ -44,12 +43,12 @@ impl PharArchiver {
 impl ArchiverInterface for PharArchiver {
     fn archive(
         &self,
-        sources: &Path,
-        target: &Path,
+        sources: &std::path::Path,
+        target: &std::path::Path,
         format: &BStr,
         excludes: Vec<BString>,
         ignore_filters: bool,
-    ) -> anyhow::Result<PathBuf> {
+    ) -> anyhow::Result<std::path::PathBuf> {
         let sources = realpath(sources).unwrap_or_else(|| sources.to_path_buf());
         let formats = formats();
         let compress_formats = compress_formats();
@@ -59,7 +58,7 @@ impl ArchiverInterface for PharArchiver {
         }
 
         let target_outer = target;
-        let inner = (|| -> anyhow::Result<PathBuf> {
+        let inner = (|| -> anyhow::Result<std::path::PathBuf> {
             let target_bytes = path_to_bytes(target);
             let pos = strrpos(target_bytes, format).unwrap_or(target_bytes.len());
             let filename = BString::from(&target_bytes[..pos.saturating_sub(1)]);

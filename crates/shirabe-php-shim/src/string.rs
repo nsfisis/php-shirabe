@@ -1,7 +1,7 @@
 use crate::{
     PhpMixed, ToPhpString, TypeError, bformat, display_to_bytes, get_debug_type, intval, utf8_text,
 };
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 pub use shirabe_php_src::standard::string::{addcslashes, strip_tags, stripcslashes};
 use shirabe_php_src::standard::string::{php_trim_mask, php_wordwrap};

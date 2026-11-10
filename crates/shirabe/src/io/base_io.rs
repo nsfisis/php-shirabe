@@ -3,7 +3,7 @@
 use crate::config::Config;
 use crate::io::{IOInterface, IOInterfaceWrite, io_interface};
 use crate::util::ProcessExecutor;
-use bstr::{B, BStr, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     JSON_INVALID_UTF8_IGNORE, JSON_UNESCAPED_SLASHES, JSON_UNESCAPED_UNICODE, PhpMixed,

@@ -8,11 +8,9 @@
 //! even when multiple OS threads use this crate concurrently, which happens today only under
 //! `cargo test`'s parallel test harness but is not assumed to be forbidden in the future.
 
-use std::sync::{Condvar, LazyLock, Mutex};
-
 struct SessionLock {
-    owner: Mutex<Option<(std::thread::ThreadId, u32)>>,
-    cvar: Condvar,
+    owner: std::sync::Mutex<Option<(std::thread::ThreadId, u32)>>,
+    cvar: std::sync::Condvar,
 }
 
 impl SessionLock {
@@ -54,9 +52,9 @@ impl SessionLock {
     }
 }
 
-static SESSION: LazyLock<SessionLock> = LazyLock::new(|| SessionLock {
-    owner: Mutex::new(None),
-    cvar: Condvar::new(),
+static SESSION: std::sync::LazyLock<SessionLock> = std::sync::LazyLock::new(|| SessionLock {
+    owner: std::sync::Mutex::new(None),
+    cvar: std::sync::Condvar::new(),
 });
 
 /// RAII guard; acquired once at the outermost `rpc_call`, re-entered (depth += 1, no blocking)
@@ -98,19 +96,16 @@ mod tests {
 
     #[test]
     fn other_threads_are_serialized() {
-        use std::sync::Arc;
-        use std::sync::atomic::{AtomicU32, Ordering};
-
-        let concurrent = Arc::new(AtomicU32::new(0));
+        let concurrent = std::sync::Arc::new(std::sync::atomic::AtomicU32::new(0));
         let mut handles = Vec::new();
         for _ in 0..4 {
-            let concurrent = Arc::clone(&concurrent);
+            let concurrent = std::sync::Arc::clone(&concurrent);
             handles.push(std::thread::spawn(move || {
                 for _ in 0..50 {
                     let _guard = SessionGuard::enter();
-                    let now = concurrent.fetch_add(1, Ordering::SeqCst);
+                    let now = concurrent.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                     assert_eq!(now, 0, "two sessions were in flight at once");
-                    concurrent.fetch_sub(1, Ordering::SeqCst);
+                    concurrent.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
                 }
             }));
         }

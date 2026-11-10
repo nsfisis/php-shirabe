@@ -4,10 +4,7 @@
 )]
 
 use crate::utf8_text;
-use serde::ser::{
-    Error as _, Serialize, SerializeMap, SerializeSeq, SerializeStruct, SerializeStructVariant,
-    SerializeTuple, SerializeTupleStruct, SerializeTupleVariant, Serializer,
-};
+use serde::ser::Error as _;
 
 /// A value serialized as JSON the way PHP's `json_encode()` writes it. The `Serialize` impls of
 /// this crate pass PHP strings to `serialize_bytes`, which a JSON serializer would write as an
@@ -20,7 +17,7 @@ pub struct PhpJson<'a, T: ?Sized> {
     invalid_utf8_ignore: bool,
 }
 
-impl<'a, T: Serialize + ?Sized> PhpJson<'a, T> {
+impl<'a, T: serde::ser::Serialize + ?Sized> PhpJson<'a, T> {
     pub fn new(value: &'a T) -> Self {
         Self {
             value,
@@ -36,8 +33,8 @@ impl<'a, T: Serialize + ?Sized> PhpJson<'a, T> {
     }
 }
 
-impl<T: Serialize + ?Sized> Serialize for PhpJson<'_, T> {
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+impl<T: serde::ser::Serialize + ?Sized> serde::ser::Serialize for PhpJson<'_, T> {
+    fn serialize<S: serde::ser::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         self.value.serialize(PhpJsonSerializer {
             inner: serializer,
             invalid_utf8_ignore: self.invalid_utf8_ignore,
@@ -75,7 +72,7 @@ impl<C> Compound<C> {
     }
 }
 
-impl<S: Serializer> Serializer for PhpJsonSerializer<S> {
+impl<S: serde::ser::Serializer> serde::ser::Serializer for PhpJsonSerializer<S> {
     type Ok = S::Ok;
     type Error = S::Error;
     type SerializeSeq = Compound<S::SerializeSeq>;
@@ -163,7 +160,10 @@ impl<S: Serializer> Serializer for PhpJsonSerializer<S> {
         self.inner.serialize_none()
     }
 
-    fn serialize_some<T: Serialize + ?Sized>(self, value: &T) -> Result<S::Ok, S::Error> {
+    fn serialize_some<T: serde::ser::Serialize + ?Sized>(
+        self,
+        value: &T,
+    ) -> Result<S::Ok, S::Error> {
         let value = self.wrap(value);
         self.inner.serialize_some(&value)
     }
@@ -186,7 +186,7 @@ impl<S: Serializer> Serializer for PhpJsonSerializer<S> {
             .serialize_unit_variant(name, variant_index, variant)
     }
 
-    fn serialize_newtype_struct<T: Serialize + ?Sized>(
+    fn serialize_newtype_struct<T: serde::ser::Serialize + ?Sized>(
         self,
         name: &'static str,
         value: &T,
@@ -195,7 +195,7 @@ impl<S: Serializer> Serializer for PhpJsonSerializer<S> {
         self.inner.serialize_newtype_struct(name, &value)
     }
 
-    fn serialize_newtype_variant<T: Serialize + ?Sized>(
+    fn serialize_newtype_variant<T: serde::ser::Serialize + ?Sized>(
         self,
         name: &'static str,
         variant_index: u32,
@@ -292,11 +292,14 @@ impl<S: Serializer> Serializer for PhpJsonSerializer<S> {
     }
 }
 
-impl<C: SerializeSeq> SerializeSeq for Compound<C> {
+impl<C: serde::ser::SerializeSeq> serde::ser::SerializeSeq for Compound<C> {
     type Ok = C::Ok;
     type Error = C::Error;
 
-    fn serialize_element<T: Serialize + ?Sized>(&mut self, value: &T) -> Result<(), C::Error> {
+    fn serialize_element<T: serde::ser::Serialize + ?Sized>(
+        &mut self,
+        value: &T,
+    ) -> Result<(), C::Error> {
         let value = self.wrap(value);
         self.inner.serialize_element(&value)
     }
@@ -306,11 +309,14 @@ impl<C: SerializeSeq> SerializeSeq for Compound<C> {
     }
 }
 
-impl<C: SerializeTuple> SerializeTuple for Compound<C> {
+impl<C: serde::ser::SerializeTuple> serde::ser::SerializeTuple for Compound<C> {
     type Ok = C::Ok;
     type Error = C::Error;
 
-    fn serialize_element<T: Serialize + ?Sized>(&mut self, value: &T) -> Result<(), C::Error> {
+    fn serialize_element<T: serde::ser::Serialize + ?Sized>(
+        &mut self,
+        value: &T,
+    ) -> Result<(), C::Error> {
         let value = self.wrap(value);
         self.inner.serialize_element(&value)
     }
@@ -320,11 +326,14 @@ impl<C: SerializeTuple> SerializeTuple for Compound<C> {
     }
 }
 
-impl<C: SerializeTupleStruct> SerializeTupleStruct for Compound<C> {
+impl<C: serde::ser::SerializeTupleStruct> serde::ser::SerializeTupleStruct for Compound<C> {
     type Ok = C::Ok;
     type Error = C::Error;
 
-    fn serialize_field<T: Serialize + ?Sized>(&mut self, value: &T) -> Result<(), C::Error> {
+    fn serialize_field<T: serde::ser::Serialize + ?Sized>(
+        &mut self,
+        value: &T,
+    ) -> Result<(), C::Error> {
         let value = self.wrap(value);
         self.inner.serialize_field(&value)
     }
@@ -334,11 +343,14 @@ impl<C: SerializeTupleStruct> SerializeTupleStruct for Compound<C> {
     }
 }
 
-impl<C: SerializeTupleVariant> SerializeTupleVariant for Compound<C> {
+impl<C: serde::ser::SerializeTupleVariant> serde::ser::SerializeTupleVariant for Compound<C> {
     type Ok = C::Ok;
     type Error = C::Error;
 
-    fn serialize_field<T: Serialize + ?Sized>(&mut self, value: &T) -> Result<(), C::Error> {
+    fn serialize_field<T: serde::ser::Serialize + ?Sized>(
+        &mut self,
+        value: &T,
+    ) -> Result<(), C::Error> {
         let value = self.wrap(value);
         self.inner.serialize_field(&value)
     }
@@ -348,21 +360,27 @@ impl<C: SerializeTupleVariant> SerializeTupleVariant for Compound<C> {
     }
 }
 
-impl<C: SerializeMap> SerializeMap for Compound<C> {
+impl<C: serde::ser::SerializeMap> serde::ser::SerializeMap for Compound<C> {
     type Ok = C::Ok;
     type Error = C::Error;
 
-    fn serialize_key<T: Serialize + ?Sized>(&mut self, key: &T) -> Result<(), C::Error> {
+    fn serialize_key<T: serde::ser::Serialize + ?Sized>(
+        &mut self,
+        key: &T,
+    ) -> Result<(), C::Error> {
         let key = self.wrap(key);
         self.inner.serialize_key(&key)
     }
 
-    fn serialize_value<T: Serialize + ?Sized>(&mut self, value: &T) -> Result<(), C::Error> {
+    fn serialize_value<T: serde::ser::Serialize + ?Sized>(
+        &mut self,
+        value: &T,
+    ) -> Result<(), C::Error> {
         let value = self.wrap(value);
         self.inner.serialize_value(&value)
     }
 
-    fn serialize_entry<K: Serialize + ?Sized, V: Serialize + ?Sized>(
+    fn serialize_entry<K: serde::ser::Serialize + ?Sized, V: serde::ser::Serialize + ?Sized>(
         &mut self,
         key: &K,
         value: &V,
@@ -377,11 +395,11 @@ impl<C: SerializeMap> SerializeMap for Compound<C> {
     }
 }
 
-impl<C: SerializeStruct> SerializeStruct for Compound<C> {
+impl<C: serde::ser::SerializeStruct> serde::ser::SerializeStruct for Compound<C> {
     type Ok = C::Ok;
     type Error = C::Error;
 
-    fn serialize_field<T: Serialize + ?Sized>(
+    fn serialize_field<T: serde::ser::Serialize + ?Sized>(
         &mut self,
         key: &'static str,
         value: &T,
@@ -399,11 +417,11 @@ impl<C: SerializeStruct> SerializeStruct for Compound<C> {
     }
 }
 
-impl<C: SerializeStructVariant> SerializeStructVariant for Compound<C> {
+impl<C: serde::ser::SerializeStructVariant> serde::ser::SerializeStructVariant for Compound<C> {
     type Ok = C::Ok;
     type Error = C::Error;
 
-    fn serialize_field<T: Serialize + ?Sized>(
+    fn serialize_field<T: serde::ser::Serialize + ?Sized>(
         &mut self,
         key: &'static str,
         value: &T,

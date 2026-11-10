@@ -8,9 +8,9 @@ use crate::delegate_base_command_trait_impls_to_inner;
 use crate::factory::Factory;
 use crate::io::{IOInterfaceWrite, io_interface};
 use crate::json::{JsonEncodeOptions, JsonFile};
-use crate::package::base_package::{self};
+use crate::package::base_package;
 use crate::util::{Filesystem, Platform};
-use bstr::{B, BStr, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, RuntimeException, ToPhpString, array_is_list,

@@ -8,8 +8,7 @@ use crate::json::{JsonEncodeOptions, JsonFile};
 use crate::repository::vcs::{GitDriver, VcsDriverBase, VcsDriverInterface};
 use crate::util::http::Response;
 use crate::util::{Bitbucket, HttpDownloader, ProcessExecutor};
-use bstr::{B, BStr, BString, ByteSlice};
-use chrono::{DateTime, FixedOffset};
+use bstr::{B, BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, LogicException, PhpMixed, RuntimeException,
@@ -407,7 +406,7 @@ impl GitBitbucketDriver {
     pub fn get_change_date(
         &mut self,
         identifier: &BStr,
-    ) -> anyhow::Result<Option<DateTime<FixedOffset>>> {
+    ) -> anyhow::Result<Option<chrono::DateTime<chrono::FixedOffset>>> {
         if let Some(fallback) = self.fallback_driver.as_mut() {
             return fallback.get_change_date(identifier);
         }
@@ -433,7 +432,7 @@ impl GitBitbucketDriver {
             .get("date")
             .and_then(|v| v.as_string())
             .unwrap_or_default();
-        let date: DateTime<FixedOffset> = date_create(date_str)?;
+        let date: chrono::DateTime<chrono::FixedOffset> = date_create(date_str)?;
         Ok(Some(date))
     }
 
@@ -802,7 +801,7 @@ impl VcsDriverInterface for GitBitbucketDriver {
     fn get_change_date(
         &mut self,
         identifier: &BStr,
-    ) -> anyhow::Result<Option<DateTime<FixedOffset>>> {
+    ) -> anyhow::Result<Option<chrono::DateTime<chrono::FixedOffset>>> {
         GitBitbucketDriver::get_change_date(self, identifier)
     }
 

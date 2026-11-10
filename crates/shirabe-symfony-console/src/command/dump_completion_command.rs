@@ -11,8 +11,6 @@ use shirabe_php_shim::{
     path_to_bytes, php_str, realpath, str_replace_arrays, sys_get_temp_dir, touch,
 };
 use shirabe_symfony_process::Process;
-use std::ops::{Deref, DerefMut};
-use std::path::PathBuf;
 
 /// __DIR__.'/../Resources/completion.bash', embedded at compile time (this port ships as a
 /// single binary and does not install the Resources directory alongside it).
@@ -29,7 +27,7 @@ impl_php_class!(
     r"Symfony\Component\Console\Command\DumpCompletionCommand"
 );
 
-impl Deref for DumpCompletionCommand {
+impl std::ops::Deref for DumpCompletionCommand {
     type Target = CommandData;
 
     fn deref(&self) -> &Self::Target {
@@ -37,7 +35,7 @@ impl Deref for DumpCompletionCommand {
     }
 }
 
-impl DerefMut for DumpCompletionCommand {
+impl std::ops::DerefMut for DumpCompletionCommand {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.inner
     }
@@ -147,7 +145,7 @@ impl Command for DumpCompletionCommand {
         // @realpath($fullCommand) ?: $fullCommand
         let full_command = match realpath(&full_command) {
             Some(p) if !p.as_os_str().is_empty() => p,
-            _ => PathBuf::from(full_command),
+            _ => std::path::PathBuf::from(full_command),
         };
 
         self.inner.set_help(bstr::BStr::new(&bformat!("The <info>%command.name%</> command dumps the shell completion script required\nto use shell autocompletion (currently only bash completion is supported).\n\n<comment>Static installation\n-------------------</>\n\nDump the script to a global completion file and restart your shell:\n\n    <info>%command.full_name% bash | sudo tee /etc/bash_completion.d/{command_name}</>\n\nOr dump the script to a local file and source it:\n\n    <info>%command.full_name% bash > completion.sh</>\n\n    <comment># source the file whenever you use the project</>\n    <info>source completion.sh</>\n\n    <comment># or add this line at the end of your \"~/.bashrc\" file:</>\n    <info>source /path/to/completion.sh</>\n\n<comment>Dynamic installation\n--------------------</>\n\nAdd this to the end of your shell configuration file (e.g. <info>\"~/.bashrc\"</>):\n\n    <info>eval \"$({full_command} completion bash)\"</>")));

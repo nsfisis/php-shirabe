@@ -1,6 +1,5 @@
 //! Benchmarks for `ProcessExecutor::execute_async`.
 
-use criterion::{BatchSize, BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use shirabe::util::ProcessExecutor;
 
 /// Pinned so the measurement does not depend on `COMPOSER_MAX_PARALLEL_PROCESSES`, which
@@ -27,7 +26,7 @@ fn executor() -> ProcessExecutor {
     process_executor
 }
 
-fn bench_single(c: &mut Criterion) {
+fn bench_single(c: &mut criterion::Criterion) {
     let runtime = runtime();
     let mut group = c.benchmark_group("execute_async/single");
 
@@ -38,7 +37,7 @@ fn bench_single(c: &mut Criterion) {
                 let process = process_executor.execute_async(COMMAND, None);
                 process.await.expect("the child failed to run")
             },
-            BatchSize::SmallInput,
+            criterion::BatchSize::SmallInput,
         );
     });
 
@@ -49,39 +48,43 @@ fn bench_single(c: &mut Criterion) {
                 let process = process_executor.execute_async("true", None);
                 process.await.expect("the child failed to run")
             },
-            BatchSize::SmallInput,
+            criterion::BatchSize::SmallInput,
         );
     });
 
     group.finish();
 }
 
-fn bench_concurrent(c: &mut Criterion) {
+fn bench_concurrent(c: &mut criterion::Criterion) {
     let runtime = runtime();
     let mut group = c.benchmark_group("execute_async/concurrent");
 
     for jobs in [1_u64, MAX_JOBS as u64, MAX_JOBS as u64 * 2] {
-        group.throughput(Throughput::Elements(jobs));
-        group.bench_with_input(BenchmarkId::from_parameter(jobs), &jobs, |b, &jobs| {
-            b.to_async(&runtime).iter_batched(
-                executor,
-                |process_executor| async move {
-                    let processes: Vec<_> = (0..jobs)
-                        .map(|_| process_executor.execute_async(COMMAND, None))
-                        .collect();
-                    futures::future::join_all(processes)
-                        .await
-                        .into_iter()
-                        .map(|process| process.expect("the child failed to run"))
-                        .collect::<Vec<_>>()
-                },
-                BatchSize::SmallInput,
-            );
-        });
+        group.throughput(criterion::Throughput::Elements(jobs));
+        group.bench_with_input(
+            criterion::BenchmarkId::from_parameter(jobs),
+            &jobs,
+            |b, &jobs| {
+                b.to_async(&runtime).iter_batched(
+                    executor,
+                    |process_executor| async move {
+                        let processes: Vec<_> = (0..jobs)
+                            .map(|_| process_executor.execute_async(COMMAND, None))
+                            .collect();
+                        futures::future::join_all(processes)
+                            .await
+                            .into_iter()
+                            .map(|process| process.expect("the child failed to run"))
+                            .collect::<Vec<_>>()
+                    },
+                    criterion::BatchSize::SmallInput,
+                );
+            },
+        );
     }
 
     group.finish();
 }
 
-criterion_group!(benches, bench_single, bench_concurrent);
-criterion_main!(benches);
+criterion::criterion_group!(benches, bench_single, bench_concurrent);
+criterion::criterion_main!(benches);

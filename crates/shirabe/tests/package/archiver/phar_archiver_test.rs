@@ -1,21 +1,19 @@
 //! ref: composer/tests/Composer/Test/Package/Archiver/PharArchiverTest.php sha1:bb3df0d5b21448501a2b6f9bf54744293b1a33ec
 
 use crate::test_case::get_unique_tmp_directory;
-use bstr::{BStr, BString, ByteSlice};
-use serial_test::serial;
+use bstr::{BStr, BString, ByteSlice as _};
 use shirabe::package::CompletePackageHandle;
 use shirabe::package::archiver::{ArchiverInterface, PharArchiver};
 use shirabe::util::{Filesystem, Platform};
 use shirabe_php_shim::{
     dirname, file_exists, file_put_contents, mkdir, path_from_bytes, path_to_bytes, realpath,
 };
-use tempfile::TempDir;
 
 // ref: ArchiverTestCase.
 struct ArchiverTestCase {
     filesystem: Filesystem,
     test_dir: std::path::PathBuf,
-    _test_dir_guard: TempDir,
+    _test_dir_guard: tempfile::TempDir,
 }
 
 impl ArchiverTestCase {
@@ -90,7 +88,7 @@ impl ArchiverTestCase {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_tar_archive() {
     let mut test_case = ArchiverTestCase::set_up();
 
@@ -118,7 +116,7 @@ fn test_tar_archive() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_zip_archive() {
     let mut test_case = ArchiverTestCase::set_up();
 

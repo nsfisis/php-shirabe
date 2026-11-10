@@ -4,7 +4,7 @@
 //! worker's. Upstream has no test for this, so the PHP code is written here.
 
 use crate::php_worker::lock_php_worker;
-use bstr::{BStr, ByteSlice};
+use bstr::{BStr, ByteSlice as _};
 use shirabe::console::Application;
 use shirabe::php_worker::call::PhpCall;
 use shirabe_php_rpc::PluginValue;

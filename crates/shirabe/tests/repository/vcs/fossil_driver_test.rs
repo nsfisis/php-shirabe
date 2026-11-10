@@ -8,10 +8,9 @@ use shirabe::io::{IOInterface, NullIO};
 use shirabe::repository::vcs::FossilDriver;
 use shirabe::util::Filesystem;
 use shirabe_php_shim::{PhpMixed, path_to_bytes};
-use tempfile::TempDir;
 
 struct SetUp {
-    home: TempDir,
+    home: tempfile::TempDir,
     config: Config,
 }
 

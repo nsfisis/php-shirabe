@@ -15,7 +15,7 @@
 use crate::package::{DisplayMode, Link, Mirror};
 use crate::util::StreamContextOptions;
 use crate::util::http::Response;
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_class_map_generator::class_map::ClassMap;
 use shirabe_php_rpc::{FromPluginValue, PhpObject, PhpThrow, PluginValue, ToPluginValue, codec};

@@ -6,7 +6,7 @@ use crate::helper::{
     Helper, TableCell, TableCellOption, TableCellStyle, TableRows, TableSeparator, TableStyle,
 };
 use crate::output::{OUTPUT_NORMAL, OutputInterface};
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     PhpDisplay, PhpMixed, ToPhpString, array_splice, bformat, explode, get_debug_type,

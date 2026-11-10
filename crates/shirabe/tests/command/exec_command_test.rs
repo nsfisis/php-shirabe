@@ -1,14 +1,13 @@
 //! ref: composer/tests/Composer/Test/Command/ExecCommandTest.php sha1:3c86f24a58d2338489cac207610707609782bea9
 
 use crate::test_case::{RunOptions, get_application_tester, init_temp_composer};
-use bstr::ByteSlice;
-use serial_test::serial;
+use bstr::ByteSlice as _;
 use shirabe_php_shim::{bformat, error_message, trim};
 use shirabe_symfony_console::input::{InputValue, ParameterName};
 
 /// ref: ExecCommandTest::testListThrowsIfNoBinariesExist
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_list_throws_if_no_binaries_exist() {
     let tear_down = init_temp_composer(Some(&serde_json::json!({})), None, None, false);
     let composer_dir = tear_down.working_dir();
@@ -39,7 +38,7 @@ fn test_list_throws_if_no_binaries_exist() {
 
 /// ref: ExecCommandTest::testList
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_list() {
     let tear_down = init_temp_composer(
         Some(&serde_json::json!({

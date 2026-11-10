@@ -24,7 +24,7 @@ use crate::repository::{
     RootPackageRepository,
 };
 use crate::util::PackageInfo;
-use bstr::{BStr, BString, ByteSlice, ByteVec};
+use bstr::{BStr, BString, ByteSlice as _, ByteVec as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     CmpOp, DATE_ATOM, InvalidArgumentException, LogicException, PhpMixed, STR_PAD_RIGHT,
@@ -2748,7 +2748,7 @@ impl serde::Serialize for ViewDataJson<'_> {
         S: serde::Serializer,
     {
         if self.0.is_empty() {
-            use serde::ser::SerializeSeq;
+            use serde::ser::SerializeSeq as _;
             return serializer.serialize_seq(Some(0))?.end();
         }
         serializer.collect_map(self.0.iter().map(|(key, value)| (ViewDataKey(key), value)))

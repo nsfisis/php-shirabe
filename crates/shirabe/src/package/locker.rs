@@ -10,13 +10,13 @@ use crate::package::{
     BasePackageHandle, CompleteAliasPackageHandle, Link, PackageInterfaceHandle,
     RootPackageInterfaceHandle,
 };
-use crate::plugin::plugin_interface::{self};
+use crate::plugin::plugin_interface;
 use crate::repository::{
     FindPackageConstraint, InstalledRepository, LockArrayRepository, LockArrayRepositoryHandle,
     PlatformRepository, RepositoryInterfaceHandle, RootPackageRepository,
 };
 use crate::util::{Git as GitUtil, ProcessExecutor};
-use bstr::{B, BStr, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, DATE_RFC3339, LogicException, PhpMixed, RuntimeException, ToPhpString,

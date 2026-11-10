@@ -9,10 +9,9 @@ use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::package::PackageInterfaceHandle;
 use crate::repository::VcsRepository;
 use crate::util::{Filesystem, Perforce, PerforceInterface, ProcessExecutor};
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{PhpMixed, bformat, impl_php_class, strpos, substr};
-use std::path::Path;
 
 #[derive(Debug)]
 pub struct PerforceDownloader {
@@ -47,7 +46,12 @@ impl PerforceDownloader {
         None
     }
 
-    pub fn init_perforce(&self, package: PackageInterfaceHandle, path: &Path, url: BString) {
+    pub fn init_perforce(
+        &self,
+        package: PackageInterfaceHandle,
+        path: &std::path::Path,
+        url: BString,
+    ) {
         if let Some(perforce) = self.perforce.borrow_mut().as_mut() {
             perforce.initialize_path(path);
             return;
@@ -105,7 +109,7 @@ impl VcsDownloader for PerforceDownloader {
     async fn do_download(
         &self,
         _package: PackageInterfaceHandle,
-        _path: &Path,
+        _path: &std::path::Path,
         _url: &bstr::BStr,
         _prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -115,7 +119,7 @@ impl VcsDownloader for PerforceDownloader {
     async fn do_install(
         &self,
         package: PackageInterfaceHandle,
-        path: &Path,
+        path: &std::path::Path,
         url: &bstr::BStr,
     ) -> anyhow::Result<Option<PhpMixed>> {
         let source_ref = package.get_source_reference();
@@ -145,7 +149,7 @@ impl VcsDownloader for PerforceDownloader {
         &self,
         _initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
-        path: &Path,
+        path: &std::path::Path,
         url: &bstr::BStr,
     ) -> anyhow::Result<Option<PhpMixed>> {
         self.do_install(target, path, url).await
@@ -155,7 +159,7 @@ impl VcsDownloader for PerforceDownloader {
         &self,
         from_reference: &bstr::BStr,
         to_reference: &bstr::BStr,
-        _path: &Path,
+        _path: &std::path::Path,
     ) -> anyhow::Result<bstr::BString> {
         Ok(self
             .perforce
@@ -166,7 +170,7 @@ impl VcsDownloader for PerforceDownloader {
             .unwrap_or_default())
     }
 
-    fn has_metadata_repository(&self, _path: &Path) -> bool {
+    fn has_metadata_repository(&self, _path: &std::path::Path) -> bool {
         true
     }
 }
@@ -176,7 +180,7 @@ impl ChangeReportInterface for PerforceDownloader {
     async fn get_local_changes(
         &self,
         _package: PackageInterfaceHandle,
-        _path: &Path,
+        _path: &std::path::Path,
     ) -> anyhow::Result<Option<bstr::BString>> {
         self.inner
             .io
@@ -190,7 +194,7 @@ impl VcsCapableDownloaderInterface for PerforceDownloader {
     fn get_vcs_reference(
         &self,
         package: PackageInterfaceHandle,
-        path: &Path,
+        path: &std::path::Path,
     ) -> anyhow::Result<Option<bstr::BString>> {
         self.inner.get_vcs_reference(package, path)
     }
@@ -213,7 +217,7 @@ impl DownloaderInterface for PerforceDownloader {
     async fn download_with_output(
         &self,
         package: PackageInterfaceHandle,
-        path: &Path,
+        path: &std::path::Path,
         prev_package: Option<PackageInterfaceHandle>,
         _output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -224,7 +228,7 @@ impl DownloaderInterface for PerforceDownloader {
         &self,
         r#type: &BStr,
         package: PackageInterfaceHandle,
-        path: &Path,
+        path: &std::path::Path,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as VcsDownloader>::prepare(self, r#type, package, path, prev_package).await
@@ -233,7 +237,7 @@ impl DownloaderInterface for PerforceDownloader {
     async fn install_with_output(
         &self,
         package: PackageInterfaceHandle,
-        path: &Path,
+        path: &std::path::Path,
         _output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as VcsDownloader>::install(self, package, path).await
@@ -243,7 +247,7 @@ impl DownloaderInterface for PerforceDownloader {
         &self,
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
-        path: &Path,
+        path: &std::path::Path,
     ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as VcsDownloader>::update(self, initial, target, path).await
     }
@@ -251,7 +255,7 @@ impl DownloaderInterface for PerforceDownloader {
     async fn remove_with_output(
         &self,
         package: PackageInterfaceHandle,
-        path: &Path,
+        path: &std::path::Path,
         _output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as VcsDownloader>::remove(self, package, path).await
@@ -261,7 +265,7 @@ impl DownloaderInterface for PerforceDownloader {
         &self,
         r#type: &BStr,
         package: PackageInterfaceHandle,
-        path: &Path,
+        path: &std::path::Path,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as VcsDownloader>::cleanup(self, r#type, package, path, prev_package).await

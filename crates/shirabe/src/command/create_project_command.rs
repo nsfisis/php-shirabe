@@ -28,7 +28,7 @@ use crate::repository::{
 use crate::script::ScriptEvents;
 use crate::signal::SignalSubscription;
 use crate::util::{Filesystem, Platform, ProcessExecutor};
-use bstr::{B, BStr, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice as _};
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, PhpMixed, RuntimeException, UnexpectedValueException,
     array_pop, bformat, chdir, error_message, explode_with_limit, file_exists, getcwd,
@@ -39,7 +39,6 @@ use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::{InputInterface, InputInterfaceByName, InputValue};
 use shirabe_symfony_console::output::OutputInterface;
 use shirabe_symfony_finder::Finder;
-use std::path::PathBuf;
 
 /// Install a package as new project into new directory.
 #[derive(Debug)]
@@ -80,7 +79,7 @@ impl CreateProjectCommand {
         config: std::rc::Rc<std::cell::RefCell<Config>>,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         package_name: Option<BString>,
-        directory: Option<PathBuf>,
+        directory: Option<std::path::PathBuf>,
         package_version: Option<BString>,
         stability: Option<BString>,
         mut prefer_source: bool,
@@ -341,7 +340,7 @@ impl CreateProjectCommand {
             }
 
             // PHP: try { $dirs = iterator_to_array($finder); ... } catch (\Exception $e) { ... }
-            let dirs: Vec<PathBuf> = finder.iter().collect();
+            let dirs: Vec<std::path::PathBuf> = finder.iter().collect();
             drop(finder);
             let mut had_error: Option<anyhow::Error> = None;
             for dir in &dirs {
@@ -409,7 +408,7 @@ impl CreateProjectCommand {
         config: &std::rc::Rc<std::cell::RefCell<Config>>,
         package_name: &BStr,
         platform_requirement_filter: std::rc::Rc<dyn PlatformRequirementFilterInterface>,
-        directory: Option<PathBuf>,
+        directory: Option<std::path::PathBuf>,
         mut package_version: Option<BString>,
         mut stability: Option<BString>,
         prefer_source: bool,

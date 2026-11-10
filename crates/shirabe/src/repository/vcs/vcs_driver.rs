@@ -9,7 +9,6 @@ use crate::repository::vcs::VcsDriverInterface;
 use crate::util::http::Response;
 use crate::util::{HttpDownloader, ProcessExecutor, StreamContextOptions};
 use bstr::{B, BStr, BString};
-use chrono::{DateTime, FixedOffset};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, DATE_RFC3339, PhpMixed, bformat, display_to_bytes, extension_loaded, php_regex,
@@ -97,7 +96,7 @@ impl VcsDriverBase {
     pub fn finish_base_composer_information(
         identifier: &BStr,
         composer_file_content: Option<BString>,
-        change_date: impl FnOnce() -> anyhow::Result<Option<DateTime<FixedOffset>>>,
+        change_date: impl FnOnce() -> anyhow::Result<Option<chrono::DateTime<chrono::FixedOffset>>>,
     ) -> anyhow::Result<Option<IndexMap<BString, PhpMixed>>> {
         let content = match composer_file_content {
             None => return Ok(None),

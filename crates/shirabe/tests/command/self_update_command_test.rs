@@ -1,9 +1,8 @@
 //! ref: composer/tests/Composer/Test/Command/SelfUpdateCommandTest.php sha1:7fe96bf18edf3e973ff6f47e92deb30c624edca4
 
 use crate::test_case::{RunOptions, TearDown, get_application_tester, init_temp_composer};
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
-use serial_test::serial;
 use shirabe_php_shim::{PHP_BINARY, PhpMixed, ToPhpString, error_message};
 use shirabe_symfony_console::input::{InputValue, ParameterName};
 use shirabe_symfony_process::Process;
@@ -40,7 +39,7 @@ fn channel_options() -> Vec<(&'static BStr, &'static BStr)> {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 #[ignore = "composer-test.phar is built by AllFunctionalTest::testBuildPhar via bin/compile, which has no equivalent here, so the fixture set_up_with_phar copies can never exist"]
 fn test_successful_update() {
     let (_tear_down, phar) = set_up_with_phar();
@@ -77,7 +76,7 @@ fn test_successful_update() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 #[ignore = "composer-test.phar is built by AllFunctionalTest::testBuildPhar via bin/compile, which has no equivalent here, so the fixture set_up_with_phar copies can never exist"]
 fn test_update_to_specific_version() {
     let (_tear_down, phar) = set_up_with_phar();
@@ -112,7 +111,7 @@ fn test_update_to_specific_version() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_update_with_invalid_option_throws_exception() {
     let _tear_down = set_up();
 
@@ -138,7 +137,7 @@ fn test_update_with_invalid_option_throws_exception() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 #[ignore = "composer-test.phar is built by AllFunctionalTest::testBuildPhar via bin/compile, which has no equivalent here, so the fixture set_up_with_phar copies can never exist"]
 fn test_update_to_different_channel() {
     for (option, expected_output) in channel_options() {

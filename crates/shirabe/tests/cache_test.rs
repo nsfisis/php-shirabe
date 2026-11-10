@@ -11,11 +11,9 @@ use shirabe::cache::{Cache, CacheMock, GcFinderMock};
 use shirabe::io::{IOInterface, NullIO};
 use shirabe::util::Filesystem;
 use shirabe_php_shim::{bformat, path_from_bytes};
-use std::fs;
-use tempfile::TempDir;
 
 struct SetUp {
-    root: TempDir,
+    root: tempfile::TempDir,
     files: Vec<std::path::PathBuf>,
     cache: Cache,
 }
@@ -29,7 +27,7 @@ fn set_up() -> SetUp {
         let path = root
             .path()
             .join(path_from_bytes(&bformat!("cached.file{i}.zip")));
-        fs::write(&path, &zeros).unwrap();
+        std::fs::write(&path, &zeros).unwrap();
         files.push(path);
     }
 

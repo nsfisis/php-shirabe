@@ -1,6 +1,6 @@
 //! ref: composer/tests/Composer/Test/Json/JsonFileTest.php sha1:6d5617bb11969b5f9b9cf2e2286c61abce2eb473
 
-use bstr::{B, BStr, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe::json::{JsonEncodeOptions, JsonFile, JsonValidationException};
 use shirabe_php_shim::{

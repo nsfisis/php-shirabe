@@ -12,7 +12,7 @@ use crate::plugin::{PluginEvents, PrePoolCreateEvent};
 use crate::repository::{
     PlatformRepository, RepositoryInterface, RepositoryInterfaceHandle, RootPackageRepository,
 };
-use bstr::{B, BStr, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     CmpOp, LogicException, PhpMixed, ToPhpString, array_map, bformat, display_to_bytes,

@@ -9,13 +9,12 @@ use crate::input::{
     InputOption, InputValue,
 };
 use crate::output::OutputInterface;
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     AsAny, PHP_SERVER, PhpClass, PhpMixed, bformat, explode, is_numeric_to_int, path_to_bytes,
     php_regex, preg_is_match, str_replace_array, trim,
 };
-use std::cell::{Cell, Ref};
 
 /// The base-class state of the PHP `Command` class.
 ///
@@ -29,11 +28,11 @@ pub struct CommandData {
     name: std::cell::RefCell<Option<BString>>,
     aliases: std::cell::RefCell<Vec<BString>>,
     definition: std::cell::RefCell<Option<InputDefinition>>,
-    hidden: Cell<bool>,
+    hidden: std::cell::Cell<bool>,
     help: std::cell::RefCell<BString>,
     description: std::cell::RefCell<BString>,
     full_definition: std::cell::RefCell<Option<InputDefinition>>,
-    ignore_validation_errors: Cell<bool>,
+    ignore_validation_errors: std::cell::Cell<bool>,
     // A callable(InputInterface, OutputInterface) -> i64.
     code: std::cell::RefCell<
         Option<Box<dyn Fn(&mut dyn InputInterface, &mut dyn OutputInterface) -> PhpMixed>>,
@@ -63,11 +62,11 @@ impl CommandData {
             definition: std::cell::RefCell::new(Some(
                 InputDefinition::new(Vec::new()).expect("an empty InputDefinition cannot fail"),
             )),
-            hidden: Cell::new(false),
+            hidden: std::cell::Cell::new(false),
             help: std::cell::RefCell::new(BString::default()),
             description: std::cell::RefCell::new(BString::default()),
             full_definition: std::cell::RefCell::new(None),
-            ignore_validation_errors: Cell::new(false),
+            ignore_validation_errors: std::cell::Cell::new(false),
             code: std::cell::RefCell::new(None),
             synopsis: std::cell::RefCell::new(IndexMap::new()),
             usages: std::cell::RefCell::new(Vec::new()),
@@ -439,9 +438,9 @@ pub trait Command: std::fmt::Debug + AsAny + PhpClass {
 
     fn merge_application_definition(&self, merge_args: bool);
 
-    fn get_definition(&self) -> Ref<'_, InputDefinition>;
+    fn get_definition(&self) -> std::cell::Ref<'_, InputDefinition>;
 
-    fn get_native_definition(&self) -> Ref<'_, InputDefinition>;
+    fn get_native_definition(&self) -> std::cell::Ref<'_, InputDefinition>;
 
     fn set_name(&self, name: &BStr) -> anyhow::Result<()>;
 
@@ -483,7 +482,10 @@ pub trait Command: std::fmt::Debug + AsAny + PhpClass {
 
     fn get_code(
         &self,
-    ) -> Ref<'_, Option<Box<dyn Fn(&mut dyn InputInterface, &mut dyn OutputInterface) -> PhpMixed>>>;
+    ) -> std::cell::Ref<
+        '_,
+        Option<Box<dyn Fn(&mut dyn InputInterface, &mut dyn OutputInterface) -> PhpMixed>>,
+    >;
 
     fn ignore_validation_errors(&self);
 
@@ -606,9 +608,9 @@ impl Command for CommandData {
         *self.full_definition.borrow_mut() = Some(full_definition);
     }
 
-    fn get_definition(&self) -> Ref<'_, InputDefinition> {
+    fn get_definition(&self) -> std::cell::Ref<'_, InputDefinition> {
         if self.full_definition.borrow().is_some() {
-            Ref::map(self.full_definition.borrow(), |full_definition| {
+            std::cell::Ref::map(self.full_definition.borrow(), |full_definition| {
                 full_definition.as_ref().unwrap()
             })
         } else {
@@ -616,8 +618,8 @@ impl Command for CommandData {
         }
     }
 
-    fn get_native_definition(&self) -> Ref<'_, InputDefinition> {
-        Ref::map(self.definition.borrow(), |definition| match definition {
+    fn get_native_definition(&self) -> std::cell::Ref<'_, InputDefinition> {
+        std::cell::Ref::map(self.definition.borrow(), |definition| match definition {
             Some(definition) => definition,
             None => {
                 // PHP throws LogicException; `definition` is set in `new()`, so None is a
@@ -778,8 +780,10 @@ impl Command for CommandData {
 
     fn get_code(
         &self,
-    ) -> Ref<'_, Option<Box<dyn Fn(&mut dyn InputInterface, &mut dyn OutputInterface) -> PhpMixed>>>
-    {
+    ) -> std::cell::Ref<
+        '_,
+        Option<Box<dyn Fn(&mut dyn InputInterface, &mut dyn OutputInterface) -> PhpMixed>>,
+    > {
         self.code.borrow()
     }
 

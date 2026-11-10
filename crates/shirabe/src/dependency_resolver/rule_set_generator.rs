@@ -9,10 +9,9 @@ use crate::filter::platform_requirement_filter::{
     PlatformRequirementFilterInterface,
 };
 use crate::package::PackageInterfaceHandle;
-use bstr::{BString, ByteSlice};
+use bstr::{BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{LogicException, bformat};
-use std::collections::VecDeque;
 
 #[derive(Debug)]
 pub struct RuleSetGenerator {
@@ -136,7 +135,8 @@ impl RuleSetGenerator {
         package: PackageInterfaceHandle,
         platform_requirement_filter: &dyn PlatformRequirementFilterInterface,
     ) {
-        let mut work_queue: VecDeque<PackageInterfaceHandle> = VecDeque::new();
+        let mut work_queue: std::collections::VecDeque<PackageInterfaceHandle> =
+            std::collections::VecDeque::new();
         work_queue.push_back(package);
 
         while let Some(package) = work_queue.pop_front() {

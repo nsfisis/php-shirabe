@@ -4,8 +4,7 @@ use crate::test_case::{
     RunOptions, create_composer_lock, create_installed_json, get_application_tester, get_package,
     init_temp_composer,
 };
-use bstr::{BStr, BString, ByteSlice};
-use serial_test::serial;
+use bstr::{BStr, BString, ByteSlice as _};
 use shirabe::json::JsonFile;
 use shirabe_php_shim::{error_message, trim};
 use shirabe_symfony_console::input::{InputValue, ParameterName};
@@ -18,7 +17,7 @@ fn input(pairs: Vec<(&BStr, InputValue)>) -> Vec<(ParameterName, InputValue)> {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_require_throws_if_none_matches() {
     let composer_json = serde_json::json!({
         "repositories": {
@@ -58,7 +57,7 @@ fn test_require_throws_if_none_matches() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_require_warns_if_resolved_to_feature_branch() {
     let composer_json = serde_json::json!({
         "repositories": {
@@ -262,7 +261,7 @@ Using version 1.1.0 for required/pkg"),
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_require() {
     for (label, composer_json, command, expected) in provide_require() {
         let _tear_down = init_temp_composer(Some(&composer_json), None, None, true);
@@ -357,7 +356,7 @@ fn provide_inconsistent_require_keys() -> Vec<(bool, bool, &'static BStr)> {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_inconsistent_require_keys() {
     for (is_dev, is_interactive, expected_warning) in provide_inconsistent_require_keys() {
         let current_key = if is_dev { "require" } else { "require-dev" };

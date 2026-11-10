@@ -5,7 +5,7 @@
 
 use crate::php_worker::rpc::entity::{Call, protocol_violation};
 use crate::php_worker::rpc::forwarding;
-use bstr::{BStr, ByteSlice};
+use bstr::{BStr, ByteSlice as _};
 use shirabe_php_rpc::{PhpThrow, PluginValue};
 
 /// `__shirabe_construct`: builds the entity, registers it and answers its rhandle. A stub's
@@ -130,7 +130,7 @@ pub(crate) mod autoload {
         use crate::php_worker::rpc::entity::{
             Call, Crossing, Entity, constructed, protocol_violation,
         };
-        use bstr::ByteSlice;
+        use bstr::ByteSlice as _;
         use shirabe_php_rpc::{PhpThrow, PluginValue};
 
         /// `Composer\Autoload\AutoloadGenerator`.
@@ -269,7 +269,7 @@ pub(crate) mod autoload {
 pub(crate) mod composer {
     use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
     use crate::php_worker::rpc::forwarding;
-    use bstr::ByteSlice;
+    use bstr::ByteSlice as _;
     use shirabe_php_rpc::{PhpThrow, PluginValue};
 
     /// `Composer\Composer`.
@@ -407,7 +407,7 @@ dispatch,
 
 pub(crate) mod config {
     use crate::php_worker::rpc::entity::{Call, Crossing, Entity, constructed, protocol_violation};
-    use bstr::ByteSlice;
+    use bstr::ByteSlice as _;
     use shirabe_php_rpc::{PhpThrow, PluginValue};
 
     /// `Composer\Config`.
@@ -568,7 +568,7 @@ pub(crate) mod dependency_resolver {
     pub(crate) mod local_repo_transaction {
         use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
         use crate::php_worker::rpc::forwarding;
-        use bstr::ByteSlice;
+        use bstr::ByteSlice as _;
         use shirabe_php_rpc::{PhpThrow, PluginValue};
 
         /// `Composer\DependencyResolver\LocalRepoTransaction`.
@@ -605,7 +605,7 @@ dispatch,
         pub(crate) mod install_operation {
             use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
             use crate::php_worker::rpc::forwarding;
-            use bstr::ByteSlice;
+            use bstr::ByteSlice as _;
             use shirabe_php_rpc::{PhpThrow, PluginValue};
 
             /// `Composer\DependencyResolver\Operation\InstallOperation`.
@@ -652,7 +652,7 @@ dispatch,
         pub(crate) mod mark_alias_installed_operation {
             use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
             use crate::php_worker::rpc::forwarding;
-            use bstr::ByteSlice;
+            use bstr::ByteSlice as _;
             use shirabe_php_rpc::{PhpThrow, PluginValue};
 
             /// `Composer\DependencyResolver\Operation\MarkAliasInstalledOperation`.
@@ -699,7 +699,7 @@ dispatch,
         pub(crate) mod mark_alias_uninstalled_operation {
             use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
             use crate::php_worker::rpc::forwarding;
-            use bstr::ByteSlice;
+            use bstr::ByteSlice as _;
             use shirabe_php_rpc::{PhpThrow, PluginValue};
 
             /// `Composer\DependencyResolver\Operation\MarkAliasUninstalledOperation`.
@@ -745,7 +745,7 @@ dispatch,
         }
         pub(crate) mod solver_operation {
             use crate::php_worker::rpc::entity::{Call, Crossing, Entity, protocol_violation};
-            use bstr::ByteSlice;
+            use bstr::ByteSlice as _;
             use shirabe_php_rpc::{PhpThrow, PluginValue};
 
             /// `Composer\DependencyResolver\Operation\SolverOperation`.
@@ -798,7 +798,7 @@ dispatch,
         pub(crate) mod uninstall_operation {
             use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
             use crate::php_worker::rpc::forwarding;
-            use bstr::ByteSlice;
+            use bstr::ByteSlice as _;
             use shirabe_php_rpc::{PhpThrow, PluginValue};
 
             /// `Composer\DependencyResolver\Operation\UninstallOperation`.
@@ -845,7 +845,7 @@ dispatch,
         pub(crate) mod update_operation {
             use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
             use crate::php_worker::rpc::forwarding;
-            use bstr::ByteSlice;
+            use bstr::ByteSlice as _;
             use shirabe_php_rpc::{PhpThrow, PluginValue};
 
             /// `Composer\DependencyResolver\Operation\UpdateOperation`.
@@ -903,7 +903,7 @@ dispatch,
         use crate::php_worker::rpc::entity::{
             Call, Crossing, Entity, constructed, protocol_violation,
         };
-        use bstr::ByteSlice;
+        use bstr::ByteSlice as _;
         use shirabe_php_rpc::{PhpThrow, PluginValue};
 
         /// `Composer\DependencyResolver\Transaction`.
@@ -954,7 +954,7 @@ pub(crate) mod downloader {
         use crate::php_worker::rpc::entity::{
             Call, Crossing, Entity, constructed, protocol_violation,
         };
-        use bstr::ByteSlice;
+        use bstr::ByteSlice as _;
         use shirabe_php_rpc::{PhpThrow, PluginValue};
 
         /// `Composer\Downloader\DownloadManager`.
@@ -1095,7 +1095,7 @@ pub(crate) mod downloader {
 pub(crate) mod event_dispatcher {
     pub(crate) mod event {
         use crate::php_worker::rpc::entity::{Call, Crossing, Entity, protocol_violation};
-        use bstr::ByteSlice;
+        use bstr::ByteSlice as _;
         use shirabe_php_rpc::{PhpThrow, PluginValue};
 
         /// `Composer\EventDispatcher\Event`.
@@ -1169,7 +1169,7 @@ pub(crate) mod event_dispatcher {
         use crate::php_worker::rpc::entity::{
             Call, Crossing, Entity, constructed, protocol_violation,
         };
-        use bstr::ByteSlice;
+        use bstr::ByteSlice as _;
         use shirabe_php_rpc::{PhpThrow, PluginValue};
 
         /// `Composer\EventDispatcher\EventDispatcher`.
@@ -1290,7 +1290,7 @@ pub(crate) mod event_dispatcher {
 
 pub(crate) mod factory {
     use crate::php_worker::rpc::entity::{Call, protocol_violation};
-    use bstr::ByteSlice;
+    use bstr::ByteSlice as _;
     use shirabe_php_rpc::{PhpThrow, PluginValue};
 
     /// `Composer\Factory`, whose static methods are forwarded.
@@ -1314,7 +1314,7 @@ pub(crate) mod factory {
 pub(crate) mod io {
     pub(crate) mod base_io {
         use crate::php_worker::rpc::entity::{Call, Crossing, Entity, protocol_violation};
-        use bstr::ByteSlice;
+        use bstr::ByteSlice as _;
         use shirabe_php_rpc::{PhpThrow, PluginValue};
 
         /// `Composer\IO\BaseIO`.
@@ -1588,7 +1588,7 @@ pub(crate) mod io {
     pub(crate) mod buffer_io {
         use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
         use crate::php_worker::rpc::forwarding;
-        use bstr::ByteSlice;
+        use bstr::ByteSlice as _;
         use shirabe_php_rpc::{PhpThrow, PluginValue};
 
         /// `Composer\IO\BufferIO`.
@@ -1682,7 +1682,7 @@ _ => protocol_violation(call),
     pub(crate) mod console_io {
         use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
         use crate::php_worker::rpc::forwarding;
-        use bstr::ByteSlice;
+        use bstr::ByteSlice as _;
         use shirabe_php_rpc::{PhpThrow, PluginValue};
 
         /// `Composer\IO\ConsoleIO`.
@@ -1782,7 +1782,7 @@ _ => protocol_violation(call),
     pub(crate) mod null_io {
         use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
         use crate::php_worker::rpc::forwarding;
-        use bstr::ByteSlice;
+        use bstr::ByteSlice as _;
         use shirabe_php_rpc::{PhpThrow, PluginValue};
 
         /// `Composer\IO\NullIO`.
@@ -1859,7 +1859,7 @@ pub(crate) mod installer {
         use crate::php_worker::rpc::entity::{
             Call, Crossing, Entity, constructed, protocol_violation,
         };
-        use bstr::ByteSlice;
+        use bstr::ByteSlice as _;
         use shirabe_php_rpc::{PhpThrow, PluginValue};
 
         /// `Composer\Installer\InstallationManager`.
@@ -2039,7 +2039,7 @@ pub(crate) mod installer {
     pub(crate) mod installer_event {
         use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
         use crate::php_worker::rpc::forwarding;
-        use bstr::ByteSlice;
+        use bstr::ByteSlice as _;
         use shirabe_php_rpc::{PhpThrow, PluginValue};
 
         /// `Composer\Installer\InstallerEvent`.
@@ -2124,7 +2124,7 @@ dispatch,
     pub(crate) mod package_event {
         use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
         use crate::php_worker::rpc::forwarding;
-        use bstr::ByteSlice;
+        use bstr::ByteSlice as _;
         use shirabe_php_rpc::{PhpThrow, PluginValue};
 
         /// `Composer\Installer\PackageEvent`.
@@ -2221,7 +2221,7 @@ pub(crate) mod package {
     pub(crate) mod alias_package {
         use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
         use crate::php_worker::rpc::forwarding;
-        use bstr::ByteSlice;
+        use bstr::ByteSlice as _;
         use shirabe_php_rpc::{PhpThrow, PluginValue};
 
         /// `Composer\Package\AliasPackage`.
@@ -2348,7 +2348,7 @@ dispatch,
     }
     pub(crate) mod base_package {
         use crate::php_worker::rpc::entity::{Call, Crossing, Entity, protocol_violation};
-        use bstr::ByteSlice;
+        use bstr::ByteSlice as _;
         use shirabe_php_rpc::{PhpThrow, PluginValue};
 
         /// `Composer\Package\BasePackage`.
@@ -2888,7 +2888,7 @@ dispatch,
     pub(crate) mod complete_alias_package {
         use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
         use crate::php_worker::rpc::forwarding;
-        use bstr::ByteSlice;
+        use bstr::ByteSlice as _;
         use shirabe_php_rpc::{PhpThrow, PluginValue};
 
         /// `Composer\Package\CompleteAliasPackage`.
@@ -3209,7 +3209,7 @@ dispatch,
     pub(crate) mod complete_package {
         use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
         use crate::php_worker::rpc::forwarding;
-        use bstr::ByteSlice;
+        use bstr::ByteSlice as _;
         use shirabe_php_rpc::{PhpThrow, PluginValue};
 
         /// `Composer\Package\CompletePackage`.
@@ -3548,7 +3548,7 @@ dispatch,
         use crate::php_worker::rpc::entity::{
             Call, Crossing, Entity, constructed, protocol_violation,
         };
-        use bstr::ByteSlice;
+        use bstr::ByteSlice as _;
         use shirabe_php_rpc::{PhpThrow, PluginValue};
 
         /// `Composer\Package\Locker`.
@@ -3759,7 +3759,7 @@ dispatch,
     pub(crate) mod package {
         use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
         use crate::php_worker::rpc::forwarding;
-        use bstr::ByteSlice;
+        use bstr::ByteSlice as _;
         use shirabe_php_rpc::{PhpThrow, PluginValue};
 
         /// `Composer\Package\Package`.
@@ -4040,7 +4040,7 @@ dispatch,
     pub(crate) mod root_alias_package {
         use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
         use crate::php_worker::rpc::forwarding;
-        use bstr::ByteSlice;
+        use bstr::ByteSlice as _;
         use shirabe_php_rpc::{PhpThrow, PluginValue};
 
         /// `Composer\Package\RootAliasPackage`.
@@ -4350,7 +4350,7 @@ dispatch,
     pub(crate) mod root_package {
         use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
         use crate::php_worker::rpc::forwarding;
-        use bstr::ByteSlice;
+        use bstr::ByteSlice as _;
         use shirabe_php_rpc::{PhpThrow, PluginValue};
 
         /// `Composer\Package\RootPackage`.
@@ -4597,7 +4597,7 @@ dispatch,
 
 pub(crate) mod partial_composer {
     use crate::php_worker::rpc::entity::{Call, Crossing, Entity, constructed, protocol_violation};
-    use bstr::ByteSlice;
+    use bstr::ByteSlice as _;
     use shirabe_php_rpc::{PhpThrow, PluginValue};
 
     /// `Composer\PartialComposer`.
@@ -4737,7 +4737,7 @@ pub(crate) mod plugin {
     pub(crate) mod command_event {
         use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
         use crate::php_worker::rpc::forwarding;
-        use bstr::ByteSlice;
+        use bstr::ByteSlice as _;
         use shirabe_php_rpc::{PhpThrow, PluginValue};
 
         /// `Composer\Plugin\CommandEvent`.
@@ -4804,7 +4804,7 @@ dispatch,
     pub(crate) mod post_file_download_event {
         use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
         use crate::php_worker::rpc::forwarding;
-        use bstr::ByteSlice;
+        use bstr::ByteSlice as _;
         use shirabe_php_rpc::{PhpThrow, PluginValue};
 
         /// `Composer\Plugin\PostFileDownloadEvent`.
@@ -4898,7 +4898,7 @@ dispatch,
     pub(crate) mod pre_command_run_event {
         use crate::php_worker::rpc::entity::{Call, Crossing, protocol_violation};
         use crate::php_worker::rpc::forwarding;
-        use bstr::ByteSlice;
+        use bstr::ByteSlice as _;
         use shirabe_php_rpc::{PhpThrow, PluginValue};
 
         /// `Composer\Plugin\PreCommandRunEvent`.
@@ -4947,7 +4947,7 @@ dispatch,
     pub(crate) mod pre_file_download_event {
         use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
         use crate::php_worker::rpc::forwarding;
-        use bstr::ByteSlice;
+        use bstr::ByteSlice as _;
         use shirabe_php_rpc::{PhpThrow, PluginValue};
 
         /// `Composer\Plugin\PreFileDownloadEvent`.
@@ -5068,7 +5068,7 @@ dispatch,
     pub(crate) mod pre_pool_create_event {
         use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
         use crate::php_worker::rpc::forwarding;
-        use bstr::ByteSlice;
+        use bstr::ByteSlice as _;
         use shirabe_php_rpc::{PhpThrow, PluginValue};
 
         /// `Composer\Plugin\PrePoolCreateEvent`.
@@ -5202,7 +5202,7 @@ pub(crate) mod repository {
         use crate::php_worker::rpc::entity::{
             Call, Crossing, Entity, constructed, protocol_violation,
         };
-        use bstr::ByteSlice;
+        use bstr::ByteSlice as _;
         use shirabe_php_rpc::{PhpThrow, PluginValue};
 
         /// `Composer\Repository\ArrayRepository`.
@@ -5333,7 +5333,7 @@ pub(crate) mod repository {
     pub(crate) mod filesystem_repository {
         use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
         use crate::php_worker::rpc::forwarding;
-        use bstr::ByteSlice;
+        use bstr::ByteSlice as _;
         use shirabe_php_rpc::{PhpThrow, PluginValue};
 
         /// `Composer\Repository\FilesystemRepository`.
@@ -5385,7 +5385,7 @@ dispatch,
     pub(crate) mod installed_array_repository {
         use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
         use crate::php_worker::rpc::forwarding;
-        use bstr::ByteSlice;
+        use bstr::ByteSlice as _;
         use shirabe_php_rpc::{PhpThrow, PluginValue};
 
         /// `Composer\Repository\InstalledArrayRepository`.
@@ -5446,7 +5446,7 @@ dispatch,
     pub(crate) mod installed_filesystem_repository {
         use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
         use crate::php_worker::rpc::forwarding;
-        use bstr::ByteSlice;
+        use bstr::ByteSlice as _;
         use shirabe_php_rpc::{PhpThrow, PluginValue};
 
         /// `Composer\Repository\InstalledFilesystemRepository`.
@@ -5507,7 +5507,7 @@ dispatch,
     pub(crate) mod lock_array_repository {
         use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
         use crate::php_worker::rpc::forwarding;
-        use bstr::ByteSlice;
+        use bstr::ByteSlice as _;
         use shirabe_php_rpc::{PhpThrow, PluginValue};
 
         /// `Composer\Repository\LockArrayRepository`.
@@ -5554,7 +5554,7 @@ dispatch,
         use crate::php_worker::rpc::entity::{
             Call, Crossing, Entity, constructed, protocol_violation,
         };
-        use bstr::ByteSlice;
+        use bstr::ByteSlice as _;
         use shirabe_php_rpc::{PhpThrow, PluginValue};
 
         /// `Composer\Repository\RepositoryManager`.
@@ -5673,7 +5673,7 @@ dispatch,
     pub(crate) mod writable_array_repository {
         use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
         use crate::php_worker::rpc::forwarding;
-        use bstr::ByteSlice;
+        use bstr::ByteSlice as _;
         use shirabe_php_rpc::{PhpThrow, PluginValue};
 
         /// `Composer\Repository\WritableArrayRepository`.
@@ -5776,7 +5776,7 @@ pub(crate) mod script {
     pub(crate) mod event {
         use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
         use crate::php_worker::rpc::forwarding;
-        use bstr::ByteSlice;
+        use bstr::ByteSlice as _;
         use shirabe_php_rpc::{PhpThrow, PluginValue};
 
         /// `Composer\Script\Event`.
@@ -5865,7 +5865,7 @@ pub(crate) mod util {
         use crate::php_worker::rpc::entity::{
             Call, Crossing, Entity, constructed, protocol_violation,
         };
-        use bstr::ByteSlice;
+        use bstr::ByteSlice as _;
         use shirabe_php_rpc::{PhpThrow, PluginValue};
 
         /// `Composer\Util\Filesystem`.
@@ -6109,7 +6109,7 @@ pub(crate) mod util {
         use crate::php_worker::rpc::entity::{
             Call, Crossing, Entity, constructed, protocol_violation,
         };
-        use bstr::ByteSlice;
+        use bstr::ByteSlice as _;
         use shirabe_php_rpc::{PhpThrow, PluginValue};
 
         /// `Composer\Util\HttpDownloader`.
@@ -6214,7 +6214,7 @@ pub(crate) mod util {
         use crate::php_worker::rpc::entity::{
             Call, Crossing, Entity, constructed, protocol_violation,
         };
-        use bstr::ByteSlice;
+        use bstr::ByteSlice as _;
         use shirabe_php_rpc::{PhpThrow, PluginValue};
 
         /// `Composer\Util\ProcessExecutor`.
@@ -6364,7 +6364,7 @@ pub(crate) mod shirabe {
     pub(crate) mod rust_capable_plugin_stub {
         use crate::php_worker::rpc::entity::{Call, Crossing, protocol_violation};
         use crate::php_worker::rpc::forwarding;
-        use bstr::ByteSlice;
+        use bstr::ByteSlice as _;
         use shirabe_php_rpc::{PhpThrow, PluginValue};
 
         /// `Shirabe\RustCapablePluginStub`.
@@ -6401,7 +6401,7 @@ dispatch,
     }
     pub(crate) mod rust_plugin_stub {
         use crate::php_worker::rpc::entity::{Call, Crossing, Entity, protocol_violation};
-        use bstr::ByteSlice;
+        use bstr::ByteSlice as _;
         use shirabe_php_rpc::{PhpThrow, PluginValue};
 
         /// `Shirabe\RustPluginStub`.
@@ -6453,7 +6453,7 @@ dispatch,
     }
     pub(crate) mod rust_process_stub {
         use crate::php_worker::rpc::entity::{Call, Crossing, Entity, protocol_violation};
-        use bstr::ByteSlice;
+        use bstr::ByteSlice as _;
         use shirabe_php_rpc::{PhpThrow, PluginValue};
 
         /// `Shirabe\RustProcessStub`.

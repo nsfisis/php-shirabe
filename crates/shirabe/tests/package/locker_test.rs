@@ -1,7 +1,7 @@
 //! ref: composer/tests/Composer/Test/Package/LockerTest.php sha1:ee0b07a0d06518399706b1b00cdc0459e819cbf3
 
 use crate::test_case::installation_manager;
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe::io::{IOInterface, NullIO};
 use shirabe::json::{JsonEncodeOptions, JsonFile};
@@ -12,7 +12,6 @@ use shirabe::util::ProcessExecutor;
 use shirabe_php_shim::{
     Catch as _, LogicException, PhpMixed, ToPhpString, bformat, hash, trim, utf8_text,
 };
-use tempfile::TempDir;
 
 fn null_io() -> std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
     std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()))
@@ -44,10 +43,10 @@ fn make_locker(
     lock_contents: Option<&BStr>,
 ) -> (
     Locker,
-    TempDir,
+    tempfile::TempDir,
     std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
 ) {
-    let temp_dir = TempDir::new().unwrap();
+    let temp_dir = tempfile::TempDir::new().unwrap();
     let lock_path = temp_dir.path().join("composer.lock");
     if let Some(contents) = lock_contents {
         std::fs::write(&lock_path, contents).unwrap();

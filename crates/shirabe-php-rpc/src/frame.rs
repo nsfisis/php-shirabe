@@ -9,7 +9,6 @@ use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::{ToPhpString, utf8_text};
 use std::io::{Read as _, Write as _};
-use std::os::unix::net::UnixStream;
 
 /// Upper bound for the declared frame length, so a corrupted length header cannot make the
 /// process allocate absurd amounts of memory.
@@ -170,7 +169,10 @@ fn int_value(id: u64) -> PluginValue {
     PluginValue::Int(i64::try_from(id).expect("handle id exceeds i64"))
 }
 
-pub fn write_frame(stream: &mut UnixStream, frame: &Frame) -> std::io::Result<()> {
+pub fn write_frame(
+    stream: &mut std::os::unix::net::UnixStream,
+    frame: &Frame,
+) -> std::io::Result<()> {
     let payload = value::serialize(&PluginValue::List(frame.fields()));
     let len = 1 + 8 + payload.len() as u64;
     stream.write_all(&len.to_le_bytes())?;
@@ -184,7 +186,7 @@ pub fn write_frame(stream: &mut UnixStream, frame: &Frame) -> std::io::Result<()
     clippy::disallowed_macros,
     reason = "std::io::Error takes text, and the message holds no PHP string"
 )]
-pub fn read_frame(stream: &mut UnixStream) -> std::io::Result<Frame> {
+pub fn read_frame(stream: &mut std::os::unix::net::UnixStream) -> std::io::Result<Frame> {
     let mut header = [0u8; 8];
     stream.read_exact(&mut header)?;
     let len = u64::from_le_bytes(header);
@@ -299,7 +301,7 @@ mod tests {
     use super::*;
 
     fn roundtrip(frame: Frame) -> Frame {
-        let (mut a, mut b) = UnixStream::pair().unwrap();
+        let (mut a, mut b) = std::os::unix::net::UnixStream::pair().unwrap();
         write_frame(&mut a, &frame).unwrap();
         read_frame(&mut b).unwrap()
     }
@@ -432,7 +434,7 @@ mod tests {
     )]
     #[test]
     fn read_frame_rejects_oversized_length() {
-        let (mut a, mut b) = UnixStream::pair().unwrap();
+        let (mut a, mut b) = std::os::unix::net::UnixStream::pair().unwrap();
         a.write_all(&(MAX_FRAME_LEN + 1).to_le_bytes()).unwrap();
         let err = read_frame(&mut b).unwrap_err();
         assert_eq!(err.kind(), std::io::ErrorKind::InvalidData);

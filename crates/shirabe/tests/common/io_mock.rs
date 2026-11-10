@@ -1,6 +1,6 @@
 //! ref: composer/tests/Composer/Test/Mock/IOMock.php sha1:3bacded1f921d96583c78932d0678a08b83bc488
 
-use bstr::{BString, ByteSlice};
+use bstr::{BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe::config::Config;
 use shirabe::io::{BufferIO, IOInterface, IOInterfaceImmutable, IOInterfaceMutable, io_interface};
@@ -8,7 +8,6 @@ use shirabe::util::Platform;
 use shirabe_php_shim::{PHP_EOL, bformat, php_regex, preg_is_match, preg_quote, preg_split};
 use shirabe_symfony_console::input::InputValue;
 use shirabe_symfony_console::output::output_interface;
-use std::collections::VecDeque;
 
 // A single entry of the IO expectation list. PHP models these as associative
 // arrays (`{text, regex?}` / `{ask, reply}` / `{auth: [repo, user, pass]}`); the
@@ -126,11 +125,15 @@ impl IOMock {
         };
 
         if !expectations.is_empty() {
-            let mut lines: VecDeque<bstr::BString> = preg_split(php_regex!("{\r?\n}"), &output)
-                .into_iter()
-                .collect();
-            let mut auth_log: VecDeque<(bstr::BString, bstr::BString, Option<bstr::BString>)> =
-                self.auth_log.clone().into();
+            let mut lines: std::collections::VecDeque<bstr::BString> =
+                preg_split(php_regex!("{\r?\n}"), &output)
+                    .into_iter()
+                    .collect();
+            let mut auth_log: std::collections::VecDeque<(
+                bstr::BString,
+                bstr::BString,
+                Option<bstr::BString>,
+            )> = self.auth_log.clone().into();
 
             'expects: for expect in expectations {
                 if let Expectation::Auth {

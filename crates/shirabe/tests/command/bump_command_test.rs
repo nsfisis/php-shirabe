@@ -4,8 +4,7 @@ use crate::test_case::{
     RunOptions, create_composer_lock, create_installed_json, get_application_tester,
     get_complete_package, init_temp_composer,
 };
-use bstr::{BStr, ByteSlice};
-use serial_test::serial;
+use bstr::{BStr, ByteSlice as _};
 use shirabe::json::JsonFile;
 use shirabe::package::PackageInterfaceHandle;
 use shirabe_php_shim::{chmod, function_exists, posix_getuid};
@@ -53,7 +52,7 @@ fn run_bump_case(
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_bump() {
     // 'bump all by default'
     run_bump_case(
@@ -204,7 +203,7 @@ fn test_bump() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_bump_fails_on_non_existing_composer_file() {
     let tear_down = init_temp_composer(Some(&serde_json::json!({})), None, None, false);
     let composer_json_path = tear_down.working_dir().join("composer.json");
@@ -233,7 +232,7 @@ fn test_bump_fails_on_non_existing_composer_file() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_bump_fails_on_write_error_to_composer_file() {
     if function_exists("posix_getuid") && posix_getuid() == 0 {
         // ref: $this->markTestSkipped('Cannot run as root');

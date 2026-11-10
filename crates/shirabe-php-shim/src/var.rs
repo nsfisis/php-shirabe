@@ -1,5 +1,5 @@
 use crate::{PhpDisplay, PhpMixed, ToPhpString, bwrite, utf8_text};
-use bstr::{BStr, BString, ByteSlice, ByteVec};
+use bstr::{BStr, BString, ByteSlice as _, ByteVec as _};
 use indexmap::IndexMap;
 
 pub fn empty(value: &PhpMixed) -> bool {

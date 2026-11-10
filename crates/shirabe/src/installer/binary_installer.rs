@@ -3,14 +3,13 @@
 use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::package::PackageInterfaceHandle;
 use crate::util::{Filesystem, Platform, ProcessExecutor};
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use shirabe_php_shim::{
     basename, basename_with_suffix, bformat, bwrite, chmod, dirname, fclose, fgets, file_exists,
     file_get_contents_with_max_length, file_put_contents, fopen, is_dir, is_file, is_link,
     path_from_bytes, path_to_bytes, php_regex, preg_match, realpath, rmdir, substr, trim,
     trim_chars, umask,
 };
-use std::path::{Path, PathBuf};
 
 /// Seam over the BinaryInstaller methods reached through LibraryInstaller, so tests can inject a
 /// recording double. Composer has no PHP `BinaryInstallerInterface`; this exists only to allow the
@@ -19,7 +18,7 @@ pub trait BinaryInstallerInterface: std::fmt::Debug {
     fn install_binaries(
         &mut self,
         package: PackageInterfaceHandle,
-        install_path: &Path,
+        install_path: &std::path::Path,
         warn_on_overwrite: bool,
     ) -> anyhow::Result<()>;
     fn remove_binaries(&mut self, package: PackageInterfaceHandle);
@@ -29,7 +28,7 @@ impl BinaryInstallerInterface for BinaryInstaller {
     fn install_binaries(
         &mut self,
         package: PackageInterfaceHandle,
-        install_path: &Path,
+        install_path: &std::path::Path,
         warn_on_overwrite: bool,
     ) -> anyhow::Result<()> {
         BinaryInstaller::install_binaries(self, package, install_path, warn_on_overwrite)
@@ -43,20 +42,20 @@ impl BinaryInstallerInterface for BinaryInstaller {
 /// Utility to handle installation of package "bin"/binaries
 #[derive(Debug)]
 pub struct BinaryInstaller {
-    bin_dir: PathBuf,
+    bin_dir: std::path::PathBuf,
     bin_compat: BString,
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     filesystem: std::rc::Rc<std::cell::RefCell<Filesystem>>,
-    vendor_dir: Option<PathBuf>,
+    vendor_dir: Option<std::path::PathBuf>,
 }
 
 impl BinaryInstaller {
     pub fn new(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        bin_dir: PathBuf,
+        bin_dir: std::path::PathBuf,
         bin_compat: BString,
         filesystem: Option<std::rc::Rc<std::cell::RefCell<Filesystem>>>,
-        vendor_dir: Option<PathBuf>,
+        vendor_dir: Option<std::path::PathBuf>,
     ) -> Self {
         let filesystem = filesystem
             .unwrap_or_else(|| std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(None))));
@@ -72,7 +71,7 @@ impl BinaryInstaller {
     pub fn install_binaries(
         &mut self,
         package: PackageInterfaceHandle,
-        install_path: &Path,
+        install_path: &std::path::Path,
         warn_on_overwrite: bool,
     ) -> anyhow::Result<()> {
         let binaries = self.get_binaries(package.clone());
@@ -83,7 +82,8 @@ impl BinaryInstaller {
         Platform::workaround_filesystem_issues();
 
         for bin in &binaries {
-            let mut bin_path = PathBuf::from(path_from_bytes(&bformat!("{install_path}/{bin}")));
+            let mut bin_path =
+                std::path::PathBuf::from(path_from_bytes(&bformat!("{install_path}/{bin}")));
             if !file_exists(&bin_path) {
                 self.io.write_error(bformat!("    <warning>Skipped installation of bin {bin} for package {}: file not found in package</warning>", package.get_name()));
                 continue;
@@ -100,7 +100,7 @@ impl BinaryInstaller {
                 bin_path = realpath(&bin_path).unwrap_or_default();
             }
             self.initialize_bin_dir();
-            let link = PathBuf::from(path_from_bytes(&bformat!(
+            let link = std::path::PathBuf::from(path_from_bytes(&bformat!(
                 "{}/{}",
                 self.bin_dir,
                 basename(bin)
@@ -144,7 +144,7 @@ impl BinaryInstaller {
             return;
         }
         for bin in &binaries {
-            let link = PathBuf::from(path_from_bytes(&bformat!(
+            let link = std::path::PathBuf::from(path_from_bytes(&bformat!(
                 "{}/{}",
                 self.bin_dir,
                 basename(bin)
@@ -153,7 +153,7 @@ impl BinaryInstaller {
                 // still checking for symlinks here for legacy support
                 self.filesystem.borrow_mut().unlink(&link);
             }
-            let bat = PathBuf::from(path_from_bytes(&bformat!("{link}.bat")));
+            let bat = std::path::PathBuf::from(path_from_bytes(&bformat!("{link}.bat")));
             if is_file(&bat) {
                 self.filesystem.borrow_mut().unlink(&bat);
             }
@@ -165,7 +165,7 @@ impl BinaryInstaller {
         }
     }
 
-    pub fn determine_binary_caller(bin: &Path) -> BString {
+    pub fn determine_binary_caller(bin: &std::path::Path) -> BString {
         let bin_bytes = path_to_bytes(bin);
         if ".bat" == substr(bin_bytes, -4, None) || ".exe" == substr(bin_bytes, -4, None) {
             return BString::from("call");
@@ -195,8 +195,8 @@ impl BinaryInstaller {
 
     fn install_full_binaries(
         &mut self,
-        bin_path: &Path,
-        link: &Path,
+        bin_path: &std::path::Path,
+        link: &std::path::Path,
         bin: &BStr,
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<()> {
@@ -204,7 +204,7 @@ impl BinaryInstaller {
         // add unixy support for cygwin and similar environments
         if ".bat" != substr(path_to_bytes(bin_path), -4, None) {
             self.install_unixy_proxy_binaries(bin_path, &link)?;
-            link = PathBuf::from(path_from_bytes(&bformat!("{link}.bat")));
+            link = std::path::PathBuf::from(path_from_bytes(&bformat!("{link}.bat")));
             if file_exists(&link) {
                 self.io.write_error(bformat!("    Skipped installation of bin {bin}.bat proxy for package {}: a .bat proxy was already installed", package.get_name()));
             }
@@ -218,7 +218,11 @@ impl BinaryInstaller {
         Ok(())
     }
 
-    fn install_unixy_proxy_binaries(&self, bin_path: &Path, link: &Path) -> anyhow::Result<()> {
+    fn install_unixy_proxy_binaries(
+        &self,
+        bin_path: &std::path::Path,
+        link: &std::path::Path,
+    ) -> anyhow::Result<()> {
         let code = self.generate_unixy_proxy_code(bin_path, link)?;
         file_put_contents(link, &code);
         chmod(link, 0o777 & !umask());
@@ -233,7 +237,11 @@ impl BinaryInstaller {
         self.bin_dir = realpath(&self.bin_dir).unwrap_or_default();
     }
 
-    fn generate_windows_proxy_code(&self, bin: &Path, link: &Path) -> anyhow::Result<BString> {
+    fn generate_windows_proxy_code(
+        &self,
+        bin: &std::path::Path,
+        link: &std::path::Path,
+    ) -> anyhow::Result<BString> {
         let bin_path = self
             .filesystem
             .borrow_mut()
@@ -259,7 +267,11 @@ impl BinaryInstaller {
         ))
     }
 
-    fn generate_unixy_proxy_code(&self, bin: &Path, link: &Path) -> anyhow::Result<BString> {
+    fn generate_unixy_proxy_code(
+        &self,
+        bin: &std::path::Path,
+        link: &std::path::Path,
+    ) -> anyhow::Result<BString> {
         let bin_path = self
             .filesystem
             .borrow_mut()

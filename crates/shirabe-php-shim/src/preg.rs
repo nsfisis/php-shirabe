@@ -18,9 +18,8 @@
 //! See docs/dev/regex-porting.md for the regex porting rules.
 
 use crate::{PcreException, bformat, utf8_text};
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
-use std::sync::{Arc, LazyLock, Mutex};
 
 /// A single match's `$matches`: the `regex::bytes::Captures` the search produced, read by either
 /// the named or the numbered form of a capture group. `'h` is the lifetime of the searched
@@ -365,40 +364,42 @@ pub struct CompiledPattern {
 // `Regex::clone()` does not share the underlying meta engine's search-cache pool, so handing out
 // fresh clones here would pay a ~10us per-clone cache warmup cost on every single `preg_*` call
 // (measured), defeating the point of this cache. `Arc::clone()` is a refcount bump.
-static PATTERN_CACHE: LazyLock<Mutex<IndexMap<BString, Arc<CompiledPattern>>>> =
-    LazyLock::new(|| Mutex::new(IndexMap::new()));
+static PATTERN_CACHE: std::sync::LazyLock<
+    std::sync::Mutex<IndexMap<BString, std::sync::Arc<CompiledPattern>>>,
+> = std::sync::LazyLock::new(|| std::sync::Mutex::new(IndexMap::new()));
 
 // Each thread also keeps its own entries: threads matching through a single `Regex` instance
 // contend on its search-cache pool (and on `PATTERN_CACHE` itself), which makes parallel matching
 // slower than matching on one thread. The thread that compiles a pattern uses the shared instance;
 // other threads clone it.
 thread_local! {
-    static THREAD_PATTERN_CACHE: std::cell::RefCell<IndexMap<BString, Arc<CompiledPattern>>> =
+    static THREAD_PATTERN_CACHE: std::cell::RefCell<IndexMap<BString, std::sync::Arc<CompiledPattern>>> =
         std::cell::RefCell::new(IndexMap::new());
 }
 
-fn compile_php_pattern(pattern: &[u8]) -> anyhow::Result<Arc<CompiledPattern>> {
+fn compile_php_pattern(pattern: &[u8]) -> anyhow::Result<std::sync::Arc<CompiledPattern>> {
     if let Some(cached) = THREAD_PATTERN_CACHE.with_borrow(|cache| cache.get(pattern).cloned()) {
         return Ok(cached);
     }
 
     let shared = PATTERN_CACHE.lock().unwrap().get(pattern).cloned();
     let compiled = match shared {
-        Some(shared) => Arc::new(CompiledPattern {
+        Some(shared) => std::sync::Arc::new(CompiledPattern {
             regex: shared.regex.clone(),
             utf8: shared.utf8,
         }),
         None => {
-            let compiled = Arc::new(compile_php_pattern_uncached(&byte_pattern_source(pattern))?);
+            let compiled =
+                std::sync::Arc::new(compile_php_pattern_uncached(&byte_pattern_source(pattern))?);
             PATTERN_CACHE
                 .lock()
                 .unwrap()
-                .insert(BString::from(pattern), Arc::clone(&compiled));
+                .insert(BString::from(pattern), std::sync::Arc::clone(&compiled));
             compiled
         }
     };
     THREAD_PATTERN_CACHE.with_borrow_mut(|cache| {
-        cache.insert(BString::from(pattern), Arc::clone(&compiled));
+        cache.insert(BString::from(pattern), std::sync::Arc::clone(&compiled));
     });
     Ok(compiled)
 }
@@ -468,7 +469,7 @@ fn translate_php_pattern(pattern: &str) -> anyhow::Result<(String, bool)> {
 /// cache warmup cost regardless of which path produced it (measured).
 #[derive(Debug)]
 pub enum ResolvedPattern {
-    Cached(Arc<CompiledPattern>),
+    Cached(std::sync::Arc<CompiledPattern>),
     Static(&'static CompiledPattern),
 }
 

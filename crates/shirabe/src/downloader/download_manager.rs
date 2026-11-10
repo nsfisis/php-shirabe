@@ -5,7 +5,7 @@ use crate::exception::IrrecoverableDownloadException;
 use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite};
 use crate::package::PackageInterfaceHandle;
 use crate::util::Filesystem;
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, LogicException, PhpMixed, RuntimeException, ToPhpString,
@@ -13,7 +13,6 @@ use shirabe_php_shim::{
     path_from_bytes, path_to_bytes, preg_is_match, preg_quote, rtrim_chars, str_replace,
     strtolower, usort,
 };
-use std::path::{Path, PathBuf};
 
 /// Downloaders manager.
 #[derive(Debug)]
@@ -140,7 +139,7 @@ impl DownloadManager {
     pub async fn download(
         &self,
         package: PackageInterfaceHandle,
-        target_dir: &Path,
+        target_dir: &std::path::Path,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         let target_dir = self.normalize_target_dir(target_dir);
@@ -210,7 +209,7 @@ impl DownloadManager {
         &self,
         r#type: &BStr,
         package: PackageInterfaceHandle,
-        target_dir: &Path,
+        target_dir: &std::path::Path,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         let target_dir = self.normalize_target_dir(target_dir);
@@ -228,7 +227,7 @@ impl DownloadManager {
     pub async fn install(
         &self,
         package: PackageInterfaceHandle,
-        target_dir: &Path,
+        target_dir: &std::path::Path,
     ) -> anyhow::Result<Option<PhpMixed>> {
         let target_dir = self.normalize_target_dir(target_dir);
         if let Some(downloader) = self.get_downloader_for_package(package.clone())? {
@@ -243,7 +242,7 @@ impl DownloadManager {
         &self,
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
-        target_dir: &Path,
+        target_dir: &std::path::Path,
     ) -> anyhow::Result<Option<PhpMixed>> {
         let target_dir = self.normalize_target_dir(target_dir);
         let downloader = self.get_downloader_for_package(target.clone())?;
@@ -316,7 +315,7 @@ impl DownloadManager {
     pub async fn remove(
         &self,
         package: PackageInterfaceHandle,
-        target_dir: &Path,
+        target_dir: &std::path::Path,
     ) -> anyhow::Result<Option<PhpMixed>> {
         let target_dir = self.normalize_target_dir(target_dir);
         if let Some(downloader) = self.get_downloader_for_package(package.clone())? {
@@ -331,7 +330,7 @@ impl DownloadManager {
         &self,
         r#type: &BStr,
         package: PackageInterfaceHandle,
-        target_dir: &Path,
+        target_dir: &std::path::Path,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         let target_dir = self.normalize_target_dir(target_dir);
@@ -442,7 +441,7 @@ impl DownloadManager {
     /// Downloaders expect a /path/to/dir without trailing slash
     ///
     /// If any Installer provides a path with a trailing slash, this can cause bugs so make sure we remove them
-    fn normalize_target_dir(&self, dir: &Path) -> PathBuf {
+    fn normalize_target_dir(&self, dir: &std::path::Path) -> std::path::PathBuf {
         let dir = path_to_bytes(dir);
         if dir == b"\\" || dir == b"/" {
             return path_from_bytes(dir).to_path_buf();
@@ -466,37 +465,37 @@ pub trait DownloadManagerInterface: std::fmt::Debug {
     async fn download(
         &self,
         package: PackageInterfaceHandle,
-        target_dir: &Path,
+        target_dir: &std::path::Path,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>>;
     async fn prepare(
         &self,
         r#type: &BStr,
         package: PackageInterfaceHandle,
-        target_dir: &Path,
+        target_dir: &std::path::Path,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>>;
     async fn install(
         &self,
         package: PackageInterfaceHandle,
-        target_dir: &Path,
+        target_dir: &std::path::Path,
     ) -> anyhow::Result<Option<PhpMixed>>;
     async fn update(
         &self,
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
-        target_dir: &Path,
+        target_dir: &std::path::Path,
     ) -> anyhow::Result<Option<PhpMixed>>;
     async fn remove(
         &self,
         package: PackageInterfaceHandle,
-        target_dir: &Path,
+        target_dir: &std::path::Path,
     ) -> anyhow::Result<Option<PhpMixed>>;
     async fn cleanup(
         &self,
         r#type: &BStr,
         package: PackageInterfaceHandle,
-        target_dir: &Path,
+        target_dir: &std::path::Path,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>>;
 }
@@ -521,7 +520,7 @@ impl DownloadManagerInterface for DownloadManager {
     async fn download(
         &self,
         package: PackageInterfaceHandle,
-        target_dir: &Path,
+        target_dir: &std::path::Path,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         self.download(package, target_dir, prev_package).await
@@ -531,7 +530,7 @@ impl DownloadManagerInterface for DownloadManager {
         &self,
         r#type: &BStr,
         package: PackageInterfaceHandle,
-        target_dir: &Path,
+        target_dir: &std::path::Path,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         self.prepare(r#type, package, target_dir, prev_package)
@@ -541,7 +540,7 @@ impl DownloadManagerInterface for DownloadManager {
     async fn install(
         &self,
         package: PackageInterfaceHandle,
-        target_dir: &Path,
+        target_dir: &std::path::Path,
     ) -> anyhow::Result<Option<PhpMixed>> {
         self.install(package, target_dir).await
     }
@@ -550,7 +549,7 @@ impl DownloadManagerInterface for DownloadManager {
         &self,
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
-        target_dir: &Path,
+        target_dir: &std::path::Path,
     ) -> anyhow::Result<Option<PhpMixed>> {
         self.update(initial, target, target_dir).await
     }
@@ -558,7 +557,7 @@ impl DownloadManagerInterface for DownloadManager {
     async fn remove(
         &self,
         package: PackageInterfaceHandle,
-        target_dir: &Path,
+        target_dir: &std::path::Path,
     ) -> anyhow::Result<Option<PhpMixed>> {
         self.remove(package, target_dir).await
     }
@@ -567,7 +566,7 @@ impl DownloadManagerInterface for DownloadManager {
         &self,
         r#type: &BStr,
         package: PackageInterfaceHandle,
-        target_dir: &Path,
+        target_dir: &std::path::Path,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         self.cleanup(r#type, package, target_dir, prev_package)

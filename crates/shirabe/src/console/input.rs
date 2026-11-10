@@ -1,5 +1,5 @@
 use crate::command::BaseCommand;
-use bstr::{BString, ByteSlice};
+use bstr::{BString, ByteSlice as _};
 pub mod input_argument;
 pub mod input_option;
 

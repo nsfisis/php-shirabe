@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/Util/Platform.php sha1:49a0644016351e98716ab8029b0d72b12d3f21f0
 
 use crate::util::ProcessExecutor;
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use shirabe_php_shim::{
     PHP_ENV, PHP_SERVER, PhpMixed, PhpResource, PregMatches, RuntimeException, STDOUT, bformat,
     defined, file_exists, file_get_contents, function_exists, getcwd, getenv, ini_get, is_readable,
@@ -9,14 +9,13 @@ use shirabe_php_shim::{
     posix_getpwuid, posix_getuid, preg_is_match, preg_replace_callback, putenv, realpath,
     stream_isatty, stripos, strlen, strtoupper, substr, usleep,
 };
-use std::sync::Mutex;
 
 /// Platform helper for uniform platform-specific tests.
 pub struct Platform;
 
-static IS_VIRTUAL_BOX_GUEST: Mutex<Option<bool>> = Mutex::new(None);
-static IS_WINDOWS_SUBSYSTEM_FOR_LINUX: Mutex<Option<bool>> = Mutex::new(None);
-static IS_DOCKER: Mutex<Option<bool>> = Mutex::new(None);
+static IS_VIRTUAL_BOX_GUEST: std::sync::Mutex<Option<bool>> = std::sync::Mutex::new(None);
+static IS_WINDOWS_SUBSYSTEM_FOR_LINUX: std::sync::Mutex<Option<bool>> = std::sync::Mutex::new(None);
+static IS_DOCKER: std::sync::Mutex<Option<bool>> = std::sync::Mutex::new(None);
 
 impl Platform {
     /// getcwd() equivalent which always returns a string
@@ -238,7 +237,7 @@ impl Platform {
 
     pub fn strlen(str: impl AsRef<[u8]>) -> i64 {
         let str = str.as_ref();
-        static USE_MB_STRING: Mutex<Option<bool>> = Mutex::new(None);
+        static USE_MB_STRING: std::sync::Mutex<Option<bool>> = std::sync::Mutex::new(None);
         let mut use_mb_string = USE_MB_STRING.lock().unwrap();
         if use_mb_string.is_none() {
             *use_mb_string = Some(

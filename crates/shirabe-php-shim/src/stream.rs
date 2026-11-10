@@ -160,7 +160,7 @@ pub fn stream_copy_to_stream(source: &PhpResource, dest: &PhpResource) -> Option
 }
 
 pub fn stream_isatty_resource(resource: &PhpResource) -> bool {
-    use std::io::IsTerminal;
+    use std::io::IsTerminal as _;
     match resource {
         PhpResource::Stdin => std::io::stdin().is_terminal(),
         PhpResource::Stdout => std::io::stdout().is_terminal(),

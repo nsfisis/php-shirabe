@@ -4,7 +4,7 @@ use crate::Terminal;
 use crate::formatter::OutputFormatterInterface;
 use crate::helper::Helper;
 use crate::output::{DoWrite, OUTPUT_NORMAL, OutputInterface, StreamOutput};
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use shirabe_php_shim::{
     PHP_EOL, PhpResource, array_reverse, array_splice, array_unshift, bformat, explode, str_replace,
 };

@@ -6,7 +6,6 @@ use shirabe_php_shim::{
     is_executable, is_file, path_from_bytes, path_to_bytes, pathinfo, php_str, strcspn, strpos,
     strtolower, substr,
 };
-use std::path::PathBuf;
 
 const CMD_BUILTINS: &[&BStr] = &[
     php_str(b"assoc"),
@@ -86,7 +85,7 @@ impl ExecutableFinder {
         let path = getenv("PATH")
             .or_else(|| getenv("Path"))
             .unwrap_or_default();
-        let mut dirs: Vec<PathBuf> = std::env::split_paths(&path).collect();
+        let mut dirs: Vec<std::path::PathBuf> = std::env::split_paths(&path).collect();
         dirs.extend(
             extra_dirs
                 .iter()

@@ -3,7 +3,7 @@
 use crate::dependency_resolver::operation::AnyOperation;
 use crate::dependency_resolver::{Decisions, Pool, Transaction};
 use crate::package::PackageInterfaceHandle;
-use bstr::{BString, ByteSlice};
+use bstr::{BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     PregMatches, ToPhpString, bformat, php_regex, preg_is_match, preg_replace_callback,

@@ -9,7 +9,7 @@ use crate::repository::{
     LoadPackagesResult, ProviderInfo, RepositoryInterface, RepositoryInterfaceWeakHandle,
     SearchResult, SecurityAdvisoryResult,
 };
-use bstr::{B, BStr, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     PhpMixed, RuntimeException, bformat, error_message, json_encode, php_regex, preg_replace,

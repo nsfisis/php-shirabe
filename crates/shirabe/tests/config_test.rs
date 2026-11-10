@@ -1,8 +1,7 @@
 //! ref: composer/tests/Composer/Test/ConfigTest.php sha1:3e56d46bbf990dfe2ea9afa25fa3e5b00557dabe
 
-use bstr::{B, BStr, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
-use serial_test::serial;
 use shirabe::{
     advisory::Auditor,
     config::Config,
@@ -648,7 +647,7 @@ fn test_disable_tls_can_be_overridden() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_process_timeout() {
     Platform::put_env("COMPOSER_PROCESS_TIMEOUT", "0").unwrap();
     let config = Config::new(true, None);
@@ -659,7 +658,7 @@ fn test_process_timeout() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_htaccess_protect() {
     Platform::put_env("COMPOSER_HTACCESS_PROTECT", "0").unwrap();
     let config = Config::new(true, None);
@@ -670,7 +669,7 @@ fn test_htaccess_protect() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_get_source_of_value() {
     Platform::clear_env("COMPOSER_PROCESS_TIMEOUT").unwrap();
 
@@ -693,7 +692,7 @@ fn test_get_source_of_value() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_get_source_of_value_env_variables() {
     Platform::put_env("COMPOSER_HTACCESS_PROTECT", "0").unwrap();
     let config = Config::new(true, None);
@@ -704,7 +703,7 @@ fn test_get_source_of_value_env_variables() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_audit() {
     let mut config = Config::new(true, None);
     let result = config.get("audit").unwrap();

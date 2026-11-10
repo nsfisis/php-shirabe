@@ -3,10 +3,9 @@ use crate::throw::PhpThrow;
 use crate::value::{PhpObjHandle, PluginValue};
 use crate::worker::{recv_frame, send_frame};
 use crate::{env, session};
-use bstr::{BStr, ByteSlice};
+use bstr::{BStr, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::bformat;
-use std::sync::atomic::{AtomicU64, Ordering};
 
 /// Handles `CallRustMethod` requests arriving while a Rust-initiated call is waiting for its
 /// `Return` (the cooperative reentrancy loop). A handler may itself issue nested RPC calls.
@@ -28,11 +27,11 @@ pub trait RustMethodDispatcher {
 /// The Rust side allocates odd correlation ids; the PHP side allocates even ones. Calls nest
 /// strictly, so this split is not needed for disambiguation — it just makes any captured frame
 /// attributable to its initiator.
-static NEXT_CORR_ID: AtomicU64 = AtomicU64::new(1);
+static NEXT_CORR_ID: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
 
 /// Allocates a Rust-side object handle. Handle 0 is reserved for the runtime service endpoint
 /// (e.g. `__shirabe_find_file` autoload queries), so ids start at 1.
-static NEXT_RHANDLE: AtomicU64 = AtomicU64::new(1);
+static NEXT_RHANDLE: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
 
 thread_local! {
     /// Listener for ReleaseRustHandle notifications, thread-local like the R table it prunes.
@@ -49,7 +48,7 @@ pub fn set_release_rust_handle_hook(hook: impl Fn(u64) + 'static) {
 }
 
 pub fn alloc_rhandle() -> u64 {
-    NEXT_RHANDLE.fetch_add(1, Ordering::Relaxed)
+    NEXT_RHANDLE.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
 }
 
 /// Answers every `CallRustMethod` with an explicit error: the dispatcher of calls none of which runs
@@ -162,7 +161,7 @@ fn rpc_call(
     if session.is_outermost() {
         env::flush()?;
     }
-    let my_id = NEXT_CORR_ID.fetch_add(2, Ordering::Relaxed);
+    let my_id = NEXT_CORR_ID.fetch_add(2, std::sync::atomic::Ordering::Relaxed);
     send_frame(&request(my_id))?;
     loop {
         let incoming = recv_frame()?;

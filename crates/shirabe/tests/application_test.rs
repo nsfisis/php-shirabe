@@ -5,8 +5,7 @@ mod bootstrap;
 #[path = "common/test_case.rs"]
 mod test_case;
 
-use bstr::{BStr, BString, ByteSlice};
-use serial_test::serial;
+use bstr::{BStr, BString, ByteSlice as _};
 use shirabe_symfony_console::input::{ArrayInput, InputInterface, InputValue, ParameterName};
 use test_case::init_temp_composer;
 
@@ -153,7 +152,7 @@ fn test_process_isolation_works_multiple_times() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_no_plugins_disables_plugins_when_script_commands_exist() {
     let _tear_down = TearDown;
     set_up();
@@ -218,7 +217,7 @@ fn test_no_plugins_disables_plugins_when_script_commands_exist() {
 }
 
 #[test]
-#[serial]
+#[serial_test::serial]
 fn test_script_command_takes_priority_over_abbreviated_builtin_command() {
     let _tear_down = TearDown;
     set_up();

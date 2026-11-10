@@ -37,7 +37,6 @@ use shirabe_php_shim::{
 };
 use shirabe_semver::VersionParser;
 use shirabe_symfony_console::output::VERBOSITY_NORMAL;
-use tempfile::TempDir;
 
 /// `__DIR__ . '/Fixtures'` of the upstream test class.
 fn fixtures_dir() -> std::path::PathBuf {
@@ -237,7 +236,7 @@ pub(crate) struct SetUp {
     // Keeps the Composer alive; PluginManager only holds a weak back-reference to it.
     pub(crate) composer: ComposerHandle,
     // PHP's tearDown() removes this directory; TempDir does the same on drop.
-    _directory: TempDir,
+    _directory: tempfile::TempDir,
 }
 
 pub(crate) fn set_up() -> SetUp {

@@ -1,6 +1,6 @@
 //! ref: composer/tests/Composer/Test/DependencyResolver/PoolOptimizerTest.php sha1:03d43302268d6664f350b63398ce191085833df9
 
-use bstr::{B, BStr, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe::dependency_resolver::{DefaultPolicy, Pool, PoolOptimizer, Request};
 use shirabe::json::JsonFile;
@@ -12,7 +12,6 @@ use shirabe_php_shim::{
     PhpMixed, bformat, file_get_contents, path_to_bytes, php_regex, preg_is_match,
     preg_split_delim_capture, str_replace,
 };
-use std::path::PathBuf;
 
 fn load_package(package_data: &PhpMixed) -> BasePackageHandle {
     let loader = ArrayLoader::new(None, false);
@@ -106,7 +105,7 @@ fn read_test_file(
     data
 }
 
-fn collect_test_files(dir: &std::path::Path, out: &mut Vec<PathBuf>) {
+fn collect_test_files(dir: &std::path::Path, out: &mut Vec<std::path::PathBuf>) {
     for entry in std::fs::read_dir(dir).unwrap() {
         let entry = entry.unwrap();
         let path = entry.path();
@@ -127,11 +126,11 @@ fn provide_integration_tests() -> IndexMap<
         BString,
     ),
 > {
-    let fixtures_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+    let fixtures_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../composer/tests/Composer/Test/DependencyResolver/Fixtures/pooloptimizer");
     let fixtures_dir = std::fs::canonicalize(&fixtures_dir).unwrap();
 
-    let mut files: Vec<PathBuf> = Vec::new();
+    let mut files: Vec<std::path::PathBuf> = Vec::new();
     collect_test_files(&fixtures_dir, &mut files);
 
     let mut tests: IndexMap<

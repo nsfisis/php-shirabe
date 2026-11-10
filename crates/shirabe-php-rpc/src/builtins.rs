@@ -5,9 +5,8 @@ pub mod rar;
 use crate::codec::{FromPluginValue, ToPluginValue, protocol_value};
 use crate::transport::call_internal_function;
 use crate::value::PluginValue;
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use shirabe_php_shim::{bformat, path_from_bytes};
-use std::sync::OnceLock;
 
 /// The version constants of the PHP the worker runs.
 #[derive(Debug)]
@@ -24,7 +23,7 @@ pub struct PhpVersion {
     pub release: i64,
 }
 
-static PHP_VERSION: OnceLock<PhpVersion> = OnceLock::new();
+static PHP_VERSION: std::sync::OnceLock<PhpVersion> = std::sync::OnceLock::new();
 
 /// The PHP version the worker runs. The worker is queried once per process; subsequent calls
 /// reuse the cached constants.
@@ -53,7 +52,7 @@ fn constant<T: FromPluginValue>(name: impl AsRef<[u8]>) -> anyhow::Result<T> {
 /// The value `cell` caches, computing it with `init` on first use. A failed `init` caches
 /// nothing, so the next call asks again.
 pub fn cached<T>(
-    cell: &'static OnceLock<T>,
+    cell: &'static std::sync::OnceLock<T>,
     init: impl FnOnce() -> anyhow::Result<T>,
 ) -> anyhow::Result<&'static T> {
     if let Some(value) = cell.get() {

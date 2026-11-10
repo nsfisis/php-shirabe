@@ -9,9 +9,7 @@
 //! `#[path = "../common/async_runtime.rs"] mod async_runtime;`.
 #![allow(dead_code)]
 
-use std::sync::LazyLock;
-
-static RUNTIME: LazyLock<tokio::runtime::Runtime> = LazyLock::new(|| {
+static RUNTIME: std::sync::LazyLock<tokio::runtime::Runtime> = std::sync::LazyLock::new(|| {
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()

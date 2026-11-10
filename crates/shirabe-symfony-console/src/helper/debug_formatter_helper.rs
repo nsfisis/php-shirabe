@@ -172,7 +172,7 @@ impl HelperInterface for DebugFormatterHelper {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bstr::ByteSlice;
+    use bstr::ByteSlice as _;
 
     #[test]
     fn id_prefix_and_message_keep_their_bytes() {

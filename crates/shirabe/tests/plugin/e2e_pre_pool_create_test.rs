@@ -8,14 +8,12 @@
 
 use crate::e2e_extension_installer_test::{copy_dir, upstream_composer_bin};
 use crate::php_worker::lock_php_worker;
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use shirabe_php_shim::os_str_from_bytes;
-use std::ffi::OsStr;
-use std::path::{Path, PathBuf};
-use tempfile::TempDir;
 
-fn fixture_dir() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/plugin/fixtures/e2e-pre-pool-create")
+fn fixture_dir() -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/plugin/fixtures/e2e-pre-pool-create")
 }
 
 struct Run {
@@ -27,8 +25,8 @@ struct Run {
 /// Runs `install` and then `require shirabe-test/pool-lib` in a fresh copy of the fixture: the
 /// plugin is only active once the first command has installed it, so the event it records is the
 /// one the second command dispatches.
-fn install_then_require(program: &BStr, prefix_args: &[&OsStr]) -> Run {
-    let work = TempDir::new().unwrap();
+fn install_then_require(program: &BStr, prefix_args: &[&std::ffi::OsStr]) -> Run {
+    let work = tempfile::TempDir::new().unwrap();
     copy_dir(&fixture_dir(), work.path());
     let project = work.path().join("project");
     let commands: [&[&BStr]; 2] = [

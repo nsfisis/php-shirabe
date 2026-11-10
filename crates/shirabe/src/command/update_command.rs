@@ -20,7 +20,7 @@ use crate::repository::{
     CanonicalPackagesTrait, CompositeRepository, PlatformRepository, RepositoryInterfaceHandle,
     RepositorySet, RootAliasInput,
 };
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, RuntimeException, array_filter, array_intersect,

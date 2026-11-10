@@ -3,7 +3,7 @@
 use crate::dependency_resolver::{PolicyInterface, Pool, Request};
 use crate::package::version::VersionParser;
 use crate::package::{BasePackageHandle, Link};
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{CmpOp, ToPhpString, bformat, bwrite, implode, ksort};
 use shirabe_semver::constraint::{AnyConstraint, MultiConstraint, SimpleConstraint};

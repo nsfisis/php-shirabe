@@ -6,14 +6,13 @@ use crate::package::CompletePackageInterfaceHandle;
 use crate::package::archiver::{ArchiverInterface, PharArchiver, ZipArchiver};
 use crate::util::r#loop::Loop;
 use crate::util::{Filesystem, SyncHelper};
-use bstr::{BString, ByteSlice};
+use bstr::{BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     InvalidArgumentException, RuntimeException, bformat, bin2hex, file_exists, hash, implode,
     path_from_bytes, php_regex, preg_is_match, preg_replace, random_bytes, realpath, str_replace,
     sys_get_temp_dir,
 };
-use std::path::PathBuf;
 
 pub struct ArchiveManager {
     download_manager: std::rc::Rc<std::cell::RefCell<DownloadManager>>,
@@ -108,10 +107,10 @@ impl ArchiveManager {
         &mut self,
         package: CompletePackageInterfaceHandle,
         format: BString,
-        target_dir: PathBuf,
+        target_dir: std::path::PathBuf,
         file_name: Option<BString>,
         ignore_filters: bool,
-    ) -> anyhow::Result<PathBuf> {
+    ) -> anyhow::Result<std::path::PathBuf> {
         if format.is_empty() {
             return Err(
                 InvalidArgumentException::new(BString::from("Format must be specified")).into(),
@@ -142,10 +141,10 @@ impl ArchiveManager {
         let mut filesystem = Filesystem::new(None);
 
         let is_root = package.as_rc().borrow().is_root();
-        let source_path: PathBuf;
+        let source_path: std::path::PathBuf;
 
         if is_root {
-            source_path = realpath(".").unwrap_or_else(|| PathBuf::from("."));
+            source_path = realpath(".").unwrap_or_else(|| std::path::PathBuf::from("."));
         } else {
             let random_suffix = bin2hex(random_bytes(5));
             source_path = path_from_bytes(&bformat!(
@@ -318,10 +317,10 @@ pub trait ArchiveManagerInterface: std::fmt::Debug {
         &mut self,
         package: CompletePackageInterfaceHandle,
         format: BString,
-        target_dir: PathBuf,
+        target_dir: std::path::PathBuf,
         file_name: Option<BString>,
         ignore_filters: bool,
-    ) -> anyhow::Result<PathBuf>;
+    ) -> anyhow::Result<std::path::PathBuf>;
 }
 
 #[async_trait::async_trait(?Send)]
@@ -330,10 +329,10 @@ impl ArchiveManagerInterface for ArchiveManager {
         &mut self,
         package: CompletePackageInterfaceHandle,
         format: BString,
-        target_dir: PathBuf,
+        target_dir: std::path::PathBuf,
         file_name: Option<BString>,
         ignore_filters: bool,
-    ) -> anyhow::Result<PathBuf> {
+    ) -> anyhow::Result<std::path::PathBuf> {
         self.archive(package, format, target_dir, file_name, ignore_filters)
             .await
     }
