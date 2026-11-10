@@ -33,8 +33,8 @@ use crate::php_worker::console::{
 use crate::php_worker::proxy::PhpCommandProxy;
 use crate::php_worker::rpc::dispatch::find_file_in_registered_loaders;
 use crate::php_worker::rpc::entity::entity_value;
-use crate::php_worker::runtime;
 use crate::php_worker::xdebug::is_xdebug_active;
+use crate::php_worker::{error_handler, runtime};
 use crate::util::{ErrorHandler, Filesystem, HttpDownloader, Platform};
 use bstr::{B, BStr, BString, ByteSlice as _, ByteVec as _};
 use indexmap::IndexMap;
@@ -49,9 +49,9 @@ use shirabe_php_shim::{
     mb_convert_encoding, mb_convert_variables, mb_detect_encoding, mb_strwidth, microtime,
     os_str_from_bytes, path_from_bytes, path_to_bytes, php_regex, php_str, php_truthy, php_uname,
     posix_getuid, preg_grep, preg_match, preg_quote, preg_replace_callback, preg_split, putenv,
-    random_bytes, realpath, restore_error_handler, round, sort_natural_flag_case, str_pad,
-    str_repeat, str_replace, str_split, strlen, strpos, strrpos, strtoupper, substr, substr_count,
-    sys_get_temp_dir, time, trim, unlink,
+    random_bytes, realpath, round, sort_natural_flag_case, str_pad, str_repeat, str_replace,
+    str_split, strlen, strpos, strrpos, strtoupper, substr, substr_count, sys_get_temp_dir, time,
+    trim, unlink,
 };
 use shirabe_seld_json_lint::ParsingException;
 use shirabe_symfony_console::command::{Command as SymfonyCommand, HelpCommand};
@@ -1877,7 +1877,7 @@ impl ApplicationHandle {
         let io = application.borrow().io.clone();
 
         // Register error handler again to pass it the IO instance
-        ErrorHandler::register(Some(io.clone()));
+        ErrorHandler::register(Some(io.clone()))?;
 
         if input.borrow().has_parameter_option(&["--no-cache"], false) {
             io.write_error_with_verbosity("Disabling cache usage", io_interface::DEBUG);
@@ -2492,7 +2492,7 @@ impl ApplicationHandle {
             }
         };
 
-        restore_error_handler();
+        error_handler::restore_error_handler()?;
 
         outcome
     }

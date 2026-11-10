@@ -39,7 +39,7 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 /// ref: composer/bin/composer
 pub async fn run(argv: Vec<bstr::BString>) -> anyhow::Result<i32> {
     use crate::console::ApplicationHandle;
-    use crate::util::Platform;
+    use crate::util::{ErrorHandler, Platform};
     use shirabe_symfony_console::input::ArgvInput;
 
     // TODO(php-runtime): the full initialization process in composer/bin/composer should be ported
@@ -52,6 +52,8 @@ pub async fn run(argv: Vec<bstr::BString>) -> anyhow::Result<i32> {
         .map(|p| bstr::BString::from(path_to_bytes(&p)))
         .unwrap_or_default(),
     )?;
+
+    ErrorHandler::register(None)?;
 
     let application = ApplicationHandle::new(BString::from("Shirabe"), BString::default())?;
     let input = std::rc::Rc::new(std::cell::RefCell::new(ArgvInput::new(Some(argv), None)?));

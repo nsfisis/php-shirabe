@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+* PHP warnings and notices raised by plugins and scripts are turned into exceptions, and deprecation notices are reported, as in Composer.
+
+
 ## v0.2.0 (based on Composer 2.9.7)
 
 * Prebuilt binaries for Linux (x86_64, aarch64) and macOS (aarch64) are attached to GitHub releases.

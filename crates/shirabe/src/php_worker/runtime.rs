@@ -9,7 +9,7 @@
 //!   [`ScriptRpcDispatcher`](crate::php_worker::rpc::dispatch::ScriptRpcDispatcher).
 
 use crate::php_worker::call::PhpCall;
-use crate::php_worker::{bundle, installed_versions};
+use crate::php_worker::{bundle, error_handler, installed_versions};
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_rpc::{FromPluginValue, PhpObjHandle, PluginValue};
@@ -38,6 +38,7 @@ pub(crate) fn ensure_composer_php_runtime(
     let autoload = composer_php_runtime_autoload(cache_dir)?;
     PhpCall::Function(BStr::new("__shirabe_require"))
         .run::<PluginValue>(vec![PluginValue::string(autoload)])?;
+    error_handler::register_pending()?;
     installed_versions::load_pending()
 }
 

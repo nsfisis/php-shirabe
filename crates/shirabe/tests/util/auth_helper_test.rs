@@ -914,7 +914,7 @@ fn test_add_authentication_header_is_working() {
 #[test]
 #[ignore = "asserts that the deprecated addAuthenticationHeader wrapper raises a RuntimeException \
 through a set_error_handler converting E_USER_DEPRECATED; shirabe_php_shim::trigger_error is a \
-todo!() and set_error_handler is a no-op"]
+todo!() and the shim has no set_error_handler"]
 fn test_add_authentication_header_deprecation() {
     // TODO(php-runtime): asserts that calling addAuthenticationHeader itself raises a
     // RuntimeException via a custom set_error_handler converting E_USER_DEPRECATED; the same

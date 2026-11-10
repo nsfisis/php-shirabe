@@ -11,7 +11,7 @@ Composer\InstalledVersions needs-sync
 Composer\Package\Version\VersionParser memo-cache
 Composer\Platform\HhvmDetector memo-cache
 Composer\Repository\PlatformRepository memo-cache
-Composer\Util\ErrorHandler memo-cache
+Composer\Util\ErrorHandler needs-sync
 Composer\Util\Git memo-cache
 Composer\Util\Hg memo-cache
 Composer\Util\Http\ProxyManager memo-cache

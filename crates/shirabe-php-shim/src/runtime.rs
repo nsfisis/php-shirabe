@@ -1,4 +1,4 @@
-use crate::{PhpMixed, PhpResource, bformat, php_str};
+use crate::{PhpResource, bformat, php_str};
 use bstr::{BStr, BString, ByteSlice as _};
 use shirabe_php_src::standard::versioning::php_version_compare;
 
@@ -149,38 +149,6 @@ pub fn get_loaded_extensions() -> Vec<BString> {
     .collect()
 }
 
-// TODO(php-runtime): the callback should be registered in PHP runtime.
-pub fn set_error_handler(_callback: fn(i64, &BStr, &BStr, i64) -> bool) {}
-
-/// One frame of PHP `debug_backtrace()`. Every key but `function` may be absent from PHP's array.
-#[derive(Debug, Clone)]
-pub struct BacktraceFrame {
-    pub function: BString,
-    pub line: Option<i64>,
-    pub file: Option<BString>,
-    pub class: Option<BString>,
-    pub object: Option<PhpMixed>,
-    pub r#type: Option<BString>,
-    pub args: Option<Vec<PhpMixed>>,
-}
-
-pub fn debug_backtrace() -> Vec<BacktraceFrame> {
-    // TODO(php-runtime): capturing a PHP-style call stack requires runtime introspection of the
-    // interpreter frames, which has no equivalent in the compiled shim.
-    todo!()
-}
-
-static ERROR_REPORTING_LEVEL: std::sync::atomic::AtomicI64 =
-    std::sync::atomic::AtomicI64::new(E_ALL);
-
-pub fn error_reporting(level: Option<i64>) -> i64 {
-    let old = ERROR_REPORTING_LEVEL.load(std::sync::atomic::Ordering::Relaxed);
-    if let Some(level) = level {
-        ERROR_REPORTING_LEVEL.store(level, std::sync::atomic::Ordering::Relaxed);
-    }
-    old
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CmpOp {
     Lt,
@@ -227,10 +195,6 @@ pub fn version_compare_ordering(v1: impl AsRef<[u8]>, v2: impl AsRef<[u8]>) -> s
         std::cmp::Ordering::Equal
     }
 }
-
-// TODO(php-runtime): the previous handler should be restored in the PHP runtime.
-// Paired with set_error_handler, which is a no-op in this shim.
-pub fn restore_error_handler() {}
 
 pub trait HasAddress {
     fn address(&self) -> usize;

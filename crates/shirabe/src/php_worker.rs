@@ -8,6 +8,7 @@ pub(crate) mod callable;
 pub mod codec;
 pub(crate) mod console;
 pub mod diagnostics;
+pub mod error_handler;
 pub(crate) mod installed_versions;
 pub(crate) mod job;
 pub mod platform_info;
