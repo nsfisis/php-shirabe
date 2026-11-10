@@ -391,12 +391,12 @@ Three, all versioned next to the tool, all expected to stay short:
   child).
 
 Next to them, `constructible.list` is not an exception but a mirror of the
-Rust side: the `rust-proxy` classes whose stub constructor reaches an arm of
-`construct_entity` (`crates/shirabe/src/php_worker/rpc/dispatch.rs`), which
-"Unreachable types" above lets other classes construct. An entry that is
-not classified `rust-proxy` fails the run, and the
-`plugin_constructible_list` rule of `scripts/linters/lint` fails unless the
-list names exactly the classes that function builds.
+Rust side: the `rust-proxy` classes whose forwarded constructor the Rust side
+answers (the `constructor supported` rows of
+`crates/shirabe/src/php_worker/rpc/surface.tsv`), which "Unreachable types"
+above lets other classes construct. An entry that is not classified
+`rust-proxy` fails the run, and the `plugin_constructible_list` rule of
+`scripts/linters/lint` fails unless the list names exactly those classes.
 
 ### Failure mode
 
