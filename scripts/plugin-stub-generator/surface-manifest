@@ -10,6 +10,7 @@ use Shirabe\PluginStubGenerator\SurfaceManifest;
 
 $repoRoot = dirname(__DIR__, 2);
 $manifestPath = $repoRoot . '/crates/shirabe/src/php_worker/rpc/surface.tsv';
+$forwardingPath = $repoRoot . '/crates/shirabe/src/php_worker/rpc/forwarding.rs';
 $check = false;
 
 foreach (array_slice($argv, 1) as $arg) {
@@ -33,7 +34,11 @@ foreach (file(__DIR__ . '/dispatchers.list', FILE_IGNORE_NEW_LINES) as $line) {
         fwrite(STDERR, "error: malformed or duplicate entry in dispatchers.list: $line\n");
         exit(1);
     }
-    $dispatchers[$fqcn] = $fields === ['-'] ? [] : $fields;
+    $dispatchers[$fqcn] = match ($fields) {
+        ['-'] => [],
+        ['forwarding'] => null,
+        default => $fields,
+    };
 }
 
 $phpDir = $repoRoot . '/crates/shirabe-php-rpc/php';
@@ -44,7 +49,7 @@ $manifest = new SurfaceManifest(
     [$phpDir . '/guards'],
 );
 try {
-    $content = $manifest->render();
+    $rendered = $manifest->render();
 } catch (GenerationError $e) {
     foreach ($e->errors as $error) {
         fwrite(STDERR, "error: $error\n");
@@ -52,12 +57,18 @@ try {
     exit(1);
 }
 
+$outputs = [$manifestPath => $rendered['manifest'], $forwardingPath => $rendered['forwarding']];
 if ($check) {
-    if (@file_get_contents($manifestPath) !== $content) {
-        fwrite(STDERR, "error: stale manifest (regenerate): $manifestPath\n");
-        exit(1);
+    $stale = false;
+    foreach ($outputs as $path => $content) {
+        if (@file_get_contents($path) !== $content) {
+            fwrite(STDERR, "error: stale output (regenerate): $path\n");
+            $stale = true;
+        }
     }
-    exit(0);
+    exit($stale ? 1 : 0);
 }
-file_put_contents($manifestPath, $content);
-fwrite(STDERR, "manifest written to $manifestPath\n");
+foreach ($outputs as $path => $content) {
+    file_put_contents($path, $content);
+    fwrite(STDERR, "written to $path\n");
+}

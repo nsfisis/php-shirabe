@@ -2,6 +2,7 @@
 
 use crate::composer::ComposerHandle;
 use crate::php_worker::rpc::dispatch::unavailable_method;
+use crate::php_worker::rpc::entity::entity_value;
 use crate::php_worker::rpc::table::{
     RustEntity, config_handle_value, package_handle_value, register_entity, rust_handle_value,
 };
@@ -78,11 +79,7 @@ pub(crate) fn dispatch_composer_method(
                 },
             ]))
         }
-        b"getLocker" => {
-            let locker = composer.borrow().get_locker();
-            let rhandle = register_entity(RustEntity::Locker(locker));
-            Ok(rust_handle_value(rhandle, "Composer\\Package\\Locker"))
-        }
+        b"getLocker" => entity_value(&composer.borrow().get_locker()),
         // TODO(plugin): the remaining Composer object graph (getPluginManager, ...)
         // becomes reachable over RPC on demand, driven by explicit errors from real plugins.
         other => Err(unavailable_method("Composer", other)),

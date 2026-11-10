@@ -1,112 +1,194 @@
 //! The methods a `Composer\Package\Locker` entity answers over RPC.
 
 use crate::package::{LockerInterface, PackageInterfaceHandle};
-use crate::php_worker::rpc::args::{arg, arg_or};
-use crate::php_worker::rpc::dispatch::{error_throw, unavailable_method};
-use crate::php_worker::rpc::entities::autoload_generator::root_package_arg;
+use crate::php_worker::rpc::entities::autoload_generator::root_package;
+use crate::php_worker::rpc::entity::{Call, Crossing, Entity};
+use crate::php_worker::rpc::forwarding;
 use crate::php_worker::rpc::table::repository_handle_value;
-use bstr::{BStr, BString, ByteSlice};
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_rpc::{PhpThrow, PluginValue, ToWire};
-use shirabe_php_shim::{PhpMixed, bformat};
+use shirabe_php_shim::PhpMixed;
 
-pub(crate) fn dispatch_locker_method(
-    locker: &std::rc::Rc<std::cell::RefCell<dyn LockerInterface>>,
-    method_name: &BStr,
-    args: &[PluginValue],
-) -> Result<PluginValue, PhpThrow> {
-    let failed =
-        |error: anyhow::Error| error_throw(bformat!("{method_name} failed over RPC"), &error);
-    let with_dev_reqs = || arg_or::<bool>(method_name, args, 0, false);
-    match method_name.as_bytes() {
-        b"isLocked" => Ok(locker.borrow_mut().is_locked().to_wire()),
-        b"isFresh" => Ok(locker.borrow_mut().is_fresh().map_err(failed)?.to_wire()),
-        b"getLockedRepository" => {
-            let repository = locker
-                .borrow_mut()
-                .get_locked_repository(with_dev_reqs()?)
-                .map_err(failed)?;
-            repository_handle_value(&repository.into())
-        }
-        b"getDevPackageNames" => Ok(locker
+impl Entity for std::rc::Rc<std::cell::RefCell<dyn LockerInterface>> {
+    const EXPECTED: &'static [u8] = b"a Locker";
+
+    fn address(&self) -> *const () {
+        std::rc::Rc::as_ptr(self) as *const ()
+    }
+
+    fn class(&self) -> Result<&'static Crossing<Self>, PhpThrow> {
+        Ok(&forwarding::package::locker::CROSSING)
+    }
+}
+
+impl forwarding::package::locker::Forwarding for forwarding::package::locker::PhpClass {
+    type Handle = std::rc::Rc<std::cell::RefCell<dyn LockerInterface>>;
+
+    fn is_locked(locker: &Self::Handle, _: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+        Ok(locker.borrow_mut().is_locked().to_wire())
+    }
+
+    fn is_fresh(locker: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+        Ok(locker
+            .borrow_mut()
+            .is_fresh()
+            .map_err(call.failed())?
+            .to_wire())
+    }
+
+    fn get_locked_repository(
+        locker: &Self::Handle,
+        call: &mut Call<'_>,
+    ) -> Result<PluginValue, PhpThrow> {
+        let repository = locker
+            .borrow_mut()
+            .get_locked_repository(call.arg_or(0, false)?)
+            .map_err(call.failed())?;
+        repository_handle_value(&repository.into())
+    }
+
+    fn get_dev_package_names(
+        locker: &Self::Handle,
+        call: &mut Call<'_>,
+    ) -> Result<PluginValue, PhpThrow> {
+        Ok(locker
             .borrow_mut()
             .get_dev_package_names()
-            .map_err(failed)?
-            .to_wire()),
-        b"getPlatformRequirements" => Ok(locker
+            .map_err(call.failed())?
+            .to_wire())
+    }
+
+    fn get_platform_requirements(
+        locker: &Self::Handle,
+        call: &mut Call<'_>,
+    ) -> Result<PluginValue, PhpThrow> {
+        Ok(locker
             .borrow_mut()
-            .get_platform_requirements(with_dev_reqs()?)
-            .map_err(failed)?
-            .to_wire()),
-        b"getMinimumStability" => Ok(locker
+            .get_platform_requirements(call.arg_or(0, false)?)
+            .map_err(call.failed())?
+            .to_wire())
+    }
+
+    fn get_minimum_stability(
+        locker: &Self::Handle,
+        call: &mut Call<'_>,
+    ) -> Result<PluginValue, PhpThrow> {
+        Ok(locker
             .borrow_mut()
             .get_minimum_stability()
-            .map_err(failed)?
-            .to_wire()),
-        b"getStabilityFlags" => Ok(locker
+            .map_err(call.failed())?
+            .to_wire())
+    }
+
+    fn get_stability_flags(
+        locker: &Self::Handle,
+        call: &mut Call<'_>,
+    ) -> Result<PluginValue, PhpThrow> {
+        Ok(locker
             .borrow_mut()
             .get_stability_flags()
-            .map_err(failed)?
-            .to_wire()),
-        b"getPreferStable" => Ok(locker
+            .map_err(call.failed())?
+            .to_wire())
+    }
+
+    fn get_prefer_stable(
+        locker: &Self::Handle,
+        call: &mut Call<'_>,
+    ) -> Result<PluginValue, PhpThrow> {
+        Ok(locker
             .borrow_mut()
             .get_prefer_stable()
-            .map_err(failed)?
-            .to_wire()),
-        b"getPreferLowest" => Ok(locker
+            .map_err(call.failed())?
+            .to_wire())
+    }
+
+    fn get_prefer_lowest(
+        locker: &Self::Handle,
+        call: &mut Call<'_>,
+    ) -> Result<PluginValue, PhpThrow> {
+        Ok(locker
             .borrow_mut()
             .get_prefer_lowest()
-            .map_err(failed)?
-            .to_wire()),
-        b"getPlatformOverrides" => Ok(locker
+            .map_err(call.failed())?
+            .to_wire())
+    }
+
+    fn get_platform_overrides(
+        locker: &Self::Handle,
+        call: &mut Call<'_>,
+    ) -> Result<PluginValue, PhpThrow> {
+        Ok(locker
             .borrow_mut()
             .get_platform_overrides()
-            .map_err(failed)?
-            .to_wire()),
-        b"getAliases" => Ok(locker.borrow_mut().get_aliases().map_err(failed)?.to_wire()),
-        b"getPluginApi" => Ok(locker
+            .map_err(call.failed())?
+            .to_wire())
+    }
+
+    fn get_aliases(locker: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+        Ok(locker
+            .borrow_mut()
+            .get_aliases()
+            .map_err(call.failed())?
+            .to_wire())
+    }
+
+    fn get_plugin_api(locker: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+        Ok(locker
             .borrow_mut()
             .get_plugin_api()
-            .map_err(failed)?
-            .to_wire()),
-        b"getLockData" => Ok(locker
+            .map_err(call.failed())?
+            .to_wire())
+    }
+
+    fn get_lock_data(locker: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+        Ok(locker
             .borrow_mut()
             .get_lock_data()
-            .map_err(failed)?
-            .to_wire()),
-        b"setLockData" => {
-            let written = locker
-                .borrow_mut()
-                .set_lock_data(
-                    arg::<Vec<PackageInterfaceHandle>>(method_name, args, 0)?,
-                    arg::<Option<Vec<PackageInterfaceHandle>>>(method_name, args, 1)?,
-                    arg::<IndexMap<BString, BString>>(method_name, args, 2)?,
-                    arg::<IndexMap<BString, BString>>(method_name, args, 3)?,
-                    arg::<Vec<IndexMap<BString, PhpMixed>>>(method_name, args, 4)?,
-                    arg::<BString>(method_name, args, 5)?.as_ref(),
-                    arg::<IndexMap<BString, i64>>(method_name, args, 6)?,
-                    arg::<bool>(method_name, args, 7)?,
-                    arg::<bool>(method_name, args, 8)?,
-                    arg::<IndexMap<BString, PhpMixed>>(method_name, args, 9)?,
-                    arg_or::<bool>(method_name, args, 10, true)?,
-                )
-                .map_err(failed)?;
-            Ok(written.to_wire())
-        }
-        b"getMissingRequirementInfo" => {
-            let package = root_package_arg(method_name, args, 0)?;
-            let include_dev = arg::<bool>(method_name, args, 1)?;
-            Ok(locker
-                .borrow_mut()
-                .get_missing_requirement_info(package, include_dev)
-                .map_err(failed)?
-                .to_wire())
-        }
-        // TODO(plugin): `JsonFile` has no proxy stub, so the lock file cannot be handed out and
-        // no plugin holds a JsonFile it could pass to `updateHash()`.
-        b"getJsonFile" | b"updateHash" => Err(PhpThrow::runtime(bformat!(
-            "the Locker method `{method_name}` is not available over RPC yet: JsonFile cannot cross the boundary"
-        ))),
-        other => Err(unavailable_method("Locker", other)),
+            .map_err(call.failed())?
+            .to_wire())
+    }
+
+    fn set_lock_data(locker: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+        let written = locker
+            .borrow_mut()
+            .set_lock_data(
+                call.arg::<Vec<PackageInterfaceHandle>>(0)?,
+                call.arg::<Option<Vec<PackageInterfaceHandle>>>(1)?,
+                call.arg::<IndexMap<BString, BString>>(2)?,
+                call.arg::<IndexMap<BString, BString>>(3)?,
+                call.arg::<Vec<IndexMap<BString, PhpMixed>>>(4)?,
+                call.arg::<BString>(5)?.as_ref(),
+                call.arg::<IndexMap<BString, i64>>(6)?,
+                call.arg::<bool>(7)?,
+                call.arg::<bool>(8)?,
+                call.arg::<IndexMap<BString, PhpMixed>>(9)?,
+                call.arg_or::<bool>(10, true)?,
+            )
+            .map_err(call.failed())?;
+        Ok(written.to_wire())
+    }
+
+    fn get_missing_requirement_info(
+        locker: &Self::Handle,
+        call: &mut Call<'_>,
+    ) -> Result<PluginValue, PhpThrow> {
+        let package = root_package(call, 0)?;
+        let include_dev = call.arg::<bool>(1)?;
+        Ok(locker
+            .borrow_mut()
+            .get_missing_requirement_info(package, include_dev)
+            .map_err(call.failed())?
+            .to_wire())
+    }
+
+    // TODO(plugin): `JsonFile` has no proxy stub, so the lock file cannot be handed out.
+    fn get_json_file(_: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+        Err(call.unavailable("JsonFile cannot cross the boundary"))
+    }
+
+    // TODO(plugin): `JsonFile` has no proxy stub, so no plugin holds a JsonFile it could pass.
+    fn update_hash(_: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+        Err(call.unavailable("JsonFile cannot cross the boundary"))
     }
 }

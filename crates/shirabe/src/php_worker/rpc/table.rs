@@ -10,8 +10,10 @@ use crate::downloader::DownloadManagerInterface;
 use crate::event_dispatcher::{Event, EventDispatcherInterface, EventInterface};
 use crate::installer::{InstallationManagerInterface, InstallerEvent, PackageEvent};
 use crate::io::{BufferIO, ConsoleIO, IOInterface, NullIO};
-use crate::package::{AnyPackage, LockerInterface, PackageInterfaceHandle};
+use crate::package::{AnyPackage, PackageInterfaceHandle};
 use crate::php_worker::rpc::args::arg_throw;
+use crate::php_worker::rpc::dispatch::dispatch_legacy_entity;
+use crate::php_worker::rpc::entity::{Call, Crossing, Entity, PropertyAccess};
 use crate::plugin::{
     CommandEvent, PluginInterface, PostFileDownloadEvent, PreCommandRunEvent, PreFileDownloadEvent,
     PrePoolCreateEvent,
@@ -22,7 +24,7 @@ use crate::repository::{
 };
 use crate::script::Event as ScriptEvent;
 use crate::util::{Filesystem, HttpDownloader, ProcessExecutor};
-use bstr::{BStr, BString};
+use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_rpc::{FromWire, PhpThrow, PluginValue, RustObjHandle, ToWire, wire};
 use shirabe_php_shim::{bformat, php_str};
@@ -37,7 +39,6 @@ pub(crate) enum RustEntity {
     Filesystem(std::rc::Rc<std::cell::RefCell<Filesystem>>),
     Io(std::rc::Rc<std::cell::RefCell<dyn IOInterface>>),
     InstallationManager(std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>),
-    Locker(std::rc::Rc<std::cell::RefCell<dyn LockerInterface>>),
     RepositoryManager(std::rc::Rc<std::cell::RefCell<dyn RepositoryManagerInterface>>),
     Repository(RepositoryInterfaceHandle),
     Package(std::rc::Rc<std::cell::RefCell<AnyPackage>>),
@@ -47,8 +48,6 @@ pub(crate) enum RustEntity {
     Plugin(std::rc::Rc<std::cell::RefCell<dyn PluginInterface>>),
     ProcessExecutor(std::rc::Rc<std::cell::RefCell<ProcessExecutor>>),
     HttpDownloader(std::rc::Rc<std::cell::RefCell<HttpDownloader>>),
-    /// A child a `ProcessExecutor` job ran to its exit, behind a `Shirabe\RustProcessStub`.
-    Process(std::rc::Rc<std::cell::RefCell<shirabe_symfony_process::Process>>),
     Event(std::rc::Rc<std::cell::RefCell<dyn EventInterface>>),
 }
 
@@ -67,7 +66,6 @@ fn entity_ptr_id(entity: &RustEntity) -> usize {
         RustEntity::Filesystem(fs) => std::rc::Rc::as_ptr(fs) as *const () as usize,
         RustEntity::Io(io) => std::rc::Rc::as_ptr(io) as *const () as usize,
         RustEntity::InstallationManager(im) => std::rc::Rc::as_ptr(im) as *const () as usize,
-        RustEntity::Locker(locker) => std::rc::Rc::as_ptr(locker) as *const () as usize,
         RustEntity::RepositoryManager(rm) => std::rc::Rc::as_ptr(rm) as *const () as usize,
         RustEntity::Repository(repository) => repository.ptr_id(),
         RustEntity::Package(package) => std::rc::Rc::as_ptr(package) as *const () as usize,
@@ -83,8 +81,140 @@ fn entity_ptr_id(entity: &RustEntity) -> usize {
         RustEntity::HttpDownloader(downloader) => {
             std::rc::Rc::as_ptr(downloader) as *const () as usize
         }
-        RustEntity::Process(process) => std::rc::Rc::as_ptr(process) as *const () as usize,
         RustEntity::Event(event) => std::rc::Rc::as_ptr(event) as *const () as usize,
+    }
+}
+
+/// An R-table entry: one registered entity, whatever its kind.
+trait Slot: std::fmt::Debug {
+    fn address(&self) -> *const ();
+    fn call(
+        &self,
+        method: &BStr,
+        args: &[PluginValue],
+        out_params: &mut IndexMap<u32, PluginValue>,
+    ) -> Result<PluginValue, PhpThrow>;
+    fn as_any(&self) -> &dyn std::any::Any;
+}
+
+struct Registered<H: Entity> {
+    entity: H,
+    /// The class the child's stub was built as, fixed when the entity was registered.
+    class: &'static Crossing<H>,
+}
+
+impl<H: Entity> std::fmt::Debug for Registered<H> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Registered")
+            .field("class", &BStr::new(self.class.name))
+            .field("address", &self.entity.address())
+            .finish()
+    }
+}
+
+impl<H: Entity> Slot for Registered<H> {
+    fn address(&self) -> *const () {
+        self.entity.address()
+    }
+
+    fn call(
+        &self,
+        method: &BStr,
+        args: &[PluginValue],
+        out_params: &mut IndexMap<u32, PluginValue>,
+    ) -> Result<PluginValue, PhpThrow> {
+        let mut call = Call::new(BStr::new(self.class.name), method, args, out_params);
+        match method.as_bytes() {
+            b"__shirabe_clone" => {
+                let (rhandle, _) = register(self.entity.clone_entity()?)?;
+                Ok(PluginValue::Int(rhandle as i64))
+            }
+            b"__get" | b"__set" | b"__isset" | b"__unset" => {
+                let name = call.arg::<BString>(0)?;
+                let name = name.as_bstr();
+                self.entity.property(match method.as_bytes() {
+                    b"__get" => PropertyAccess::Get { name },
+                    b"__set" => PropertyAccess::Set {
+                        name,
+                        value: args.get(1).unwrap_or(&wire::NULL),
+                    },
+                    b"__isset" => PropertyAccess::Isset { name },
+                    b"__unset" => PropertyAccess::Unset { name },
+                    _ => unreachable!(),
+                })
+            }
+            _ => match self.entity.worker_method(&mut call) {
+                Some(answer) => answer,
+                None => (self.class.dispatch)(&self.entity, &mut call),
+            },
+        }
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+}
+
+/// An entity of a kind still served by the `RustEntity` routing.
+#[derive(Debug)]
+struct Legacy(RustEntity);
+
+impl Slot for Legacy {
+    fn address(&self) -> *const () {
+        entity_ptr_id(&self.0) as *const ()
+    }
+
+    fn call(
+        &self,
+        method: &BStr,
+        args: &[PluginValue],
+        out_params: &mut IndexMap<u32, PluginValue>,
+    ) -> Result<PluginValue, PhpThrow> {
+        dispatch_legacy_entity(&self.0, method, args, out_params)
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+}
+
+#[derive(Debug, Default)]
+struct RTable {
+    slots: IndexMap<u64, std::rc::Rc<dyn Slot>>,
+    /// `Slot::address` => rhandle.
+    by_address: IndexMap<usize, u64>,
+}
+
+impl RTable {
+    /// The rhandle `slot`'s entity is registered under, registering it if it is not yet.
+    /// `same_kind` tells whether the slot already registered at that address holds the same kind
+    /// of entity.
+    fn intern(
+        &mut self,
+        slot: std::rc::Rc<dyn Slot>,
+        same_kind: impl FnOnce(&dyn Slot) -> bool,
+    ) -> (u64, std::rc::Rc<dyn Slot>) {
+        let address = slot.address() as usize;
+        if let Some(rhandle) = self.by_address.get(&address) {
+            let existing = self.slots[rhandle].clone();
+            // One PHP object belongs to one class, so one allocation crossing as two kinds of
+            // entity is a bug of the Rust side.
+            assert!(
+                same_kind(&*existing),
+                "an allocation already registered as {existing:?} is registered as {slot:?}"
+            );
+            return (*rhandle, existing);
+        }
+        let rhandle = shirabe_php_rpc::alloc_rhandle();
+        self.slots.insert(rhandle, slot.clone());
+        self.by_address.insert(address, rhandle);
+        (rhandle, slot)
+    }
+
+    fn release(&mut self, rhandle: u64) -> Option<std::rc::Rc<dyn Slot>> {
+        let slot = self.slots.shift_remove(&rhandle)?;
+        self.by_address.shift_remove(&(slot.address() as usize));
+        Some(slot)
     }
 }
 
@@ -92,47 +222,113 @@ thread_local! {
     /// The R table. Entries are strong references held while the child-side stub lives; a
     /// ReleaseRustHandle notification (sent by the stub's `__destruct`) removes the entry.
     /// Handles are monotonically increasing and never reused, so a released handle can never
-    /// be confused with a later entity (no generation counter is needed).
+    /// be confused with a later entity (no generation counter is needed). A slot holds its
+    /// entity strongly, so the address of a registered entity is not reused either.
     /// TODO(plugin): thread-local while the worker and its stub intern table are
     /// process-global; the session lock serializes calls, and every dispatch currently runs on
     /// the thread that registered the handle, but a handle minted on one thread is invisible
     /// to another.
-    pub(crate) static R_TABLE: std::cell::RefCell<IndexMap<u64, RustEntity>> =
-        std::cell::RefCell::new(IndexMap::new());
-
-    static RELEASE_HOOK_INSTALLED: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    static R_TABLE: std::cell::RefCell<RTable> = {
+        shirabe_php_rpc::set_release_rust_handle_hook(|rhandle| {
+            let released = R_TABLE.with(|table| table.borrow_mut().release(rhandle));
+            drop(released);
+        });
+        std::cell::RefCell::new(RTable::default())
+    };
 }
 
-/// Installs the ReleaseRustHandle listener that drops R-table entries when the child-side stub
-/// is destructed. Idempotent; called by every entity registration.
-fn ensure_release_hook_installed() {
-    RELEASE_HOOK_INSTALLED.with(|installed| {
-        if !installed.get() {
-            installed.set(true);
-            shirabe_php_rpc::set_release_rust_handle_hook(|rhandle| {
-                R_TABLE.with(|table| {
-                    table.borrow_mut().shift_remove(&rhandle);
-                });
-            });
-        }
+/// Registers an entity in the R table, interned by the allocation it points to, and answers its
+/// rhandle and the class it crosses as.
+pub(crate) fn register<H: Entity>(entity: H) -> Result<(u64, &'static Crossing<H>), PhpThrow> {
+    let class = entity.class()?;
+    let slot: std::rc::Rc<dyn Slot> = std::rc::Rc::new(Registered { entity, class });
+    let (rhandle, slot) = R_TABLE.with(|table| {
+        table
+            .borrow_mut()
+            .intern(slot, |existing| existing.as_any().is::<Registered<H>>())
     });
+    let registered = slot
+        .as_any()
+        .downcast_ref::<Registered<H>>()
+        .expect("interning keeps the kind of entity");
+    Ok((rhandle, registered.class))
 }
 
-/// Registers an entity in the R table, interned by shared-pointer identity within its variant.
-pub(crate) fn register_entity(entity: RustEntity) -> u64 {
-    ensure_release_hook_installed();
+/// The entity of kind `H` an rhandle names.
+pub(crate) fn lookup<H: Entity>(rhandle: u64) -> Option<H> {
+    let slot = R_TABLE.with(|table| table.borrow().slots.get(&rhandle).cloned())?;
+    slot.as_any()
+        .downcast_ref::<Registered<H>>()
+        .map(|registered| registered.entity.clone())
+}
+
+/// Every registered entity of kind `H`.
+pub(crate) fn entities<H: Entity>() -> Vec<H> {
     R_TABLE.with(|table| {
-        let mut table = table.borrow_mut();
-        let ptr = entity_ptr_id(&entity);
-        let discriminant = std::mem::discriminant(&entity);
-        for (rhandle, existing) in table.iter() {
-            if std::mem::discriminant(existing) == discriminant && entity_ptr_id(existing) == ptr {
-                return *rhandle;
-            }
-        }
-        let rhandle = shirabe_php_rpc::alloc_rhandle();
-        table.insert(rhandle, entity);
-        rhandle
+        table
+            .borrow()
+            .slots
+            .values()
+            .filter_map(|slot| {
+                slot.as_any()
+                    .downcast_ref::<Registered<H>>()
+                    .map(|registered| registered.entity.clone())
+            })
+            .collect()
+    })
+}
+
+/// Serves a method call on an R-table entity. The table is not borrowed while the call runs: the
+/// method may register further entities.
+pub(crate) fn call(
+    rhandle: u64,
+    method: &BStr,
+    args: &[PluginValue],
+    out_params: &mut IndexMap<u32, PluginValue>,
+) -> Result<PluginValue, PhpThrow> {
+    let slot = R_TABLE.with(|table| table.borrow().slots.get(&rhandle).cloned());
+    match slot {
+        Some(slot) => slot.call(method, args, out_params),
+        None => Err(PhpThrow::runtime(bformat!("unknown Rust handle {rhandle}"))),
+    }
+}
+
+/// Registers an entity in the R table, interned by shared-pointer identity.
+pub(crate) fn register_entity(entity: RustEntity) -> u64 {
+    let discriminant = std::mem::discriminant(&entity);
+    let slot: std::rc::Rc<dyn Slot> = std::rc::Rc::new(Legacy(entity));
+    R_TABLE.with(|table| {
+        table
+            .borrow_mut()
+            .intern(slot, |existing| {
+                existing
+                    .as_any()
+                    .downcast_ref::<Legacy>()
+                    .is_some_and(|legacy| std::mem::discriminant(&legacy.0) == discriminant)
+            })
+            .0
+    })
+}
+
+fn legacy_entity(rhandle: u64) -> Option<RustEntity> {
+    let slot = R_TABLE.with(|table| table.borrow().slots.get(&rhandle).cloned())?;
+    slot.as_any()
+        .downcast_ref::<Legacy>()
+        .map(|legacy| legacy.0.clone())
+}
+
+/// Every registered Composer instance.
+pub(crate) fn composer_entities() -> Vec<ComposerHandle> {
+    R_TABLE.with(|table| {
+        table
+            .borrow()
+            .slots
+            .values()
+            .filter_map(|slot| match slot.as_any().downcast_ref::<Legacy>() {
+                Some(Legacy(RustEntity::Composer(composer))) => Some(composer.clone()),
+                _ => None,
+            })
+            .collect()
     })
 }
 
@@ -357,8 +553,7 @@ fn rust_entity_from_wire<T: FromRustEntity>(value: &PluginValue) -> Result<T, Ph
     let PluginValue::RustHandle(handle) = value else {
         return Err(wire::unexpected(T::EXPECTED, value));
     };
-    R_TABLE
-        .with(|table| table.borrow().get(&handle.rhandle).cloned())
+    legacy_entity(handle.rhandle)
         .and_then(T::from_entity)
         .ok_or_else(|| {
             PhpThrow::runtime(bformat!(
@@ -446,17 +641,6 @@ impl FromRustEntity for std::rc::Rc<std::cell::RefCell<dyn InstallationManagerIn
     fn from_entity(entity: RustEntity) -> Option<Self> {
         match entity {
             RustEntity::InstallationManager(im) => Some(im),
-            _ => None,
-        }
-    }
-}
-
-impl FromRustEntity for std::rc::Rc<std::cell::RefCell<dyn LockerInterface>> {
-    const EXPECTED: &'static [u8] = b"a Locker";
-
-    fn from_entity(entity: RustEntity) -> Option<Self> {
-        match entity {
-            RustEntity::Locker(locker) => Some(locker),
             _ => None,
         }
     }

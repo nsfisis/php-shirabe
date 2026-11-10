@@ -26,16 +26,15 @@ use crate::php_worker::rpc::entities::filesystem::dispatch_filesystem_method;
 use crate::php_worker::rpc::entities::http_downloader::dispatch_http_downloader_method;
 use crate::php_worker::rpc::entities::installation_manager::dispatch_installation_manager_method;
 use crate::php_worker::rpc::entities::io::dispatch_io_method;
-use crate::php_worker::rpc::entities::locker::dispatch_locker_method;
 use crate::php_worker::rpc::entities::operation::dispatch_operation_method;
 use crate::php_worker::rpc::entities::package::dispatch_package_method;
 use crate::php_worker::rpc::entities::plugin::dispatch_plugin_method;
-use crate::php_worker::rpc::entities::process::dispatch_process_method;
 use crate::php_worker::rpc::entities::process_executor::dispatch_process_executor_method;
 use crate::php_worker::rpc::entities::repository::dispatch_repository_method;
 use crate::php_worker::rpc::entities::repository_manager::dispatch_repository_manager_method;
 use crate::php_worker::rpc::entities::transaction::dispatch_transaction_method;
-use crate::php_worker::rpc::table::{R_TABLE, RustEntity, entity_arg, register_entity};
+use crate::php_worker::rpc::table;
+use crate::php_worker::rpc::table::{RustEntity, entity_arg, register_entity};
 use crate::php_worker::throwable::exception_into_throw;
 use crate::util::{Filesystem, HttpDownloader, ProcessExecutor, StreamContextOptions};
 use bstr::{BStr, BString, ByteSlice};
@@ -86,7 +85,7 @@ impl RustMethodDispatcher for PluginRpcDispatcher {
             return dispatch_runtime_service_method(method_name, &args);
         }
 
-        dispatch_r_table_method(rhandle, method_name, &args, out_params)
+        table::call(rhandle, method_name, &args, out_params)
     }
 }
 
@@ -108,7 +107,7 @@ impl RustMethodDispatcher for ScriptRpcDispatcher {
         if rhandle == 0 {
             return dispatch_runtime_service_method(method_name, &args);
         }
-        dispatch_r_table_method(rhandle, method_name, &args, out_params)
+        table::call(rhandle, method_name, &args, out_params)
     }
 }
 
@@ -172,74 +171,58 @@ fn dispatch_job_service_method(
     })
 }
 
-/// Serves a method call on an R-table entity, shared by every dispatcher: the child holds a
-/// stub for an entity registered by an earlier call, and the handle outlives the call that
-/// minted it.
-fn dispatch_r_table_method(
-    rhandle: u64,
+/// Serves a method call on an entity of a kind still routed through `RustEntity`.
+pub(crate) fn dispatch_legacy_entity(
+    entity: &RustEntity,
     method_name: &BStr,
     args: &[PluginValue],
     out_params: &mut IndexMap<u32, PluginValue>,
 ) -> Result<PluginValue, PhpThrow> {
-    let entity = R_TABLE.with(|table| table.borrow().get(&rhandle).cloned());
     if method_name == "__shirabe_clone" {
-        return match entity {
-            Some(entity) => clone_entity(&entity),
-            None => Err(PhpThrow::runtime(bformat!("unknown Rust handle {rhandle}"))),
-        };
+        return clone_entity(entity);
     }
     if matches!(
         method_name.as_bytes(),
         b"__get" | b"__set" | b"__isset" | b"__unset"
     ) {
-        return match entity {
-            Some(entity) => dispatch_property_access(&entity, method_name, args),
-            None => Err(PhpThrow::runtime(bformat!("unknown Rust handle {rhandle}"))),
-        };
+        return dispatch_property_access(entity, method_name, args);
     }
-    match entity {
-        Some(RustEntity::Io(io)) => dispatch_io_method(&io, method_name, args),
-        Some(RustEntity::Composer(composer)) => dispatch_composer_method(&composer, method_name),
-        Some(RustEntity::AutoloadGenerator(generator)) => {
+    match entity.clone() {
+        RustEntity::Io(io) => dispatch_io_method(&io, method_name, args),
+        RustEntity::Composer(composer) => dispatch_composer_method(&composer, method_name),
+        RustEntity::AutoloadGenerator(generator) => {
             dispatch_autoload_generator_method(&generator, method_name, args)
         }
-        Some(RustEntity::Config(config)) => dispatch_config_method(&config, method_name, args),
-        Some(RustEntity::DownloadManager(dm)) => {
-            dispatch_download_manager_method(&dm, method_name, args)
-        }
-        Some(RustEntity::Filesystem(fs)) => dispatch_filesystem_method(&fs, method_name, args),
-        Some(RustEntity::InstallationManager(im)) => {
+        RustEntity::Config(config) => dispatch_config_method(&config, method_name, args),
+        RustEntity::DownloadManager(dm) => dispatch_download_manager_method(&dm, method_name, args),
+        RustEntity::Filesystem(fs) => dispatch_filesystem_method(&fs, method_name, args),
+        RustEntity::InstallationManager(im) => {
             dispatch_installation_manager_method(&im, method_name, args)
         }
-        Some(RustEntity::Locker(locker)) => dispatch_locker_method(&locker, method_name, args),
-        Some(RustEntity::RepositoryManager(rm)) => {
-            dispatch_repository_manager_method(&rm, method_name)
-        }
-        Some(RustEntity::Repository(repository)) => {
+        RustEntity::RepositoryManager(rm) => dispatch_repository_manager_method(&rm, method_name),
+        RustEntity::Repository(repository) => {
             dispatch_repository_method(&repository, method_name, args)
         }
-        Some(RustEntity::Package(package)) => dispatch_package_method(&package, method_name, args),
-        Some(RustEntity::EventDispatcher(dispatcher)) => {
+        RustEntity::Package(package) => dispatch_package_method(&package, method_name, args),
+        RustEntity::EventDispatcher(dispatcher) => {
             dispatch_event_dispatcher_method(&dispatcher, method_name, args)
         }
-        Some(RustEntity::Operation(operation)) => {
+        RustEntity::Operation(operation) => {
             dispatch_operation_method(&operation, method_name, args)
         }
-        Some(RustEntity::Transaction(transaction)) => {
+        RustEntity::Transaction(transaction) => {
             dispatch_transaction_method(&transaction, method_name)
         }
-        Some(RustEntity::Plugin(plugin)) => dispatch_plugin_method(&plugin, method_name),
-        Some(RustEntity::ProcessExecutor(process)) => {
+        RustEntity::Plugin(plugin) => dispatch_plugin_method(&plugin, method_name),
+        RustEntity::ProcessExecutor(process) => {
             dispatch_process_executor_method(&process, method_name, args, out_params)
         }
-        Some(RustEntity::HttpDownloader(downloader)) => {
+        RustEntity::HttpDownloader(downloader) => {
             dispatch_http_downloader_method(&downloader, method_name, args)
         }
-        Some(RustEntity::Process(process)) => dispatch_process_method(&process, method_name),
-        Some(RustEntity::Event(event)) => {
+        RustEntity::Event(event) => {
             dispatch_event_method(&mut *event.borrow_mut(), method_name, args)
         }
-        None => Err(PhpThrow::runtime(bformat!("unknown Rust handle {rhandle}"))),
     }
 }
 
@@ -479,7 +462,6 @@ fn clone_entity(entity: &RustEntity) -> Result<PluginValue, PhpThrow> {
         | RustEntity::Filesystem(_)
         | RustEntity::Io(_)
         | RustEntity::InstallationManager(_)
-        | RustEntity::Locker(_)
         | RustEntity::RepositoryManager(_)
         | RustEntity::Repository(_)
         | RustEntity::EventDispatcher(_)
@@ -488,7 +470,6 @@ fn clone_entity(entity: &RustEntity) -> Result<PluginValue, PhpThrow> {
         | RustEntity::Plugin(_)
         | RustEntity::ProcessExecutor(_)
         | RustEntity::HttpDownloader(_)
-        | RustEntity::Process(_)
         | RustEntity::Event(_) => {
             return Err(PhpThrow::runtime(
                 "cloning this Rust-side entity over RPC is not supported",

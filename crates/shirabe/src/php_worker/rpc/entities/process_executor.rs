@@ -8,7 +8,7 @@ use crate::php_worker::job::rpc::{
 use crate::php_worker::rpc::args::{arg, arg_throw};
 use crate::php_worker::rpc::dispatch::{error_throw, unavailable_method};
 use crate::php_worker::rpc::entities::event_dispatcher::{call_php_callable, is_php_callable};
-use crate::php_worker::rpc::table::{RustEntity, register_entity, rust_handle_value};
+use crate::php_worker::rpc::entity::entity_value;
 use crate::util::{CommandLine, ProcessExecutor};
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
@@ -124,12 +124,7 @@ pub(crate) fn dispatch_process_executor_method(
                     .borrow()
                     .execute_async_job(command, cwd.as_deref(), Some(started.clone()));
             let resolve = |child: shirabe_symfony_process::Process| {
-                rust_handle_value(
-                    register_entity(RustEntity::Process(std::rc::Rc::new(
-                        std::cell::RefCell::new(child),
-                    ))),
-                    BStr::new("Shirabe\\RustProcessStub"),
-                )
+                entity_value(&std::rc::Rc::new(std::cell::RefCell::new(child)))
             };
             let future: std::pin::Pin<
                 Box<dyn std::future::Future<Output = Result<PluginValue, PhpThrow>>>,
@@ -142,12 +137,13 @@ pub(crate) fn dispatch_process_executor_method(
                 std::task::Poll::Ready(Err(error)) => return rejected_promise(failed(error)),
                 // The child exited within the poll. PHP resolves only from `countActiveJobs()`,
                 // so the result waits in the registry for the next tick.
-                std::task::Poll::Ready(Ok(child)) => Box::pin(async move { Ok(resolve(child)) }),
+                std::task::Poll::Ready(Ok(child)) => Box::pin(async move { resolve(child) }),
                 std::task::Poll::Pending => Box::pin(async move {
-                    future
-                        .await
-                        .map(resolve)
-                        .map_err(|error| error_throw(b"executeAsync failed", &error))
+                    resolve(
+                        future
+                            .await
+                            .map_err(|error| error_throw(b"executeAsync failed", &error))?,
+                    )
                 }),
             };
             Ok(job::register(

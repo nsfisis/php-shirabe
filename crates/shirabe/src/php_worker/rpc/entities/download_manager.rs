@@ -1,6 +1,5 @@
 //! The methods a `Composer\Downloader\DownloadManager` entity answers over RPC.
 
-use crate::composer::ComposerHandle;
 use crate::downloader::DownloadManagerInterface;
 use crate::exception::IrrecoverableDownloadException;
 use crate::package::PackageInterfaceHandle;
@@ -8,7 +7,7 @@ use crate::php_worker::job;
 use crate::php_worker::job::JobOwner;
 use crate::php_worker::rpc::args::arg;
 use crate::php_worker::rpc::dispatch::{error_throw, unavailable_method};
-use crate::php_worker::rpc::table::{R_TABLE, RustEntity};
+use crate::php_worker::rpc::table;
 use crate::util::HttpDownloader;
 use bstr::{BStr, BString, ByteSlice};
 use shirabe_php_rpc::{PhpThrow, PluginValue, ToWire};
@@ -135,17 +134,7 @@ pub(crate) fn dispatch_download_manager_method(
 fn graph_http_downloader(
     dm: &std::rc::Rc<std::cell::RefCell<dyn DownloadManagerInterface>>,
 ) -> Result<std::rc::Rc<std::cell::RefCell<HttpDownloader>>, PhpThrow> {
-    let composers: Vec<ComposerHandle> = R_TABLE.with(|table| {
-        table
-            .borrow()
-            .values()
-            .filter_map(|entity| match entity {
-                RustEntity::Composer(composer) => Some(composer.clone()),
-                _ => None,
-            })
-            .collect()
-    });
-    for composer in composers {
+    for composer in table::composer_entities() {
         let composer = composer.borrow();
         if std::rc::Rc::ptr_eq(&composer.get_download_manager(), dm) {
             return Ok(composer.get_loop().borrow().get_http_downloader().clone());

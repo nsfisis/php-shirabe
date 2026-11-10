@@ -2,7 +2,8 @@
 # for scripts/plugin-stub-generator/surface-manifest. One FQCN per line, followed by the
 # functions whose `match method_name` arms serve an entity handed out under that class, or by
 # `-` for a class no entity is handed out as (an abstract base, or a class whose entities are
-# always handed out under a subclass).
+# always handed out under a subclass), or by `forwarding` for a class whose dispatch is generated
+# into crates/shirabe/src/php_worker/rpc/forwarding.rs.
 Composer\Autoload\AutoloadGenerator dispatch_autoload_generator_method
 Composer\Composer dispatch_composer_method
 Composer\Config dispatch_config_method
@@ -28,7 +29,7 @@ Composer\Package\AliasPackage dispatch_package_method dispatch_package_getter di
 Composer\Package\BasePackage -
 Composer\Package\CompleteAliasPackage dispatch_package_method dispatch_package_getter dispatch_complete_package_getter
 Composer\Package\CompletePackage dispatch_package_method dispatch_package_getter dispatch_complete_package_getter
-Composer\Package\Locker dispatch_locker_method
+Composer\Package\Locker forwarding
 Composer\Package\Package dispatch_package_method dispatch_package_getter dispatch_complete_package_getter
 Composer\Package\RootAliasPackage dispatch_package_method dispatch_package_getter dispatch_complete_package_getter
 Composer\Package\RootPackage dispatch_package_method dispatch_package_getter dispatch_complete_package_getter
@@ -51,3 +52,4 @@ Composer\Util\HttpDownloader dispatch_http_downloader_method
 Composer\Util\ProcessExecutor dispatch_process_executor_method
 Shirabe\RustCapablePluginStub dispatch_plugin_method
 Shirabe\RustPluginStub dispatch_plugin_method
+Shirabe\RustProcessStub forwarding

@@ -9,7 +9,8 @@ use crate::php_worker::call::PhpCall;
 use crate::php_worker::codec::class_map_to_wire;
 use crate::php_worker::rpc::args::{arg, arg_or, arg_throw};
 use crate::php_worker::rpc::dispatch::{error_throw, unavailable_method};
-use crate::php_worker::rpc::table::{entity_arg, optional_entity_arg};
+use crate::php_worker::rpc::entity::{Call, EntityArg};
+use crate::php_worker::rpc::table::entity_arg;
 use crate::php_worker::runtime::autoloading;
 use crate::repository::RepositoryInterfaceHandle;
 use bstr::{BStr, BString, ByteSlice};
@@ -60,11 +61,10 @@ pub(crate) fn dispatch_autoload_generator_method(
             let target_dir = arg::<BString>(method_name, args, 4)?;
             let scan_psr_packages = arg_or::<bool>(method_name, args, 5, false)?;
             let suffix = arg::<Option<BString>>(method_name, args, 6)?;
-            let locker = optional_entity_arg::<std::rc::Rc<std::cell::RefCell<dyn LockerInterface>>>(
-                method_name,
-                args,
-                7,
-            )?;
+            let locker = arg::<
+                Option<EntityArg<std::rc::Rc<std::cell::RefCell<dyn LockerInterface>>>>,
+            >(method_name, args, 7)?
+            .map(|locker| locker.0);
             let strict_ambiguous = arg_or::<bool>(method_name, args, 8, false)?;
             let class_map = generator
                 .borrow()
@@ -146,6 +146,24 @@ pub(crate) fn root_package_arg(
                 wire::unexpected(
                     "a RootPackageInterface",
                     args.get(position).unwrap_or(&wire::NULL),
+                ),
+            )
+        })
+}
+
+/// [`root_package_arg`] for a forwarded call.
+pub(crate) fn root_package(
+    call: &Call<'_>,
+    position: usize,
+) -> Result<RootPackageInterfaceHandle, PhpThrow> {
+    call.arg::<PackageInterfaceHandle>(position)?
+        .as_root()
+        .ok_or_else(|| {
+            call.arg_throw(
+                position,
+                wire::unexpected(
+                    "a RootPackageInterface",
+                    call.args().get(position).unwrap_or(&wire::NULL),
                 ),
             )
         })

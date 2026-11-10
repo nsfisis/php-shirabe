@@ -43,19 +43,23 @@ final class SurfaceManifest
 {
     private const PROTOCOL_METHODS = ['__get', '__set', '__isset', '__unset'];
 
+    /** What the R table answers for every entity, whatever class it crosses as. */
+    private const GENERIC_METHODS = ['__get', '__set', '__isset', '__unset', '__shirabe_clone'];
+
     /**
      * FQCN => what its declaration forwards; `constructs` is null for a class declaring no
      * constructor of its own.
      *
-     * @var array<string, array{parent: ?string, abstract: bool, methods: list<string>, statics: list<string>, constructs: ?bool}>
+     * @var array<string, array{guard: bool, parent: ?string, abstract: bool, methods: list<string>, statics: list<string>, constructs: ?bool}>
      */
     private array $classes = [];
 
     /**
      * @param list<string> $phpDirs the directories of worker-side classes, laid out by FQCN
-     * @param array<string, list<string>> $dispatchers FQCN => the Rust functions answering its
-     *                                                 instance methods; empty for a class no
-     *                                                 entity is handed out as
+     * @param array<string, ?list<string>> $dispatchers FQCN => the Rust functions answering its
+     *                                                  instance methods; empty for a class no
+     *                                                  entity is handed out as, null for a class
+     *                                                  whose forwarding module is generated
      * @param list<string> $guardDirs the directories of the guard classes; only the static
      *                                methods a guard forwards are read from them, since every
      *                                other member of a guard is an explicit error
@@ -68,15 +72,19 @@ final class SurfaceManifest
     ) {
     }
 
-    /** The manifest text. */
-    public function render(): string
+    /**
+     * The manifest text and the Rust module of the forwarding classes.
+     *
+     * @return array{manifest: string, forwarding: string}
+     */
+    public function render(): array
     {
         $this->readClasses();
 
         $errors = [];
         $forwarding = array_filter(
             $this->classes,
-            fn (string $fqcn): bool => $this->instanceSurface($fqcn) !== [],
+            fn (string $fqcn): bool => $this->isForwarding($fqcn),
             ARRAY_FILTER_USE_KEY,
         );
         foreach (array_keys($forwarding) as $fqcn) {
@@ -93,11 +101,27 @@ final class SurfaceManifest
             throw new GenerationError($errors);
         }
 
+        $generated = array_keys(array_filter(
+            $this->dispatchers,
+            static fn (?array $functions): bool => $functions === null,
+        ));
+        foreach ($generated as $fqcn) {
+            $root = $this->root($fqcn);
+            if ($this->dispatchers[$root] !== null) {
+                $errors[] = "$fqcn is generated, but the class it descends from, $root, is not";
+            }
+        }
+        if ($errors !== []) {
+            throw new GenerationError($errors);
+        }
+        $modules = new ForwardingModules($this->classes, $generated, fn (string $fqcn): string => $this->root($fqcn));
+        $impls = $modules->overrides(RustForwardingImpls::in($this->rustSourceDir));
+
         $rows = [];
 
         $served = [];
         foreach ($this->dispatchers as $functions) {
-            foreach ($functions as $function) {
+            foreach ($functions ?? [] as $function) {
                 if (isset($served[$function])) {
                     continue;
                 }
@@ -112,10 +136,27 @@ final class SurfaceManifest
         }
         $forwardedBy = [];
         foreach ($this->dispatchers as $fqcn => $functions) {
+            if ($functions === null) {
+                if ($this->classes[$fqcn]['abstract']) {
+                    continue;
+                }
+                foreach ($this->instanceSurface($fqcn) as $method) {
+                    if (self::isProtocol($method)) {
+                        continue;
+                    }
+                    $declaring = $this->declaring($fqcn, $method);
+                    $supported = in_array(ForwardingModules::rustName($method), $impls[$declaring], true);
+                    $rows[] = [$fqcn . '::' . $method, 'method', $supported ? 'supported' : 'unsupported'];
+                }
+                continue;
+            }
             if ($functions === []) {
                 continue;
             }
             foreach ($this->instanceSurface($fqcn) as $method) {
+                if (self::isProtocol($method)) {
+                    continue;
+                }
                 $supported = false;
                 foreach ($functions as $function) {
                     $forwardedBy[$function][$method] = true;
@@ -138,7 +179,7 @@ final class SurfaceManifest
         }
         $constructed = [];
         foreach (array_keys($this->classes) as $fqcn) {
-            if ($this->classes[$fqcn]['abstract'] || !$this->constructs($fqcn)) {
+            if (!$this->constructsEntity($fqcn)) {
                 continue;
             }
             $constructed[$fqcn] = true;
@@ -174,9 +215,45 @@ final class SurfaceManifest
         $lines = array_map(static fn (array $row): string => implode("\t", $row), $rows);
         sort($lines, SORT_STRING);
 
-        return "# Generated by scripts/plugin-stub-generator/surface-manifest; do not edit by hand.\n"
-            . "# <member>\t<constructor|method|static>\t<supported|unsupported|orphan>\n"
-            . implode("\n", $lines) . "\n";
+        return [
+            'manifest' => "# Generated by scripts/plugin-stub-generator/surface-manifest; do not edit by hand.\n"
+                . "# <member>\t<constructor|method|static>\t<supported|unsupported|orphan>\n"
+                . implode("\n", $lines) . "\n",
+            'forwarding' => $modules->render(),
+        ];
+    }
+
+    /** Whether `$fqcn` is a stub or runtime class forwarding any instance method. */
+    private function isForwarding(string $fqcn): bool
+    {
+        return !$this->classes[$fqcn]['guard'] && $this->instanceSurface($fqcn) !== [];
+    }
+
+    /** The forwarding class `$fqcn` descends from whose parent forwards nothing. */
+    private function root(string $fqcn): string
+    {
+        while (($parent = $this->classes[$fqcn]['parent']) !== null && isset($this->classes[$parent]) && $this->isForwarding($parent)) {
+            $fqcn = $parent;
+        }
+
+        return $fqcn;
+    }
+
+    /** The class, `$fqcn` or an ancestor, that declares the forwarder of `$method`. */
+    private function declaring(string $fqcn, string $method): string
+    {
+        for ($class = $fqcn; $class !== null && isset($this->classes[$class]); $class = $this->classes[$class]['parent']) {
+            if (in_array($method, $this->classes[$class]['methods'], true)) {
+                return $class;
+            }
+        }
+        throw new \LogicException("$fqcn does not forward $method");
+    }
+
+    /** Whether `new $fqcn(...)` builds a Rust-side entity. */
+    private function constructsEntity(string $fqcn): bool
+    {
+        return !$this->classes[$fqcn]['abstract'] && $this->constructs($fqcn);
     }
 
     private static function isProtocol(string $method): bool
@@ -257,6 +334,7 @@ final class SurfaceManifest
     {
         $fqcn = $class->namespacedName->toString();
         $entry = [
+            'guard' => $isGuard,
             'parent' => $class->extends?->toString(),
             'abstract' => $class->isAbstract(),
             'methods' => [],
@@ -275,7 +353,7 @@ final class SurfaceManifest
             if ($entry['statics'] === []) {
                 return;
             }
-            $entry = ['parent' => null, 'abstract' => $entry['abstract'], 'methods' => [], 'statics' => $entry['statics'], 'constructs' => null];
+            $entry = ['guard' => true, 'parent' => null, 'abstract' => $entry['abstract'], 'methods' => [], 'statics' => $entry['statics'], 'constructs' => null];
         }
         if (isset($this->classes[$fqcn])) {
             throw new GenerationError(["$path declares $fqcn a second time"]);
@@ -292,7 +370,7 @@ final class SurfaceManifest
             && $node->name->toString() === 'callRust';
     }
 
-    /** @param array{parent: ?string, abstract: bool, methods: list<string>, statics: list<string>, constructs: ?bool} $entry */
+    /** @param array{guard: bool, parent: ?string, abstract: bool, methods: list<string>, statics: list<string>, constructs: ?bool} $entry */
     private function readCall(string $path, string $fqcn, ClassMethod $method, StaticCall $call, array &$entry): void
     {
         $where = "$path: " . $fqcn . '::' . $method->name->toString();
@@ -307,7 +385,7 @@ final class SurfaceManifest
             && $handle->var instanceof Variable && $handle->var->name === 'this'
             && $handle->name instanceof Node\Identifier && $handle->name->toString() === '__rhandle'
         ) {
-            if (!self::isProtocol($name)) {
+            if (!in_array($name, self::GENERIC_METHODS, true)) {
                 $entry['methods'][] = $name;
             }
             return;
