@@ -9,7 +9,7 @@ use crate::package::version::VersionParser;
 use crate::php_worker::job::{JobOwner, record_internal_job};
 use crate::util::http::{NativeHttpDownloader, Response};
 use crate::util::{
-    GetResult, HttpOptions, LocalFilesystem, Platform, RemoteFilesystem, Silencer, SslOptions,
+    GetResult, HttpOptions, LocalFilesystem, Platform, RemoteFilesystem, SslOptions,
     StreamContextFactory, StreamContextOptions, Url, sync_executor,
 };
 use bstr::{B, BStr, BString, ByteSlice};
@@ -563,7 +563,6 @@ impl HttpDownloader {
         if strpos(e_as_transport.get_message(), "Resolving timed out").is_some()
             || strpos(e_as_transport.get_message(), "Could not resolve host").is_some()
         {
-            Silencer::suppress(None);
             let mut ctx_options = StreamContextOptions::new();
             let mut ssl = SslOptions::new();
             ssl.insert("verify_peer", PhpMixed::Bool(false));
@@ -574,7 +573,6 @@ impl HttpDownloader {
             ctx_options.set_http(http);
             let test_connectivity =
                 get_as_php_http_wrapper(BStr::new("https://8.8.8.8"), &ctx_options);
-            Silencer::restore();
             if test_connectivity.is_ok() {
                 return Some(vec![BString::from(
                     "<error>The following exception probably indicates you have misconfigured DNS resolver(s)</error>",

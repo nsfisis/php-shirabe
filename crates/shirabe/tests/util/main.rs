@@ -34,7 +34,6 @@ mod perforce_test;
 mod platform_test;
 mod process_executor_test;
 mod remote_filesystem_test;
-mod silencer_test;
 mod stream_context_factory_test;
 mod svn_test;
 mod tar_test;

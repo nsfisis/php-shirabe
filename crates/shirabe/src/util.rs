@@ -1,6 +1,10 @@
 //! `Composer\Util\RemoteFilesystem` has no Rust port. Only PHP's stream layer can serve the
 //! requests it takes, so the real class runs in the PHP worker, and `RemoteFilesystem` is
 //! re-exported here from the adapter that forwards to it (`php_worker::proxy::remote_filesystem`).
+//!
+//! `Composer\Util\Silencer` has no Rust port. It lowers PHP's `error_reporting()` level so that
+//! warnings and notices raised by the work it wraps are not reported. Rust code raises no PHP
+//! errors, so each place where Composer uses it runs the work unguarded instead.
 
 pub mod auth_helper;
 pub mod bitbucket;
@@ -26,7 +30,6 @@ pub mod package_sorter;
 pub mod perforce;
 pub mod platform;
 pub mod process_executor;
-pub mod silencer;
 pub mod stream_context_factory;
 pub mod stream_context_options;
 pub mod svn;
@@ -59,7 +62,6 @@ pub use package_sorter::*;
 pub use perforce::*;
 pub use platform::*;
 pub use process_executor::*;
-pub use silencer::*;
 pub use stream_context_factory::*;
 pub use stream_context_options::*;
 pub use svn::*;

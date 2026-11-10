@@ -35,7 +35,7 @@ use crate::php_worker::rpc::dispatch::find_file_in_registered_loaders;
 use crate::php_worker::rpc::entity::entity_value;
 use crate::php_worker::runtime;
 use crate::php_worker::xdebug::is_xdebug_active;
-use crate::util::{ErrorHandler, Filesystem, HttpDownloader, Platform, Silencer};
+use crate::util::{ErrorHandler, Filesystem, HttpDownloader, Platform};
 use bstr::{B, BStr, BString, ByteSlice, ByteVec};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
@@ -219,7 +219,6 @@ impl Application {
                 .set_verbosity(output_interface::VERBOSITY_VERBOSE);
         }
 
-        Silencer::suppress(None);
         let disk_hint_msg: Option<BString> = (|| -> anyhow::Result<Option<BString>> {
             let composer = self.get_composer(false, Some(true), None)?;
             if let Some(composer) = composer {
@@ -252,7 +251,6 @@ impl Application {
         })()
         .ok()
         .flatten();
-        Silencer::restore();
 
         let io = self.get_io();
         if let Some(msg) = &disk_hint_msg {
