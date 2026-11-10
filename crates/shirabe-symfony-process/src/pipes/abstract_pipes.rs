@@ -3,7 +3,7 @@
 use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpMixed, PhpResource, ToPhpString, fclose, fwrite, php_truthy, stream_select,
+    PhpMixed, PhpResource, ToPhpString, boolval, fclose, fwrite, stream_select,
     stream_set_blocking, stripos,
 };
 
@@ -99,7 +99,7 @@ impl AbstractPipes {
         }
 
         // no input to read on resource, buffer is empty
-        if self.input_buffer.is_empty() && !php_truthy(&self.input) {
+        if self.input_buffer.is_empty() && !boolval(&self.input) {
             self.input = PhpMixed::Null;
             fclose(&stdin);
             self.pipes.shift_remove(&0);

@@ -1,6 +1,6 @@
 use crate::{
-    PhpMixed, ToPhpString, canonical_int_key, display_to_bytes, is_numeric_string, strnatcasecmp,
-    to_bool, utf8_text,
+    PhpMixed, ToPhpString, boolval, canonical_int_key, display_to_bytes, is_numeric_string,
+    strnatcasecmp, utf8_text,
 };
 use bstr::{B, BString};
 use indexmap::IndexMap;
@@ -607,10 +607,10 @@ pub fn loose_eq(a: &PhpMixed, b: &PhpMixed) -> bool {
     match (a, b) {
         (Null, Null) => true,
         // null compares loosely against the "empty"/false-y value of the other type.
-        (Null, other) | (other, Null) => !to_bool(other),
+        (Null, other) | (other, Null) => !boolval(other),
         // If either operand is a bool, both are converted to bool.
-        (Bool(x), other) => *x == to_bool(other),
-        (other, Bool(y)) => to_bool(other) == *y,
+        (Bool(x), other) => *x == boolval(other),
+        (other, Bool(y)) => boolval(other) == *y,
         (Int(x), Int(y)) => x == y,
         (Int(_) | Float(_), Int(_) | Float(_)) => loose_num_value(a) == loose_num_value(b),
         (String(x), String(y)) => match (loose_to_number(x), loose_to_number(y)) {

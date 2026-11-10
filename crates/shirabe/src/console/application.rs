@@ -47,10 +47,10 @@ use shirabe_php_shim::{
     get_debug_type_obj, getcwd, getenv, getmypid, glob, implode, intval, is_dir, is_file,
     is_numeric_string, is_string, json_decode_assoc, levenshtein, ltrim_chars, mb_convert_encoding,
     mb_convert_variables, mb_detect_encoding, mb_strwidth, microtime, os_str_from_bytes,
-    path_from_bytes, path_to_bytes, php_regex, php_str, php_truthy, php_uname, posix_getuid,
-    preg_grep, preg_match, preg_quote, preg_replace_callback, preg_split, putenv, random_bytes,
-    realpath, round, sort_natural_flag_case, str_pad, str_repeat, str_replace, str_split, strlen,
-    strpos, strrpos, strtoupper, substr, substr_count, sys_get_temp_dir, time, trim, unlink,
+    path_from_bytes, path_to_bytes, php_regex, php_str, php_uname, posix_getuid, preg_grep,
+    preg_match, preg_quote, preg_replace_callback, preg_split, putenv, random_bytes, realpath,
+    round, sort_natural_flag_case, str_pad, str_repeat, str_replace, str_split, strlen, strpos,
+    strrpos, strtoupper, substr, substr_count, sys_get_temp_dir, time, trim, unlink,
 };
 use shirabe_seld_json_lint::ParsingException;
 use shirabe_symfony_console::command::{Command as SymfonyCommand, HelpCommand};
@@ -710,7 +710,7 @@ impl Application {
             let filtered: Vec<shirabe_symfony_console::completion::StringOrSuggestion> =
                 command_names
                     .into_iter()
-                    .filter(php_truthy)
+                    .filter(boolval)
                     .map(|n| {
                         shirabe_symfony_console::completion::StringOrSuggestion::String(
                             n.to_php_string(),
@@ -1081,7 +1081,7 @@ impl Application {
                 if commands.len() > 1 {
                     let filtered: Vec<BString> = formatted_abbrevs
                         .iter()
-                        .filter(|a| php_truthy(a))
+                        .filter(boolval)
                         .map(ToPhpString::to_php_string)
                         .collect();
                     let suggestions = self.get_abbreviation_suggestions(&filtered);

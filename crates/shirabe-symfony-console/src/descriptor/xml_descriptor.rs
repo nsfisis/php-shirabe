@@ -9,7 +9,7 @@ use crate::input::{InputArgument, InputDefinition, InputOption};
 use crate::output::OutputInterface;
 use bstr::BString;
 use shirabe_php_shim::{
-    DOMDocument, DOMNode, PhpMixed, ToPhpString, bformat, php_truthy, str_replace, strpos, substr,
+    DOMDocument, DOMNode, PhpMixed, ToPhpString, bformat, boolval, str_replace, strpos, substr,
     var_export,
 };
 
@@ -228,7 +228,7 @@ impl XmlDescriptor {
                 self.default_values_as_strings(&default_value)
             }
             PhpMixed::Bool(_) => vec![var_export(&default_value, true)],
-            d if php_truthy(d) => {
+            d if boolval(d) => {
                 vec![default_value.to_php_string()]
             }
             _ => vec![],
@@ -292,7 +292,7 @@ impl XmlDescriptor {
                 PhpMixed::Bool(_) => {
                     vec![var_export(&default_value, true)]
                 }
-                d if php_truthy(d) => {
+                d if boolval(d) => {
                     vec![default_value.to_php_string()]
                 }
                 _ => vec![],

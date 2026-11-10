@@ -17,8 +17,8 @@ use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, LogicException, PHP_EOL, PhpJson, PhpMixed, bformat,
     boolval, empty, extension_loaded, implode, intval, is_numeric, path_to_bytes,
-    pcre_check_utf8_subject, php_regex, php_truthy, preg_is_match, preg_match, preg_replace,
-    rawurldecode, stripos, strpos, substr, ucfirst, utf8_text,
+    pcre_check_utf8_subject, php_regex, preg_is_match, preg_match, preg_replace, rawurldecode,
+    stripos, strpos, substr, ucfirst, utf8_text,
 };
 use shirabe_semver::constraint::SimpleConstraint;
 
@@ -822,7 +822,7 @@ fn get_as_php_http_wrapper(url: &BStr, options: &StreamContextOptions) -> anyhow
     let ssl = wrapper_options(b"ssl", &[b"verify_peer", b"verify_peer_name"]);
     let http = wrapper_options(b"http", &[b"follow_location", b"ignore_errors"]);
     let is_true_or = |map: &IndexMap<BString, PhpMixed>, key: &[u8], default: bool| {
-        map.get(key).map_or(default, php_truthy)
+        map.get(key).map_or(default, boolval)
     };
     let verify_peer = is_true_or(&ssl, b"verify_peer", true);
     let verify_peer_name = is_true_or(&ssl, b"verify_peer_name", true);

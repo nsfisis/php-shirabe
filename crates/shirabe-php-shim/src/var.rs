@@ -434,14 +434,6 @@ pub fn to_array(value: PhpMixed) -> IndexMap<BString, PhpMixed> {
     }
 }
 
-pub fn to_bool(value: &PhpMixed) -> bool {
-    value.is_truthy()
-}
-
-pub fn php_truthy(value: &PhpMixed) -> bool {
-    value.is_truthy()
-}
-
 pub fn var_export(value: &PhpMixed, r#return: bool) -> BString {
     let mut out = BString::default();
     var_export_into(&mut out, value, 0);

@@ -7,8 +7,8 @@ use bstr::{B, BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpMixed, ToPhpString, addcslashes, array_key_exists,
-    array_keys, array_reverse, bformat, empty, explode, implode, in_array_loose, intval, is_array,
-    is_int, is_numeric, json_decode_assoc, json_decode_obj, php_regex, php_str, php_truthy,
+    array_keys, array_reverse, bformat, boolval, empty, explode, implode, in_array_loose, intval,
+    is_array, is_int, is_numeric, json_decode_assoc, json_decode_obj, php_regex, php_str,
     preg_is_match, preg_match, preg_quote, preg_replace, preg_replace_with_limit_and_count,
     rtrim_chars, str_repeat, str_replace, strlen, strnatcmp, strpos, substr, trim_chars, uksort,
 };
@@ -734,7 +734,7 @@ impl JsonManipulator {
         let node_end = BString::from(&self.contents[node.value_end..]);
         let mut children = BString::from(&self.contents[node.value_pos..node.value_end]);
         // invalid match due to un-regexable content, abort
-        if !php_truthy(&json_decode_obj(&children)?) {
+        if !boolval(&json_decode_obj(&children)?) {
             return Ok(false);
         }
 
@@ -881,7 +881,7 @@ impl JsonManipulator {
         let children = BString::from(&self.contents[node.value_pos..node.value_end]);
 
         // invalid match due to un-regexable content, abort
-        if !php_truthy(&json_decode_assoc(&children)?) {
+        if !boolval(&json_decode_assoc(&children)?) {
             return Ok(false);
         }
 
