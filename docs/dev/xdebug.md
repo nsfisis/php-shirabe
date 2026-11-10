@@ -11,6 +11,12 @@ different from Composer: Composer restarts its own process with a temporary
 INI file in which the Xdebug extension is disabled. The difference is unlikely
 to matter to users or plugin authors.
 
+Composer also sets `xdebug.show_exception_trace` and `xdebug.scream` to `0`
+when Xdebug is loaded. Shirabe always spawns the PHP worker with
+`-d xdebug.show_exception_trace=0 -d xdebug.scream=0`, even when
+`COMPOSER_ALLOW_XDEBUG` leaves Xdebug enabled. PHP ignores these settings when
+Xdebug is not loaded.
+
 ## Enabling Xdebug in Shirabe's PHP worker
 
 As in Composer, setting `COMPOSER_ALLOW_XDEBUG` to `1` makes Shirabe leave

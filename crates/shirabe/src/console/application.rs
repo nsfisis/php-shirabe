@@ -43,15 +43,14 @@ use shirabe_php_shim::{
     LogicException as ShimLogicException, PHP_ENV, PHP_SERVER, PhpMixed, PregMatches,
     RuntimeException, STDIN, STR_PAD_RIGHT, ToPhpString, basename, bformat, bin2hex, chdir,
     defined, dirname, disk_free_space, display_to_bytes, error_message, exec, explode,
-    explode_limit, extension_loaded, file_exists, file_get_contents, file_put_contents,
-    function_exists, get_debug_type_obj, getcwd, getenv, getmypid, glob, implode, ini_set, intval,
-    is_dir, is_file, is_numeric_string, is_string, json_decode_assoc, levenshtein, ltrim_chars,
-    mb_convert_encoding, mb_convert_variables, mb_detect_encoding, mb_strwidth, microtime,
-    os_str_from_bytes, path_from_bytes, path_to_bytes, php_regex, php_str, php_truthy, php_uname,
-    posix_getuid, preg_grep, preg_match, preg_quote, preg_replace_callback, preg_split, putenv,
-    random_bytes, realpath, round, sort_natural_flag_case, str_pad, str_repeat, str_replace,
-    str_split, strlen, strpos, strrpos, strtoupper, substr, substr_count, sys_get_temp_dir, time,
-    trim, unlink,
+    explode_limit, file_exists, file_get_contents, file_put_contents, function_exists,
+    get_debug_type_obj, getcwd, getenv, getmypid, glob, implode, intval, is_dir, is_file,
+    is_numeric_string, is_string, json_decode_assoc, levenshtein, ltrim_chars, mb_convert_encoding,
+    mb_convert_variables, mb_detect_encoding, mb_strwidth, microtime, os_str_from_bytes,
+    path_from_bytes, path_to_bytes, php_regex, php_str, php_truthy, php_uname, posix_getuid,
+    preg_grep, preg_match, preg_quote, preg_replace_callback, preg_split, putenv, random_bytes,
+    realpath, round, sort_natural_flag_case, str_pad, str_repeat, str_replace, str_split, strlen,
+    strpos, strrpos, strtoupper, substr, substr_count, sys_get_temp_dir, time, trim, unlink,
 };
 use shirabe_seld_json_lint::ParsingException;
 use shirabe_symfony_console::command::{Command as SymfonyCommand, HelpCommand};
@@ -134,10 +133,9 @@ impl Application {
         if version.is_empty() {
             version = composer::SHIRABE_VERSION.into();
         }
-        if function_exists("ini_set") && extension_loaded("xdebug") {
-            ini_set("xdebug.show_exception_trace", "0");
-            ini_set("xdebug.scream", "0");
-        }
+        // Composer sets `xdebug.show_exception_trace` and `xdebug.scream` to `0` here when Xdebug
+        // is loaded. Xdebug can only be loaded into the PHP worker, which is spawned with both
+        // settings instead (see `php_worker::xdebug::worker_config`).
 
         let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
             std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));

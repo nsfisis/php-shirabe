@@ -47,6 +47,14 @@ pub(crate) fn worker_config() -> WorkerConfig {
             .push((BString::from("xdebug.mode"), BString::from("off")));
         config.env.push(("XDEBUG_MODE".into(), "off".into()));
     }
+    // PHP: `Application::__construct()` calls `ini_set()` for these when Xdebug is loaded. Here
+    // they are passed at spawn time whether or not it is, since an ini entry no extension
+    // registers is ignored.
+    for name in ["xdebug.show_exception_trace", "xdebug.scream"] {
+        config
+            .ini_settings
+            .push((BString::from(name), BString::from("0")));
+    }
     config
 }
 
@@ -73,6 +81,17 @@ mod tests {
         // XdebugHandler::getAllIniFiles() always yields at least one entry, which is the empty
         // string when no php.ini is loaded.
         assert!(!get_all_ini_files().unwrap().is_empty());
+    }
+
+    #[test]
+    fn worker_starts_with_application_xdebug_settings() {
+        let settings = worker_config().ini_settings;
+        for name in ["xdebug.show_exception_trace", "xdebug.scream"] {
+            assert!(
+                settings.contains(&(BString::from(name), BString::from("0"))),
+                "{name}=0 is missing from {settings:?}",
+            );
+        }
     }
 
     #[test]
