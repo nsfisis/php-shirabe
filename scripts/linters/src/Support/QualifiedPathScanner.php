@@ -12,12 +12,19 @@ namespace Shirabe\Lint\Support;
  */
 final class QualifiedPathScanner
 {
-    private const SEGMENT_RE = '/\A\s*::\s*((?:r#)?[A-Za-z_][A-Za-z0-9_]*)/';
+    private const SEGMENT_RE = '/\G\s*::\s*((?:r#)?[A-Za-z_][A-Za-z0-9_]*)/';
+
+    /** Bytes that can start a word, a comment, a literal, or a line. */
+    private const STOP_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_/\"'\n";
 
     /** @return list<array{path: string, line: int, offset: int, length: int}> */
     public static function find(string $src, string $root): array
     {
         $found = [];
+        if (!str_contains($src, $root)) {
+            return $found;
+        }
+
         $len = strlen($src);
         $line = 1;
         $i = 0;
@@ -39,24 +46,25 @@ final class QualifiedPathScanner
 
             if (!ctype_alpha($ch) && $ch !== '_') {
                 $i++;
+                $i += strcspn($src, self::STOP_CHARS, $i);
                 continue;
             }
 
-            preg_match('/\A[A-Za-z0-9_]+/', substr($src, $i, 64), $m);
-            $word = $m[0];
-            $afterWord = $i + strlen($word);
+            $wordLen = strspn($src, 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_', $i);
+            $word = substr($src, $i, $wordLen);
+            $afterWord = $i + $wordLen;
             $prev = $i > 0 ? $src[$i - 1] : ' ';
 
             if ($word === 'use') {
                 $end = self::skipUntilSemicolon($src, $i);
             } elseif ($word === 'macro_rules' && ($src[$afterWord] ?? '') === '!') {
                 $end = self::skipDelimited($src, $afterWord + 1);
-            } elseif ($word === 'pub' && preg_match('/\A\s*\(/', substr($src, $afterWord, 64))) {
+            } elseif ($word === 'pub' && preg_match('/\G\s*\(/', $src, $m, 0, $afterWord)) {
                 $end = self::skipDelimited($src, $afterWord);
             } elseif ($word === $root && $prev !== '$') {
                 $end = $afterWord;
                 $path = $word;
-                while (preg_match(self::SEGMENT_RE, substr($src, $end, 256), $s)) {
+                while (preg_match(self::SEGMENT_RE, $src, $s, 0, $end)) {
                     $path .= "::{$s[1]}";
                     $end += strlen($s[0]);
                 }
@@ -77,6 +85,11 @@ final class QualifiedPathScanner
     /** Returns the offset past a comment, string or char literal starting at $i, or $i itself. */
     private static function skipNonCode(string $src, int $i): int
     {
+        $ch = $src[$i];
+        if ($ch !== '/' && $ch !== '"' && $ch !== "'" && $ch !== 'b' && $ch !== 'r') {
+            return $i;
+        }
+
         $rest = substr($src, $i, 256);
 
         if (str_starts_with($rest, '//')) {
