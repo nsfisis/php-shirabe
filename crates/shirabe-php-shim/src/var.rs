@@ -1,5 +1,5 @@
 use crate::{PhpDisplay, PhpMixed, ToPhpString, bwrite, utf8_text};
-use bstr::{BStr, BString, ByteSlice as _, ByteVec as _};
+use bstr::{BString, ByteSlice as _, ByteVec as _};
 use indexmap::IndexMap;
 
 pub fn empty(value: &PhpMixed) -> bool {
@@ -141,26 +141,12 @@ pub fn is_object(value: &PhpMixed) -> bool {
     matches!(value, PhpMixed::Object(_))
 }
 
-pub fn is_a(_object_or_class: &PhpMixed, _class: impl AsRef<[u8]>, _allow_string: bool) -> bool {
-    let _class = BStr::new(_class.as_ref());
-    // TODO(php-runtime): requires runtime class information (the object's class and its ancestry), which
-    // PhpMixed::Object does not carry.
-    todo!()
-}
-
 pub fn is_array(value: &PhpMixed) -> bool {
     matches!(value, PhpMixed::List(_) | PhpMixed::Array(_))
 }
 
 pub fn is_null(value: &PhpMixed) -> bool {
     matches!(value, PhpMixed::Null)
-}
-
-pub fn is_iterable(value: &PhpMixed) -> bool {
-    // PHP is_iterable() is true for arrays and Traversable objects.
-    // TODO(php-runtime): PhpMixed::Object cannot report whether it implements Traversable, so an
-    // iterable object is conservatively treated as non-iterable here.
-    matches!(value, PhpMixed::List(_) | PhpMixed::Array(_))
 }
 
 /// The ASCII text of `s`, or `None` if `s` holds a byte that is not ASCII (which no numeric string
@@ -351,10 +337,6 @@ pub fn to_array(value: PhpMixed) -> IndexMap<BString, PhpMixed> {
     }
 }
 
-pub fn to_string(value: &PhpMixed) -> BString {
-    value.to_php_string()
-}
-
 pub fn to_bool(value: &PhpMixed) -> bool {
     php_truthy(value)
 }
@@ -372,10 +354,6 @@ pub fn php_truthy(value: &PhpMixed) -> bool {
         // Objects are always truthy.
         PhpMixed::Object(_) => true,
     }
-}
-
-pub fn boolval(value: &PhpMixed) -> bool {
-    php_truthy(value)
 }
 
 pub fn var_export(value: &PhpMixed, r#return: bool) -> BString {
