@@ -11,6 +11,10 @@ use Shirabe\Lint\Support\UseTree;
 
 final class NoBannedUse implements Linter
 {
+    /**
+     * Regex patterns (without delimiters) matched against the whole expanded `use` path,
+     * e.g. `foo::.*` bans every item under `foo`.
+     */
     private const BANNED_USE_PATHS = [
         'anyhow::Result',
         'std::any::Any',
@@ -79,7 +83,7 @@ final class NoBannedUse implements Linter
             $tree = $m[1] ?? null;
 
             foreach ($this->expandUseTree($tree) as $full) {
-                if (!in_array($full, self::BANNED_USE_PATHS, true)) {
+                if (!$this->isBanned($full)) {
                     continue;
                 }
                 $errors[] = "{$relative}:" . ($startIdx + 1) . ": `use {$full}` is banned (fully qualify as `{$full}` instead)";
@@ -89,6 +93,17 @@ final class NoBannedUse implements Linter
         }
 
         return array_values(array_unique($errors));
+    }
+
+    private function isBanned(string $path): bool
+    {
+        foreach (self::BANNED_USE_PATHS as $pattern) {
+            if (preg_match('~\\A(?:' . $pattern . ')\\z~', $path)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /** @return list<string> */
