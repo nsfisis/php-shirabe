@@ -2,41 +2,20 @@
 //! answers (construction, clone, property access), and the routing to each class's methods.
 
 use crate::autoload::ClassLoader;
-use crate::config::Config;
-use crate::dependency_resolver::operation::{
-    AnyOperation, InstallOperation, MarkAliasInstalledOperation, MarkAliasUninstalledOperation,
-    UninstallOperation, UpdateOperation,
-};
 use crate::factory::Factory;
-use crate::io::{BufferIO, IOInterface};
 use crate::package::{
-    AliasPackage, AliasPackageHandle, AnyPackage, CompleteAliasPackage, CompletePackage, Locker,
-    Package, PackageInterfaceHandle, RootAliasPackage,
+    AliasPackage, AnyPackage, CompleteAliasPackage, CompletePackage, Locker, Package,
+    PackageInterfaceHandle, RootAliasPackage,
 };
 use crate::php_worker::console::run_worker_reverse_command;
 use crate::php_worker::job;
-use crate::php_worker::rpc::args::{arg, arg_or};
-use crate::php_worker::rpc::entities::autoload_generator::dispatch_autoload_generator_method;
-use crate::php_worker::rpc::entities::composer::dispatch_composer_method;
-use crate::php_worker::rpc::entities::config::dispatch_config_method;
-use crate::php_worker::rpc::entities::download_manager::dispatch_download_manager_method;
-use crate::php_worker::rpc::entities::event_dispatcher::dispatch_event_dispatcher_method;
+use crate::php_worker::rpc::args::arg;
 use crate::php_worker::rpc::entities::events::dispatch_event_method;
-use crate::php_worker::rpc::entities::filesystem::dispatch_filesystem_method;
-use crate::php_worker::rpc::entities::http_downloader::dispatch_http_downloader_method;
-use crate::php_worker::rpc::entities::installation_manager::dispatch_installation_manager_method;
-use crate::php_worker::rpc::entities::io::dispatch_io_method;
-use crate::php_worker::rpc::entities::operation::dispatch_operation_method;
 use crate::php_worker::rpc::entities::package::dispatch_package_method;
-use crate::php_worker::rpc::entities::plugin::dispatch_plugin_method;
-use crate::php_worker::rpc::entities::process_executor::dispatch_process_executor_method;
-use crate::php_worker::rpc::entities::repository::dispatch_repository_method;
-use crate::php_worker::rpc::entities::repository_manager::dispatch_repository_manager_method;
-use crate::php_worker::rpc::entities::transaction::dispatch_transaction_method;
-use crate::php_worker::rpc::table;
-use crate::php_worker::rpc::table::{RustEntity, entity_arg, register_entity};
+use crate::php_worker::rpc::entity::{Call, Entity};
+use crate::php_worker::rpc::table::{RustEntity, register_entity};
+use crate::php_worker::rpc::{forwarding, table};
 use crate::php_worker::throwable::exception_into_throw;
-use crate::util::{Filesystem, HttpDownloader, ProcessExecutor, StreamContextOptions};
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_rpc::{PhpThrow, PluginValue, RustMethodDispatcher, ToWire};
@@ -176,7 +155,7 @@ pub(crate) fn dispatch_legacy_entity(
     entity: &RustEntity,
     method_name: &BStr,
     args: &[PluginValue],
-    out_params: &mut IndexMap<u32, PluginValue>,
+    _out_params: &mut IndexMap<u32, PluginValue>,
 ) -> Result<PluginValue, PhpThrow> {
     if method_name == "__shirabe_clone" {
         return clone_entity(entity);
@@ -188,42 +167,22 @@ pub(crate) fn dispatch_legacy_entity(
         return dispatch_property_access(entity, method_name, args);
     }
     match entity.clone() {
-        RustEntity::Io(io) => dispatch_io_method(&io, method_name, args),
-        RustEntity::Composer(composer) => dispatch_composer_method(&composer, method_name),
-        RustEntity::AutoloadGenerator(generator) => {
-            dispatch_autoload_generator_method(&generator, method_name, args)
-        }
-        RustEntity::Config(config) => dispatch_config_method(&config, method_name, args),
-        RustEntity::DownloadManager(dm) => dispatch_download_manager_method(&dm, method_name, args),
-        RustEntity::Filesystem(fs) => dispatch_filesystem_method(&fs, method_name, args),
-        RustEntity::InstallationManager(im) => {
-            dispatch_installation_manager_method(&im, method_name, args)
-        }
-        RustEntity::RepositoryManager(rm) => dispatch_repository_manager_method(&rm, method_name),
-        RustEntity::Repository(repository) => {
-            dispatch_repository_method(&repository, method_name, args)
-        }
         RustEntity::Package(package) => dispatch_package_method(&package, method_name, args),
-        RustEntity::EventDispatcher(dispatcher) => {
-            dispatch_event_dispatcher_method(&dispatcher, method_name, args)
-        }
-        RustEntity::Operation(operation) => {
-            dispatch_operation_method(&operation, method_name, args)
-        }
-        RustEntity::Transaction(transaction) => {
-            dispatch_transaction_method(&transaction, method_name)
-        }
-        RustEntity::Plugin(plugin) => dispatch_plugin_method(&plugin, method_name),
-        RustEntity::ProcessExecutor(process) => {
-            dispatch_process_executor_method(&process, method_name, args, out_params)
-        }
-        RustEntity::HttpDownloader(downloader) => {
-            dispatch_http_downloader_method(&downloader, method_name, args)
-        }
         RustEntity::Event(event) => {
             dispatch_event_method(&mut *event.borrow_mut(), method_name, args)
         }
     }
+}
+
+/// Registers an entity a forwarded constructor built for `class`.
+fn constructed<H: Entity>(class: &BStr, entity: H) -> Result<u64, PhpThrow> {
+    let (rhandle, crossing) = table::register(entity)?;
+    assert_eq!(
+        class,
+        BStr::new(crossing.name),
+        "a constructor builds an entity of its own class"
+    );
+    Ok(rhandle)
 }
 
 /// Serves the constructor every proxy stub carries: plugin code writing `new SomeProxiedClass`
@@ -247,27 +206,16 @@ pub(crate) fn construct_entity(args: &[PluginValue]) -> Result<PluginValue, PhpT
         }
     };
     let class_name = class.as_bstr();
+    let mut out_params = IndexMap::new();
+    let mut call = Call::new(
+        class_name,
+        BStr::new("__construct"),
+        ctor_args,
+        &mut out_params,
+    );
     let string_arg = |position: usize| arg::<BString>(class_name, ctor_args, position);
     let package_arg =
         |position: usize| arg::<PackageInterfaceHandle>(class_name, ctor_args, position);
-    let io_arg = |position: usize| {
-        entity_arg::<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>(
-            class_name, ctor_args, position,
-        )
-    };
-    let process_executor_arg = |position: usize| {
-        entity_arg::<std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>(
-            class_name, ctor_args, position,
-        )
-    };
-    let config_arg = |position: usize| {
-        entity_arg::<std::rc::Rc<std::cell::RefCell<Config>>>(class_name, ctor_args, position)
-    };
-    let alias_package_arg = |position: usize| -> Result<AliasPackageHandle, PhpThrow> {
-        package_arg(position)?
-            .as_alias()
-            .ok_or_else(|| PhpThrow::runtime(bformat!("{class_name} expects an AliasPackage")))
-    };
     let package = match class.as_slice() {
         b"Composer\\Package\\Package" => {
             AnyPackage::Package(Package::new(string_arg(0)?, string_arg(1)?, string_arg(2)?))
@@ -310,115 +258,63 @@ pub(crate) fn construct_entity(args: &[PluginValue]) -> Result<PluginValue, PhpT
                 )?,
             )
         }
-        // A solver operation carries no state beyond the packages it names, so a plugin-built
-        // one is a complete instance rather than a second view on a Rust-side service.
         b"Composer\\DependencyResolver\\Operation\\InstallOperation" => {
-            return Ok(operation_construction_result(AnyOperation::Install(
-                InstallOperation::new(package_arg(0)?),
-            )));
+            return construction_result(constructed(
+                class_name,
+                <forwarding::dependency_resolver::operation::install_operation::PhpClass as forwarding::dependency_resolver::operation::install_operation::Forwarding>::__construct(&mut call)?,
+            )?);
         }
         b"Composer\\DependencyResolver\\Operation\\UpdateOperation" => {
-            return Ok(operation_construction_result(AnyOperation::Update(
-                UpdateOperation::new(package_arg(0)?, package_arg(1)?),
-            )));
+            return construction_result(constructed(
+                class_name,
+                <forwarding::dependency_resolver::operation::update_operation::PhpClass as forwarding::dependency_resolver::operation::update_operation::Forwarding>::__construct(&mut call)?,
+            )?);
         }
         b"Composer\\DependencyResolver\\Operation\\UninstallOperation" => {
-            return Ok(operation_construction_result(AnyOperation::Uninstall(
-                UninstallOperation::new(package_arg(0)?),
-            )));
+            return construction_result(constructed(
+                class_name,
+                <forwarding::dependency_resolver::operation::uninstall_operation::PhpClass as forwarding::dependency_resolver::operation::uninstall_operation::Forwarding>::__construct(&mut call)?,
+            )?);
         }
         b"Composer\\DependencyResolver\\Operation\\MarkAliasInstalledOperation" => {
-            return Ok(operation_construction_result(
-                AnyOperation::MarkAliasInstalled(MarkAliasInstalledOperation::new(
-                    alias_package_arg(0)?,
-                )),
-            ));
+            return construction_result(constructed(
+                class_name,
+                <forwarding::dependency_resolver::operation::mark_alias_installed_operation::PhpClass as forwarding::dependency_resolver::operation::mark_alias_installed_operation::Forwarding>::__construct(&mut call)?,
+            )?);
         }
         b"Composer\\DependencyResolver\\Operation\\MarkAliasUninstalledOperation" => {
-            return Ok(operation_construction_result(
-                AnyOperation::MarkAliasUninstalled(MarkAliasUninstalledOperation::new(
-                    alias_package_arg(0)?,
-                )),
-            ));
+            return construction_result(constructed(
+                class_name,
+                <forwarding::dependency_resolver::operation::mark_alias_uninstalled_operation::PhpClass as forwarding::dependency_resolver::operation::mark_alias_uninstalled_operation::Forwarding>::__construct(&mut call)?,
+            )?);
         }
-        // A Filesystem shares no state with the object graph beyond the process executor it
-        // runs subprocesses through, so a plugin-built one is a complete instance rather than
-        // a second view on a Rust-side service.
         b"Composer\\Util\\Filesystem" => {
-            let executor = match ctor_args.first() {
-                None | Some(PluginValue::Null) => None,
-                _ => Some(process_executor_arg(0)?),
-            };
-            let rhandle = register_entity(RustEntity::Filesystem(std::rc::Rc::new(
-                std::cell::RefCell::new(Filesystem::new(executor)),
-            )));
-            return Ok(construction_result(rhandle));
+            return construction_result(constructed(
+                class_name,
+                <forwarding::util::filesystem::PhpClass as forwarding::util::filesystem::Forwarding>::__construct(&mut call)?,
+            )?);
         }
-        // The job queue and the async permits of a process executor are its own state, and the
-        // timeout it runs children under is the Rust side's; a plugin-built one is a complete
-        // instance of the former holding the latter, not a second view on the graph's executor.
         b"Composer\\Util\\ProcessExecutor" => {
-            let io = match ctor_args.first() {
-                None | Some(PluginValue::Null) => None,
-                _ => Some(io_arg(0)?),
-            };
-            let rhandle = register_entity(RustEntity::ProcessExecutor(std::rc::Rc::new(
-                std::cell::RefCell::new(ProcessExecutor::new(io)),
-            )));
-            return Ok(construction_result(rhandle));
+            return construction_result(constructed(
+                class_name,
+                <forwarding::util::process_executor::PhpClass as forwarding::util::process_executor::Forwarding>::__construct(&mut call)?,
+            )?);
         }
-        // A downloader carries its own options, TLS defaults and request backends; what it
-        // shares with the graph is the IO it collects authentication into and the config it
-        // reads, both of which it receives as the proxies the plugin already holds.
         b"Composer\\Util\\HttpDownloader" => {
-            let rhandle = register_entity(RustEntity::HttpDownloader(std::rc::Rc::new(
-                std::cell::RefCell::new(
-                    HttpDownloader::new(
-                        io_arg(0)?,
-                        config_arg(1)?,
-                        arg_or::<StreamContextOptions>(
-                            class_name,
-                            ctor_args,
-                            2,
-                            StreamContextOptions::new(),
-                        )?,
-                        arg_or::<bool>(class_name, ctor_args, 3, false)?,
-                    )
-                    .map_err(|error| error_throw(b"HttpDownloader construction failed", &error))?,
-                ),
-            )));
-            return Ok(construction_result(rhandle));
+            return construction_result(constructed(
+                class_name,
+                <forwarding::util::http_downloader::PhpClass as forwarding::util::http_downloader::Forwarding>::__construct(&mut call)?,
+            )?);
         }
-        // A BufferIO writes into a memory stream of its own and reads from its own string
-        // input, so a plugin-built one is a complete instance rather than a second view on the
-        // graph's IO.
         b"Composer\\IO\\BufferIO" => {
-            // TODO(plugin): an OutputFormatterInterface is a Symfony object the plugin builds in
-            // its own process, and no proxy carries one to the Rust side.
-            if !matches!(ctor_args.get(2), None | Some(PluginValue::Null)) {
-                return Err(PhpThrow::runtime(bformat!(
-                    "Shirabe does not support passing an output formatter to {class_name} inside the plugin process yet"
-                )));
-            }
-            let io = BufferIO::new(
-                arg_or::<BString>(class_name, ctor_args, 0, BString::default())?,
-                arg_or::<i64>(
-                    class_name,
-                    ctor_args,
-                    1,
-                    shirabe_symfony_console::output::VERBOSITY_NORMAL,
-                )?,
-                None,
-            )
-            .map_err(|error| error_throw(b"BufferIO::__construct failed", &error))?;
-            let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
-                std::rc::Rc::new(std::cell::RefCell::new(io));
-            return Ok(construction_result(register_entity(RustEntity::Io(io))));
+            return construction_result(constructed(
+                class_name,
+                <forwarding::io::buffer_io::PhpClass as forwarding::io::buffer_io::Forwarding>::__construct(&mut call)?,
+            )?);
         }
-        // TODO(plugin): the remaining proxied classes get a construction story on demand,
-        // driven by explicit errors from real plugins. Each one has to decide what a
-        // plugin-built instance means for the Rust-side graph, which is why none of them is
-        // answered generically here.
+        // TODO(plugin): the remaining proxied classes get a construction story on demand. Each
+        // one has to decide what a plugin-built instance means for the Rust-side graph, which is
+        // why none of them is answered generically here.
         _ => {
             return Err(PhpThrow::runtime(bformat!(
                 "Shirabe does not support constructing {class_name} inside the plugin process yet"
@@ -428,18 +324,12 @@ pub(crate) fn construct_entity(args: &[PluginValue]) -> Result<PluginValue, PhpT
     let rhandle = register_entity(RustEntity::Package(std::rc::Rc::new(
         std::cell::RefCell::new(package),
     )));
-    Ok(construction_result(rhandle))
-}
-
-fn operation_construction_result(operation: AnyOperation) -> PluginValue {
-    construction_result(register_entity(RustEntity::Operation(std::rc::Rc::new(
-        operation,
-    ))))
+    construction_result(rhandle)
 }
 
 /// The rhandle a proxy stub's constructor binds itself to.
-fn construction_result(rhandle: u64) -> PluginValue {
-    PluginValue::Int(rhandle as i64)
+fn construction_result(rhandle: u64) -> Result<PluginValue, PhpThrow> {
+    Ok(PluginValue::Int(rhandle as i64))
 }
 
 /// Serves the `__clone` forwarder every proxy stub carries. Only entities whose Rust type
@@ -455,22 +345,7 @@ fn clone_entity(entity: &RustEntity) -> Result<PluginValue, PhpThrow> {
                 std::cell::RefCell::new(cloned),
             )))
         }
-        RustEntity::Composer(_)
-        | RustEntity::AutoloadGenerator(_)
-        | RustEntity::Config(_)
-        | RustEntity::DownloadManager(_)
-        | RustEntity::Filesystem(_)
-        | RustEntity::Io(_)
-        | RustEntity::InstallationManager(_)
-        | RustEntity::RepositoryManager(_)
-        | RustEntity::Repository(_)
-        | RustEntity::EventDispatcher(_)
-        | RustEntity::Operation(_)
-        | RustEntity::Transaction(_)
-        | RustEntity::Plugin(_)
-        | RustEntity::ProcessExecutor(_)
-        | RustEntity::HttpDownloader(_)
-        | RustEntity::Event(_) => {
+        RustEntity::Event(_) => {
             return Err(PhpThrow::runtime(
                 "cloning this Rust-side entity over RPC is not supported",
             ));
@@ -535,6 +410,13 @@ fn call_static_entity(args: &[PluginValue]) -> Result<PluginValue, PhpThrow> {
     };
     let name = bformat!("{class}::{method}");
     let string_arg = |position: usize| arg::<BString>(name.as_bstr(), &call_args, position);
+    let mut out_params = IndexMap::new();
+    let mut call = Call::new(
+        class.as_bstr(),
+        method.as_bstr(),
+        &call_args,
+        &mut out_params,
+    );
     match (class.as_slice(), method.as_slice()) {
         (b"Composer\\Factory", b"getComposerFile") => Factory::get_composer_file()
             .map(|file| PluginValue::string(path_to_bytes(&file)))
@@ -545,11 +427,10 @@ fn call_static_entity(args: &[PluginValue]) -> Result<PluginValue, PhpThrow> {
                 .map_err(|error| error_throw(b"getContentHash failed", &error))
         }
         (b"Composer\\Util\\ProcessExecutor", b"getTimeout") => {
-            Ok(ProcessExecutor::get_timeout().to_wire())
+            <forwarding::util::process_executor::PhpClass as forwarding::util::process_executor::Forwarding>::get_timeout(&mut call)
         }
         (b"Composer\\Util\\ProcessExecutor", b"setTimeout") => {
-            ProcessExecutor::set_timeout(arg::<i64>(name.as_bstr(), &call_args, 0)?);
-            Ok(PluginValue::Null)
+            <forwarding::util::process_executor::PhpClass as forwarding::util::process_executor::Forwarding>::set_timeout(&mut call)
         }
         _ => Err(PhpThrow::runtime(bformat!(
             "the static method {name} is not available over RPC yet"

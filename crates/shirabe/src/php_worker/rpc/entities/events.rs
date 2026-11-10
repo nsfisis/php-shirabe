@@ -7,10 +7,7 @@ use crate::installer::{InstallerEvent, PackageEvent};
 use crate::package::PackageInterfaceHandle;
 use crate::php_worker::rpc::args::arg;
 use crate::php_worker::rpc::dispatch::unavailable_method;
-use crate::php_worker::rpc::table::{
-    RustEntity, io_stub_class, operation_handle_value, register_composer_entity, register_entity,
-    register_io_entity, repository_handle_value, rust_handle_value, transaction_handle_value,
-};
+use crate::php_worker::rpc::entity::entity_value;
 use crate::plugin::{
     CommandEvent, FileDownloadContext, PostFileDownloadEvent, PreCommandRunEvent,
     PreFileDownloadEvent, PrePoolCreateEvent,
@@ -19,7 +16,7 @@ use crate::script::Event as ScriptEvent;
 use crate::util::StreamContextOptions;
 use bstr::{BStr, BString, ByteSlice};
 use shirabe_php_rpc::{PhpThrow, PluginValue, ToWire};
-use shirabe_php_shim::{PhpMixed, bformat, error_message};
+use shirabe_php_shim::{PhpMixed, bformat};
 
 /// Serves the methods `PreFileDownloadEvent` declares beyond the base event's.
 pub(crate) fn dispatch_pre_file_download_event_method(
@@ -28,12 +25,7 @@ pub(crate) fn dispatch_pre_file_download_event_method(
     args: &[PluginValue],
 ) -> Result<PluginValue, PhpThrow> {
     match method_name.as_bytes() {
-        b"getHttpDownloader" => Ok(rust_handle_value(
-            register_entity(RustEntity::HttpDownloader(
-                event.get_http_downloader().clone(),
-            )),
-            BStr::new("Composer\\Util\\HttpDownloader"),
-        )),
+        b"getHttpDownloader" => entity_value(event.get_http_downloader()),
         b"getProcessedUrl" => Ok(event.get_processed_url().to_wire()),
         b"setProcessedUrl" => {
             event.set_processed_url(arg::<BString>(method_name, args, 0)?);
@@ -82,7 +74,7 @@ pub(crate) fn dispatch_pre_pool_create_event_method(
             event
                 .get_repositories()
                 .iter()
-                .map(repository_handle_value)
+                .map(entity_value)
                 .collect::<Result<Vec<_>, _>>()?,
         )),
         // TODO(plugin): Request has no proxy stub, so the request a listener would inspect or
@@ -180,8 +172,7 @@ pub(crate) fn dispatch_event_method(
             let composer = composer.ok_or_else(|| {
                 PhpThrow::runtime(BString::from("the Composer instance of this event is gone"))
             })?;
-            let rhandle = register_composer_entity(&composer);
-            Ok(rust_handle_value(rhandle, BStr::new("Composer\\Composer")))
+            entity_value(&composer)
         }
         b"getIO" => {
             let io = match (
@@ -198,13 +189,10 @@ pub(crate) fn dispatch_event_method(
                     )));
                 }
             };
-            let class =
-                io_stub_class(&io).map_err(|error| PhpThrow::runtime(error_message(&error)))?;
-            let rhandle = register_io_entity(&io);
-            Ok(rust_handle_value(rhandle, class))
+            entity_value(&io)
         }
         b"getLocalRepo" => match package_event(event) {
-            Some(event) => repository_handle_value(&event.get_local_repo().as_repository_handle()),
+            Some(event) => entity_value(&event.get_local_repo().as_repository_handle()),
             None => Err(PhpThrow::runtime(BString::from(
                 "getLocalRepo is only available on package events",
             ))),
@@ -214,15 +202,15 @@ pub(crate) fn dispatch_event_method(
                 event
                     .get_operations()
                     .iter()
-                    .map(operation_handle_value)
-                    .collect(),
+                    .map(entity_value)
+                    .collect::<Result<_, _>>()?,
             )),
             None => Err(PhpThrow::runtime(BString::from(
                 "getOperations is only available on package events",
             ))),
         },
         b"getOperation" => match package_event(event) {
-            Some(event) => Ok(operation_handle_value(event.get_operation())),
+            Some(event) => entity_value(event.get_operation()),
             None => Err(PhpThrow::runtime(BString::from(
                 "getOperation is only available on package events",
             ))),
@@ -265,7 +253,7 @@ pub(crate) fn dispatch_event_method(
         },
         b"getTransaction" => match installer_event(event) {
             Some(event) => match event.get_transaction() {
-                Some(transaction) => Ok(transaction_handle_value(transaction)),
+                Some(transaction) => entity_value(transaction),
                 None => Ok(PluginValue::Null),
             },
             None => Err(PhpThrow::runtime(BString::from(

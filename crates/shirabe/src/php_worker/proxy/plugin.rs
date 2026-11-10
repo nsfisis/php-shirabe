@@ -4,7 +4,7 @@ use crate::composer::ComposerHandle;
 use crate::event_dispatcher::{EventSubscriberInterface, SubscribedEventEntry};
 use crate::io::IOInterface;
 use crate::php_worker::call::PhpCall;
-use crate::php_worker::rpc::table::{composer_handle_value, io_handle_value};
+use crate::php_worker::rpc::entity::entity_value;
 use crate::plugin::{Capable, PluginInterface};
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
@@ -29,7 +29,7 @@ impl PhpPluginProxy {
         composer: &ComposerHandle,
         io: &std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     ) -> anyhow::Result<()> {
-        let args = vec![composer_handle_value(composer), io_handle_value(io)?];
+        let args = vec![entity_value(composer)?, entity_value(io)?];
         PhpCall::Method(&self.handle, method).run::<PluginValue>(args)?;
         Ok(())
     }

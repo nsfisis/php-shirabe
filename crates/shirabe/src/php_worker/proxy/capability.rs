@@ -3,7 +3,7 @@
 use crate::command::BaseCommand;
 use crate::php_worker::call::PhpCall;
 use crate::php_worker::proxy::PhpCommandProxy;
-use crate::php_worker::rpc::table::plugin_handle_value;
+use crate::php_worker::rpc::entity::entity_value;
 use crate::php_worker::runtime;
 use crate::plugin::PluginInterface;
 use crate::plugin::capability::{Capability, CommandProvider};
@@ -23,7 +23,7 @@ pub(crate) fn new_capability_object(
 ) -> anyhow::Result<PhpObjHandle> {
     let plugin_value = match plugin.borrow().__as_php_plugin_proxy() {
         Some(proxy) => PluginValue::PhpHandle(proxy.handle.clone()),
-        None => plugin_handle_value(plugin),
+        None => entity_value(plugin)?,
     };
     ctor_args.insert(BString::from("plugin"), plugin_value);
     runtime::new_object(

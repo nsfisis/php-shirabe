@@ -6,7 +6,7 @@ use crate::composer::ComposerHandle;
 use crate::console::Application;
 use crate::io::IOInterface;
 use crate::php_worker::call::PhpCall;
-use crate::php_worker::rpc::table::{composer_handle_value, io_handle_value};
+use crate::php_worker::rpc::entity::entity_value;
 use crate::util::sync_executor::block_on;
 use bstr::{BStr, BString};
 use shirabe_php_rpc::{PhpObjHandle, PluginValue, ToWire};
@@ -146,8 +146,8 @@ impl PhpConsoleApplicationContext {
             return Ok(app.clone());
         }
         let config = ConsoleBootConfig {
-            composer: self.composer.as_ref().map(composer_handle_value),
-            io: io_handle_value(&self.io)?,
+            composer: self.composer.as_ref().map(entity_value).transpose()?,
+            io: entity_value(&self.io)?,
             initial_working_directory: self.initial_working_directory.clone(),
             disable_plugins_by_default: self.disable_plugins_by_default,
             disable_scripts_by_default: self.disable_scripts_by_default,

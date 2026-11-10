@@ -1,19 +1,29 @@
 //! The methods a `Composer\Repository\RepositoryManager` entity answers over RPC.
 
-use crate::php_worker::rpc::dispatch::unavailable_method;
-use crate::php_worker::rpc::table::repository_handle_value;
+use crate::php_worker::rpc::entity::{Call, Crossing, Entity, entity_value};
+use crate::php_worker::rpc::forwarding;
 use crate::repository::RepositoryManagerInterface;
-use bstr::{BStr, ByteSlice};
 use shirabe_php_rpc::{PhpThrow, PluginValue};
 
-pub(crate) fn dispatch_repository_manager_method(
-    rm: &std::rc::Rc<std::cell::RefCell<dyn RepositoryManagerInterface>>,
-    method_name: &BStr,
-) -> Result<PluginValue, PhpThrow> {
-    match method_name.as_bytes() {
-        b"getLocalRepository" => repository_handle_value(&rm.borrow().get_local_repository()),
-        // TODO(plugin): the remaining RepositoryManager surface is widened on demand, driven
-        // by explicit errors from real plugins.
-        other => Err(unavailable_method("RepositoryManager", other)),
+impl Entity for std::rc::Rc<std::cell::RefCell<dyn RepositoryManagerInterface>> {
+    const EXPECTED: &'static [u8] = b"a RepositoryManager";
+
+    fn address(&self) -> *const () {
+        std::rc::Rc::as_ptr(self) as *const ()
+    }
+
+    fn class(&self) -> Result<&'static Crossing<Self>, PhpThrow> {
+        Ok(&forwarding::repository::repository_manager::CROSSING)
+    }
+}
+
+// TODO(plugin): the remaining RepositoryManager surface is widened on demand.
+impl forwarding::repository::repository_manager::Forwarding
+    for forwarding::repository::repository_manager::PhpClass
+{
+    type Handle = std::rc::Rc<std::cell::RefCell<dyn RepositoryManagerInterface>>;
+
+    fn get_local_repository(rm: &Self::Handle, _: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+        entity_value(&rm.borrow().get_local_repository())
     }
 }

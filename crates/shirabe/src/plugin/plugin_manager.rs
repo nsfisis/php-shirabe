@@ -15,7 +15,7 @@ use crate::php_worker::proxy::{
     PhpCapabilityProxy, PhpCommandProviderProxy, PhpPluginProxy, new_capability_object,
     php_installer_proxy,
 };
-use crate::php_worker::rpc::table::{composer_handle_value, io_handle_value};
+use crate::php_worker::rpc::entity::entity_value;
 use crate::php_worker::runtime;
 use crate::plugin::capability::Capability;
 use crate::plugin::{PluginBlockedException, PluginInterface, plugin_interface};
@@ -489,7 +489,7 @@ impl PluginManager {
                 let composer = self.composer_full();
                 let handle = runtime::new_object(
                     class.as_bstr(),
-                    vec![io_handle_value(&self.io)?, composer_handle_value(&composer)],
+                    vec![entity_value(&self.io)?, entity_value(&composer)?],
                 )?;
                 let installer = php_installer_proxy(handle);
                 composer

@@ -9,7 +9,7 @@
 use crate::config::Config;
 use crate::io::IOInterface;
 use crate::php_worker::call::PhpCall;
-use crate::php_worker::rpc::table::{config_handle_value, io_handle_value};
+use crate::php_worker::rpc::entity::entity_value;
 use crate::php_worker::runtime;
 use crate::util::StreamContextOptions;
 use bstr::{BStr, BString};
@@ -145,8 +145,8 @@ impl RemoteFilesystem {
             Ok(path_from_bytes(&cache_dir).to_path_buf())
         })?;
         let handle: PhpObjHandle = PhpCall::New(CLASS).run(vec![
-            io_handle_value(&self.io)?,
-            config_handle_value(&self.config),
+            entity_value(&self.io)?,
+            entity_value(&self.config)?,
             self.options.clone().to_wire(),
             PluginValue::Bool(self.disable_tls),
         ])?;

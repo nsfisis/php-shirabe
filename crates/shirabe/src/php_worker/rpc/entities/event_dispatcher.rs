@@ -2,9 +2,9 @@
 
 use crate::event_dispatcher::{Event, EventDispatcherInterface};
 use crate::php_worker::call::PhpCall;
-use crate::php_worker::rpc::args::arg;
-use crate::php_worker::rpc::dispatch::unavailable_method;
-use bstr::{BStr, BString, ByteSlice};
+use crate::php_worker::rpc::entity::{Call, Crossing, Entity};
+use crate::php_worker::rpc::forwarding;
+use bstr::{BStr, BString};
 use shirabe_php_rpc::{PhpThrow, PluginValue};
 use shirabe_php_shim::bformat;
 
@@ -36,29 +36,38 @@ pub(crate) fn call_php_callable(
     PhpCall::Function(BStr::new("call_user_func")).run(call_args)
 }
 
-pub(crate) fn dispatch_event_dispatcher_method(
-    dispatcher: &std::rc::Rc<std::cell::RefCell<dyn EventDispatcherInterface>>,
-    method_name: &BStr,
-    args: &[PluginValue],
-) -> Result<PluginValue, PhpThrow> {
-    match method_name.as_bytes() {
-        b"dispatch" => {
-            let name = arg::<BString>(method_name, args, 0)?;
-            let probe = Event::from_name(name.clone());
-            if dispatcher.borrow_mut().has_event_listeners(&probe) {
-                // TODO(plugin): dispatching a worker-constructed event through the Rust-side
-                // dispatcher needs the event object (and the console input it carries) proxied
-                // back into this process, so only the no-listener case is answered here.
-                return Err(PhpThrow::runtime(bformat!(
-                    "dispatching `{name}` from the plugin process is not supported yet while listeners are registered for it"
-                )));
-            }
-            // TODO(plugin): answering 0 here skips what `do_dispatch` does before it reaches the
-            // listener loop, and upstream does both regardless of the listener count: the
-            // `COMPOSER_DEBUG_EVENTS` trace line, and `push_event`'s circular-call detection
-            // (a nested dispatch of the same event name throws there even with no listeners).
-            Ok(PluginValue::Int(0))
+impl Entity for std::rc::Rc<std::cell::RefCell<dyn EventDispatcherInterface>> {
+    const EXPECTED: &'static [u8] = b"an EventDispatcher";
+
+    fn address(&self) -> *const () {
+        std::rc::Rc::as_ptr(self) as *const ()
+    }
+
+    fn class(&self) -> Result<&'static Crossing<Self>, PhpThrow> {
+        Ok(&forwarding::event_dispatcher::event_dispatcher::CROSSING)
+    }
+}
+
+impl forwarding::event_dispatcher::event_dispatcher::Forwarding
+    for forwarding::event_dispatcher::event_dispatcher::PhpClass
+{
+    type Handle = std::rc::Rc<std::cell::RefCell<dyn EventDispatcherInterface>>;
+
+    fn dispatch(dispatcher: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+        let name = call.arg::<BString>(0)?;
+        let probe = Event::from_name(name.clone());
+        if dispatcher.borrow_mut().has_event_listeners(&probe) {
+            // TODO(plugin): dispatching a worker-constructed event through the Rust-side
+            // dispatcher needs the event object (and the console input it carries) proxied back
+            // into this process, so only the no-listener case is answered here.
+            return Err(PhpThrow::runtime(bformat!(
+                "dispatching `{name}` from the plugin process is not supported yet while listeners are registered for it"
+            )));
         }
-        other => Err(unavailable_method("EventDispatcher", other)),
+        // TODO(plugin): answering 0 here skips what `do_dispatch` does before it reaches the
+        // listener loop, and upstream does both regardless of the listener count: the
+        // `COMPOSER_DEBUG_EVENTS` trace line, and `push_event`'s circular-call detection (a
+        // nested dispatch of the same event name throws there even with no listeners).
+        Ok(PluginValue::Int(0))
     }
 }

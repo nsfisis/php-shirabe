@@ -2,9 +2,9 @@
 
 use crate::package::{LockerInterface, PackageInterfaceHandle};
 use crate::php_worker::rpc::entities::autoload_generator::root_package;
-use crate::php_worker::rpc::entity::{Call, Crossing, Entity};
+use crate::php_worker::rpc::entity::{Call, Crossing, Entity, entity_value};
 use crate::php_worker::rpc::forwarding;
-use crate::php_worker::rpc::table::repository_handle_value;
+use crate::repository::RepositoryInterfaceHandle;
 use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_rpc::{PhpThrow, PluginValue, ToWire};
@@ -45,7 +45,7 @@ impl forwarding::package::locker::Forwarding for forwarding::package::locker::Ph
             .borrow_mut()
             .get_locked_repository(call.arg_or(0, false)?)
             .map_err(call.failed())?;
-        repository_handle_value(&repository.into())
+        entity_value(&RepositoryInterfaceHandle::from(repository))
     }
 
     fn get_dev_package_names(

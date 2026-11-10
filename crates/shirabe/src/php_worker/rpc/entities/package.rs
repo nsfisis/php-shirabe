@@ -6,7 +6,8 @@ use crate::package::{
 };
 use crate::php_worker::rpc::args::{arg, arg_or};
 use crate::php_worker::rpc::dispatch::{error_throw, unavailable_method};
-use crate::php_worker::rpc::table::{package_handle_value, repository_handle_value};
+use crate::php_worker::rpc::entity::entity_value;
+use crate::php_worker::rpc::table::package_handle_value;
 use crate::repository::{PlatformRepository, RepositoryInterfaceHandle};
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
@@ -511,7 +512,7 @@ fn dispatch_package_getter(
             None => PluginValue::Null,
         }),
         b"getRepository" => match package.get_repository() {
-            Some(repository) => repository_handle_value(&repository),
+            Some(repository) => entity_value(&repository),
             None => Ok(PluginValue::Null),
         },
         b"getBinaries" => Ok(package.get_binaries().to_wire()),

@@ -4,7 +4,8 @@ use crate::installer::InstallerInterface;
 use crate::package::PackageInterfaceHandle;
 use crate::php_worker::call::PhpCall;
 use crate::php_worker::job;
-use crate::php_worker::rpc::table::{package_handle_value, repository_handle_value};
+use crate::php_worker::rpc::entity::entity_value;
+use crate::php_worker::rpc::table::package_handle_value;
 use crate::repository::InstalledRepositoryInterfaceHandle;
 use bstr::BStr;
 use indexmap::IndexMap;
@@ -40,7 +41,7 @@ impl PhpInstallerProxy {
     }
 
     fn repo_arg(repo: &InstalledRepositoryInterfaceHandle) -> anyhow::Result<PluginValue> {
-        Ok(repository_handle_value(&repo.as_repository_handle())?)
+        Ok(entity_value(&repo.as_repository_handle())?)
     }
 
     /// The `?PromiseInterface` half of the installer contract. The Rust callers await the

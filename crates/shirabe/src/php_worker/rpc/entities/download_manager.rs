@@ -1,111 +1,50 @@
 //! The methods a `Composer\Downloader\DownloadManager` entity answers over RPC.
 
+use crate::composer::ComposerHandle;
 use crate::downloader::DownloadManagerInterface;
 use crate::exception::IrrecoverableDownloadException;
 use crate::package::PackageInterfaceHandle;
 use crate::php_worker::job;
 use crate::php_worker::job::JobOwner;
-use crate::php_worker::rpc::args::arg;
-use crate::php_worker::rpc::dispatch::{error_throw, unavailable_method};
-use crate::php_worker::rpc::table;
+use crate::php_worker::rpc::dispatch::error_throw;
+use crate::php_worker::rpc::entity::{Call, Crossing, Entity};
+use crate::php_worker::rpc::{forwarding, table};
 use crate::util::HttpDownloader;
-use bstr::{BStr, BString, ByteSlice};
+use bstr::{BStr, BString};
 use shirabe_php_rpc::{PhpThrow, PluginValue, ToWire};
 use shirabe_php_shim::{PhpMixed, bformat, path_from_bytes};
+
+impl Entity for std::rc::Rc<std::cell::RefCell<dyn DownloadManagerInterface>> {
+    const EXPECTED: &'static [u8] = b"a DownloadManager";
+
+    fn address(&self) -> *const () {
+        std::rc::Rc::as_ptr(self) as *const ()
+    }
+
+    fn class(&self) -> Result<&'static Crossing<Self>, PhpThrow> {
+        Ok(&forwarding::downloader::download_manager::CROSSING)
+    }
+}
+
+fn path(call: &Call<'_>, position: usize) -> Result<std::path::PathBuf, PhpThrow> {
+    call.arg::<BString>(position)
+        .map(|path| std::path::PathBuf::from(path_from_bytes(&path)))
+}
 
 /// The download manager's contract is asynchronous on both sides: PHP declares a
 /// `PromiseInterface` return, Rust an `async fn`. Each call registers its future as a job and
 /// answers with the job's pending promise.
-pub(crate) fn dispatch_download_manager_method(
+fn promise(
     dm: &std::rc::Rc<std::cell::RefCell<dyn DownloadManagerInterface>>,
-    method_name: &BStr,
-    args: &[PluginValue],
+    call: &Call<'_>,
+    future: std::pin::Pin<Box<dyn std::future::Future<Output = anyhow::Result<Option<PhpMixed>>>>>,
 ) -> Result<PluginValue, PhpThrow> {
-    let string_arg = |position: usize| arg::<BString>(method_name, args, position);
-    let path_arg = |position: usize| {
-        arg::<bstr::BString>(method_name, args, position)
-            .map(|path| std::path::PathBuf::from(path_from_bytes(&path)))
-    };
-    let package_arg = |position: usize| arg::<PackageInterfaceHandle>(method_name, args, position);
-    let optional_package_arg =
-        |position: usize| arg::<Option<PackageInterfaceHandle>>(method_name, args, position);
-    let future: std::pin::Pin<
-        Box<dyn std::future::Future<Output = anyhow::Result<Option<PhpMixed>>>>,
-    > = match method_name.as_bytes() {
-        b"setPreferSource" => {
-            let preferred = arg::<bool>(method_name, args, 0)?;
-            dm.borrow().set_prefer_source(preferred);
-            return Ok(PluginValue::Null);
-        }
-        b"setPreferDist" => {
-            let preferred = arg::<bool>(method_name, args, 0)?;
-            dm.borrow().set_prefer_dist(preferred);
-            return Ok(PluginValue::Null);
-        }
-        b"download" => {
-            let (dm, package, path, prev) = (
-                dm.clone(),
-                package_arg(0)?,
-                path_arg(1)?,
-                optional_package_arg(2)?,
-            );
-            Box::pin(async move { dm.borrow().download(package, &path, prev).await })
-        }
-        b"prepare" => {
-            let (dm, r#type, package, path, prev) = (
-                dm.clone(),
-                string_arg(0)?,
-                package_arg(1)?,
-                path_arg(2)?,
-                optional_package_arg(3)?,
-            );
-            Box::pin(async move {
-                dm.borrow()
-                    .prepare(BStr::new(&r#type), package, &path, prev)
-                    .await
-            })
-        }
-        b"install" => {
-            let (dm, package, path) = (dm.clone(), package_arg(0)?, path_arg(1)?);
-            Box::pin(async move { dm.borrow().install(package, &path).await })
-        }
-        b"update" => {
-            let (dm, initial, target, path) =
-                (dm.clone(), package_arg(0)?, package_arg(1)?, path_arg(2)?);
-            Box::pin(async move { dm.borrow().update(initial, target, &path).await })
-        }
-        b"remove" => {
-            let (dm, package, path) = (dm.clone(), package_arg(0)?, path_arg(1)?);
-            Box::pin(async move { dm.borrow().remove(package, &path).await })
-        }
-        b"cleanup" => {
-            let (dm, r#type, package, path, prev) = (
-                dm.clone(),
-                string_arg(0)?,
-                package_arg(1)?,
-                path_arg(2)?,
-                optional_package_arg(3)?,
-            );
-            Box::pin(async move {
-                dm.borrow()
-                    .cleanup(BStr::new(&r#type), package, &path, prev)
-                    .await
-            })
-        }
-        // TODO(plugin): the downloader-facing surface (getDownloader / setDownloader /
-        // getDownloaderForPackage / getDownloaderType) needs proxy stubs for
-        // DownloaderInterface implementations before it can cross.
-        other => {
-            return Err(unavailable_method("DownloadManager", other));
-        }
-    };
-
     // Under Composer the promise is a chain over the job the downloader started on the graph's
     // HttpDownloader, so that is the service whose `countActiveJobs()` keeps a wait going until
     // this job is done.
     let downloader = graph_http_downloader(dm)?;
     let started = std::rc::Rc::new(std::cell::Cell::new(false));
-    let method = method_name.to_owned();
+    let failed = call.failed();
     Ok(job::register(
         JobOwner::http_downloader(&downloader),
         downloader,
@@ -115,7 +54,8 @@ pub(crate) fn dispatch_download_manager_method(
         error_throw(
             BStr::new(""),
             &IrrecoverableDownloadException::new(bformat!(
-                "DownloadManager::{method_name}() canceled"
+                "DownloadManager::{}() canceled",
+                call.method()
             ))
             .into(),
         ),
@@ -124,9 +64,122 @@ pub(crate) fn dispatch_download_manager_method(
             future
                 .await
                 .map(|resolved| resolved.to_wire())
-                .map_err(|error| error_throw(bformat!("{method} failed over RPC"), &error))
+                .map_err(failed)
         }),
     ))
+}
+
+// TODO(plugin): the downloader-facing surface (getDownloader / setDownloader /
+// getDownloaderForPackage / getDownloaderType) needs proxy stubs for DownloaderInterface
+// implementations before it can cross.
+impl forwarding::downloader::download_manager::Forwarding
+    for forwarding::downloader::download_manager::PhpClass
+{
+    type Handle = std::rc::Rc<std::cell::RefCell<dyn DownloadManagerInterface>>;
+
+    fn set_prefer_source(dm: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+        dm.borrow().set_prefer_source(call.arg::<bool>(0)?);
+        Ok(PluginValue::Null)
+    }
+
+    fn set_prefer_dist(dm: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+        dm.borrow().set_prefer_dist(call.arg::<bool>(0)?);
+        Ok(PluginValue::Null)
+    }
+
+    fn download(dm: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+        let (manager, package, path, prev) = (
+            dm.clone(),
+            call.arg::<PackageInterfaceHandle>(0)?,
+            path(call, 1)?,
+            call.arg::<Option<PackageInterfaceHandle>>(2)?,
+        );
+        promise(
+            dm,
+            call,
+            Box::pin(async move { manager.borrow().download(package, &path, prev).await }),
+        )
+    }
+
+    fn prepare(dm: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+        let (manager, r#type, package, path, prev) = (
+            dm.clone(),
+            call.arg::<BString>(0)?,
+            call.arg::<PackageInterfaceHandle>(1)?,
+            path(call, 2)?,
+            call.arg::<Option<PackageInterfaceHandle>>(3)?,
+        );
+        promise(
+            dm,
+            call,
+            Box::pin(async move {
+                manager
+                    .borrow()
+                    .prepare(BStr::new(&r#type), package, &path, prev)
+                    .await
+            }),
+        )
+    }
+
+    fn install(dm: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+        let (manager, package, path) = (
+            dm.clone(),
+            call.arg::<PackageInterfaceHandle>(0)?,
+            path(call, 1)?,
+        );
+        promise(
+            dm,
+            call,
+            Box::pin(async move { manager.borrow().install(package, &path).await }),
+        )
+    }
+
+    fn update(dm: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+        let (manager, initial, target, path) = (
+            dm.clone(),
+            call.arg::<PackageInterfaceHandle>(0)?,
+            call.arg::<PackageInterfaceHandle>(1)?,
+            path(call, 2)?,
+        );
+        promise(
+            dm,
+            call,
+            Box::pin(async move { manager.borrow().update(initial, target, &path).await }),
+        )
+    }
+
+    fn remove(dm: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+        let (manager, package, path) = (
+            dm.clone(),
+            call.arg::<PackageInterfaceHandle>(0)?,
+            path(call, 1)?,
+        );
+        promise(
+            dm,
+            call,
+            Box::pin(async move { manager.borrow().remove(package, &path).await }),
+        )
+    }
+
+    fn cleanup(dm: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+        let (manager, r#type, package, path, prev) = (
+            dm.clone(),
+            call.arg::<BString>(0)?,
+            call.arg::<PackageInterfaceHandle>(1)?,
+            path(call, 2)?,
+            call.arg::<Option<PackageInterfaceHandle>>(3)?,
+        );
+        promise(
+            dm,
+            call,
+            Box::pin(async move {
+                manager
+                    .borrow()
+                    .cleanup(BStr::new(&r#type), package, &path, prev)
+                    .await
+            }),
+        )
+    }
 }
 
 /// The HttpDownloader of the object graph `dm` belongs to: the one the Loop of its Composer
@@ -134,7 +187,7 @@ pub(crate) fn dispatch_download_manager_method(
 fn graph_http_downloader(
     dm: &std::rc::Rc<std::cell::RefCell<dyn DownloadManagerInterface>>,
 ) -> Result<std::rc::Rc<std::cell::RefCell<HttpDownloader>>, PhpThrow> {
-    for composer in table::composer_entities() {
+    for composer in table::entities::<ComposerHandle>() {
         let composer = composer.borrow();
         if std::rc::Rc::ptr_eq(&composer.get_download_manager(), dm) {
             return Ok(composer.get_loop().borrow().get_http_downloader().clone());
