@@ -1,9 +1,9 @@
 //! The methods a `Composer\Composer` entity answers over RPC.
 
 use crate::composer::ComposerHandle;
+use crate::php_worker::rpc::entities::package::package_value;
 use crate::php_worker::rpc::entity::{Call, Crossing, Entity, entity_value};
 use crate::php_worker::rpc::forwarding;
-use crate::php_worker::rpc::table::package_handle_value;
 use shirabe_php_rpc::{PhpThrow, PluginValue};
 
 impl Entity for ComposerHandle {
@@ -45,7 +45,7 @@ impl forwarding::partial_composer::Forwarding for forwarding::partial_composer::
 
     fn get_package(composer: &Self::Handle, _: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
         let package = composer.borrow().get_package().as_rc().clone();
-        Ok(package_handle_value(&package))
+        package_value(&package)
     }
 
     fn get_config(composer: &Self::Handle, _: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {

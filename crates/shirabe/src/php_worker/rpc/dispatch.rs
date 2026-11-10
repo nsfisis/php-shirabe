@@ -3,17 +3,13 @@
 
 use crate::autoload::ClassLoader;
 use crate::factory::Factory;
-use crate::package::{
-    AliasPackage, AnyPackage, CompleteAliasPackage, CompletePackage, Locker, Package,
-    PackageInterfaceHandle, RootAliasPackage,
-};
+use crate::package::Locker;
 use crate::php_worker::console::run_worker_reverse_command;
 use crate::php_worker::job;
 use crate::php_worker::rpc::args::arg;
 use crate::php_worker::rpc::entities::events::dispatch_event_method;
-use crate::php_worker::rpc::entities::package::dispatch_package_method;
 use crate::php_worker::rpc::entity::{Call, Entity};
-use crate::php_worker::rpc::table::{RustEntity, register_entity};
+use crate::php_worker::rpc::table::RustEntity;
 use crate::php_worker::rpc::{forwarding, table};
 use crate::php_worker::throwable::exception_into_throw;
 use bstr::{BStr, BString, ByteSlice};
@@ -158,16 +154,22 @@ pub(crate) fn dispatch_legacy_entity(
     _out_params: &mut IndexMap<u32, PluginValue>,
 ) -> Result<PluginValue, PhpThrow> {
     if method_name == "__shirabe_clone" {
-        return clone_entity(entity);
+        return Err(PhpThrow::runtime(
+            "cloning this Rust-side entity over RPC is not supported",
+        ));
     }
     if matches!(
         method_name.as_bytes(),
         b"__get" | b"__set" | b"__isset" | b"__unset"
     ) {
-        return dispatch_property_access(entity, method_name, args);
+        let property = arg::<BString>(method_name, args, 0)?;
+        // TODO(plugin): the instance properties the proxied classes expose are widened on
+        // demand.
+        return Err(PhpThrow::runtime(bformat!(
+            "the property `{property}` is not available over RPC yet"
+        )));
     }
     match entity.clone() {
-        RustEntity::Package(package) => dispatch_package_method(&package, method_name, args),
         RustEntity::Event(event) => {
             dispatch_event_method(&mut *event.borrow_mut(), method_name, args)
         }
@@ -213,104 +215,80 @@ pub(crate) fn construct_entity(args: &[PluginValue]) -> Result<PluginValue, PhpT
         ctor_args,
         &mut out_params,
     );
-    let string_arg = |position: usize| arg::<BString>(class_name, ctor_args, position);
-    let package_arg =
-        |position: usize| arg::<PackageInterfaceHandle>(class_name, ctor_args, position);
-    let package = match class.as_slice() {
-        b"Composer\\Package\\Package" => {
-            AnyPackage::Package(Package::new(string_arg(0)?, string_arg(1)?, string_arg(2)?))
-        }
-        b"Composer\\Package\\CompletePackage" => AnyPackage::CompletePackage(CompletePackage::new(
-            string_arg(0)?,
-            string_arg(1)?,
-            string_arg(2)?,
-        )),
-        // The alias target has to be a package that already lives on the Rust side; an alias of
-        // an alias has no Rust representation, so its narrowing is an explicit error too.
-        b"Composer\\Package\\AliasPackage" => {
-            let alias_of = package_arg(0)?.as_package().ok_or_else(|| {
-                PhpThrow::runtime(bformat!("{class_name} expects a real Package to alias"))
-            })?;
-            AnyPackage::AliasPackage(
-                AliasPackage::new(alias_of, string_arg(1)?, string_arg(2)?)
-                    .map_err(|error| error_throw(b"AliasPackage construction failed", &error))?,
-            )
-        }
-        b"Composer\\Package\\CompleteAliasPackage" => {
-            let alias_of = package_arg(0)?.as_complete_package().ok_or_else(|| {
-                PhpThrow::runtime(bformat!(
-                    "{class_name} expects a real CompletePackage to alias"
-                ))
-            })?;
-            AnyPackage::CompleteAliasPackage(
-                CompleteAliasPackage::new(alias_of, string_arg(1)?, string_arg(2)?).map_err(
-                    |error| error_throw(b"CompleteAliasPackage construction failed", &error),
-                )?,
-            )
-        }
-        b"Composer\\Package\\RootAliasPackage" => {
-            let alias_of = package_arg(0)?.as_root_package().ok_or_else(|| {
-                PhpThrow::runtime(bformat!("{class_name} expects a real RootPackage to alias"))
-            })?;
-            AnyPackage::RootAliasPackage(
-                RootAliasPackage::new(alias_of, string_arg(1)?, string_arg(2)?).map_err(
-                    |error| error_throw(b"RootAliasPackage construction failed", &error),
-                )?,
-            )
-        }
+    let rhandle = match class.as_slice() {
+        b"Composer\\Package\\Package" => constructed(
+            class_name,
+            <forwarding::package::package::PhpClass as forwarding::package::package::Forwarding>::__construct(&mut call)?,
+        )?,
+        b"Composer\\Package\\CompletePackage" => constructed(
+            class_name,
+            <forwarding::package::complete_package::PhpClass as forwarding::package::complete_package::Forwarding>::__construct(&mut call)?,
+        )?,
+        b"Composer\\Package\\AliasPackage" => constructed(
+            class_name,
+            <forwarding::package::alias_package::PhpClass as forwarding::package::alias_package::Forwarding>::__construct(&mut call)?,
+        )?,
+        b"Composer\\Package\\CompleteAliasPackage" => constructed(
+            class_name,
+            <forwarding::package::complete_alias_package::PhpClass as forwarding::package::complete_alias_package::Forwarding>::__construct(&mut call)?,
+        )?,
+        b"Composer\\Package\\RootAliasPackage" => constructed(
+            class_name,
+            <forwarding::package::root_alias_package::PhpClass as forwarding::package::root_alias_package::Forwarding>::__construct(&mut call)?,
+        )?,
         b"Composer\\DependencyResolver\\Operation\\InstallOperation" => {
-            return construction_result(constructed(
+            constructed(
                 class_name,
                 <forwarding::dependency_resolver::operation::install_operation::PhpClass as forwarding::dependency_resolver::operation::install_operation::Forwarding>::__construct(&mut call)?,
-            )?);
+            )?
         }
         b"Composer\\DependencyResolver\\Operation\\UpdateOperation" => {
-            return construction_result(constructed(
+            constructed(
                 class_name,
                 <forwarding::dependency_resolver::operation::update_operation::PhpClass as forwarding::dependency_resolver::operation::update_operation::Forwarding>::__construct(&mut call)?,
-            )?);
+            )?
         }
         b"Composer\\DependencyResolver\\Operation\\UninstallOperation" => {
-            return construction_result(constructed(
+            constructed(
                 class_name,
                 <forwarding::dependency_resolver::operation::uninstall_operation::PhpClass as forwarding::dependency_resolver::operation::uninstall_operation::Forwarding>::__construct(&mut call)?,
-            )?);
+            )?
         }
         b"Composer\\DependencyResolver\\Operation\\MarkAliasInstalledOperation" => {
-            return construction_result(constructed(
+            constructed(
                 class_name,
                 <forwarding::dependency_resolver::operation::mark_alias_installed_operation::PhpClass as forwarding::dependency_resolver::operation::mark_alias_installed_operation::Forwarding>::__construct(&mut call)?,
-            )?);
+            )?
         }
         b"Composer\\DependencyResolver\\Operation\\MarkAliasUninstalledOperation" => {
-            return construction_result(constructed(
+            constructed(
                 class_name,
                 <forwarding::dependency_resolver::operation::mark_alias_uninstalled_operation::PhpClass as forwarding::dependency_resolver::operation::mark_alias_uninstalled_operation::Forwarding>::__construct(&mut call)?,
-            )?);
+            )?
         }
         b"Composer\\Util\\Filesystem" => {
-            return construction_result(constructed(
+            constructed(
                 class_name,
                 <forwarding::util::filesystem::PhpClass as forwarding::util::filesystem::Forwarding>::__construct(&mut call)?,
-            )?);
+            )?
         }
         b"Composer\\Util\\ProcessExecutor" => {
-            return construction_result(constructed(
+            constructed(
                 class_name,
                 <forwarding::util::process_executor::PhpClass as forwarding::util::process_executor::Forwarding>::__construct(&mut call)?,
-            )?);
+            )?
         }
         b"Composer\\Util\\HttpDownloader" => {
-            return construction_result(constructed(
+            constructed(
                 class_name,
                 <forwarding::util::http_downloader::PhpClass as forwarding::util::http_downloader::Forwarding>::__construct(&mut call)?,
-            )?);
+            )?
         }
         b"Composer\\IO\\BufferIO" => {
-            return construction_result(constructed(
+            constructed(
                 class_name,
                 <forwarding::io::buffer_io::PhpClass as forwarding::io::buffer_io::Forwarding>::__construct(&mut call)?,
-            )?);
+            )?
         }
         // TODO(plugin): the remaining proxied classes get a construction story on demand. Each
         // one has to decide what a plugin-built instance means for the Rust-side graph, which is
@@ -321,70 +299,7 @@ pub(crate) fn construct_entity(args: &[PluginValue]) -> Result<PluginValue, PhpT
             )));
         }
     };
-    let rhandle = register_entity(RustEntity::Package(std::rc::Rc::new(
-        std::cell::RefCell::new(package),
-    )));
-    construction_result(rhandle)
-}
-
-/// The rhandle a proxy stub's constructor binds itself to.
-fn construction_result(rhandle: u64) -> Result<PluginValue, PhpThrow> {
     Ok(PluginValue::Int(rhandle as i64))
-}
-
-/// Serves the `__clone` forwarder every proxy stub carries. Only entities whose Rust type
-/// models the PHP clone answer; the rest are an explicit error, so a plugin cloning a live
-/// service never silently ends up with two stubs over one entity.
-fn clone_entity(entity: &RustEntity) -> Result<PluginValue, PhpThrow> {
-    let rhandle = match entity {
-        // `AnyPackage::dup` carries `BasePackage::__clone` (repository reset, id = -1) and the
-        // `RootAliasPackage::__clone` override.
-        RustEntity::Package(package) => {
-            let cloned = package.borrow().dup();
-            register_entity(RustEntity::Package(std::rc::Rc::new(
-                std::cell::RefCell::new(cloned),
-            )))
-        }
-        RustEntity::Event(_) => {
-            return Err(PhpThrow::runtime(
-                "cloning this Rust-side entity over RPC is not supported",
-            ));
-        }
-    };
-    Ok(PluginValue::Int(rhandle as i64))
-}
-
-/// Serves the `__get`/`__set`/`__isset`/`__unset` forwarders every proxy stub carries.
-fn dispatch_property_access(
-    entity: &RustEntity,
-    method_name: &BStr,
-    args: &[PluginValue],
-) -> Result<PluginValue, PhpThrow> {
-    let property = arg::<BString>(method_name, args, 0)?;
-    // `BasePackage::$id` is the one instance property the entities expose so far.
-    if let RustEntity::Package(package) = entity
-        && property == "id"
-    {
-        return match method_name.as_bytes() {
-            b"__get" => Ok(package.borrow().as_package_interface().get_id().to_wire()),
-            b"__isset" => Ok(PluginValue::Bool(true)),
-            b"__set" => {
-                let id = arg::<i64>(method_name, args, 1)?;
-                package.borrow_mut().as_package_interface_mut().set_id(id);
-                Ok(PluginValue::Null)
-            }
-            b"__unset" => Err(PhpThrow::runtime(
-                "the package property `id` cannot be unset over RPC",
-            )),
-            _ => unreachable!(),
-        };
-    }
-    // TODO(plugin): the instance properties the proxied classes expose are widened on demand,
-    // driven by these explicit errors from real plugins. Each one has to decide how the state
-    // the real class keeps in that property is served from the Rust-side entity.
-    Err(PhpThrow::runtime(bformat!(
-        "the property `{property}` is not available over RPC yet"
-    )))
 }
 
 /// Serves the static methods a proxy stub forwards instead of running locally, because their real

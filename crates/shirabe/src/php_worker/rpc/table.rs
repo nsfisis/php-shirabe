@@ -3,7 +3,7 @@
 
 use crate::event_dispatcher::{Event, EventInterface};
 use crate::installer::{InstallerEvent, PackageEvent};
-use crate::package::{AnyPackage, PackageInterfaceHandle};
+use crate::package::PackageInterfaceHandle;
 use crate::php_worker::rpc::dispatch::dispatch_legacy_entity;
 use crate::php_worker::rpc::entity::{Call, Crossing, Entity, EntityArg, PropertyAccess};
 use crate::plugin::{
@@ -14,19 +14,17 @@ use crate::repository::RepositoryInterfaceHandle;
 use crate::script::Event as ScriptEvent;
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe_php_rpc::{FromWire, PhpThrow, PluginValue, RustObjHandle, ToWire, wire};
-use shirabe_php_shim::{bformat, php_str};
+use shirabe_php_rpc::{FromWire, PhpThrow, PluginValue, RustObjHandle, wire};
+use shirabe_php_shim::bformat;
 
 /// A Rust-side entity of a kind still routed by hand.
 #[derive(Debug, Clone)]
 pub(crate) enum RustEntity {
-    Package(std::rc::Rc<std::cell::RefCell<AnyPackage>>),
     Event(std::rc::Rc<std::cell::RefCell<dyn EventInterface>>),
 }
 
 fn entity_ptr_id(entity: &RustEntity) -> usize {
     match entity {
-        RustEntity::Package(package) => std::rc::Rc::as_ptr(package) as *const () as usize,
         RustEntity::Event(event) => std::rc::Rc::as_ptr(event) as *const () as usize,
     }
 }
@@ -256,40 +254,12 @@ pub(crate) fn register_entity(entity: RustEntity) -> u64 {
     })
 }
 
-fn legacy_entity(rhandle: u64) -> Option<RustEntity> {
-    let slot = R_TABLE.with(|table| table.borrow().slots.get(&rhandle).cloned())?;
-    slot.as_any()
-        .downcast_ref::<Legacy>()
-        .map(|legacy| legacy.0.clone())
-}
-
 /// A `RustHandle` wire descriptor for a freshly registered (or re-interned) entity.
 pub(crate) fn rust_handle_value(rhandle: u64, class: impl AsRef<[u8]>) -> PluginValue {
     PluginValue::RustHandle(RustObjHandle {
         rhandle,
         class: BString::from(class.as_ref()),
     })
-}
-
-/// The proxy stub class matching a package's concrete variant.
-fn package_stub_class(package: &std::rc::Rc<std::cell::RefCell<AnyPackage>>) -> &'static BStr {
-    match &*package.borrow() {
-        AnyPackage::Package(_) => php_str(b"Composer\\Package\\Package"),
-        AnyPackage::CompletePackage(_) => php_str(b"Composer\\Package\\CompletePackage"),
-        AnyPackage::RootPackage(_) => php_str(b"Composer\\Package\\RootPackage"),
-        AnyPackage::AliasPackage(_) => php_str(b"Composer\\Package\\AliasPackage"),
-        AnyPackage::CompleteAliasPackage(_) => php_str(b"Composer\\Package\\CompleteAliasPackage"),
-        AnyPackage::RootAliasPackage(_) => php_str(b"Composer\\Package\\RootAliasPackage"),
-    }
-}
-
-/// Registers a package and returns its wire descriptor.
-pub(crate) fn package_handle_value(
-    package: &std::rc::Rc<std::cell::RefCell<AnyPackage>>,
-) -> PluginValue {
-    let class = package_stub_class(package);
-    let rhandle = register_entity(RustEntity::Package(package.clone()));
-    rust_handle_value(rhandle, class)
 }
 
 /// The proxy stub class (same FQCN as the real event class) an event crosses the RPC
@@ -334,52 +304,9 @@ pub(crate) fn event_stub_class(event: &dyn EventInterface) -> Option<&'static BS
     }
 }
 
-/// A Rust-side entity a proxy stub stands for, as the `RustEntity` variant holding it.
-pub(crate) trait FromRustEntity: Sized {
-    /// What the value has to be, for the failure of a handle naming another kind of entity.
-    const EXPECTED: &'static [u8];
-
-    fn from_entity(entity: RustEntity) -> Option<Self>;
-}
-
-/// Resolves a handle descriptor back to the R-table entity it names.
-fn rust_entity_from_wire<T: FromRustEntity>(value: &PluginValue) -> Result<T, PhpThrow> {
-    let PluginValue::RustHandle(handle) = value else {
-        return Err(wire::unexpected(T::EXPECTED, value));
-    };
-    legacy_entity(handle.rhandle)
-        .and_then(T::from_entity)
-        .ok_or_else(|| {
-            PhpThrow::runtime(bformat!(
-                "expected {}, got Rust handle {}",
-                T::EXPECTED,
-                handle.rhandle
-            ))
-        })
-}
-
-impl FromRustEntity for PackageInterfaceHandle {
-    const EXPECTED: &'static [u8] = b"a package";
-
-    fn from_entity(entity: RustEntity) -> Option<Self> {
-        match entity {
-            RustEntity::Package(package) => {
-                Some(PackageInterfaceHandle::from_rc_unchecked(package))
-            }
-            _ => None,
-        }
-    }
-}
-
 impl FromWire for PackageInterfaceHandle {
     fn from_wire(value: &PluginValue) -> Result<Self, PhpThrow> {
-        rust_entity_from_wire(value)
-    }
-}
-
-impl ToWire for PackageInterfaceHandle {
-    fn to_wire(self) -> PluginValue {
-        package_handle_value(self.as_rc())
+        EntityArg::from_wire(value).map(|package| package.0)
     }
 }
 

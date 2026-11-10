@@ -5,11 +5,10 @@ use crate::package::PackageInterfaceHandle;
 use crate::php_worker::call::PhpCall;
 use crate::php_worker::job;
 use crate::php_worker::rpc::entity::entity_value;
-use crate::php_worker::rpc::table::package_handle_value;
 use crate::repository::InstalledRepositoryInterfaceHandle;
 use bstr::BStr;
 use indexmap::IndexMap;
-use shirabe_php_rpc::{FromWire, PhpObjHandle, PluginValue, wire};
+use shirabe_php_rpc::{FromWire, PhpObjHandle, PluginValue, ToWire, wire};
 use shirabe_php_shim::PhpMixed;
 
 /// `InstallerInterface` adapter for an installer entity living in the PHP child process: the
@@ -30,7 +29,7 @@ impl PhpInstallerProxy {
     }
 
     fn package_arg(package: &PackageInterfaceHandle) -> PluginValue {
-        package_handle_value(package.as_rc())
+        package.clone().to_wire()
     }
 
     fn optional_package_arg(package: &Option<PackageInterfaceHandle>) -> PluginValue {

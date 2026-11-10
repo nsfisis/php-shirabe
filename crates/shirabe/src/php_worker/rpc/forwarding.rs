@@ -1732,6 +1732,1317 @@ pub(crate) mod installer {
 }
 
 pub(crate) mod package {
+    pub(crate) mod alias_package {
+        use crate::php_worker::rpc::entity::{Call, Crossing, protocol_violation};
+        use crate::php_worker::rpc::forwarding;
+        use bstr::ByteSlice;
+        use shirabe_php_rpc::{PhpThrow, PluginValue};
+
+        /// `Composer\Package\AliasPackage`.
+        #[derive(Debug)]
+        pub(crate) struct PhpClass;
+
+        pub(crate) trait Forwarding {
+            fn get_alias_of(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_root_package_alias(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn is_root_package_alias(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn has_self_version_requires(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn __construct(call: &mut Call<'_>) -> Result<<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle, PhpThrow>{
+                Err(call.unsupported())
+            }
+        }
+
+        pub(crate) fn dispatch(
+            this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+            call: &mut Call<'_>,
+        ) -> Result<PluginValue, PhpThrow> {
+            match call.method().as_bytes() {
+b"getAliasOf" => <PhpClass as Forwarding>::get_alias_of(this, call),
+b"setRootPackageAlias" => <PhpClass as Forwarding>::set_root_package_alias(this, call),
+b"isRootPackageAlias" => <PhpClass as Forwarding>::is_root_package_alias(this, call),
+b"hasSelfVersionRequires" => <PhpClass as Forwarding>::has_self_version_requires(this, call),
+b"getName" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_name(this, call),
+b"getPrettyName" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_pretty_name(this, call),
+b"getNames" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_names(this, call),
+b"setId" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::set_id(this, call),
+b"getId" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_id(this, call),
+b"isDev" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::is_dev(this, call),
+b"getType" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_type(this, call),
+b"getTargetDir" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_target_dir(this, call),
+b"getExtra" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_extra(this, call),
+b"setInstallationSource" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::set_installation_source(this, call),
+b"getInstallationSource" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_installation_source(this, call),
+b"getSourceType" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_source_type(this, call),
+b"getSourceUrl" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_source_url(this, call),
+b"getSourceUrls" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_source_urls(this, call),
+b"getSourceReference" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_source_reference(this, call),
+b"getSourceMirrors" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_source_mirrors(this, call),
+b"setSourceMirrors" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::set_source_mirrors(this, call),
+b"getDistType" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_dist_type(this, call),
+b"getDistUrl" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_dist_url(this, call),
+b"getDistUrls" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_dist_urls(this, call),
+b"getDistReference" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_dist_reference(this, call),
+b"getDistSha1Checksum" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_dist_sha1_checksum(this, call),
+b"getDistMirrors" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_dist_mirrors(this, call),
+b"setDistMirrors" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::set_dist_mirrors(this, call),
+b"getVersion" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_version(this, call),
+b"getPrettyVersion" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_pretty_version(this, call),
+b"getFullPrettyVersion" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_full_pretty_version(this, call),
+b"getReleaseDate" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_release_date(this, call),
+b"getStability" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_stability(this, call),
+b"getRequires" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_requires(this, call),
+b"getConflicts" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_conflicts(this, call),
+b"getProvides" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_provides(this, call),
+b"getReplaces" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_replaces(this, call),
+b"getDevRequires" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_dev_requires(this, call),
+b"getSuggests" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_suggests(this, call),
+b"getAutoload" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_autoload(this, call),
+b"getDevAutoload" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_dev_autoload(this, call),
+b"getIncludePaths" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_include_paths(this, call),
+b"getPhpExt" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_php_ext(this, call),
+b"setRepository" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::set_repository(this, call),
+b"getRepository" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_repository(this, call),
+b"getBinaries" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_binaries(this, call),
+b"getUniqueName" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_unique_name(this, call),
+b"getNotificationUrl" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_notification_url(this, call),
+b"__toString" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::__to_string(this, call),
+b"getPrettyString" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_pretty_string(this, call),
+b"isDefaultBranch" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::is_default_branch(this, call),
+b"getTransportOptions" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_transport_options(this, call),
+b"setTransportOptions" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::set_transport_options(this, call),
+b"setSourceReference" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::set_source_reference(this, call),
+b"setDistUrl" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::set_dist_url(this, call),
+b"setDistType" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::set_dist_type(this, call),
+b"setDistReference" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::set_dist_reference(this, call),
+b"setSourceDistReferences" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::set_source_dist_references(this, call),
+b"isPlatform" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::is_platform(this, call),
+b"equals" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::equals(this, call),
+b"getStabilityPriority" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_stability_priority(this, call),
+_ => protocol_violation(call),
+}
+        }
+
+        pub(crate) static CROSSING: Crossing<<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle> = Crossing {
+name: b"Composer\\Package\\AliasPackage",
+dispatch,
+};
+    }
+    pub(crate) mod base_package {
+        use crate::php_worker::rpc::entity::{Call, Crossing, Entity, protocol_violation};
+        use bstr::ByteSlice;
+        use shirabe_php_rpc::{PhpThrow, PluginValue};
+
+        /// `Composer\Package\BasePackage`.
+        #[derive(Debug)]
+        pub(crate) struct PhpClass;
+
+        pub(crate) trait Forwarding {
+            /// The handle type of the entities crossing as this class or a subclass.
+            type Handle: Entity;
+
+            fn get_name(this: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_pretty_name(
+                this: &Self::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_names(
+                this: &Self::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_id(this: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_id(this: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn is_dev(this: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_type(this: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_target_dir(
+                this: &Self::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_extra(
+                this: &Self::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_installation_source(
+                this: &Self::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_installation_source(
+                this: &Self::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_source_type(
+                this: &Self::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_source_url(
+                this: &Self::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_source_urls(
+                this: &Self::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_source_reference(
+                this: &Self::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_source_mirrors(
+                this: &Self::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_source_mirrors(
+                this: &Self::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_dist_type(
+                this: &Self::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_dist_url(
+                this: &Self::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_dist_urls(
+                this: &Self::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_dist_reference(
+                this: &Self::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_dist_sha1_checksum(
+                this: &Self::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_dist_mirrors(
+                this: &Self::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_dist_mirrors(
+                this: &Self::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_version(
+                this: &Self::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_pretty_version(
+                this: &Self::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_full_pretty_version(
+                this: &Self::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_release_date(
+                this: &Self::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_stability(
+                this: &Self::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_requires(
+                this: &Self::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_conflicts(
+                this: &Self::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_provides(
+                this: &Self::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_replaces(
+                this: &Self::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_dev_requires(
+                this: &Self::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_suggests(
+                this: &Self::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_autoload(
+                this: &Self::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_dev_autoload(
+                this: &Self::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_include_paths(
+                this: &Self::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_php_ext(
+                this: &Self::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_repository(
+                this: &Self::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_repository(
+                this: &Self::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_binaries(
+                this: &Self::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_unique_name(
+                this: &Self::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_notification_url(
+                this: &Self::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn __to_string(
+                this: &Self::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_pretty_string(
+                this: &Self::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn is_default_branch(
+                this: &Self::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_transport_options(
+                this: &Self::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_transport_options(
+                this: &Self::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_source_reference(
+                this: &Self::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_dist_url(
+                this: &Self::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_dist_type(
+                this: &Self::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_dist_reference(
+                this: &Self::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_source_dist_references(
+                this: &Self::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn is_platform(
+                this: &Self::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn equals(this: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_stability_priority(
+                this: &Self::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+        }
+
+        pub(crate) fn dispatch(
+            this: &<PhpClass as Forwarding>::Handle,
+            call: &mut Call<'_>,
+        ) -> Result<PluginValue, PhpThrow> {
+            match call.method().as_bytes() {
+                b"getName" => <PhpClass as Forwarding>::get_name(this, call),
+                b"getPrettyName" => <PhpClass as Forwarding>::get_pretty_name(this, call),
+                b"getNames" => <PhpClass as Forwarding>::get_names(this, call),
+                b"setId" => <PhpClass as Forwarding>::set_id(this, call),
+                b"getId" => <PhpClass as Forwarding>::get_id(this, call),
+                b"isDev" => <PhpClass as Forwarding>::is_dev(this, call),
+                b"getType" => <PhpClass as Forwarding>::get_type(this, call),
+                b"getTargetDir" => <PhpClass as Forwarding>::get_target_dir(this, call),
+                b"getExtra" => <PhpClass as Forwarding>::get_extra(this, call),
+                b"setInstallationSource" => {
+                    <PhpClass as Forwarding>::set_installation_source(this, call)
+                }
+                b"getInstallationSource" => {
+                    <PhpClass as Forwarding>::get_installation_source(this, call)
+                }
+                b"getSourceType" => <PhpClass as Forwarding>::get_source_type(this, call),
+                b"getSourceUrl" => <PhpClass as Forwarding>::get_source_url(this, call),
+                b"getSourceUrls" => <PhpClass as Forwarding>::get_source_urls(this, call),
+                b"getSourceReference" => <PhpClass as Forwarding>::get_source_reference(this, call),
+                b"getSourceMirrors" => <PhpClass as Forwarding>::get_source_mirrors(this, call),
+                b"setSourceMirrors" => <PhpClass as Forwarding>::set_source_mirrors(this, call),
+                b"getDistType" => <PhpClass as Forwarding>::get_dist_type(this, call),
+                b"getDistUrl" => <PhpClass as Forwarding>::get_dist_url(this, call),
+                b"getDistUrls" => <PhpClass as Forwarding>::get_dist_urls(this, call),
+                b"getDistReference" => <PhpClass as Forwarding>::get_dist_reference(this, call),
+                b"getDistSha1Checksum" => {
+                    <PhpClass as Forwarding>::get_dist_sha1_checksum(this, call)
+                }
+                b"getDistMirrors" => <PhpClass as Forwarding>::get_dist_mirrors(this, call),
+                b"setDistMirrors" => <PhpClass as Forwarding>::set_dist_mirrors(this, call),
+                b"getVersion" => <PhpClass as Forwarding>::get_version(this, call),
+                b"getPrettyVersion" => <PhpClass as Forwarding>::get_pretty_version(this, call),
+                b"getFullPrettyVersion" => {
+                    <PhpClass as Forwarding>::get_full_pretty_version(this, call)
+                }
+                b"getReleaseDate" => <PhpClass as Forwarding>::get_release_date(this, call),
+                b"getStability" => <PhpClass as Forwarding>::get_stability(this, call),
+                b"getRequires" => <PhpClass as Forwarding>::get_requires(this, call),
+                b"getConflicts" => <PhpClass as Forwarding>::get_conflicts(this, call),
+                b"getProvides" => <PhpClass as Forwarding>::get_provides(this, call),
+                b"getReplaces" => <PhpClass as Forwarding>::get_replaces(this, call),
+                b"getDevRequires" => <PhpClass as Forwarding>::get_dev_requires(this, call),
+                b"getSuggests" => <PhpClass as Forwarding>::get_suggests(this, call),
+                b"getAutoload" => <PhpClass as Forwarding>::get_autoload(this, call),
+                b"getDevAutoload" => <PhpClass as Forwarding>::get_dev_autoload(this, call),
+                b"getIncludePaths" => <PhpClass as Forwarding>::get_include_paths(this, call),
+                b"getPhpExt" => <PhpClass as Forwarding>::get_php_ext(this, call),
+                b"setRepository" => <PhpClass as Forwarding>::set_repository(this, call),
+                b"getRepository" => <PhpClass as Forwarding>::get_repository(this, call),
+                b"getBinaries" => <PhpClass as Forwarding>::get_binaries(this, call),
+                b"getUniqueName" => <PhpClass as Forwarding>::get_unique_name(this, call),
+                b"getNotificationUrl" => <PhpClass as Forwarding>::get_notification_url(this, call),
+                b"__toString" => <PhpClass as Forwarding>::__to_string(this, call),
+                b"getPrettyString" => <PhpClass as Forwarding>::get_pretty_string(this, call),
+                b"isDefaultBranch" => <PhpClass as Forwarding>::is_default_branch(this, call),
+                b"getTransportOptions" => {
+                    <PhpClass as Forwarding>::get_transport_options(this, call)
+                }
+                b"setTransportOptions" => {
+                    <PhpClass as Forwarding>::set_transport_options(this, call)
+                }
+                b"setSourceReference" => <PhpClass as Forwarding>::set_source_reference(this, call),
+                b"setDistUrl" => <PhpClass as Forwarding>::set_dist_url(this, call),
+                b"setDistType" => <PhpClass as Forwarding>::set_dist_type(this, call),
+                b"setDistReference" => <PhpClass as Forwarding>::set_dist_reference(this, call),
+                b"setSourceDistReferences" => {
+                    <PhpClass as Forwarding>::set_source_dist_references(this, call)
+                }
+                b"isPlatform" => <PhpClass as Forwarding>::is_platform(this, call),
+                b"equals" => <PhpClass as Forwarding>::equals(this, call),
+                b"getStabilityPriority" => {
+                    <PhpClass as Forwarding>::get_stability_priority(this, call)
+                }
+                _ => protocol_violation(call),
+            }
+        }
+
+        pub(crate) static CROSSING: Crossing<<PhpClass as Forwarding>::Handle> = Crossing {
+            name: b"Composer\\Package\\BasePackage",
+            dispatch,
+        };
+    }
+    pub(crate) mod complete_alias_package {
+        use crate::php_worker::rpc::entity::{Call, Crossing, protocol_violation};
+        use crate::php_worker::rpc::forwarding;
+        use bstr::ByteSlice;
+        use shirabe_php_rpc::{PhpThrow, PluginValue};
+
+        /// `Composer\Package\CompleteAliasPackage`.
+        #[derive(Debug)]
+        pub(crate) struct PhpClass;
+
+        pub(crate) trait Forwarding {
+            fn get_scripts(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_scripts(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_repositories(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_repositories(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_license(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_license(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_keywords(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_keywords(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_description(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_description(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_homepage(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_homepage(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_authors(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_authors(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_support(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_support(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_funding(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_funding(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn is_abandoned(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_replacement_package(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_abandoned(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_archive_name(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_archive_name(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_archive_excludes(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_archive_excludes(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn __construct(call: &mut Call<'_>) -> Result<<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle, PhpThrow>{
+                Err(call.unsupported())
+            }
+        }
+
+        pub(crate) fn dispatch(
+            this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+            call: &mut Call<'_>,
+        ) -> Result<PluginValue, PhpThrow> {
+            match call.method().as_bytes() {
+b"getScripts" => <PhpClass as Forwarding>::get_scripts(this, call),
+b"setScripts" => <PhpClass as Forwarding>::set_scripts(this, call),
+b"getRepositories" => <PhpClass as Forwarding>::get_repositories(this, call),
+b"setRepositories" => <PhpClass as Forwarding>::set_repositories(this, call),
+b"getLicense" => <PhpClass as Forwarding>::get_license(this, call),
+b"setLicense" => <PhpClass as Forwarding>::set_license(this, call),
+b"getKeywords" => <PhpClass as Forwarding>::get_keywords(this, call),
+b"setKeywords" => <PhpClass as Forwarding>::set_keywords(this, call),
+b"getDescription" => <PhpClass as Forwarding>::get_description(this, call),
+b"setDescription" => <PhpClass as Forwarding>::set_description(this, call),
+b"getHomepage" => <PhpClass as Forwarding>::get_homepage(this, call),
+b"setHomepage" => <PhpClass as Forwarding>::set_homepage(this, call),
+b"getAuthors" => <PhpClass as Forwarding>::get_authors(this, call),
+b"setAuthors" => <PhpClass as Forwarding>::set_authors(this, call),
+b"getSupport" => <PhpClass as Forwarding>::get_support(this, call),
+b"setSupport" => <PhpClass as Forwarding>::set_support(this, call),
+b"getFunding" => <PhpClass as Forwarding>::get_funding(this, call),
+b"setFunding" => <PhpClass as Forwarding>::set_funding(this, call),
+b"isAbandoned" => <PhpClass as Forwarding>::is_abandoned(this, call),
+b"getReplacementPackage" => <PhpClass as Forwarding>::get_replacement_package(this, call),
+b"setAbandoned" => <PhpClass as Forwarding>::set_abandoned(this, call),
+b"getArchiveName" => <PhpClass as Forwarding>::get_archive_name(this, call),
+b"setArchiveName" => <PhpClass as Forwarding>::set_archive_name(this, call),
+b"getArchiveExcludes" => <PhpClass as Forwarding>::get_archive_excludes(this, call),
+b"setArchiveExcludes" => <PhpClass as Forwarding>::set_archive_excludes(this, call),
+b"getAliasOf" => <forwarding::package::alias_package::PhpClass as forwarding::package::alias_package::Forwarding>::get_alias_of(this, call),
+b"setRootPackageAlias" => <forwarding::package::alias_package::PhpClass as forwarding::package::alias_package::Forwarding>::set_root_package_alias(this, call),
+b"isRootPackageAlias" => <forwarding::package::alias_package::PhpClass as forwarding::package::alias_package::Forwarding>::is_root_package_alias(this, call),
+b"hasSelfVersionRequires" => <forwarding::package::alias_package::PhpClass as forwarding::package::alias_package::Forwarding>::has_self_version_requires(this, call),
+b"getName" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_name(this, call),
+b"getPrettyName" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_pretty_name(this, call),
+b"getNames" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_names(this, call),
+b"setId" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::set_id(this, call),
+b"getId" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_id(this, call),
+b"isDev" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::is_dev(this, call),
+b"getType" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_type(this, call),
+b"getTargetDir" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_target_dir(this, call),
+b"getExtra" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_extra(this, call),
+b"setInstallationSource" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::set_installation_source(this, call),
+b"getInstallationSource" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_installation_source(this, call),
+b"getSourceType" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_source_type(this, call),
+b"getSourceUrl" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_source_url(this, call),
+b"getSourceUrls" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_source_urls(this, call),
+b"getSourceReference" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_source_reference(this, call),
+b"getSourceMirrors" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_source_mirrors(this, call),
+b"setSourceMirrors" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::set_source_mirrors(this, call),
+b"getDistType" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_dist_type(this, call),
+b"getDistUrl" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_dist_url(this, call),
+b"getDistUrls" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_dist_urls(this, call),
+b"getDistReference" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_dist_reference(this, call),
+b"getDistSha1Checksum" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_dist_sha1_checksum(this, call),
+b"getDistMirrors" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_dist_mirrors(this, call),
+b"setDistMirrors" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::set_dist_mirrors(this, call),
+b"getVersion" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_version(this, call),
+b"getPrettyVersion" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_pretty_version(this, call),
+b"getFullPrettyVersion" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_full_pretty_version(this, call),
+b"getReleaseDate" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_release_date(this, call),
+b"getStability" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_stability(this, call),
+b"getRequires" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_requires(this, call),
+b"getConflicts" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_conflicts(this, call),
+b"getProvides" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_provides(this, call),
+b"getReplaces" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_replaces(this, call),
+b"getDevRequires" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_dev_requires(this, call),
+b"getSuggests" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_suggests(this, call),
+b"getAutoload" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_autoload(this, call),
+b"getDevAutoload" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_dev_autoload(this, call),
+b"getIncludePaths" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_include_paths(this, call),
+b"getPhpExt" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_php_ext(this, call),
+b"setRepository" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::set_repository(this, call),
+b"getRepository" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_repository(this, call),
+b"getBinaries" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_binaries(this, call),
+b"getUniqueName" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_unique_name(this, call),
+b"getNotificationUrl" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_notification_url(this, call),
+b"__toString" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::__to_string(this, call),
+b"getPrettyString" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_pretty_string(this, call),
+b"isDefaultBranch" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::is_default_branch(this, call),
+b"getTransportOptions" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_transport_options(this, call),
+b"setTransportOptions" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::set_transport_options(this, call),
+b"setSourceReference" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::set_source_reference(this, call),
+b"setDistUrl" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::set_dist_url(this, call),
+b"setDistType" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::set_dist_type(this, call),
+b"setDistReference" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::set_dist_reference(this, call),
+b"setSourceDistReferences" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::set_source_dist_references(this, call),
+b"isPlatform" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::is_platform(this, call),
+b"equals" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::equals(this, call),
+b"getStabilityPriority" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_stability_priority(this, call),
+_ => protocol_violation(call),
+}
+        }
+
+        pub(crate) static CROSSING: Crossing<<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle> = Crossing {
+name: b"Composer\\Package\\CompleteAliasPackage",
+dispatch,
+};
+    }
+    pub(crate) mod complete_package {
+        use crate::php_worker::rpc::entity::{Call, Crossing, protocol_violation};
+        use crate::php_worker::rpc::forwarding;
+        use bstr::ByteSlice;
+        use shirabe_php_rpc::{PhpThrow, PluginValue};
+
+        /// `Composer\Package\CompletePackage`.
+        #[derive(Debug)]
+        pub(crate) struct PhpClass;
+
+        pub(crate) trait Forwarding {
+            fn get_scripts(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_scripts(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_repositories(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_repositories(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_license(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_license(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_keywords(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_keywords(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_description(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_description(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_homepage(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_homepage(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_authors(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_authors(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_support(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_support(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_funding(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_funding(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn is_abandoned(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_replacement_package(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_abandoned(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_archive_name(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_archive_name(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_archive_excludes(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_archive_excludes(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn __construct(call: &mut Call<'_>) -> Result<<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle, PhpThrow>{
+                Err(call.unsupported())
+            }
+        }
+
+        pub(crate) fn dispatch(
+            this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+            call: &mut Call<'_>,
+        ) -> Result<PluginValue, PhpThrow> {
+            match call.method().as_bytes() {
+b"getScripts" => <PhpClass as Forwarding>::get_scripts(this, call),
+b"setScripts" => <PhpClass as Forwarding>::set_scripts(this, call),
+b"getRepositories" => <PhpClass as Forwarding>::get_repositories(this, call),
+b"setRepositories" => <PhpClass as Forwarding>::set_repositories(this, call),
+b"getLicense" => <PhpClass as Forwarding>::get_license(this, call),
+b"setLicense" => <PhpClass as Forwarding>::set_license(this, call),
+b"getKeywords" => <PhpClass as Forwarding>::get_keywords(this, call),
+b"setKeywords" => <PhpClass as Forwarding>::set_keywords(this, call),
+b"getDescription" => <PhpClass as Forwarding>::get_description(this, call),
+b"setDescription" => <PhpClass as Forwarding>::set_description(this, call),
+b"getHomepage" => <PhpClass as Forwarding>::get_homepage(this, call),
+b"setHomepage" => <PhpClass as Forwarding>::set_homepage(this, call),
+b"getAuthors" => <PhpClass as Forwarding>::get_authors(this, call),
+b"setAuthors" => <PhpClass as Forwarding>::set_authors(this, call),
+b"getSupport" => <PhpClass as Forwarding>::get_support(this, call),
+b"setSupport" => <PhpClass as Forwarding>::set_support(this, call),
+b"getFunding" => <PhpClass as Forwarding>::get_funding(this, call),
+b"setFunding" => <PhpClass as Forwarding>::set_funding(this, call),
+b"isAbandoned" => <PhpClass as Forwarding>::is_abandoned(this, call),
+b"getReplacementPackage" => <PhpClass as Forwarding>::get_replacement_package(this, call),
+b"setAbandoned" => <PhpClass as Forwarding>::set_abandoned(this, call),
+b"getArchiveName" => <PhpClass as Forwarding>::get_archive_name(this, call),
+b"setArchiveName" => <PhpClass as Forwarding>::set_archive_name(this, call),
+b"getArchiveExcludes" => <PhpClass as Forwarding>::get_archive_excludes(this, call),
+b"setArchiveExcludes" => <PhpClass as Forwarding>::set_archive_excludes(this, call),
+b"setType" => <forwarding::package::package::PhpClass as forwarding::package::package::Forwarding>::set_type(this, call),
+b"setTargetDir" => <forwarding::package::package::PhpClass as forwarding::package::package::Forwarding>::set_target_dir(this, call),
+b"setExtra" => <forwarding::package::package::PhpClass as forwarding::package::package::Forwarding>::set_extra(this, call),
+b"setBinaries" => <forwarding::package::package::PhpClass as forwarding::package::package::Forwarding>::set_binaries(this, call),
+b"setSourceType" => <forwarding::package::package::PhpClass as forwarding::package::package::Forwarding>::set_source_type(this, call),
+b"setSourceUrl" => <forwarding::package::package::PhpClass as forwarding::package::package::Forwarding>::set_source_url(this, call),
+b"setDistSha1Checksum" => <forwarding::package::package::PhpClass as forwarding::package::package::Forwarding>::set_dist_sha1_checksum(this, call),
+b"setReleaseDate" => <forwarding::package::package::PhpClass as forwarding::package::package::Forwarding>::set_release_date(this, call),
+b"setRequires" => <forwarding::package::package::PhpClass as forwarding::package::package::Forwarding>::set_requires(this, call),
+b"setConflicts" => <forwarding::package::package::PhpClass as forwarding::package::package::Forwarding>::set_conflicts(this, call),
+b"setProvides" => <forwarding::package::package::PhpClass as forwarding::package::package::Forwarding>::set_provides(this, call),
+b"setReplaces" => <forwarding::package::package::PhpClass as forwarding::package::package::Forwarding>::set_replaces(this, call),
+b"setDevRequires" => <forwarding::package::package::PhpClass as forwarding::package::package::Forwarding>::set_dev_requires(this, call),
+b"setSuggests" => <forwarding::package::package::PhpClass as forwarding::package::package::Forwarding>::set_suggests(this, call),
+b"setAutoload" => <forwarding::package::package::PhpClass as forwarding::package::package::Forwarding>::set_autoload(this, call),
+b"setDevAutoload" => <forwarding::package::package::PhpClass as forwarding::package::package::Forwarding>::set_dev_autoload(this, call),
+b"setIncludePaths" => <forwarding::package::package::PhpClass as forwarding::package::package::Forwarding>::set_include_paths(this, call),
+b"setPhpExt" => <forwarding::package::package::PhpClass as forwarding::package::package::Forwarding>::set_php_ext(this, call),
+b"setNotificationUrl" => <forwarding::package::package::PhpClass as forwarding::package::package::Forwarding>::set_notification_url(this, call),
+b"setIsDefaultBranch" => <forwarding::package::package::PhpClass as forwarding::package::package::Forwarding>::set_is_default_branch(this, call),
+b"replaceVersion" => <forwarding::package::package::PhpClass as forwarding::package::package::Forwarding>::replace_version(this, call),
+b"getName" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_name(this, call),
+b"getPrettyName" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_pretty_name(this, call),
+b"getNames" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_names(this, call),
+b"setId" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::set_id(this, call),
+b"getId" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_id(this, call),
+b"isDev" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::is_dev(this, call),
+b"getType" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_type(this, call),
+b"getTargetDir" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_target_dir(this, call),
+b"getExtra" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_extra(this, call),
+b"setInstallationSource" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::set_installation_source(this, call),
+b"getInstallationSource" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_installation_source(this, call),
+b"getSourceType" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_source_type(this, call),
+b"getSourceUrl" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_source_url(this, call),
+b"getSourceUrls" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_source_urls(this, call),
+b"getSourceReference" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_source_reference(this, call),
+b"getSourceMirrors" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_source_mirrors(this, call),
+b"setSourceMirrors" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::set_source_mirrors(this, call),
+b"getDistType" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_dist_type(this, call),
+b"getDistUrl" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_dist_url(this, call),
+b"getDistUrls" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_dist_urls(this, call),
+b"getDistReference" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_dist_reference(this, call),
+b"getDistSha1Checksum" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_dist_sha1_checksum(this, call),
+b"getDistMirrors" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_dist_mirrors(this, call),
+b"setDistMirrors" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::set_dist_mirrors(this, call),
+b"getVersion" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_version(this, call),
+b"getPrettyVersion" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_pretty_version(this, call),
+b"getFullPrettyVersion" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_full_pretty_version(this, call),
+b"getReleaseDate" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_release_date(this, call),
+b"getStability" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_stability(this, call),
+b"getRequires" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_requires(this, call),
+b"getConflicts" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_conflicts(this, call),
+b"getProvides" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_provides(this, call),
+b"getReplaces" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_replaces(this, call),
+b"getDevRequires" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_dev_requires(this, call),
+b"getSuggests" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_suggests(this, call),
+b"getAutoload" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_autoload(this, call),
+b"getDevAutoload" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_dev_autoload(this, call),
+b"getIncludePaths" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_include_paths(this, call),
+b"getPhpExt" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_php_ext(this, call),
+b"setRepository" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::set_repository(this, call),
+b"getRepository" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_repository(this, call),
+b"getBinaries" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_binaries(this, call),
+b"getUniqueName" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_unique_name(this, call),
+b"getNotificationUrl" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_notification_url(this, call),
+b"__toString" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::__to_string(this, call),
+b"getPrettyString" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_pretty_string(this, call),
+b"isDefaultBranch" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::is_default_branch(this, call),
+b"getTransportOptions" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_transport_options(this, call),
+b"setTransportOptions" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::set_transport_options(this, call),
+b"setSourceReference" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::set_source_reference(this, call),
+b"setDistUrl" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::set_dist_url(this, call),
+b"setDistType" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::set_dist_type(this, call),
+b"setDistReference" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::set_dist_reference(this, call),
+b"setSourceDistReferences" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::set_source_dist_references(this, call),
+b"isPlatform" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::is_platform(this, call),
+b"equals" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::equals(this, call),
+b"getStabilityPriority" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_stability_priority(this, call),
+_ => protocol_violation(call),
+}
+        }
+
+        pub(crate) static CROSSING: Crossing<<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle> = Crossing {
+name: b"Composer\\Package\\CompletePackage",
+dispatch,
+};
+    }
     pub(crate) mod locker {
         use crate::php_worker::rpc::entity::{Call, Crossing, Entity, protocol_violation};
         use bstr::ByteSlice;
@@ -1929,6 +3240,828 @@ pub(crate) mod package {
             name: b"Composer\\Package\\Locker",
             dispatch,
         };
+    }
+    pub(crate) mod package {
+        use crate::php_worker::rpc::entity::{Call, Crossing, protocol_violation};
+        use crate::php_worker::rpc::forwarding;
+        use bstr::ByteSlice;
+        use shirabe_php_rpc::{PhpThrow, PluginValue};
+
+        /// `Composer\Package\Package`.
+        #[derive(Debug)]
+        pub(crate) struct PhpClass;
+
+        pub(crate) trait Forwarding {
+            fn set_type(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_target_dir(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_extra(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_binaries(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_source_type(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_source_url(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_dist_sha1_checksum(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_release_date(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_requires(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_conflicts(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_provides(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_replaces(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_dev_requires(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_suggests(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_autoload(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_dev_autoload(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_include_paths(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_php_ext(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_notification_url(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_is_default_branch(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn replace_version(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn __construct(call: &mut Call<'_>) -> Result<<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle, PhpThrow>{
+                Err(call.unsupported())
+            }
+        }
+
+        pub(crate) fn dispatch(
+            this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+            call: &mut Call<'_>,
+        ) -> Result<PluginValue, PhpThrow> {
+            match call.method().as_bytes() {
+b"setType" => <PhpClass as Forwarding>::set_type(this, call),
+b"setTargetDir" => <PhpClass as Forwarding>::set_target_dir(this, call),
+b"setExtra" => <PhpClass as Forwarding>::set_extra(this, call),
+b"setBinaries" => <PhpClass as Forwarding>::set_binaries(this, call),
+b"setSourceType" => <PhpClass as Forwarding>::set_source_type(this, call),
+b"setSourceUrl" => <PhpClass as Forwarding>::set_source_url(this, call),
+b"setDistSha1Checksum" => <PhpClass as Forwarding>::set_dist_sha1_checksum(this, call),
+b"setReleaseDate" => <PhpClass as Forwarding>::set_release_date(this, call),
+b"setRequires" => <PhpClass as Forwarding>::set_requires(this, call),
+b"setConflicts" => <PhpClass as Forwarding>::set_conflicts(this, call),
+b"setProvides" => <PhpClass as Forwarding>::set_provides(this, call),
+b"setReplaces" => <PhpClass as Forwarding>::set_replaces(this, call),
+b"setDevRequires" => <PhpClass as Forwarding>::set_dev_requires(this, call),
+b"setSuggests" => <PhpClass as Forwarding>::set_suggests(this, call),
+b"setAutoload" => <PhpClass as Forwarding>::set_autoload(this, call),
+b"setDevAutoload" => <PhpClass as Forwarding>::set_dev_autoload(this, call),
+b"setIncludePaths" => <PhpClass as Forwarding>::set_include_paths(this, call),
+b"setPhpExt" => <PhpClass as Forwarding>::set_php_ext(this, call),
+b"setNotificationUrl" => <PhpClass as Forwarding>::set_notification_url(this, call),
+b"setIsDefaultBranch" => <PhpClass as Forwarding>::set_is_default_branch(this, call),
+b"replaceVersion" => <PhpClass as Forwarding>::replace_version(this, call),
+b"getName" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_name(this, call),
+b"getPrettyName" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_pretty_name(this, call),
+b"getNames" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_names(this, call),
+b"setId" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::set_id(this, call),
+b"getId" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_id(this, call),
+b"isDev" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::is_dev(this, call),
+b"getType" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_type(this, call),
+b"getTargetDir" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_target_dir(this, call),
+b"getExtra" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_extra(this, call),
+b"setInstallationSource" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::set_installation_source(this, call),
+b"getInstallationSource" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_installation_source(this, call),
+b"getSourceType" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_source_type(this, call),
+b"getSourceUrl" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_source_url(this, call),
+b"getSourceUrls" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_source_urls(this, call),
+b"getSourceReference" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_source_reference(this, call),
+b"getSourceMirrors" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_source_mirrors(this, call),
+b"setSourceMirrors" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::set_source_mirrors(this, call),
+b"getDistType" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_dist_type(this, call),
+b"getDistUrl" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_dist_url(this, call),
+b"getDistUrls" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_dist_urls(this, call),
+b"getDistReference" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_dist_reference(this, call),
+b"getDistSha1Checksum" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_dist_sha1_checksum(this, call),
+b"getDistMirrors" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_dist_mirrors(this, call),
+b"setDistMirrors" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::set_dist_mirrors(this, call),
+b"getVersion" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_version(this, call),
+b"getPrettyVersion" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_pretty_version(this, call),
+b"getFullPrettyVersion" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_full_pretty_version(this, call),
+b"getReleaseDate" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_release_date(this, call),
+b"getStability" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_stability(this, call),
+b"getRequires" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_requires(this, call),
+b"getConflicts" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_conflicts(this, call),
+b"getProvides" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_provides(this, call),
+b"getReplaces" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_replaces(this, call),
+b"getDevRequires" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_dev_requires(this, call),
+b"getSuggests" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_suggests(this, call),
+b"getAutoload" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_autoload(this, call),
+b"getDevAutoload" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_dev_autoload(this, call),
+b"getIncludePaths" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_include_paths(this, call),
+b"getPhpExt" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_php_ext(this, call),
+b"setRepository" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::set_repository(this, call),
+b"getRepository" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_repository(this, call),
+b"getBinaries" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_binaries(this, call),
+b"getUniqueName" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_unique_name(this, call),
+b"getNotificationUrl" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_notification_url(this, call),
+b"__toString" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::__to_string(this, call),
+b"getPrettyString" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_pretty_string(this, call),
+b"isDefaultBranch" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::is_default_branch(this, call),
+b"getTransportOptions" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_transport_options(this, call),
+b"setTransportOptions" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::set_transport_options(this, call),
+b"setSourceReference" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::set_source_reference(this, call),
+b"setDistUrl" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::set_dist_url(this, call),
+b"setDistType" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::set_dist_type(this, call),
+b"setDistReference" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::set_dist_reference(this, call),
+b"setSourceDistReferences" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::set_source_dist_references(this, call),
+b"isPlatform" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::is_platform(this, call),
+b"equals" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::equals(this, call),
+b"getStabilityPriority" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_stability_priority(this, call),
+_ => protocol_violation(call),
+}
+        }
+
+        pub(crate) static CROSSING: Crossing<<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle> = Crossing {
+name: b"Composer\\Package\\Package",
+dispatch,
+};
+    }
+    pub(crate) mod root_alias_package {
+        use crate::php_worker::rpc::entity::{Call, Crossing, protocol_violation};
+        use crate::php_worker::rpc::forwarding;
+        use bstr::ByteSlice;
+        use shirabe_php_rpc::{PhpThrow, PluginValue};
+
+        /// `Composer\Package\RootAliasPackage`.
+        #[derive(Debug)]
+        pub(crate) struct PhpClass;
+
+        pub(crate) trait Forwarding {
+            fn get_aliases(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_minimum_stability(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_stability_flags(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_references(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_prefer_stable(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_config(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_requires(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_dev_requires(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_conflicts(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_provides(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_replaces(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_autoload(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_dev_autoload(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_stability_flags(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_minimum_stability(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_prefer_stable(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_config(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_references(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_aliases(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_suggests(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_extra(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn __construct(call: &mut Call<'_>) -> Result<<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle, PhpThrow>{
+                Err(call.unsupported())
+            }
+        }
+
+        pub(crate) fn dispatch(
+            this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+            call: &mut Call<'_>,
+        ) -> Result<PluginValue, PhpThrow> {
+            match call.method().as_bytes() {
+b"getAliases" => <PhpClass as Forwarding>::get_aliases(this, call),
+b"getMinimumStability" => <PhpClass as Forwarding>::get_minimum_stability(this, call),
+b"getStabilityFlags" => <PhpClass as Forwarding>::get_stability_flags(this, call),
+b"getReferences" => <PhpClass as Forwarding>::get_references(this, call),
+b"getPreferStable" => <PhpClass as Forwarding>::get_prefer_stable(this, call),
+b"getConfig" => <PhpClass as Forwarding>::get_config(this, call),
+b"setRequires" => <PhpClass as Forwarding>::set_requires(this, call),
+b"setDevRequires" => <PhpClass as Forwarding>::set_dev_requires(this, call),
+b"setConflicts" => <PhpClass as Forwarding>::set_conflicts(this, call),
+b"setProvides" => <PhpClass as Forwarding>::set_provides(this, call),
+b"setReplaces" => <PhpClass as Forwarding>::set_replaces(this, call),
+b"setAutoload" => <PhpClass as Forwarding>::set_autoload(this, call),
+b"setDevAutoload" => <PhpClass as Forwarding>::set_dev_autoload(this, call),
+b"setStabilityFlags" => <PhpClass as Forwarding>::set_stability_flags(this, call),
+b"setMinimumStability" => <PhpClass as Forwarding>::set_minimum_stability(this, call),
+b"setPreferStable" => <PhpClass as Forwarding>::set_prefer_stable(this, call),
+b"setConfig" => <PhpClass as Forwarding>::set_config(this, call),
+b"setReferences" => <PhpClass as Forwarding>::set_references(this, call),
+b"setAliases" => <PhpClass as Forwarding>::set_aliases(this, call),
+b"setSuggests" => <PhpClass as Forwarding>::set_suggests(this, call),
+b"setExtra" => <PhpClass as Forwarding>::set_extra(this, call),
+b"getScripts" => <forwarding::package::complete_alias_package::PhpClass as forwarding::package::complete_alias_package::Forwarding>::get_scripts(this, call),
+b"setScripts" => <forwarding::package::complete_alias_package::PhpClass as forwarding::package::complete_alias_package::Forwarding>::set_scripts(this, call),
+b"getRepositories" => <forwarding::package::complete_alias_package::PhpClass as forwarding::package::complete_alias_package::Forwarding>::get_repositories(this, call),
+b"setRepositories" => <forwarding::package::complete_alias_package::PhpClass as forwarding::package::complete_alias_package::Forwarding>::set_repositories(this, call),
+b"getLicense" => <forwarding::package::complete_alias_package::PhpClass as forwarding::package::complete_alias_package::Forwarding>::get_license(this, call),
+b"setLicense" => <forwarding::package::complete_alias_package::PhpClass as forwarding::package::complete_alias_package::Forwarding>::set_license(this, call),
+b"getKeywords" => <forwarding::package::complete_alias_package::PhpClass as forwarding::package::complete_alias_package::Forwarding>::get_keywords(this, call),
+b"setKeywords" => <forwarding::package::complete_alias_package::PhpClass as forwarding::package::complete_alias_package::Forwarding>::set_keywords(this, call),
+b"getDescription" => <forwarding::package::complete_alias_package::PhpClass as forwarding::package::complete_alias_package::Forwarding>::get_description(this, call),
+b"setDescription" => <forwarding::package::complete_alias_package::PhpClass as forwarding::package::complete_alias_package::Forwarding>::set_description(this, call),
+b"getHomepage" => <forwarding::package::complete_alias_package::PhpClass as forwarding::package::complete_alias_package::Forwarding>::get_homepage(this, call),
+b"setHomepage" => <forwarding::package::complete_alias_package::PhpClass as forwarding::package::complete_alias_package::Forwarding>::set_homepage(this, call),
+b"getAuthors" => <forwarding::package::complete_alias_package::PhpClass as forwarding::package::complete_alias_package::Forwarding>::get_authors(this, call),
+b"setAuthors" => <forwarding::package::complete_alias_package::PhpClass as forwarding::package::complete_alias_package::Forwarding>::set_authors(this, call),
+b"getSupport" => <forwarding::package::complete_alias_package::PhpClass as forwarding::package::complete_alias_package::Forwarding>::get_support(this, call),
+b"setSupport" => <forwarding::package::complete_alias_package::PhpClass as forwarding::package::complete_alias_package::Forwarding>::set_support(this, call),
+b"getFunding" => <forwarding::package::complete_alias_package::PhpClass as forwarding::package::complete_alias_package::Forwarding>::get_funding(this, call),
+b"setFunding" => <forwarding::package::complete_alias_package::PhpClass as forwarding::package::complete_alias_package::Forwarding>::set_funding(this, call),
+b"isAbandoned" => <forwarding::package::complete_alias_package::PhpClass as forwarding::package::complete_alias_package::Forwarding>::is_abandoned(this, call),
+b"getReplacementPackage" => <forwarding::package::complete_alias_package::PhpClass as forwarding::package::complete_alias_package::Forwarding>::get_replacement_package(this, call),
+b"setAbandoned" => <forwarding::package::complete_alias_package::PhpClass as forwarding::package::complete_alias_package::Forwarding>::set_abandoned(this, call),
+b"getArchiveName" => <forwarding::package::complete_alias_package::PhpClass as forwarding::package::complete_alias_package::Forwarding>::get_archive_name(this, call),
+b"setArchiveName" => <forwarding::package::complete_alias_package::PhpClass as forwarding::package::complete_alias_package::Forwarding>::set_archive_name(this, call),
+b"getArchiveExcludes" => <forwarding::package::complete_alias_package::PhpClass as forwarding::package::complete_alias_package::Forwarding>::get_archive_excludes(this, call),
+b"setArchiveExcludes" => <forwarding::package::complete_alias_package::PhpClass as forwarding::package::complete_alias_package::Forwarding>::set_archive_excludes(this, call),
+b"getAliasOf" => <forwarding::package::alias_package::PhpClass as forwarding::package::alias_package::Forwarding>::get_alias_of(this, call),
+b"setRootPackageAlias" => <forwarding::package::alias_package::PhpClass as forwarding::package::alias_package::Forwarding>::set_root_package_alias(this, call),
+b"isRootPackageAlias" => <forwarding::package::alias_package::PhpClass as forwarding::package::alias_package::Forwarding>::is_root_package_alias(this, call),
+b"hasSelfVersionRequires" => <forwarding::package::alias_package::PhpClass as forwarding::package::alias_package::Forwarding>::has_self_version_requires(this, call),
+b"getName" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_name(this, call),
+b"getPrettyName" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_pretty_name(this, call),
+b"getNames" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_names(this, call),
+b"setId" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::set_id(this, call),
+b"getId" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_id(this, call),
+b"isDev" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::is_dev(this, call),
+b"getType" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_type(this, call),
+b"getTargetDir" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_target_dir(this, call),
+b"getExtra" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_extra(this, call),
+b"setInstallationSource" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::set_installation_source(this, call),
+b"getInstallationSource" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_installation_source(this, call),
+b"getSourceType" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_source_type(this, call),
+b"getSourceUrl" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_source_url(this, call),
+b"getSourceUrls" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_source_urls(this, call),
+b"getSourceReference" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_source_reference(this, call),
+b"getSourceMirrors" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_source_mirrors(this, call),
+b"setSourceMirrors" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::set_source_mirrors(this, call),
+b"getDistType" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_dist_type(this, call),
+b"getDistUrl" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_dist_url(this, call),
+b"getDistUrls" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_dist_urls(this, call),
+b"getDistReference" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_dist_reference(this, call),
+b"getDistSha1Checksum" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_dist_sha1_checksum(this, call),
+b"getDistMirrors" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_dist_mirrors(this, call),
+b"setDistMirrors" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::set_dist_mirrors(this, call),
+b"getVersion" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_version(this, call),
+b"getPrettyVersion" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_pretty_version(this, call),
+b"getFullPrettyVersion" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_full_pretty_version(this, call),
+b"getReleaseDate" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_release_date(this, call),
+b"getStability" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_stability(this, call),
+b"getRequires" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_requires(this, call),
+b"getConflicts" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_conflicts(this, call),
+b"getProvides" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_provides(this, call),
+b"getReplaces" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_replaces(this, call),
+b"getDevRequires" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_dev_requires(this, call),
+b"getSuggests" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_suggests(this, call),
+b"getAutoload" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_autoload(this, call),
+b"getDevAutoload" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_dev_autoload(this, call),
+b"getIncludePaths" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_include_paths(this, call),
+b"getPhpExt" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_php_ext(this, call),
+b"setRepository" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::set_repository(this, call),
+b"getRepository" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_repository(this, call),
+b"getBinaries" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_binaries(this, call),
+b"getUniqueName" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_unique_name(this, call),
+b"getNotificationUrl" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_notification_url(this, call),
+b"__toString" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::__to_string(this, call),
+b"getPrettyString" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_pretty_string(this, call),
+b"isDefaultBranch" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::is_default_branch(this, call),
+b"getTransportOptions" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_transport_options(this, call),
+b"setTransportOptions" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::set_transport_options(this, call),
+b"setSourceReference" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::set_source_reference(this, call),
+b"setDistUrl" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::set_dist_url(this, call),
+b"setDistType" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::set_dist_type(this, call),
+b"setDistReference" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::set_dist_reference(this, call),
+b"setSourceDistReferences" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::set_source_dist_references(this, call),
+b"isPlatform" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::is_platform(this, call),
+b"equals" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::equals(this, call),
+b"getStabilityPriority" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_stability_priority(this, call),
+_ => protocol_violation(call),
+}
+        }
+
+        pub(crate) static CROSSING: Crossing<<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle> = Crossing {
+name: b"Composer\\Package\\RootAliasPackage",
+dispatch,
+};
+    }
+    pub(crate) mod root_package {
+        use crate::php_worker::rpc::entity::{Call, Crossing, protocol_violation};
+        use crate::php_worker::rpc::forwarding;
+        use bstr::ByteSlice;
+        use shirabe_php_rpc::{PhpThrow, PluginValue};
+
+        /// `Composer\Package\RootPackage`.
+        #[derive(Debug)]
+        pub(crate) struct PhpClass;
+
+        pub(crate) trait Forwarding {
+            fn get_aliases(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_minimum_stability(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_stability_flags(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_references(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_prefer_stable(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn get_config(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_stability_flags(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_minimum_stability(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_prefer_stable(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_config(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_references(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn set_aliases(
+                this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+                call: &mut Call<'_>,
+            ) -> Result<PluginValue, PhpThrow> {
+                let _ = this;
+                Err(call.unsupported())
+            }
+
+            fn __construct(call: &mut Call<'_>) -> Result<<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle, PhpThrow>{
+                Err(call.unsupported())
+            }
+        }
+
+        pub(crate) fn dispatch(
+            this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
+            call: &mut Call<'_>,
+        ) -> Result<PluginValue, PhpThrow> {
+            match call.method().as_bytes() {
+b"getAliases" => <PhpClass as Forwarding>::get_aliases(this, call),
+b"getMinimumStability" => <PhpClass as Forwarding>::get_minimum_stability(this, call),
+b"getStabilityFlags" => <PhpClass as Forwarding>::get_stability_flags(this, call),
+b"getReferences" => <PhpClass as Forwarding>::get_references(this, call),
+b"getPreferStable" => <PhpClass as Forwarding>::get_prefer_stable(this, call),
+b"getConfig" => <PhpClass as Forwarding>::get_config(this, call),
+b"setStabilityFlags" => <PhpClass as Forwarding>::set_stability_flags(this, call),
+b"setMinimumStability" => <PhpClass as Forwarding>::set_minimum_stability(this, call),
+b"setPreferStable" => <PhpClass as Forwarding>::set_prefer_stable(this, call),
+b"setConfig" => <PhpClass as Forwarding>::set_config(this, call),
+b"setReferences" => <PhpClass as Forwarding>::set_references(this, call),
+b"setAliases" => <PhpClass as Forwarding>::set_aliases(this, call),
+b"getScripts" => <forwarding::package::complete_package::PhpClass as forwarding::package::complete_package::Forwarding>::get_scripts(this, call),
+b"setScripts" => <forwarding::package::complete_package::PhpClass as forwarding::package::complete_package::Forwarding>::set_scripts(this, call),
+b"getRepositories" => <forwarding::package::complete_package::PhpClass as forwarding::package::complete_package::Forwarding>::get_repositories(this, call),
+b"setRepositories" => <forwarding::package::complete_package::PhpClass as forwarding::package::complete_package::Forwarding>::set_repositories(this, call),
+b"getLicense" => <forwarding::package::complete_package::PhpClass as forwarding::package::complete_package::Forwarding>::get_license(this, call),
+b"setLicense" => <forwarding::package::complete_package::PhpClass as forwarding::package::complete_package::Forwarding>::set_license(this, call),
+b"getKeywords" => <forwarding::package::complete_package::PhpClass as forwarding::package::complete_package::Forwarding>::get_keywords(this, call),
+b"setKeywords" => <forwarding::package::complete_package::PhpClass as forwarding::package::complete_package::Forwarding>::set_keywords(this, call),
+b"getDescription" => <forwarding::package::complete_package::PhpClass as forwarding::package::complete_package::Forwarding>::get_description(this, call),
+b"setDescription" => <forwarding::package::complete_package::PhpClass as forwarding::package::complete_package::Forwarding>::set_description(this, call),
+b"getHomepage" => <forwarding::package::complete_package::PhpClass as forwarding::package::complete_package::Forwarding>::get_homepage(this, call),
+b"setHomepage" => <forwarding::package::complete_package::PhpClass as forwarding::package::complete_package::Forwarding>::set_homepage(this, call),
+b"getAuthors" => <forwarding::package::complete_package::PhpClass as forwarding::package::complete_package::Forwarding>::get_authors(this, call),
+b"setAuthors" => <forwarding::package::complete_package::PhpClass as forwarding::package::complete_package::Forwarding>::set_authors(this, call),
+b"getSupport" => <forwarding::package::complete_package::PhpClass as forwarding::package::complete_package::Forwarding>::get_support(this, call),
+b"setSupport" => <forwarding::package::complete_package::PhpClass as forwarding::package::complete_package::Forwarding>::set_support(this, call),
+b"getFunding" => <forwarding::package::complete_package::PhpClass as forwarding::package::complete_package::Forwarding>::get_funding(this, call),
+b"setFunding" => <forwarding::package::complete_package::PhpClass as forwarding::package::complete_package::Forwarding>::set_funding(this, call),
+b"isAbandoned" => <forwarding::package::complete_package::PhpClass as forwarding::package::complete_package::Forwarding>::is_abandoned(this, call),
+b"getReplacementPackage" => <forwarding::package::complete_package::PhpClass as forwarding::package::complete_package::Forwarding>::get_replacement_package(this, call),
+b"setAbandoned" => <forwarding::package::complete_package::PhpClass as forwarding::package::complete_package::Forwarding>::set_abandoned(this, call),
+b"getArchiveName" => <forwarding::package::complete_package::PhpClass as forwarding::package::complete_package::Forwarding>::get_archive_name(this, call),
+b"setArchiveName" => <forwarding::package::complete_package::PhpClass as forwarding::package::complete_package::Forwarding>::set_archive_name(this, call),
+b"getArchiveExcludes" => <forwarding::package::complete_package::PhpClass as forwarding::package::complete_package::Forwarding>::get_archive_excludes(this, call),
+b"setArchiveExcludes" => <forwarding::package::complete_package::PhpClass as forwarding::package::complete_package::Forwarding>::set_archive_excludes(this, call),
+b"setType" => <forwarding::package::package::PhpClass as forwarding::package::package::Forwarding>::set_type(this, call),
+b"setTargetDir" => <forwarding::package::package::PhpClass as forwarding::package::package::Forwarding>::set_target_dir(this, call),
+b"setExtra" => <forwarding::package::package::PhpClass as forwarding::package::package::Forwarding>::set_extra(this, call),
+b"setBinaries" => <forwarding::package::package::PhpClass as forwarding::package::package::Forwarding>::set_binaries(this, call),
+b"setSourceType" => <forwarding::package::package::PhpClass as forwarding::package::package::Forwarding>::set_source_type(this, call),
+b"setSourceUrl" => <forwarding::package::package::PhpClass as forwarding::package::package::Forwarding>::set_source_url(this, call),
+b"setDistSha1Checksum" => <forwarding::package::package::PhpClass as forwarding::package::package::Forwarding>::set_dist_sha1_checksum(this, call),
+b"setReleaseDate" => <forwarding::package::package::PhpClass as forwarding::package::package::Forwarding>::set_release_date(this, call),
+b"setRequires" => <forwarding::package::package::PhpClass as forwarding::package::package::Forwarding>::set_requires(this, call),
+b"setConflicts" => <forwarding::package::package::PhpClass as forwarding::package::package::Forwarding>::set_conflicts(this, call),
+b"setProvides" => <forwarding::package::package::PhpClass as forwarding::package::package::Forwarding>::set_provides(this, call),
+b"setReplaces" => <forwarding::package::package::PhpClass as forwarding::package::package::Forwarding>::set_replaces(this, call),
+b"setDevRequires" => <forwarding::package::package::PhpClass as forwarding::package::package::Forwarding>::set_dev_requires(this, call),
+b"setSuggests" => <forwarding::package::package::PhpClass as forwarding::package::package::Forwarding>::set_suggests(this, call),
+b"setAutoload" => <forwarding::package::package::PhpClass as forwarding::package::package::Forwarding>::set_autoload(this, call),
+b"setDevAutoload" => <forwarding::package::package::PhpClass as forwarding::package::package::Forwarding>::set_dev_autoload(this, call),
+b"setIncludePaths" => <forwarding::package::package::PhpClass as forwarding::package::package::Forwarding>::set_include_paths(this, call),
+b"setPhpExt" => <forwarding::package::package::PhpClass as forwarding::package::package::Forwarding>::set_php_ext(this, call),
+b"setNotificationUrl" => <forwarding::package::package::PhpClass as forwarding::package::package::Forwarding>::set_notification_url(this, call),
+b"setIsDefaultBranch" => <forwarding::package::package::PhpClass as forwarding::package::package::Forwarding>::set_is_default_branch(this, call),
+b"replaceVersion" => <forwarding::package::package::PhpClass as forwarding::package::package::Forwarding>::replace_version(this, call),
+b"getName" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_name(this, call),
+b"getPrettyName" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_pretty_name(this, call),
+b"getNames" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_names(this, call),
+b"setId" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::set_id(this, call),
+b"getId" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_id(this, call),
+b"isDev" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::is_dev(this, call),
+b"getType" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_type(this, call),
+b"getTargetDir" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_target_dir(this, call),
+b"getExtra" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_extra(this, call),
+b"setInstallationSource" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::set_installation_source(this, call),
+b"getInstallationSource" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_installation_source(this, call),
+b"getSourceType" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_source_type(this, call),
+b"getSourceUrl" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_source_url(this, call),
+b"getSourceUrls" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_source_urls(this, call),
+b"getSourceReference" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_source_reference(this, call),
+b"getSourceMirrors" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_source_mirrors(this, call),
+b"setSourceMirrors" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::set_source_mirrors(this, call),
+b"getDistType" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_dist_type(this, call),
+b"getDistUrl" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_dist_url(this, call),
+b"getDistUrls" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_dist_urls(this, call),
+b"getDistReference" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_dist_reference(this, call),
+b"getDistSha1Checksum" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_dist_sha1_checksum(this, call),
+b"getDistMirrors" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_dist_mirrors(this, call),
+b"setDistMirrors" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::set_dist_mirrors(this, call),
+b"getVersion" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_version(this, call),
+b"getPrettyVersion" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_pretty_version(this, call),
+b"getFullPrettyVersion" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_full_pretty_version(this, call),
+b"getReleaseDate" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_release_date(this, call),
+b"getStability" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_stability(this, call),
+b"getRequires" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_requires(this, call),
+b"getConflicts" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_conflicts(this, call),
+b"getProvides" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_provides(this, call),
+b"getReplaces" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_replaces(this, call),
+b"getDevRequires" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_dev_requires(this, call),
+b"getSuggests" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_suggests(this, call),
+b"getAutoload" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_autoload(this, call),
+b"getDevAutoload" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_dev_autoload(this, call),
+b"getIncludePaths" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_include_paths(this, call),
+b"getPhpExt" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_php_ext(this, call),
+b"setRepository" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::set_repository(this, call),
+b"getRepository" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_repository(this, call),
+b"getBinaries" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_binaries(this, call),
+b"getUniqueName" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_unique_name(this, call),
+b"getNotificationUrl" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_notification_url(this, call),
+b"__toString" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::__to_string(this, call),
+b"getPrettyString" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_pretty_string(this, call),
+b"isDefaultBranch" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::is_default_branch(this, call),
+b"getTransportOptions" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_transport_options(this, call),
+b"setTransportOptions" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::set_transport_options(this, call),
+b"setSourceReference" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::set_source_reference(this, call),
+b"setDistUrl" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::set_dist_url(this, call),
+b"setDistType" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::set_dist_type(this, call),
+b"setDistReference" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::set_dist_reference(this, call),
+b"setSourceDistReferences" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::set_source_dist_references(this, call),
+b"isPlatform" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::is_platform(this, call),
+b"equals" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::equals(this, call),
+b"getStabilityPriority" => <forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::get_stability_priority(this, call),
+_ => protocol_violation(call),
+}
+        }
+
+        pub(crate) static CROSSING: Crossing<<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle> = Crossing {
+name: b"Composer\\Package\\RootPackage",
+dispatch,
+};
     }
 }
 

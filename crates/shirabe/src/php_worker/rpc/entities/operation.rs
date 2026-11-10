@@ -5,9 +5,9 @@ use crate::dependency_resolver::operation::{
     UninstallOperation, UpdateOperation,
 };
 use crate::package::{AliasPackageHandle, PackageInterfaceHandle};
+use crate::php_worker::rpc::entities::package::package_value;
 use crate::php_worker::rpc::entity::{Call, Crossing, Entity};
 use crate::php_worker::rpc::forwarding;
-use crate::php_worker::rpc::table::package_handle_value;
 use shirabe_php_rpc::{PhpThrow, PluginValue, ToWire, wire};
 
 impl Entity for std::rc::Rc<AnyOperation> {
@@ -90,7 +90,7 @@ impl forwarding::dependency_resolver::operation::install_operation::Forwarding
         let AnyOperation::Install(operation) = &**operation else {
             unreachable!("only an InstallOperation crosses as one");
         };
-        Ok(package_handle_value(operation.get_package().as_rc()))
+        package_value(operation.get_package().as_rc())
     }
 
     fn __construct(call: &mut Call<'_>) -> Result<std::rc::Rc<AnyOperation>, PhpThrow> {
@@ -110,9 +110,7 @@ impl forwarding::dependency_resolver::operation::update_operation::Forwarding
         let AnyOperation::Update(operation) = &**operation else {
             unreachable!("only an UpdateOperation crosses as one");
         };
-        Ok(package_handle_value(
-            operation.get_initial_package().as_rc(),
-        ))
+        package_value(operation.get_initial_package().as_rc())
     }
 
     fn get_target_package(
@@ -122,7 +120,7 @@ impl forwarding::dependency_resolver::operation::update_operation::Forwarding
         let AnyOperation::Update(operation) = &**operation else {
             unreachable!("only an UpdateOperation crosses as one");
         };
-        Ok(package_handle_value(operation.get_target_package().as_rc()))
+        package_value(operation.get_target_package().as_rc())
     }
 
     fn __construct(call: &mut Call<'_>) -> Result<std::rc::Rc<AnyOperation>, PhpThrow> {
@@ -143,7 +141,7 @@ impl forwarding::dependency_resolver::operation::uninstall_operation::Forwarding
         let AnyOperation::Uninstall(operation) = &**operation else {
             unreachable!("only an UninstallOperation crosses as one");
         };
-        Ok(package_handle_value(operation.get_package().as_rc()))
+        package_value(operation.get_package().as_rc())
     }
 
     fn __construct(call: &mut Call<'_>) -> Result<std::rc::Rc<AnyOperation>, PhpThrow> {
@@ -163,7 +161,7 @@ impl forwarding::dependency_resolver::operation::mark_alias_installed_operation:
         let AnyOperation::MarkAliasInstalled(operation) = &**operation else {
             unreachable!("only a MarkAliasInstalledOperation crosses as one");
         };
-        Ok(package_handle_value(operation.get_package().as_rc()))
+        package_value(operation.get_package().as_rc())
     }
 
     fn __construct(call: &mut Call<'_>) -> Result<std::rc::Rc<AnyOperation>, PhpThrow> {
@@ -183,7 +181,7 @@ impl forwarding::dependency_resolver::operation::mark_alias_uninstalled_operatio
         let AnyOperation::MarkAliasUninstalled(operation) = &**operation else {
             unreachable!("only a MarkAliasUninstalledOperation crosses as one");
         };
-        Ok(package_handle_value(operation.get_package().as_rc()))
+        package_value(operation.get_package().as_rc())
     }
 
     fn __construct(call: &mut Call<'_>) -> Result<std::rc::Rc<AnyOperation>, PhpThrow> {

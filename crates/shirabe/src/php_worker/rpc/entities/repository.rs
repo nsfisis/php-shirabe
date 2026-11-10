@@ -2,9 +2,9 @@
 
 use crate::package::PackageInterfaceHandle;
 use crate::php_worker::codec::constraint_from_wire;
+use crate::php_worker::rpc::entities::package::package_value;
 use crate::php_worker::rpc::entity::{Call, Crossing, Entity};
 use crate::php_worker::rpc::forwarding;
-use crate::php_worker::rpc::table::package_handle_value;
 use crate::repository::{
     FindPackageConstraint, InstalledArrayRepository, InstalledFilesystemRepository,
     LockArrayRepository, RepositoryInterfaceHandle, WritableRepositoryInterface,
@@ -120,8 +120,8 @@ impl forwarding::repository::array_repository::Forwarding
         Ok(PluginValue::List(
             packages
                 .iter()
-                .map(|package| package_handle_value(package.as_rc()))
-                .collect(),
+                .map(|package| package_value(package.as_rc()))
+                .collect::<Result<_, _>>()?,
         ))
     }
 
@@ -140,9 +140,10 @@ impl forwarding::repository::array_repository::Forwarding
             .borrow_mut()
             .find_package(name.as_bstr(), constraint)
             .map_err(call.failed())?;
-        Ok(package.map_or(PluginValue::Null, |package| {
-            package_handle_value(package.as_rc())
-        }))
+        match package {
+            Some(package) => package_value(package.as_rc()),
+            None => Ok(PluginValue::Null),
+        }
     }
 
     fn find_packages(
@@ -158,8 +159,8 @@ impl forwarding::repository::array_repository::Forwarding
         Ok(PluginValue::List(
             packages
                 .iter()
-                .map(|package| package_handle_value(package.as_rc()))
-                .collect(),
+                .map(|package| package_value(package.as_rc()))
+                .collect::<Result<_, _>>()?,
         ))
     }
 }
