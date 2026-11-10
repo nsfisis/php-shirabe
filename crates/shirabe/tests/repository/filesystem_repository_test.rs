@@ -12,7 +12,7 @@ use shirabe::json::JsonFile;
 use shirabe::package::loader::ArrayLoader;
 use shirabe::package::{Link, PackageInterfaceHandle, RootAliasPackageHandle, RootPackageHandle};
 use shirabe::repository::{FilesystemRepository, RepositoryInterface};
-use shirabe_php_rpc::{PluginValue, ToWire};
+use shirabe_php_rpc::{PluginValue, ToPluginValue};
 use shirabe_php_shim::{
     Catch as _, PhpMixed, ToPhpString, bformat, path_from_bytes, path_to_bytes,
 };
@@ -421,5 +421,5 @@ fn test_safely_load_installed_versions() {
         ),
     ]));
 
-    assert_eq!(expected.clone().to_wire(), raw_data);
+    assert_eq!(expected.clone().to_plugin_value(), raw_data);
 }

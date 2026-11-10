@@ -4,7 +4,7 @@ use crate::io::{BufferIO, ConsoleIO, IOInterface, NORMAL, NullIO};
 use crate::php_worker::rpc::entity::{Call, Crossing, Entity};
 use crate::php_worker::rpc::forwarding;
 use bstr::{BString, ByteSlice};
-use shirabe_php_rpc::{PhpThrow, PluginValue, ToWire};
+use shirabe_php_rpc::{PhpThrow, PluginValue, ToPluginValue};
 use shirabe_symfony_console::output::VERBOSITY_NORMAL;
 
 impl Entity for std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
@@ -50,23 +50,23 @@ impl forwarding::io::base_io::Forwarding for forwarding::io::base_io::PhpClass {
     type Handle = std::rc::Rc<std::cell::RefCell<dyn IOInterface>>;
 
     fn is_interactive(io: &Self::Handle, _: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
-        Ok(io.borrow().is_interactive().to_wire())
+        Ok(io.borrow().is_interactive().to_plugin_value())
     }
 
     fn is_verbose(io: &Self::Handle, _: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
-        Ok(io.borrow().is_verbose().to_wire())
+        Ok(io.borrow().is_verbose().to_plugin_value())
     }
 
     fn is_very_verbose(io: &Self::Handle, _: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
-        Ok(io.borrow().is_very_verbose().to_wire())
+        Ok(io.borrow().is_very_verbose().to_plugin_value())
     }
 
     fn is_debug(io: &Self::Handle, _: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
-        Ok(io.borrow().is_debug().to_wire())
+        Ok(io.borrow().is_debug().to_plugin_value())
     }
 
     fn is_decorated(io: &Self::Handle, _: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
-        Ok(io.borrow().is_decorated().to_wire())
+        Ok(io.borrow().is_decorated().to_plugin_value())
     }
 
     fn write(io: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {

@@ -185,8 +185,8 @@ mechanism.
 #### throwable
 
 Subclasses of `\Throwable`. These always need a real PHP class definition in
-the child (so `catch`/`instanceof` work) regardless of category, and a wire
-mapping for the `Throw` message.
+the child (so `catch`/`instanceof` work) regardless of category, and a mapping to and
+from the fields of the `Throw` message.
 
 #### pure/mutator (per method)
 

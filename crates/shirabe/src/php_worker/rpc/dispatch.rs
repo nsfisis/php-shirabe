@@ -10,7 +10,7 @@ use crate::php_worker::rpc::{forwarding, table};
 use crate::php_worker::throwable::exception_into_throw;
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe_php_rpc::{PhpThrow, PluginValue, RustMethodDispatcher, ToWire};
+use shirabe_php_rpc::{PhpThrow, PluginValue, RustMethodDispatcher, ToPluginValue};
 use shirabe_php_shim::{AnyThrowable, ToPhpString, bformat, error_chain_message};
 
 /// Looks a class up in every Rust-side `ClassLoader` on the autoload stack, in stack order — the
@@ -47,7 +47,7 @@ impl RustMethodDispatcher for PluginRpcDispatcher {
                 let name = arg::<BString>(method_name, &args, 0)?;
                 let input_line = arg::<BString>(method_name, &args, 1)?;
                 return match run_worker_reverse_command(name.as_ref(), input_line.as_ref()) {
-                    Ok(code) => Ok(code.to_wire()),
+                    Ok(code) => Ok(code.to_plugin_value()),
                     Err(e) => Err(PhpThrow::runtime(error_chain_message(&e).to_php_string())),
                 };
             }
@@ -90,7 +90,7 @@ fn dispatch_runtime_service_method(
         let class = arg::<BString>(method_name, args, 0)?;
         return Ok(find_file_in_registered_loaders(&class)
             .map_err(|error| error_throw(b"__shirabe_find_file failed", &error))?
-            .to_wire());
+            .to_plugin_value());
     }
     if method_name == "__shirabe_construct" {
         return construct(args);
@@ -125,11 +125,11 @@ fn dispatch_job_service_method(
                 .get(1)
                 .cloned()
                 .expect("the worker rejects a job with the description of its exception");
-            job::settle_php_job(id, Err(PhpThrow::from_wire(description)));
+            job::settle_php_job(id, Err(PhpThrow::from_plugin_value(description)));
             PluginValue::Null
         }),
         b"__shirabe_cancel_job" => job_id().map(|id| match job::cancel(id) {
-            Some(throw) => throw.to_wire(),
+            Some(throw) => throw.to_plugin_value(),
             None => PluginValue::Null,
         }),
         b"__shirabe_abort_jobs" => {

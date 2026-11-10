@@ -12,7 +12,7 @@ use crate::php_worker::rpc::entity::{Call, Crossing, Entity, entity_value};
 use crate::php_worker::rpc::forwarding;
 use crate::util::{CommandLine, ProcessExecutor};
 use bstr::{BStr, BString};
-use shirabe_php_rpc::{FromWire, PhpThrow, PluginValue, ToWire, wire};
+use shirabe_php_rpc::{FromPluginValue, PhpThrow, PluginValue, ToPluginValue, codec};
 use shirabe_php_shim::{Catch as _, LogicException, path_from_bytes};
 
 impl Entity for std::rc::Rc<std::cell::RefCell<ProcessExecutor>> {
@@ -65,7 +65,7 @@ impl forwarding::util::process_executor::Forwarding
             return process
                 .borrow()
                 .execute(command, ProcessExecutor::FORWARD_OUTPUT, cwd.as_deref())
-                .map(|code| code.to_wire())
+                .map(|code| code.to_plugin_value())
                 .map_err(failed);
         };
         if is_php_callable(output).map_err(&failed)? {
@@ -81,7 +81,7 @@ impl forwarding::util::process_executor::Forwarding
             return process
                 .borrow()
                 .execute(command, callback, cwd.as_deref())
-                .map(|code| code.to_wire())
+                .map(|code| code.to_plugin_value())
                 .map_err(failed);
         }
         let mut captured: Option<BString> = None;
@@ -94,7 +94,7 @@ impl forwarding::util::process_executor::Forwarding
         if let Some(captured) = captured {
             call.set_out_param(1, PluginValue::string(captured));
         }
-        Ok(code.to_wire())
+        Ok(code.to_plugin_value())
     }
 
     fn execute_tty(process: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
@@ -102,7 +102,7 @@ impl forwarding::util::process_executor::Forwarding
             .borrow()
             .execute_tty(exec_command_arg(call, 0)?, cwd(call, 1)?.as_deref())
             .map_err(call.failed())?
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn split_lines(process: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
@@ -128,7 +128,7 @@ impl forwarding::util::process_executor::Forwarding
         Ok(process
             .borrow()
             .requires_git_dir_env(&exec_command_arg(call, 0)?)
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn set_max_jobs(process: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
@@ -211,7 +211,7 @@ impl forwarding::util::process_executor::Forwarding
     }
 
     fn get_timeout(_: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
-        Ok(ProcessExecutor::get_timeout().to_wire())
+        Ok(ProcessExecutor::get_timeout().to_plugin_value())
     }
 
     fn set_timeout(call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
@@ -222,11 +222,14 @@ impl forwarding::util::process_executor::Forwarding
 
 /// Decodes the `string|non-empty-list<string>` a process executor takes as its command.
 fn exec_command_arg(call: &Call<'_>, position: usize) -> Result<CommandLine, PhpThrow> {
-    let value = call.args().get(position).unwrap_or(&wire::NULL);
+    let value = call.args().get(position).unwrap_or(&codec::NULL);
     match value {
         PluginValue::String(bytes) => Ok(CommandLine::Shell(bytes.clone())),
-        PluginValue::List(_) => Vec::<BString>::from_wire(value).map(CommandLine::Args),
-        other => Err(wire::unexpected("a command string or argument list", other)),
+        PluginValue::List(_) => Vec::<BString>::from_plugin_value(value).map(CommandLine::Args),
+        other => Err(codec::unexpected(
+            "a command string or argument list",
+            other,
+        )),
     }
     .map_err(|throw| call.arg_throw(position, throw))
 }

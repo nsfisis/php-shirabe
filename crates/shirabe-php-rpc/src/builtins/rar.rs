@@ -8,8 +8,8 @@
 
 use crate::PhpObjHandle;
 use crate::builtins::or_false;
+use crate::codec::{ToPluginValue, protocol_value};
 use crate::transport::{RefuseCallbacks, call_php_method, call_static_method};
-use crate::wire::{ToWire, protocol_value};
 use bstr::BStr;
 use shirabe_php_shim::php_str;
 
@@ -26,7 +26,7 @@ impl RarArchive {
         let value = call_static_method(
             CLASS,
             "open",
-            vec![file.as_ref().to_wire()],
+            vec![file.as_ref().to_plugin_value()],
             &mut RefuseCallbacks,
         )??;
         Ok(or_false(&value, "RarArchive::open()").map(|entity| RarArchive { entity }))
@@ -63,7 +63,7 @@ impl RarEntry {
         let value = call_php_method(
             &self.entity,
             "extract",
-            vec![dir.as_ref().to_wire()],
+            vec![dir.as_ref().to_plugin_value()],
             &mut RefuseCallbacks,
         )??;
         Ok(protocol_value(&value, "RarEntry::extract()"))

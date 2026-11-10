@@ -4,7 +4,7 @@
 use crate::php_worker::rpc::entity::{Call, Crossing, Entity};
 use crate::php_worker::rpc::forwarding;
 use crate::plugin::PluginInterface;
-use shirabe_php_rpc::{PhpThrow, PluginValue, ToWire};
+use shirabe_php_rpc::{PhpThrow, PluginValue, ToPluginValue};
 
 impl Entity for std::rc::Rc<std::cell::RefCell<dyn PluginInterface>> {
     const EXPECTED: &'static [u8] = b"a plugin";
@@ -46,6 +46,6 @@ impl forwarding::shirabe::rust_capable_plugin_stub::Forwarding
             .expect("only a Capable plugin crosses as Shirabe\\RustCapablePluginStub")
             .get_capabilities()
             .map_err(call.failed())?;
-        Ok(capabilities.to_wire())
+        Ok(capabilities.to_plugin_value())
     }
 }

@@ -8,7 +8,7 @@ use crate::php_worker::rpc::entity::entity_value;
 use crate::plugin::{Capable, PluginInterface};
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
-use shirabe_php_rpc::{FromWire, PhpObjHandle, PhpThrow, PluginValue, wire};
+use shirabe_php_rpc::{FromPluginValue, PhpObjHandle, PhpThrow, PluginValue, codec};
 use shirabe_php_shim::PhpMixed;
 
 /// `PluginInterface` adapter for a plugin entity living in the PHP child process: every
@@ -125,12 +125,13 @@ impl Capable for PhpPluginProxy {
         let entries = match value {
             PluginValue::Null => IndexMap::new(),
             array @ (PluginValue::Array(_) | PluginValue::List(_)) => {
-                IndexMap::<BString, PhpMixed>::from_wire(&array)
+                IndexMap::<BString, PhpMixed>::from_plugin_value(&array)
                     .map_err(|throw| call.unsupported_shape(throw))?
             }
             scalar => IndexMap::from([(
                 "0".into(),
-                PhpMixed::from_wire(&scalar).map_err(|throw| call.unsupported_shape(throw))?,
+                PhpMixed::from_plugin_value(&scalar)
+                    .map_err(|throw| call.unsupported_shape(throw))?,
             )]),
         };
         Ok(entries)
@@ -140,12 +141,12 @@ impl Capable for PhpPluginProxy {
 /// One entry of a `getSubscribedEvents()` answer, in the three shapes `addSubscriber`
 /// distinguishes: `'method'`, `['method', priority]`, and `[['method', priority], ...]`. A shape
 /// outside these is an explicit error, never a silently dropped listener.
-impl FromWire for SubscribedEventEntry {
-    fn from_wire(value: &PluginValue) -> Result<Self, PhpThrow> {
+impl FromPluginValue for SubscribedEventEntry {
+    fn from_plugin_value(value: &PluginValue) -> Result<Self, PhpThrow> {
         let listener = |items: &[PluginValue]| -> Result<(BString, Option<i64>), PhpThrow> {
             Ok((
-                BString::from_wire(items.first().unwrap_or(&wire::NULL))?,
-                Option::<i64>::from_wire(items.get(1).unwrap_or(&wire::NULL))?,
+                BString::from_plugin_value(items.first().unwrap_or(&codec::NULL))?,
+                Option::<i64>::from_plugin_value(items.get(1).unwrap_or(&codec::NULL))?,
             ))
         };
         match value {
@@ -158,11 +159,11 @@ impl FromWire for SubscribedEventEntry {
                 .iter()
                 .map(|item| match item {
                     PluginValue::List(pair) => listener(pair),
-                    other => Err(wire::unexpected("a [method, priority] pair", other)),
+                    other => Err(codec::unexpected("a [method, priority] pair", other)),
                 })
                 .collect::<Result<_, _>>()
                 .map(SubscribedEventEntry::Methods),
-            other => Err(wire::unexpected(
+            other => Err(codec::unexpected(
                 "a listener method or a list of them",
                 other,
             )),
@@ -177,8 +178,8 @@ mod tests {
     #[test]
     fn a_listener_method_name_that_is_not_utf8_keeps_its_bytes() {
         let method = BString::from(b"on\xffEvent".as_slice());
-        let events = IndexMap::<BString, SubscribedEventEntry>::from_wire(&PluginValue::Array(
-            IndexMap::from([
+        let events = IndexMap::<BString, SubscribedEventEntry>::from_plugin_value(
+            &PluginValue::Array(IndexMap::from([
                 (BString::from("a"), PluginValue::String(method.clone())),
                 (
                     BString::from("b"),
@@ -193,8 +194,8 @@ mod tests {
                         method.clone(),
                     )])]),
                 ),
-            ]),
-        ))
+            ])),
+        )
         .unwrap();
         assert!(matches!(&events[bstr::B("a")], SubscribedEventEntry::Method(m) if *m == method));
         assert!(
@@ -208,10 +209,11 @@ mod tests {
     #[test]
     fn an_event_name_that_is_not_utf8_keeps_its_bytes() {
         let name = BString::from(b"event\xE9".as_slice());
-        let events = IndexMap::<BString, SubscribedEventEntry>::from_wire(&PluginValue::Array(
-            IndexMap::from([(name.clone(), PluginValue::String(BString::from("method")))]),
-        ))
-        .unwrap();
+        let events =
+            IndexMap::<BString, SubscribedEventEntry>::from_plugin_value(&PluginValue::Array(
+                IndexMap::from([(name.clone(), PluginValue::String(BString::from("method")))]),
+            ))
+            .unwrap();
         assert!(events.contains_key(&name));
     }
 }

@@ -12,7 +12,7 @@ use crate::php_worker::call::PhpCall;
 use crate::php_worker::{bundle, installed_versions};
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
-use shirabe_php_rpc::{FromWire, PhpObjHandle, PluginValue};
+use shirabe_php_rpc::{FromPluginValue, PhpObjHandle, PluginValue};
 use shirabe_php_shim::bformat;
 
 pub(crate) mod autoloading;
@@ -124,7 +124,7 @@ pub(crate) fn anonymous_class_display_name(class: &BStr) -> anyhow::Result<BStri
     let parent = match get_parent_class.run::<PluginValue>(vec![string()])? {
         PluginValue::Bool(false) => None,
         value => Some(
-            BString::from_wire(&value)
+            BString::from_plugin_value(&value)
                 .map_err(|throw| get_parent_class.unsupported_shape(throw))?,
         ),
     };

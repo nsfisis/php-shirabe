@@ -57,7 +57,7 @@ Six rules follow.
 
 *Eager settling.* This would be a correctness bug, not just a performance problem. When every job settles before the call that started it returns, `countActiveJobs()` can only answer `0`, `abortJobs()` has nothing to cancel, the progress bar has nothing to advance, and a plugin that starts ten downloads gets them run one after another. The whole observable surface of the async API degenerates.
 
-## Wire
+## Wire protocol
 
 The additions to [docs/dev/php-rpc.md](./php-rpc.md) are small, deliberately. There is no new frame tag and no new message direction.
 
@@ -69,7 +69,7 @@ Alongside `RustHandle` and `PhpHandle`, a job travels as the record of its own r
 Shirabe\Wire\Job {id: <int>}
 ```
 
-Ownership is encoded in the parity of the id, as it already is for correlation ids. **Rust allocates odd job ids, the worker even ones.** An even id names either a PHP-owned job or a settled promise the worker built for `__shirabe_resolved_promise` / `__shirabe_rejected_promise` and is holding until the id comes back. The worker's `fromWire` creates and interns a `Deferred` for an id it has not seen, so one id always resolves to the same promise object. The intern table holds the `Deferred` strongly, and the entry is removed when the settle push arrives. A `Deferred` outlives the plugin dropping its promise, until the job settles, just as Composer's `$this->jobs[$id]['resolve']` keeps hold of the promise's internals. The worker's `toWire` maps a `React\Promise\PromiseInterface` to an even id and registers the settle recorder on it.
+Ownership is encoded in the parity of the id, as it already is for correlation ids. **Rust allocates odd job ids, the worker even ones.** An even id names either a PHP-owned job or a settled promise the worker built for `__shirabe_resolved_promise` / `__shirabe_rejected_promise` and is holding until the id comes back. The worker's `fromPluginValue` creates and interns a `Deferred` for an id it has not seen, so one id always resolves to the same promise object. The intern table holds the `Deferred` strongly, and the entry is removed when the settle push arrives. A `Deferred` outlives the plugin dropping its promise, until the job settles, just as Composer's `$this->jobs[$id]['resolve']` keeps hold of the promise's internals. The worker's `toPluginValue` maps a `React\Promise\PromiseInterface` to an even id and registers the settle recorder on it.
 
 ### Worker functions (Rust → PHP)
 
@@ -77,7 +77,7 @@ Ownership is encoded in the parity of the id, as it already is for correlation i
 |---|---|
 | `__shirabe_resolve_job` | `(id, value)` — resolves the `Deferred` of a Rust-owned job. Runs the plugin's callbacks synchronously. |
 | `__shirabe_reject_job` | `(id, exception)` — the failure half. `exception` is the description a `Throw` frame carries; `\Shirabe\MaterializedThrowable` builds the exception from it and rejects the `Deferred`. |
-| `__shirabe_resolved_promise` | `(value)` — the fast path for a Rust method that must answer with `PromiseInterface` and has the value before building a future. There is no job to register. A promise is never an entity, so this cannot hand the promise itself back: the worker parks it under an even id, `toWire` answers with that id instead of registering a job, and the Rust method passes the descriptor on as its own answer, where `fromWire` exchanges it for the parked promise. |
+| `__shirabe_resolved_promise` | `(value)` — the fast path for a Rust method that must answer with `PromiseInterface` and has the value before building a future. There is no job to register. A promise is never an entity, so this cannot hand the promise itself back: the worker parks it under an even id, `toPluginValue` answers with that id instead of registering a job, and the Rust method passes the descriptor on as its own answer, where `fromPluginValue` exchanges it for the parked promise. |
 | `__shirabe_rejected_promise` | `(exception)` — the failure half. |
 
 ### Runtime service methods (PHP → Rust, handle 0)

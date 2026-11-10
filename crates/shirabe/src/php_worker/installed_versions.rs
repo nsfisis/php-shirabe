@@ -4,7 +4,7 @@
 use crate::php_worker::call::PhpCall;
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
-use shirabe_php_rpc::{PluginValue, ToWire};
+use shirabe_php_rpc::{PluginValue, ToPluginValue};
 use shirabe_php_shim::{PhpMixed, path_to_bytes};
 
 /// The `installed.php` passed to [`safely_load`], waiting for the Composer PHP runtime to be
@@ -51,7 +51,7 @@ pub(crate) fn reload(
     }
     PhpCall::Function(BStr::new("__shirabe_installed_versions_reload")).run::<PluginValue>(
         vec![
-            PhpMixed::Array(versions).to_wire(),
+            PhpMixed::Array(versions).to_plugin_value(),
             PluginValue::string(path_to_bytes(repo_dir)),
         ],
     )?;

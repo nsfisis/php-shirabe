@@ -7,7 +7,7 @@ use crate::php_worker::rpc::entity::{Call, Crossing, Entity};
 use crate::php_worker::rpc::forwarding;
 use crate::php_worker::runtime;
 use bstr::BStr;
-use shirabe_php_rpc::{PhpObjHandle, PhpThrow, PluginValue, ToWire};
+use shirabe_php_rpc::{PhpObjHandle, PhpThrow, PluginValue, ToPluginValue};
 use shirabe_php_shim::{bformat, error_chain_message};
 
 impl Entity for std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>> {
@@ -55,7 +55,7 @@ impl forwarding::installer::installation_manager::Forwarding
 
     fn get_install_path(im: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
         let package = call.arg::<PackageInterfaceHandle>(0)?;
-        Ok(im.borrow().get_install_path(package).to_wire())
+        Ok(im.borrow().get_install_path(package).to_plugin_value())
     }
 
     fn add_installer(im: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {

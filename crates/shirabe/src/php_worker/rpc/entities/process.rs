@@ -4,10 +4,10 @@ use crate::php_worker::rpc::entity::{Call, Crossing, Entity};
 use crate::php_worker::rpc::forwarding;
 use bstr::BString;
 use indexmap::IndexMap;
-use shirabe_php_rpc::{PhpThrow, PluginValue, ToWire};
+use shirabe_php_rpc::{PhpThrow, PluginValue, ToPluginValue};
 use shirabe_php_shim::PhpMixed;
 
-shirabe_php_rpc::wire_record! {
+shirabe_php_rpc::plugin_value_record! {
     /// Everything `Shirabe\RustProcessStub` answers about the terminated process behind it.
     #[derive(Debug)]
     struct ProcessFacts {
@@ -68,6 +68,6 @@ impl forwarding::shirabe::rust_process_stub::Forwarding
             timeout: process.get_timeout(),
             start_time: process.get_start_time().map_err(&failed)?,
         }
-        .to_wire())
+        .to_plugin_value())
     }
 }

@@ -11,7 +11,7 @@ use crate::php_worker::rpc::entity::{Call, Crossing, Entity};
 use crate::php_worker::rpc::{forwarding, table};
 use crate::util::HttpDownloader;
 use bstr::{BStr, BString};
-use shirabe_php_rpc::{PhpThrow, PluginValue, ToWire};
+use shirabe_php_rpc::{PhpThrow, PluginValue, ToPluginValue};
 use shirabe_php_shim::{PhpMixed, bformat, path_from_bytes};
 
 impl Entity for std::rc::Rc<std::cell::RefCell<dyn DownloadManagerInterface>> {
@@ -63,7 +63,7 @@ fn promise(
             started.set(true);
             future
                 .await
-                .map(|resolved| resolved.to_wire())
+                .map(|resolved| resolved.to_plugin_value())
                 .map_err(failed)
         }),
     ))

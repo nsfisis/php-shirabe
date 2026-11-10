@@ -8,7 +8,7 @@
 use crate::php_worker::rpc::dispatch::PluginRpcDispatcher;
 use crate::php_worker::throwable::throw_into_error;
 use bstr::BStr;
-use shirabe_php_rpc::{FromWire, PhpObjHandle, PhpThrow, PluginValue, RustMethodDispatcher};
+use shirabe_php_rpc::{FromPluginValue, PhpObjHandle, PhpThrow, PluginValue, RustMethodDispatcher};
 use shirabe_php_shim::{RuntimeException, bformat};
 
 /// What a call into the worker runs.
@@ -26,12 +26,12 @@ pub enum PhpCall<'a> {
 
 impl PhpCall<'_> {
     /// Runs the call. A PHP exception becomes the error of the ported exception it stands for.
-    pub fn run<R: FromWire>(self, args: Vec<PluginValue>) -> anyhow::Result<R> {
+    pub fn run<R: FromPluginValue>(self, args: Vec<PluginValue>) -> anyhow::Result<R> {
         self.run_with(args, &mut PluginRpcDispatcher)
     }
 
     /// [`PhpCall::run`], for a caller that catches the PHP exception itself.
-    pub fn try_run<R: FromWire>(
+    pub fn try_run<R: FromPluginValue>(
         self,
         args: Vec<PluginValue>,
     ) -> anyhow::Result<Result<R, PhpThrow>> {
@@ -39,7 +39,7 @@ impl PhpCall<'_> {
     }
 
     /// [`PhpCall::run`] with `dispatcher` serving the callbacks.
-    pub fn run_with<R: FromWire>(
+    pub fn run_with<R: FromPluginValue>(
         self,
         args: Vec<PluginValue>,
         dispatcher: &mut dyn RustMethodDispatcher,
@@ -50,7 +50,7 @@ impl PhpCall<'_> {
 
     /// [`PhpCall::try_run`] with `dispatcher` serving the callbacks. An answer that is not an `R`
     /// is the error [`PhpCall::unsupported_shape`] describes.
-    pub fn try_run_with<R: FromWire>(
+    pub fn try_run_with<R: FromPluginValue>(
         self,
         args: Vec<PluginValue>,
         dispatcher: &mut dyn RustMethodDispatcher,
@@ -66,7 +66,9 @@ impl PhpCall<'_> {
             PhpCall::New(class) => shirabe_php_rpc::new_object(class, args, dispatcher),
         }?;
         Ok(match outcome {
-            Ok(value) => Ok(R::from_wire(&value).map_err(|throw| self.unsupported_shape(throw))?),
+            Ok(value) => {
+                Ok(R::from_plugin_value(&value).map_err(|throw| self.unsupported_shape(throw))?)
+            }
             Err(throw) => Err(throw),
         })
     }

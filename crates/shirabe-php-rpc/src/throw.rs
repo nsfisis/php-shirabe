@@ -1,5 +1,5 @@
+use crate::codec::protocol_value;
 use crate::value::PluginValue;
-use crate::wire::protocol_value;
 use bstr::BString;
 use indexmap::IndexMap;
 
@@ -50,17 +50,18 @@ impl PhpThrow {
     /// frame, a job rejection, or a value an entry point answers with: `[class, message, code,
     /// properties, file, line, parents]`. `\Shirabe\MaterializedThrowable::describe()` writes the
     /// same list on the PHP side.
-    pub fn to_wire(&self) -> PluginValue {
-        PluginValue::List(self.wire_fields())
+    pub fn to_plugin_value(&self) -> PluginValue {
+        PluginValue::List(self.payload_fields())
     }
 
-    /// Rebuilds the exception [`PhpThrow::to_wire`] describes. Both sides write the description
-    /// in the same commit of Shirabe, so one that does not decode is a protocol violation.
-    pub fn from_wire(value: PluginValue) -> PhpThrow {
-        PhpThrow::from_wire_fields(protocol_value(&value, "an exception description"))
+    /// Rebuilds the exception [`PhpThrow::to_plugin_value`] describes. Both sides write the
+    /// description in the same commit of Shirabe, so one that does not decode is a protocol
+    /// violation.
+    pub fn from_plugin_value(value: PluginValue) -> PhpThrow {
+        PhpThrow::from_payload_fields(protocol_value(&value, "an exception description"))
     }
 
-    pub(crate) fn wire_fields(&self) -> Vec<PluginValue> {
+    pub(crate) fn payload_fields(&self) -> Vec<PluginValue> {
         vec![
             PluginValue::string(self.exception_class.clone()),
             PluginValue::string(self.message.clone()),
@@ -78,7 +79,7 @@ impl PhpThrow {
         ]
     }
 
-    pub(crate) fn from_wire_fields(fields: Vec<PluginValue>) -> PhpThrow {
+    pub(crate) fn from_payload_fields(fields: Vec<PluginValue>) -> PhpThrow {
         let Ok([class, message, code, properties, file, line, parents]) =
             <[PluginValue; 7]>::try_from(fields)
         else {

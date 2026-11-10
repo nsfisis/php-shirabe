@@ -10,7 +10,7 @@ use crate::php_worker::rpc::dispatch::error_throw;
 use crate::php_worker::rpc::table;
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
-use shirabe_php_rpc::{FromWire, PhpThrow, PluginValue, RustObjHandle, wire};
+use shirabe_php_rpc::{FromPluginValue, PhpThrow, PluginValue, RustObjHandle, codec};
 use shirabe_php_shim::bformat;
 
 /// A handle type pointing to a Rust-side entity that crosses the boundary.
@@ -136,17 +136,19 @@ impl<'a> Call<'a> {
 
     /// Decodes the argument at `position`. A missing argument decodes the same way PHP's `null`
     /// does; a parameter's own default belongs to `arg_or`.
-    pub fn arg<T: FromWire>(&self, position: usize) -> Result<T, PhpThrow> {
-        T::from_wire(self.args.get(position).unwrap_or(&wire::NULL))
+    pub fn arg<T: FromPluginValue>(&self, position: usize) -> Result<T, PhpThrow> {
+        T::from_plugin_value(self.args.get(position).unwrap_or(&codec::NULL))
             .map_err(|throw| self.arg_throw(position, throw))
     }
 
     /// Decodes the argument at `position` for a parameter whose PHP declaration carries a
     /// default: an omitted argument, and the `null` PHP passes in its place, take `default`.
-    pub fn arg_or<T: FromWire>(&self, position: usize, default: T) -> Result<T, PhpThrow> {
+    pub fn arg_or<T: FromPluginValue>(&self, position: usize, default: T) -> Result<T, PhpThrow> {
         match self.args.get(position) {
             None | Some(PluginValue::Null) => Ok(default),
-            Some(value) => T::from_wire(value).map_err(|throw| self.arg_throw(position, throw)),
+            Some(value) => {
+                T::from_plugin_value(value).map_err(|throw| self.arg_throw(position, throw))
+            }
         }
     }
 
@@ -248,10 +250,10 @@ pub fn entity_value<H: Entity>(entity: &H) -> Result<PluginValue, PhpThrow> {
 #[derive(Debug)]
 pub struct EntityArg<H>(pub H);
 
-impl<H: Entity> FromWire for EntityArg<H> {
-    fn from_wire(value: &PluginValue) -> Result<Self, PhpThrow> {
+impl<H: Entity> FromPluginValue for EntityArg<H> {
+    fn from_plugin_value(value: &PluginValue) -> Result<Self, PhpThrow> {
         let PluginValue::RustHandle(handle) = value else {
-            return Err(wire::unexpected(H::EXPECTED, value));
+            return Err(codec::unexpected(H::EXPECTED, value));
         };
         table::lookup::<H>(handle.rhandle)
             .map(EntityArg)

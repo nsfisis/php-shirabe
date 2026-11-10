@@ -14,7 +14,7 @@ use crate::php_worker::runtime;
 use crate::util::StreamContextOptions;
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
-use shirabe_php_rpc::{FromWire, PhpObjHandle, PhpThrow, PluginValue, ToWire, wire};
+use shirabe_php_rpc::{FromPluginValue, PhpObjHandle, PhpThrow, PluginValue, ToPluginValue, codec};
 use shirabe_php_shim::{
     PhpMixed, path_from_bytes, path_to_bytes, php_regex, php_str, preg_match, utf8_text,
 };
@@ -40,7 +40,7 @@ pub struct RemoteFilesystem {
 
 impl RemoteFilesystem {
     /// TODO(plugin): PHP's trailing `?AuthHelper $authHelper` parameter is not offered: a Rust
-    /// `AuthHelper` has no wire form, so the PHP instance always builds its own.
+    /// `AuthHelper` cannot cross the wire, so the PHP instance always builds its own.
     pub fn new(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
@@ -71,7 +71,7 @@ impl RemoteFilesystem {
                 PluginValue::string(file_url.as_ref()),
                 PluginValue::string(path_to_bytes(file_name.as_ref())),
                 PluginValue::Bool(progress),
-                options.to_wire(),
+                options.to_plugin_value(),
             ],
         )
     }
@@ -89,7 +89,7 @@ impl RemoteFilesystem {
                 PluginValue::string(origin_url.as_ref()),
                 PluginValue::string(file_url.as_ref()),
                 PluginValue::Bool(progress),
-                options.to_wire(),
+                options.to_plugin_value(),
             ],
         )
     }
@@ -99,7 +99,7 @@ impl RemoteFilesystem {
     }
 
     pub fn set_options(&self, options: StreamContextOptions) -> anyhow::Result<()> {
-        self.call::<PluginValue>(BStr::new("setOptions"), vec![options.to_wire()])?;
+        self.call::<PluginValue>(BStr::new("setOptions"), vec![options.to_plugin_value()])?;
         Ok(())
     }
 
@@ -130,7 +130,7 @@ impl RemoteFilesystem {
     pub fn find_status_message(&self, headers: &[BString]) -> anyhow::Result<Option<BString>> {
         self.call(
             BStr::new("findStatusMessage"),
-            vec![headers.to_vec().to_wire()],
+            vec![headers.to_vec().to_plugin_value()],
         )
     }
 
@@ -147,7 +147,7 @@ impl RemoteFilesystem {
         let handle: PhpObjHandle = PhpCall::New(CLASS).run(vec![
             entity_value(&self.io)?,
             entity_value(&self.config)?,
-            self.options.clone().to_wire(),
+            self.options.clone().to_plugin_value(),
             PluginValue::Bool(self.disable_tls),
         ])?;
 
@@ -156,7 +156,7 @@ impl RemoteFilesystem {
 
     /// Forwards the call to the PHP instance. An exception it throws comes back as the ported
     /// class, so a caller catching `TransportException` catches it as it would under Composer.
-    fn call<R: FromWire>(&self, method: &BStr, args: Vec<PluginValue>) -> anyhow::Result<R> {
+    fn call<R: FromPluginValue>(&self, method: &BStr, args: Vec<PluginValue>) -> anyhow::Result<R> {
         PhpCall::Method(self.entity()?, method).run(args)
     }
 
@@ -171,7 +171,7 @@ impl RemoteFilesystem {
             BStr::new("getOptionsForUrl"),
             vec![
                 PluginValue::string(origin_url.as_ref()),
-                additional_options.to_wire(),
+                additional_options.to_plugin_value(),
             ],
         )
     }
@@ -230,7 +230,7 @@ impl RemoteFilesystem {
         self.reflection_get_property(BStr::new("lastProgress"))
     }
 
-    fn reflection_invoke<R: FromWire>(
+    fn reflection_invoke<R: FromPluginValue>(
         &self,
         method: &BStr,
         args: Vec<PluginValue>,
@@ -243,7 +243,7 @@ impl RemoteFilesystem {
         ])
     }
 
-    fn reflection_get_property<R: FromWire>(&self, name: &BStr) -> anyhow::Result<R> {
+    fn reflection_get_property<R: FromPluginValue>(&self, name: &BStr) -> anyhow::Result<R> {
         let entity = PluginValue::PhpHandle(self.entity()?.clone());
         PhpCall::Function(BStr::new("__shirabe_reflection_get_property"))
             .run(vec![entity, PluginValue::string(name)])
@@ -258,13 +258,13 @@ impl RemoteFilesystem {
 }
 
 /// `string|bool` as `get()` answers it: the content, or whether a copy succeeded.
-impl FromWire for GetResult {
-    fn from_wire(value: &PluginValue) -> Result<Self, PhpThrow> {
+impl FromPluginValue for GetResult {
+    fn from_plugin_value(value: &PluginValue) -> Result<Self, PhpThrow> {
         match value {
             PluginValue::Bool(true) => Ok(GetResult::True),
             PluginValue::Bool(false) => Ok(GetResult::False),
             PluginValue::String(content) => Ok(GetResult::Content(content.to_vec())),
-            other => Err(wire::unexpected("a string or a bool", other)),
+            other => Err(codec::unexpected("a string or a bool", other)),
         }
     }
 }

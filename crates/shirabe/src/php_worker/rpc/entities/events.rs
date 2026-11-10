@@ -14,7 +14,7 @@ use crate::plugin::{
 use crate::script::Event as ScriptEvent;
 use crate::util::StreamContextOptions;
 use bstr::BString;
-use shirabe_php_rpc::{PhpThrow, PluginValue, ToWire};
+use shirabe_php_rpc::{PhpThrow, PluginValue, ToPluginValue};
 use shirabe_php_shim::{PhpMixed, bformat};
 
 impl Entity for std::rc::Rc<std::cell::RefCell<dyn EventInterface>> {
@@ -88,7 +88,7 @@ impl forwarding::event_dispatcher::event::Forwarding
     }
 
     fn get_flags(event: &Self::Handle, _: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
-        Ok(PhpMixed::Array(event.borrow().get_flags().to_php_array()).to_wire())
+        Ok(PhpMixed::Array(event.borrow().get_flags().to_php_array()).to_plugin_value())
     }
 
     fn is_propagation_stopped(
@@ -304,7 +304,7 @@ fn file_download_context_value(
 ) -> Result<PluginValue, PhpThrow> {
     match context {
         None => Ok(PluginValue::Null),
-        Some(FileDownloadContext::Package(package)) => Ok(package.clone().to_wire()),
+        Some(FileDownloadContext::Package(package)) => Ok(package.clone().to_plugin_value()),
         // TODO(plugin): the array a repository passes names the repository itself, which cannot
         // cross the boundary yet.
         Some(FileDownloadContext::Repository) => Err(PhpThrow::runtime(
@@ -332,7 +332,7 @@ impl forwarding::plugin::pre_file_download_event::Forwarding
     ) -> Result<PluginValue, PhpThrow> {
         Ok(concrete::<PreFileDownloadEvent>(event)
             .get_processed_url()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn set_processed_url(
@@ -350,7 +350,7 @@ impl forwarding::plugin::pre_file_download_event::Forwarding
     ) -> Result<PluginValue, PhpThrow> {
         Ok(concrete::<PreFileDownloadEvent>(event)
             .get_custom_cache_key()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn set_custom_cache_key(
@@ -366,7 +366,9 @@ impl forwarding::plugin::pre_file_download_event::Forwarding
         event: &std::rc::Rc<std::cell::RefCell<dyn EventInterface>>,
         _: &mut Call<'_>,
     ) -> Result<PluginValue, PhpThrow> {
-        Ok(concrete::<PreFileDownloadEvent>(event).get_type().to_wire())
+        Ok(concrete::<PreFileDownloadEvent>(event)
+            .get_type()
+            .to_plugin_value())
     }
 
     fn get_context(
@@ -383,7 +385,7 @@ impl forwarding::plugin::pre_file_download_event::Forwarding
         Ok(concrete::<PreFileDownloadEvent>(event)
             .get_transport_options()
             .clone()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn set_transport_options(
@@ -405,7 +407,7 @@ impl forwarding::plugin::post_file_download_event::Forwarding
     ) -> Result<PluginValue, PhpThrow> {
         Ok(concrete::<PostFileDownloadEvent>(event)
             .get_file_name()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn get_checksum(
@@ -414,14 +416,16 @@ impl forwarding::plugin::post_file_download_event::Forwarding
     ) -> Result<PluginValue, PhpThrow> {
         Ok(concrete::<PostFileDownloadEvent>(event)
             .get_checksum()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn get_url(
         event: &std::rc::Rc<std::cell::RefCell<dyn EventInterface>>,
         _: &mut Call<'_>,
     ) -> Result<PluginValue, PhpThrow> {
-        Ok(concrete::<PostFileDownloadEvent>(event).get_url().to_wire())
+        Ok(concrete::<PostFileDownloadEvent>(event)
+            .get_url()
+            .to_plugin_value())
     }
 
     fn get_context(
@@ -437,7 +441,7 @@ impl forwarding::plugin::post_file_download_event::Forwarding
     ) -> Result<PluginValue, PhpThrow> {
         Ok(concrete::<PostFileDownloadEvent>(event)
             .get_package()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn get_type(
@@ -446,7 +450,7 @@ impl forwarding::plugin::post_file_download_event::Forwarding
     ) -> Result<PluginValue, PhpThrow> {
         Ok(concrete::<PostFileDownloadEvent>(event)
             .get_type()
-            .to_wire())
+            .to_plugin_value())
     }
 }
 
@@ -484,7 +488,7 @@ impl forwarding::plugin::pre_pool_create_event::Forwarding
         Ok(concrete::<PrePoolCreateEvent>(event)
             .get_acceptable_stabilities()
             .clone()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn get_stability_flags(
@@ -494,7 +498,7 @@ impl forwarding::plugin::pre_pool_create_event::Forwarding
         Ok(concrete::<PrePoolCreateEvent>(event)
             .get_stability_flags()
             .clone()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn get_root_aliases(
@@ -504,7 +508,7 @@ impl forwarding::plugin::pre_pool_create_event::Forwarding
         Ok(concrete::<PrePoolCreateEvent>(event)
             .get_root_aliases()
             .clone()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn get_root_references(
@@ -514,7 +518,7 @@ impl forwarding::plugin::pre_pool_create_event::Forwarding
         Ok(concrete::<PrePoolCreateEvent>(event)
             .get_root_references()
             .clone()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn get_packages(
@@ -524,7 +528,7 @@ impl forwarding::plugin::pre_pool_create_event::Forwarding
         Ok(concrete::<PrePoolCreateEvent>(event)
             .get_packages()
             .clone()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn get_unacceptable_fixed_packages(
@@ -534,7 +538,7 @@ impl forwarding::plugin::pre_pool_create_event::Forwarding
         Ok(concrete::<PrePoolCreateEvent>(event)
             .get_unacceptable_fixed_packages()
             .clone()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn set_packages(

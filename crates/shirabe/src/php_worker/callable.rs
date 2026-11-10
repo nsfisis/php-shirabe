@@ -70,7 +70,7 @@ pub(crate) fn call_static_with_event(
         .run_with(vec![argument], &mut ScriptRpcDispatcher)
 }
 
-shirabe_php_rpc::wire_record! {
+shirabe_php_rpc::plugin_value_record! {
     /// What the snippet hosting a `scripts` Command class reports about its run: the exit status,
     /// or the exception it ended with and whether Composer would have caught that exception.
     #[derive(Debug)]
@@ -125,7 +125,7 @@ pub(crate) fn run_command_script(
         output: result.output,
         throw: result
             .throw
-            .map(|throw| throw_into_error(PhpThrow::from_wire(throw))),
+            .map(|throw| throw_into_error(PhpThrow::from_plugin_value(throw))),
         caught: result.caught,
     })
 }

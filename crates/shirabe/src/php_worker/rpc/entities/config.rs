@@ -5,7 +5,7 @@ use crate::php_worker::rpc::entity::{Call, Crossing, Entity};
 use crate::php_worker::rpc::forwarding;
 use bstr::BString;
 use indexmap::IndexMap;
-use shirabe_php_rpc::{PhpThrow, PluginValue, ToWire};
+use shirabe_php_rpc::{PhpThrow, PluginValue, ToPluginValue};
 use shirabe_php_shim::PhpMixed;
 
 impl Entity for std::rc::Rc<std::cell::RefCell<Config>> {
@@ -31,7 +31,7 @@ impl forwarding::config::Forwarding for forwarding::config::PhpClass {
             .borrow()
             .get_with_flags(&call.arg::<BString>(0)?, call.arg_or(1, 0)?)
             .map_err(call.failed())?;
-        Ok(value.to_wire())
+        Ok(value.to_plugin_value())
     }
 
     fn all(config: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
@@ -39,19 +39,22 @@ impl forwarding::config::Forwarding for forwarding::config::PhpClass {
             .borrow()
             .all(call.arg_or(0, 0)?)
             .map_err(call.failed())?;
-        Ok(all.to_wire())
+        Ok(all.to_plugin_value())
     }
 
     fn raw(config: &Self::Handle, _: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
-        Ok(config.borrow().raw().to_wire())
+        Ok(config.borrow().raw().to_plugin_value())
     }
 
     fn has(config: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
-        Ok(config.borrow().has(&call.arg::<BString>(0)?).to_wire())
+        Ok(config
+            .borrow()
+            .has(&call.arg::<BString>(0)?)
+            .to_plugin_value())
     }
 
     fn get_repositories(config: &Self::Handle, _: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
-        Ok(config.borrow().get_repositories().to_wire())
+        Ok(config.borrow().get_repositories().to_plugin_value())
     }
 
     fn get_source_of_value(
@@ -62,7 +65,7 @@ impl forwarding::config::Forwarding for forwarding::config::PhpClass {
             .borrow()
             .get_source_of_value(&call.arg::<BString>(0)?)
             .map_err(call.failed())?;
-        Ok(source.to_wire())
+        Ok(source.to_plugin_value())
     }
 
     fn merge(config: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {

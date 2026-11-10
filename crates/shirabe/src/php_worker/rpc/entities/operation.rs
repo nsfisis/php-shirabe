@@ -8,7 +8,7 @@ use crate::package::{AliasPackageHandle, PackageInterfaceHandle};
 use crate::php_worker::rpc::entities::package::package_value;
 use crate::php_worker::rpc::entity::{Call, Crossing, Entity};
 use crate::php_worker::rpc::forwarding;
-use shirabe_php_rpc::{PhpThrow, PluginValue, ToWire, wire};
+use shirabe_php_rpc::{PhpThrow, PluginValue, ToPluginValue, codec};
 
 impl Entity for std::rc::Rc<AnyOperation> {
     const EXPECTED: &'static [u8] = b"an operation";
@@ -45,9 +45,9 @@ fn alias_package(call: &Call<'_>, position: usize) -> Result<AliasPackageHandle,
         .ok_or_else(|| {
             call.arg_throw(
                 position,
-                wire::unexpected(
+                codec::unexpected(
                     "an AliasPackage",
-                    call.args().get(position).unwrap_or(&wire::NULL),
+                    call.args().get(position).unwrap_or(&codec::NULL),
                 ),
             )
         })
@@ -66,15 +66,15 @@ impl forwarding::dependency_resolver::operation::solver_operation::Forwarding
         operation: &Self::Handle,
         _: &mut Call<'_>,
     ) -> Result<PluginValue, PhpThrow> {
-        Ok(operation.get_operation_type().to_wire())
+        Ok(operation.get_operation_type().to_plugin_value())
     }
 
     fn show(operation: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
-        Ok(operation.show(call.arg::<bool>(0)?).to_wire())
+        Ok(operation.show(call.arg::<bool>(0)?).to_plugin_value())
     }
 
     fn __to_string(operation: &Self::Handle, _: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
-        Ok(operation.show(false).to_wire())
+        Ok(operation.show(false).to_plugin_value())
     }
 }
 

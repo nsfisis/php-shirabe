@@ -6,7 +6,7 @@
 
 use crate::config::Config;
 use crate::io::IOInterface;
-use crate::php_worker::codec::response_to_wire;
+use crate::php_worker::codec::response_to_plugin_value;
 use crate::php_worker::job;
 use crate::php_worker::job::JobOwner;
 use crate::php_worker::job::rpc::{
@@ -17,7 +17,7 @@ use crate::php_worker::rpc::entity::{Call, Crossing, Entity};
 use crate::php_worker::rpc::forwarding;
 use crate::util::{HttpDownloader, HttpDownloaderJob, StreamContextOptions};
 use bstr::{BStr, BString, ByteSlice};
-use shirabe_php_rpc::{PhpThrow, PluginValue, ToWire};
+use shirabe_php_rpc::{PhpThrow, PluginValue, ToPluginValue};
 use shirabe_php_shim::{bformat, path_from_bytes};
 
 impl Entity for std::rc::Rc<std::cell::RefCell<HttpDownloader>> {
@@ -55,7 +55,9 @@ fn add_job(
         )
         .map_err(&failed)?;
     match job {
-        HttpDownloaderJob::Settled(Ok(response)) => resolved_promise(response_to_wire(&response)),
+        HttpDownloaderJob::Settled(Ok(response)) => {
+            resolved_promise(response_to_plugin_value(&response))
+        }
         HttpDownloaderJob::Settled(Err(error)) => rejected_promise(failed(error)),
         HttpDownloaderJob::Pending(future) => {
             let method = call.method().to_owned();
@@ -70,7 +72,7 @@ fn add_job(
                 Box::pin(async move {
                     future
                         .await
-                        .map(|response| response_to_wire(&response))
+                        .map(|response| response_to_plugin_value(&response))
                         .map_err(|error| error_throw(bformat!("{method} failed"), &error))
                 }),
             ))
@@ -96,7 +98,7 @@ impl forwarding::util::http_downloader::Forwarding for forwarding::util::http_do
     }
 
     fn get_options(downloader: &Self::Handle, _: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
-        Ok(downloader.borrow().get_options().clone().to_wire())
+        Ok(downloader.borrow().get_options().clone().to_plugin_value())
     }
 
     fn set_options(
@@ -115,7 +117,7 @@ impl forwarding::util::http_downloader::Forwarding for forwarding::util::http_do
             .borrow()
             .get(&url, options)
             .map_err(call.failed())?;
-        Ok(response_to_wire(&response))
+        Ok(response_to_plugin_value(&response))
     }
 
     fn copy(downloader: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
@@ -126,7 +128,7 @@ impl forwarding::util::http_downloader::Forwarding for forwarding::util::http_do
             .borrow()
             .copy(&url, path_from_bytes(&to), options)
             .map_err(call.failed())?;
-        Ok(response_to_wire(&response))
+        Ok(response_to_plugin_value(&response))
     }
 
     fn add(downloader: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {

@@ -12,8 +12,8 @@ use crate::plugin::PluginBlockedException;
 use crate::repository::{InvalidRepositoryException, RepositorySecurityException};
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe_php_rpc::wire::protocol_value;
-use shirabe_php_rpc::{PhpThrow, PluginValue, ToWire};
+use shirabe_php_rpc::codec::protocol_value;
+use shirabe_php_rpc::{PhpThrow, PluginValue, ToPluginValue};
 use shirabe_php_shim::{
     AnyThrowable, BadFunctionCallException, BadMethodCallException, Catch as _, Error, Exception,
     InvalidArgumentException, LogicException, OutOfBoundsException, PhpClass as _, PhpMixed,
@@ -258,7 +258,7 @@ fn throwable_properties(error: &anyhow::Error) -> IndexMap<bstr::BString, Plugin
                     .get_response_info()
                     .iter()
                     .cloned()
-                    .map(PhpMixed::to_wire)
+                    .map(PhpMixed::to_plugin_value)
                     .collect(),
             ),
         );
@@ -268,7 +268,7 @@ fn throwable_properties(error: &anyhow::Error) -> IndexMap<bstr::BString, Plugin
         properties.insert("warnings".into(), byte_strings(exception.get_warnings()));
         properties.insert(
             "data".into(),
-            PhpMixed::Array(exception.get_data().clone()).to_wire(),
+            PhpMixed::Array(exception.get_data().clone()).to_plugin_value(),
         );
     }
     if let Some(exception) = error.catch::<JsonValidationException>() {

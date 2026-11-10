@@ -77,10 +77,10 @@ record of a class reserved for it (declared in `php/runtime/Shirabe/Wire/`):
   allocates odd job ids, the PHP side even ones. See "Jobs" below.
 
 A descriptor is told apart from data by its class alone, so an array is always data, whatever its
-keys. Nothing but the codec writes a descriptor record: the worker's `toWire` turns every object
-into a descriptor or a materialized value, so an object of plugin code crosses as a `PhpHandle`
-even when it is an instance of a descriptor class. A descriptor record without exactly its
-declared properties is a protocol error.
+keys. Nothing but the codec writes a descriptor record: the worker's `toPluginValue` turns every
+object into a descriptor or a materialized value, so an object of plugin code crosses as a
+`PhpHandle` even when it is an instance of a descriptor class. A descriptor record without exactly
+its declared properties is a protocol error.
 
 An immutable value has no entity to point at, so it crosses in neither table: it travels as the
 object record `serialize()` writes for it (`PluginValue::PhpObject` — the class name and the
@@ -94,8 +94,8 @@ a record can never name an arbitrary class. Which classes are on the list, and h
 to a Rust value, is not part of the protocol; see "Materialized values" in
 [docs/dev/php-worker.md](./php-worker.md).
 
-An `a:` record decodes as `List` when its keys are exactly `0..N` and as `Array` otherwise; the
-wire has no shape for an object without a class, so such an object crosses as an array. A
+An `a:` record decodes as `List` when its keys are exactly `0..N` and as `Array` otherwise; a
+plugin value has no shape for an object without a class, so such an object crosses as an array. A
 repeated object instance arrives as PHP's `r:` back-reference, which the
 decoder resolves by copying the value it names (identity means nothing to a value on this side);
 a cyclic object graph and a PHP reference (`R:`) are both rejected. The decoder is iterative
@@ -106,17 +106,17 @@ The codec is verified against the real PHP `serialize()`/`unserialize()` by orac
 (`tests/oracle.rs`), with floats, non-UTF-8 byte strings, object records and deep nesting as
 focus areas.
 
-### Typed values: `ToWire` and `FromWire`
+### Typed values: `ToPluginValue` and `FromPluginValue`
 
-Code on either side of a call never takes a `PluginValue` apart by hand: `ToWire` encodes a Rust
-value as the PHP value the receiving side declares, and `FromWire` decodes one, failing with the
-`PhpThrow` a PHP caller gets for a value of the wrong shape (`src/wire.rs`). The same pair serves
-the arguments and the answer of a call in either direction. A value absent where PHP reads null
-(an omitted argument, a missing property) decodes from `PluginValue::Null`. Where a malformed
-value can only be a bug in Shirabe — a frame, or a payload only Shirabe's own worker code writes
-— `wire::protocol_value` turns the failure into a panic instead.
+Code on either side of a call never takes a `PluginValue` apart by hand: `ToPluginValue` encodes a
+Rust value as the PHP value the receiving side declares, and `FromPluginValue` decodes one, failing
+with the `PhpThrow` a PHP caller gets for a value of the wrong shape (`src/codec.rs`). The same pair
+serves the arguments and the answer of a call in either direction. A value absent where PHP reads
+null (an omitted argument, a missing property) decodes from `PluginValue::Null`. Where a malformed
+value can only be a bug in Shirabe — a frame, or a payload only Shirabe's own worker code writes —
+`codec::protocol_value` turns the failure into a panic instead.
 
-`src/wire.rs` implements the pair for the scalars, byte strings and paths, the containers
+`src/codec.rs` implements the pair for the scalars, byte strings and paths, the containers
 (`Option`, `Vec`, `IndexMap`), the handles, `\DateTimeInterface` (as the `\DateTimeImmutable`
 record, rebased on UTC because the Rust side carries no timezone database) and
 `shirabe_php_shim::PhpMixed`, which is the only conversion between `PhpMixed` and `PluginValue`.
@@ -154,7 +154,7 @@ same dispatch while waiting for its own `Return`.
   the boundary as a `Throw` frame.
 - An exception crosses as its description, the list a `Throw` frame carries as its payload, and
   as nothing else wherever else it crosses (a job rejection, a value an entry point answers
-  with). `PhpThrow::to_wire` / `PhpThrow::from_wire` on the Rust side and
+  with). `PhpThrow::to_plugin_value` / `PhpThrow::from_plugin_value` on the Rust side and
   `\Shirabe\MaterializedThrowable::describe` / `revive` in the worker are its only codec.
 - A description names the class the exception was thrown as, `properties` carries the state that
   class declares beyond `message` and `code`, and `file` and `line` are where it was created.
@@ -214,14 +214,14 @@ worker; one caught in a reference cycle keeps its entry until PHP's cycle collec
 everything goes away with the worker process.
 
 `ShirabePhpObjectRegistry` holds PHP-owned entities keyed by phandle, strongly referenced until the
-Rust side sends `ReleasePhpHandle`. `ShirabeRpcRuntime::toWire` turns any object that is not a
-proxy stub, a promise or a materialized value into a `PhpHandle` descriptor through
+Rust side sends `ReleasePhpHandle`. `ShirabeRpcRuntime::toPluginValue` turns any object that is not
+a proxy stub, a promise or a materialized value into a `PhpHandle` descriptor through
 `ShirabePhpObjectRegistry::descriptor` (interned by `spl_object_id`, so one entity keeps one
-handle); `ShirabeRpcRuntime::fromWire` resolves descriptors back to the live entity through
+handle); `ShirabeRpcRuntime::fromPluginValue` resolves descriptors back to the live entity through
 `ShirabePhpObjectRegistry::get`.
 
 On the Rust side a P-table entry is owned by `PhpObjHandle`, the only form a phandle takes outside
-the wire layer. Its clones share one reference-counted entry, and the decoder interns by phandle:
+the codec. Its clones share one reference-counted entry, and the decoder interns by phandle:
 decoding a descriptor whose phandle is already held yields another clone of the same entry,
 however many times and through whichever value the entity crosses. The entry therefore stands for
 the P-table entry itself, so the worker needs no reference count. When the last clone drops, the

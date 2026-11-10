@@ -6,7 +6,7 @@ use crate::php_worker::rpc::entity::{Call, Crossing, Entity, EntityArg, Property
 use crate::repository::RepositoryInterfaceHandle;
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe_php_rpc::{FromWire, PhpThrow, PluginValue, wire};
+use shirabe_php_rpc::{FromPluginValue, PhpThrow, PluginValue, codec};
 use shirabe_php_shim::bformat;
 
 /// An R-table entry: one registered entity, whatever its kind.
@@ -60,7 +60,7 @@ impl<H: Entity> Slot for Registered<H> {
                     b"__get" => PropertyAccess::Get { name },
                     b"__set" => PropertyAccess::Set {
                         name,
-                        value: args.get(1).unwrap_or(&wire::NULL),
+                        value: args.get(1).unwrap_or(&codec::NULL),
                     },
                     b"__isset" => PropertyAccess::Isset { name },
                     b"__unset" => PropertyAccess::Unset { name },
@@ -194,14 +194,14 @@ pub(crate) fn call(
     }
 }
 
-impl FromWire for PackageInterfaceHandle {
-    fn from_wire(value: &PluginValue) -> Result<Self, PhpThrow> {
-        EntityArg::from_wire(value).map(|package| package.0)
+impl FromPluginValue for PackageInterfaceHandle {
+    fn from_plugin_value(value: &PluginValue) -> Result<Self, PhpThrow> {
+        EntityArg::from_plugin_value(value).map(|package| package.0)
     }
 }
 
-impl FromWire for RepositoryInterfaceHandle {
-    fn from_wire(value: &PluginValue) -> Result<Self, PhpThrow> {
-        EntityArg::from_wire(value).map(|repository| repository.0)
+impl FromPluginValue for RepositoryInterfaceHandle {
+    fn from_plugin_value(value: &PluginValue) -> Result<Self, PhpThrow> {
+        EntityArg::from_plugin_value(value).map(|repository| repository.0)
     }
 }

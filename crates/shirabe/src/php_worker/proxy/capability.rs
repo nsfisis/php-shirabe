@@ -52,8 +52,8 @@ impl PhpCapabilityProxy {
     }
 
     /// For testing only: reads a public property of the capability entity in the child. Unlike
-    /// `PhpPluginProxy::__get_property` the value keeps its wire form, so a test can assert the
-    /// object identity behind a handle instead of only the plain data around it.
+    /// `PhpPluginProxy::__get_property` the value keeps its plugin value form, so a test can assert
+    /// the object identity behind a handle instead of only the plain data around it.
     pub fn __get_property(&self, name: &BStr) -> anyhow::Result<PluginValue> {
         PhpCall::Function(BStr::new("__shirabe_get_property")).run(vec![
             PluginValue::PhpHandle(self.handle.clone()),

@@ -1,7 +1,7 @@
 //! The methods a `Composer\Repository\RepositoryInterface` entity answers over RPC.
 
 use crate::package::PackageInterfaceHandle;
-use crate::php_worker::codec::constraint_from_wire;
+use crate::php_worker::codec::constraint_from_plugin_value;
 use crate::php_worker::rpc::entities::package::package_value;
 use crate::php_worker::rpc::entity::{Call, Crossing, Entity};
 use crate::php_worker::rpc::forwarding;
@@ -10,7 +10,7 @@ use crate::repository::{
     LockArrayRepository, RepositoryInterfaceHandle, WritableRepositoryInterface,
 };
 use bstr::{BString, ByteSlice};
-use shirabe_php_rpc::{PhpThrow, PluginValue, ToWire};
+use shirabe_php_rpc::{PhpThrow, PluginValue, ToPluginValue};
 use shirabe_php_shim::bformat;
 
 impl Entity for RepositoryInterfaceHandle {
@@ -46,7 +46,7 @@ fn find_package_constraint(
         Some(PluginValue::String(constraint)) => {
             Ok(Some(FindPackageConstraint::String(constraint.clone())))
         }
-        Some(value) => constraint_from_wire(value)
+        Some(value) => constraint_from_plugin_value(value)
             .map(|constraint| Some(FindPackageConstraint::Constraint(constraint)))
             .map_err(|throw| call.arg_throw(position, throw)),
     }
@@ -84,7 +84,7 @@ impl forwarding::repository::array_repository::Forwarding
     ) -> Result<PluginValue, PhpThrow> {
         let package = call.arg::<PackageInterfaceHandle>(0)?;
         let has = repository.has_package(package).map_err(call.failed())?;
-        Ok(has.to_wire())
+        Ok(has.to_plugin_value())
     }
 
     fn add_package(
@@ -178,7 +178,7 @@ impl forwarding::repository::writable_array_repository::Forwarding
             .expect("only a writable repository crosses as a WritableArrayRepository")
             .get_canonical_packages()
             .map_err(call.failed())?;
-        Ok(packages.to_wire())
+        Ok(packages.to_plugin_value())
     }
 
     fn get_dev_package_names(
@@ -190,7 +190,7 @@ impl forwarding::repository::writable_array_repository::Forwarding
             .as_writable_repository_interface_mut()
             .expect("only a writable repository crosses as a WritableArrayRepository")
             .get_dev_package_names()
-            .to_wire())
+            .to_plugin_value())
     }
 }
 

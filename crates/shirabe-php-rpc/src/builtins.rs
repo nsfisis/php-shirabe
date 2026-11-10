@@ -2,9 +2,9 @@
 
 pub mod rar;
 
+use crate::codec::{FromPluginValue, ToPluginValue, protocol_value};
 use crate::transport::call_internal_function;
 use crate::value::PluginValue;
-use crate::wire::{FromWire, ToWire, protocol_value};
 use bstr::{BStr, BString, ByteSlice};
 use shirabe_php_shim::{bformat, path_from_bytes};
 use std::sync::OnceLock;
@@ -46,7 +46,7 @@ pub fn get_php_binary() -> anyhow::Result<std::path::PathBuf> {
 }
 
 /// PHP `constant($name)`.
-fn constant<T: FromWire>(name: impl AsRef<[u8]>) -> anyhow::Result<T> {
+fn constant<T: FromPluginValue>(name: impl AsRef<[u8]>) -> anyhow::Result<T> {
     query("__shirabe_constant", name.as_ref().as_bstr())
 }
 
@@ -67,15 +67,21 @@ pub fn cached<T>(
 /// questions about the runtime. A failure to reach the worker and an exception the call throws are
 /// errors; an answer that does not decode as `T` is a protocol violation, because only the
 /// worker's own code or a PHP builtin with a fixed return type writes it.
-pub fn query<T: FromWire>(name: impl AsRef<[u8]>, request: impl ToWire) -> anyhow::Result<T> {
+pub fn query<T: FromPluginValue>(
+    name: impl AsRef<[u8]>,
+    request: impl ToPluginValue,
+) -> anyhow::Result<T> {
     let name = name.as_ref().as_bstr();
-    let value = call_internal_function(name, vec![request.to_wire()])??;
+    let value = call_internal_function(name, vec![request.to_plugin_value()])??;
     Ok(protocol_value(&value, bformat!("the answer of {name}")))
 }
 
 /// An answer typed `T|false`, with `false` mapped to `None`. Any other answer that does not decode
 /// as `T` is a protocol violation, as for [`query`].
-pub(crate) fn or_false<T: FromWire>(value: &PluginValue, what: impl AsRef<[u8]>) -> Option<T> {
+pub(crate) fn or_false<T: FromPluginValue>(
+    value: &PluginValue,
+    what: impl AsRef<[u8]>,
+) -> Option<T> {
     match value {
         PluginValue::Bool(false) => None,
         value => Some(protocol_value(value, what)),

@@ -85,7 +85,7 @@ regenerates the report.
   target or a `php/runtime/` class inherits the boilerplate from it) carry the
   proxy boilerplate: the `__rhandle` property, the `__shirabeBind`
   binder the registry calls when reviving a stub for an existing entity, a
-  destructor releasing the Rust handle, and the wire descriptor helper. The
+  destructor releasing the Rust handle, and the Rust handle descriptor helper. The
   real `extends`/`implements` hierarchy is preserved and `\ShirabeRustStub` is
   appended to the interface list.
 * **Constructors** reproduce the real class's parameter list and forward to the

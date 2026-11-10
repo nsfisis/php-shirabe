@@ -62,7 +62,7 @@ const PLATFORM_EXTENSION_INFO: &[&BStr] = &[
     php_str(b"zlib"),
 ];
 
-shirabe_php_rpc::wire_record! {
+shirabe_php_rpc::plugin_value_record! {
     /// The names the `__shirabe_platform` payload reports on.
     struct PlatformQuery {
         constants: Vec<BString>,
@@ -71,7 +71,7 @@ shirabe_php_rpc::wire_record! {
     }
 }
 
-shirabe_php_rpc::wire_record! {
+shirabe_php_rpc::plugin_value_record! {
     /// The answer to the `__shirabe_platform` query, which [`PlatformInfo`] is built from.
     struct PlatformPayload {
         extensions: Vec<BString>,

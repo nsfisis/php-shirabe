@@ -8,7 +8,7 @@ use crate::php_worker::rpc::entity::{Call, Crossing, Entity};
 use crate::php_worker::rpc::forwarding;
 use crate::util::{Filesystem, ProcessExecutor};
 use bstr::BString;
-use shirabe_php_rpc::{PhpThrow, PluginValue, ToWire};
+use shirabe_php_rpc::{PhpThrow, PluginValue, ToPluginValue};
 use shirabe_php_shim::path_from_bytes;
 
 impl Entity for std::rc::Rc<std::cell::RefCell<Filesystem>> {
@@ -47,11 +47,11 @@ impl forwarding::util::filesystem::Forwarding for forwarding::util::filesystem::
             .borrow_mut()
             .remove(path(call, 0)?)
             .map_err(call.failed())?
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn is_dir_empty(fs: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
-        Ok(fs.borrow().is_dir_empty(&path(call, 0)?).to_wire())
+        Ok(fs.borrow().is_dir_empty(&path(call, 0)?).to_plugin_value())
     }
 
     fn empty_directory(fs: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
@@ -66,7 +66,7 @@ impl forwarding::util::filesystem::Forwarding for forwarding::util::filesystem::
             .borrow_mut()
             .remove_directory(path(call, 0)?)
             .map_err(call.failed())?
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn remove_directory_async(
@@ -82,7 +82,7 @@ impl forwarding::util::filesystem::Forwarding for forwarding::util::filesystem::
         // raises what goes wrong up to there out of the call.
         match poll_once(&mut future) {
             std::task::Poll::Ready(removed) => {
-                resolved_promise(removed.map_err(call.failed())?.to_wire())
+                resolved_promise(removed.map_err(call.failed())?.to_plugin_value())
             }
             std::task::Poll::Pending => Ok(job::register(
                 JobOwner::process_executor(&executor),
@@ -92,7 +92,7 @@ impl forwarding::util::filesystem::Forwarding for forwarding::util::filesystem::
                 Box::pin(async move {
                     future
                         .await
-                        .map(|removed| removed.to_wire())
+                        .map(|removed| removed.to_plugin_value())
                         .map_err(|error| error_throw(b"removeDirectoryAsync failed", &error))
                 }),
             )),
@@ -107,7 +107,7 @@ impl forwarding::util::filesystem::Forwarding for forwarding::util::filesystem::
             .borrow_mut()
             .remove_directory_php(&path(call, 0)?)
             .map_err(call.failed())?
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn ensure_directory_exists(
@@ -125,7 +125,7 @@ impl forwarding::util::filesystem::Forwarding for forwarding::util::filesystem::
             .borrow()
             .unlink(path(call, 0)?)
             .map_err(call.failed())?
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn rmdir(fs: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
@@ -133,7 +133,7 @@ impl forwarding::util::filesystem::Forwarding for forwarding::util::filesystem::
             .borrow()
             .rmdir(path(call, 0)?)
             .map_err(call.failed())?
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn copy_then_remove(fs: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
@@ -148,7 +148,7 @@ impl forwarding::util::filesystem::Forwarding for forwarding::util::filesystem::
             .borrow_mut()
             .copy(&path(call, 0)?, &path(call, 1)?)
             .map_err(call.failed())?
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn rename(fs: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
@@ -168,7 +168,7 @@ impl forwarding::util::filesystem::Forwarding for forwarding::util::filesystem::
                 call.arg::<bool>(3)?,
             )
             .map_err(call.failed())?
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn find_shortest_path_code(
@@ -185,11 +185,14 @@ impl forwarding::util::filesystem::Forwarding for forwarding::util::filesystem::
                 call.arg::<bool>(4)?,
             )
             .map_err(call.failed())?
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn is_absolute_path(fs: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
-        Ok(fs.borrow().is_absolute_path(&path(call, 0)?).to_wire())
+        Ok(fs
+            .borrow()
+            .is_absolute_path(&path(call, 0)?)
+            .to_plugin_value())
     }
 
     fn size(fs: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
@@ -197,11 +200,14 @@ impl forwarding::util::filesystem::Forwarding for forwarding::util::filesystem::
             .borrow()
             .size(path(call, 0)?)
             .map_err(call.failed())?
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn normalize_path(fs: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
-        Ok(fs.borrow().normalize_path(&path(call, 0)?).to_wire())
+        Ok(fs
+            .borrow()
+            .normalize_path(&path(call, 0)?)
+            .to_plugin_value())
     }
 
     fn relative_symlink(fs: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
@@ -209,7 +215,7 @@ impl forwarding::util::filesystem::Forwarding for forwarding::util::filesystem::
             .borrow()
             .relative_symlink(&path(call, 0)?, &path(call, 1)?)
             .map_err(call.failed())?
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn is_symlinked_directory(
@@ -219,7 +225,7 @@ impl forwarding::util::filesystem::Forwarding for forwarding::util::filesystem::
         Ok(fs
             .borrow()
             .is_symlinked_directory(&path(call, 0)?)
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn junction(fs: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
@@ -230,7 +236,7 @@ impl forwarding::util::filesystem::Forwarding for forwarding::util::filesystem::
     }
 
     fn is_junction(fs: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
-        Ok(fs.borrow().is_junction(&path(call, 0)?).to_wire())
+        Ok(fs.borrow().is_junction(&path(call, 0)?).to_plugin_value())
     }
 
     fn remove_junction(fs: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
@@ -238,7 +244,7 @@ impl forwarding::util::filesystem::Forwarding for forwarding::util::filesystem::
             .borrow_mut()
             .remove_junction(&path(call, 0)?)
             .map_err(call.failed())?
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn file_put_contents_if_modified(
@@ -249,7 +255,7 @@ impl forwarding::util::filesystem::Forwarding for forwarding::util::filesystem::
             .borrow()
             .file_put_contents_if_modified(&path(call, 0)?, call.arg::<BString>(1)?)
             .map_err(call.failed())?
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn safe_copy(fs: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {

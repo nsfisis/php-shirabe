@@ -1,4 +1,4 @@
-//! Wire forms of the domain values that cross the worker boundary by value.
+//! The plugin values standing for the domain values that cross the worker boundary by value.
 //!
 //! Most of them are immutable values that cross as real PHP objects. A proxied entity crosses as a handle, but a value object has no
 //! entity to point at — the child has to hold a genuine instance of the real class. Each value
@@ -18,7 +18,7 @@ use crate::util::http::Response;
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_class_map_generator::class_map::ClassMap;
-use shirabe_php_rpc::{FromWire, PhpObject, PhpThrow, PluginValue, ToWire, wire};
+use shirabe_php_rpc::{FromPluginValue, PhpObject, PhpThrow, PluginValue, ToPluginValue, codec};
 use shirabe_php_shim::{PhpMixed, bformat, display_to_bytes, error_message, php_str};
 use shirabe_semver::constraint::{
     AnyConstraint, MatchAllConstraint, MatchNoneConstraint, MultiConstraint, SimpleConstraint,
@@ -40,17 +40,17 @@ fn as_object(value: &PluginValue) -> Option<&PhpObject> {
 }
 
 /// Decodes the property `value`, if any, `context` names.
-fn property<T: FromWire>(
+fn property<T: FromPluginValue>(
     context: impl AsRef<[u8]>,
     value: Option<&PluginValue>,
 ) -> Result<T, PhpThrow> {
-    T::from_wire(value.unwrap_or(&wire::NULL)).map_err(|throw| PhpThrow {
+    T::from_plugin_value(value.unwrap_or(&codec::NULL)).map_err(|throw| PhpThrow {
         message: bformat!("{}: {}", context.as_ref(), throw.message),
         ..throw
     })
 }
 
-fn constraint_to_wire(constraint: &AnyConstraint) -> PluginValue {
+fn constraint_to_plugin_value(constraint: &AnyConstraint) -> PluginValue {
     // Whether the pretty string was ever set is observable (`getPrettyString()` falls back to the
     // string form), so an unset one crosses as null rather than as an absent property.
     let pretty_string = match constraint.pretty_string() {
@@ -77,7 +77,12 @@ fn constraint_to_wire(constraint: &AnyConstraint) -> PluginValue {
             let mut object = PhpObject::new(MULTI_CONSTRAINT_CLASS);
             object.set_protected(
                 "constraints",
-                PluginValue::List(c.get_constraints().iter().map(constraint_to_wire).collect()),
+                PluginValue::List(
+                    c.get_constraints()
+                        .iter()
+                        .map(constraint_to_plugin_value)
+                        .collect(),
+                ),
             );
             object.set_protected("prettyString", pretty_string);
             // A cold memo like the bounds below, of the rendering PHP derives from the
@@ -102,7 +107,7 @@ fn constraint_to_wire(constraint: &AnyConstraint) -> PluginValue {
     PluginValue::PhpObject(object)
 }
 
-pub(crate) fn constraint_from_wire(value: &PluginValue) -> Result<AnyConstraint, PhpThrow> {
+pub(crate) fn constraint_from_plugin_value(value: &PluginValue) -> Result<AnyConstraint, PhpThrow> {
     let object = as_object(value).ok_or_else(|| {
         PhpThrow::runtime(bformat!(
             "expected a semver constraint from the plugin, got {}",
@@ -132,12 +137,12 @@ pub(crate) fn constraint_from_wire(value: &PluginValue) -> Result<AnyConstraint,
             let constraints = match object.protected("constraints") {
                 Some(PluginValue::List(items)) => items
                     .iter()
-                    .map(constraint_from_wire)
+                    .map(constraint_from_plugin_value)
                     .collect::<Result<Vec<_>, _>>()?,
                 // A MultiConstraint built from a PHP associative array crosses as a map.
                 Some(PluginValue::Array(items)) => items
                     .values()
-                    .map(constraint_from_wire)
+                    .map(constraint_from_plugin_value)
                     .collect::<Result<Vec<_>, _>>()?,
                 other => {
                     return Err(PhpThrow::runtime(bformat!(
@@ -187,7 +192,7 @@ pub(crate) fn constraint_from_wire(value: &PluginValue) -> Result<AnyConstraint,
 /// carrying the transfer info; the native downloader that takes those requests here flattens its
 /// response into `Response` before the value leaves `HttpDownloader`, so `getCurlInfo()` is gone
 /// and `get_class()` differs.
-pub(crate) fn response_to_wire(response: &Response) -> PluginValue {
+pub(crate) fn response_to_plugin_value(response: &Response) -> PluginValue {
     let mut object = PhpObject::new(RESPONSE_CLASS);
     let mut request = indexmap::IndexMap::new();
     request.insert("url".into(), PluginValue::string(response.request_url()));
@@ -222,16 +227,16 @@ pub(crate) fn response_to_wire(response: &Response) -> PluginValue {
 
 /// The class map `AutoloadGenerator::dump()` returns. It is a `php-native` class, so the child
 /// owns the revived instance outright: the Rust side keeps no entity behind it.
-pub(crate) fn class_map_to_wire(class_map: &ClassMap) -> PluginValue {
+pub(crate) fn class_map_to_plugin_value(class_map: &ClassMap) -> PluginValue {
     let mut object = PhpObject::new(CLASS_MAP_CLASS);
-    object.set_public("map", class_map.get_map().clone().to_wire());
+    object.set_public("map", class_map.get_map().clone().to_plugin_value());
     let ambiguous_classes = class_map
         .get_ambiguous_classes(None)
         .expect("no duplicates filter is applied");
     object.set_private(
         CLASS_MAP_CLASS,
         "ambiguousClasses",
-        ambiguous_classes.to_wire(),
+        ambiguous_classes.to_plugin_value(),
     );
     let psr_violations: indexmap::IndexMap<bstr::BString, PluginValue> = class_map
         .get_raw_psr_violations()
@@ -255,15 +260,22 @@ pub(crate) fn class_map_to_wire(class_map: &ClassMap) -> PluginValue {
             (path.clone(), PluginValue::List(violations))
         })
         .collect();
-    object.set_private(CLASS_MAP_CLASS, "psrViolations", psr_violations.to_wire());
+    object.set_private(
+        CLASS_MAP_CLASS,
+        "psrViolations",
+        psr_violations.to_plugin_value(),
+    );
     PluginValue::PhpObject(object)
 }
 
-pub(crate) fn link_to_wire(link: &Link) -> PluginValue {
+pub(crate) fn link_to_plugin_value(link: &Link) -> PluginValue {
     let mut object = PhpObject::new(LINK_CLASS);
     object.set_protected("source", PluginValue::string(link.get_source()));
     object.set_protected("target", PluginValue::string(link.get_target()));
-    object.set_protected("constraint", constraint_to_wire(link.get_constraint()));
+    object.set_protected(
+        "constraint",
+        constraint_to_plugin_value(link.get_constraint()),
+    );
     object.set_protected("description", PluginValue::string(link.get_description()));
     let pretty_constraint = match link.get_pretty_constraint_for_serialization() {
         Some(pretty) => PluginValue::string(pretty),
@@ -273,7 +285,7 @@ pub(crate) fn link_to_wire(link: &Link) -> PluginValue {
     PluginValue::PhpObject(object)
 }
 
-pub(crate) fn link_from_wire(value: &PluginValue) -> Result<Link, PhpThrow> {
+pub(crate) fn link_from_plugin_value(value: &PluginValue) -> Result<Link, PhpThrow> {
     let object = as_object(value).ok_or_else(|| {
         PhpThrow::runtime(bformat!(
             "expected a Link from the plugin, got {}",
@@ -288,7 +300,7 @@ pub(crate) fn link_from_wire(value: &PluginValue) -> Result<Link, PhpThrow> {
             object.class
         )));
     }
-    let constraint = constraint_from_wire(
+    let constraint = constraint_from_plugin_value(
         object
             .protected("constraint")
             .ok_or_else(|| PhpThrow::runtime("a Link expects a constraint"))?,
@@ -306,9 +318,9 @@ pub(crate) fn link_from_wire(value: &PluginValue) -> Result<Link, PhpThrow> {
     ))
 }
 
-impl FromWire for Link {
-    fn from_wire(value: &PluginValue) -> Result<Self, PhpThrow> {
-        link_from_wire(value)
+impl FromPluginValue for Link {
+    fn from_plugin_value(value: &PluginValue) -> Result<Self, PhpThrow> {
+        link_from_plugin_value(value)
     }
 }
 
@@ -316,26 +328,26 @@ impl FromWire for Link {
 ///
 /// TODO(plugin): links have no entity to intern against, so two calls of the same getter answer
 /// with distinct child-side objects where upstream returns the identical one.
-impl ToWire for Link {
-    fn to_wire(self) -> PluginValue {
-        link_to_wire(&self)
+impl ToPluginValue for Link {
+    fn to_plugin_value(self) -> PluginValue {
+        link_to_plugin_value(&self)
     }
 }
 
 /// `array{url: string, preferred: bool}` as PHP shapes it.
-impl FromWire for Mirror {
-    fn from_wire(value: &PluginValue) -> Result<Self, PhpThrow> {
-        let row = IndexMap::<BString, PluginValue>::from_wire(value)?;
-        let field = |key: &[u8]| row.get(key).unwrap_or(&wire::NULL);
+impl FromPluginValue for Mirror {
+    fn from_plugin_value(value: &PluginValue) -> Result<Self, PhpThrow> {
+        let row = IndexMap::<BString, PluginValue>::from_plugin_value(value)?;
+        let field = |key: &[u8]| row.get(key).unwrap_or(&codec::NULL);
         Ok(Mirror {
-            url: BString::from_wire(field(b"url"))?,
-            preferred: Option::<bool>::from_wire(field(b"preferred"))?.unwrap_or(false),
+            url: BString::from_plugin_value(field(b"url"))?,
+            preferred: Option::<bool>::from_plugin_value(field(b"preferred"))?.unwrap_or(false),
         })
     }
 }
 
-impl ToWire for Mirror {
-    fn to_wire(self) -> PluginValue {
+impl ToPluginValue for Mirror {
+    fn to_plugin_value(self) -> PluginValue {
         PluginValue::Array(IndexMap::from([
             ("url".into(), PluginValue::string(self.url)),
             ("preferred".into(), PluginValue::Bool(self.preferred)),
@@ -343,26 +355,26 @@ impl ToWire for Mirror {
     }
 }
 
-impl FromWire for DisplayMode {
-    fn from_wire(value: &PluginValue) -> Result<Self, PhpThrow> {
+impl FromPluginValue for DisplayMode {
+    fn from_plugin_value(value: &PluginValue) -> Result<Self, PhpThrow> {
         match value {
             PluginValue::Int(0) => Ok(DisplayMode::SourceRefIfDev),
             PluginValue::Int(1) => Ok(DisplayMode::SourceRef),
             PluginValue::Int(2) => Ok(DisplayMode::DistRef),
-            other => Err(wire::unexpected("a display mode of 0..=2", other)),
+            other => Err(codec::unexpected("a display mode of 0..=2", other)),
         }
     }
 }
 
-impl ToWire for StreamContextOptions {
-    fn to_wire(self) -> PluginValue {
-        PhpMixed::Array(self.into_array()).to_wire()
+impl ToPluginValue for StreamContextOptions {
+    fn to_plugin_value(self) -> PluginValue {
+        PhpMixed::Array(self.into_array()).to_plugin_value()
     }
 }
 
-impl FromWire for StreamContextOptions {
-    fn from_wire(value: &PluginValue) -> Result<Self, PhpThrow> {
-        Self::from_array(IndexMap::<BString, PhpMixed>::from_wire(value)?)
+impl FromPluginValue for StreamContextOptions {
+    fn from_plugin_value(value: &PluginValue) -> Result<Self, PhpThrow> {
+        Self::from_array(IndexMap::<BString, PhpMixed>::from_plugin_value(value)?)
             .map_err(|error| PhpThrow::new("TypeError", error_message(&error), 0))
     }
 }
@@ -395,7 +407,7 @@ mod tests {
             Some(BString::from("^1.0")),
         );
         assert_eq!(
-            BStr::new(&serialize(&link_to_wire(&link))),
+            BStr::new(&serialize(&link_to_plugin_value(&link))),
             BStr::new(
                 b"O:21:\"Composer\\Package\\Link\":5:{\
                     s:9:\"\0*\0source\";s:3:\"a/b\";\
@@ -425,7 +437,7 @@ mod tests {
             None,
         );
         assert_eq!(
-            BStr::new(&serialize(&link_to_wire(&link))),
+            BStr::new(&serialize(&link_to_plugin_value(&link))),
             BStr::new(
                 b"O:21:\"Composer\\Package\\Link\":5:{\
                     s:9:\"\0*\0source\";s:3:\"a/b\";\
@@ -436,7 +448,7 @@ mod tests {
                     s:19:\"\0*\0prettyConstraint\";N;}"
             ),
         );
-        let decoded = link_from_wire(&link_to_wire(&link)).expect("decode failed");
+        let decoded = link_from_plugin_value(&link_to_plugin_value(&link)).expect("decode failed");
         assert_eq!(None, decoded.get_pretty_constraint_for_serialization());
         assert!(decoded.get_pretty_constraint().is_err());
     }
@@ -455,7 +467,7 @@ mod tests {
             Some(BString::from("^1.0")),
         ));
         assert_eq!(
-            BStr::new(&serialize(&constraint_to_wire(&constraint))),
+            BStr::new(&serialize(&constraint_to_plugin_value(&constraint))),
             BStr::new(
                 b"O:42:\"Composer\\Semver\\Constraint\\MultiConstraint\":6:{\
                     s:14:\"\0*\0constraints\";a:2:{\
@@ -515,7 +527,8 @@ mod tests {
                 Some(Link::TYPE_DEV_REQUIRE.to_owned()),
                 Some(BString::from("^1.0")),
             );
-            let decoded = link_from_wire(&link_to_wire(&link)).expect("decode failed");
+            let decoded =
+                link_from_plugin_value(&link_to_plugin_value(&link)).expect("decode failed");
             assert_eq!(link.to_php_string(), decoded.to_php_string());
             assert_eq!(link.get_description(), decoded.get_description());
             assert_eq!(
@@ -529,14 +542,14 @@ mod tests {
     fn a_foreign_class_cannot_cross_as_a_value() {
         let mut object = PhpObject::new("MyPlugin\\OddConstraint");
         object.set_protected("prettyString", PluginValue::Null);
-        let err = constraint_from_wire(&PluginValue::PhpObject(object)).unwrap_err();
+        let err = constraint_from_plugin_value(&PluginValue::PhpObject(object)).unwrap_err();
         assert!(
             err.message.contains_str("OddConstraint"),
             "{}",
             err.message.display_lossy()
         );
 
-        let err = link_from_wire(&PluginValue::List(Vec::new())).unwrap_err();
+        let err = link_from_plugin_value(&PluginValue::List(Vec::new())).unwrap_err();
         assert!(
             err.message.contains_str("expected a Link"),
             "{}",

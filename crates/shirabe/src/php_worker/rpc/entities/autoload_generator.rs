@@ -6,14 +6,14 @@ use crate::filter::platform_requirement_filter::PlatformRequirementFilterFactory
 use crate::installer::InstallationManagerInterface;
 use crate::package::{LockerInterface, PackageInterfaceHandle, RootPackageInterfaceHandle};
 use crate::php_worker::call::PhpCall;
-use crate::php_worker::codec::class_map_to_wire;
+use crate::php_worker::codec::class_map_to_plugin_value;
 use crate::php_worker::rpc::entity::{Call, Crossing, Entity};
 use crate::php_worker::rpc::forwarding;
 use crate::php_worker::runtime::autoloading;
 use crate::repository::RepositoryInterfaceHandle;
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe_php_rpc::{FromWire, PhpThrow, PluginValue, ToWire, wire};
+use shirabe_php_rpc::{FromPluginValue, PhpThrow, PluginValue, ToPluginValue, codec};
 use shirabe_php_shim::PhpMixed;
 
 impl Entity for std::rc::Rc<std::cell::RefCell<dyn AutoloadGeneratorInterface>> {
@@ -121,7 +121,7 @@ impl forwarding::autoload::autoload_generator::Forwarding
                 strict_ambiguous,
             )
             .map_err(call.failed())?;
-        Ok(class_map_to_wire(&class_map))
+        Ok(class_map_to_plugin_value(&class_map))
     }
 
     fn build_package_map(
@@ -151,7 +151,7 @@ impl forwarding::autoload::autoload_generator::Forwarding
         Ok(generator
             .borrow()
             .parse_autoloads(package_map, root_package, filtered_dev_packages)
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn create_loader(
@@ -178,9 +178,9 @@ pub(crate) fn root_package(
         .ok_or_else(|| {
             call.arg_throw(
                 position,
-                wire::unexpected(
+                codec::unexpected(
                     "a RootPackageInterface",
-                    call.args().get(position).unwrap_or(&wire::NULL),
+                    call.args().get(position).unwrap_or(&codec::NULL),
                 ),
             )
         })
@@ -196,10 +196,10 @@ fn package_map_arg(
         .into_iter()
         .map(|pair| match <[PluginValue; 2]>::try_from(pair) {
             Ok([package, install_path]) => Ok((
-                PackageInterfaceHandle::from_wire(&package)?,
-                Option::<std::path::PathBuf>::from_wire(&install_path)?,
+                PackageInterfaceHandle::from_plugin_value(&package)?,
+                Option::<std::path::PathBuf>::from_plugin_value(&install_path)?,
             )),
-            Err(pair) => Err(wire::unexpected(
+            Err(pair) => Err(codec::unexpected(
                 "a [package, install path] pair",
                 &PluginValue::List(pair),
             )),
@@ -215,7 +215,10 @@ fn package_map_value(
         package_map
             .into_iter()
             .map(|(package, install_path)| {
-                PluginValue::List(vec![package.to_wire(), install_path.to_wire()])
+                PluginValue::List(vec![
+                    package.to_plugin_value(),
+                    install_path.to_plugin_value(),
+                ])
             })
             .collect(),
     )
@@ -230,11 +233,14 @@ fn class_loader_to_php(
 ) -> anyhow::Result<PluginValue> {
     let handle = autoloading::new_object(
         BStr::new("Composer\\Autoload\\ClassLoader"),
-        vec![vendor_dir.to_wire()],
+        vec![vendor_dir.to_plugin_value()],
     )?;
     let add = |method: &[u8], prefix: &[u8], paths: &[BString]| {
         PhpCall::Method(&handle, BStr::new(method))
-            .run::<PluginValue>(vec![PluginValue::string(prefix), paths.to_vec().to_wire()])
+            .run::<PluginValue>(vec![
+                PluginValue::string(prefix),
+                paths.to_vec().to_plugin_value(),
+            ])
             .map(|_| ())
     };
     for (prefix, paths) in loader.get_prefixes() {
@@ -251,7 +257,7 @@ fn class_loader_to_php(
     }
     if !loader.get_class_map().is_empty() {
         PhpCall::Method(&handle, BStr::new("addClassMap"))
-            .run::<PluginValue>(vec![loader.get_class_map().clone().to_wire()])?;
+            .run::<PluginValue>(vec![loader.get_class_map().clone().to_plugin_value()])?;
     }
     Ok(PluginValue::PhpHandle(handle))
 }

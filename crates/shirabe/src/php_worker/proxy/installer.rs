@@ -8,7 +8,7 @@ use crate::php_worker::rpc::entity::entity_value;
 use crate::repository::InstalledRepositoryInterfaceHandle;
 use bstr::BStr;
 use indexmap::IndexMap;
-use shirabe_php_rpc::{FromWire, PhpObjHandle, PluginValue, ToWire, wire};
+use shirabe_php_rpc::{FromPluginValue, PhpObjHandle, PluginValue, ToPluginValue, codec};
 use shirabe_php_shim::PhpMixed;
 
 /// `InstallerInterface` adapter for an installer entity living in the PHP child process: the
@@ -24,12 +24,12 @@ impl PhpInstallerProxy {
         Self { handle }
     }
 
-    fn call<R: FromWire>(&self, method: &BStr, args: Vec<PluginValue>) -> anyhow::Result<R> {
+    fn call<R: FromPluginValue>(&self, method: &BStr, args: Vec<PluginValue>) -> anyhow::Result<R> {
         PhpCall::Method(&self.handle, method).run(args)
     }
 
     fn package_arg(package: &PackageInterfaceHandle) -> PluginValue {
-        package.clone().to_wire()
+        package.clone().to_plugin_value()
     }
 
     fn optional_package_arg(package: &Option<PackageInterfaceHandle>) -> PluginValue {
@@ -56,11 +56,12 @@ impl PhpInstallerProxy {
             PluginValue::Null => return Ok(None),
             PluginValue::Job(id) => id,
             other => {
-                return Err(call.unsupported_shape(wire::unexpected("a promise or null", &other)));
+                return Err(call.unsupported_shape(codec::unexpected("a promise or null", &other)));
             }
         };
         let result = job::await_php_job(id).await?;
-        Option::<PhpMixed>::from_wire(&result).map_err(|throw| call.unsupported_shape(throw))
+        Option::<PhpMixed>::from_plugin_value(&result)
+            .map_err(|throw| call.unsupported_shape(throw))
     }
 }
 

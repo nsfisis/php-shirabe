@@ -221,7 +221,7 @@ fn push_settle(id: u64, outcome: Result<PluginValue, PhpThrow>) -> Result<(), Ph
         ),
         Err(throw) => (
             "__shirabe_reject_job",
-            vec![PluginValue::Int(id as i64), throw.to_wire()],
+            vec![PluginValue::Int(id as i64), throw.to_plugin_value()],
         ),
     };
     match PhpCall::Function(BStr::new(function)).try_run::<PluginValue>(args) {

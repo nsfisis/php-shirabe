@@ -4,12 +4,12 @@
 # running here would silently work on an instance the Rust side never sees. One FQCN per line,
 # each with the mechanism that justifies it.
 
-# The wire codec revives values of this class from the object record serialize() writes for them
-# (php/runtime/Shirabe/MaterializedValue.php), so the real declaration has to stay loadable.
+# The plugin value codec revives values of this class from the object record serialize() writes for
+# them (php/runtime/Shirabe/MaterializedValue.php), so the real declaration has to stay loadable.
 Composer\Package\Link
 
-# The wire codec revives values of this class from the object record serialize() writes for them
-# (php/runtime/Shirabe/MaterializedValue.php), so the real declaration has to stay loadable.
+# The plugin value codec revives values of this class from the object record serialize() writes for
+# them (php/runtime/Shirabe/MaterializedValue.php), so the real declaration has to stay loadable.
 Composer\Util\Http\Response
 
 # Plugins subclass this class to provide their own installers. An instance is constructed by the

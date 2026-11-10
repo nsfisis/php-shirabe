@@ -3,8 +3,8 @@
 //! fields as a PHP-serialized list. See `docs/dev/php-rpc.md`.
 
 use crate::PhpThrow;
+use crate::codec::{FromPluginValue, protocol_value};
 use crate::value::{self, PluginValue};
-use crate::wire::{FromWire, protocol_value};
 use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::{ToPhpString, utf8_text};
@@ -60,7 +60,7 @@ pub enum Frame {
         value: PluginValue,
         out_params: IndexMap<u32, PluginValue>,
     },
-    /// The payload is the exception's description (`PhpThrow::to_wire`) itself.
+    /// The payload is the exception's description (`PhpThrow::to_plugin_value`) itself.
     Throw {
         corr_id: u64,
         throw: PhpThrow,
@@ -159,7 +159,7 @@ impl Frame {
                         .collect(),
                 ),
             ],
-            Frame::Throw { throw, .. } => throw.wire_fields(),
+            Frame::Throw { throw, .. } => throw.payload_fields(),
             Frame::ReleaseRustHandle { rhandle } => vec![int_value(*rhandle)],
             Frame::ReleasePhpHandle { phandle } => vec![int_value(*phandle)],
         }
@@ -258,7 +258,7 @@ fn decode_frame(tag: u8, corr_id: u64, payload: &[u8]) -> Frame {
         },
         TAG_THROW => Frame::Throw {
             corr_id,
-            throw: PhpThrow::from_wire_fields(fields.collect()),
+            throw: PhpThrow::from_payload_fields(fields.collect()),
         },
         TAG_RELEASE_RUST_HANDLE => Frame::ReleaseRustHandle {
             rhandle: expect_id(next()),
@@ -270,7 +270,7 @@ fn decode_frame(tag: u8, corr_id: u64, payload: &[u8]) -> Frame {
     }
 }
 
-fn field<T: FromWire>(value: PluginValue) -> T {
+fn field<T: FromPluginValue>(value: PluginValue) -> T {
     protocol_value(&value, "a frame field")
 }
 

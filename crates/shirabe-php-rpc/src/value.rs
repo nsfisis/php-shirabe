@@ -1,10 +1,11 @@
-//! Plugin-boundary value model and its wire codec. The wire format is documented in
-//! `docs/dev/php-rpc.md`.
+//! Plugin-boundary value model and its serialization. The format of the payloads on the wire is
+//! documented in `docs/dev/php-rpc.md`.
 //!
 //! `PluginValue` is the value type crossing the Rust/PHP RPC boundary. It is deliberately
 //! independent from `shirabe_php_shim::PhpMixed`: handles exist only at the plugin boundary, the
-//! one conversion between the two is the `ToWire` / `FromWire` pair of `PhpMixed` in `wire.rs`,
-//! and the codec below is a separate implementation from `shirabe_php_shim::var::serialize`.
+//! one conversion between the two is the `ToPluginValue` / `FromPluginValue` pair of `PhpMixed` in
+//! `codec.rs`, and the codec below is a separate implementation from
+//! `shirabe_php_shim::var::serialize`.
 //!
 //! Strings and array keys are byte strings (`BString`), matching PHP's string semantics: the
 //! codec must round-trip non-UTF-8 byte sequences losslessly.
@@ -923,13 +924,13 @@ mod tests {
 
     #[test]
     fn decodes_sparse_int_keys_as_array_and_reencodes_identically() {
-        let wire = b"a:2:{i:5;i:1;i:0;i:2;}".as_slice();
-        let decoded = unserialize(wire).unwrap();
+        let serialized = b"a:2:{i:5;i:1;i:0;i:2;}".as_slice();
+        let decoded = unserialize(serialized).unwrap();
         let PluginValue::Array(ref map) = decoded else {
             panic!("expected an array, got {decoded:?}");
         };
         assert_eq!(map.get(b"5".as_slice()), Some(&PluginValue::Int(1)));
-        assert_eq!(serialize(&decoded), wire);
+        assert_eq!(serialize(&decoded), serialized);
     }
 
     #[expect(

@@ -1,8 +1,8 @@
 <?php
 
-// The PHP half of the exception codec (`PhpThrow::to_wire` / `PhpThrow::from_wire` on the Rust
-// side), used wherever an exception crosses: a Throw frame, a job rejection, or a value an entry
-// point answers with. A failure crosses with the class it was thrown as, so
+// The PHP half of the exception codec (`PhpThrow::to_plugin_value` / `PhpThrow::from_plugin_value`
+// on the Rust side), used wherever an exception crosses: a Throw frame, a job rejection, or a value
+// an entry point answers with. A failure crosses with the class it was thrown as, so
 // `catch (TransportException $e)` on either side catches what it would catch under Composer, plus
 // the state that class declares beyond message and code and the place it was thrown at.
 

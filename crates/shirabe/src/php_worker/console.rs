@@ -9,13 +9,13 @@ use crate::php_worker::call::PhpCall;
 use crate::php_worker::rpc::entity::entity_value;
 use crate::util::sync_executor::block_on;
 use bstr::{BStr, BString};
-use shirabe_php_rpc::{PhpObjHandle, PluginValue, ToWire};
+use shirabe_php_rpc::{PhpObjHandle, PluginValue, ToPluginValue};
 use shirabe_php_shim::{RuntimeException, bformat, trim};
 use shirabe_symfony_console::command::Command as SymfonyCommand;
 use shirabe_symfony_console::input::InputInterface;
 use shirabe_symfony_console::output::{ConsoleOutput, OutputInterface};
 
-shirabe_php_rpc::wire_record! {
+shirabe_php_rpc::plugin_value_record! {
     /// Metadata row for one Rust-implemented command, mirrored into the worker as a
     /// `\Shirabe\RustCommandStub` so a worker-hosted command can `find()` and invoke built-in
     /// commands (their execution crosses back into this process).
@@ -28,7 +28,7 @@ shirabe_php_rpc::wire_record! {
     }
 }
 
-shirabe_php_rpc::wire_record! {
+shirabe_php_rpc::plugin_value_record! {
     /// What `__shirabe_console_application_boot` builds the worker-side application from.
     #[derive(Debug)]
     struct ConsoleBootConfig {
@@ -131,7 +131,7 @@ pub(crate) fn extend_console_application_rust_command(
     let app = context.app.borrow().clone();
     if let Some(app) = app {
         let stub: PhpObjHandle = PhpCall::New(BStr::new("Shirabe\\RustCommandStub"))
-            .run(vec![metadata.clone().to_wire()])?;
+            .run(vec![metadata.clone().to_plugin_value()])?;
         PhpCall::Method(&app, BStr::new("add"))
             .run::<PluginValue>(vec![PluginValue::PhpHandle(stub)])?;
     }
@@ -155,7 +155,7 @@ impl PhpConsoleApplicationContext {
             plugin_commands: self.plugin_commands.borrow().clone(),
         };
         let app: PhpObjHandle = PhpCall::Function(BStr::new("__shirabe_console_application_boot"))
-            .run(vec![config.to_wire()])?;
+            .run(vec![config.to_plugin_value()])?;
         *self.app.borrow_mut() = Some(app.clone());
         Ok(app)
     }

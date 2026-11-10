@@ -11,16 +11,15 @@ is split between the two worlds. Which treatment each Composer class receives is
 
 The `shirabe` crate calls into the worker through `php_worker::call::PhpCall` and nothing else: it
 names what to run (a function or entry point, a method of a P-table entity, a static method, a
-constructor) and decodes the answer as the type the caller asks for (`FromWire`). The callbacks
-the worker makes while the call is in flight are served by `PluginRpcDispatcher` — the runtime
-service endpoint and the R table — unless the caller brings a dispatcher of its own. Script
-execution brings `ScriptRpcDispatcher`, which answers the same runtime service methods and R
-table except `__shirabe_run_rust_command`. Both dispatchers live in
-`php_worker/rpc/dispatch.rs`. The ported code reaches the worker through the named functions of
-`php_worker` (`runtime`, `callable`, `installed_versions`, the proxies) rather than building
-calls itself. A PHP exception becomes the error of the ported exception it stands for (`try_run`
-keeps it apart for a caller that catches it), and an answer that does not decode is an error
-naming the call and the value it answered with.
+constructor) and decodes the answer as the type the caller asks for (`FromPluginValue`). The
+callbacks the worker makes while the call is in flight are served by `PluginRpcDispatcher` — the
+runtime service endpoint and the R table — unless the caller brings a dispatcher of its own. Script
+execution brings `ScriptRpcDispatcher`, which answers the same runtime service methods and R table
+except `__shirabe_run_rust_command`. Both dispatchers live in `php_worker/rpc/dispatch.rs`. The
+ported code reaches the worker through the named functions of `php_worker` (`runtime`, `callable`,
+`installed_versions`, the proxies) rather than building calls itself. A PHP exception becomes the
+error of the ported exception it stands for (`try_run` keeps it apart for a caller that catches it),
+and an answer that does not decode is an error naming the call and the value it answered with.
 
 ## Entry points
 
@@ -52,12 +51,13 @@ answer is cached only once it has arrived, so a failed query is asked again on t
 
 ### Records
 
-A composite payload — the answer of a composite query, the console application handoff, a
-command definition read back, the facts of a terminated process, the result of a `scripts` Command
-class — is a PHP array whose keys are the field names of one Rust struct declared with
-`shirabe_php_rpc::wire_record!`, which derives its `ToWire` / `FromWire` from those fields. The
-worker code reading or writing such an array uses the same snake_case names. A missing key or a
-value of the wrong type is a decoding failure naming the record and the key, never a default.
+A composite payload — the answer of a composite query, the console application handoff, a command
+definition read back, the facts of a terminated process, the result of a `scripts` Command class —
+is a PHP array whose keys are the field names of one Rust struct declared with
+`shirabe_php_rpc::plugin_value_record!`, which derives its `ToPluginValue` / `FromPluginValue` from
+those fields. The worker code reading or writing such an array uses the same snake_case names. A
+missing key or a value of the wrong type is a decoding failure naming the record and the key, never
+a default.
 
 Notable internal helpers:
 
@@ -129,7 +129,7 @@ are an explicit error naming them.
 ## Materialized values
 
 The two halves of the materialized-value codec are `crates/shirabe/src/php_worker/codec.rs`
-(and, for the PHP built-in `\DateTimeInterface`, the `ToWire` / `FromWire` impls of
+(and, for the PHP built-in `\DateTimeInterface`, the `ToPluginValue` / `FromPluginValue` impls of
 `shirabe-php-rpc`) and `Shirabe\MaterializedValue`, whose `CLASSES` constant is the closed list of
 classes that may cross as object records.
 

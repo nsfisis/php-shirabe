@@ -10,7 +10,7 @@ use crate::php_worker::rpc::forwarding;
 use crate::repository::{PlatformRepository, RepositoryInterfaceHandle};
 use bstr::BString;
 use indexmap::IndexMap;
-use shirabe_php_rpc::{FromWire, PhpThrow, PluginValue, ToWire};
+use shirabe_php_rpc::{FromPluginValue, PhpThrow, PluginValue, ToPluginValue};
 use shirabe_php_shim::{PhpMixed, bformat};
 
 impl Entity for PackageInterfaceHandle {
@@ -55,10 +55,10 @@ impl Entity for PackageInterfaceHandle {
                 .borrow()
                 .as_package_interface()
                 .get_id()
-                .to_wire()),
+                .to_plugin_value()),
             PropertyAccess::Isset { .. } => Ok(PluginValue::Bool(true)),
             PropertyAccess::Set { value, .. } => {
-                let id = i64::from_wire(value)?;
+                let id = i64::from_plugin_value(value)?;
                 self.as_rc()
                     .borrow_mut()
                     .as_package_interface_mut()
@@ -79,8 +79,8 @@ pub(crate) fn package_value(
     entity_value(&PackageInterfaceHandle::from_rc_unchecked(package.clone()))
 }
 
-impl ToWire for PackageInterfaceHandle {
-    fn to_wire(self) -> PluginValue {
+impl ToPluginValue for PackageInterfaceHandle {
+    fn to_plugin_value(self) -> PluginValue {
         entity_value(&self).expect("every package variant crosses as its own class")
     }
 }
@@ -116,7 +116,7 @@ impl forwarding::package::base_package::Forwarding for forwarding::package::base
             .borrow()
             .as_package_interface()
             .get_name()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn get_pretty_name(
@@ -128,7 +128,7 @@ impl forwarding::package::base_package::Forwarding for forwarding::package::base
             .borrow()
             .as_package_interface()
             .get_pretty_name()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn get_names(
@@ -140,7 +140,7 @@ impl forwarding::package::base_package::Forwarding for forwarding::package::base
             .borrow()
             .as_package_interface()
             .get_names(call.arg_or(0, true)?)
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn set_id(
@@ -162,7 +162,7 @@ impl forwarding::package::base_package::Forwarding for forwarding::package::base
             .borrow()
             .as_package_interface()
             .get_id()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn is_dev(package: &PackageInterfaceHandle, _: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
@@ -171,7 +171,7 @@ impl forwarding::package::base_package::Forwarding for forwarding::package::base
             .borrow()
             .as_package_interface()
             .is_dev()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn get_type(
@@ -183,7 +183,7 @@ impl forwarding::package::base_package::Forwarding for forwarding::package::base
             .borrow()
             .as_package_interface()
             .get_type()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn get_target_dir(
@@ -195,7 +195,7 @@ impl forwarding::package::base_package::Forwarding for forwarding::package::base
             .borrow()
             .as_package_interface()
             .get_target_dir()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn get_extra(
@@ -207,7 +207,7 @@ impl forwarding::package::base_package::Forwarding for forwarding::package::base
             .borrow()
             .as_package_interface()
             .get_extra()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn set_installation_source(
@@ -232,7 +232,7 @@ impl forwarding::package::base_package::Forwarding for forwarding::package::base
             .borrow()
             .as_package_interface()
             .get_installation_source()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn get_source_type(
@@ -244,7 +244,7 @@ impl forwarding::package::base_package::Forwarding for forwarding::package::base
             .borrow()
             .as_package_interface()
             .get_source_type()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn get_source_url(
@@ -256,7 +256,7 @@ impl forwarding::package::base_package::Forwarding for forwarding::package::base
             .borrow()
             .as_package_interface()
             .get_source_url()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn get_source_urls(
@@ -268,7 +268,7 @@ impl forwarding::package::base_package::Forwarding for forwarding::package::base
             .borrow()
             .as_package_interface()
             .get_source_urls()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn get_source_reference(
@@ -280,7 +280,7 @@ impl forwarding::package::base_package::Forwarding for forwarding::package::base
             .borrow()
             .as_package_interface()
             .get_source_reference()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn get_source_mirrors(
@@ -292,7 +292,7 @@ impl forwarding::package::base_package::Forwarding for forwarding::package::base
             .borrow()
             .as_package_interface()
             .get_source_mirrors()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn set_source_mirrors(
@@ -317,7 +317,7 @@ impl forwarding::package::base_package::Forwarding for forwarding::package::base
             .borrow()
             .as_package_interface()
             .get_dist_type()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn get_dist_url(
@@ -329,7 +329,7 @@ impl forwarding::package::base_package::Forwarding for forwarding::package::base
             .borrow()
             .as_package_interface()
             .get_dist_url()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn get_dist_urls(
@@ -341,7 +341,7 @@ impl forwarding::package::base_package::Forwarding for forwarding::package::base
             .borrow()
             .as_package_interface()
             .get_dist_urls()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn get_dist_reference(
@@ -353,7 +353,7 @@ impl forwarding::package::base_package::Forwarding for forwarding::package::base
             .borrow()
             .as_package_interface()
             .get_dist_reference()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn get_dist_sha1_checksum(
@@ -365,7 +365,7 @@ impl forwarding::package::base_package::Forwarding for forwarding::package::base
             .borrow()
             .as_package_interface()
             .get_dist_sha1_checksum()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn get_dist_mirrors(
@@ -377,7 +377,7 @@ impl forwarding::package::base_package::Forwarding for forwarding::package::base
             .borrow()
             .as_package_interface()
             .get_dist_mirrors()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn set_dist_mirrors(
@@ -402,7 +402,7 @@ impl forwarding::package::base_package::Forwarding for forwarding::package::base
             .borrow()
             .as_package_interface()
             .get_version()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn get_pretty_version(
@@ -414,7 +414,7 @@ impl forwarding::package::base_package::Forwarding for forwarding::package::base
             .borrow()
             .as_package_interface()
             .get_pretty_version()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn get_full_pretty_version(
@@ -428,7 +428,7 @@ impl forwarding::package::base_package::Forwarding for forwarding::package::base
             .borrow()
             .as_package_interface()
             .get_full_pretty_version(truncate, display_mode)
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn get_release_date(
@@ -440,7 +440,7 @@ impl forwarding::package::base_package::Forwarding for forwarding::package::base
             .borrow()
             .as_package_interface()
             .get_release_date()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn get_stability(
@@ -452,7 +452,7 @@ impl forwarding::package::base_package::Forwarding for forwarding::package::base
             .borrow()
             .as_package_interface()
             .get_stability()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn get_requires(
@@ -465,7 +465,7 @@ impl forwarding::package::base_package::Forwarding for forwarding::package::base
             .as_package_interface()
             .get_requires())
         .clone()
-        .to_wire())
+        .to_plugin_value())
     }
 
     fn get_conflicts(
@@ -478,7 +478,7 @@ impl forwarding::package::base_package::Forwarding for forwarding::package::base
             .as_package_interface()
             .get_conflicts())
         .clone()
-        .to_wire())
+        .to_plugin_value())
     }
 
     fn get_provides(
@@ -491,7 +491,7 @@ impl forwarding::package::base_package::Forwarding for forwarding::package::base
             .as_package_interface()
             .get_provides())
         .clone()
-        .to_wire())
+        .to_plugin_value())
     }
 
     fn get_replaces(
@@ -504,7 +504,7 @@ impl forwarding::package::base_package::Forwarding for forwarding::package::base
             .as_package_interface()
             .get_replaces())
         .clone()
-        .to_wire())
+        .to_plugin_value())
     }
 
     fn get_dev_requires(
@@ -517,7 +517,7 @@ impl forwarding::package::base_package::Forwarding for forwarding::package::base
             .as_package_interface()
             .get_dev_requires())
         .clone()
-        .to_wire())
+        .to_plugin_value())
     }
 
     fn get_suggests(
@@ -529,7 +529,7 @@ impl forwarding::package::base_package::Forwarding for forwarding::package::base
             .borrow()
             .as_package_interface()
             .get_suggests()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn get_autoload(
@@ -541,7 +541,7 @@ impl forwarding::package::base_package::Forwarding for forwarding::package::base
             .borrow()
             .as_package_interface()
             .get_autoload()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn get_dev_autoload(
@@ -553,7 +553,7 @@ impl forwarding::package::base_package::Forwarding for forwarding::package::base
             .borrow()
             .as_package_interface()
             .get_dev_autoload()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn get_include_paths(
@@ -565,7 +565,7 @@ impl forwarding::package::base_package::Forwarding for forwarding::package::base
             .borrow()
             .as_package_interface()
             .get_include_paths()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn get_php_ext(
@@ -579,7 +579,7 @@ impl forwarding::package::base_package::Forwarding for forwarding::package::base
                 .as_package_interface()
                 .get_php_ext()
             {
-                Some(config) => config.to_wire(),
+                Some(config) => config.to_plugin_value(),
                 None => PluginValue::Null,
             },
         )
@@ -623,7 +623,7 @@ impl forwarding::package::base_package::Forwarding for forwarding::package::base
             .borrow()
             .as_package_interface()
             .get_binaries()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn get_unique_name(
@@ -635,7 +635,7 @@ impl forwarding::package::base_package::Forwarding for forwarding::package::base
             .borrow()
             .as_package_interface()
             .get_unique_name()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn get_notification_url(
@@ -647,7 +647,7 @@ impl forwarding::package::base_package::Forwarding for forwarding::package::base
             .borrow()
             .as_package_interface()
             .get_notification_url()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn __to_string(
@@ -659,7 +659,7 @@ impl forwarding::package::base_package::Forwarding for forwarding::package::base
             .borrow()
             .as_package_interface()
             .get_unique_name()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn get_pretty_string(
@@ -671,7 +671,7 @@ impl forwarding::package::base_package::Forwarding for forwarding::package::base
             .borrow()
             .as_package_interface()
             .get_pretty_string()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn is_default_branch(
@@ -683,7 +683,7 @@ impl forwarding::package::base_package::Forwarding for forwarding::package::base
             .borrow()
             .as_package_interface()
             .is_default_branch()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn get_transport_options(
@@ -695,7 +695,7 @@ impl forwarding::package::base_package::Forwarding for forwarding::package::base
             .borrow()
             .as_package_interface()
             .get_transport_options()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn set_transport_options(
@@ -790,7 +790,7 @@ impl forwarding::package::base_package::Forwarding for forwarding::package::base
             .as_package_interface()
             .get_repository()
             .is_some_and(|repository| repository.is::<PlatformRepository>())
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn equals(
@@ -798,7 +798,7 @@ impl forwarding::package::base_package::Forwarding for forwarding::package::base
         call: &mut Call<'_>,
     ) -> Result<PluginValue, PhpThrow> {
         let other = call.arg::<PackageInterfaceHandle>(0)?;
-        Ok(package.equals(&other).to_wire())
+        Ok(package.equals(&other).to_plugin_value())
     }
 
     fn get_stability_priority(
@@ -813,7 +813,7 @@ impl forwarding::package::base_package::Forwarding for forwarding::package::base
                 .get_stability(),
         )
         .unwrap_or(STABILITY_STABLE)
-        .to_wire())
+        .to_plugin_value())
     }
 }
 
@@ -1129,7 +1129,7 @@ impl forwarding::package::complete_package::Forwarding
             .as_complete_package_interface()
             .expect(COMPLETE)
             .get_scripts()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn set_scripts(
@@ -1156,7 +1156,7 @@ impl forwarding::package::complete_package::Forwarding
             .as_complete_package_interface()
             .expect(COMPLETE)
             .get_repositories()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn set_repositories(
@@ -1183,7 +1183,7 @@ impl forwarding::package::complete_package::Forwarding
             .as_complete_package_interface()
             .expect(COMPLETE)
             .get_license()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn set_license(
@@ -1210,7 +1210,7 @@ impl forwarding::package::complete_package::Forwarding
             .as_complete_package_interface()
             .expect(COMPLETE)
             .get_keywords()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn set_keywords(
@@ -1237,7 +1237,7 @@ impl forwarding::package::complete_package::Forwarding
             .as_complete_package_interface()
             .expect(COMPLETE)
             .get_description()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn set_description(
@@ -1264,7 +1264,7 @@ impl forwarding::package::complete_package::Forwarding
             .as_complete_package_interface()
             .expect(COMPLETE)
             .get_homepage()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn set_homepage(
@@ -1291,7 +1291,7 @@ impl forwarding::package::complete_package::Forwarding
             .as_complete_package_interface()
             .expect(COMPLETE)
             .get_authors()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn set_authors(
@@ -1318,7 +1318,7 @@ impl forwarding::package::complete_package::Forwarding
             .as_complete_package_interface()
             .expect(COMPLETE)
             .get_support()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn set_support(
@@ -1345,7 +1345,7 @@ impl forwarding::package::complete_package::Forwarding
             .as_complete_package_interface()
             .expect(COMPLETE)
             .get_funding()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn set_funding(
@@ -1372,7 +1372,7 @@ impl forwarding::package::complete_package::Forwarding
             .as_complete_package_interface()
             .expect(COMPLETE)
             .is_abandoned()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn get_replacement_package(
@@ -1385,7 +1385,7 @@ impl forwarding::package::complete_package::Forwarding
             .as_complete_package_interface()
             .expect(COMPLETE)
             .get_replacement_package()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn set_abandoned(
@@ -1412,7 +1412,7 @@ impl forwarding::package::complete_package::Forwarding
             .as_complete_package_interface()
             .expect(COMPLETE)
             .get_archive_name()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn set_archive_name(
@@ -1439,7 +1439,7 @@ impl forwarding::package::complete_package::Forwarding
             .as_complete_package_interface()
             .expect(COMPLETE)
             .get_archive_excludes()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn set_archive_excludes(
@@ -1476,7 +1476,7 @@ impl forwarding::package::root_package::Forwarding for forwarding::package::root
             .as_root_package_interface()
             .expect(ROOT)
             .get_aliases()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn get_minimum_stability(
@@ -1503,7 +1503,7 @@ impl forwarding::package::root_package::Forwarding for forwarding::package::root
             .as_root_package_interface()
             .expect(ROOT)
             .get_stability_flags()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn get_references(
@@ -1516,7 +1516,7 @@ impl forwarding::package::root_package::Forwarding for forwarding::package::root
             .as_root_package_interface()
             .expect(ROOT)
             .get_references()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn get_prefer_stable(
@@ -1529,7 +1529,7 @@ impl forwarding::package::root_package::Forwarding for forwarding::package::root
             .as_root_package_interface()
             .expect(ROOT)
             .get_prefer_stable()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn get_config(
@@ -1542,7 +1542,7 @@ impl forwarding::package::root_package::Forwarding for forwarding::package::root
             .as_root_package_interface()
             .expect(ROOT)
             .get_config()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn set_stability_flags(
@@ -1674,7 +1674,7 @@ impl forwarding::package::alias_package::Forwarding
             .as_alias_package()
             .expect(ALIAS)
             .is_root_package_alias()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn has_self_version_requires(
@@ -1687,7 +1687,7 @@ impl forwarding::package::alias_package::Forwarding
             .as_alias_package()
             .expect(ALIAS)
             .has_self_version_requires()
-            .to_wire())
+            .to_plugin_value())
     }
 
     // The alias target has to be a package that already lives on the Rust side; an alias of an
@@ -1718,7 +1718,7 @@ impl forwarding::package::complete_alias_package::Forwarding
             .as_complete_package_interface()
             .expect(COMPLETE)
             .get_scripts()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn set_scripts(
@@ -1745,7 +1745,7 @@ impl forwarding::package::complete_alias_package::Forwarding
             .as_complete_package_interface()
             .expect(COMPLETE)
             .get_repositories()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn set_repositories(
@@ -1772,7 +1772,7 @@ impl forwarding::package::complete_alias_package::Forwarding
             .as_complete_package_interface()
             .expect(COMPLETE)
             .get_license()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn set_license(
@@ -1799,7 +1799,7 @@ impl forwarding::package::complete_alias_package::Forwarding
             .as_complete_package_interface()
             .expect(COMPLETE)
             .get_keywords()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn set_keywords(
@@ -1826,7 +1826,7 @@ impl forwarding::package::complete_alias_package::Forwarding
             .as_complete_package_interface()
             .expect(COMPLETE)
             .get_description()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn set_description(
@@ -1853,7 +1853,7 @@ impl forwarding::package::complete_alias_package::Forwarding
             .as_complete_package_interface()
             .expect(COMPLETE)
             .get_homepage()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn set_homepage(
@@ -1880,7 +1880,7 @@ impl forwarding::package::complete_alias_package::Forwarding
             .as_complete_package_interface()
             .expect(COMPLETE)
             .get_authors()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn set_authors(
@@ -1907,7 +1907,7 @@ impl forwarding::package::complete_alias_package::Forwarding
             .as_complete_package_interface()
             .expect(COMPLETE)
             .get_support()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn set_support(
@@ -1934,7 +1934,7 @@ impl forwarding::package::complete_alias_package::Forwarding
             .as_complete_package_interface()
             .expect(COMPLETE)
             .get_funding()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn set_funding(
@@ -1961,7 +1961,7 @@ impl forwarding::package::complete_alias_package::Forwarding
             .as_complete_package_interface()
             .expect(COMPLETE)
             .is_abandoned()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn get_replacement_package(
@@ -1974,7 +1974,7 @@ impl forwarding::package::complete_alias_package::Forwarding
             .as_complete_package_interface()
             .expect(COMPLETE)
             .get_replacement_package()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn set_abandoned(
@@ -2001,7 +2001,7 @@ impl forwarding::package::complete_alias_package::Forwarding
             .as_complete_package_interface()
             .expect(COMPLETE)
             .get_archive_name()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn set_archive_name(
@@ -2028,7 +2028,7 @@ impl forwarding::package::complete_alias_package::Forwarding
             .as_complete_package_interface()
             .expect(COMPLETE)
             .get_archive_excludes()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn set_archive_excludes(
@@ -2079,7 +2079,7 @@ impl forwarding::package::root_alias_package::Forwarding
             .as_root_package_interface()
             .expect(ROOT)
             .get_aliases()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn get_minimum_stability(
@@ -2106,7 +2106,7 @@ impl forwarding::package::root_alias_package::Forwarding
             .as_root_package_interface()
             .expect(ROOT)
             .get_stability_flags()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn get_references(
@@ -2119,7 +2119,7 @@ impl forwarding::package::root_alias_package::Forwarding
             .as_root_package_interface()
             .expect(ROOT)
             .get_references()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn get_prefer_stable(
@@ -2132,7 +2132,7 @@ impl forwarding::package::root_alias_package::Forwarding
             .as_root_package_interface()
             .expect(ROOT)
             .get_prefer_stable()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn get_config(
@@ -2145,7 +2145,7 @@ impl forwarding::package::root_alias_package::Forwarding
             .as_root_package_interface()
             .expect(ROOT)
             .get_config()
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn set_stability_flags(

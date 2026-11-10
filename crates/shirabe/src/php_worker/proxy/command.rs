@@ -6,13 +6,13 @@ use crate::php_worker::call::PhpCall;
 use crate::php_worker::console::{CONSOLE_APP_CONTEXT, PENDING_COMMAND_HANDLES};
 use crate::php_worker::runtime;
 use bstr::{BStr, BString, ByteSlice};
-use shirabe_php_rpc::{FromWire, PhpObjHandle, PluginValue};
+use shirabe_php_rpc::{FromPluginValue, PhpObjHandle, PluginValue};
 use shirabe_php_shim::{PhpClass, PhpMixed, RuntimeException, ToPhpString, bformat};
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::{InputInterface, InputValue};
 use shirabe_symfony_console::output::OutputInterface;
 
-shirabe_php_rpc::wire_record! {
+shirabe_php_rpc::plugin_value_record! {
     /// A command's input definition, help text and extra usages, as
     /// `__shirabe_read_command_definition` reads them.
     #[derive(Debug)]
@@ -24,7 +24,7 @@ shirabe_php_rpc::wire_record! {
     }
 }
 
-shirabe_php_rpc::wire_record! {
+shirabe_php_rpc::plugin_value_record! {
     /// One `InputArgument` of a [`CommandDefinition`].
     #[derive(Debug)]
     struct CommandArgument {
@@ -36,7 +36,7 @@ shirabe_php_rpc::wire_record! {
     }
 }
 
-shirabe_php_rpc::wire_record! {
+shirabe_php_rpc::plugin_value_record! {
     /// One `InputOption` of a [`CommandDefinition`].
     #[derive(Debug)]
     struct CommandOption {
@@ -211,7 +211,7 @@ impl PhpCommandProxy {
         Ok(())
     }
 
-    fn call_metadata_getter<R: FromWire>(
+    fn call_metadata_getter<R: FromPluginValue>(
         handle: &PhpObjHandle,
         method: &BStr,
     ) -> anyhow::Result<R> {

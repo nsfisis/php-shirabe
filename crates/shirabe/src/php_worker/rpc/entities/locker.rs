@@ -7,7 +7,7 @@ use crate::php_worker::rpc::forwarding;
 use crate::repository::RepositoryInterfaceHandle;
 use bstr::BString;
 use indexmap::IndexMap;
-use shirabe_php_rpc::{PhpThrow, PluginValue, ToWire};
+use shirabe_php_rpc::{PhpThrow, PluginValue, ToPluginValue};
 use shirabe_php_shim::PhpMixed;
 
 impl Entity for std::rc::Rc<std::cell::RefCell<dyn LockerInterface>> {
@@ -26,7 +26,7 @@ impl forwarding::package::locker::Forwarding for forwarding::package::locker::Ph
     type Handle = std::rc::Rc<std::cell::RefCell<dyn LockerInterface>>;
 
     fn is_locked(locker: &Self::Handle, _: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
-        Ok(locker.borrow_mut().is_locked().to_wire())
+        Ok(locker.borrow_mut().is_locked().to_plugin_value())
     }
 
     fn is_fresh(locker: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
@@ -34,7 +34,7 @@ impl forwarding::package::locker::Forwarding for forwarding::package::locker::Ph
             .borrow_mut()
             .is_fresh()
             .map_err(call.failed())?
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn get_locked_repository(
@@ -56,7 +56,7 @@ impl forwarding::package::locker::Forwarding for forwarding::package::locker::Ph
             .borrow_mut()
             .get_dev_package_names()
             .map_err(call.failed())?
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn get_platform_requirements(
@@ -67,7 +67,7 @@ impl forwarding::package::locker::Forwarding for forwarding::package::locker::Ph
             .borrow_mut()
             .get_platform_requirements(call.arg_or(0, false)?)
             .map_err(call.failed())?
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn get_minimum_stability(
@@ -78,7 +78,7 @@ impl forwarding::package::locker::Forwarding for forwarding::package::locker::Ph
             .borrow_mut()
             .get_minimum_stability()
             .map_err(call.failed())?
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn get_stability_flags(
@@ -89,7 +89,7 @@ impl forwarding::package::locker::Forwarding for forwarding::package::locker::Ph
             .borrow_mut()
             .get_stability_flags()
             .map_err(call.failed())?
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn get_prefer_stable(
@@ -100,7 +100,7 @@ impl forwarding::package::locker::Forwarding for forwarding::package::locker::Ph
             .borrow_mut()
             .get_prefer_stable()
             .map_err(call.failed())?
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn get_prefer_lowest(
@@ -111,7 +111,7 @@ impl forwarding::package::locker::Forwarding for forwarding::package::locker::Ph
             .borrow_mut()
             .get_prefer_lowest()
             .map_err(call.failed())?
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn get_platform_overrides(
@@ -122,7 +122,7 @@ impl forwarding::package::locker::Forwarding for forwarding::package::locker::Ph
             .borrow_mut()
             .get_platform_overrides()
             .map_err(call.failed())?
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn get_aliases(locker: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
@@ -130,7 +130,7 @@ impl forwarding::package::locker::Forwarding for forwarding::package::locker::Ph
             .borrow_mut()
             .get_aliases()
             .map_err(call.failed())?
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn get_plugin_api(locker: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
@@ -138,7 +138,7 @@ impl forwarding::package::locker::Forwarding for forwarding::package::locker::Ph
             .borrow_mut()
             .get_plugin_api()
             .map_err(call.failed())?
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn get_lock_data(locker: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
@@ -146,7 +146,7 @@ impl forwarding::package::locker::Forwarding for forwarding::package::locker::Ph
             .borrow_mut()
             .get_lock_data()
             .map_err(call.failed())?
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn set_lock_data(locker: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
@@ -166,7 +166,7 @@ impl forwarding::package::locker::Forwarding for forwarding::package::locker::Ph
                 call.arg_or::<bool>(10, true)?,
             )
             .map_err(call.failed())?;
-        Ok(written.to_wire())
+        Ok(written.to_plugin_value())
     }
 
     fn get_missing_requirement_info(
@@ -179,7 +179,7 @@ impl forwarding::package::locker::Forwarding for forwarding::package::locker::Ph
             .borrow_mut()
             .get_missing_requirement_info(package, include_dev)
             .map_err(call.failed())?
-            .to_wire())
+            .to_plugin_value())
     }
 
     fn get_content_hash(call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {

@@ -68,7 +68,8 @@ pub(crate) fn resolved_promise(value: PluginValue) -> Result<PluginValue, PhpThr
 /// built in the worker. A failed request reaches the plugin as a rejection it handles, the way it
 /// does under Composer, rather than as a throw out of the call that started it.
 pub(crate) fn rejected_promise(throw: PhpThrow) -> Result<PluginValue, PhpThrow> {
-    match PhpCall::Function(BStr::new("__shirabe_rejected_promise")).try_run(vec![throw.to_wire()])
+    match PhpCall::Function(BStr::new("__shirabe_rejected_promise"))
+        .try_run(vec![throw.to_plugin_value()])
     {
         Ok(Ok(promise)) => Ok(promise),
         Ok(Err(throw)) => Err(throw),

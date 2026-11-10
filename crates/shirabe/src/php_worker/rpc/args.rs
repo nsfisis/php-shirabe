@@ -1,23 +1,23 @@
 //! Argument decoding for the entity methods.
 
 use bstr::BStr;
-use shirabe_php_rpc::{FromWire, PhpThrow, PluginValue, wire};
+use shirabe_php_rpc::{FromPluginValue, PhpThrow, PluginValue, codec};
 use shirabe_php_shim::bformat;
 
 /// Decodes the argument at `position`. A missing argument decodes the same way PHP's `null`
 /// does; a parameter's own default belongs to `arg_or`.
-pub(crate) fn arg<T: FromWire>(
+pub(crate) fn arg<T: FromPluginValue>(
     method: &BStr,
     args: &[PluginValue],
     position: usize,
 ) -> Result<T, PhpThrow> {
-    T::from_wire(args.get(position).unwrap_or(&wire::NULL))
+    T::from_plugin_value(args.get(position).unwrap_or(&codec::NULL))
         .map_err(|throw| arg_throw(method, position, throw))
 }
 
 /// Decodes the argument at `position` for a parameter whose PHP declaration carries a default:
 /// an omitted argument, and the `null` PHP passes in its place, take `default`.
-pub(crate) fn arg_or<T: FromWire>(
+pub(crate) fn arg_or<T: FromPluginValue>(
     method: &BStr,
     args: &[PluginValue],
     position: usize,
@@ -25,7 +25,9 @@ pub(crate) fn arg_or<T: FromWire>(
 ) -> Result<T, PhpThrow> {
     match args.get(position) {
         None | Some(PluginValue::Null) => Ok(default),
-        Some(value) => T::from_wire(value).map_err(|throw| arg_throw(method, position, throw)),
+        Some(value) => {
+            T::from_plugin_value(value).map_err(|throw| arg_throw(method, position, throw))
+        }
     }
 }
 
