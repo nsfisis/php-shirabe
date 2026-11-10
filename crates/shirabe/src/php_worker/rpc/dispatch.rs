@@ -247,7 +247,7 @@ fn dispatch_r_table_method(
 /// gets a fresh Rust-side entity, since the proxied FQCN has no implementation of its own in the
 /// child. Classes whose entity cannot be built here are an explicit error, so a plugin never
 /// ends up holding a second, unconnected instance of a Composer service.
-fn construct_entity(args: &[PluginValue]) -> Result<PluginValue, PhpThrow> {
+pub(crate) fn construct_entity(args: &[PluginValue]) -> Result<PluginValue, PhpThrow> {
     let (class, ctor_args) = match (args.first(), args.get(1)) {
         (Some(PluginValue::String(class)), Some(PluginValue::List(ctor_args))) => {
             (class, ctor_args)

@@ -1,5 +1,6 @@
 //! ref: composer/src/Composer/Util/IniHelper.php sha1:1533d2baf9088a804193ca464c0081145da3ede4
 
+use crate::php_worker::xdebug::get_all_ini_files;
 use bstr::BString;
 use shirabe_php_shim::bformat;
 
@@ -13,7 +14,7 @@ impl IniHelper {
     /// the ones it replaced. Nothing here restarts PHP, so the worker always runs on the machine's
     /// own ini files and the variable is not consulted.
     pub fn get_all() -> anyhow::Result<Vec<std::path::PathBuf>> {
-        crate::php_worker::xdebug::get_all_ini_files()
+        get_all_ini_files()
     }
 
     /// Describes the location of the loaded php.ini file(s).

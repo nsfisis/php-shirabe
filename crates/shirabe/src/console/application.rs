@@ -34,6 +34,7 @@ use crate::php_worker::proxy::PhpCommandProxy;
 use crate::php_worker::rpc::dispatch::find_file_in_registered_loaders;
 use crate::php_worker::rpc::table::{composer_handle_value, io_handle_value};
 use crate::php_worker::runtime;
+use crate::php_worker::xdebug::is_xdebug_active;
 use crate::util::{ErrorHandler, Filesystem, HttpDownloader, Platform, Silencer};
 use bstr::{B, BStr, BString, ByteSlice, ByteVec};
 use indexmap::IndexMap;
@@ -2161,9 +2162,7 @@ impl ApplicationHandle {
                 io.write_error(bformat!("<warning>Shirabe supports PHP 7.2.5 and above, you will most likely encounter problems with your PHP {}. Upgrading is strongly recommended but you can use Composer 2.2.x LTS as a fallback.</warning>", shirabe_php_rpc::get_php_version()?.version));
             }
 
-            if crate::php_worker::xdebug::is_xdebug_active()?
-                && Platform::get_env("COMPOSER_DISABLE_XDEBUG_WARN").is_none()
-            {
+            if is_xdebug_active()? && Platform::get_env("COMPOSER_DISABLE_XDEBUG_WARN").is_none() {
                 io.write_error("<warning>Shirabe is operating slower than normal because you have Xdebug enabled. See https://getcomposer.org/xdebug</warning>");
             }
 

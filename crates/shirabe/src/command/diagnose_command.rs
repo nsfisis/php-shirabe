@@ -13,6 +13,8 @@ use crate::io::{BufferIO, IOInterface, IOInterfaceWrite, NullIO};
 use crate::json::{JsonFile, JsonValidationException};
 use crate::package::version::VersionParser;
 use crate::package::{LockerInterface, RootPackage, RootPackageHandle};
+use crate::php_worker::bundle;
+use crate::php_worker::diagnostics::get_diagnostics;
 use crate::plugin::{CommandEvent, PluginEvents};
 use crate::repository::{
     ComposerRepository, FilesystemRepository, FindPackageConstraint, PlatformRepository,
@@ -140,7 +142,7 @@ impl DiagnoseCommand {
     }
 
     fn check_git(&self) -> anyhow::Result<BString> {
-        if !crate::php_worker::diagnostics::get_diagnostics()?.function_exists("proc_open") {
+        if !get_diagnostics()?.function_exists("proc_open") {
             return Ok(BString::from(
                 "<comment>proc_open is not available, git cannot be used</comment>",
             ));
@@ -498,7 +500,7 @@ impl DiagnoseCommand {
     }
 
     fn check_disk_space(&self, config: &Config) -> anyhow::Result<CheckResult> {
-        if !crate::php_worker::diagnostics::get_diagnostics()?.function_exists("disk_free_space") {
+        if !get_diagnostics()?.function_exists("disk_free_space") {
             return Ok(CheckResult::Ok);
         }
 
@@ -625,7 +627,7 @@ impl DiagnoseCommand {
         );
         // PHP reads the installed.json of the Composer that runs; here that is the one in the
         // Composer PHP runtime. The handle holds the file in place while the repository reads it.
-        let installed = crate::php_worker::bundle::local_file("vendor/composer/installed.json")?;
+        let installed = bundle::local_file("vendor/composer/installed.json")?;
         let installed_json = JsonFile::new(installed.path(), None, None)?;
         if !installed_json.exists() {
             return Ok(CheckResult::Message(BString::from(
@@ -703,7 +705,7 @@ impl DiagnoseCommand {
     }
 
     fn get_curl_version(&self) -> anyhow::Result<BString> {
-        let diagnostics = crate::php_worker::diagnostics::get_diagnostics()?;
+        let diagnostics = get_diagnostics()?;
         if diagnostics.extension_loaded("curl") {
             if !HttpDownloader::is_curl_enabled() {
                 return Ok(BString::from(
@@ -817,7 +819,7 @@ impl DiagnoseCommand {
             "{PHP_EOL}If you can not modify the ini file, you can also run `php -d option=value` to modify ini values on the fly. You can use -d multiple times."
         );
 
-        let diagnostics = crate::php_worker::diagnostics::get_diagnostics()?;
+        let diagnostics = get_diagnostics()?;
 
         // PHP stores `true` for an issue with no detail, and a version string otherwise.
         let mut errors: IndexMap<BString, Option<BString>> = IndexMap::new();
@@ -1076,8 +1078,7 @@ impl DiagnoseCommand {
     /// Check if allow_url_fopen is ON
     fn check_connectivity(&self) -> anyhow::Result<CheckResult> {
         // PHP: if (!ini_get('allow_url_fopen')) — a missing setting, "" and "0" are all falsey.
-        let allow_url_fopen =
-            crate::php_worker::diagnostics::get_diagnostics()?.ini_get("allow_url_fopen");
+        let allow_url_fopen = get_diagnostics()?.ini_get("allow_url_fopen");
         if !allow_url_fopen.is_some_and(|value| !value.is_empty() && value != "0") {
             return Ok(CheckResult::Message(BString::from(
                 "<info>SKIP</> <comment>Because allow_url_fopen is missing.</>",
@@ -1242,7 +1243,7 @@ impl Command for DiagnoseCommand {
 
         io.write(bformat!("PHP version: <comment>{php_version}</comment>"));
 
-        let diagnostics = crate::php_worker::diagnostics::get_diagnostics()?;
+        let diagnostics = get_diagnostics()?;
 
         if let Some(php_binary) = &diagnostics.php_binary {
             io.write(bformat!("PHP binary path: <comment>{php_binary}</comment>"));

@@ -9,7 +9,7 @@
 //!   [`ScriptRpcDispatcher`](crate::php_worker::rpc::dispatch::ScriptRpcDispatcher).
 
 use crate::php_worker::call::PhpCall;
-use crate::php_worker::installed_versions;
+use crate::php_worker::{bundle, installed_versions};
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_rpc::{FromWire, PhpObjHandle, PluginValue};
@@ -54,7 +54,7 @@ fn composer_php_runtime_autoload(
 ) -> anyhow::Result<BString> {
     Ok(bformat!(
         "{}/vendor/autoload.php",
-        crate::php_worker::bundle::base_path(cache_dir)?
+        bundle::base_path(cache_dir)?
     ))
 }
 

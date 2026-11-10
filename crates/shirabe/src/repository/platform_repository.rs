@@ -7,7 +7,7 @@ use crate::package::{
     CompletePackageInterface, CompletePackageInterfaceHandle, Link, PackageInterface,
     PackageInterfaceHandle,
 };
-use crate::php_worker::platform_info::PlatformInfo;
+use crate::php_worker::platform_info::{PlatformInfo, get_platform_info};
 use crate::platform::{HhvmDetector, HhvmDetectorInterface, Version};
 use crate::plugin::plugin_interface::{self};
 use crate::repository::{
@@ -125,7 +125,7 @@ impl PlatformRepository {
             Some(platform_info) => platform_info.clone(),
             None => self
                 .platform_info
-                .insert(crate::php_worker::platform_info::get_platform_info()?.clone())
+                .insert(get_platform_info()?.clone())
                 .clone(),
         };
 
