@@ -271,13 +271,6 @@ pub fn usleep(microseconds: u64) {
     std::thread::sleep(std::time::Duration::from_micros(microseconds));
 }
 
-/// Equivalent to PHP's __DIR__ magic constant
-pub fn dir() -> BString {
-    // TODO(php-runtime): __DIR__ is the directory of the source file at compile time; it must be supplied
-    // per call site (e.g. via a macro), not from a runtime shim function.
-    todo!()
-}
-
 pub fn ini_set(_varname: impl AsRef<[u8]>, _value: impl AsRef<[u8]>) -> Option<BString> {
     let _varname = BStr::new(_varname.as_ref());
     let _value = BStr::new(_value.as_ref());

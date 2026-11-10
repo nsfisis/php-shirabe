@@ -11,12 +11,12 @@ use crate::question::{ChoiceQuestion, QuestionInterface};
 use crate::{Cursor, Terminal};
 use bstr::{B, BStr, BString, ByteSlice as _};
 use shirabe_php_shim::{
-    Exception, PHP_EOL, PhpResource, SEEK_SET, ToPhpString, bformat, copy, dir, explode, feof,
-    fgetc, fgets, fopen, fread, fseek, ftell, function_exists, mb_detect_encoding, mb_strlen, ord,
-    path_from_bytes, path_to_bytes, php_fopen_resource, rewind, rtrim, sapi_windows_cp_conv,
-    sapi_windows_cp_get, sapi_windows_cp_set, shell_exec, stdin, str_bitand, str_repeat,
-    stream_copy_to_stream, stream_get_meta_data, stream_isatty_resource, stream_select,
-    stream_set_blocking, strlen, substr, sys_get_temp_dir, trim, unlink,
+    Exception, PHP_EOL, PhpResource, SEEK_SET, ToPhpString, bformat, explode, feof, fgetc, fgets,
+    fopen, fread, fseek, ftell, function_exists, mb_detect_encoding, mb_strlen, ord,
+    path_from_bytes, php_fopen_resource, rewind, rtrim, sapi_windows_cp_conv, sapi_windows_cp_get,
+    sapi_windows_cp_set, shell_exec, stdin, str_bitand, str_repeat, stream_copy_to_stream,
+    stream_get_meta_data, stream_isatty_resource, stream_select, stream_set_blocking, strlen,
+    substr, trim,
 };
 use shirabe_symfony_string::s;
 
@@ -634,26 +634,13 @@ impl QuestionHelper {
         trimmable: bool,
     ) -> anyhow::Result<Result<BString, RuntimeException>> {
         if cfg!(windows) {
-            let mut exe = bformat!("{}/../Resources/bin/hiddeninput.exe", dir());
-
-            // handle code running from a phar
-            let mut tmp_exe: Option<BString> = None;
-            if substr(magic_file(), 0, Some(5)) == "phar:" {
-                let tmp = bformat!("{}/hiddeninput.exe", sys_get_temp_dir());
-                let _ = copy(path_from_bytes(&exe), path_from_bytes(&tmp));
-                exe = tmp.clone();
-                tmp_exe = Some(tmp);
-            }
-
-            let s_exec = shell_exec(bformat!("\"{exe}\"")).unwrap_or_default();
+            // PHP runs Symfony's bundled `Resources/bin/hiddeninput.exe` through `shell_exec`.
+            // `hidden_input()` does the same work in-process.
+            let s_exec = hidden_input();
             let value = if trimmable { rtrim(&s_exec) } else { s_exec };
             output
                 .borrow()
                 .writeln(&[bstr::BString::default()], output_interface::OUTPUT_NORMAL);
-
-            if let Some(tmp) = tmp_exe {
-                unlink(path_from_bytes(&tmp));
-            }
 
             return Ok(Ok(value));
         }
@@ -796,15 +783,6 @@ impl QuestionHelper {
     }
 }
 
-/// PHP `__FILE__` magic constant. The executing code lives in the Shirabe binary itself, which is
-/// the closest analogue for a native executable; it never carries the `phar:` scheme, so the
-/// phar-relocation branch in `get_hidden_response` correctly never triggers.
-fn magic_file() -> BString {
-    BString::from(path_to_bytes(
-        &std::env::current_exe().expect("current executable path"),
-    ))
-}
-
 impl HelperInterface for QuestionHelper {
     fn set_helper_set(&mut self, helper_set: Option<std::rc::Rc<std::cell::RefCell<HelperSet>>>) {
         self.inner.set_helper_set(helper_set);
@@ -817,4 +795,68 @@ impl HelperInterface for QuestionHelper {
     fn get_name(&self) -> BString {
         self.get_name()
     }
+}
+
+/// The output of `hiddeninput.exe` (https://github.com/Seldaek/hidden-input): it turns off the
+/// echo of the console input, reads one line from stdin and prints it followed by a CRLF. Like the
+/// executable, it ignores console API failures (stdin not being a console) and leaves the echo
+/// turned off.
+#[cfg(windows)]
+fn hidden_input() -> BString {
+    // SAFETY: the functions take no pointer other than `mode`, which outlives the calls, and
+    // accept any handle value, including an invalid one.
+    let h_stdin = unsafe {
+        let h_stdin = windows_sys::Win32::System::Console::GetStdHandle(
+            windows_sys::Win32::System::Console::STD_INPUT_HANDLE,
+        );
+        let mut mode: windows_sys::Win32::System::Console::CONSOLE_MODE = 0;
+        windows_sys::Win32::System::Console::GetConsoleMode(h_stdin, &mut mode);
+        windows_sys::Win32::System::Console::SetConsoleMode(
+            h_stdin,
+            mode & !windows_sys::Win32::System::Console::ENABLE_ECHO_INPUT,
+        );
+        h_stdin
+    };
+
+    // The executable reads stdin with `ReadFile` through the CRT in text mode, so the bytes are
+    // in the console input code page. The text mode turns CRLF into LF and, unless stdin is a
+    // character device, ends the input at Ctrl+Z. It reads one byte at a time because, unlike the
+    // executable, this process keeps reading stdin afterwards.
+    // SAFETY: `GetFileType` accepts any handle value.
+    let is_device = unsafe { windows_sys::Win32::Storage::FileSystem::GetFileType(h_stdin) }
+        == windows_sys::Win32::Storage::FileSystem::FILE_TYPE_CHAR;
+    let read_byte = || {
+        let mut byte = 0u8;
+        let mut read = 0u32;
+        // SAFETY: `byte` and `read` outlive the call, the buffer size matches `byte`, and the
+        // handle is not opened for overlapped I/O, so no `OVERLAPPED` is needed.
+        let ok = unsafe {
+            windows_sys::Win32::Storage::FileSystem::ReadFile(
+                h_stdin,
+                &mut byte,
+                1,
+                &mut read,
+                std::ptr::null_mut(),
+            )
+        };
+        (ok != 0 && read == 1 && (is_device || byte != 0x1a)).then_some(byte)
+    };
+
+    let mut line = Vec::new();
+    let mut pending = read_byte();
+    while let Some(byte) = pending {
+        pending = read_byte();
+        match byte {
+            b'\n' => break,
+            b'\r' if pending == Some(b'\n') => break,
+            _ => line.push(byte),
+        }
+    }
+    line.extend_from_slice(b"\r\n");
+    BString::from(line)
+}
+
+#[cfg(not(windows))]
+fn hidden_input() -> BString {
+    unreachable!("hiddeninput.exe is only run on Windows")
 }

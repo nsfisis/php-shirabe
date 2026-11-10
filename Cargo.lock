@@ -2485,6 +2485,7 @@ dependencies = [
  "shirabe-php-shim",
  "shirabe-symfony-process",
  "shirabe-symfony-string",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
