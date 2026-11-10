@@ -15,25 +15,32 @@ final class Runner
 
     public function run(): bool
     {
-        $allPassed = true;
+        $failed = [];
 
         foreach ($this->linters as [$linter, $excludes]) {
-            echo "===== {$linter->name()} =====\n";
-
             $errors = $linter->check($this->rootDir, $excludes);
             if ($errors === []) {
-                echo "Passed.\n";
-            } else {
-                echo $linter->failureIntro(), "\n";
-                foreach ($errors as $error) {
-                    echo "  {$error}\n";
-                }
-                $allPassed = false;
+                continue;
             }
 
+            echo "===== {$linter->name()} =====\n";
+            echo "FAILED.\n";
+            echo $linter->failureIntro(), "\n";
+            foreach ($errors as $error) {
+                echo "  {$error}\n";
+            }
             echo "\n";
+            $failed[] = $linter->name();
         }
 
-        return $allPassed;
+        $total = count($this->linters);
+        if ($failed === []) {
+            echo "PASSED: All {$total} lint rules passed.\n";
+        } else {
+            $count = count($failed);
+            echo "FAILED: {$count} of {$total} lint rules failed: ", implode(', ', $failed), "\n";
+        }
+
+        return $failed === [];
     }
 }
