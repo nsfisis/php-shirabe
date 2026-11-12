@@ -37,7 +37,6 @@ license of the package it is ported from:
 | [`shirabe-metadata-minifier`](crates/shirabe-metadata-minifier/LICENSE)     | composer/metadata-minifier                  |
 | [`shirabe-php-rpc`](crates/shirabe-php-rpc/LICENSE)                         | composer/xdebug-handler                     |
 | [`shirabe-seld-json-lint`](crates/shirabe-seld-json-lint/LICENSE)           | seld/jsonlint                               |
-| [`shirabe-seld-signal`](crates/shirabe-seld-signal/LICENSE)                 | seld/signal-handler                         |
 | [`shirabe-semver`](crates/shirabe-semver/LICENSE)                           | composer/semver                             |
 | [`shirabe-spdx-licenses`](crates/shirabe-spdx-licenses/LICENSE)             | composer/spdx-licenses                      |
 | [`shirabe-symfony-console`](crates/shirabe-symfony-console/LICENSE)         | symfony/console                             |
