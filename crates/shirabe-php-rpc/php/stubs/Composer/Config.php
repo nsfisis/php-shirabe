@@ -10,7 +10,7 @@ use Composer\Config\ConfigSourceInterface;
 use Composer\IO\IOInterface;
 use Composer\Util\ProcessExecutor;
 
-class Config implements \ShirabeRustStub
+class Config implements \Shirabe\RustStub
 {
     /** @var int */
     protected $__rhandle;
@@ -26,7 +26,7 @@ class Config implements \ShirabeRustStub
 
     public function __destruct()
     {
-        \ShirabeRustObjectRegistry::release($this->__rhandle);
+        \Shirabe\RustObjectRegistry::release($this->__rhandle);
     }
 
     public function __shirabeRustHandleDescriptor(): \Shirabe\Wire\RustHandle
@@ -40,34 +40,34 @@ class Config implements \ShirabeRustStub
         // entity and release it twice. The Rust side clones the entity instead, applying
         // whatever __clone semantics the real class defines, and this copy rebinds to the
         // fresh handle. Entities without clone semantics answer with an explicit error.
-        $this->__rhandle = \ShirabeRpcRuntime::callRust($this->__rhandle, '__shirabe_clone', []);
-        \ShirabeRustObjectRegistry::adopt($this->__rhandle, $this);
+        $this->__rhandle = \Shirabe\RpcRuntime::callRust($this->__rhandle, '__shirabe_clone', []);
+        \Shirabe\RustObjectRegistry::adopt($this->__rhandle, $this);
     }
 
     public function __get($name)
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, '__get', [$name]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, '__get', [$name]);
     }
 
     public function __set($name, $value): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, '__set', [$name, $value]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, '__set', [$name, $value]);
     }
 
     public function __isset($name): bool
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, '__isset', [$name]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, '__isset', [$name]);
     }
 
     public function __unset($name): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, '__unset', [$name]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, '__unset', [$name]);
     }
 
     public function __construct(bool $useEnvironment = true, ?string $baseDir = null)
     {
-        $this->__rhandle = \ShirabeRpcRuntime::callRust(0, '__shirabe_construct', [static::class, [$useEnvironment, $baseDir]]);
-        \ShirabeRustObjectRegistry::adopt($this->__rhandle, $this);
+        $this->__rhandle = \Shirabe\RpcRuntime::callRust(0, '__shirabe_construct', [static::class, [$useEnvironment, $baseDir]]);
+        \Shirabe\RustObjectRegistry::adopt($this->__rhandle, $this);
     }
 
     public const SOURCE_DEFAULT = 'default';
@@ -150,76 +150,76 @@ class Config implements \ShirabeRustStub
 
     public function setBaseDir(?string $baseDir): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, 'setBaseDir', [$baseDir]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setBaseDir', [$baseDir]);
     }
 
     public function setConfigSource(ConfigSourceInterface $source): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, 'setConfigSource', [$source]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setConfigSource', [$source]);
     }
 
     public function getConfigSource(): ConfigSourceInterface
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getConfigSource', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getConfigSource', []);
     }
 
     public function setAuthConfigSource(ConfigSourceInterface $source): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, 'setAuthConfigSource', [$source]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setAuthConfigSource', [$source]);
     }
 
     public function getAuthConfigSource(): ConfigSourceInterface
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getAuthConfigSource', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getAuthConfigSource', []);
     }
 
     public function setLocalAuthConfigSource(ConfigSourceInterface $source): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, 'setLocalAuthConfigSource', [$source]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setLocalAuthConfigSource', [$source]);
     }
 
     public function getLocalAuthConfigSource(): ?ConfigSourceInterface
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getLocalAuthConfigSource', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getLocalAuthConfigSource', []);
     }
 
     public function merge(array $config, string $source = self::SOURCE_UNKNOWN): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, 'merge', [$config, $source]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'merge', [$config, $source]);
     }
 
     public function getRepositories(): array
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getRepositories', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getRepositories', []);
     }
 
     public function get(string $key, int $flags = 0)
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'get', [$key, $flags]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'get', [$key, $flags]);
     }
 
     public function all(int $flags = 0): array
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'all', [$flags]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'all', [$flags]);
     }
 
     public function getSourceOfValue(string $key): string
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getSourceOfValue', [$key]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getSourceOfValue', [$key]);
     }
 
     public function raw(): array
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'raw', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'raw', []);
     }
 
     public function has(string $key): bool
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'has', [$key]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'has', [$key]);
     }
 
     public function prohibitUrlByConfig(string $url, ?IOInterface $io = null, array $repoOptions = []): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, 'prohibitUrlByConfig', [$url, $io, $repoOptions]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'prohibitUrlByConfig', [$url, $io, $repoOptions]);
     }
 }

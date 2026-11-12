@@ -13,7 +13,7 @@ use Composer\Composer;
 use Composer\Package\Version\VersionParser;
 use Composer\Semver\Constraint\Constraint;
 
-class HttpDownloader implements \ShirabeRustStub
+class HttpDownloader implements \Shirabe\RustStub
 {
     /** @var int */
     protected $__rhandle;
@@ -29,7 +29,7 @@ class HttpDownloader implements \ShirabeRustStub
 
     public function __destruct()
     {
-        \ShirabeRustObjectRegistry::release($this->__rhandle);
+        \Shirabe\RustObjectRegistry::release($this->__rhandle);
     }
 
     public function __shirabeRustHandleDescriptor(): \Shirabe\Wire\RustHandle
@@ -43,34 +43,34 @@ class HttpDownloader implements \ShirabeRustStub
         // entity and release it twice. The Rust side clones the entity instead, applying
         // whatever __clone semantics the real class defines, and this copy rebinds to the
         // fresh handle. Entities without clone semantics answer with an explicit error.
-        $this->__rhandle = \ShirabeRpcRuntime::callRust($this->__rhandle, '__shirabe_clone', []);
-        \ShirabeRustObjectRegistry::adopt($this->__rhandle, $this);
+        $this->__rhandle = \Shirabe\RpcRuntime::callRust($this->__rhandle, '__shirabe_clone', []);
+        \Shirabe\RustObjectRegistry::adopt($this->__rhandle, $this);
     }
 
     public function __get($name)
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, '__get', [$name]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, '__get', [$name]);
     }
 
     public function __set($name, $value): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, '__set', [$name, $value]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, '__set', [$name, $value]);
     }
 
     public function __isset($name): bool
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, '__isset', [$name]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, '__isset', [$name]);
     }
 
     public function __unset($name): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, '__unset', [$name]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, '__unset', [$name]);
     }
 
     public function __construct(IOInterface $io, Config $config, array $options = [], bool $disableTls = false)
     {
-        $this->__rhandle = \ShirabeRpcRuntime::callRust(0, '__shirabe_construct', [static::class, [$io, $config, $options, $disableTls]]);
-        \ShirabeRustObjectRegistry::adopt($this->__rhandle, $this);
+        $this->__rhandle = \Shirabe\RpcRuntime::callRust(0, '__shirabe_construct', [static::class, [$io, $config, $options, $disableTls]]);
+        \Shirabe\RustObjectRegistry::adopt($this->__rhandle, $this);
     }
 
     private const STATUS_QUEUED = 1;
@@ -164,46 +164,46 @@ class HttpDownloader implements \ShirabeRustStub
 
     public function get(string $url, array $options = [])
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'get', [$url, $options]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'get', [$url, $options]);
     }
 
     public function add(string $url, array $options = [])
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'add', [$url, $options]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'add', [$url, $options]);
     }
 
     public function copy(string $url, string $to, array $options = [])
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'copy', [$url, $to, $options]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'copy', [$url, $to, $options]);
     }
 
     public function addCopy(string $url, string $to, array $options = [])
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'addCopy', [$url, $to, $options]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'addCopy', [$url, $to, $options]);
     }
 
     public function getOptions()
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getOptions', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getOptions', []);
     }
 
     public function setOptions(array $options)
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'setOptions', [$options]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setOptions', [$options]);
     }
 
     public function wait(?int $index = null)
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'wait', [$index]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'wait', [$index]);
     }
 
     public function enableAsync(): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, 'enableAsync', []);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'enableAsync', []);
     }
 
     public function countActiveJobs(?int $index = null): int
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'countActiveJobs', [$index]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'countActiveJobs', [$index]);
     }
 }

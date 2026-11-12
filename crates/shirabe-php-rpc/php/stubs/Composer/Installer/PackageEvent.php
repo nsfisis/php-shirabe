@@ -15,37 +15,37 @@ class PackageEvent extends Event
 {
     public function __construct(string $eventName, Composer $composer, IOInterface $io, bool $devMode, RepositoryInterface $localRepo, array $operations, OperationInterface $operation)
     {
-        $this->__rhandle = \ShirabeRpcRuntime::callRust(0, '__shirabe_construct', [static::class, [$eventName, $composer, $io, $devMode, $localRepo, $operations, $operation]]);
-        \ShirabeRustObjectRegistry::adopt($this->__rhandle, $this);
+        $this->__rhandle = \Shirabe\RpcRuntime::callRust(0, '__shirabe_construct', [static::class, [$eventName, $composer, $io, $devMode, $localRepo, $operations, $operation]]);
+        \Shirabe\RustObjectRegistry::adopt($this->__rhandle, $this);
     }
 
     public function getComposer(): Composer
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getComposer', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getComposer', []);
     }
 
     public function getIO(): IOInterface
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getIO', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getIO', []);
     }
 
     public function isDevMode(): bool
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'isDevMode', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'isDevMode', []);
     }
 
     public function getLocalRepo(): RepositoryInterface
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getLocalRepo', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getLocalRepo', []);
     }
 
     public function getOperations(): array
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getOperations', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getOperations', []);
     }
 
     public function getOperation(): OperationInterface
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getOperation', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getOperation', []);
     }
 }

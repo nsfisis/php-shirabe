@@ -17,36 +17,36 @@ class GitHub
 
     public function __construct(IOInterface $io, Config $config, ?ProcessExecutor $process = null, ?HttpDownloader $httpDownloader = null)
     {
-        \ShirabeUnsupportedClass::fail(self::class, '__construct');
+        \Shirabe\UnsupportedClass::fail(self::class, '__construct');
     }
 
     public function authorizeOAuth(string $originUrl): bool
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'authorizeOAuth');
+        \Shirabe\UnsupportedClass::fail(self::class, 'authorizeOAuth');
     }
 
     public function authorizeOAuthInteractively(string $originUrl, ?string $message = null): bool
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'authorizeOAuthInteractively');
+        \Shirabe\UnsupportedClass::fail(self::class, 'authorizeOAuthInteractively');
     }
 
     public function getRateLimit(array $headers): array
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getRateLimit');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getRateLimit');
     }
 
     public function getSsoUrl(array $headers): ?string
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getSsoUrl');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getSsoUrl');
     }
 
     public function isRateLimited(array $headers): bool
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'isRateLimited');
+        \Shirabe\UnsupportedClass::fail(self::class, 'isRateLimited');
     }
 
     public function requiresSso(array $headers): bool
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'requiresSso');
+        \Shirabe\UnsupportedClass::fail(self::class, 'requiresSso');
     }
 }

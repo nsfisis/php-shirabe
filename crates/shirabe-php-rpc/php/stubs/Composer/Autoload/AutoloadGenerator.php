@@ -15,7 +15,7 @@ use Composer\Package\RootPackageInterface;
 use Composer\Repository\InstalledRepositoryInterface;
 use Composer\Package\Locker;
 
-class AutoloadGenerator implements \ShirabeRustStub
+class AutoloadGenerator implements \Shirabe\RustStub
 {
     /** @var int */
     protected $__rhandle;
@@ -31,7 +31,7 @@ class AutoloadGenerator implements \ShirabeRustStub
 
     public function __destruct()
     {
-        \ShirabeRustObjectRegistry::release($this->__rhandle);
+        \Shirabe\RustObjectRegistry::release($this->__rhandle);
     }
 
     public function __shirabeRustHandleDescriptor(): \Shirabe\Wire\RustHandle
@@ -45,88 +45,88 @@ class AutoloadGenerator implements \ShirabeRustStub
         // entity and release it twice. The Rust side clones the entity instead, applying
         // whatever __clone semantics the real class defines, and this copy rebinds to the
         // fresh handle. Entities without clone semantics answer with an explicit error.
-        $this->__rhandle = \ShirabeRpcRuntime::callRust($this->__rhandle, '__shirabe_clone', []);
-        \ShirabeRustObjectRegistry::adopt($this->__rhandle, $this);
+        $this->__rhandle = \Shirabe\RpcRuntime::callRust($this->__rhandle, '__shirabe_clone', []);
+        \Shirabe\RustObjectRegistry::adopt($this->__rhandle, $this);
     }
 
     public function __get($name)
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, '__get', [$name]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, '__get', [$name]);
     }
 
     public function __set($name, $value): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, '__set', [$name, $value]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, '__set', [$name, $value]);
     }
 
     public function __isset($name): bool
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, '__isset', [$name]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, '__isset', [$name]);
     }
 
     public function __unset($name): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, '__unset', [$name]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, '__unset', [$name]);
     }
 
     public function __construct(EventDispatcher $eventDispatcher, ?IOInterface $io = null)
     {
-        $this->__rhandle = \ShirabeRpcRuntime::callRust(0, '__shirabe_construct', [static::class, [$eventDispatcher, $io]]);
-        \ShirabeRustObjectRegistry::adopt($this->__rhandle, $this);
+        $this->__rhandle = \Shirabe\RpcRuntime::callRust(0, '__shirabe_construct', [static::class, [$eventDispatcher, $io]]);
+        \Shirabe\RustObjectRegistry::adopt($this->__rhandle, $this);
     }
 
     public function setDevMode(bool $devMode = true)
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'setDevMode', [$devMode]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setDevMode', [$devMode]);
     }
 
     public function setClassMapAuthoritative(bool $classMapAuthoritative)
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'setClassMapAuthoritative', [$classMapAuthoritative]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setClassMapAuthoritative', [$classMapAuthoritative]);
     }
 
     public function setApcu(bool $apcu, ?string $apcuPrefix = null)
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'setApcu', [$apcu, $apcuPrefix]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setApcu', [$apcu, $apcuPrefix]);
     }
 
     public function setRunScripts(bool $runScripts = true)
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'setRunScripts', [$runScripts]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setRunScripts', [$runScripts]);
     }
 
     public function setDryRun(bool $dryRun = true): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, 'setDryRun', [$dryRun]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setDryRun', [$dryRun]);
     }
 
     public function setIgnorePlatformRequirements($ignorePlatformReqs)
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'setIgnorePlatformRequirements', [$ignorePlatformReqs]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setIgnorePlatformRequirements', [$ignorePlatformReqs]);
     }
 
     public function setPlatformRequirementFilter(PlatformRequirementFilterInterface $platformRequirementFilter)
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'setPlatformRequirementFilter', [$platformRequirementFilter]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setPlatformRequirementFilter', [$platformRequirementFilter]);
     }
 
     public function dump(Config $config, InstalledRepositoryInterface $localRepo, RootPackageInterface $rootPackage, InstallationManager $installationManager, string $targetDir, bool $scanPsrPackages = false, ?string $suffix = null, ?Locker $locker = null, bool $strictAmbiguous = false)
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'dump', [$config, $localRepo, $rootPackage, $installationManager, $targetDir, $scanPsrPackages, $suffix, $locker, $strictAmbiguous]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'dump', [$config, $localRepo, $rootPackage, $installationManager, $targetDir, $scanPsrPackages, $suffix, $locker, $strictAmbiguous]);
     }
 
     public function buildPackageMap(InstallationManager $installationManager, PackageInterface $rootPackage, array $packages)
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'buildPackageMap', [$installationManager, $rootPackage, $packages]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'buildPackageMap', [$installationManager, $rootPackage, $packages]);
     }
 
     public function parseAutoloads(array $packageMap, PackageInterface $rootPackage, $filteredDevPackages = false)
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'parseAutoloads', [$packageMap, $rootPackage, $filteredDevPackages]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'parseAutoloads', [$packageMap, $rootPackage, $filteredDevPackages]);
     }
 
     public function createLoader(array $autoloads, ?string $vendorDir = null)
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'createLoader', [$autoloads, $vendorDir]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'createLoader', [$autoloads, $vendorDir]);
     }
 }

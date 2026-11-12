@@ -21,106 +21,106 @@ class Request
 
     public function __construct(?LockArrayRepository $lockedRepository = null)
     {
-        \ShirabeUnsupportedClass::fail(self::class, '__construct');
+        \Shirabe\UnsupportedClass::fail(self::class, '__construct');
     }
 
     public function requireName(string $packageName, ?ConstraintInterface $constraint = null): void
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'requireName');
+        \Shirabe\UnsupportedClass::fail(self::class, 'requireName');
     }
 
     public function fixPackage(BasePackage $package): void
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'fixPackage');
+        \Shirabe\UnsupportedClass::fail(self::class, 'fixPackage');
     }
 
     public function lockPackage(BasePackage $package): void
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'lockPackage');
+        \Shirabe\UnsupportedClass::fail(self::class, 'lockPackage');
     }
 
     public function fixLockedPackage(BasePackage $package): void
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'fixLockedPackage');
+        \Shirabe\UnsupportedClass::fail(self::class, 'fixLockedPackage');
     }
 
     public function unlockPackage(BasePackage $package): void
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'unlockPackage');
+        \Shirabe\UnsupportedClass::fail(self::class, 'unlockPackage');
     }
 
     public function setUpdateAllowList(array $updateAllowList, $updateAllowTransitiveDependencies): void
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'setUpdateAllowList');
+        \Shirabe\UnsupportedClass::fail(self::class, 'setUpdateAllowList');
     }
 
     public function getUpdateAllowList(): array
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getUpdateAllowList');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getUpdateAllowList');
     }
 
     public function getUpdateAllowTransitiveDependencies(): bool
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getUpdateAllowTransitiveDependencies');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getUpdateAllowTransitiveDependencies');
     }
 
     public function getUpdateAllowTransitiveRootDependencies(): bool
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getUpdateAllowTransitiveRootDependencies');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getUpdateAllowTransitiveRootDependencies');
     }
 
     public function getRequires(): array
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getRequires');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getRequires');
     }
 
     public function getFixedPackages(): array
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getFixedPackages');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getFixedPackages');
     }
 
     public function isFixedPackage(BasePackage $package): bool
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'isFixedPackage');
+        \Shirabe\UnsupportedClass::fail(self::class, 'isFixedPackage');
     }
 
     public function getLockedPackages(): array
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getLockedPackages');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getLockedPackages');
     }
 
     public function isLockedPackage(PackageInterface $package): bool
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'isLockedPackage');
+        \Shirabe\UnsupportedClass::fail(self::class, 'isLockedPackage');
     }
 
     public function getFixedOrLockedPackages(): array
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getFixedOrLockedPackages');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getFixedOrLockedPackages');
     }
 
     public function getPresentMap(bool $packageIds = false): array
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getPresentMap');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getPresentMap');
     }
 
     public function getFixedPackagesMap(): array
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getFixedPackagesMap');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getFixedPackagesMap');
     }
 
     public function getLockedRepository(): ?LockArrayRepository
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getLockedRepository');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getLockedRepository');
     }
 
     public function restrictPackages(array $names): void
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'restrictPackages');
+        \Shirabe\UnsupportedClass::fail(self::class, 'restrictPackages');
     }
 
     public function getRestrictedPackages(): ?array
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getRestrictedPackages');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getRestrictedPackages');
     }
 }

@@ -15,66 +15,66 @@ class FilterRepository implements RepositoryInterface, AdvisoryProviderInterface
 {
     public function __construct(RepositoryInterface $repo, array $options)
     {
-        \ShirabeUnsupportedClass::fail(self::class, '__construct');
+        \Shirabe\UnsupportedClass::fail(self::class, '__construct');
     }
 
     public function getRepoName(): string
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getRepoName');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getRepoName');
     }
 
     public function getRepository(): RepositoryInterface
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getRepository');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getRepository');
     }
 
     public function hasPackage(PackageInterface $package): bool
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'hasPackage');
+        \Shirabe\UnsupportedClass::fail(self::class, 'hasPackage');
     }
 
     public function findPackage($name, $constraint): ?BasePackage
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'findPackage');
+        \Shirabe\UnsupportedClass::fail(self::class, 'findPackage');
     }
 
     public function findPackages($name, $constraint = null): array
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'findPackages');
+        \Shirabe\UnsupportedClass::fail(self::class, 'findPackages');
     }
 
     public function loadPackages(array $packageNameMap, array $acceptableStabilities, array $stabilityFlags, array $alreadyLoaded = []): array
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'loadPackages');
+        \Shirabe\UnsupportedClass::fail(self::class, 'loadPackages');
     }
 
     public function search(string $query, int $mode = 0, ?string $type = null): array
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'search');
+        \Shirabe\UnsupportedClass::fail(self::class, 'search');
     }
 
     public function getPackages(): array
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getPackages');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getPackages');
     }
 
     public function getProviders($packageName): array
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getProviders');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getProviders');
     }
 
     public function count(): int
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'count');
+        \Shirabe\UnsupportedClass::fail(self::class, 'count');
     }
 
     public function hasSecurityAdvisories(): bool
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'hasSecurityAdvisories');
+        \Shirabe\UnsupportedClass::fail(self::class, 'hasSecurityAdvisories');
     }
 
     public function getSecurityAdvisories(array $packageConstraintMap, bool $allowPartialAdvisories = false): array
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getSecurityAdvisories');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getSecurityAdvisories');
     }
 }

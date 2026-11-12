@@ -16,96 +16,96 @@ class PerforceDownloader extends VcsDownloader
 {
     protected function doDownload(PackageInterface $package, string $path, string $url, ?PackageInterface $prevPackage = null): PromiseInterface
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'doDownload');
+        \Shirabe\UnsupportedClass::fail(self::class, 'doDownload');
     }
 
     public function doInstall(PackageInterface $package, string $path, string $url): PromiseInterface
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'doInstall');
+        \Shirabe\UnsupportedClass::fail(self::class, 'doInstall');
     }
 
     public function initPerforce(PackageInterface $package, string $path, string $url): void
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'initPerforce');
+        \Shirabe\UnsupportedClass::fail(self::class, 'initPerforce');
     }
 
     protected function doUpdate(PackageInterface $initial, PackageInterface $target, string $path, string $url): PromiseInterface
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'doUpdate');
+        \Shirabe\UnsupportedClass::fail(self::class, 'doUpdate');
     }
 
     public function getLocalChanges(PackageInterface $package, string $path): ?string
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getLocalChanges');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getLocalChanges');
     }
 
     protected function getCommitLogs(string $fromReference, string $toReference, string $path): string
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getCommitLogs');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getCommitLogs');
     }
 
     public function setPerforce(Perforce $perforce): void
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'setPerforce');
+        \Shirabe\UnsupportedClass::fail(self::class, 'setPerforce');
     }
 
     protected function hasMetadataRepository(string $path): bool
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'hasMetadataRepository');
+        \Shirabe\UnsupportedClass::fail(self::class, 'hasMetadataRepository');
     }
 
     public function __construct(IOInterface $io, Config $config, ?ProcessExecutor $process = null, ?Filesystem $fs = null)
     {
-        \ShirabeUnsupportedClass::fail(self::class, '__construct');
+        \Shirabe\UnsupportedClass::fail(self::class, '__construct');
     }
 
     public function getInstallationSource(): string
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getInstallationSource');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getInstallationSource');
     }
 
     public function download(PackageInterface $package, string $path, ?PackageInterface $prevPackage = null): PromiseInterface
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'download');
+        \Shirabe\UnsupportedClass::fail(self::class, 'download');
     }
 
     public function prepare(string $type, PackageInterface $package, string $path, ?PackageInterface $prevPackage = null): PromiseInterface
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'prepare');
+        \Shirabe\UnsupportedClass::fail(self::class, 'prepare');
     }
 
     public function cleanup(string $type, PackageInterface $package, string $path, ?PackageInterface $prevPackage = null): PromiseInterface
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'cleanup');
+        \Shirabe\UnsupportedClass::fail(self::class, 'cleanup');
     }
 
     public function install(PackageInterface $package, string $path): PromiseInterface
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'install');
+        \Shirabe\UnsupportedClass::fail(self::class, 'install');
     }
 
     public function update(PackageInterface $initial, PackageInterface $target, string $path): PromiseInterface
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'update');
+        \Shirabe\UnsupportedClass::fail(self::class, 'update');
     }
 
     public function remove(PackageInterface $package, string $path): PromiseInterface
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'remove');
+        \Shirabe\UnsupportedClass::fail(self::class, 'remove');
     }
 
     public function getVcsReference(PackageInterface $package, string $path): ?string
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getVcsReference');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getVcsReference');
     }
 
     protected function cleanChanges(PackageInterface $package, string $path, bool $update): PromiseInterface
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'cleanChanges');
+        \Shirabe\UnsupportedClass::fail(self::class, 'cleanChanges');
     }
 
     protected function reapplyChanges(string $path): void
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'reapplyChanges');
+        \Shirabe\UnsupportedClass::fail(self::class, 'reapplyChanges');
     }
 }

@@ -20,51 +20,51 @@ class VcsRepository extends ArrayRepository implements ConfigurableRepositoryInt
 {
     public function __construct(array $repoConfig, IOInterface $io, Config $config, HttpDownloader $httpDownloader, ?EventDispatcher $dispatcher = null, ?ProcessExecutor $process = null, ?array $drivers = null, ?VersionCacheInterface $versionCache = null)
     {
-        \ShirabeUnsupportedClass::fail(self::class, '__construct');
+        \Shirabe\UnsupportedClass::fail(self::class, '__construct');
     }
 
     public function getRepoName()
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getRepoName');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getRepoName');
     }
 
     public function getRepoConfig()
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getRepoConfig');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getRepoConfig');
     }
 
     public function setLoader(LoaderInterface $loader): void
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'setLoader');
+        \Shirabe\UnsupportedClass::fail(self::class, 'setLoader');
     }
 
     public function getDriver(): ?VcsDriverInterface
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getDriver');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getDriver');
     }
 
     public function hadInvalidBranches(): bool
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'hadInvalidBranches');
+        \Shirabe\UnsupportedClass::fail(self::class, 'hadInvalidBranches');
     }
 
     public function getEmptyReferences(): array
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getEmptyReferences');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getEmptyReferences');
     }
 
     public function getVersionTransportExceptions(): array
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getVersionTransportExceptions');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getVersionTransportExceptions');
     }
 
     protected function initialize()
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'initialize');
+        \Shirabe\UnsupportedClass::fail(self::class, 'initialize');
     }
 
     protected function preProcess(VcsDriverInterface $driver, array $data, string $identifier): array
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'preProcess');
+        \Shirabe\UnsupportedClass::fail(self::class, 'preProcess');
     }
 }

@@ -9,112 +9,112 @@ class RootAliasPackage extends CompleteAliasPackage implements RootPackageInterf
 {
     public function __construct(RootPackage $aliasOf, string $version, string $prettyVersion)
     {
-        $this->__rhandle = \ShirabeRpcRuntime::callRust(0, '__shirabe_construct', [static::class, [$aliasOf, $version, $prettyVersion]]);
-        \ShirabeRustObjectRegistry::adopt($this->__rhandle, $this);
+        $this->__rhandle = \Shirabe\RpcRuntime::callRust(0, '__shirabe_construct', [static::class, [$aliasOf, $version, $prettyVersion]]);
+        \Shirabe\RustObjectRegistry::adopt($this->__rhandle, $this);
     }
 
     public function getAliases(): array
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getAliases', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getAliases', []);
     }
 
     public function getMinimumStability(): string
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getMinimumStability', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getMinimumStability', []);
     }
 
     public function getStabilityFlags(): array
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getStabilityFlags', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getStabilityFlags', []);
     }
 
     public function getReferences(): array
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getReferences', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getReferences', []);
     }
 
     public function getPreferStable(): bool
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getPreferStable', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getPreferStable', []);
     }
 
     public function getConfig(): array
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getConfig', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getConfig', []);
     }
 
     public function setRequires(array $requires): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, 'setRequires', [$requires]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setRequires', [$requires]);
     }
 
     public function setDevRequires(array $devRequires): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, 'setDevRequires', [$devRequires]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setDevRequires', [$devRequires]);
     }
 
     public function setConflicts(array $conflicts): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, 'setConflicts', [$conflicts]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setConflicts', [$conflicts]);
     }
 
     public function setProvides(array $provides): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, 'setProvides', [$provides]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setProvides', [$provides]);
     }
 
     public function setReplaces(array $replaces): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, 'setReplaces', [$replaces]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setReplaces', [$replaces]);
     }
 
     public function setAutoload(array $autoload): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, 'setAutoload', [$autoload]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setAutoload', [$autoload]);
     }
 
     public function setDevAutoload(array $devAutoload): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, 'setDevAutoload', [$devAutoload]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setDevAutoload', [$devAutoload]);
     }
 
     public function setStabilityFlags(array $stabilityFlags): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, 'setStabilityFlags', [$stabilityFlags]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setStabilityFlags', [$stabilityFlags]);
     }
 
     public function setMinimumStability(string $minimumStability): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, 'setMinimumStability', [$minimumStability]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setMinimumStability', [$minimumStability]);
     }
 
     public function setPreferStable(bool $preferStable): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, 'setPreferStable', [$preferStable]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setPreferStable', [$preferStable]);
     }
 
     public function setConfig(array $config): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, 'setConfig', [$config]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setConfig', [$config]);
     }
 
     public function setReferences(array $references): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, 'setReferences', [$references]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setReferences', [$references]);
     }
 
     public function setAliases(array $aliases): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, 'setAliases', [$aliases]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setAliases', [$aliases]);
     }
 
     public function setSuggests(array $suggests): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, 'setSuggests', [$suggests]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setSuggests', [$suggests]);
     }
 
     public function setExtra(array $extra): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, 'setExtra', [$extra]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setExtra', [$extra]);
     }
 }

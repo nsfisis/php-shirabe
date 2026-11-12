@@ -14,11 +14,11 @@ class RootPackageRepository extends ArrayRepository
 {
     public function __construct(RootPackageInterface $package)
     {
-        \ShirabeUnsupportedClass::fail(self::class, '__construct');
+        \Shirabe\UnsupportedClass::fail(self::class, '__construct');
     }
 
     public function getRepoName(): string
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getRepoName');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getRepoName');
     }
 }

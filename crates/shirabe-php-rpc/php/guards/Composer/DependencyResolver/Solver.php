@@ -18,41 +18,41 @@ class Solver
 
     public function __construct(PolicyInterface $policy, Pool $pool, IOInterface $io)
     {
-        \ShirabeUnsupportedClass::fail(self::class, '__construct');
+        \Shirabe\UnsupportedClass::fail(self::class, '__construct');
     }
 
     public function getRuleSetSize(): int
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getRuleSetSize');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getRuleSetSize');
     }
 
     public function getPool(): Pool
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getPool');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getPool');
     }
 
     protected function setupFixedMap(Request $request): void
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'setupFixedMap');
+        \Shirabe\UnsupportedClass::fail(self::class, 'setupFixedMap');
     }
 
     protected function checkForRootRequireProblems(Request $request, PlatformRequirementFilterInterface $platformRequirementFilter): void
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'checkForRootRequireProblems');
+        \Shirabe\UnsupportedClass::fail(self::class, 'checkForRootRequireProblems');
     }
 
     public function solve(Request $request, ?PlatformRequirementFilterInterface $platformRequirementFilter = null): LockTransaction
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'solve');
+        \Shirabe\UnsupportedClass::fail(self::class, 'solve');
     }
 
     protected function propagate(int $level): ?Rule
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'propagate');
+        \Shirabe\UnsupportedClass::fail(self::class, 'propagate');
     }
 
     protected function analyze(int $level, Rule $rule): array
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'analyze');
+        \Shirabe\UnsupportedClass::fail(self::class, 'analyze');
     }
 }

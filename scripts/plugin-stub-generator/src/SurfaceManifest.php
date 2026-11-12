@@ -24,7 +24,7 @@ use PhpParser\ParserFactory;
  * them (see `ForwardingModules`), and records which forwarded members the Rust side answers.
  *
  * The forwarding side is read from the PHP classes the worker resolves proxied FQCNs to (the
- * generated stubs and the hand-written runtime classes): every `\ShirabeRpcRuntime::callRust` on
+ * generated stubs and the hand-written runtime classes): every `\Shirabe\RpcRuntime::callRust` on
  * the instance handle, every `__shirabe_construct` and every `__shirabe_call_static`, plus the
  * `__shirabe_call_static` forwards of the guard classes. The answering side is read from the
  * hand-written forwarding impls (see `RustForwardingImpls`): a member is answered when the impl
@@ -273,7 +273,7 @@ final class SurfaceManifest
     {
         return $node instanceof StaticCall
             && $node->class instanceof Name
-            && $node->class->toString() === 'ShirabeRpcRuntime'
+            && $node->class->toString() === 'Shirabe\RpcRuntime'
             && $node->name instanceof Node\Identifier
             && $node->name->toString() === 'callRust';
     }

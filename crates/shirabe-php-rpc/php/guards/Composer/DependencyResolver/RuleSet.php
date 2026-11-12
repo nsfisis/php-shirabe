@@ -23,56 +23,56 @@ class RuleSet implements \IteratorAggregate, \Countable
 
     public function __construct()
     {
-        \ShirabeUnsupportedClass::fail(self::class, '__construct');
+        \Shirabe\UnsupportedClass::fail(self::class, '__construct');
     }
 
     public function add(Rule $rule, $type): void
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'add');
+        \Shirabe\UnsupportedClass::fail(self::class, 'add');
     }
 
     public function count(): int
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'count');
+        \Shirabe\UnsupportedClass::fail(self::class, 'count');
     }
 
     public function ruleById(int $id): Rule
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'ruleById');
+        \Shirabe\UnsupportedClass::fail(self::class, 'ruleById');
     }
 
     public function getRules(): array
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getRules');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getRules');
     }
 
     public function getIterator(): RuleSetIterator
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getIterator');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getIterator');
     }
 
     public function getIteratorFor($types): RuleSetIterator
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getIteratorFor');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getIteratorFor');
     }
 
     public function getIteratorWithout($types): RuleSetIterator
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getIteratorWithout');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getIteratorWithout');
     }
 
     public function getTypes(): array
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getTypes');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getTypes');
     }
 
     public function getPrettyString(?RepositorySet $repositorySet = null, ?Request $request = null, ?Pool $pool = null, bool $isVerbose = false): string
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getPrettyString');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getPrettyString');
     }
 
     public function __toString(): string
     {
-        \ShirabeUnsupportedClass::fail(self::class, '__toString');
+        \Shirabe\UnsupportedClass::fail(self::class, '__toString');
     }
 }

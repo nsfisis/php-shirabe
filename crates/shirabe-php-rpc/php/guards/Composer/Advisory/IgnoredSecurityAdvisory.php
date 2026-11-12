@@ -15,11 +15,11 @@ class IgnoredSecurityAdvisory extends SecurityAdvisory
 {
     public function __construct(string $packageName, string $advisoryId, ConstraintInterface $affectedVersions, string $title, array $sources, DateTimeImmutable $reportedAt, ?string $cve = null, ?string $link = null, ?string $ignoreReason = null, ?string $severity = null)
     {
-        \ShirabeUnsupportedClass::fail(self::class, '__construct');
+        \Shirabe\UnsupportedClass::fail(self::class, '__construct');
     }
 
     public function jsonSerialize()
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'jsonSerialize');
+        \Shirabe\UnsupportedClass::fail(self::class, 'jsonSerialize');
     }
 }

@@ -9,6 +9,6 @@ class InstalledArrayRepository extends WritableArrayRepository implements Instal
 {
     public function isFresh(): bool
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'isFresh', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'isFresh', []);
     }
 }

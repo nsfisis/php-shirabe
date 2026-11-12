@@ -9,7 +9,7 @@
 // CLASSES is the whole vocabulary that may cross this way: it is both the set of classes handed
 // to `serialize()` in place of a handle descriptor, and, together with the descriptor classes,
 // the `allowed_classes` list every frame payload is unserialized under
-// (`ShirabeRpcRuntime::unserializePayload`), so a payload can never name another class.
+// (`Shirabe\RpcRuntime::unserializePayload`), so a payload can never name another class.
 
 namespace Shirabe;
 

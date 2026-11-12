@@ -23,71 +23,71 @@ class RepositorySet
 
     public function __construct(string $minimumStability = 'stable', array $stabilityFlags = [], array $rootAliases = [], array $rootReferences = [], array $rootRequires = [], array $temporaryConstraints = [])
     {
-        \ShirabeUnsupportedClass::fail(self::class, '__construct');
+        \Shirabe\UnsupportedClass::fail(self::class, '__construct');
     }
 
     public function allowInstalledRepositories(bool $allow = true): void
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'allowInstalledRepositories');
+        \Shirabe\UnsupportedClass::fail(self::class, 'allowInstalledRepositories');
     }
 
     public function getRootRequires(): array
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getRootRequires');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getRootRequires');
     }
 
     public function getTemporaryConstraints(): array
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getTemporaryConstraints');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getTemporaryConstraints');
     }
 
     public function addRepository(RepositoryInterface $repo): void
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'addRepository');
+        \Shirabe\UnsupportedClass::fail(self::class, 'addRepository');
     }
 
     public function findPackages(string $name, ?ConstraintInterface $constraint = null, int $flags = 0): array
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'findPackages');
+        \Shirabe\UnsupportedClass::fail(self::class, 'findPackages');
     }
 
     public function getSecurityAdvisories(array $packageNames, bool $allowPartialAdvisories, bool $ignoreUnreachable = false): array
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getSecurityAdvisories');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getSecurityAdvisories');
     }
 
     public function getMatchingSecurityAdvisories(array $packages, bool $allowPartialAdvisories = false, bool $ignoreUnreachable = false): array
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getMatchingSecurityAdvisories');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getMatchingSecurityAdvisories');
     }
 
     public function getProviders(string $packageName): array
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getProviders');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getProviders');
     }
 
     public function isPackageAcceptable(array $names, string $stability): bool
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'isPackageAcceptable');
+        \Shirabe\UnsupportedClass::fail(self::class, 'isPackageAcceptable');
     }
 
     public function createPool(Request $request, IOInterface $io, ?EventDispatcher $eventDispatcher = null, ?PoolOptimizer $poolOptimizer = null, array $ignoredTypes = [], ?array $allowedTypes = null, ?SecurityAdvisoryPoolFilter $securityAdvisoryPoolFilter = null): Pool
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'createPool');
+        \Shirabe\UnsupportedClass::fail(self::class, 'createPool');
     }
 
     public function createPoolWithAllPackages(): Pool
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'createPoolWithAllPackages');
+        \Shirabe\UnsupportedClass::fail(self::class, 'createPoolWithAllPackages');
     }
 
     public function createPoolForPackage(string $packageName, ?LockArrayRepository $lockedRepo = null): Pool
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'createPoolForPackage');
+        \Shirabe\UnsupportedClass::fail(self::class, 'createPoolForPackage');
     }
 
     public function createPoolForPackages(array $packageNames, ?LockArrayRepository $lockedRepo = null): Pool
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'createPoolForPackages');
+        \Shirabe\UnsupportedClass::fail(self::class, 'createPoolForPackages');
     }
 }

@@ -19,26 +19,26 @@ class ValidatingArrayLoader implements LoaderInterface
 
     public function __construct(LoaderInterface $loader, bool $strictName = true, ?VersionParser $parser = null, int $flags = 0)
     {
-        \ShirabeUnsupportedClass::fail(self::class, '__construct');
+        \Shirabe\UnsupportedClass::fail(self::class, '__construct');
     }
 
     public function load(array $config, string $class = 'Composer\Package\CompletePackage'): BasePackage
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'load');
+        \Shirabe\UnsupportedClass::fail(self::class, 'load');
     }
 
     public function getWarnings(): array
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getWarnings');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getWarnings');
     }
 
     public function getErrors(): array
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getErrors');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getErrors');
     }
 
     public static function hasPackageNamingError(string $name, bool $isLink = false): ?string
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'hasPackageNamingError');
+        \Shirabe\UnsupportedClass::fail(self::class, 'hasPackageNamingError');
     }
 }

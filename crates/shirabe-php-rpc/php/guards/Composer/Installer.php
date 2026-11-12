@@ -38,216 +38,216 @@ class Installer
 
     public function __construct(IOInterface $io, Config $config, RootPackageInterface $package, DownloadManager $downloadManager, RepositoryManager $repositoryManager, Locker $locker, InstallationManager $installationManager, EventDispatcher $eventDispatcher, AutoloadGenerator $autoloadGenerator)
     {
-        \ShirabeUnsupportedClass::fail(self::class, '__construct');
+        \Shirabe\UnsupportedClass::fail(self::class, '__construct');
     }
 
     public function run(): int
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'run');
+        \Shirabe\UnsupportedClass::fail(self::class, 'run');
     }
 
     protected function doUpdate(InstalledRepositoryInterface $localRepo, bool $doInstall): int
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'doUpdate');
+        \Shirabe\UnsupportedClass::fail(self::class, 'doUpdate');
     }
 
     protected function extractDevPackages(LockTransaction $lockTransaction, PlatformRepository $platformRepo, array $aliases, PolicyInterface $policy, ?LockArrayRepository $lockedRepository = null): int
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'extractDevPackages');
+        \Shirabe\UnsupportedClass::fail(self::class, 'extractDevPackages');
     }
 
     protected function doInstall(InstalledRepositoryInterface $localRepo, bool $alreadySolved = false): int
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'doInstall');
+        \Shirabe\UnsupportedClass::fail(self::class, 'doInstall');
     }
 
     protected function createPlatformRepo(bool $forUpdate): PlatformRepository
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'createPlatformRepo');
+        \Shirabe\UnsupportedClass::fail(self::class, 'createPlatformRepo');
     }
 
     public static function create(IOInterface $io, Composer $composer): self
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'create');
+        \Shirabe\UnsupportedClass::fail(self::class, 'create');
     }
 
     public function setIgnoredTypes(array $types): self
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'setIgnoredTypes');
+        \Shirabe\UnsupportedClass::fail(self::class, 'setIgnoredTypes');
     }
 
     public function setAllowedTypes(?array $types): self
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'setAllowedTypes');
+        \Shirabe\UnsupportedClass::fail(self::class, 'setAllowedTypes');
     }
 
     public function setAdditionalFixedRepository(RepositoryInterface $additionalFixedRepository): self
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'setAdditionalFixedRepository');
+        \Shirabe\UnsupportedClass::fail(self::class, 'setAdditionalFixedRepository');
     }
 
     public function setTemporaryConstraints(array $constraints): self
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'setTemporaryConstraints');
+        \Shirabe\UnsupportedClass::fail(self::class, 'setTemporaryConstraints');
     }
 
     public function setDryRun(bool $dryRun = true): self
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'setDryRun');
+        \Shirabe\UnsupportedClass::fail(self::class, 'setDryRun');
     }
 
     public function isDryRun(): bool
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'isDryRun');
+        \Shirabe\UnsupportedClass::fail(self::class, 'isDryRun');
     }
 
     public function setDownloadOnly(bool $downloadOnly = true): self
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'setDownloadOnly');
+        \Shirabe\UnsupportedClass::fail(self::class, 'setDownloadOnly');
     }
 
     public function setPreferSource(bool $preferSource = true): self
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'setPreferSource');
+        \Shirabe\UnsupportedClass::fail(self::class, 'setPreferSource');
     }
 
     public function setPreferDist(bool $preferDist = true): self
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'setPreferDist');
+        \Shirabe\UnsupportedClass::fail(self::class, 'setPreferDist');
     }
 
     public function setOptimizeAutoloader(bool $optimizeAutoloader): self
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'setOptimizeAutoloader');
+        \Shirabe\UnsupportedClass::fail(self::class, 'setOptimizeAutoloader');
     }
 
     public function setClassMapAuthoritative(bool $classMapAuthoritative): self
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'setClassMapAuthoritative');
+        \Shirabe\UnsupportedClass::fail(self::class, 'setClassMapAuthoritative');
     }
 
     public function setApcuAutoloader(bool $apcuAutoloader, ?string $apcuAutoloaderPrefix = null): self
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'setApcuAutoloader');
+        \Shirabe\UnsupportedClass::fail(self::class, 'setApcuAutoloader');
     }
 
     public function setUpdate(bool $update): self
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'setUpdate');
+        \Shirabe\UnsupportedClass::fail(self::class, 'setUpdate');
     }
 
     public function setInstall(bool $install): self
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'setInstall');
+        \Shirabe\UnsupportedClass::fail(self::class, 'setInstall');
     }
 
     public function setDevMode(bool $devMode = true): self
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'setDevMode');
+        \Shirabe\UnsupportedClass::fail(self::class, 'setDevMode');
     }
 
     public function setDumpAutoloader(bool $dumpAutoloader = true): self
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'setDumpAutoloader');
+        \Shirabe\UnsupportedClass::fail(self::class, 'setDumpAutoloader');
     }
 
     public function setRunScripts(bool $runScripts = true): self
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'setRunScripts');
+        \Shirabe\UnsupportedClass::fail(self::class, 'setRunScripts');
     }
 
     public function setConfig(Config $config): self
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'setConfig');
+        \Shirabe\UnsupportedClass::fail(self::class, 'setConfig');
     }
 
     public function setVerbose(bool $verbose = true): self
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'setVerbose');
+        \Shirabe\UnsupportedClass::fail(self::class, 'setVerbose');
     }
 
     public function isVerbose(): bool
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'isVerbose');
+        \Shirabe\UnsupportedClass::fail(self::class, 'isVerbose');
     }
 
     public function setIgnorePlatformRequirements($ignorePlatformReqs): self
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'setIgnorePlatformRequirements');
+        \Shirabe\UnsupportedClass::fail(self::class, 'setIgnorePlatformRequirements');
     }
 
     public function setPlatformRequirementFilter(PlatformRequirementFilterInterface $platformRequirementFilter): self
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'setPlatformRequirementFilter');
+        \Shirabe\UnsupportedClass::fail(self::class, 'setPlatformRequirementFilter');
     }
 
     public function setUpdateMirrors(bool $updateMirrors): self
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'setUpdateMirrors');
+        \Shirabe\UnsupportedClass::fail(self::class, 'setUpdateMirrors');
     }
 
     public function setUpdateAllowList(array $packages): self
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'setUpdateAllowList');
+        \Shirabe\UnsupportedClass::fail(self::class, 'setUpdateAllowList');
     }
 
     public function setUpdateAllowTransitiveDependencies(int $updateAllowTransitiveDependencies): self
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'setUpdateAllowTransitiveDependencies');
+        \Shirabe\UnsupportedClass::fail(self::class, 'setUpdateAllowTransitiveDependencies');
     }
 
     public function setPreferStable(bool $preferStable = true): self
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'setPreferStable');
+        \Shirabe\UnsupportedClass::fail(self::class, 'setPreferStable');
     }
 
     public function setPreferLowest(bool $preferLowest = true): self
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'setPreferLowest');
+        \Shirabe\UnsupportedClass::fail(self::class, 'setPreferLowest');
     }
 
     public function setMinimalUpdate(bool $minimalUpdate = true): self
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'setMinimalUpdate');
+        \Shirabe\UnsupportedClass::fail(self::class, 'setMinimalUpdate');
     }
 
     public function setWriteLock(bool $writeLock = true): self
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'setWriteLock');
+        \Shirabe\UnsupportedClass::fail(self::class, 'setWriteLock');
     }
 
     public function setExecuteOperations(bool $executeOperations = true): self
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'setExecuteOperations');
+        \Shirabe\UnsupportedClass::fail(self::class, 'setExecuteOperations');
     }
 
     public function setAudit(bool $audit): self
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'setAudit');
+        \Shirabe\UnsupportedClass::fail(self::class, 'setAudit');
     }
 
     public function setErrorOnAudit(bool $errorOnAudit): self
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'setErrorOnAudit');
+        \Shirabe\UnsupportedClass::fail(self::class, 'setErrorOnAudit');
     }
 
     public function setAuditFormat(string $auditFormat): self
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'setAuditFormat');
+        \Shirabe\UnsupportedClass::fail(self::class, 'setAuditFormat');
     }
 
     public function setAuditConfig(AuditConfig $auditConfig): self
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'setAuditConfig');
+        \Shirabe\UnsupportedClass::fail(self::class, 'setAuditConfig');
     }
 
     public function disablePlugins(): self
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'disablePlugins');
+        \Shirabe\UnsupportedClass::fail(self::class, 'disablePlugins');
     }
 
     public function setSuggestedPackagesReporter(SuggestedPackagesReporter $suggestedPackagesReporter): self
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'setSuggestedPackagesReporter');
+        \Shirabe\UnsupportedClass::fail(self::class, 'setSuggestedPackagesReporter');
     }
 }

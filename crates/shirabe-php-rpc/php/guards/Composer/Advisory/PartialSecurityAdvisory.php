@@ -16,16 +16,16 @@ class PartialSecurityAdvisory implements JsonSerializable
 {
     public static function create(string $packageName, array $data, VersionParser $parser): self
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'create');
+        \Shirabe\UnsupportedClass::fail(self::class, 'create');
     }
 
     public function __construct(string $packageName, string $advisoryId, ConstraintInterface $affectedVersions)
     {
-        \ShirabeUnsupportedClass::fail(self::class, '__construct');
+        \Shirabe\UnsupportedClass::fail(self::class, '__construct');
     }
 
     public function jsonSerialize()
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'jsonSerialize');
+        \Shirabe\UnsupportedClass::fail(self::class, 'jsonSerialize');
     }
 }

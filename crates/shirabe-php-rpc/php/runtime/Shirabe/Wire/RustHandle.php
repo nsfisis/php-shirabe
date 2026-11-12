@@ -3,7 +3,7 @@
 namespace Shirabe\Wire;
 
 /**
- * The descriptor of an entity in the Rust side's R table. Only `ShirabeRpcRuntime::toPluginValue`
+ * The descriptor of an entity in the Rust side's R table. Only `Shirabe\RpcRuntime::toPluginValue`
  * builds one, so a record of this class on the wire is always a descriptor (see
  * docs/dev/php-rpc.md).
  */

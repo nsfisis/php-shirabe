@@ -16,36 +16,36 @@ class ArchiveManager
 {
     public function __construct(DownloadManager $downloadManager, Loop $loop)
     {
-        \ShirabeUnsupportedClass::fail(self::class, '__construct');
+        \Shirabe\UnsupportedClass::fail(self::class, '__construct');
     }
 
     public function addArchiver(ArchiverInterface $archiver): void
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'addArchiver');
+        \Shirabe\UnsupportedClass::fail(self::class, 'addArchiver');
     }
 
     public function setOverwriteFiles(bool $overwriteFiles): self
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'setOverwriteFiles');
+        \Shirabe\UnsupportedClass::fail(self::class, 'setOverwriteFiles');
     }
 
     public function getPackageFilenameParts(CompletePackageInterface $package): array
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getPackageFilenameParts');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getPackageFilenameParts');
     }
 
     public function getPackageFilenameFromParts(array $parts): string
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getPackageFilenameFromParts');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getPackageFilenameFromParts');
     }
 
     public function getPackageFilename(CompletePackageInterface $package): string
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getPackageFilename');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getPackageFilename');
     }
 
     public function archive(CompletePackageInterface $package, string $format, string $targetDir, ?string $fileName = null, bool $ignoreFilters = false): string
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'archive');
+        \Shirabe\UnsupportedClass::fail(self::class, 'archive');
     }
 }

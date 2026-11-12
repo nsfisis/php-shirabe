@@ -15,131 +15,131 @@ class Decisions implements \Iterator, \Countable
 
     public function __construct(Pool $pool)
     {
-        \ShirabeUnsupportedClass::fail(self::class, '__construct');
+        \Shirabe\UnsupportedClass::fail(self::class, '__construct');
     }
 
     public function decide(int $literal, int $level, Rule $why): void
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'decide');
+        \Shirabe\UnsupportedClass::fail(self::class, 'decide');
     }
 
     public function satisfy(int $literal): bool
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'satisfy');
+        \Shirabe\UnsupportedClass::fail(self::class, 'satisfy');
     }
 
     public function conflict(int $literal): bool
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'conflict');
+        \Shirabe\UnsupportedClass::fail(self::class, 'conflict');
     }
 
     public function decided(int $literalOrPackageId): bool
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'decided');
+        \Shirabe\UnsupportedClass::fail(self::class, 'decided');
     }
 
     public function undecided(int $literalOrPackageId): bool
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'undecided');
+        \Shirabe\UnsupportedClass::fail(self::class, 'undecided');
     }
 
     public function decidedInstall(int $literalOrPackageId): bool
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'decidedInstall');
+        \Shirabe\UnsupportedClass::fail(self::class, 'decidedInstall');
     }
 
     public function decisionLevel(int $literalOrPackageId): int
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'decisionLevel');
+        \Shirabe\UnsupportedClass::fail(self::class, 'decisionLevel');
     }
 
     public function decisionRule(int $literalOrPackageId): Rule
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'decisionRule');
+        \Shirabe\UnsupportedClass::fail(self::class, 'decisionRule');
     }
 
     public function atOffset(int $queueOffset): array
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'atOffset');
+        \Shirabe\UnsupportedClass::fail(self::class, 'atOffset');
     }
 
     public function validOffset(int $queueOffset): bool
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'validOffset');
+        \Shirabe\UnsupportedClass::fail(self::class, 'validOffset');
     }
 
     public function lastReason(): Rule
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'lastReason');
+        \Shirabe\UnsupportedClass::fail(self::class, 'lastReason');
     }
 
     public function lastLiteral(): int
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'lastLiteral');
+        \Shirabe\UnsupportedClass::fail(self::class, 'lastLiteral');
     }
 
     public function reset(): void
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'reset');
+        \Shirabe\UnsupportedClass::fail(self::class, 'reset');
     }
 
     public function resetToOffset(int $offset): void
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'resetToOffset');
+        \Shirabe\UnsupportedClass::fail(self::class, 'resetToOffset');
     }
 
     public function revertLast(): void
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'revertLast');
+        \Shirabe\UnsupportedClass::fail(self::class, 'revertLast');
     }
 
     public function count(): int
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'count');
+        \Shirabe\UnsupportedClass::fail(self::class, 'count');
     }
 
     public function rewind(): void
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'rewind');
+        \Shirabe\UnsupportedClass::fail(self::class, 'rewind');
     }
 
     public function current()
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'current');
+        \Shirabe\UnsupportedClass::fail(self::class, 'current');
     }
 
     public function key(): ?int
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'key');
+        \Shirabe\UnsupportedClass::fail(self::class, 'key');
     }
 
     public function next(): void
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'next');
+        \Shirabe\UnsupportedClass::fail(self::class, 'next');
     }
 
     public function valid(): bool
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'valid');
+        \Shirabe\UnsupportedClass::fail(self::class, 'valid');
     }
 
     public function isEmpty(): bool
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'isEmpty');
+        \Shirabe\UnsupportedClass::fail(self::class, 'isEmpty');
     }
 
     protected function addDecision(int $literal, int $level): void
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'addDecision');
+        \Shirabe\UnsupportedClass::fail(self::class, 'addDecision');
     }
 
     public function toString(?Pool $pool = null): string
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'toString');
+        \Shirabe\UnsupportedClass::fail(self::class, 'toString');
     }
 
     public function __toString(): string
     {
-        \ShirabeUnsupportedClass::fail(self::class, '__toString');
+        \Shirabe\UnsupportedClass::fail(self::class, '__toString');
     }
 }

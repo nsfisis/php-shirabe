@@ -9,7 +9,7 @@ use Composer\IO\IOInterface;
 use Composer\Pcre\Preg;
 use React\Promise\PromiseInterface;
 
-class ProcessExecutor implements \ShirabeRustStub
+class ProcessExecutor implements \Shirabe\RustStub
 {
     /** @var int */
     protected $__rhandle;
@@ -25,7 +25,7 @@ class ProcessExecutor implements \ShirabeRustStub
 
     public function __destruct()
     {
-        \ShirabeRustObjectRegistry::release($this->__rhandle);
+        \Shirabe\RustObjectRegistry::release($this->__rhandle);
     }
 
     public function __shirabeRustHandleDescriptor(): \Shirabe\Wire\RustHandle
@@ -39,34 +39,34 @@ class ProcessExecutor implements \ShirabeRustStub
         // entity and release it twice. The Rust side clones the entity instead, applying
         // whatever __clone semantics the real class defines, and this copy rebinds to the
         // fresh handle. Entities without clone semantics answer with an explicit error.
-        $this->__rhandle = \ShirabeRpcRuntime::callRust($this->__rhandle, '__shirabe_clone', []);
-        \ShirabeRustObjectRegistry::adopt($this->__rhandle, $this);
+        $this->__rhandle = \Shirabe\RpcRuntime::callRust($this->__rhandle, '__shirabe_clone', []);
+        \Shirabe\RustObjectRegistry::adopt($this->__rhandle, $this);
     }
 
     public function __get($name)
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, '__get', [$name]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, '__get', [$name]);
     }
 
     public function __set($name, $value): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, '__set', [$name, $value]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, '__set', [$name, $value]);
     }
 
     public function __isset($name): bool
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, '__isset', [$name]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, '__isset', [$name]);
     }
 
     public function __unset($name): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, '__unset', [$name]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, '__unset', [$name]);
     }
 
     public function __construct(?IOInterface $io = null)
     {
-        $this->__rhandle = \ShirabeRpcRuntime::callRust(0, '__shirabe_construct', [static::class, [$io]]);
-        \ShirabeRustObjectRegistry::adopt($this->__rhandle, $this);
+        $this->__rhandle = \Shirabe\RpcRuntime::callRust(0, '__shirabe_construct', [static::class, [$io]]);
+        \Shirabe\RustObjectRegistry::adopt($this->__rhandle, $this);
     }
 
     private const STATUS_QUEUED = 1;
@@ -146,13 +146,13 @@ class ProcessExecutor implements \ShirabeRustStub
     // Forwarded rather than materialized: it reads the static property $timeout, whose value the Rust side owns.
     public static function getTimeout(): int
     {
-        return \ShirabeRpcRuntime::callRust(0, '__shirabe_call_static', [self::class, 'getTimeout', []]);
+        return \Shirabe\RpcRuntime::callRust(0, '__shirabe_call_static', [self::class, 'getTimeout', []]);
     }
 
     // Forwarded rather than materialized: it reads the static property $timeout, whose value the Rust side owns.
     public static function setTimeout(int $timeout): void
     {
-        \ShirabeRpcRuntime::callRust(0, '__shirabe_call_static', [self::class, 'setTimeout', [$timeout]]);
+        \Shirabe\RpcRuntime::callRust(0, '__shirabe_call_static', [self::class, 'setTimeout', [$timeout]]);
     }
 
     public function execute($command, &$output = null, ?string $cwd = null): int
@@ -160,7 +160,7 @@ class ProcessExecutor implements \ShirabeRustStub
         $__args = [$command, $output, $cwd];
         array_splice($__args, func_num_args());
         $__out = [];
-        $__result = \ShirabeRpcRuntime::callRust($this->__rhandle, 'execute', $__args, $__out);
+        $__result = \Shirabe\RpcRuntime::callRust($this->__rhandle, 'execute', $__args, $__out);
         if (array_key_exists(1, $__out)) {
             $output = $__out[1];
         }
@@ -169,51 +169,51 @@ class ProcessExecutor implements \ShirabeRustStub
 
     public function executeTty($command, ?string $cwd = null): int
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'executeTty', [$command, $cwd]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'executeTty', [$command, $cwd]);
     }
 
     public function executeAsync($command, ?string $cwd = null): PromiseInterface
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'executeAsync', [$command, $cwd]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'executeAsync', [$command, $cwd]);
     }
 
     public function setMaxJobs(int $maxJobs): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, 'setMaxJobs', [$maxJobs]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setMaxJobs', [$maxJobs]);
     }
 
     public function resetMaxJobs(): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, 'resetMaxJobs', []);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'resetMaxJobs', []);
     }
 
     public function wait($index = null): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, 'wait', [$index]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'wait', [$index]);
     }
 
     public function enableAsync(): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, 'enableAsync', []);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'enableAsync', []);
     }
 
     public function countActiveJobs($index = null): int
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'countActiveJobs', [$index]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'countActiveJobs', [$index]);
     }
 
     public function splitLines(?string $output): array
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'splitLines', [$output]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'splitLines', [$output]);
     }
 
     public function getErrorOutput(): string
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getErrorOutput', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getErrorOutput', []);
     }
 
     public function requiresGitDirEnv($command): bool
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'requiresGitDirEnv', [$command]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'requiresGitDirEnv', [$command]);
     }
 }

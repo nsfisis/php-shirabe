@@ -12,26 +12,26 @@ class PackageRepository extends ArrayRepository implements AdvisoryProviderInter
 {
     public function __construct(array $config)
     {
-        \ShirabeUnsupportedClass::fail(self::class, '__construct');
+        \Shirabe\UnsupportedClass::fail(self::class, '__construct');
     }
 
     protected function initialize(): void
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'initialize');
+        \Shirabe\UnsupportedClass::fail(self::class, 'initialize');
     }
 
     public function getRepoName(): string
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getRepoName');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getRepoName');
     }
 
     public function hasSecurityAdvisories(): bool
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'hasSecurityAdvisories');
+        \Shirabe\UnsupportedClass::fail(self::class, 'hasSecurityAdvisories');
     }
 
     public function getSecurityAdvisories(array $packageConstraintMap, bool $allowPartialAdvisories = false): array
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getSecurityAdvisories');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getSecurityAdvisories');
     }
 }

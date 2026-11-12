@@ -34,7 +34,7 @@ class PreCommandRunEvent extends Event
     public function getInput(): InputInterface
     {
         if ($this->__rhandle !== null) {
-            return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getInput', []);
+            return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getInput', []);
         }
 
         return $this->input;
@@ -43,7 +43,7 @@ class PreCommandRunEvent extends Event
     public function getCommand(): string
     {
         if ($this->__rhandle !== null) {
-            return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getCommand', []);
+            return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getCommand', []);
         }
 
         return $this->command;

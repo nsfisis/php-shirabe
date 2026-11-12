@@ -13,22 +13,22 @@ class CommandEvent extends Event
 {
     public function __construct(string $name, string $commandName, InputInterface $input, OutputInterface $output, array $args = [], array $flags = [])
     {
-        $this->__rhandle = \ShirabeRpcRuntime::callRust(0, '__shirabe_construct', [static::class, [$name, $commandName, $input, $output, $args, $flags]]);
-        \ShirabeRustObjectRegistry::adopt($this->__rhandle, $this);
+        $this->__rhandle = \Shirabe\RpcRuntime::callRust(0, '__shirabe_construct', [static::class, [$name, $commandName, $input, $output, $args, $flags]]);
+        \Shirabe\RustObjectRegistry::adopt($this->__rhandle, $this);
     }
 
     public function getInput(): InputInterface
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getInput', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getInput', []);
     }
 
     public function getOutput(): OutputInterface
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getOutput', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getOutput', []);
     }
 
     public function getCommandName(): string
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getCommandName', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getCommandName', []);
     }
 }

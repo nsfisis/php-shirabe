@@ -11,7 +11,7 @@ use Composer\Composer;
 use Composer\IO\IOInterface;
 use Composer\Plugin\PluginInterface;
 
-class RustPluginStub implements PluginInterface, \ShirabeRustStub
+class RustPluginStub implements PluginInterface, \Shirabe\RustStub
 {
     /** @var int */
     protected $__rhandle;
@@ -27,7 +27,7 @@ class RustPluginStub implements PluginInterface, \ShirabeRustStub
 
     public function __destruct()
     {
-        \ShirabeRustObjectRegistry::release($this->__rhandle);
+        \Shirabe\RustObjectRegistry::release($this->__rhandle);
     }
 
     public function __shirabeRustHandleDescriptor(): \Shirabe\Wire\RustHandle
@@ -41,42 +41,42 @@ class RustPluginStub implements PluginInterface, \ShirabeRustStub
         // entity and release it twice. The Rust side clones the entity instead, applying
         // whatever __clone semantics the real class defines, and this copy rebinds to the
         // fresh handle. Entities without clone semantics answer with an explicit error.
-        $this->__rhandle = \ShirabeRpcRuntime::callRust($this->__rhandle, '__shirabe_clone', []);
-        \ShirabeRustObjectRegistry::adopt($this->__rhandle, $this);
+        $this->__rhandle = \Shirabe\RpcRuntime::callRust($this->__rhandle, '__shirabe_clone', []);
+        \Shirabe\RustObjectRegistry::adopt($this->__rhandle, $this);
     }
 
     public function __get($name)
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, '__get', [$name]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, '__get', [$name]);
     }
 
     public function __set($name, $value): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, '__set', [$name, $value]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, '__set', [$name, $value]);
     }
 
     public function __isset($name): bool
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, '__isset', [$name]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, '__isset', [$name]);
     }
 
     public function __unset($name): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, '__unset', [$name]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, '__unset', [$name]);
     }
 
     public function activate(Composer $composer, IOInterface $io)
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, 'activate', [$composer, $io]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'activate', [$composer, $io]);
     }
 
     public function deactivate(Composer $composer, IOInterface $io)
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, 'deactivate', [$composer, $io]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'deactivate', [$composer, $io]);
     }
 
     public function uninstall(Composer $composer, IOInterface $io)
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, 'uninstall', [$composer, $io]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'uninstall', [$composer, $io]);
     }
 }

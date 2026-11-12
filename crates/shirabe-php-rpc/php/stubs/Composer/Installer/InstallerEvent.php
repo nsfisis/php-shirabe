@@ -14,32 +14,32 @@ class InstallerEvent extends Event
 {
     public function __construct(string $eventName, Composer $composer, IOInterface $io, bool $devMode, bool $executeOperations, Transaction $transaction)
     {
-        $this->__rhandle = \ShirabeRpcRuntime::callRust(0, '__shirabe_construct', [static::class, [$eventName, $composer, $io, $devMode, $executeOperations, $transaction]]);
-        \ShirabeRustObjectRegistry::adopt($this->__rhandle, $this);
+        $this->__rhandle = \Shirabe\RpcRuntime::callRust(0, '__shirabe_construct', [static::class, [$eventName, $composer, $io, $devMode, $executeOperations, $transaction]]);
+        \Shirabe\RustObjectRegistry::adopt($this->__rhandle, $this);
     }
 
     public function getComposer(): Composer
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getComposer', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getComposer', []);
     }
 
     public function getIO(): IOInterface
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getIO', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getIO', []);
     }
 
     public function isDevMode(): bool
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'isDevMode', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'isDevMode', []);
     }
 
     public function isExecutingOperations(): bool
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'isExecutingOperations', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'isExecutingOperations', []);
     }
 
     public function getTransaction(): ?Transaction
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getTransaction', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getTransaction', []);
     }
 }

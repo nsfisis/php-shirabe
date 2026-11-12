@@ -14,26 +14,26 @@ class InstalledRepository extends CompositeRepository
 {
     public function __construct()
     {
-        \ShirabeUnsupportedClass::fail(self::class, '__construct');
+        \Shirabe\UnsupportedClass::fail(self::class, '__construct');
     }
 
     public function findPackagesWithReplacersAndProviders(string $name, $constraint = null): array
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'findPackagesWithReplacersAndProviders');
+        \Shirabe\UnsupportedClass::fail(self::class, 'findPackagesWithReplacersAndProviders');
     }
 
     public function getDependents($needle, ?ConstraintInterface $constraint = null, bool $invert = false, bool $recurse = true, ?array $packagesFound = null): array
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getDependents');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getDependents');
     }
 
     public function getRepoName(): string
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getRepoName');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getRepoName');
     }
 
     public function addRepository(RepositoryInterface $repository): void
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'addRepository');
+        \Shirabe\UnsupportedClass::fail(self::class, 'addRepository');
     }
 }

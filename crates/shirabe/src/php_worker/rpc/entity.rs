@@ -43,7 +43,7 @@ pub trait Entity: Clone + 'static {
         )))
     }
 
-    /// A method only `worker.php` itself calls on this entity (`__shirabe_loop_services` on the
+    /// A method only the worker runtime itself calls on this entity (`__shirabe_loop_services` on the
     /// Composer instance); `None` for every other name.
     fn worker_method(&self, call: &mut Call<'_>) -> Option<Result<PluginValue, PhpThrow>> {
         let _ = call;

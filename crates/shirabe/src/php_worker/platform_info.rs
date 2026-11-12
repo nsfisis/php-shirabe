@@ -1,6 +1,6 @@
 //! What `PlatformRepository` asks the PHP runtime, answered by the worker in one round trip.
 //! `Composer\Platform\Runtime` itself has no Rust counterpart: its work belongs to the running
-//! PHP interpreter, so it is ported as PHP into the worker (`ShirabePlatformRuntime`).
+//! PHP interpreter, so it is ported as PHP into the worker (`Shirabe\PlatformRuntime`).
 
 use bstr::{B, BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;

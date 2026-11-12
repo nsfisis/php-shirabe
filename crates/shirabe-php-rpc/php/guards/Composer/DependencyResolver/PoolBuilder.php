@@ -17,21 +17,21 @@ class PoolBuilder
 
     public function __construct(array $acceptableStabilities, array $stabilityFlags, array $rootAliases, array $rootReferences, IOInterface $io, ?EventDispatcher $eventDispatcher = null, ?PoolOptimizer $poolOptimizer = null, array $temporaryConstraints = [], ?SecurityAdvisoryPoolFilter $securityAdvisoryPoolFilter = null)
     {
-        \ShirabeUnsupportedClass::fail(self::class, '__construct');
+        \Shirabe\UnsupportedClass::fail(self::class, '__construct');
     }
 
     public function setIgnoredTypes(array $types): void
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'setIgnoredTypes');
+        \Shirabe\UnsupportedClass::fail(self::class, 'setIgnoredTypes');
     }
 
     public function setAllowedTypes(?array $types): void
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'setAllowedTypes');
+        \Shirabe\UnsupportedClass::fail(self::class, 'setAllowedTypes');
     }
 
     public function buildPool(array $repositories, Request $request): Pool
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'buildPool');
+        \Shirabe\UnsupportedClass::fail(self::class, 'buildPool');
     }
 }

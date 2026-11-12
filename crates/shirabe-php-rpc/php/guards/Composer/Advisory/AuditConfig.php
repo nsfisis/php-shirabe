@@ -14,11 +14,11 @@ class AuditConfig
 {
     public function __construct(bool $audit, string $auditFormat, string $auditAbandoned, bool $blockInsecure, bool $blockAbandoned, bool $ignoreUnreachable, array $ignoreListForAudit, array $ignoreListForBlocking, array $ignoreSeverityForAudit, array $ignoreSeverityForBlocking, array $ignoreAbandonedForAudit, array $ignoreAbandonedForBlocking)
     {
-        \ShirabeUnsupportedClass::fail(self::class, '__construct');
+        \Shirabe\UnsupportedClass::fail(self::class, '__construct');
     }
 
     public static function fromConfig(Config $config, bool $audit = true, string $auditFormat = Auditor::FORMAT_SUMMARY): self
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'fromConfig');
+        \Shirabe\UnsupportedClass::fail(self::class, 'fromConfig');
     }
 }

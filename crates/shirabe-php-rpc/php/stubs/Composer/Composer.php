@@ -37,51 +37,51 @@ class Composer extends PartialComposer
 
     public function setLocker(Locker $locker): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, 'setLocker', [$locker]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setLocker', [$locker]);
     }
 
     public function getLocker(): Locker
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getLocker', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getLocker', []);
     }
 
     public function setDownloadManager(DownloadManager $manager): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, 'setDownloadManager', [$manager]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setDownloadManager', [$manager]);
     }
 
     public function getDownloadManager(): DownloadManager
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getDownloadManager', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getDownloadManager', []);
     }
 
     public function setArchiveManager(ArchiveManager $manager): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, 'setArchiveManager', [$manager]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setArchiveManager', [$manager]);
     }
 
     public function getArchiveManager(): ArchiveManager
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getArchiveManager', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getArchiveManager', []);
     }
 
     public function setPluginManager(PluginManager $manager): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, 'setPluginManager', [$manager]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setPluginManager', [$manager]);
     }
 
     public function getPluginManager(): PluginManager
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getPluginManager', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getPluginManager', []);
     }
 
     public function setAutoloadGenerator(AutoloadGenerator $autoloadGenerator): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, 'setAutoloadGenerator', [$autoloadGenerator]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setAutoloadGenerator', [$autoloadGenerator]);
     }
 
     public function getAutoloadGenerator(): AutoloadGenerator
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getAutoloadGenerator', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getAutoloadGenerator', []);
     }
 }

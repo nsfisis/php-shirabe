@@ -29,6 +29,6 @@ class RustCommandStub extends BaseCommand
 
     public function run(InputInterface $input, OutputInterface $output): int
     {
-        return (int) \ShirabeRpcRuntime::callRust(0, '__shirabe_run_rust_command', [$this->getName(), (string) $input]);
+        return (int) \Shirabe\RpcRuntime::callRust(0, '__shirabe_run_rust_command', [$this->getName(), (string) $input]);
     }
 }

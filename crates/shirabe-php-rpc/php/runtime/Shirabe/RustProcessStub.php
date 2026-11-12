@@ -15,7 +15,7 @@ namespace Shirabe;
 
 use Symfony\Component\Process\Process;
 
-class RustProcessStub extends Process implements \ShirabeRustStub
+class RustProcessStub extends Process implements \Shirabe\RustStub
 {
     /** @var int */
     protected $__rhandle;
@@ -41,7 +41,7 @@ class RustProcessStub extends Process implements \ShirabeRustStub
 
     public function __destruct()
     {
-        \ShirabeRustObjectRegistry::release($this->__rhandle);
+        \Shirabe\RustObjectRegistry::release($this->__rhandle);
     }
 
     public function __shirabeRustHandleDescriptor(): \Shirabe\Wire\RustHandle
@@ -64,7 +64,7 @@ class RustProcessStub extends Process implements \ShirabeRustStub
     private function __shirabeFacts(): array
     {
         if ($this->__shirabeFacts === null) {
-            $this->__shirabeFacts = \ShirabeRpcRuntime::callRust($this->__rhandle, '__shirabe_facts', []);
+            $this->__shirabeFacts = \Shirabe\RpcRuntime::callRust($this->__rhandle, '__shirabe_facts', []);
             $this->__shirabeOutput = $this->__shirabeFacts['output'];
             $this->__shirabeErrorOutput = $this->__shirabeFacts['error_output'];
         }

@@ -10,7 +10,7 @@ use Composer\IO\IOInterface;
 use Composer\Util\Filesystem;
 use React\Promise\PromiseInterface;
 
-class DownloadManager implements \ShirabeRustStub
+class DownloadManager implements \Shirabe\RustStub
 {
     /** @var int */
     protected $__rhandle;
@@ -26,7 +26,7 @@ class DownloadManager implements \ShirabeRustStub
 
     public function __destruct()
     {
-        \ShirabeRustObjectRegistry::release($this->__rhandle);
+        \Shirabe\RustObjectRegistry::release($this->__rhandle);
     }
 
     public function __shirabeRustHandleDescriptor(): \Shirabe\Wire\RustHandle
@@ -40,102 +40,102 @@ class DownloadManager implements \ShirabeRustStub
         // entity and release it twice. The Rust side clones the entity instead, applying
         // whatever __clone semantics the real class defines, and this copy rebinds to the
         // fresh handle. Entities without clone semantics answer with an explicit error.
-        $this->__rhandle = \ShirabeRpcRuntime::callRust($this->__rhandle, '__shirabe_clone', []);
-        \ShirabeRustObjectRegistry::adopt($this->__rhandle, $this);
+        $this->__rhandle = \Shirabe\RpcRuntime::callRust($this->__rhandle, '__shirabe_clone', []);
+        \Shirabe\RustObjectRegistry::adopt($this->__rhandle, $this);
     }
 
     public function __get($name)
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, '__get', [$name]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, '__get', [$name]);
     }
 
     public function __set($name, $value): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, '__set', [$name, $value]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, '__set', [$name, $value]);
     }
 
     public function __isset($name): bool
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, '__isset', [$name]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, '__isset', [$name]);
     }
 
     public function __unset($name): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, '__unset', [$name]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, '__unset', [$name]);
     }
 
     public function __construct(IOInterface $io, bool $preferSource = false, ?Filesystem $filesystem = null)
     {
-        $this->__rhandle = \ShirabeRpcRuntime::callRust(0, '__shirabe_construct', [static::class, [$io, $preferSource, $filesystem]]);
-        \ShirabeRustObjectRegistry::adopt($this->__rhandle, $this);
+        $this->__rhandle = \Shirabe\RpcRuntime::callRust(0, '__shirabe_construct', [static::class, [$io, $preferSource, $filesystem]]);
+        \Shirabe\RustObjectRegistry::adopt($this->__rhandle, $this);
     }
 
     public function setPreferSource(bool $preferSource): self
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, 'setPreferSource', [$preferSource]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setPreferSource', [$preferSource]);
         return $this;
     }
 
     public function setPreferDist(bool $preferDist): self
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, 'setPreferDist', [$preferDist]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setPreferDist', [$preferDist]);
         return $this;
     }
 
     public function setPreferences(array $preferences): self
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, 'setPreferences', [$preferences]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setPreferences', [$preferences]);
         return $this;
     }
 
     public function setDownloader(string $type, DownloaderInterface $downloader): self
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, 'setDownloader', [$type, $downloader]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setDownloader', [$type, $downloader]);
         return $this;
     }
 
     public function getDownloader(string $type): DownloaderInterface
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getDownloader', [$type]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getDownloader', [$type]);
     }
 
     public function getDownloaderForPackage(PackageInterface $package): ?DownloaderInterface
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getDownloaderForPackage', [$package]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getDownloaderForPackage', [$package]);
     }
 
     public function getDownloaderType(DownloaderInterface $downloader): string
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getDownloaderType', [$downloader]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getDownloaderType', [$downloader]);
     }
 
     public function download(PackageInterface $package, string $targetDir, ?PackageInterface $prevPackage = null): PromiseInterface
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'download', [$package, $targetDir, $prevPackage]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'download', [$package, $targetDir, $prevPackage]);
     }
 
     public function prepare(string $type, PackageInterface $package, string $targetDir, ?PackageInterface $prevPackage = null): PromiseInterface
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'prepare', [$type, $package, $targetDir, $prevPackage]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'prepare', [$type, $package, $targetDir, $prevPackage]);
     }
 
     public function install(PackageInterface $package, string $targetDir): PromiseInterface
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'install', [$package, $targetDir]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'install', [$package, $targetDir]);
     }
 
     public function update(PackageInterface $initial, PackageInterface $target, string $targetDir): PromiseInterface
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'update', [$initial, $target, $targetDir]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'update', [$initial, $target, $targetDir]);
     }
 
     public function remove(PackageInterface $package, string $targetDir): PromiseInterface
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'remove', [$package, $targetDir]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'remove', [$package, $targetDir]);
     }
 
     public function cleanup(string $type, PackageInterface $package, string $targetDir, ?PackageInterface $prevPackage = null): PromiseInterface
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'cleanup', [$type, $package, $targetDir, $prevPackage]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'cleanup', [$type, $package, $targetDir, $prevPackage]);
     }
 }

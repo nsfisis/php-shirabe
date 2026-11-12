@@ -25,81 +25,81 @@ class FileDownloader implements DownloaderInterface, ChangeReportInterface
 
     public function __construct(IOInterface $io, Config $config, HttpDownloader $httpDownloader, ?EventDispatcher $eventDispatcher = null, ?Cache $cache = null, ?Filesystem $filesystem = null, ?ProcessExecutor $process = null)
     {
-        \ShirabeUnsupportedClass::fail(self::class, '__construct');
+        \Shirabe\UnsupportedClass::fail(self::class, '__construct');
     }
 
     public function getInstallationSource(): string
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getInstallationSource');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getInstallationSource');
     }
 
     public function download(PackageInterface $package, string $path, ?PackageInterface $prevPackage = null, bool $output = true): PromiseInterface
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'download');
+        \Shirabe\UnsupportedClass::fail(self::class, 'download');
     }
 
     public function prepare(string $type, PackageInterface $package, string $path, ?PackageInterface $prevPackage = null): PromiseInterface
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'prepare');
+        \Shirabe\UnsupportedClass::fail(self::class, 'prepare');
     }
 
     public function cleanup(string $type, PackageInterface $package, string $path, ?PackageInterface $prevPackage = null): PromiseInterface
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'cleanup');
+        \Shirabe\UnsupportedClass::fail(self::class, 'cleanup');
     }
 
     public function install(PackageInterface $package, string $path, bool $output = true): PromiseInterface
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'install');
+        \Shirabe\UnsupportedClass::fail(self::class, 'install');
     }
 
     protected function getDistPath(PackageInterface $package, int $component): string
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getDistPath');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getDistPath');
     }
 
     protected function clearLastCacheWrite(PackageInterface $package): void
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'clearLastCacheWrite');
+        \Shirabe\UnsupportedClass::fail(self::class, 'clearLastCacheWrite');
     }
 
     protected function addCleanupPath(PackageInterface $package, string $path): void
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'addCleanupPath');
+        \Shirabe\UnsupportedClass::fail(self::class, 'addCleanupPath');
     }
 
     protected function removeCleanupPath(PackageInterface $package, string $path): void
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'removeCleanupPath');
+        \Shirabe\UnsupportedClass::fail(self::class, 'removeCleanupPath');
     }
 
     public function update(PackageInterface $initial, PackageInterface $target, string $path): PromiseInterface
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'update');
+        \Shirabe\UnsupportedClass::fail(self::class, 'update');
     }
 
     public function remove(PackageInterface $package, string $path, bool $output = true): PromiseInterface
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'remove');
+        \Shirabe\UnsupportedClass::fail(self::class, 'remove');
     }
 
     protected function getFileName(PackageInterface $package, string $path): string
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getFileName');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getFileName');
     }
 
     protected function getInstallOperationAppendix(PackageInterface $package, string $path): string
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getInstallOperationAppendix');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getInstallOperationAppendix');
     }
 
     protected function processUrl(PackageInterface $package, string $url): string
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'processUrl');
+        \Shirabe\UnsupportedClass::fail(self::class, 'processUrl');
     }
 
     public function getLocalChanges(PackageInterface $package, string $path): ?string
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getLocalChanges');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getLocalChanges');
     }
 }

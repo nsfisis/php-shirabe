@@ -15,26 +15,26 @@ class GitLab
 {
     public function __construct(IOInterface $io, Config $config, ?ProcessExecutor $process = null, ?HttpDownloader $httpDownloader = null)
     {
-        \ShirabeUnsupportedClass::fail(self::class, '__construct');
+        \Shirabe\UnsupportedClass::fail(self::class, '__construct');
     }
 
     public function authorizeOAuth(string $originUrl): bool
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'authorizeOAuth');
+        \Shirabe\UnsupportedClass::fail(self::class, 'authorizeOAuth');
     }
 
     public function authorizeOAuthInteractively(string $scheme, string $originUrl, ?string $message = null): bool
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'authorizeOAuthInteractively');
+        \Shirabe\UnsupportedClass::fail(self::class, 'authorizeOAuthInteractively');
     }
 
     public function authorizeOAuthRefresh(string $scheme, string $originUrl): bool
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'authorizeOAuthRefresh');
+        \Shirabe\UnsupportedClass::fail(self::class, 'authorizeOAuthRefresh');
     }
 
     public function isOAuthExpired(string $originUrl): bool
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'isOAuthExpired');
+        \Shirabe\UnsupportedClass::fail(self::class, 'isOAuthExpired');
     }
 }

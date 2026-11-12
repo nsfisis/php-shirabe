@@ -18,21 +18,21 @@ class PathRepository extends ArrayRepository implements ConfigurableRepositoryIn
 {
     public function __construct(array $repoConfig, IOInterface $io, Config $config, ?HttpDownloader $httpDownloader = null, ?EventDispatcher $dispatcher = null, ?ProcessExecutor $process = null)
     {
-        \ShirabeUnsupportedClass::fail(self::class, '__construct');
+        \Shirabe\UnsupportedClass::fail(self::class, '__construct');
     }
 
     public function getRepoName(): string
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getRepoName');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getRepoName');
     }
 
     public function getRepoConfig(): array
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getRepoConfig');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getRepoConfig');
     }
 
     protected function initialize(): void
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'initialize');
+        \Shirabe\UnsupportedClass::fail(self::class, 'initialize');
     }
 }

@@ -12,17 +12,17 @@ class BufferIO extends ConsoleIO
 {
     public function __construct(string $input = '', int $verbosity = StreamOutput::VERBOSITY_NORMAL, ?OutputFormatterInterface $formatter = null)
     {
-        $this->__rhandle = \ShirabeRpcRuntime::callRust(0, '__shirabe_construct', [static::class, [$input, $verbosity, $formatter]]);
-        \ShirabeRustObjectRegistry::adopt($this->__rhandle, $this);
+        $this->__rhandle = \Shirabe\RpcRuntime::callRust(0, '__shirabe_construct', [static::class, [$input, $verbosity, $formatter]]);
+        \Shirabe\RustObjectRegistry::adopt($this->__rhandle, $this);
     }
 
     public function getOutput(): string
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getOutput', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getOutput', []);
     }
 
     public function setUserInputs(array $inputs): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, 'setUserInputs', [$inputs]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setUserInputs', [$inputs]);
     }
 }

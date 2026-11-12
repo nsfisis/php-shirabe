@@ -9,27 +9,27 @@ class AliasPackage extends BasePackage
 {
     public function __construct(BasePackage $aliasOf, string $version, string $prettyVersion)
     {
-        $this->__rhandle = \ShirabeRpcRuntime::callRust(0, '__shirabe_construct', [static::class, [$aliasOf, $version, $prettyVersion]]);
-        \ShirabeRustObjectRegistry::adopt($this->__rhandle, $this);
+        $this->__rhandle = \Shirabe\RpcRuntime::callRust(0, '__shirabe_construct', [static::class, [$aliasOf, $version, $prettyVersion]]);
+        \Shirabe\RustObjectRegistry::adopt($this->__rhandle, $this);
     }
 
     public function getAliasOf()
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getAliasOf', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getAliasOf', []);
     }
 
     public function setRootPackageAlias(bool $value): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, 'setRootPackageAlias', [$value]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setRootPackageAlias', [$value]);
     }
 
     public function isRootPackageAlias(): bool
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'isRootPackageAlias', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'isRootPackageAlias', []);
     }
 
     public function hasSelfVersionRequires(): bool
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'hasSelfVersionRequires', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'hasSelfVersionRequires', []);
     }
 }

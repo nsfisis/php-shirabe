@@ -15,96 +15,96 @@ class Cache
 {
     public function __construct(IOInterface $io, string $cacheDir, string $allowlist = 'a-z0-9._', ?Filesystem $filesystem = null, bool $readOnly = false)
     {
-        \ShirabeUnsupportedClass::fail(self::class, '__construct');
+        \Shirabe\UnsupportedClass::fail(self::class, '__construct');
     }
 
     public function setReadOnly(bool $readOnly)
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'setReadOnly');
+        \Shirabe\UnsupportedClass::fail(self::class, 'setReadOnly');
     }
 
     public function isReadOnly()
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'isReadOnly');
+        \Shirabe\UnsupportedClass::fail(self::class, 'isReadOnly');
     }
 
     public static function isUsable(string $path)
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'isUsable');
+        \Shirabe\UnsupportedClass::fail(self::class, 'isUsable');
     }
 
     public function isEnabled()
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'isEnabled');
+        \Shirabe\UnsupportedClass::fail(self::class, 'isEnabled');
     }
 
     public function getRoot()
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getRoot');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getRoot');
     }
 
     public function read(string $file)
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'read');
+        \Shirabe\UnsupportedClass::fail(self::class, 'read');
     }
 
     public function write(string $file, string $contents)
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'write');
+        \Shirabe\UnsupportedClass::fail(self::class, 'write');
     }
 
     public function copyFrom(string $file, string $source)
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'copyFrom');
+        \Shirabe\UnsupportedClass::fail(self::class, 'copyFrom');
     }
 
     public function copyTo(string $file, string $target)
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'copyTo');
+        \Shirabe\UnsupportedClass::fail(self::class, 'copyTo');
     }
 
     public function gcIsNecessary()
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'gcIsNecessary');
+        \Shirabe\UnsupportedClass::fail(self::class, 'gcIsNecessary');
     }
 
     public function remove(string $file)
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'remove');
+        \Shirabe\UnsupportedClass::fail(self::class, 'remove');
     }
 
     public function clear()
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'clear');
+        \Shirabe\UnsupportedClass::fail(self::class, 'clear');
     }
 
     public function getAge(string $file)
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getAge');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getAge');
     }
 
     public function gc(int $ttl, int $maxSize)
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'gc');
+        \Shirabe\UnsupportedClass::fail(self::class, 'gc');
     }
 
     public function gcVcsCache(int $ttl): bool
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'gcVcsCache');
+        \Shirabe\UnsupportedClass::fail(self::class, 'gcVcsCache');
     }
 
     public function sha1(string $file)
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'sha1');
+        \Shirabe\UnsupportedClass::fail(self::class, 'sha1');
     }
 
     public function sha256(string $file)
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'sha256');
+        \Shirabe\UnsupportedClass::fail(self::class, 'sha256');
     }
 
     protected function getFinder()
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getFinder');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getFinder');
     }
 }

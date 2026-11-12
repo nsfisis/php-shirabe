@@ -12,11 +12,11 @@ class PoolOptimizer
 {
     public function __construct(PolicyInterface $policy)
     {
-        \ShirabeUnsupportedClass::fail(self::class, '__construct');
+        \Shirabe\UnsupportedClass::fail(self::class, '__construct');
     }
 
     public function optimize(Request $request, Pool $pool): Pool
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'optimize');
+        \Shirabe\UnsupportedClass::fail(self::class, 'optimize');
     }
 }

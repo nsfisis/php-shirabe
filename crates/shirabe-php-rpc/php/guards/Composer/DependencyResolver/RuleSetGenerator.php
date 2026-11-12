@@ -15,51 +15,51 @@ class RuleSetGenerator
 {
     public function __construct(PolicyInterface $policy, Pool $pool)
     {
-        \ShirabeUnsupportedClass::fail(self::class, '__construct');
+        \Shirabe\UnsupportedClass::fail(self::class, '__construct');
     }
 
     protected function createRequireRule(BasePackage $package, array $providers, $reason, $reasonData): ?Rule
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'createRequireRule');
+        \Shirabe\UnsupportedClass::fail(self::class, 'createRequireRule');
     }
 
     protected function createInstallOneOfRule(array $packages, $reason, $reasonData): Rule
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'createInstallOneOfRule');
+        \Shirabe\UnsupportedClass::fail(self::class, 'createInstallOneOfRule');
     }
 
     protected function createRule2Literals(BasePackage $issuer, BasePackage $provider, $reason, $reasonData): ?Rule
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'createRule2Literals');
+        \Shirabe\UnsupportedClass::fail(self::class, 'createRule2Literals');
     }
 
     protected function createMultiConflictRule(array $packages, $reason, $reasonData): Rule
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'createMultiConflictRule');
+        \Shirabe\UnsupportedClass::fail(self::class, 'createMultiConflictRule');
     }
 
     protected function addRulesForPackage(BasePackage $package, PlatformRequirementFilterInterface $platformRequirementFilter): void
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'addRulesForPackage');
+        \Shirabe\UnsupportedClass::fail(self::class, 'addRulesForPackage');
     }
 
     protected function addConflictRules(PlatformRequirementFilterInterface $platformRequirementFilter): void
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'addConflictRules');
+        \Shirabe\UnsupportedClass::fail(self::class, 'addConflictRules');
     }
 
     protected function addRulesForRequest(Request $request, PlatformRequirementFilterInterface $platformRequirementFilter): void
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'addRulesForRequest');
+        \Shirabe\UnsupportedClass::fail(self::class, 'addRulesForRequest');
     }
 
     protected function addRulesForRootAliases(PlatformRequirementFilterInterface $platformRequirementFilter): void
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'addRulesForRootAliases');
+        \Shirabe\UnsupportedClass::fail(self::class, 'addRulesForRootAliases');
     }
 
     public function getRulesFor(Request $request, ?PlatformRequirementFilterInterface $platformRequirementFilter = null): RuleSet
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getRulesFor');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getRulesFor');
     }
 }

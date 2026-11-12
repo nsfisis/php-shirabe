@@ -12,6 +12,6 @@ class PearRepository extends ArrayRepository
 {
     public function __construct()
     {
-        \ShirabeUnsupportedClass::fail(self::class, '__construct');
+        \Shirabe\UnsupportedClass::fail(self::class, '__construct');
     }
 }

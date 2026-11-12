@@ -26,56 +26,56 @@ class JsonFile
 
     public function __construct(string $path, ?HttpDownloader $httpDownloader = null, ?IOInterface $io = null)
     {
-        \ShirabeUnsupportedClass::fail(self::class, '__construct');
+        \Shirabe\UnsupportedClass::fail(self::class, '__construct');
     }
 
     public function getPath(): string
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getPath');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getPath');
     }
 
     public function exists(): bool
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'exists');
+        \Shirabe\UnsupportedClass::fail(self::class, 'exists');
     }
 
     public function read()
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'read');
+        \Shirabe\UnsupportedClass::fail(self::class, 'read');
     }
 
     public function write(array $hash, int $options = JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'write');
+        \Shirabe\UnsupportedClass::fail(self::class, 'write');
     }
 
     public function validateSchema(int $schema = self::STRICT_SCHEMA, ?string $schemaFile = null): bool
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'validateSchema');
+        \Shirabe\UnsupportedClass::fail(self::class, 'validateSchema');
     }
 
     public static function validateJsonSchema(string $source, $data, int $schema, ?string $schemaFile = null): bool
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'validateJsonSchema');
+        \Shirabe\UnsupportedClass::fail(self::class, 'validateJsonSchema');
     }
 
     public static function encode($data, int $options = \JSON_UNESCAPED_SLASHES | \JSON_PRETTY_PRINT | \JSON_UNESCAPED_UNICODE, string $indent = self::INDENT_DEFAULT): string
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'encode');
+        \Shirabe\UnsupportedClass::fail(self::class, 'encode');
     }
 
     public static function parseJson(?string $json, ?string $file = null)
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'parseJson');
+        \Shirabe\UnsupportedClass::fail(self::class, 'parseJson');
     }
 
     protected static function validateSyntax(string $json, ?string $file = null): bool
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'validateSyntax');
+        \Shirabe\UnsupportedClass::fail(self::class, 'validateSyntax');
     }
 
     public static function detectIndenting(?string $json): string
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'detectIndenting');
+        \Shirabe\UnsupportedClass::fail(self::class, 'detectIndenting');
     }
 }

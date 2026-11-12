@@ -12,26 +12,26 @@ class LockTransaction extends Transaction
 {
     public function __construct(Pool $pool, array $presentMap, array $unlockableMap, Decisions $decisions)
     {
-        \ShirabeUnsupportedClass::fail(self::class, '__construct');
+        \Shirabe\UnsupportedClass::fail(self::class, '__construct');
     }
 
     public function setResultPackages(Pool $pool, Decisions $decisions): void
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'setResultPackages');
+        \Shirabe\UnsupportedClass::fail(self::class, 'setResultPackages');
     }
 
     public function setNonDevPackages(LockTransaction $extractionResult): void
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'setNonDevPackages');
+        \Shirabe\UnsupportedClass::fail(self::class, 'setNonDevPackages');
     }
 
     public function getNewLockPackages(bool $devMode, bool $updateMirrors = false): array
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getNewLockPackages');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getNewLockPackages');
     }
 
     public function getAliases(array $aliases): array
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getAliases');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getAliases');
     }
 }

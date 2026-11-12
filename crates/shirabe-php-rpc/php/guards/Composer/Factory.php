@@ -25,112 +25,112 @@ class Factory
 {
     public function __construct()
     {
-        \ShirabeUnsupportedClass::fail(self::class, '__construct');
+        \Shirabe\UnsupportedClass::fail(self::class, '__construct');
     }
 
     protected static function getHomeDir(): string
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getHomeDir');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getHomeDir');
     }
 
     protected static function getCacheDir(string $home): string
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getCacheDir');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getCacheDir');
     }
 
     protected static function getDataDir(string $home): string
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getDataDir');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getDataDir');
     }
 
     public static function createConfig(?IOInterface $io = null, ?string $cwd = null): Config
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'createConfig');
+        \Shirabe\UnsupportedClass::fail(self::class, 'createConfig');
     }
 
     // Forwarded rather than guarded: it only reads the COMPOSER environment variable, whose value the Rust side owns.
     public static function getComposerFile(): string
     {
-        return \ShirabeRpcRuntime::callRust(0, '__shirabe_call_static', [self::class, 'getComposerFile', []]);
+        return \Shirabe\RpcRuntime::callRust(0, '__shirabe_call_static', [self::class, 'getComposerFile', []]);
     }
 
     public static function getLockFile(string $composerFile): string
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getLockFile');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getLockFile');
     }
 
     public static function createAdditionalStyles(): array
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'createAdditionalStyles');
+        \Shirabe\UnsupportedClass::fail(self::class, 'createAdditionalStyles');
     }
 
     public static function createOutput(): ConsoleOutput
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'createOutput');
+        \Shirabe\UnsupportedClass::fail(self::class, 'createOutput');
     }
 
     public function createComposer(IOInterface $io, $localConfig = null, $disablePlugins = false, ?string $cwd = null, bool $fullLoad = true, bool $disableScripts = false)
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'createComposer');
+        \Shirabe\UnsupportedClass::fail(self::class, 'createComposer');
     }
 
     public static function createGlobal(IOInterface $io, bool $disablePlugins = false, bool $disableScripts = false): ?Composer
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'createGlobal');
+        \Shirabe\UnsupportedClass::fail(self::class, 'createGlobal');
     }
 
     protected function addLocalRepository(IOInterface $io, RepositoryManager $rm, string $vendorDir, RootPackageInterface $rootPackage, ?ProcessExecutor $process = null): void
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'addLocalRepository');
+        \Shirabe\UnsupportedClass::fail(self::class, 'addLocalRepository');
     }
 
     protected function createGlobalComposer(IOInterface $io, Config $config, $disablePlugins, bool $disableScripts, bool $fullLoad = false): ?PartialComposer
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'createGlobalComposer');
+        \Shirabe\UnsupportedClass::fail(self::class, 'createGlobalComposer');
     }
 
     public function createDownloadManager(IOInterface $io, Config $config, HttpDownloader $httpDownloader, ProcessExecutor $process, ?EventDispatcher $eventDispatcher = null): \Composer\Downloader\DownloadManager
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'createDownloadManager');
+        \Shirabe\UnsupportedClass::fail(self::class, 'createDownloadManager');
     }
 
     public function createArchiveManager(Config $config, \Composer\Downloader\DownloadManager $dm, Loop $loop)
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'createArchiveManager');
+        \Shirabe\UnsupportedClass::fail(self::class, 'createArchiveManager');
     }
 
     protected function createPluginManager(IOInterface $io, Composer $composer, ?PartialComposer $globalComposer = null, $disablePlugins = false): \Composer\Plugin\PluginManager
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'createPluginManager');
+        \Shirabe\UnsupportedClass::fail(self::class, 'createPluginManager');
     }
 
     public function createInstallationManager(Loop $loop, IOInterface $io, ?EventDispatcher $eventDispatcher = null): \Composer\Installer\InstallationManager
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'createInstallationManager');
+        \Shirabe\UnsupportedClass::fail(self::class, 'createInstallationManager');
     }
 
     protected function createDefaultInstallers(\Composer\Installer\InstallationManager $im, PartialComposer $composer, IOInterface $io, ?ProcessExecutor $process = null): void
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'createDefaultInstallers');
+        \Shirabe\UnsupportedClass::fail(self::class, 'createDefaultInstallers');
     }
 
     protected function purgePackages(InstalledRepositoryInterface $repo, \Composer\Installer\InstallationManager $im): void
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'purgePackages');
+        \Shirabe\UnsupportedClass::fail(self::class, 'purgePackages');
     }
 
     protected function loadRootPackage(RepositoryManager $rm, Config $config, VersionParser $parser, VersionGuesser $guesser, IOInterface $io): \Composer\Package\Loader\RootPackageLoader
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'loadRootPackage');
+        \Shirabe\UnsupportedClass::fail(self::class, 'loadRootPackage');
     }
 
     public static function create(IOInterface $io, $config = null, $disablePlugins = false, bool $disableScripts = false): Composer
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'create');
+        \Shirabe\UnsupportedClass::fail(self::class, 'create');
     }
 
     public static function createHttpDownloader(IOInterface $io, Config $config, array $options = []): HttpDownloader
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'createHttpDownloader');
+        \Shirabe\UnsupportedClass::fail(self::class, 'createHttpDownloader');
     }
 }

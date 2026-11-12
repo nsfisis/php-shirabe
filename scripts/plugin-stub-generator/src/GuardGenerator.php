@@ -107,7 +107,7 @@ final class GuardGenerator
             // Nothing in the hierarchy declares one, so PHP would hand out the implicit
             // constructor. The guard declares its own to close that door.
             $methods[] = "    public function __construct()\n    {\n"
-                . "        \\ShirabeUnsupportedClass::fail(self::class, '__construct');\n    }";
+                . "        \\Shirabe\\UnsupportedClass::fail(self::class, '__construct');\n    }";
         }
         foreach ($closure as $lowerName => [$method, $declaringFile]) {
             if ($method->isPrivate() || $lowerName === '__destruct') {
@@ -235,14 +235,14 @@ final class GuardGenerator
                 }
             }
             $args = implode(', ', array_map(static fn ($param): string => '$' . $param->var->name, $method->params));
-            $call = "\\ShirabeRpcRuntime::callRust(0, '__shirabe_call_static', [self::class, '$name', [$args]])";
+            $call = "\\Shirabe\\RpcRuntime::callRust(0, '__shirabe_call_static', [self::class, '$name', [$args]])";
             $isVoid = $returnType === 'void';
             return "    // Forwarded rather than guarded: " . self::FORWARDED_STATICS[$member] . "\n"
                 . "    $signature\n    {\n"
                 . "        " . ($isVoid ? '' : 'return ') . "$call;\n    }";
         }
         return "    $signature\n    {\n"
-            . "        \\ShirabeUnsupportedClass::fail(self::class, '$name');\n    }";
+            . "        \\Shirabe\\UnsupportedClass::fail(self::class, '$name');\n    }";
     }
 
 }

@@ -14,21 +14,21 @@ class ArtifactRepository extends ArrayRepository implements ConfigurableReposito
 {
     public function __construct(array $repoConfig, IOInterface $io)
     {
-        \ShirabeUnsupportedClass::fail(self::class, '__construct');
+        \Shirabe\UnsupportedClass::fail(self::class, '__construct');
     }
 
     public function getRepoName()
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getRepoName');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getRepoName');
     }
 
     public function getRepoConfig()
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getRepoConfig');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getRepoConfig');
     }
 
     protected function initialize()
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'initialize');
+        \Shirabe\UnsupportedClass::fail(self::class, 'initialize');
     }
 }

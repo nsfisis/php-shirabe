@@ -17,26 +17,26 @@ class Bitbucket
 
     public function __construct(IOInterface $io, Config $config, ?ProcessExecutor $process = null, ?HttpDownloader $httpDownloader = null, ?int $time = null)
     {
-        \ShirabeUnsupportedClass::fail(self::class, '__construct');
+        \Shirabe\UnsupportedClass::fail(self::class, '__construct');
     }
 
     public function getToken(): string
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getToken');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getToken');
     }
 
     public function authorizeOAuth(string $originUrl): bool
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'authorizeOAuth');
+        \Shirabe\UnsupportedClass::fail(self::class, 'authorizeOAuth');
     }
 
     public function authorizeOAuthInteractively(string $originUrl, ?string $message = null): bool
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'authorizeOAuthInteractively');
+        \Shirabe\UnsupportedClass::fail(self::class, 'authorizeOAuthInteractively');
     }
 
     public function requestToken(string $originUrl, string $consumerKey, string $consumerSecret): string
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'requestToken');
+        \Shirabe\UnsupportedClass::fail(self::class, 'requestToken');
     }
 }

@@ -12,31 +12,31 @@ class RuleSetIterator implements \Iterator
 {
     public function __construct(array $rules)
     {
-        \ShirabeUnsupportedClass::fail(self::class, '__construct');
+        \Shirabe\UnsupportedClass::fail(self::class, '__construct');
     }
 
     public function current(): Rule
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'current');
+        \Shirabe\UnsupportedClass::fail(self::class, 'current');
     }
 
     public function key(): int
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'key');
+        \Shirabe\UnsupportedClass::fail(self::class, 'key');
     }
 
     public function next(): void
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'next');
+        \Shirabe\UnsupportedClass::fail(self::class, 'next');
     }
 
     public function rewind(): void
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'rewind');
+        \Shirabe\UnsupportedClass::fail(self::class, 'rewind');
     }
 
     public function valid(): bool
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'valid');
+        \Shirabe\UnsupportedClass::fail(self::class, 'valid');
     }
 }

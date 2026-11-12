@@ -11,31 +11,31 @@ class WritableArrayRepository extends ArrayRepository implements WritableReposit
 {
     public function write(bool $devMode, InstallationManager $installationManager)
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'write', [$devMode, $installationManager]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'write', [$devMode, $installationManager]);
     }
 
     public function getCanonicalPackages()
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getCanonicalPackages', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getCanonicalPackages', []);
     }
 
     public function reload()
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'reload', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'reload', []);
     }
 
     public function setDevPackageNames(array $devPackageNames)
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'setDevPackageNames', [$devPackageNames]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setDevPackageNames', [$devPackageNames]);
     }
 
     public function getDevPackageNames()
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getDevPackageNames', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getDevPackageNames', []);
     }
 
     public function getDevMode()
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getDevMode', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getDevMode', []);
     }
 }

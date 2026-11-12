@@ -17,11 +17,11 @@ class ConfigValidator
 
     public function __construct(IOInterface $io)
     {
-        \ShirabeUnsupportedClass::fail(self::class, '__construct');
+        \Shirabe\UnsupportedClass::fail(self::class, '__construct');
     }
 
     public function validate(string $file, int $arrayLoaderValidationFlags = ValidatingArrayLoader::CHECK_ALL, int $flags = self::CHECK_VERSION): array
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'validate');
+        \Shirabe\UnsupportedClass::fail(self::class, 'validate');
     }
 }

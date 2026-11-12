@@ -15,16 +15,16 @@ class SecurityAdvisory extends PartialSecurityAdvisory
 {
     public function __construct(string $packageName, string $advisoryId, ConstraintInterface $affectedVersions, string $title, array $sources, DateTimeImmutable $reportedAt, ?string $cve = null, ?string $link = null, ?string $severity = null)
     {
-        \ShirabeUnsupportedClass::fail(self::class, '__construct');
+        \Shirabe\UnsupportedClass::fail(self::class, '__construct');
     }
 
     public function toIgnoredAdvisory(?string $ignoreReason): IgnoredSecurityAdvisory
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'toIgnoredAdvisory');
+        \Shirabe\UnsupportedClass::fail(self::class, 'toIgnoredAdvisory');
     }
 
     public function jsonSerialize()
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'jsonSerialize');
+        \Shirabe\UnsupportedClass::fail(self::class, 'jsonSerialize');
     }
 }

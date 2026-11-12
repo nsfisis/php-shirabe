@@ -17,7 +17,7 @@ use Composer\EventDispatcher\EventDispatcher;
 use Composer\Util\Loop;
 use React\Promise\PromiseInterface;
 
-class InstallationManager implements \ShirabeRustStub
+class InstallationManager implements \Shirabe\RustStub
 {
     /** @var int */
     protected $__rhandle;
@@ -33,7 +33,7 @@ class InstallationManager implements \ShirabeRustStub
 
     public function __destruct()
     {
-        \ShirabeRustObjectRegistry::release($this->__rhandle);
+        \Shirabe\RustObjectRegistry::release($this->__rhandle);
     }
 
     public function __shirabeRustHandleDescriptor(): \Shirabe\Wire\RustHandle
@@ -47,118 +47,118 @@ class InstallationManager implements \ShirabeRustStub
         // entity and release it twice. The Rust side clones the entity instead, applying
         // whatever __clone semantics the real class defines, and this copy rebinds to the
         // fresh handle. Entities without clone semantics answer with an explicit error.
-        $this->__rhandle = \ShirabeRpcRuntime::callRust($this->__rhandle, '__shirabe_clone', []);
-        \ShirabeRustObjectRegistry::adopt($this->__rhandle, $this);
+        $this->__rhandle = \Shirabe\RpcRuntime::callRust($this->__rhandle, '__shirabe_clone', []);
+        \Shirabe\RustObjectRegistry::adopt($this->__rhandle, $this);
     }
 
     public function __get($name)
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, '__get', [$name]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, '__get', [$name]);
     }
 
     public function __set($name, $value): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, '__set', [$name, $value]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, '__set', [$name, $value]);
     }
 
     public function __isset($name): bool
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, '__isset', [$name]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, '__isset', [$name]);
     }
 
     public function __unset($name): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, '__unset', [$name]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, '__unset', [$name]);
     }
 
     public function __construct(Loop $loop, IOInterface $io, ?EventDispatcher $eventDispatcher = null)
     {
-        $this->__rhandle = \ShirabeRpcRuntime::callRust(0, '__shirabe_construct', [static::class, [$loop, $io, $eventDispatcher]]);
-        \ShirabeRustObjectRegistry::adopt($this->__rhandle, $this);
+        $this->__rhandle = \Shirabe\RpcRuntime::callRust(0, '__shirabe_construct', [static::class, [$loop, $io, $eventDispatcher]]);
+        \Shirabe\RustObjectRegistry::adopt($this->__rhandle, $this);
     }
 
     public function reset(): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, 'reset', []);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'reset', []);
     }
 
     public function addInstaller(InstallerInterface $installer): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, 'addInstaller', [$installer]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'addInstaller', [$installer]);
     }
 
     public function removeInstaller(InstallerInterface $installer): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, 'removeInstaller', [$installer]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'removeInstaller', [$installer]);
     }
 
     public function disablePlugins(): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, 'disablePlugins', []);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'disablePlugins', []);
     }
 
     public function getInstaller(string $type): InstallerInterface
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getInstaller', [$type]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getInstaller', [$type]);
     }
 
     public function isPackageInstalled(InstalledRepositoryInterface $repo, PackageInterface $package): bool
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'isPackageInstalled', [$repo, $package]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'isPackageInstalled', [$repo, $package]);
     }
 
     public function ensureBinariesPresence(PackageInterface $package): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, 'ensureBinariesPresence', [$package]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'ensureBinariesPresence', [$package]);
     }
 
     public function execute(InstalledRepositoryInterface $repo, array $operations, bool $devMode = true, bool $runScripts = true, bool $downloadOnly = false): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, 'execute', [$repo, $operations, $devMode, $runScripts, $downloadOnly]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'execute', [$repo, $operations, $devMode, $runScripts, $downloadOnly]);
     }
 
     public function download(PackageInterface $package): ?PromiseInterface
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'download', [$package]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'download', [$package]);
     }
 
     public function install(InstalledRepositoryInterface $repo, InstallOperation $operation): ?PromiseInterface
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'install', [$repo, $operation]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'install', [$repo, $operation]);
     }
 
     public function update(InstalledRepositoryInterface $repo, UpdateOperation $operation): ?PromiseInterface
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'update', [$repo, $operation]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'update', [$repo, $operation]);
     }
 
     public function uninstall(InstalledRepositoryInterface $repo, UninstallOperation $operation): ?PromiseInterface
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'uninstall', [$repo, $operation]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'uninstall', [$repo, $operation]);
     }
 
     public function markAliasInstalled(InstalledRepositoryInterface $repo, MarkAliasInstalledOperation $operation): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, 'markAliasInstalled', [$repo, $operation]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'markAliasInstalled', [$repo, $operation]);
     }
 
     public function markAliasUninstalled(InstalledRepositoryInterface $repo, MarkAliasUninstalledOperation $operation): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, 'markAliasUninstalled', [$repo, $operation]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'markAliasUninstalled', [$repo, $operation]);
     }
 
     public function getInstallPath(PackageInterface $package): ?string
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getInstallPath', [$package]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getInstallPath', [$package]);
     }
 
     public function setOutputProgress(bool $outputProgress): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, 'setOutputProgress', [$outputProgress]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setOutputProgress', [$outputProgress]);
     }
 
     public function notifyInstalls(IOInterface $io): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, 'notifyInstalls', [$io]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'notifyInstalls', [$io]);
     }
 }

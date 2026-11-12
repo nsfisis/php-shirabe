@@ -12,7 +12,7 @@ use Composer\DependencyResolver\Operation\OperationInterface;
 use Composer\Repository\RepositoryInterface;
 use Composer\Util\ProcessExecutor;
 
-class EventDispatcher implements \ShirabeRustStub
+class EventDispatcher implements \Shirabe\RustStub
 {
     /** @var int */
     protected $__rhandle;
@@ -28,7 +28,7 @@ class EventDispatcher implements \ShirabeRustStub
 
     public function __destruct()
     {
-        \ShirabeRustObjectRegistry::release($this->__rhandle);
+        \Shirabe\RustObjectRegistry::release($this->__rhandle);
     }
 
     public function __shirabeRustHandleDescriptor(): \Shirabe\Wire\RustHandle
@@ -42,79 +42,79 @@ class EventDispatcher implements \ShirabeRustStub
         // entity and release it twice. The Rust side clones the entity instead, applying
         // whatever __clone semantics the real class defines, and this copy rebinds to the
         // fresh handle. Entities without clone semantics answer with an explicit error.
-        $this->__rhandle = \ShirabeRpcRuntime::callRust($this->__rhandle, '__shirabe_clone', []);
-        \ShirabeRustObjectRegistry::adopt($this->__rhandle, $this);
+        $this->__rhandle = \Shirabe\RpcRuntime::callRust($this->__rhandle, '__shirabe_clone', []);
+        \Shirabe\RustObjectRegistry::adopt($this->__rhandle, $this);
     }
 
     public function __get($name)
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, '__get', [$name]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, '__get', [$name]);
     }
 
     public function __set($name, $value): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, '__set', [$name, $value]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, '__set', [$name, $value]);
     }
 
     public function __isset($name): bool
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, '__isset', [$name]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, '__isset', [$name]);
     }
 
     public function __unset($name): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, '__unset', [$name]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, '__unset', [$name]);
     }
 
     public function __construct(PartialComposer $composer, IOInterface $io, ?ProcessExecutor $process = null)
     {
-        $this->__rhandle = \ShirabeRpcRuntime::callRust(0, '__shirabe_construct', [static::class, [$composer, $io, $process]]);
-        \ShirabeRustObjectRegistry::adopt($this->__rhandle, $this);
+        $this->__rhandle = \Shirabe\RpcRuntime::callRust(0, '__shirabe_construct', [static::class, [$composer, $io, $process]]);
+        \Shirabe\RustObjectRegistry::adopt($this->__rhandle, $this);
     }
 
     public function setRunScripts(bool $runScripts = true): self
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, 'setRunScripts', [$runScripts]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setRunScripts', [$runScripts]);
         return $this;
     }
 
     public function dispatch(?string $eventName, ?Event $event = null): int
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'dispatch', [$eventName, $event]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'dispatch', [$eventName, $event]);
     }
 
     public function dispatchScript(string $eventName, bool $devMode = false, array $additionalArgs = [], array $flags = []): int
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'dispatchScript', [$eventName, $devMode, $additionalArgs, $flags]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'dispatchScript', [$eventName, $devMode, $additionalArgs, $flags]);
     }
 
     public function dispatchPackageEvent(string $eventName, bool $devMode, RepositoryInterface $localRepo, array $operations, OperationInterface $operation): int
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'dispatchPackageEvent', [$eventName, $devMode, $localRepo, $operations, $operation]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'dispatchPackageEvent', [$eventName, $devMode, $localRepo, $operations, $operation]);
     }
 
     public function dispatchInstallerEvent(string $eventName, bool $devMode, bool $executeOperations, Transaction $transaction): int
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'dispatchInstallerEvent', [$eventName, $devMode, $executeOperations, $transaction]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'dispatchInstallerEvent', [$eventName, $devMode, $executeOperations, $transaction]);
     }
 
     public function addListener(string $eventName, $listener, int $priority = 0): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, 'addListener', [$eventName, $listener, $priority]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'addListener', [$eventName, $listener, $priority]);
     }
 
     public function removeListener($listener): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, 'removeListener', [$listener]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'removeListener', [$listener]);
     }
 
     public function addSubscriber(EventSubscriberInterface $subscriber): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, 'addSubscriber', [$subscriber]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'addSubscriber', [$subscriber]);
     }
 
     public function hasEventListeners(Event $event): bool
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'hasEventListeners', [$event]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'hasEventListeners', [$event]);
     }
 }

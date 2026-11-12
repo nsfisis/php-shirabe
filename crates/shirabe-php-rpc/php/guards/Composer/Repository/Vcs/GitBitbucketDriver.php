@@ -17,121 +17,121 @@ class GitBitbucketDriver extends VcsDriver
 {
     public function __construct()
     {
-        \ShirabeUnsupportedClass::fail(self::class, '__construct');
+        \Shirabe\UnsupportedClass::fail(self::class, '__construct');
     }
 
     public function initialize(): void
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'initialize');
+        \Shirabe\UnsupportedClass::fail(self::class, 'initialize');
     }
 
     public function getUrl(): string
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getUrl');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getUrl');
     }
 
     protected function getRepoData(): bool
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getRepoData');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getRepoData');
     }
 
     public function getComposerInformation(string $identifier): ?array
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getComposerInformation');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getComposerInformation');
     }
 
     public function getFileContent(string $file, string $identifier): ?string
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getFileContent');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getFileContent');
     }
 
     public function getChangeDate(string $identifier): ?\DateTimeImmutable
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getChangeDate');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getChangeDate');
     }
 
     public function getSource(string $identifier): array
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getSource');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getSource');
     }
 
     public function getDist(string $identifier): ?array
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getDist');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getDist');
     }
 
     public function getTags(): array
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getTags');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getTags');
     }
 
     public function getBranches(): array
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getBranches');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getBranches');
     }
 
     protected function fetchWithOAuthCredentials(string $url, bool $fetchingRepoData = false): Response
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'fetchWithOAuthCredentials');
+        \Shirabe\UnsupportedClass::fail(self::class, 'fetchWithOAuthCredentials');
     }
 
     protected function generateSshUrl(): string
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'generateSshUrl');
+        \Shirabe\UnsupportedClass::fail(self::class, 'generateSshUrl');
     }
 
     protected function attemptCloneFallback(): bool
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'attemptCloneFallback');
+        \Shirabe\UnsupportedClass::fail(self::class, 'attemptCloneFallback');
     }
 
     protected function setupFallbackDriver(string $url): void
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'setupFallbackDriver');
+        \Shirabe\UnsupportedClass::fail(self::class, 'setupFallbackDriver');
     }
 
     protected function parseCloneUrls(array $cloneLinks): void
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'parseCloneUrls');
+        \Shirabe\UnsupportedClass::fail(self::class, 'parseCloneUrls');
     }
 
     public function getRootIdentifier(): string
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getRootIdentifier');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getRootIdentifier');
     }
 
     public static function supports(IOInterface $io, Config $config, string $url, bool $deep = false): bool
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'supports');
+        \Shirabe\UnsupportedClass::fail(self::class, 'supports');
     }
 
     protected function shouldCache(string $identifier): bool
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'shouldCache');
+        \Shirabe\UnsupportedClass::fail(self::class, 'shouldCache');
     }
 
     protected function getBaseComposerInformation(string $identifier): ?array
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getBaseComposerInformation');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getBaseComposerInformation');
     }
 
     public function hasComposerFile(string $identifier): bool
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'hasComposerFile');
+        \Shirabe\UnsupportedClass::fail(self::class, 'hasComposerFile');
     }
 
     protected function getScheme(): string
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getScheme');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getScheme');
     }
 
     protected function getContents(string $url): Response
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getContents');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getContents');
     }
 
     public function cleanup(): void
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'cleanup');
+        \Shirabe\UnsupportedClass::fail(self::class, 'cleanup');
     }
 }

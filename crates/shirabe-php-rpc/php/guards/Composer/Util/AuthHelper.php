@@ -15,31 +15,31 @@ class AuthHelper
 {
     public function __construct(IOInterface $io, Config $config)
     {
-        \ShirabeUnsupportedClass::fail(self::class, '__construct');
+        \Shirabe\UnsupportedClass::fail(self::class, '__construct');
     }
 
     public function storeAuth(string $origin, $storeAuth): void
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'storeAuth');
+        \Shirabe\UnsupportedClass::fail(self::class, 'storeAuth');
     }
 
     public function promptAuthIfNeeded(string $url, string $origin, int $statusCode, ?string $reason = null, array $headers = [], int $retryCount = 0, ?string $responseBody = null): array
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'promptAuthIfNeeded');
+        \Shirabe\UnsupportedClass::fail(self::class, 'promptAuthIfNeeded');
     }
 
     public function addAuthenticationHeader(array $headers, string $origin, string $url): array
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'addAuthenticationHeader');
+        \Shirabe\UnsupportedClass::fail(self::class, 'addAuthenticationHeader');
     }
 
     public function addAuthenticationOptions(array $options, string $origin, string $url): array
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'addAuthenticationOptions');
+        \Shirabe\UnsupportedClass::fail(self::class, 'addAuthenticationOptions');
     }
 
     public function isPublicBitBucketDownload(string $urlToBitBucketFile): bool
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'isPublicBitBucketDownload');
+        \Shirabe\UnsupportedClass::fail(self::class, 'isPublicBitBucketDownload');
     }
 }

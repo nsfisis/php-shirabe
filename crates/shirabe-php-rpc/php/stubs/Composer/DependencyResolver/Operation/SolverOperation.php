@@ -5,7 +5,7 @@
 
 namespace Composer\DependencyResolver\Operation;
 
-abstract class SolverOperation implements OperationInterface, \ShirabeRustStub
+abstract class SolverOperation implements OperationInterface, \Shirabe\RustStub
 {
     /** @var int */
     protected $__rhandle;
@@ -21,7 +21,7 @@ abstract class SolverOperation implements OperationInterface, \ShirabeRustStub
 
     public function __destruct()
     {
-        \ShirabeRustObjectRegistry::release($this->__rhandle);
+        \Shirabe\RustObjectRegistry::release($this->__rhandle);
     }
 
     public function __shirabeRustHandleDescriptor(): \Shirabe\Wire\RustHandle
@@ -35,50 +35,50 @@ abstract class SolverOperation implements OperationInterface, \ShirabeRustStub
         // entity and release it twice. The Rust side clones the entity instead, applying
         // whatever __clone semantics the real class defines, and this copy rebinds to the
         // fresh handle. Entities without clone semantics answer with an explicit error.
-        $this->__rhandle = \ShirabeRpcRuntime::callRust($this->__rhandle, '__shirabe_clone', []);
-        \ShirabeRustObjectRegistry::adopt($this->__rhandle, $this);
+        $this->__rhandle = \Shirabe\RpcRuntime::callRust($this->__rhandle, '__shirabe_clone', []);
+        \Shirabe\RustObjectRegistry::adopt($this->__rhandle, $this);
     }
 
     public function __get($name)
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, '__get', [$name]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, '__get', [$name]);
     }
 
     public function __set($name, $value): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, '__set', [$name, $value]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, '__set', [$name, $value]);
     }
 
     public function __isset($name): bool
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, '__isset', [$name]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, '__isset', [$name]);
     }
 
     public function __unset($name): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, '__unset', [$name]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, '__unset', [$name]);
     }
 
     public function __construct()
     {
-        $this->__rhandle = \ShirabeRpcRuntime::callRust(0, '__shirabe_construct', [static::class, []]);
-        \ShirabeRustObjectRegistry::adopt($this->__rhandle, $this);
+        $this->__rhandle = \Shirabe\RpcRuntime::callRust(0, '__shirabe_construct', [static::class, []]);
+        \Shirabe\RustObjectRegistry::adopt($this->__rhandle, $this);
     }
 
     protected const TYPE = '';
 
     public function getOperationType(): string
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getOperationType', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getOperationType', []);
     }
 
     public function show(bool $lock)
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'show', [$lock]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'show', [$lock]);
     }
 
     public function __toString()
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, '__toString', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, '__toString', []);
     }
 }

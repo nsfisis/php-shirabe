@@ -126,7 +126,7 @@ class Loop
         }
 
         if ($this->__shirabeBoundToExecution) {
-            \ShirabeRpcRuntime::callRust(0, '__shirabe_abort_jobs', []);
+            \Shirabe\RpcRuntime::callRust(0, '__shirabe_abort_jobs', []);
         }
     }
 }

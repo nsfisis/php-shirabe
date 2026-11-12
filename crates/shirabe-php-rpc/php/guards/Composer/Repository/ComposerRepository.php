@@ -18,91 +18,91 @@ class ComposerRepository extends ArrayRepository implements ConfigurableReposito
 {
     public function __construct(array $repoConfig, IOInterface $io, Config $config, HttpDownloader $httpDownloader, ?EventDispatcher $eventDispatcher = null)
     {
-        \ShirabeUnsupportedClass::fail(self::class, '__construct');
+        \Shirabe\UnsupportedClass::fail(self::class, '__construct');
     }
 
     public function getRepoName()
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getRepoName');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getRepoName');
     }
 
     public function getRepoConfig()
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getRepoConfig');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getRepoConfig');
     }
 
     public function findPackage(string $name, $constraint)
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'findPackage');
+        \Shirabe\UnsupportedClass::fail(self::class, 'findPackage');
     }
 
     public function findPackages(string $name, $constraint = null)
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'findPackages');
+        \Shirabe\UnsupportedClass::fail(self::class, 'findPackages');
     }
 
     public function getPackages()
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getPackages');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getPackages');
     }
 
     public function getPackageNames(?string $packageFilter = null)
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getPackageNames');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getPackageNames');
     }
 
     public function loadPackages(array $packageNameMap, array $acceptableStabilities, array $stabilityFlags, array $alreadyLoaded = [])
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'loadPackages');
+        \Shirabe\UnsupportedClass::fail(self::class, 'loadPackages');
     }
 
     public function search(string $query, int $mode = 0, ?string $type = null)
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'search');
+        \Shirabe\UnsupportedClass::fail(self::class, 'search');
     }
 
     public function hasSecurityAdvisories(): bool
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'hasSecurityAdvisories');
+        \Shirabe\UnsupportedClass::fail(self::class, 'hasSecurityAdvisories');
     }
 
     public function getSecurityAdvisories(array $packageConstraintMap, bool $allowPartialAdvisories = false): array
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getSecurityAdvisories');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getSecurityAdvisories');
     }
 
     public function getProviders(string $packageName)
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getProviders');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getProviders');
     }
 
     protected function configurePackageTransportOptions(PackageInterface $package): void
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'configurePackageTransportOptions');
+        \Shirabe\UnsupportedClass::fail(self::class, 'configurePackageTransportOptions');
     }
 
     protected function initialize()
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'initialize');
+        \Shirabe\UnsupportedClass::fail(self::class, 'initialize');
     }
 
     public function addPackage(PackageInterface $package)
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'addPackage');
+        \Shirabe\UnsupportedClass::fail(self::class, 'addPackage');
     }
 
     protected function loadRootServerFile(?int $rootMaxAge = null)
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'loadRootServerFile');
+        \Shirabe\UnsupportedClass::fail(self::class, 'loadRootServerFile');
     }
 
     protected function fetchFile(string $filename, ?string $cacheKey = null, ?string $sha256 = null, bool $storeLastModifiedTime = false)
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'fetchFile');
+        \Shirabe\UnsupportedClass::fail(self::class, 'fetchFile');
     }
 
     protected function lazyProvidersRepoContains(string $name)
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'lazyProvidersRepoContains');
+        \Shirabe\UnsupportedClass::fail(self::class, 'lazyProvidersRepoContains');
     }
 }

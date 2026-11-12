@@ -15,11 +15,11 @@ class SecurityAdvisoryPoolFilter
 {
     public function __construct(Auditor $auditor, AuditConfig $auditConfig)
     {
-        \ShirabeUnsupportedClass::fail(self::class, '__construct');
+        \Shirabe\UnsupportedClass::fail(self::class, '__construct');
     }
 
     public function filter(Pool $pool, array $repositories, Request $request): Pool
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'filter');
+        \Shirabe\UnsupportedClass::fail(self::class, 'filter');
     }
 }

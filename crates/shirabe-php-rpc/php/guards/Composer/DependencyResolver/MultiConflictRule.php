@@ -12,96 +12,96 @@ class MultiConflictRule extends Rule
 {
     public function __construct(array $literals, $reason, $reasonData)
     {
-        \ShirabeUnsupportedClass::fail(self::class, '__construct');
+        \Shirabe\UnsupportedClass::fail(self::class, '__construct');
     }
 
     public function getLiterals(): array
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getLiterals');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getLiterals');
     }
 
     public function getHash()
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getHash');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getHash');
     }
 
     public function equals(Rule $rule): bool
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'equals');
+        \Shirabe\UnsupportedClass::fail(self::class, 'equals');
     }
 
     public function isAssertion(): bool
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'isAssertion');
+        \Shirabe\UnsupportedClass::fail(self::class, 'isAssertion');
     }
 
     public function disable(): void
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'disable');
+        \Shirabe\UnsupportedClass::fail(self::class, 'disable');
     }
 
     public function __toString(): string
     {
-        \ShirabeUnsupportedClass::fail(self::class, '__toString');
+        \Shirabe\UnsupportedClass::fail(self::class, '__toString');
     }
 
     public function getReason(): int
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getReason');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getReason');
     }
 
     public function getReasonData()
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getReasonData');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getReasonData');
     }
 
     public function getRequiredPackage(): ?string
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getRequiredPackage');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getRequiredPackage');
     }
 
     public function setType($type): void
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'setType');
+        \Shirabe\UnsupportedClass::fail(self::class, 'setType');
     }
 
     public function getType(): int
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getType');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getType');
     }
 
     public function enable(): void
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'enable');
+        \Shirabe\UnsupportedClass::fail(self::class, 'enable');
     }
 
     public function isDisabled(): bool
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'isDisabled');
+        \Shirabe\UnsupportedClass::fail(self::class, 'isDisabled');
     }
 
     public function isEnabled(): bool
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'isEnabled');
+        \Shirabe\UnsupportedClass::fail(self::class, 'isEnabled');
     }
 
     public function isCausedByLock(RepositorySet $repositorySet, Request $request, Pool $pool): bool
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'isCausedByLock');
+        \Shirabe\UnsupportedClass::fail(self::class, 'isCausedByLock');
     }
 
     public function getSourcePackage(Pool $pool): BasePackage
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getSourcePackage');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getSourcePackage');
     }
 
     public function getPrettyString(RepositorySet $repositorySet, Request $request, Pool $pool, bool $isVerbose, array $installedMap = [], array $learnedPool = []): string
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getPrettyString');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getPrettyString');
     }
 
     protected function formatPackagesUnique(Pool $pool, array $literalsOrPackages, bool $isVerbose, ?ConstraintInterface $constraint = null, bool $useRemovedVersionGroup = false): string
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'formatPackagesUnique');
+        \Shirabe\UnsupportedClass::fail(self::class, 'formatPackagesUnique');
     }
 }

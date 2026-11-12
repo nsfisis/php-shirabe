@@ -7,7 +7,7 @@ namespace Composer\Repository;
 
 use Composer\Package\PackageInterface;
 
-class ArrayRepository implements RepositoryInterface, \ShirabeRustStub
+class ArrayRepository implements RepositoryInterface, \Shirabe\RustStub
 {
     /** @var int */
     protected $__rhandle;
@@ -23,7 +23,7 @@ class ArrayRepository implements RepositoryInterface, \ShirabeRustStub
 
     public function __destruct()
     {
-        \ShirabeRustObjectRegistry::release($this->__rhandle);
+        \Shirabe\RustObjectRegistry::release($this->__rhandle);
     }
 
     public function __shirabeRustHandleDescriptor(): \Shirabe\Wire\RustHandle
@@ -37,88 +37,88 @@ class ArrayRepository implements RepositoryInterface, \ShirabeRustStub
         // entity and release it twice. The Rust side clones the entity instead, applying
         // whatever __clone semantics the real class defines, and this copy rebinds to the
         // fresh handle. Entities without clone semantics answer with an explicit error.
-        $this->__rhandle = \ShirabeRpcRuntime::callRust($this->__rhandle, '__shirabe_clone', []);
-        \ShirabeRustObjectRegistry::adopt($this->__rhandle, $this);
+        $this->__rhandle = \Shirabe\RpcRuntime::callRust($this->__rhandle, '__shirabe_clone', []);
+        \Shirabe\RustObjectRegistry::adopt($this->__rhandle, $this);
     }
 
     public function __get($name)
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, '__get', [$name]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, '__get', [$name]);
     }
 
     public function __set($name, $value): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, '__set', [$name, $value]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, '__set', [$name, $value]);
     }
 
     public function __isset($name): bool
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, '__isset', [$name]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, '__isset', [$name]);
     }
 
     public function __unset($name): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, '__unset', [$name]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, '__unset', [$name]);
     }
 
     public function __construct(array $packages = [])
     {
-        $this->__rhandle = \ShirabeRpcRuntime::callRust(0, '__shirabe_construct', [static::class, [$packages]]);
-        \ShirabeRustObjectRegistry::adopt($this->__rhandle, $this);
+        $this->__rhandle = \Shirabe\RpcRuntime::callRust(0, '__shirabe_construct', [static::class, [$packages]]);
+        \Shirabe\RustObjectRegistry::adopt($this->__rhandle, $this);
     }
 
     public function hasPackage(PackageInterface $package)
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'hasPackage', [$package]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'hasPackage', [$package]);
     }
 
     public function findPackage(string $name, $constraint)
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'findPackage', [$name, $constraint]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'findPackage', [$name, $constraint]);
     }
 
     public function findPackages(string $name, $constraint = null)
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'findPackages', [$name, $constraint]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'findPackages', [$name, $constraint]);
     }
 
     public function getPackages()
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getPackages', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getPackages', []);
     }
 
     public function loadPackages(array $packageNameMap, array $acceptableStabilities, array $stabilityFlags, array $alreadyLoaded = [])
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'loadPackages', [$packageNameMap, $acceptableStabilities, $stabilityFlags, $alreadyLoaded]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'loadPackages', [$packageNameMap, $acceptableStabilities, $stabilityFlags, $alreadyLoaded]);
     }
 
     public function search(string $query, int $mode = 0, ?string $type = null)
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'search', [$query, $mode, $type]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'search', [$query, $mode, $type]);
     }
 
     public function getProviders(string $packageName)
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getProviders', [$packageName]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getProviders', [$packageName]);
     }
 
     public function getRepoName()
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getRepoName', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getRepoName', []);
     }
 
     public function addPackage(PackageInterface $package)
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'addPackage', [$package]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'addPackage', [$package]);
     }
 
     public function removePackage(PackageInterface $package)
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'removePackage', [$package]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'removePackage', [$package]);
     }
 
     public function count(): int
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'count', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'count', []);
     }
 }

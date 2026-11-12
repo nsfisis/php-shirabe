@@ -15,41 +15,41 @@ class DefaultPolicy implements PolicyInterface
 {
     public function __construct(bool $preferStable = false, bool $preferLowest = false, ?array $preferredVersions = null)
     {
-        \ShirabeUnsupportedClass::fail(self::class, '__construct');
+        \Shirabe\UnsupportedClass::fail(self::class, '__construct');
     }
 
     public function versionCompare(PackageInterface $a, PackageInterface $b, string $operator): bool
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'versionCompare');
+        \Shirabe\UnsupportedClass::fail(self::class, 'versionCompare');
     }
 
     public function selectPreferredPackages(Pool $pool, array $literals, ?string $requiredPackage = null): array
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'selectPreferredPackages');
+        \Shirabe\UnsupportedClass::fail(self::class, 'selectPreferredPackages');
     }
 
     protected function groupLiteralsByName(Pool $pool, array $literals): array
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'groupLiteralsByName');
+        \Shirabe\UnsupportedClass::fail(self::class, 'groupLiteralsByName');
     }
 
     public function compareByPriority(Pool $pool, BasePackage $a, BasePackage $b, ?string $requiredPackage = null, bool $ignoreReplace = false): int
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'compareByPriority');
+        \Shirabe\UnsupportedClass::fail(self::class, 'compareByPriority');
     }
 
     protected function replaces(BasePackage $source, BasePackage $target): bool
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'replaces');
+        \Shirabe\UnsupportedClass::fail(self::class, 'replaces');
     }
 
     protected function pruneToBestVersion(Pool $pool, array $literals): array
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'pruneToBestVersion');
+        \Shirabe\UnsupportedClass::fail(self::class, 'pruneToBestVersion');
     }
 
     protected function pruneRemoteAliases(Pool $pool, array $literals): array
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'pruneRemoteAliases');
+        \Shirabe\UnsupportedClass::fail(self::class, 'pruneRemoteAliases');
     }
 }

@@ -19,21 +19,21 @@ class RootPackageLoader extends ArrayLoader
 {
     public function __construct(RepositoryManager $manager, Config $config, ?VersionParser $parser = null, ?VersionGuesser $versionGuesser = null, ?IOInterface $io = null)
     {
-        \ShirabeUnsupportedClass::fail(self::class, '__construct');
+        \Shirabe\UnsupportedClass::fail(self::class, '__construct');
     }
 
     public function load(array $config, string $class = 'Composer\Package\RootPackage', ?string $cwd = null): BasePackage
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'load');
+        \Shirabe\UnsupportedClass::fail(self::class, 'load');
     }
 
     public static function extractStabilityFlags(array $requires, string $minimumStability, array $stabilityFlags): array
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'extractStabilityFlags');
+        \Shirabe\UnsupportedClass::fail(self::class, 'extractStabilityFlags');
     }
 
     public static function extractReferences(array $requires, array $references): array
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'extractReferences');
+        \Shirabe\UnsupportedClass::fail(self::class, 'extractReferences');
     }
 }

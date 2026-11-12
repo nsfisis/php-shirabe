@@ -15,41 +15,41 @@ class ZipDownloader extends ArchiveDownloader
 {
     public function __construct()
     {
-        \ShirabeUnsupportedClass::fail(self::class, '__construct');
+        \Shirabe\UnsupportedClass::fail(self::class, '__construct');
     }
 
     public function download(PackageInterface $package, string $path, ?PackageInterface $prevPackage = null, bool $output = true): PromiseInterface
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'download');
+        \Shirabe\UnsupportedClass::fail(self::class, 'download');
     }
 
     protected function extract(PackageInterface $package, string $file, string $path): PromiseInterface
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'extract');
+        \Shirabe\UnsupportedClass::fail(self::class, 'extract');
     }
 
     protected function getErrorMessage(int $retval, string $file): string
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getErrorMessage');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getErrorMessage');
     }
 
     public function prepare(string $type, PackageInterface $package, string $path, ?PackageInterface $prevPackage = null): PromiseInterface
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'prepare');
+        \Shirabe\UnsupportedClass::fail(self::class, 'prepare');
     }
 
     public function cleanup(string $type, PackageInterface $package, string $path, ?PackageInterface $prevPackage = null): PromiseInterface
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'cleanup');
+        \Shirabe\UnsupportedClass::fail(self::class, 'cleanup');
     }
 
     public function install(PackageInterface $package, string $path, bool $output = true): PromiseInterface
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'install');
+        \Shirabe\UnsupportedClass::fail(self::class, 'install');
     }
 
     protected function getInstallOperationAppendix(PackageInterface $package, string $path): string
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getInstallOperationAppendix');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getInstallOperationAppendix');
     }
 }

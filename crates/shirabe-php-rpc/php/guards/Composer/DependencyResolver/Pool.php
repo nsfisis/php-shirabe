@@ -15,101 +15,101 @@ class Pool implements \Countable
 {
     public function __construct(array $packages = [], array $unacceptableFixedOrLockedPackages = [], array $removedVersions = [], array $removedVersionsByPackage = [], array $securityRemovedVersions = [], array $abandonedRemovedVersions = [])
     {
-        \ShirabeUnsupportedClass::fail(self::class, '__construct');
+        \Shirabe\UnsupportedClass::fail(self::class, '__construct');
     }
 
     public function getRemovedVersions(string $name, ConstraintInterface $constraint): array
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getRemovedVersions');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getRemovedVersions');
     }
 
     public function getAllRemovedVersions(): array
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getAllRemovedVersions');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getAllRemovedVersions');
     }
 
     public function getRemovedVersionsByPackage(string $objectHash): array
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getRemovedVersionsByPackage');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getRemovedVersionsByPackage');
     }
 
     public function getAllRemovedVersionsByPackage(): array
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getAllRemovedVersionsByPackage');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getAllRemovedVersionsByPackage');
     }
 
     public function isSecurityRemovedPackageVersion(string $packageName, ?ConstraintInterface $constraint): bool
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'isSecurityRemovedPackageVersion');
+        \Shirabe\UnsupportedClass::fail(self::class, 'isSecurityRemovedPackageVersion');
     }
 
     public function getSecurityAdvisoryIdentifiersForPackageVersion(string $packageName, ?ConstraintInterface $constraint): array
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getSecurityAdvisoryIdentifiersForPackageVersion');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getSecurityAdvisoryIdentifiersForPackageVersion');
     }
 
     public function isAbandonedRemovedPackageVersion(string $packageName, ?ConstraintInterface $constraint): bool
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'isAbandonedRemovedPackageVersion');
+        \Shirabe\UnsupportedClass::fail(self::class, 'isAbandonedRemovedPackageVersion');
     }
 
     public function getAllSecurityRemovedPackageVersions(): array
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getAllSecurityRemovedPackageVersions');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getAllSecurityRemovedPackageVersions');
     }
 
     public function getAllAbandonedRemovedPackageVersions(): array
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getAllAbandonedRemovedPackageVersions');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getAllAbandonedRemovedPackageVersions');
     }
 
     public function getPackages(): array
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getPackages');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getPackages');
     }
 
     public function packageById(int $id): BasePackage
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'packageById');
+        \Shirabe\UnsupportedClass::fail(self::class, 'packageById');
     }
 
     public function count(): int
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'count');
+        \Shirabe\UnsupportedClass::fail(self::class, 'count');
     }
 
     public function whatProvides(string $name, ?ConstraintInterface $constraint = null): array
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'whatProvides');
+        \Shirabe\UnsupportedClass::fail(self::class, 'whatProvides');
     }
 
     public function literalToPackage(int $literal): BasePackage
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'literalToPackage');
+        \Shirabe\UnsupportedClass::fail(self::class, 'literalToPackage');
     }
 
     public function literalToPrettyString(int $literal, array $installedMap): string
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'literalToPrettyString');
+        \Shirabe\UnsupportedClass::fail(self::class, 'literalToPrettyString');
     }
 
     public function match(BasePackage $candidate, string $name, ?ConstraintInterface $constraint = null): bool
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'match');
+        \Shirabe\UnsupportedClass::fail(self::class, 'match');
     }
 
     public function isUnacceptableFixedOrLockedPackage(BasePackage $package): bool
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'isUnacceptableFixedOrLockedPackage');
+        \Shirabe\UnsupportedClass::fail(self::class, 'isUnacceptableFixedOrLockedPackage');
     }
 
     public function getUnacceptableFixedOrLockedPackages(): array
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getUnacceptableFixedOrLockedPackages');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getUnacceptableFixedOrLockedPackages');
     }
 
     public function __toString(): string
     {
-        \ShirabeUnsupportedClass::fail(self::class, '__toString');
+        \Shirabe\UnsupportedClass::fail(self::class, '__toString');
     }
 }

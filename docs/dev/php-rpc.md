@@ -28,8 +28,9 @@ The child is started with the following arguments:
   (108 bytes), which a long `TMPDIR` overruns. The pair is connected from the start, so nothing
   has to wait for an `accept` either: a child that dies before reading surfaces as EOF on the
   first call.
-- The PHP half of the protocol (`php/worker.php`) and the PHP files the worker loads on top of it
-  (see [docs/dev/php-worker.md](./php-worker.md)) are embedded in the Rust binary and written to a
+- The PHP half of the protocol (`php/worker.php`, which bootstraps
+  `php/runtime/Shirabe/RpcRuntime.php`) and the PHP files the worker loads on top of it (see
+  [docs/dev/php-worker.md](./php-worker.md)) are embedded in the Rust binary and written to a
   `0700` temp dir at spawn time, so both halves of the protocol are always the same commit.
 
 ### Frame layout
@@ -110,12 +111,12 @@ The R-table (`R_TABLE`) holds each entry strongly while the PHP-side object stan
 lives: that object's destructor sends `ReleaseRustHandle`, and the entry is removed. The same Rust
 object is always sent as the same R-handle.
 
-The P-table (`ShirabePhpObjectRegistry`) holds each entry strongly until the Rust side sends
-`ReleasePhpHandle`. `ShirabeRpcRuntime::toPluginValue` turns any object that is not a proxy stub, a
+The P-table (`Shirabe\PhpObjectRegistry`) holds each entry strongly until the Rust side sends
+`ReleasePhpHandle`. `Shirabe\RpcRuntime::toPluginValue` turns any object that is not a proxy stub, a
 promise or a materialized value into a `PhpHandle` descriptor through
-`ShirabePhpObjectRegistry::descriptor`, which interns by `spl_object_id`, so the same PHP object is
-always sent as the same P-handle. `ShirabeRpcRuntime::fromPluginValue` resolves a descriptor back to
-the live object through `ShirabePhpObjectRegistry::get`.
+`Shirabe\PhpObjectRegistry::descriptor`, which interns by `spl_object_id`, so the same PHP object is
+always sent as the same P-handle. `Shirabe\RpcRuntime::fromPluginValue` resolves a descriptor back to
+the live object through `Shirabe\PhpObjectRegistry::get`.
 
 The Rust side holds a P-handle as `PhpObjHandle`, the only form a P-handle takes outside the
 codec. All `PhpObjHandle`s for one P-handle share a single reference-counted entry: decoding a
@@ -151,7 +152,7 @@ assigns those back into its own variables. The worker's `Return` always carries 
 A job is a computation one side started and the other side may wait on. The side that started it
 owns its id and pushes the outcome to the other side once it settles; cancelling a Rust-owned job
 from the worker asks the Rust side to drop it. The worker's half of the registry is
-`ShirabeJobRegistry`, and how jobs carry `React\Promise\PromiseInterface` across is described in
+`Shirabe\JobRegistry`, and how jobs carry `React\Promise\PromiseInterface` across is described in
 [docs/dev/plugin-async.md](./plugin-async.md).
 
 ## Concurrency and reentrancy

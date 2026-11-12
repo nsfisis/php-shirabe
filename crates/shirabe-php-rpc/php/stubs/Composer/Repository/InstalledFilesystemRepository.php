@@ -9,6 +9,6 @@ class InstalledFilesystemRepository extends FilesystemRepository implements Inst
 {
     public function isFresh()
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'isFresh', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'isFresh', []);
     }
 }

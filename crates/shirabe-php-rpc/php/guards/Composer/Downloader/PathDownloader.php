@@ -18,31 +18,31 @@ class PathDownloader extends FileDownloader implements VcsCapableDownloaderInter
 
     public function __construct()
     {
-        \ShirabeUnsupportedClass::fail(self::class, '__construct');
+        \Shirabe\UnsupportedClass::fail(self::class, '__construct');
     }
 
     public function download(PackageInterface $package, string $path, ?PackageInterface $prevPackage = null, bool $output = true): PromiseInterface
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'download');
+        \Shirabe\UnsupportedClass::fail(self::class, 'download');
     }
 
     public function install(PackageInterface $package, string $path, bool $output = true): PromiseInterface
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'install');
+        \Shirabe\UnsupportedClass::fail(self::class, 'install');
     }
 
     public function remove(PackageInterface $package, string $path, bool $output = true): PromiseInterface
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'remove');
+        \Shirabe\UnsupportedClass::fail(self::class, 'remove');
     }
 
     public function getVcsReference(PackageInterface $package, string $path): ?string
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getVcsReference');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getVcsReference');
     }
 
     protected function getInstallOperationAppendix(PackageInterface $package, string $path): string
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getInstallOperationAppendix');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getInstallOperationAppendix');
     }
 }

@@ -18,41 +18,41 @@ class RepositoryFactory
 {
     public function __construct()
     {
-        \ShirabeUnsupportedClass::fail(self::class, '__construct');
+        \Shirabe\UnsupportedClass::fail(self::class, '__construct');
     }
 
     public static function configFromString(IOInterface $io, Config $config, string $repository, bool $allowFilesystem = false)
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'configFromString');
+        \Shirabe\UnsupportedClass::fail(self::class, 'configFromString');
     }
 
     public static function fromString(IOInterface $io, Config $config, string $repository, bool $allowFilesystem = false, ?RepositoryManager $rm = null): RepositoryInterface
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'fromString');
+        \Shirabe\UnsupportedClass::fail(self::class, 'fromString');
     }
 
     public static function createRepo(IOInterface $io, Config $config, array $repoConfig, ?RepositoryManager $rm = null): RepositoryInterface
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'createRepo');
+        \Shirabe\UnsupportedClass::fail(self::class, 'createRepo');
     }
 
     public static function defaultRepos(?IOInterface $io = null, ?Config $config = null, ?RepositoryManager $rm = null): array
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'defaultRepos');
+        \Shirabe\UnsupportedClass::fail(self::class, 'defaultRepos');
     }
 
     public static function manager(IOInterface $io, Config $config, ?HttpDownloader $httpDownloader = null, ?EventDispatcher $eventDispatcher = null, ?ProcessExecutor $process = null): RepositoryManager
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'manager');
+        \Shirabe\UnsupportedClass::fail(self::class, 'manager');
     }
 
     public static function defaultReposWithDefaultManager(IOInterface $io): array
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'defaultReposWithDefaultManager');
+        \Shirabe\UnsupportedClass::fail(self::class, 'defaultReposWithDefaultManager');
     }
 
     public static function generateRepositoryName($index, array $repo, array $existingRepos): string
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'generateRepositoryName');
+        \Shirabe\UnsupportedClass::fail(self::class, 'generateRepositoryName');
     }
 }

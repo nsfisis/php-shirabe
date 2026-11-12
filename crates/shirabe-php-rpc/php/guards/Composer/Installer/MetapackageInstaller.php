@@ -16,51 +16,51 @@ class MetapackageInstaller implements InstallerInterface
 {
     public function __construct(IOInterface $io)
     {
-        \ShirabeUnsupportedClass::fail(self::class, '__construct');
+        \Shirabe\UnsupportedClass::fail(self::class, '__construct');
     }
 
     public function supports(string $packageType)
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'supports');
+        \Shirabe\UnsupportedClass::fail(self::class, 'supports');
     }
 
     public function isInstalled(InstalledRepositoryInterface $repo, PackageInterface $package)
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'isInstalled');
+        \Shirabe\UnsupportedClass::fail(self::class, 'isInstalled');
     }
 
     public function download(PackageInterface $package, ?PackageInterface $prevPackage = null)
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'download');
+        \Shirabe\UnsupportedClass::fail(self::class, 'download');
     }
 
     public function prepare($type, PackageInterface $package, ?PackageInterface $prevPackage = null)
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'prepare');
+        \Shirabe\UnsupportedClass::fail(self::class, 'prepare');
     }
 
     public function cleanup($type, PackageInterface $package, ?PackageInterface $prevPackage = null)
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'cleanup');
+        \Shirabe\UnsupportedClass::fail(self::class, 'cleanup');
     }
 
     public function install(InstalledRepositoryInterface $repo, PackageInterface $package)
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'install');
+        \Shirabe\UnsupportedClass::fail(self::class, 'install');
     }
 
     public function update(InstalledRepositoryInterface $repo, PackageInterface $initial, PackageInterface $target)
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'update');
+        \Shirabe\UnsupportedClass::fail(self::class, 'update');
     }
 
     public function uninstall(InstalledRepositoryInterface $repo, PackageInterface $package)
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'uninstall');
+        \Shirabe\UnsupportedClass::fail(self::class, 'uninstall');
     }
 
     public function getInstallPath(PackageInterface $package)
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getInstallPath');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getInstallPath');
     }
 }

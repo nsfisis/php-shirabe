@@ -12,16 +12,16 @@ class ZipArchiver implements ArchiverInterface
 {
     public function __construct()
     {
-        \ShirabeUnsupportedClass::fail(self::class, '__construct');
+        \Shirabe\UnsupportedClass::fail(self::class, '__construct');
     }
 
     public function archive(string $sources, string $target, string $format, array $excludes = [], bool $ignoreFilters = false): string
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'archive');
+        \Shirabe\UnsupportedClass::fail(self::class, 'archive');
     }
 
     public function supports(string $format, ?string $sourceType): bool
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'supports');
+        \Shirabe\UnsupportedClass::fail(self::class, 'supports');
     }
 }

@@ -12,11 +12,11 @@ class Compiler
 {
     public function __construct()
     {
-        \ShirabeUnsupportedClass::fail(self::class, '__construct');
+        \Shirabe\UnsupportedClass::fail(self::class, '__construct');
     }
 
     public function compile(string $pharFile = 'composer.phar'): void
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'compile');
+        \Shirabe\UnsupportedClass::fail(self::class, 'compile');
     }
 }

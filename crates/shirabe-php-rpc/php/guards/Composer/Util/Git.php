@@ -15,86 +15,86 @@ class Git
 {
     public function __construct(IOInterface $io, Config $config, ProcessExecutor $process, Filesystem $fs)
     {
-        \ShirabeUnsupportedClass::fail(self::class, '__construct');
+        \Shirabe\UnsupportedClass::fail(self::class, '__construct');
     }
 
     public static function checkForRepoOwnershipError(string $output, string $path, ?IOInterface $io = null): void
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'checkForRepoOwnershipError');
+        \Shirabe\UnsupportedClass::fail(self::class, 'checkForRepoOwnershipError');
     }
 
     public function setHttpDownloader(HttpDownloader $httpDownloader): void
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'setHttpDownloader');
+        \Shirabe\UnsupportedClass::fail(self::class, 'setHttpDownloader');
     }
 
     public function runCommands(array $commands, string $url, ?string $cwd, bool $initialClone = false, &$commandOutput = null): void
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'runCommands');
+        \Shirabe\UnsupportedClass::fail(self::class, 'runCommands');
     }
 
     public function runCommand($commandCallable, string $url, ?string $cwd, bool $initialClone = false, &$commandOutput = null): void
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'runCommand');
+        \Shirabe\UnsupportedClass::fail(self::class, 'runCommand');
     }
 
     public function syncMirror(string $url, string $dir): bool
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'syncMirror');
+        \Shirabe\UnsupportedClass::fail(self::class, 'syncMirror');
     }
 
     public function fetchRefOrSyncMirror(string $url, string $dir, string $ref, ?string $prettyVersion = null): bool
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'fetchRefOrSyncMirror');
+        \Shirabe\UnsupportedClass::fail(self::class, 'fetchRefOrSyncMirror');
     }
 
     public static function getNoShowSignatureFlag(ProcessExecutor $process): string
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getNoShowSignatureFlag');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getNoShowSignatureFlag');
     }
 
     public static function getNoShowSignatureFlags(ProcessExecutor $process): array
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getNoShowSignatureFlags');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getNoShowSignatureFlags');
     }
 
     public static function supportsNoCommitHeaderFlag(ProcessExecutor $process): bool
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'supportsNoCommitHeaderFlag');
+        \Shirabe\UnsupportedClass::fail(self::class, 'supportsNoCommitHeaderFlag');
     }
 
     public static function buildRevListCommand(ProcessExecutor $process, array $arguments): array
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'buildRevListCommand');
+        \Shirabe\UnsupportedClass::fail(self::class, 'buildRevListCommand');
     }
 
     public static function parseRevListOutput(string $output, ProcessExecutor $process): string
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'parseRevListOutput');
+        \Shirabe\UnsupportedClass::fail(self::class, 'parseRevListOutput');
     }
 
     public function getMirrorDefaultBranch(string $url, string $dir, bool $isLocalPathRepository): ?string
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getMirrorDefaultBranch');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getMirrorDefaultBranch');
     }
 
     public static function cleanEnv(?ProcessExecutor $process = null): void
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'cleanEnv');
+        \Shirabe\UnsupportedClass::fail(self::class, 'cleanEnv');
     }
 
     public static function getGitHubDomainsRegex(Config $config): string
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getGitHubDomainsRegex');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getGitHubDomainsRegex');
     }
 
     public static function getGitLabDomainsRegex(Config $config): string
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getGitLabDomainsRegex');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getGitLabDomainsRegex');
     }
 
     public static function getVersion(ProcessExecutor $process): ?string
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getVersion');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getVersion');
     }
 }

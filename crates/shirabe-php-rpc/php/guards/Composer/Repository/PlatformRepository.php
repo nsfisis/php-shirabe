@@ -18,46 +18,46 @@ class PlatformRepository extends ArrayRepository
 
     public function __construct(array $packages = [], array $overrides = [], ?Runtime $runtime = null, ?HhvmDetector $hhvmDetector = null)
     {
-        \ShirabeUnsupportedClass::fail(self::class, '__construct');
+        \Shirabe\UnsupportedClass::fail(self::class, '__construct');
     }
 
     public function getRepoName(): string
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getRepoName');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getRepoName');
     }
 
     public function isPlatformPackageDisabled(string $name): bool
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'isPlatformPackageDisabled');
+        \Shirabe\UnsupportedClass::fail(self::class, 'isPlatformPackageDisabled');
     }
 
     public function getDisabledPackages(): array
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getDisabledPackages');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getDisabledPackages');
     }
 
     protected function initialize(): void
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'initialize');
+        \Shirabe\UnsupportedClass::fail(self::class, 'initialize');
     }
 
     public function addPackage(PackageInterface $package): void
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'addPackage');
+        \Shirabe\UnsupportedClass::fail(self::class, 'addPackage');
     }
 
     public static function isPlatformPackage(string $name): bool
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'isPlatformPackage');
+        \Shirabe\UnsupportedClass::fail(self::class, 'isPlatformPackage');
     }
 
     public static function getPlatformPhpVersion(): ?string
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getPlatformPhpVersion');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getPlatformPhpVersion');
     }
 
     public function search(string $query, int $mode = 0, ?string $type = null): array
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'search');
+        \Shirabe\UnsupportedClass::fail(self::class, 'search');
     }
 }

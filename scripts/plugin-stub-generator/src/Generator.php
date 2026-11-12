@@ -33,7 +33,7 @@ final class Generator
 
         public function __destruct()
         {
-            \ShirabeRustObjectRegistry::release($this->__rhandle);
+            \Shirabe\RustObjectRegistry::release($this->__rhandle);
         }
 
         public function __shirabeRustHandleDescriptor(): \Shirabe\Wire\RustHandle
@@ -47,30 +47,30 @@ final class Generator
             // entity and release it twice. The Rust side clones the entity instead, applying
             // whatever __clone semantics the real class defines, and this copy rebinds to the
             // fresh handle. Entities without clone semantics answer with an explicit error.
-            $this->__rhandle = \ShirabeRpcRuntime::callRust($this->__rhandle, '__shirabe_clone', []);
-            \ShirabeRustObjectRegistry::adopt($this->__rhandle, $this);
+            $this->__rhandle = \Shirabe\RpcRuntime::callRust($this->__rhandle, '__shirabe_clone', []);
+            \Shirabe\RustObjectRegistry::adopt($this->__rhandle, $this);
         }
     PHP;
 
     private const PROPERTY_FORWARDERS = <<<'PHP'
         public function __get($name)
         {
-            return \ShirabeRpcRuntime::callRust($this->__rhandle, '__get', [$name]);
+            return \Shirabe\RpcRuntime::callRust($this->__rhandle, '__get', [$name]);
         }
 
         public function __set($name, $value): void
         {
-            \ShirabeRpcRuntime::callRust($this->__rhandle, '__set', [$name, $value]);
+            \Shirabe\RpcRuntime::callRust($this->__rhandle, '__set', [$name, $value]);
         }
 
         public function __isset($name): bool
         {
-            return \ShirabeRpcRuntime::callRust($this->__rhandle, '__isset', [$name]);
+            return \Shirabe\RpcRuntime::callRust($this->__rhandle, '__isset', [$name]);
         }
 
         public function __unset($name): void
         {
-            \ShirabeRpcRuntime::callRust($this->__rhandle, '__unset', [$name]);
+            \Shirabe\RpcRuntime::callRust($this->__rhandle, '__unset', [$name]);
         }
     PHP;
 
@@ -337,7 +337,7 @@ final class Generator
         }
         $interfaces = array_map(fn (Name $n): string => $this->printer->renderName($n, $file), $class->implements);
         if ($isRoot) {
-            $interfaces[] = '\ShirabeRustStub';
+            $interfaces[] = '\Shirabe\RustStub';
         }
         if ($interfaces !== []) {
             $decl .= ' implements ' . implode(', ', $interfaces);
@@ -399,12 +399,12 @@ final class Generator
             $params[] = $rendered;
             $args[] = '$' . $paramName;
         }
-        $call = "\\ShirabeRpcRuntime::callRust(0, '__shirabe_construct', [static::class, ["
+        $call = "\\Shirabe\\RpcRuntime::callRust(0, '__shirabe_construct', [static::class, ["
             . implode(', ', $args) . ']])';
         return "    public function __construct(" . implode(', ', $params) . ")\n"
             . "    {\n"
             . "        \$this->__rhandle = $call;\n"
-            . "        \\ShirabeRustObjectRegistry::adopt(\$this->__rhandle, \$this);\n"
+            . "        \\Shirabe\\RustObjectRegistry::adopt(\$this->__rhandle, \$this);\n"
             . "    }";
     }
 
@@ -561,7 +561,7 @@ final class Generator
      * worker-side sibling built over the proxied services (docs/dev/plugin-async.md).
      */
     private const LOCAL_BODIES = [
-        'Composer\\PartialComposer::getLoop' => '        return \\ShirabeRpcRuntime::loopFor($this, $this->__rhandle);',
+        'Composer\\PartialComposer::getLoop' => '        return \\Shirabe\\RpcRuntime::loopFor($this, $this->__rhandle);',
     ];
 
     /** @var array<string, true> */
@@ -578,7 +578,7 @@ final class Generator
             return "    $signature\n    {\n" . self::LOCAL_BODIES["$fqcn::$name"] . "\n    }";
         }
         $body = $this->renderForwardingBody(
-            "\\ShirabeRpcRuntime::callRust(\$this->__rhandle, '$name', %s%s)",
+            "\\Shirabe\\RpcRuntime::callRust(\$this->__rhandle, '$name', %s%s)",
             $args,
             $outPositions,
             $this->inspectsArgCount($fqcn, $name, $method),
@@ -609,7 +609,7 @@ final class Generator
         // self::class, not static::class: the forwarded statics stand for this class's own state,
         // and a plugin subclass redeclaring it is not modelled on the Rust side.
         $body = $this->renderForwardingBody(
-            "\\ShirabeRpcRuntime::callRust(0, '__shirabe_call_static', [self::class, '$name', %s]%s)",
+            "\\Shirabe\\RpcRuntime::callRust(0, '__shirabe_call_static', [self::class, '$name', %s]%s)",
             $args,
             $outPositions,
             $this->inspectsArgCount($fqcn, $name, $method),
@@ -680,7 +680,7 @@ final class Generator
      * each by-ref parameter back out of the response.
      *
      * `$callTemplate` takes the argument-list expression and the trailing arguments of
-     * `ShirabeRpcRuntime::callRust`, which only a by-ref parameter needs.
+     * `Shirabe\RpcRuntime::callRust`, which only a by-ref parameter needs.
      *
      * @param list<string> $args
      * @param list<int>    $outPositions

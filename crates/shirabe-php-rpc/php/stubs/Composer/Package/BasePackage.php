@@ -7,7 +7,7 @@ namespace Composer\Package;
 
 use Composer\Repository\RepositoryInterface;
 
-abstract class BasePackage implements PackageInterface, \ShirabeRustStub
+abstract class BasePackage implements PackageInterface, \Shirabe\RustStub
 {
     /** @var int */
     protected $__rhandle;
@@ -23,7 +23,7 @@ abstract class BasePackage implements PackageInterface, \ShirabeRustStub
 
     public function __destruct()
     {
-        \ShirabeRustObjectRegistry::release($this->__rhandle);
+        \Shirabe\RustObjectRegistry::release($this->__rhandle);
     }
 
     public function __shirabeRustHandleDescriptor(): \Shirabe\Wire\RustHandle
@@ -37,34 +37,34 @@ abstract class BasePackage implements PackageInterface, \ShirabeRustStub
         // entity and release it twice. The Rust side clones the entity instead, applying
         // whatever __clone semantics the real class defines, and this copy rebinds to the
         // fresh handle. Entities without clone semantics answer with an explicit error.
-        $this->__rhandle = \ShirabeRpcRuntime::callRust($this->__rhandle, '__shirabe_clone', []);
-        \ShirabeRustObjectRegistry::adopt($this->__rhandle, $this);
+        $this->__rhandle = \Shirabe\RpcRuntime::callRust($this->__rhandle, '__shirabe_clone', []);
+        \Shirabe\RustObjectRegistry::adopt($this->__rhandle, $this);
     }
 
     public function __get($name)
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, '__get', [$name]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, '__get', [$name]);
     }
 
     public function __set($name, $value): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, '__set', [$name, $value]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, '__set', [$name, $value]);
     }
 
     public function __isset($name): bool
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, '__isset', [$name]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, '__isset', [$name]);
     }
 
     public function __unset($name): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, '__unset', [$name]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, '__unset', [$name]);
     }
 
     public function __construct(string $name)
     {
-        $this->__rhandle = \ShirabeRpcRuntime::callRust(0, '__shirabe_construct', [static::class, [$name]]);
-        \ShirabeRustObjectRegistry::adopt($this->__rhandle, $this);
+        $this->__rhandle = \Shirabe\RpcRuntime::callRust(0, '__shirabe_construct', [static::class, [$name]]);
+        \Shirabe\RustObjectRegistry::adopt($this->__rhandle, $this);
     }
 
     public const STABILITY_STABLE = 0;
@@ -110,286 +110,286 @@ abstract class BasePackage implements PackageInterface, \ShirabeRustStub
 
     public function getName(): string
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getName', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getName', []);
     }
 
     public function getPrettyName(): string
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getPrettyName', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getPrettyName', []);
     }
 
     public function getNames($provides = true): array
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getNames', [$provides]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getNames', [$provides]);
     }
 
     public function setId(int $id): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, 'setId', [$id]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setId', [$id]);
     }
 
     public function getId(): int
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getId', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getId', []);
     }
 
     public function isDev(): bool
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'isDev', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'isDev', []);
     }
 
     public function getType(): string
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getType', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getType', []);
     }
 
     public function getTargetDir(): ?string
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getTargetDir', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getTargetDir', []);
     }
 
     public function getExtra(): array
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getExtra', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getExtra', []);
     }
 
     public function setInstallationSource(?string $type): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, 'setInstallationSource', [$type]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setInstallationSource', [$type]);
     }
 
     public function getInstallationSource(): ?string
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getInstallationSource', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getInstallationSource', []);
     }
 
     public function getSourceType(): ?string
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getSourceType', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getSourceType', []);
     }
 
     public function getSourceUrl(): ?string
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getSourceUrl', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getSourceUrl', []);
     }
 
     public function getSourceUrls(): array
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getSourceUrls', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getSourceUrls', []);
     }
 
     public function getSourceReference(): ?string
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getSourceReference', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getSourceReference', []);
     }
 
     public function getSourceMirrors(): ?array
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getSourceMirrors', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getSourceMirrors', []);
     }
 
     public function setSourceMirrors(?array $mirrors): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, 'setSourceMirrors', [$mirrors]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setSourceMirrors', [$mirrors]);
     }
 
     public function getDistType(): ?string
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getDistType', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getDistType', []);
     }
 
     public function getDistUrl(): ?string
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getDistUrl', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getDistUrl', []);
     }
 
     public function getDistUrls(): array
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getDistUrls', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getDistUrls', []);
     }
 
     public function getDistReference(): ?string
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getDistReference', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getDistReference', []);
     }
 
     public function getDistSha1Checksum(): ?string
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getDistSha1Checksum', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getDistSha1Checksum', []);
     }
 
     public function getDistMirrors(): ?array
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getDistMirrors', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getDistMirrors', []);
     }
 
     public function setDistMirrors(?array $mirrors): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, 'setDistMirrors', [$mirrors]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setDistMirrors', [$mirrors]);
     }
 
     public function getVersion(): string
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getVersion', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getVersion', []);
     }
 
     public function getPrettyVersion(): string
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getPrettyVersion', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getPrettyVersion', []);
     }
 
     public function getFullPrettyVersion(bool $truncate = true, int $displayMode = PackageInterface::DISPLAY_SOURCE_REF_IF_DEV): string
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getFullPrettyVersion', [$truncate, $displayMode]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getFullPrettyVersion', [$truncate, $displayMode]);
     }
 
     public function getReleaseDate(): ?\DateTimeInterface
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getReleaseDate', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getReleaseDate', []);
     }
 
     public function getStability(): string
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getStability', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getStability', []);
     }
 
     public function getRequires(): array
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getRequires', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getRequires', []);
     }
 
     public function getConflicts(): array
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getConflicts', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getConflicts', []);
     }
 
     public function getProvides(): array
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getProvides', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getProvides', []);
     }
 
     public function getReplaces(): array
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getReplaces', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getReplaces', []);
     }
 
     public function getDevRequires(): array
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getDevRequires', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getDevRequires', []);
     }
 
     public function getSuggests(): array
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getSuggests', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getSuggests', []);
     }
 
     public function getAutoload(): array
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getAutoload', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getAutoload', []);
     }
 
     public function getDevAutoload(): array
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getDevAutoload', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getDevAutoload', []);
     }
 
     public function getIncludePaths(): array
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getIncludePaths', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getIncludePaths', []);
     }
 
     public function getPhpExt(): ?array
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getPhpExt', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getPhpExt', []);
     }
 
     public function setRepository(RepositoryInterface $repository): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, 'setRepository', [$repository]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setRepository', [$repository]);
     }
 
     public function getRepository(): ?RepositoryInterface
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getRepository', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getRepository', []);
     }
 
     public function getBinaries(): array
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getBinaries', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getBinaries', []);
     }
 
     public function getUniqueName(): string
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getUniqueName', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getUniqueName', []);
     }
 
     public function getNotificationUrl(): ?string
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getNotificationUrl', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getNotificationUrl', []);
     }
 
     public function __toString(): string
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, '__toString', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, '__toString', []);
     }
 
     public function getPrettyString(): string
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getPrettyString', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getPrettyString', []);
     }
 
     public function isDefaultBranch(): bool
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'isDefaultBranch', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'isDefaultBranch', []);
     }
 
     public function getTransportOptions(): array
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getTransportOptions', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getTransportOptions', []);
     }
 
     public function setTransportOptions(array $options): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, 'setTransportOptions', [$options]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setTransportOptions', [$options]);
     }
 
     public function setSourceReference(?string $reference): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, 'setSourceReference', [$reference]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setSourceReference', [$reference]);
     }
 
     public function setDistUrl(?string $url): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, 'setDistUrl', [$url]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setDistUrl', [$url]);
     }
 
     public function setDistType(?string $type): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, 'setDistType', [$type]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setDistType', [$type]);
     }
 
     public function setDistReference(?string $reference): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, 'setDistReference', [$reference]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setDistReference', [$reference]);
     }
 
     public function setSourceDistReferences(string $reference): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, 'setSourceDistReferences', [$reference]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setSourceDistReferences', [$reference]);
     }
 
     public function isPlatform(): bool
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'isPlatform', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'isPlatform', []);
     }
 
     public function equals(PackageInterface $package): bool
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'equals', [$package]);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'equals', [$package]);
     }
 
     public function getStabilityPriority(): int
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getStabilityPriority', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getStabilityPriority', []);
     }
 }

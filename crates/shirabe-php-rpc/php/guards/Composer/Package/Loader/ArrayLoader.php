@@ -15,26 +15,26 @@ class ArrayLoader implements LoaderInterface
 {
     public function __construct(?VersionParser $parser = null, bool $loadOptions = false)
     {
-        \ShirabeUnsupportedClass::fail(self::class, '__construct');
+        \Shirabe\UnsupportedClass::fail(self::class, '__construct');
     }
 
     public function load(array $config, string $class = 'Composer\Package\CompletePackage'): BasePackage
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'load');
+        \Shirabe\UnsupportedClass::fail(self::class, 'load');
     }
 
     public function loadPackages(array $versions): array
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'loadPackages');
+        \Shirabe\UnsupportedClass::fail(self::class, 'loadPackages');
     }
 
     public function parseLinks(string $source, string $sourceVersion, string $description, array $links): array
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'parseLinks');
+        \Shirabe\UnsupportedClass::fail(self::class, 'parseLinks');
     }
 
     public function getBranchAlias(array $config): ?string
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getBranchAlias');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getBranchAlias');
     }
 }

@@ -14,61 +14,61 @@ class JsonConfigSource implements ConfigSourceInterface
 {
     public function __construct(JsonFile $file, bool $authConfig = false)
     {
-        \ShirabeUnsupportedClass::fail(self::class, '__construct');
+        \Shirabe\UnsupportedClass::fail(self::class, '__construct');
     }
 
     public function getName(): string
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getName');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getName');
     }
 
     public function addRepository(string $name, $config, bool $append = true): void
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'addRepository');
+        \Shirabe\UnsupportedClass::fail(self::class, 'addRepository');
     }
 
     public function insertRepository(string $name, $config, string $referenceName, int $offset = 0): void
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'insertRepository');
+        \Shirabe\UnsupportedClass::fail(self::class, 'insertRepository');
     }
 
     public function setRepositoryUrl(string $name, string $url): void
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'setRepositoryUrl');
+        \Shirabe\UnsupportedClass::fail(self::class, 'setRepositoryUrl');
     }
 
     public function removeRepository(string $name): void
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'removeRepository');
+        \Shirabe\UnsupportedClass::fail(self::class, 'removeRepository');
     }
 
     public function addConfigSetting(string $name, $value): void
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'addConfigSetting');
+        \Shirabe\UnsupportedClass::fail(self::class, 'addConfigSetting');
     }
 
     public function removeConfigSetting(string $name): void
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'removeConfigSetting');
+        \Shirabe\UnsupportedClass::fail(self::class, 'removeConfigSetting');
     }
 
     public function addProperty(string $name, $value): void
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'addProperty');
+        \Shirabe\UnsupportedClass::fail(self::class, 'addProperty');
     }
 
     public function removeProperty(string $name): void
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'removeProperty');
+        \Shirabe\UnsupportedClass::fail(self::class, 'removeProperty');
     }
 
     public function addLink(string $type, string $name, string $value): void
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'addLink');
+        \Shirabe\UnsupportedClass::fail(self::class, 'addLink');
     }
 
     public function removeLink(string $type, string $name): void
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'removeLink');
+        \Shirabe\UnsupportedClass::fail(self::class, 'removeLink');
     }
 }

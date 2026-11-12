@@ -19,96 +19,96 @@ class PluginInstaller extends LibraryInstaller
 {
     public function __construct(IOInterface $io, PartialComposer $composer, ?Filesystem $fs = null, ?BinaryInstaller $binaryInstaller = null)
     {
-        \ShirabeUnsupportedClass::fail(self::class, '__construct');
+        \Shirabe\UnsupportedClass::fail(self::class, '__construct');
     }
 
     public function supports(string $packageType)
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'supports');
+        \Shirabe\UnsupportedClass::fail(self::class, 'supports');
     }
 
     public function disablePlugins(): void
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'disablePlugins');
+        \Shirabe\UnsupportedClass::fail(self::class, 'disablePlugins');
     }
 
     public function prepare($type, PackageInterface $package, ?PackageInterface $prevPackage = null)
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'prepare');
+        \Shirabe\UnsupportedClass::fail(self::class, 'prepare');
     }
 
     public function download(PackageInterface $package, ?PackageInterface $prevPackage = null)
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'download');
+        \Shirabe\UnsupportedClass::fail(self::class, 'download');
     }
 
     public function install(InstalledRepositoryInterface $repo, PackageInterface $package)
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'install');
+        \Shirabe\UnsupportedClass::fail(self::class, 'install');
     }
 
     public function update(InstalledRepositoryInterface $repo, PackageInterface $initial, PackageInterface $target)
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'update');
+        \Shirabe\UnsupportedClass::fail(self::class, 'update');
     }
 
     public function uninstall(InstalledRepositoryInterface $repo, PackageInterface $package)
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'uninstall');
+        \Shirabe\UnsupportedClass::fail(self::class, 'uninstall');
     }
 
     protected function getPluginManager(): PluginManager
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getPluginManager');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getPluginManager');
     }
 
     public function isInstalled(InstalledRepositoryInterface $repo, PackageInterface $package)
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'isInstalled');
+        \Shirabe\UnsupportedClass::fail(self::class, 'isInstalled');
     }
 
     public function cleanup($type, PackageInterface $package, ?PackageInterface $prevPackage = null)
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'cleanup');
+        \Shirabe\UnsupportedClass::fail(self::class, 'cleanup');
     }
 
     public function getInstallPath(PackageInterface $package)
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getInstallPath');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getInstallPath');
     }
 
     public function ensureBinariesPresence(PackageInterface $package)
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'ensureBinariesPresence');
+        \Shirabe\UnsupportedClass::fail(self::class, 'ensureBinariesPresence');
     }
 
     protected function getPackageBasePath(PackageInterface $package)
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getPackageBasePath');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getPackageBasePath');
     }
 
     protected function installCode(PackageInterface $package)
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'installCode');
+        \Shirabe\UnsupportedClass::fail(self::class, 'installCode');
     }
 
     protected function updateCode(PackageInterface $initial, PackageInterface $target)
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'updateCode');
+        \Shirabe\UnsupportedClass::fail(self::class, 'updateCode');
     }
 
     protected function removeCode(PackageInterface $package)
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'removeCode');
+        \Shirabe\UnsupportedClass::fail(self::class, 'removeCode');
     }
 
     protected function initializeVendorDir()
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'initializeVendorDir');
+        \Shirabe\UnsupportedClass::fail(self::class, 'initializeVendorDir');
     }
 
     protected function getDownloadManager(): DownloadManager
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getDownloadManager');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getDownloadManager');
     }
 }

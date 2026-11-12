@@ -17,16 +17,16 @@ class VersionSelector
 {
     public function __construct(RepositorySet $repositorySet, ?PlatformRepository $platformRepo = null)
     {
-        \ShirabeUnsupportedClass::fail(self::class, '__construct');
+        \Shirabe\UnsupportedClass::fail(self::class, '__construct');
     }
 
     public function findBestCandidate(string $packageName, ?string $targetPackageVersion = null, string $preferredStability = 'stable', $platformRequirementFilter = null, int $repoSetFlags = 0, ?IOInterface $io = null, $showWarnings = true)
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'findBestCandidate');
+        \Shirabe\UnsupportedClass::fail(self::class, 'findBestCandidate');
     }
 
     public function findRecommendedRequireVersion(PackageInterface $package): string
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'findRecommendedRequireVersion');
+        \Shirabe\UnsupportedClass::fail(self::class, 'findRecommendedRequireVersion');
     }
 }

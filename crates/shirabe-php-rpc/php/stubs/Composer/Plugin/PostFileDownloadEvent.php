@@ -12,37 +12,37 @@ class PostFileDownloadEvent extends Event
 {
     public function __construct(string $name, ?string $fileName, ?string $checksum, string $url, string $type, $context = null)
     {
-        $this->__rhandle = \ShirabeRpcRuntime::callRust(0, '__shirabe_construct', [static::class, [$name, $fileName, $checksum, $url, $type, $context]]);
-        \ShirabeRustObjectRegistry::adopt($this->__rhandle, $this);
+        $this->__rhandle = \Shirabe\RpcRuntime::callRust(0, '__shirabe_construct', [static::class, [$name, $fileName, $checksum, $url, $type, $context]]);
+        \Shirabe\RustObjectRegistry::adopt($this->__rhandle, $this);
     }
 
     public function getFileName(): ?string
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getFileName', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getFileName', []);
     }
 
     public function getChecksum(): ?string
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getChecksum', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getChecksum', []);
     }
 
     public function getUrl(): string
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getUrl', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getUrl', []);
     }
 
     public function getContext()
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getContext', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getContext', []);
     }
 
     public function getPackage(): ?PackageInterface
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getPackage', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getPackage', []);
     }
 
     public function getType(): string
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getType', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getType', []);
     }
 }

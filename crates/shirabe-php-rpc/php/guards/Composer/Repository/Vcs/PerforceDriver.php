@@ -17,101 +17,101 @@ class PerforceDriver extends VcsDriver
 {
     public function __construct()
     {
-        \ShirabeUnsupportedClass::fail(self::class, '__construct');
+        \Shirabe\UnsupportedClass::fail(self::class, '__construct');
     }
 
     public function initialize(): void
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'initialize');
+        \Shirabe\UnsupportedClass::fail(self::class, 'initialize');
     }
 
     public function getFileContent(string $file, string $identifier): ?string
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getFileContent');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getFileContent');
     }
 
     public function getChangeDate(string $identifier): ?\DateTimeImmutable
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getChangeDate');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getChangeDate');
     }
 
     public function getRootIdentifier(): string
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getRootIdentifier');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getRootIdentifier');
     }
 
     public function getBranches(): array
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getBranches');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getBranches');
     }
 
     public function getTags(): array
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getTags');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getTags');
     }
 
     public function getDist(string $identifier): ?array
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getDist');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getDist');
     }
 
     public function getSource(string $identifier): array
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getSource');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getSource');
     }
 
     public function getUrl(): string
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getUrl');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getUrl');
     }
 
     public function hasComposerFile(string $identifier): bool
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'hasComposerFile');
+        \Shirabe\UnsupportedClass::fail(self::class, 'hasComposerFile');
     }
 
     public function getContents(string $url): Response
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getContents');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getContents');
     }
 
     public static function supports(IOInterface $io, Config $config, string $url, bool $deep = false): bool
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'supports');
+        \Shirabe\UnsupportedClass::fail(self::class, 'supports');
     }
 
     public function cleanup(): void
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'cleanup');
+        \Shirabe\UnsupportedClass::fail(self::class, 'cleanup');
     }
 
     public function getDepot(): string
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getDepot');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getDepot');
     }
 
     public function getBranch(): string
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getBranch');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getBranch');
     }
 
     protected function shouldCache(string $identifier): bool
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'shouldCache');
+        \Shirabe\UnsupportedClass::fail(self::class, 'shouldCache');
     }
 
     public function getComposerInformation(string $identifier): ?array
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getComposerInformation');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getComposerInformation');
     }
 
     protected function getBaseComposerInformation(string $identifier): ?array
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getBaseComposerInformation');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getBaseComposerInformation');
     }
 
     protected function getScheme(): string
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'getScheme');
+        \Shirabe\UnsupportedClass::fail(self::class, 'getScheme');
     }
 }

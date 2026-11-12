@@ -15,11 +15,11 @@ class VersionBumper
 {
     public function __construct()
     {
-        \ShirabeUnsupportedClass::fail(self::class, '__construct');
+        \Shirabe\UnsupportedClass::fail(self::class, '__construct');
     }
 
     public function bumpRequirement(ConstraintInterface $constraint, PackageInterface $package): string
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'bumpRequirement');
+        \Shirabe\UnsupportedClass::fail(self::class, 'bumpRequirement');
     }
 }

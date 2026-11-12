@@ -12,8 +12,8 @@ class UpdateOperation extends SolverOperation implements OperationInterface
 {
     public function __construct(PackageInterface $initial, PackageInterface $target)
     {
-        $this->__rhandle = \ShirabeRpcRuntime::callRust(0, '__shirabe_construct', [static::class, [$initial, $target]]);
-        \ShirabeRustObjectRegistry::adopt($this->__rhandle, $this);
+        $this->__rhandle = \Shirabe\RpcRuntime::callRust(0, '__shirabe_construct', [static::class, [$initial, $target]]);
+        \Shirabe\RustObjectRegistry::adopt($this->__rhandle, $this);
     }
 
     protected const TYPE = 'update';
@@ -38,11 +38,11 @@ class UpdateOperation extends SolverOperation implements OperationInterface
 
     public function getInitialPackage(): PackageInterface
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getInitialPackage', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getInitialPackage', []);
     }
 
     public function getTargetPackage(): PackageInterface
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getTargetPackage', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getTargetPackage', []);
     }
 }

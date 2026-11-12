@@ -85,7 +85,7 @@ regenerates the report.
   proxy boilerplate: the `__rhandle` property, the `__shirabeBind`
   binder the registry calls when reviving a stub for an existing entity, a
   destructor releasing the Rust handle, and the Rust handle descriptor helper. The
-  real `extends`/`implements` hierarchy is preserved and `\ShirabeRustStub` is
+  real `extends`/`implements` hierarchy is preserved and `\Shirabe\RustStub` is
   appended to the interface list.
 * **Constructors** reproduce the real class's parameter list and forward to the
   Rust side (`__shirabe_construct` on handle 0), which allocates the entity and
@@ -93,7 +93,7 @@ regenerates the report.
   that declares a public constructor of its own, so `new SomeProxiedClass(...)`
   in plugin code never yields an unbound stub. Proxy revival does not run them
   (see `__shirabeBind` above).
-* **Instance methods** forward via `\ShirabeRpcRuntime::callRust`. For a root
+* **Instance methods** forward via `\Shirabe\RpcRuntime::callRust`. For a root
   stub the emitted surface is the interface closure (each interface before the
   ones it extends, methods in declaration order; a concrete redeclaration in
   the class wins over the interface signature) followed by the class's own
@@ -147,7 +147,7 @@ A guard reproduces the real class's declaration — `abstract`/`final`, `extends
 `implements`, the constants and public static properties verbatim — so that
 references satisfied by the declaration alone keep working: `instanceof`,
 `catch`, `X::class`, `Link::TYPE_REQUIRE`. Everything executable raises
-`ShirabeUnsupportedClass::fail()`, which names the class and the member:
+`Shirabe\UnsupportedClass::fail()`, which names the class and the member:
 
 * the constructor,
 * every public and protected method the guard would otherwise inherit from real

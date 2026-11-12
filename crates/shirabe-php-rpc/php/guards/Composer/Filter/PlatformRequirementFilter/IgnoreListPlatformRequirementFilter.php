@@ -14,21 +14,21 @@ final class IgnoreListPlatformRequirementFilter implements PlatformRequirementFi
 {
     public function __construct(array $reqList)
     {
-        \ShirabeUnsupportedClass::fail(self::class, '__construct');
+        \Shirabe\UnsupportedClass::fail(self::class, '__construct');
     }
 
     public function isIgnored(string $req): bool
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'isIgnored');
+        \Shirabe\UnsupportedClass::fail(self::class, 'isIgnored');
     }
 
     public function isUpperBoundIgnored(string $req): bool
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'isUpperBoundIgnored');
+        \Shirabe\UnsupportedClass::fail(self::class, 'isUpperBoundIgnored');
     }
 
     public function filterConstraint(string $req, ConstraintInterface $constraint, bool $allowUpperBoundOverride = true): ConstraintInterface
     {
-        \ShirabeUnsupportedClass::fail(self::class, 'filterConstraint');
+        \Shirabe\UnsupportedClass::fail(self::class, 'filterConstraint');
     }
 }

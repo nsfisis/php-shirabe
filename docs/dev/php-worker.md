@@ -7,9 +7,8 @@ the worker loads, the classes that are sent as materialized values, and how the 
 is split between the two worlds. Which treatment each Composer class receives is decided by
 [docs/dev/plugin-class-classification.md](./plugin-class-classification.md).
 
-Everything Shirabe itself defines in the worker is internal: the classes in the `Shirabe\`
-namespace, the global classes and interfaces whose names start with `Shirabe` (such as
-`ShirabeRpcRuntime`), and the members whose names start with `__shirabe` or `__rhandle`. Plugin
+Everything Shirabe itself defines in the worker is internal: the classes and interfaces in the
+`Shirabe\` namespace, and the members whose names start with `__shirabe` or `__rhandle`. Plugin
 code can see them, but they are not meant to be used from it, and they may change in any release
 without notice.
 
@@ -157,6 +156,15 @@ and the conjunctive flag survive.
   an instance to `serialize()` in place of a handle descriptor.
 - `Shirabe\Wire\RustHandle`, `Shirabe\Wire\PhpHandle` and `Shirabe\Wire\Job` — the descriptor
   records (see "Values" in [docs/dev/php-rpc.md](./php-rpc.md)).
+- `Shirabe\RpcRuntime` — the PHP half of the protocol: the frame codec, the standing loop that
+  serves requests, and `callRust`. `php/worker.php` only opens the socket, registers the
+  autoloader for this directory and the stubs, and hands over to it.
+- `Shirabe\EntryPoints` — the dispatch table of named entry points (see "Entry points" above).
+- `Shirabe\RustObjectRegistry`, `Shirabe\PhpObjectRegistry` and `Shirabe\JobRegistry` — the
+  worker's halves of the R table, the P table and the job registry.
+- `Shirabe\RustStub` — the marker interface every proxy stub implements;
+  `Shirabe\UnsupportedClass` — the error the guard classes raise; `Shirabe\PlatformRuntime` — the
+  port of `Composer\Platform\Runtime` behind `__shirabe_platform`.
 - `Composer\EventDispatcher\Event` — dual-mode: revived from a Rust handle (through
   `__shirabeBind`) it proxies like a generated stub, while a natively-constructed instance (real
   Composer code in the worker does `new PreCommandRunEvent(...)`, whose parent constructor lands

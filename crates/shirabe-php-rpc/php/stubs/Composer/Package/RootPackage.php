@@ -11,61 +11,61 @@ class RootPackage extends CompletePackage implements RootPackageInterface
 
     public function getAliases(): array
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getAliases', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getAliases', []);
     }
 
     public function getMinimumStability(): string
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getMinimumStability', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getMinimumStability', []);
     }
 
     public function getStabilityFlags(): array
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getStabilityFlags', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getStabilityFlags', []);
     }
 
     public function getReferences(): array
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getReferences', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getReferences', []);
     }
 
     public function getPreferStable(): bool
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getPreferStable', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getPreferStable', []);
     }
 
     public function getConfig(): array
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getConfig', []);
+        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getConfig', []);
     }
 
     public function setStabilityFlags(array $stabilityFlags): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, 'setStabilityFlags', [$stabilityFlags]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setStabilityFlags', [$stabilityFlags]);
     }
 
     public function setMinimumStability(string $minimumStability): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, 'setMinimumStability', [$minimumStability]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setMinimumStability', [$minimumStability]);
     }
 
     public function setPreferStable(bool $preferStable): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, 'setPreferStable', [$preferStable]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setPreferStable', [$preferStable]);
     }
 
     public function setConfig(array $config): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, 'setConfig', [$config]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setConfig', [$config]);
     }
 
     public function setReferences(array $references): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, 'setReferences', [$references]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setReferences', [$references]);
     }
 
     public function setAliases(array $aliases): void
     {
-        \ShirabeRpcRuntime::callRust($this->__rhandle, 'setAliases', [$aliases]);
+        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setAliases', [$aliases]);
     }
 }

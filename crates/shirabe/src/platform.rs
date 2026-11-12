@@ -1,5 +1,5 @@
 //! `Composer\Platform\Runtime` has no Rust counterpart. Its work belongs to the running PHP
-//! interpreter, so it is ported as PHP into the RPC worker (`ShirabePlatformRuntime` in
+//! interpreter, so it is ported as PHP into the RPC worker (`Shirabe\PlatformRuntime` in
 //! `shirabe-php-rpc`), and its callers read the answers off `php_worker::platform_info::PlatformInfo`.
 
 pub mod hhvm_detector;
