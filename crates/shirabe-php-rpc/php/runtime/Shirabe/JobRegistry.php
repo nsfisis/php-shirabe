@@ -66,7 +66,7 @@ final class JobRegistry
                 // with the exception a started job is cancelled with, and with null for one that
                 // had not started, which Composer aborts without rejecting.
                 unset(self::$deferreds[$id]);
-                $thrown = RpcRuntime::callRust(0, '__shirabe_cancel_job', [$id]);
+                $thrown = RpcRuntime::callRustFunction('__shirabe_cancel_job', [$id]);
                 if ($thrown !== null) {
                     throw MaterializedThrowable::revive($thrown);
                 }
@@ -134,15 +134,14 @@ final class JobRegistry
         $promise->then(
             static function ($value) use ($id, $forget): void {
                 $forget();
-                RpcRuntime::callRust(0, '__shirabe_resolve_job', [$id, $value]);
+                RpcRuntime::callRustFunction('__shirabe_resolve_job', [$id, $value]);
             },
             static function ($reason) use ($id, $forget): void {
                 $forget();
                 if (!$reason instanceof \Throwable) {
                     $reason = new \RuntimeException('the promise was rejected with ' . gettype($reason));
                 }
-                RpcRuntime::callRust(
-                    0,
+                RpcRuntime::callRustFunction(
                     '__shirabe_reject_job',
                     [$id, MaterializedThrowable::describe($reason)]
                 );

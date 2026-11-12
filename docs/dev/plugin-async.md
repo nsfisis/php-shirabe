@@ -80,7 +80,7 @@ Ownership is encoded in the parity of the id, as it already is for correlation i
 | `__shirabe_resolved_promise` | `(value)` — the fast path for a Rust method that must answer with `PromiseInterface` and has the value before building a future. There is no job to register. The worker parks the promise under an even id and answers with its descriptor, which the Rust method passes on as its own answer. |
 | `__shirabe_rejected_promise` | `(exception)` — the failure half. |
 
-### Runtime service methods (PHP → Rust, handle 0)
+### Runtime services (PHP → Rust, `CallFunction`)
 
 | Name | Purpose |
 |---|---|

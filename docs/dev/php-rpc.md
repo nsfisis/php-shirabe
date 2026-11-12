@@ -46,7 +46,7 @@ The child is started with the following arguments:
 
 | tag | name | direction | payload fields |
 |---|---|---|---|
-| `0x00` | `CallFunction` | Rust→PHP | `function_name`, `args` |
+| `0x00` | `CallFunction` | both | `function_name`, `args` |
 | `0x01` | `CallMethod` | both | `handle`, `method_name`, `args` |
 | `0x02` | `CallStaticMethod` | both | `pclass`, `method_name`, `args` |
 | `0x03` | `NewObject` | both | `pclass`, `ctor_args` |
@@ -140,13 +140,13 @@ frame the Rust side sends.
 
 ### Entry points
 
-`CallFunction` first consults the worker's dispatch table of named entry points, then falls back
-to calling the named PHP function.
+`CallFunction` from the Rust side first consults the worker's dispatch table of named entry
+points, then falls back to calling the named PHP function.
 
-Rust handle 0 is reserved for the runtime service endpoint, which answers calls that have no
-receiver entity: a `CallMethod` the PHP side sends on handle 0 names one of its methods.
+`CallFunction` from the PHP side names one of the runtime services of the Rust side, which answer
+the calls that have no receiver entity. No handle is reserved for them.
 
-Every name Shirabe defines on either side — an entry point, a runtime service method, and a method
+Every name Shirabe defines on either side — an entry point, a runtime service, and a method
 an entity answers beyond its PHP class's own (such as `__shirabe_clone`) — is
 `__shirabe_<snake_case>`.
 

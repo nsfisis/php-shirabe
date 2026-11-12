@@ -9,7 +9,6 @@ use PhpParser\Node\Expr\PropertyFetch;
 use PhpParser\Node\Expr\StaticCall;
 use PhpParser\Node\Expr\Variable;
 use PhpParser\Node\Name;
-use PhpParser\Node\Scalar\Int_;
 use PhpParser\Node\Scalar\String_;
 use PhpParser\Node\Stmt\Class_;
 use PhpParser\Node\Stmt\ClassMethod;
@@ -325,8 +324,6 @@ final class SurfaceManifest
             }
             return;
         }
-        if (!$handle instanceof Int_ || $handle->value !== 0) {
-            throw new GenerationError(["$where calls callRust on a handle other than its own or 0"]);
-        }
+        throw new GenerationError(["$where calls callRust on a handle other than its own"]);
     }
 }

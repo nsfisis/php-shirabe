@@ -564,8 +564,8 @@ of `FilesystemRepository::write` (the unconditional
 
 Plugin classes are autoloaded from the Rust side. The loaders
 `PluginManager::registerPackage` builds live in the Rust process, and the
-worker's autoloader asks them for a file through the runtime service
-endpoint (`__shirabe_find_file`); the files-autoload entries and the
+worker's autoloader asks them for a file through the `__shirabe_find_file`
+runtime service; the files-autoload entries and the
 `_composer_tmp` class-rename path run in the worker. `ClassLoader::register`
 keeps a Rust-side autoload stack that mirrors PHP's: every registered loader
 stays on it in registration order (or in front, when prepended), and every

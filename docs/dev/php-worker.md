@@ -48,7 +48,8 @@ Notable internal helpers:
   required file registered its own prepending autoloader (a Composer `vendor/autoload.php`
   does).
 - `__shirabe_enable_script_autoloader` — registers the autoloader that resolves classes through
-  the Rust-side `ClassLoader`s on the autoload stack via handle 0.
+  the Rust-side `ClassLoader`s on the autoload stack via the `__shirabe_find_file` runtime
+  service.
 - `__shirabe_composer_require` — the body of `\Composer\Autoload\composerRequire`, sharing
   its `$GLOBALS['__composer_autoload_files']` guard (files-autoload entries of plugin
   packages).
@@ -89,9 +90,10 @@ The helpers that exist only for tests sit together at the end of the table, each
   `__shirabe_reflection_set_property` — the `ReflectionMethod` / `ReflectionProperty` access
   PHPUnit tests use to reach the non-public members of a P-table entity.
 
-### Runtime service endpoint
+### Runtime services
 
-The runtime service endpoint (handle 0) answers `__shirabe_find_file`, which the worker's
+The runtime services are the functions the Rust side answers when the worker sends a
+`CallFunction`: `__shirabe_find_file`, which the worker's
 script-class autoloader uses to ask the Rust-side `ClassLoader`s on the autoload stack where a
 class file lives,
 `__shirabe_run_rust_command` — the reverse half of the two-world command split: a

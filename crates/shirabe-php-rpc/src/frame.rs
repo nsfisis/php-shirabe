@@ -30,7 +30,7 @@ pub enum Frame {
         args: Vec<PluginValue>,
     },
     /// Calls a method of `handle`, an entry of the receiver's table: a P-handle when the Rust
-    /// side sends it, an R-handle (0 being the runtime service endpoint) when the PHP side does.
+    /// side sends it, an R-handle when the PHP side does.
     CallMethod {
         corr_id: u64,
         handle: u64,

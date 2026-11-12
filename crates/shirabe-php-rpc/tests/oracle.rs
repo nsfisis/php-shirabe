@@ -27,6 +27,14 @@ impl RustMethodDispatcher for NoCallbacks {
         panic!("unexpected callback `{method_name:?}`")
     }
 
+    fn call_function(
+        &mut self,
+        function_name: &bstr::BStr,
+        _args: Vec<PluginValue>,
+    ) -> Result<PluginValue, PhpThrow> {
+        panic!("unexpected callback `{function_name:?}`")
+    }
+
     fn construct(
         &mut self,
         class: &bstr::BStr,

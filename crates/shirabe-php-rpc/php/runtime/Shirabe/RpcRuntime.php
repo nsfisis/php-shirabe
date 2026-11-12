@@ -179,6 +179,15 @@ final class RpcRuntime
     }
 
     /**
+     * Sends a CallFunction request: the runtime services the Rust side answers without a
+     * receiver entity (autoload lookups, the built-in commands, the job registry).
+     */
+    public static function callRustFunction(string $name, array $args)
+    {
+        return self::request(self::TAG_CALL_FUNCTION, [$name, self::toPluginValue($args)]);
+    }
+
+    /**
      * Sends a CallMethod request and drives the cooperative loop until its Return.
      *
      * For a method with by-ref parameters, the Rust side answers with the value each of them
@@ -357,7 +366,7 @@ final class RpcRuntime
     /**
      * Registers the script-class autoloader: classes referenced by composer.json scripts are
      * resolved by asking the Rust-side ClassLoader (built by EventDispatcher::makeAutoloader)
-     * where the class file lives. Handle 0 is the runtime service endpoint on the Rust side.
+     * where the class file lives.
      */
     public static function enableScriptAutoloader(): void
     {
@@ -366,7 +375,7 @@ final class RpcRuntime
         }
         self::$scriptAutoloaderRegistered = true;
         spl_autoload_register(static function (string $class): void {
-            $file = RpcRuntime::callRust(0, '__shirabe_find_file', [$class]);
+            $file = RpcRuntime::callRustFunction('__shirabe_find_file', [$class]);
             if (is_string($file) && $file !== '') {
                 require $file;
             }

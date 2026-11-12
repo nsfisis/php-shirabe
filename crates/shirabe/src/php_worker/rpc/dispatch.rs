@@ -1,5 +1,5 @@
-//! Serves the worker's `CallMethod` requests: the runtime service endpoint (handle 0), the methods
-//! every entity answers (construction, clone, property access), and the routing to each class's
+//! Serves the worker's requests: the runtime services a `CallFunction` names, the methods every
+//! entity answers (construction, clone, property access), and the routing to each class's
 //! methods.
 
 use crate::autoload::ClassLoader;
@@ -28,8 +28,8 @@ pub(crate) fn find_file_in_registered_loaders(
     Ok(None)
 }
 
-/// Serves the `CallMethod` requests the worker makes while a call into it is in flight:
-/// rhandle 0 is the runtime service endpoint, every other rhandle resolves through the R table.
+/// Serves the requests the worker makes while a call into it is in flight: a `CallFunction` names a
+/// runtime service, every other request resolves through the R table or the forwarding classes.
 /// Unsupported methods are explicit errors, never silent fallbacks.
 #[derive(Debug)]
 pub(crate) struct RpcDispatcher;
@@ -42,10 +42,15 @@ impl RustMethodDispatcher for RpcDispatcher {
         args: Vec<PluginValue>,
         out_params: &mut IndexMap<u32, PluginValue>,
     ) -> Result<PluginValue, PhpThrow> {
-        if rhandle == 0 {
-            return dispatch_runtime_service_method(method_name, &args);
-        }
         table::call(rhandle, method_name, &args, out_params)
+    }
+
+    fn call_function(
+        &mut self,
+        function_name: &BStr,
+        args: Vec<PluginValue>,
+    ) -> Result<PluginValue, PhpThrow> {
+        call_runtime_service(function_name, &args)
     }
 
     fn construct(&mut self, class: &BStr, ctor_args: Vec<PluginValue>) -> Result<u64, PhpThrow> {
@@ -62,12 +67,9 @@ impl RustMethodDispatcher for RpcDispatcher {
     }
 }
 
-/// Serves the runtime service methods (Rust handle 0): autoload lookups, the built-in commands a
-/// plugin-provided command runs, and the job registry.
-fn dispatch_runtime_service_method(
-    method_name: &BStr,
-    args: &[PluginValue],
-) -> Result<PluginValue, PhpThrow> {
+/// Serves the runtime services a `CallFunction` from the worker names: autoload lookups, the
+/// built-in commands a plugin-provided command runs, and the job registry.
+fn call_runtime_service(method_name: &BStr, args: &[PluginValue]) -> Result<PluginValue, PhpThrow> {
     if method_name == "__shirabe_run_rust_command" {
         let name = arg::<BString>(method_name, args, 0)?;
         let input_line = arg::<BString>(method_name, args, 1)?;
@@ -86,11 +88,11 @@ fn dispatch_runtime_service_method(
         return answer;
     }
     Err(PhpThrow::runtime(bformat!(
-        "unknown runtime service method `{method_name}`"
+        "unknown runtime service `{method_name}`"
     )))
 }
 
-/// Serves the runtime service methods of the job registry (`docs/dev/plugin-async.md`): the worker
+/// Serves the runtime services of the job registry (`docs/dev/plugin-async.md`): the worker
 /// reports on a job whenever the promise behind it settles or is cancelled, whichever call happens
 /// to be in flight then. `None` for any other method.
 fn dispatch_job_service_method(
@@ -167,13 +169,13 @@ mod tests {
     use super::*;
 
     #[test]
-    fn a_method_name_that_is_not_utf8_reaches_the_error_unchanged() {
-        let name = b"method\xff";
+    fn a_function_name_that_is_not_utf8_reaches_the_error_unchanged() {
+        let name = b"function\xff";
         let throw = RpcDispatcher
-            .dispatch(0, BStr::new(name), Vec::new(), &mut IndexMap::new())
+            .call_function(BStr::new(name), Vec::new())
             .unwrap_err();
         assert_eq!(
-            BStr::new(b"unknown runtime service method `method\xff`"),
+            BStr::new(b"unknown runtime service `function\xff`"),
             throw.message.as_bstr()
         );
     }

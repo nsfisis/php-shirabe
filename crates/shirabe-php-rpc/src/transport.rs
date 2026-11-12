@@ -7,9 +7,8 @@ use bstr::{BStr, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::bformat;
 
-/// Handles the `CallMethod`, `CallStaticMethod` and `NewObject` requests the worker sends while a
-/// Rust-initiated call is waiting for its `Return` (the cooperative reentrancy loop). A handler may
-/// itself issue nested RPC calls.
+/// Handles the requests the worker sends while a Rust-initiated call is waiting for its `Return`
+/// (the cooperative reentrancy loop). A handler may itself issue nested RPC calls.
 ///
 /// A handler whose method takes by-ref parameters writes the value each one holds afterwards into
 /// `out_params` under its position, and the stub copies it back into the caller's variable;
@@ -22,6 +21,14 @@ pub trait RustMethodDispatcher {
         method_name: &BStr,
         args: Vec<PluginValue>,
         out_params: &mut IndexMap<u32, PluginValue>,
+    ) -> Result<PluginValue, PhpThrow>;
+
+    /// Runs the runtime service `function_name`: the calls the worker makes that have no receiver
+    /// entity.
+    fn call_function(
+        &mut self,
+        function_name: &BStr,
+        args: Vec<PluginValue>,
     ) -> Result<PluginValue, PhpThrow>;
 
     /// Builds a fresh entity of `class` for a proxy stub under construction in the worker, and
@@ -42,8 +49,7 @@ pub trait RustMethodDispatcher {
 /// attributable to its initiator.
 static NEXT_CORR_ID: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
 
-/// Allocates a Rust-side object handle. Handle 0 is reserved for the runtime service endpoint
-/// (e.g. `__shirabe_find_file` autoload queries), so ids start at 1.
+/// Allocates a Rust-side object handle. Ids start at 1, like the worker's P-handles.
 static NEXT_RHANDLE: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
 
 thread_local! {
@@ -80,6 +86,16 @@ impl RustMethodDispatcher for RefuseCallbacks {
     ) -> Result<PluginValue, PhpThrow> {
         Err(PhpThrow::runtime(bformat!(
             "no Rust method dispatcher is active for this call (rhandle {rhandle}, method `{method_name}`)"
+        )))
+    }
+
+    fn call_function(
+        &mut self,
+        function_name: &BStr,
+        _args: Vec<PluginValue>,
+    ) -> Result<PluginValue, PhpThrow> {
+        Err(PhpThrow::runtime(bformat!(
+            "no Rust method dispatcher is active for this call (`{function_name}()`)"
         )))
     }
 
@@ -226,6 +242,21 @@ fn rpc_call(
                         corr_id,
                         value,
                         out_params,
+                    },
+                    Err(throw) => Frame::Throw { corr_id, throw },
+                };
+                send_frame(&reply)?;
+            }
+            Frame::CallFunction {
+                corr_id,
+                function_name,
+                args,
+            } => {
+                let reply = match dispatcher.call_function(function_name.as_bstr(), args) {
+                    Ok(value) => Frame::Return {
+                        corr_id,
+                        value,
+                        out_params: IndexMap::new(),
                     },
                     Err(throw) => Frame::Throw { corr_id, throw },
                 };
