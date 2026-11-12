@@ -5,9 +5,9 @@ namespace Shirabe;
 final class RpcRuntime
 {
     private const TAG_CALL_FUNCTION = 0x00;
-    private const TAG_CALL_STATIC_METHOD = 0x01;
-    private const TAG_NEW_OBJECT = 0x02;
-    private const TAG_CALL_METHOD = 0x03;
+    private const TAG_CALL_METHOD = 0x01;
+    private const TAG_CALL_STATIC_METHOD = 0x02;
+    private const TAG_NEW_OBJECT = 0x03;
     private const TAG_RETURN = 0x04;
     private const TAG_THROW = 0x05;
     private const TAG_RELEASE_HANDLE = 0x06;
@@ -283,6 +283,19 @@ final class RpcRuntime
                     throw new \RuntimeException("PHP function `{$name}` does not exist");
                 });
                 break;
+            case self::TAG_CALL_METHOD:
+                [$phandle, $method, $args] = $fields;
+                self::replyWith($corrId, static function () use ($phandle, $method, $args) {
+                    $obj = PhpObjectRegistry::get((int) $phandle);
+                    $args = RpcRuntime::fromPluginValue($args);
+                    if (!is_callable([$obj, $method])) {
+                        throw new \RuntimeException(
+                            get_class($obj) . "::{$method} is not callable"
+                        );
+                    }
+                    return $obj->$method(...$args);
+                });
+                break;
             case self::TAG_CALL_STATIC_METHOD:
                 [$class, $method, $args] = $fields;
                 self::replyWith($corrId, static function () use ($class, $method, $args) {
@@ -301,19 +314,6 @@ final class RpcRuntime
                         throw new \RuntimeException("PHP class `{$class}` does not exist");
                     }
                     return new $class(...$ctorArgs);
-                });
-                break;
-            case self::TAG_CALL_METHOD:
-                [$phandle, $method, $args] = $fields;
-                self::replyWith($corrId, static function () use ($phandle, $method, $args) {
-                    $obj = PhpObjectRegistry::get((int) $phandle);
-                    $args = RpcRuntime::fromPluginValue($args);
-                    if (!is_callable([$obj, $method])) {
-                        throw new \RuntimeException(
-                            get_class($obj) . "::{$method} is not callable"
-                        );
-                    }
-                    return $obj->$method(...$args);
                 });
                 break;
             case self::TAG_RELEASE_HANDLE:

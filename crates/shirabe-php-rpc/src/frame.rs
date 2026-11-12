@@ -15,9 +15,9 @@ use std::io::{Read as _, Write as _};
 pub const MAX_FRAME_LEN: u64 = 256 * 1024 * 1024;
 
 pub const TAG_CALL_FUNCTION: u8 = 0x00;
-pub const TAG_CALL_STATIC_METHOD: u8 = 0x01;
-pub const TAG_NEW_OBJECT: u8 = 0x02;
-pub const TAG_CALL_METHOD: u8 = 0x03;
+pub const TAG_CALL_METHOD: u8 = 0x01;
+pub const TAG_CALL_STATIC_METHOD: u8 = 0x02;
+pub const TAG_NEW_OBJECT: u8 = 0x03;
 pub const TAG_RETURN: u8 = 0x04;
 pub const TAG_THROW: u8 = 0x05;
 pub const TAG_RELEASE_HANDLE: u8 = 0x06;
@@ -27,6 +27,14 @@ pub enum Frame {
     CallFunction {
         corr_id: u64,
         function_name: BString,
+        args: Vec<PluginValue>,
+    },
+    /// Calls a method of `handle`, an entry of the receiver's table: a P-handle when the Rust
+    /// side sends it, an R-handle (0 being the runtime service endpoint) when the PHP side does.
+    CallMethod {
+        corr_id: u64,
+        handle: u64,
+        method_name: BString,
         args: Vec<PluginValue>,
     },
     CallStaticMethod {
@@ -39,14 +47,6 @@ pub enum Frame {
         corr_id: u64,
         pclass: BString,
         ctor_args: Vec<PluginValue>,
-    },
-    /// Calls a method of `handle`, an entry of the receiver's table: a P-handle when the Rust
-    /// side sends it, an R-handle (0 being the runtime service endpoint) when the PHP side does.
-    CallMethod {
-        corr_id: u64,
-        handle: u64,
-        method_name: BString,
-        args: Vec<PluginValue>,
     },
     Return {
         corr_id: u64,
@@ -64,9 +64,9 @@ impl Frame {
     fn tag(&self) -> u8 {
         match self {
             Frame::CallFunction { .. } => TAG_CALL_FUNCTION,
+            Frame::CallMethod { .. } => TAG_CALL_METHOD,
             Frame::CallStaticMethod { .. } => TAG_CALL_STATIC_METHOD,
             Frame::NewObject { .. } => TAG_NEW_OBJECT,
-            Frame::CallMethod { .. } => TAG_CALL_METHOD,
             Frame::Return { .. } => TAG_RETURN,
             Frame::Throw { .. } => TAG_THROW,
             Frame::ReleaseHandle { .. } => TAG_RELEASE_HANDLE,
@@ -77,9 +77,9 @@ impl Frame {
     fn corr_id(&self) -> u64 {
         match self {
             Frame::CallFunction { corr_id, .. }
+            | Frame::CallMethod { corr_id, .. }
             | Frame::CallStaticMethod { corr_id, .. }
             | Frame::NewObject { corr_id, .. }
-            | Frame::CallMethod { corr_id, .. }
             | Frame::Return { corr_id, .. }
             | Frame::Throw { corr_id, .. } => *corr_id,
             Frame::ReleaseHandle { .. } => 0,
@@ -94,6 +94,16 @@ impl Frame {
                 ..
             } => vec![
                 PluginValue::string(function_name.clone()),
+                PluginValue::List(args.clone()),
+            ],
+            Frame::CallMethod {
+                handle,
+                method_name,
+                args,
+                ..
+            } => vec![
+                int_value(*handle),
+                PluginValue::string(method_name.clone()),
                 PluginValue::List(args.clone()),
             ],
             Frame::CallStaticMethod {
@@ -111,16 +121,6 @@ impl Frame {
             } => vec![
                 PluginValue::string(pclass.clone()),
                 PluginValue::List(ctor_args.clone()),
-            ],
-            Frame::CallMethod {
-                handle,
-                method_name,
-                args,
-                ..
-            } => vec![
-                int_value(*handle),
-                PluginValue::string(method_name.clone()),
-                PluginValue::List(args.clone()),
             ],
             Frame::Return {
                 value, out_params, ..
@@ -204,6 +204,12 @@ fn decode_frame(tag: u8, corr_id: u64, payload: &[u8]) -> Frame {
             function_name: field(next()),
             args: field(next()),
         },
+        TAG_CALL_METHOD => Frame::CallMethod {
+            corr_id,
+            handle: expect_id(next()),
+            method_name: field(next()),
+            args: field(next()),
+        },
         TAG_CALL_STATIC_METHOD => Frame::CallStaticMethod {
             corr_id,
             pclass: field(next()),
@@ -214,12 +220,6 @@ fn decode_frame(tag: u8, corr_id: u64, payload: &[u8]) -> Frame {
             corr_id,
             pclass: field(next()),
             ctor_args: field(next()),
-        },
-        TAG_CALL_METHOD => Frame::CallMethod {
-            corr_id,
-            handle: expect_id(next()),
-            method_name: field(next()),
-            args: field(next()),
         },
         TAG_RETURN => Frame::Return {
             corr_id,

@@ -47,9 +47,9 @@ The child is started with the following arguments:
 | tag | name | direction | payload fields |
 |---|---|---|---|
 | `0x00` | `CallFunction` | Rust→PHP | `function_name`, `args` |
-| `0x01` | `CallStaticMethod` | both | `pclass`, `method_name`, `args` |
-| `0x02` | `NewObject` | both | `pclass`, `ctor_args` |
-| `0x03` | `CallMethod` | both | `handle`, `method_name`, `args` |
+| `0x01` | `CallMethod` | both | `handle`, `method_name`, `args` |
+| `0x02` | `CallStaticMethod` | both | `pclass`, `method_name`, `args` |
+| `0x03` | `NewObject` | both | `pclass`, `ctor_args` |
 | `0x04` | `Return` | both | `value`, `out_params` |
 | `0x05` | `Throw` | both | the exception's description: `exception_class`, `message`, `code`, `properties`, `file`, `line`, `parents` |
 | `0x06` | `ReleaseHandle` | both | `handle` |
