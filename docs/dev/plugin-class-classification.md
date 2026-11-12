@@ -70,7 +70,7 @@ revives a genuine instance of the real class without running a constructor,
 and getters answer locally with zero round-trips. Identity is not preserved
 — two calls of the same getter yield two objects in the child (see
 [docs/dev/php-rpc.md](./php-rpc.md)). Only the classes on the codec's closed
-list cross this way today (`Link` and the `composer/semver` constraints it
+list are sent this way today (`Link` and the `composer/semver` constraints it
 holds, and `Composer\Util\Http\Response`); the rest of the category has no
 artifact yet and is guarded.
 
@@ -105,8 +105,7 @@ plugin throws propagates instead of degrading to an empty subscription list
 or capability map. `get_subscribed_events` takes `&self` although the PHP
 method is static, because the plugin's class is known only at run time.
 `PluginManager::getPluginCapability` builds the capability in the worker
-and wraps it in the adapter for its interface; a capability interface it has
-no adapter for (one a plugin ships itself) is an explicit error.
+and wraps it in the adapter for its interface.
 
 For abstract *classes* with concrete state and bodies (`BaseIO`,
 `BasePackage`) a declaration-only stub is not enough: real plugins subclass
@@ -128,9 +127,9 @@ the boundary.
 
 #### php-native
 
-Composer-plugin-api's pure type definitions, the stateless utility classes
-(`Platform\Version`, `ClassMapGenerator`, …), exception
-classes, constants-only classes, the state-decoupled vendor packages
+The pure type definitions of the plugin API (`composer-plugin-api`), the
+stateless utility classes (`Platform\Version`, `ClassMapGenerator`, …),
+exception classes, constants-only classes, the state-decoupled vendor packages
 (composer/pcre, composer/semver, seld/jsonlint, justinrainbow/json-schema,
 …) — and *reachable* classes that are stateless and pure (`VersionParser`,
 `Auditor`, `Platform\Runtime`): with no instance state to share, the real
@@ -139,8 +138,8 @@ to copy.
 
 #### unsupported
 
-Not a design failure; it is the no-silent-accuracy-tradeoff principle
-applied to classes nobody has needed yet. Plugins touching them get an
+Not a design failure; it applies the principle of never trading accuracy
+away silently to classes nobody has needed yet. Plugins touching them get an
 explicit error, and the class can be promoted later.
 
 ### Attributes
@@ -270,7 +269,7 @@ Iterate to a fixed point. Private members and method bodies do not extend the
 closure — the boundary is the declared API surface, not the implementation.
 Two-world classes do not extend it either: the child process carries their
 real implementation wholesale, so a `Command` subclass's protected fields are
-world-2-local, not graph seams.
+local to world 2, not graph seams.
 
 ### Direction marking
 
@@ -469,7 +468,7 @@ and executor. `React\Promise\all()`, the rethrow of a rejection and the
 
 `Composer::getAutoloadGenerator()` hands out the generator Composer's own
 dumps run on, so it is a `rust-proxy` stub: a setter a plugin calls is seen by
-the next dump the Rust side performs. Its return values cross without an
+the next dump the Rust side performs. Its return values are sent without an
 entity of their own. `buildPackageMap()` answers with package handles,
 `parseAutoloads()` with plain arrays, and `dump()` with a
 `Composer\ClassMapGenerator\ClassMap` revived as a value (`php-native`, and
@@ -484,8 +483,7 @@ because the Rust generator takes the concrete `EventDispatcher` and the R
 table holds the dispatcher only through its interface.
 `setPlatformRequirementFilter()` is the other, because no filter crosses the
 boundary: the factory's filters are guarded, and a plugin-implemented one has
-no reverse adapter. A `$locker` passed to `dump()` resolves to the Rust-side
-`Locker` its stub stands for.
+no reverse adapter.
 
 ### Locker
 
@@ -493,11 +491,10 @@ no reverse adapter. A `$locker` passed to `dump()` resolves to the Rust-side
 writes the lock file through, so it is a `rust-proxy` stub: the lock data a
 plugin reads is the cache the Rust side holds, and an in-memory
 `setLockData(..., false)` is seen by the Rust side's next read. The lock
-contents cross as plain arrays, the platform requirements as materialized
+contents are sent as plain arrays, the platform requirements as materialized
 `Link` values keyed by package name, and `getLockedRepository()` as a
 `LockArrayRepository` stub over a fresh Rust-side repository, as upstream
-builds a fresh one per call. `getContentHash()` forwards because it parses
-through the guarded `JsonFile`.
+builds a fresh one per call.
 
 `getJsonFile()` and `updateHash()` are explicit errors, since `JsonFile` has
 no stub. So are the constructors: a plugin-built `Locker` would be a second
@@ -564,9 +561,7 @@ reload: right after writing the file it calls
 `__shirabe_installed_versions_reload` in the worker, which mirrors the tail
 of `FilesystemRepository::write` (the unconditional
 `InstalledVersions::reload($versions)` plus the reflection-based
-`selfDir`/`installedIsLocalDir` restore). It is skipped when no worker runs,
-and inside the worker when the class is not even autoloadable there; in
-both cases there is no observer code either.
+`selfDir`/`installedIsLocalDir` restore).
 
 Plugin classes are autoloaded from the Rust side. The loaders
 `PluginManager::registerPackage` builds live in the Rust process, and the
@@ -577,18 +572,14 @@ keeps a Rust-side autoload stack that mirrors PHP's: every registered loader
 stays on it in registration order (or in front, when prepended), and every
 lookup the worker makes walks it, whether a plugin call or a script call is in
 flight, so the loader `EventDispatcher` builds for scripts sits on the same
-stack after the plugin loaders. `ClassLoader::getRegisteredLoaders()` keeps
-upstream's separate map of one loader per vendor directory, so a second
-plugin loader registered under the same vendor directory replaces the first
-there but not on the stack, and the earlier plugin's classes stay
-resolvable.
+stack after the plugin loaders.
 
 ### ConsoleIO leaks world-2 objects
 
 `ConsoleIO` (rust-proxy) returns real symfony/console instances through the
 seam: `getTable(): Table` / `getProgressBar(): ProgressBar`, and its
 constructor takes `InputInterface`/`OutputInterface`/`HelperSet` — none of
-which can cross the wire as values. The stub needs a bespoke story (e.g. a
+which can be sent as values. The stub needs a bespoke story (e.g. a
 local Table bound to a proxying `OutputInterface`); until one is designed,
 both members raise explicit errors, as does the constructor — the Rust side
 has no construction story for this class.
@@ -639,10 +630,7 @@ name — fully qualified or just the short name, case-insensitive:
     query crates/shirabe/src/io/io_interface.rs
     query Locker
 
-Rust paths are resolved by normalized segment matching against the report's
-FQCNs rather than textual case conversion, because the snake_case mapping
-is not reversible for acronyms (`io_interface.rs` → `IOInterface`). Vendor
-class names resolve at package granularity. The output shows category
+Vendor class names resolve at package granularity. The output shows category
 (including an overridden category's computed value), direction,
 reachability, reasons, attributes, and the mutator methods.
 

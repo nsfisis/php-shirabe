@@ -3,23 +3,17 @@
 The RPC protocol ([docs/dev/php-rpc.md](./php-rpc.md)) carries calls, values and handles between
 the Rust process and the PHP worker without knowing any class or function by name. This document
 covers what Shirabe builds on top of it: the named entry points each side answers, the PHP classes
-the worker loads, the classes that cross as materialized values, and how the console application
+the worker loads, the classes that are sent as materialized values, and how the console application
 is split between the two worlds. Which treatment each Composer class receives is decided by
 [docs/dev/plugin-class-classification.md](./plugin-class-classification.md).
 
-## Calling into the worker
+Everything Shirabe itself defines in the worker is internal: the classes in the `Shirabe\`
+namespace, the global classes and interfaces whose names start with `Shirabe` (such as
+`ShirabeRpcRuntime`), and the members whose names start with `__shirabe` or `__rhandle`. Plugin
+code can see them, but they are not meant to be used from it, and they may change in any release
+without notice.
 
-The `shirabe` crate calls into the worker through `php_worker::call::PhpCall` and nothing else: it
-names what to run (a function or entry point, a method of a P-table entity, a static method, a
-constructor) and decodes the answer as the type the caller asks for (`FromPluginValue`). The
-callbacks the worker makes while the call is in flight are served by `PluginRpcDispatcher` — the
-runtime service endpoint and the R table — unless the caller brings a dispatcher of its own. Script
-execution brings `ScriptRpcDispatcher`, which answers the same runtime service methods and R table
-except `__shirabe_run_rust_command`. Both dispatchers live in `php_worker/rpc/dispatch.rs`. The
-ported code reaches the worker through the named functions of `php_worker` (`runtime`, `callable`,
-`installed_versions`, the proxies) rather than building calls itself. A PHP exception becomes the
-error of the ported exception it stands for (`try_run` keeps it apart for a caller that catches it),
-and an answer that does not decode is an error naming the call and the value it answered with.
+TODO: Move the above notice somewhere else. It is for plugins authors, but this document is for Shirabe core developer.
 
 ## Entry points
 
@@ -27,27 +21,15 @@ A `CallFunction` name reaches the worker's dispatch table first (see "Entry poin
 [docs/dev/php-rpc.md](./php-rpc.md)). The table holds two composite queries,
 `__shirabe_diagnose` and `__shirabe_platform`, the runtime queries `__shirabe_constant`,
 `__shirabe_get_all_ini_files` and `__shirabe_xdebug_active`, and the Shirabe-internal helpers.
-Every entry is named `__shirabe_<snake_case>`, including one that answers what a standard
-function would (`__shirabe_constant` answers null for an undefined constant, where `constant()`
-throws), so a name in the table never shadows a PHP function.
+Every entry is named `__shirabe_<snake_case>`, so a name in the table never shadows a PHP
+function.
 
 A composite query answers everything one consumer needs about the runtime in a single round trip,
 because asking one constant and one extension at a time costs a round trip each. The Rust side
 sends the names to report on (the extensions, functions and ini settings for
 `__shirabe_diagnose`; the constants, classes and extension info for `__shirabe_platform`) with the
-query, so the lists exist only there, and decodes the answer into a struct cached in a `OnceLock`
-(`Diagnostics` for `__shirabe_diagnose`, `PlatformInfo` for `__shirabe_platform`) whose accessors
-panic on a name the list does not hold.
-
-The functions that answer questions about the runtime — the two composite queries
-(`php_worker::diagnostics::get_diagnostics`, `php_worker::platform_info::get_platform_info`), the
-loaded ini files and whether Xdebug is active (`php_worker::xdebug`), and in `shirabe-php-rpc` the
-PHP version and binary and the few PHP functions whose answer depends on the worker
-(`phpversion`, `stream_resolve_include_path`) — return `anyhow::Result` like every other call
-into the worker: a worker that cannot be spawned or reached, and an exception the call throws, are
-errors the caller propagates. An answer that does not decode is a protocol violation and panics,
-since only the worker's own code or a PHP builtin with a fixed return type writes it. A cached
-answer is cached only once it has arrived, so a failed query is asked again on the next call.
+query, so the lists exist only there, and decodes the answer into a cached struct (`Diagnostics`
+for `__shirabe_diagnose`, `PlatformInfo` for `__shirabe_platform`).
 
 ### Records
 
@@ -55,9 +37,7 @@ A composite payload — the answer of a composite query, the console application
 definition read back, the facts of a terminated process, the result of a `scripts` Command class —
 is a PHP array whose keys are the field names of one Rust struct declared with
 `shirabe_php_rpc::plugin_value_record!`, which derives its `ToPluginValue` / `FromPluginValue` from
-those fields. The worker code reading or writing such an array uses the same snake_case names. A
-missing key or a value of the wrong type is a decoding failure naming the record and the key, never
-a default.
+those fields. The worker code reading or writing such an array uses the same snake_case names.
 
 Notable internal helpers:
 
@@ -75,12 +55,10 @@ Notable internal helpers:
   packages).
 - `__shirabe_installed_versions_reload` — mirrors the tail of `FilesystemRepository::write`
   (the unconditional `InstalledVersions::reload($versions)` plus the reflection-based
-  `selfDir`/`installedIsLocalDir` restore) into the worker; skipped only when the class is not
-  even autoloadable there, i.e. no Composer PHP runtime and therefore no observer code.
+  `selfDir`/`installedIsLocalDir` restore) into the worker.
 - `__shirabe_resolve_job` / `__shirabe_reject_job` — the settle pushes of a Rust-owned job: the
   worker resolves or rejects the `Deferred` behind the job's promise, which runs the callbacks
-  plugin code chained on it before the call returns. The rejection is the exception described in
-  the form a `Throw` frame carries.
+  plugin code chained on it before the call returns.
 - `__shirabe_resolved_promise` — wraps a value in `\React\Promise\resolve()`, for a Rust method
   whose PHP signature declares `PromiseInterface` and that has the value before any job exists.
   The worker holds the promise under an even job id and answers with its `Job` descriptor,
@@ -94,8 +72,9 @@ Notable internal helpers:
   issues it whenever the journal has moved on.
 - `__shirabe_console_application_boot` — builds the worker-side `Composer\Console\Application`
   (the `php/runtime/` definition) from the Rust handoff: the shared `$composer`/`$io` proxies,
-  the initial working directory and disable-by-default flags, `\Shirabe\RustCommandStub` rows
-  mirroring the built-in commands, and the live plugin-provided command entities.
+  the initial working directory, the `disablePluginsByDefault`/`disableScriptsByDefault` flags,
+  `\Shirabe\RustCommandStub` rows mirroring the built-in commands, and the live plugin-provided
+  command entities.
 - `__shirabe_run_console_application` — runs one stringified command line through a booted
   worker-side application; output goes to the inherited stdio, the exit code returns over the
   wire, and a failure propagates as a Throw (the booted application does not catch exceptions).
@@ -120,18 +99,17 @@ class file lives,
 `\Shirabe\RustCommandStub` forwards its stringified input here and the built-in command runs in
 the Rust process, against the Rust-side application state — `__shirabe_construct`, which
 allocates the Rust entity behind a `new SomeProxiedClass(...)` written by plugin code and
-answers with its rhandle, `__shirabe_call_static`, which takes `[class, method, args]`
+answers with its R-handle, `__shirabe_call_static`, which takes `[class, method, args]`
 and runs a static method no handle identifies a receiver for, and the job methods
 `__shirabe_resolve_job` / `__shirabe_reject_job` / `__shirabe_cancel_job` / `__shirabe_abort_jobs`
-([docs/dev/plugin-async.md](./plugin-async.md)). Classes and static methods Rust cannot answer
-are an explicit error naming them.
+([docs/dev/plugin-async.md](./plugin-async.md)).
 
 ## Materialized values
 
-The two halves of the materialized-value codec are `crates/shirabe/src/php_worker/codec.rs`
-(and, for the PHP built-in `\DateTimeInterface`, the `ToPluginValue` / `FromPluginValue` impls of
+The two halves of the materialized-value codec are the `ToPluginValue` / `FromPluginValue` impls of
+`php_worker::codec` (and, for the PHP built-in `\DateTimeInterface`, the `ToPluginValue` / `FromPluginValue` impls of
 `shirabe-php-rpc`) and `Shirabe\MaterializedValue`, whose `CLASSES` constant is the closed list of
-classes that may cross as object records.
+classes that may be sent as object records.
 
 `Composer\Package\Link` travels this way, together with the `composer/semver` constraint it holds
 (a `Link` can be built without a pretty constraint, which no constructor call reproduces), and so
@@ -140,18 +118,9 @@ timezone database. So does the `Composer\Util\Http\Response` that `HttpDownloade
 and the `Composer\ClassMapGenerator\ClassMap` that `AutoloadGenerator::dump()` returns: the Rust
 side keeps neither after answering, so the child owns the revived instance outright.
 
-A constraint crosses structurally: `shirabe_semver::AnyConstraint` maps to and from the real
+A constraint is encoded structurally: `shirabe_semver::AnyConstraint` maps to and from the real
 `Composer\Semver\Constraint\*` objects, never through a constraint string, so the pretty string
-and the conjunctive flag survive. A subclass of a listed class (other than of
-`\DateTimeInterface`, which is rebased onto a plain `\DateTimeImmutable`) is not narrowed to its
-listed parent; it crosses as a P-table entity.
-
-## By-ref parameters
-
-A generated stub fills both halves of a by-ref call mechanically from the real signature
-([docs/dev/plugin-stub-generation.md](./plugin-stub-generation.md)).
-`Composer\Util\ProcessExecutor::execute` is the only by-ref parameter on Composer's public surface
-that belongs to a proxied class.
+and the conjunctive flag survive.
 
 ## Proxy stubs, runtime classes and guards
 
@@ -181,9 +150,8 @@ that belongs to a proxied class.
   from what the Rust-side `Process` reports about the terminated process instead of from a
   `proc_open()` resource.
 - `Shirabe\MaterializedThrowable` — the PHP half of the exception codec: rebuilds the exception
-  a description (the payload of a `Throw` frame, a job rejection) stands for as its own class, or
-  as a `RuntimeException` when the child does not know the class, and describes an exception
-  raised in the child.
+  a description (the payload of a `Throw` frame, a job rejection) stands for as its own class, and
+  describes an exception raised in the child.
 - `Shirabe\MaterializedValue` — the PHP half of the materialized-value codec: the closed list of
   classes `unserialize()` may revive beside the descriptor classes, and the hook that hands such
   an instance to `serialize()` in place of a handle descriptor.
@@ -192,8 +160,8 @@ that belongs to a proxied class.
 - `Composer\EventDispatcher\Event` — dual-mode: revived from a Rust handle (through
   `__shirabeBind`) it proxies like a generated stub, while a natively-constructed instance (real
   Composer code in the worker does `new PreCommandRunEvent(...)`, whose parent constructor lands
-  here) is a faithful in-process port of the real base class and crosses the wire as a P-table
-  entity (`__shirabeRustHandleDescriptor()` returns null in native mode).
+  here) is a faithful in-process port of the real base class and is sent as a P-table
+  entity.
 - `Composer\Plugin\PreCommandRunEvent` — dual-mode in the same way as its parent: the event a
   built-in command dispatches on the Rust side arrives as a proxy, while the one
   `BaseCommand::initialize()` constructs here for a plugin command is the real class's port.
@@ -207,35 +175,34 @@ generated by the same tool as the stubs.
 The three sets are written into two autoload directories at worker spawn (guards behind stubs) and
 resolved with highest priority, so these FQCNs can never be shadowed by the real implementation;
 `__shirabe_require` restores that priority after loading code that prepends its own autoloader.
-Stubs are interned per rhandle (`WeakReference`-based registry) so identity (`===`) holds, and
+Stubs are interned per R-handle so identity (`===`) holds, and
 their destructors send `ReleaseRustHandle`. Reviving a stub for an existing entity bypasses its
 constructor (`newInstanceWithoutConstructor` plus `__shirabeBind`), because the constructor
 carries the real class's own signature and belongs to plugin code building a *new* entity.
-`clone` on a stub calls `__shirabe_clone` on the entity and rebinds the copy to the handle that answers, so the two stubs never share (and never
-double-release) one entity; entities with no clone semantics answer with an explicit error.
+`clone` on a stub calls `__shirabe_clone` on the entity and rebinds the copy to the handle that
+answers, so the two stubs never share one entity.
 
-## The R table
+## The R-table
 
-`R_TABLE` in `crates/shirabe/src/php_worker/rpc/table.rs` holds the Rust-side entities. There is
+`R_TABLE` holds the Rust-side entities. There is
 no per-plugin bookkeeping: an entry lives as long as a stub for it is reachable in the worker,
 which is also how long Composer keeps an object a plugin holds on to.
 
 A kind of entity is a handle type (`Rc<RefCell<dyn LockerInterface>>`, `PackageInterfaceHandle`,
-...) implementing `Entity` (`crates/shirabe/src/php_worker/rpc/entity.rs`): the allocation that
-is its identity, the class it crosses as, and optionally its clone and property semantics. An
+...) implementing `Entity`: the allocation that
+is its identity, the PHP class it appears as in the worker, and optionally its clone and property semantics. An
 entity is handed to the child only through `entity_value`, which registers it and builds the Rust
 handle descriptor from the class `Entity::class` chose, and is read back as `EntityArg<H>`.
 
-The table interns by address, so the same shared instance always crosses as the same rhandle
-(`===` in the child); the address of one allocation registered as two kinds of entity is a bug and
-panics. The class is fixed when the entity is registered, as the child fixes the class of the stub
-it builds for an rhandle.
+The table interns by address, so the same shared instance is always sent as the same R-handle
+(`===` in the child). The class is fixed when the entity is registered, as the child fixes the class of the stub
+it builds for an R-handle.
 
 ### Forwarding classes
 
 Every proxy stub, runtime class and guard that forwards members to the Rust side has a module in
-`crates/shirabe/src/php_worker/rpc/forwarding.rs`, generated by `surface-manifest` (see
-`plugin-stub-generation.md`) and laid out by the class's namespace (`Composer\Package\Locker` is
+`php_worker::rpc::forwarding`, generated by `surface-manifest` (see
+[docs/dev/plugin-stub-generation.md](./plugin-stub-generation.md)) and laid out by the class's namespace (`Composer\Package\Locker` is
 `forwarding::package::locker`). The module holds:
 
 - `PhpClass`, a marker type standing for the class;
@@ -249,10 +216,11 @@ Every proxy stub, runtime class and guard that forwards members to the Rust side
   `__shirabe_call_static` to.
 
 What the Rust side answers is written by hand, as `impl forwarding::<path>::Forwarding for
-forwarding::<path>::PhpClass` in `crates/shirabe/src/php_worker/rpc/entities/`. Only the members
+forwarding::<path>::PhpClass` in the submodules of `php_worker::rpc::entities`. Only the members
 the impl overrides are answered; the rest keep the generated default, and the surface manifest
-records which is which. A member name the class does not forward is a protocol violation and
-panics.
+records which is which. An impl reads its arguments with `FromPluginValue`. A value that is absent
+where PHP would read null, such as an omitted argument or a missing property, decodes from
+`PluginValue::Null`.
 
 To serve a new class: add it to the stub generator's `targets.list`, regenerate the stubs and the
 manifest, and write its forwarding impl. A new kind of entity also needs an `Entity` impl for its
@@ -265,21 +233,19 @@ Built-in commands run on the Rust side, against the Rust-side `Application`. Com
 implementation lives in the worker — those a plugin's `CommandProvider` supplies, and `scripts`
 entries naming a Symfony `Command` subclass — run under the worker-side
 `Composer\Console\Application`. Each command always runs in the world that holds its
-implementation, against that world's `HelperSet`, and crossing over hands the whole `run()` to the
+implementation, against that world's `HelperSet`, and a call into the other world hands the whole `run()` to the
 other side as a command line that the other side parses again:
 
 - Rust to PHP, the proxy of a worker-side command sends its input stringified, and the worker runs
   it through `__shirabe_run_console_application`.
 - PHP to Rust, a `\Shirabe\RustCommandStub` forwards `(string) $input` to
-  `__shirabe_run_rust_command`, which parses it with `StringInput`. PHP omits the command name from
-  that string for an input built without a `command` entry, so the name is prepended when the first
-  token is neither the command's name nor one of its aliases.
+  `__shirabe_run_rust_command`, which parses it with `StringInput`.
 
 The handoff (`__shirabe_console_application_boot`) carries what the parsed command line cannot: the
-`$composer`/`$io` proxies, the initial working directory and the disable-by-default flags. The
-verbosity, decoration and interaction flags travel in the command line itself, and the worker,
-spawned after the Rust side has configured its IO, inherits the environment and the standard
-streams, so both worlds see the same terminal.
+`$composer`/`$io` proxies, the initial working directory and the
+`disablePluginsByDefault`/`disableScriptsByDefault` flags. The verbosity, decoration and interaction
+flags travel in the command line itself, and the worker, spawned after the Rust side has configured
+its IO, inherits the environment and the standard streams, so both worlds see the same terminal.
 
 Whether a `scripts` entry names a `Command` subclass is decided in the worker, which first needs
 the Composer PHP runtime loaded (the class extends Symfony's `Command`). The question is only asked

@@ -55,15 +55,14 @@ Inputs:
 * `guard-exemptions.list` — the Rust-owned FQCNs that stay resolvable to the real
   Composer class, each with the worker-side mechanism that makes a native
   instance correct (the materialized-value codec for `Composer\Package\Link`
-  and `Composer\Util\Http\Response`). An entry that needs no guard anyway
-  fails the run.
+  and `Composer\Util\Http\Response`).
 
 The same directory holds `surface-manifest`, which reads the forwards in the stubs, the runtime
 classes and the guards, and writes two files:
 
 * `crates/shirabe/src/php_worker/rpc/forwarding.rs` — one Rust module per forwarding class: a
   `Forwarding` trait with a defaulted method per member the class declares, and the generated
-  routing of method names, constructors and static calls to those traits (see the R table section
+  routing of method names, constructors and static calls to those traits (see the R-table section
   of `php-worker.md`).
 * `crates/shirabe/src/php_worker/rpc/surface.tsv` — every forwarded member, `supported` when the
   hand-written forwarding impl of the class declaring it overrides the default, `unsupported`
@@ -90,8 +89,7 @@ regenerates the report.
   appended to the interface list.
 * **Constructors** reproduce the real class's parameter list and forward to the
   Rust side (`__shirabe_construct` on handle 0), which allocates the entity and
-  answers with its handle; a class Rust cannot build answers with an explicit
-  error naming it. One is emitted for every root stub and for every subclass
+  answers with its handle. One is emitted for every root stub and for every subclass
   that declares a public constructor of its own, so `new SomeProxiedClass(...)`
   in plugin code never yields an unbound stub. Proxy revival does not run them
   (see `__shirabeBind` above).
@@ -103,57 +101,45 @@ regenerates the report.
   *name* is new relative to the inherited stub surface — including methods of
   interfaces the subclass adds; an omitted override must match the inherited
   parameter list (names, arity, defaults, passing modes — type declarations
-  may differ), otherwise generation fails. PHP builtin interfaces
-  (`Countable`, `Stringable`, ...) contribute no closure entries of their own;
-  the class's own public methods already cover their surface.
+  may differ), otherwise generation fails.
 * Methods returning `self`/`static` perform the RPC and then `return $this;`
   to preserve identity instead of round-tripping the handle.
 * A method listed in `Generator::LOCAL_BODIES` gets the body given there instead
   of a forward. `PartialComposer::getLoop()` is the one entry: `Composer\Util\Loop`
   is a `two-world` class the Rust side never hands out as an entity, so the stub
   answers with the worker-side Loop built over the proxied services
-  ([docs/dev/plugin-async.md](./plugin-async.md)). An entry no stub declares fails generation.
+  ([docs/dev/plugin-async.md](./plugin-async.md)).
 * **By-ref parameters** are declared `&$name` on the stub as well. The answer
   carries the value each of them holds afterwards, which the stub assigns back
-  (see "By-ref parameters" in [docs/dev/php-rpc.md](./php-rpc.md)). A position
-  the answer omits is left alone, so a parameter the callee never assigned to keeps the value it had.
+  (see "By-ref parameters" in [docs/dev/php-rpc.md](./php-rpc.md)).
 * **Arity** is reproduced when — and only when — the real method body calls
   `func_num_args()`, in which case the stub trims the argument list to what the
   caller actually passed instead of sending the declared defaults. Sending them
   regardless would make the Rust side answer a call the plugin never made:
   `ProcessExecutor::execute($cmd)` forwards the child's output, while
   `execute($cmd, $out)` captures it, and only the argument count separates them.
-  A body calling `func_get_args()` fails generation instead.
 * **Class constants, static methods and public static properties** are
   materialized verbatim from the real source (they read no instance state and
   run locally in the worker), together with any non-public static helpers the
-  methods call. Constants keep their declared visibility, so a non-public one
-  stays unreadable from outside the stub as it is in the real class.
+  methods call.
 * A static method is materialized only when it can actually run in the worker.
   One that reads a **static property** — whose value the Rust side owns, as
   `ProcessExecutor::$timeout` does — or that reaches a class a **guard**
   shadows there — as `ProcessExecutor::escape()` reaches `Composer\Util\Platform`
   — forwards instead, through `__shirabe_call_static` on handle 0, carrying a
-  comment that names the reason. The test covers the transitive closure of the
-  non-public static helpers the method calls, since those are materialized with
-  it. A forwarded static may not take by-ref parameters; that combination fails
-  generation.
+  comment that names the reason.
 * **Instance properties** are not declared on the stub, whatever their
   visibility: they are entity state. Every root stub instead carries
   `__get`/`__set`/`__isset`/`__unset` forwarders, so each access reaches the
-  Rust side, where an unsupported name is an explicit error. They are emitted
+  Rust side. They are emitted
   unconditionally because PHP's own answer for an undeclared property — null on
   a read, a dynamic property on a write, false on `isset()` — is silent.
 * **`__toString`** is forwarded like any other method. **`__clone`** is part of
   the boilerplate on every stub, whether or not the real class declares one:
   PHP has already copied the stub by the time it runs, so the copy asks the
   Rust side for a clone of the entity and rebinds itself to the fresh handle
-  (`__shirabe_clone`, answered with the fresh rhandle). The clone semantics of
-  the real class live on the Rust side with the entity; entities that model no
-  clone answer with an explicit error.
-* **Imports**: the original file's `use` statements are kept in their original
-  order, restricted to names the emitted stub references; signatures declared
-  elsewhere (interface files) are re-spelled through that import table.
+  (`__shirabe_clone`, answered with the fresh R-handle). The clone semantics of
+  the real class live on the Rust side with the entity.
 
 ## What a guard looks like
 
@@ -163,14 +149,10 @@ references satisfied by the declaration alone keep working: `instanceof`,
 `catch`, `X::class`, `Link::TYPE_REQUIRE`. Everything executable raises
 `ShirabeUnsupportedClass::fail()`, which names the class and the member:
 
-* the constructor (the class's own, or the one it would inherit; a class whose
-  hierarchy declares none gets a no-argument one, so the implicit constructor
-  cannot be reached either),
+* the constructor,
 * every public and protected method the guard would otherwise inherit from real
   code: its own, its traits', and those of ancestors up to the first one that is
-  itself guarded or shadowed by a stub. Private methods are reachable only from
-  the code the guard replaces, and a destructor that throws would fire during
-  unwinding, so neither is emitted.
+  itself guarded or shadowed by a stub.
 
 Abstract methods of an abstract guard stay abstract. A method an ancestor
 declares `final` cannot be redeclared, so it keeps running the real
@@ -181,9 +163,7 @@ A static method listed in `GuardGenerator::FORWARDED_STATICS` forwards through
 and the guard's header names it. An entry qualifies only when the method reads
 no entity, so serving it on the Rust side cannot fork the state of a second
 instance: `Factory::getComposerFile()` reads nothing but the `COMPOSER`
-environment variable. `surface-manifest` reads these forwards from the guards,
-and nothing else of a guard. An entry naming a class that is not a guard target
-fails generation.
+environment variable.
 
 ## Coverage assertions
 
