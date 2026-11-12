@@ -89,7 +89,7 @@ Ownership is encoded in the parity of the id, as it already is for correlation i
 | `__shirabe_cancel_job` | `(id)` — called from the canceller of the job's promise. Drops the future, and with it whatever the future owns: for a process job that is the `Process`, whose drop stops the child. If the job had started, it returns the exception the canceller should throw, as the description a `Throw` carries. If it had not, it returns `null`. Composer's canceller throws only for `STATUS_STARTED` and silently turns a `STATUS_QUEUED` job into `STATUS_ABORTED`. |
 | `__shirabe_abort_jobs` | `()` — forwards `Loop::abortJobs()`, so that the requests the Rust-side execution is awaiting (the recorded entries of rule 5) are cancelled too. |
 
-These four are served for every dispatcher: the worker reports on a job whenever the promise behind it settles, whichever call happens to be in flight then.
+These four are served whichever call is in flight: the worker reports on a job whenever the promise behind it settles.
 
 ### Reentrancy is the load-bearing constraint
 

@@ -29,3 +29,25 @@ pub(crate) fn new_object(class: &BStr, args: Vec<PluginValue>) -> anyhow::Result
     ensure_script_autoloader()?;
     PhpCall::New(class).run(args)
 }
+
+/// `is_callable($callable)` for a `Class::method` script.
+pub(crate) fn is_callable(callable: &BStr) -> anyhow::Result<bool> {
+    ensure_script_autoloader()?;
+    PhpCall::Function(BStr::new("is_callable")).run(vec![PluginValue::string(callable)])
+}
+
+/// `is_a($class, $parent, true)`.
+pub(crate) fn is_a_class(class: &BStr, parent: &BStr) -> anyhow::Result<bool> {
+    ensure_script_autoloader()?;
+    PhpCall::Function(BStr::new("is_a")).run(vec![
+        PluginValue::string(class),
+        PluginValue::string(parent),
+        PluginValue::Bool(true),
+    ])
+}
+
+/// `defined($name)`.
+pub(crate) fn defined(name: &BStr) -> anyhow::Result<bool> {
+    ensure_script_autoloader()?;
+    PhpCall::Function(BStr::new("defined")).run(vec![PluginValue::string(name)])
+}

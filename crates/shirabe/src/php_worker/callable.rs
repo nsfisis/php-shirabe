@@ -3,7 +3,6 @@
 
 use crate::event_dispatcher::EventInterface;
 use crate::php_worker::call::PhpCall;
-use crate::php_worker::rpc::dispatch::{PluginRpcDispatcher, ScriptRpcDispatcher};
 use crate::php_worker::rpc::entity::entity_value;
 use crate::php_worker::runtime::{ensure_composer_php_runtime, ensure_script_autoloader};
 use crate::php_worker::throwable::throw_into_error;
@@ -47,8 +46,7 @@ pub(crate) fn call_method_with_event(
     event: &std::rc::Rc<std::cell::RefCell<dyn EventInterface>>,
 ) -> anyhow::Result<bool> {
     let argument = event_argument(event, bformat!("{}::{method_name}", handle.class()))?;
-    let value: PluginValue =
-        PhpCall::Method(handle, method_name).run_with(vec![argument], &mut PluginRpcDispatcher)?;
+    let value: PluginValue = PhpCall::Method(handle, method_name).run(vec![argument])?;
     Ok(matches!(value, PluginValue::Bool(false)))
 }
 
@@ -66,8 +64,7 @@ pub(crate) fn call_static_with_event(
     // rest), which only the Composer PHP runtime carries.
     ensure_composer_php_runtime(cache_dir)?;
     ensure_script_autoloader()?;
-    PhpCall::StaticMethod(class_name, method_name)
-        .run_with(vec![argument], &mut ScriptRpcDispatcher)
+    PhpCall::StaticMethod(class_name, method_name).run(vec![argument])
 }
 
 shirabe_php_rpc::plugin_value_record! {
@@ -118,8 +115,8 @@ pub(crate) fn run_command_script(
         var_export_str(input, true)
     );
     ensure_script_autoloader()?;
-    let result: ScriptCommandResult = PhpCall::Function(BStr::new("__shirabe_eval"))
-        .run_with(vec![PluginValue::string(snippet)], &mut ScriptRpcDispatcher)?;
+    let result: ScriptCommandResult =
+        PhpCall::Function(BStr::new("__shirabe_eval")).run(vec![PluginValue::string(snippet)])?;
     Ok(CommandScriptOutcome {
         status: result.status,
         output: result.output,

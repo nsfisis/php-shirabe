@@ -4,9 +4,7 @@
 //! The wrappers differ in what they set up before the call, and are kept apart by module:
 //!
 //! - the ones here run against whatever the worker has loaded so far;
-//! - the ones in [`autoloading`] turn the script autoloader on first;
-//! - the ones in [`script`] turn the script autoloader on and serve the callbacks with the
-//!   [`ScriptRpcDispatcher`](crate::php_worker::rpc::dispatch::ScriptRpcDispatcher).
+//! - the ones in [`autoloading`] turn the script autoloader on first.
 
 use crate::php_worker::call::PhpCall;
 use crate::php_worker::{bundle, error_handler, installed_versions};
@@ -16,7 +14,6 @@ use shirabe_php_rpc::{FromPluginValue, PhpObjHandle, PluginValue};
 use shirabe_php_shim::bformat;
 
 pub(crate) mod autoloading;
-pub(crate) mod script;
 
 /// Makes the worker's script-class autoloader active, so class queries and script execution
 /// in the child can resolve classes through the Rust-side [`ClassLoader`]s registered on the

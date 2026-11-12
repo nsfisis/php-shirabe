@@ -27,45 +27,13 @@ pub(crate) fn find_file_in_registered_loaders(
     Ok(None)
 }
 
-/// Serves `CallRustMethod` requests from the child while a plugin-related call is in flight:
-/// rhandle 0 is the runtime service endpoint (autoload lookups, the built-in commands a
-/// plugin-provided command runs), every other rhandle resolves through the R table. Unsupported
-/// methods are explicit errors, never silent fallbacks.
+/// Serves the `CallRustMethod` requests the worker makes while a call into it is in flight:
+/// rhandle 0 is the runtime service endpoint, every other rhandle resolves through the R table.
+/// Unsupported methods are explicit errors, never silent fallbacks.
 #[derive(Debug)]
-pub(crate) struct PluginRpcDispatcher;
+pub(crate) struct RpcDispatcher;
 
-impl RustMethodDispatcher for PluginRpcDispatcher {
-    fn dispatch(
-        &mut self,
-        rhandle: u64,
-        method_name: &BStr,
-        args: Vec<PluginValue>,
-        out_params: &mut IndexMap<u32, PluginValue>,
-    ) -> Result<PluginValue, PhpThrow> {
-        if rhandle == 0 {
-            if method_name == "__shirabe_run_rust_command" {
-                let name = arg::<BString>(method_name, &args, 0)?;
-                let input_line = arg::<BString>(method_name, &args, 1)?;
-                return match run_worker_reverse_command(name.as_ref(), input_line.as_ref()) {
-                    Ok(code) => Ok(code.to_plugin_value()),
-                    Err(e) => Err(PhpThrow::runtime(error_chain_message(&e).to_php_string())),
-                };
-            }
-            return dispatch_runtime_service_method(method_name, &args);
-        }
-
-        table::call(rhandle, method_name, &args, out_params)
-    }
-}
-
-/// Serves `CallRustMethod` requests issued by the PHP worker while a script-related call is in
-/// flight: Rust handle 0 is the runtime service endpoint (autoload lookups against the
-/// Rust-side [`ClassLoader`]s on the autoload stack), every other rhandle resolves through the R
-/// table.
-#[derive(Debug)]
-pub(crate) struct ScriptRpcDispatcher;
-
-impl RustMethodDispatcher for ScriptRpcDispatcher {
+impl RustMethodDispatcher for RpcDispatcher {
     fn dispatch(
         &mut self,
         rhandle: u64,
@@ -80,12 +48,20 @@ impl RustMethodDispatcher for ScriptRpcDispatcher {
     }
 }
 
-/// Serves the runtime service methods (Rust handle 0) every dispatcher answers: autoload
-/// lookups, entity construction and static calls, and the job registry.
+/// Serves the runtime service methods (Rust handle 0): autoload lookups, the built-in commands a
+/// plugin-provided command runs, entity construction and static calls, and the job registry.
 fn dispatch_runtime_service_method(
     method_name: &BStr,
     args: &[PluginValue],
 ) -> Result<PluginValue, PhpThrow> {
+    if method_name == "__shirabe_run_rust_command" {
+        let name = arg::<BString>(method_name, args, 0)?;
+        let input_line = arg::<BString>(method_name, args, 1)?;
+        return match run_worker_reverse_command(name.as_ref(), input_line.as_ref()) {
+            Ok(code) => Ok(code.to_plugin_value()),
+            Err(e) => Err(PhpThrow::runtime(error_chain_message(&e).to_php_string())),
+        };
+    }
     if method_name == "__shirabe_find_file" {
         let class = arg::<BString>(method_name, args, 0)?;
         return Ok(find_file_in_registered_loaders(&class)
@@ -106,9 +82,9 @@ fn dispatch_runtime_service_method(
     )))
 }
 
-/// Serves the runtime service methods of the job registry (`docs/dev/plugin-async.md`), shared by
-/// every dispatcher: the worker reports on a job whenever the promise behind it settles or is
-/// cancelled, whichever call happens to be in flight then. `None` for any other method.
+/// Serves the runtime service methods of the job registry (`docs/dev/plugin-async.md`): the worker
+/// reports on a job whenever the promise behind it settles or is cancelled, whichever call happens
+/// to be in flight then. `None` for any other method.
 fn dispatch_job_service_method(
     method_name: &BStr,
     args: &[PluginValue],
@@ -218,7 +194,7 @@ mod tests {
     #[test]
     fn a_method_name_that_is_not_utf8_reaches_the_error_unchanged() {
         let name = b"method\xff";
-        let throw = PluginRpcDispatcher
+        let throw = RpcDispatcher
             .dispatch(0, BStr::new(name), Vec::new(), &mut IndexMap::new())
             .unwrap_err();
         assert_eq!(
