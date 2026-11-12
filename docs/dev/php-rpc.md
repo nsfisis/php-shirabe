@@ -47,18 +47,28 @@ The child is started with the following arguments:
 | tag | name | direction | payload fields |
 |---|---|---|---|
 | `0x00` | `CallFunction` | Rust→PHP | `function_name`, `args` |
-| `0x01` | `CallStaticMethod` | Rust→PHP | `pclass`, `method_name`, `args` |
-| `0x02` | `NewObject` | Rust→PHP | `pclass`, `ctor_args` |
-| `0x03` | `CallPhpMethod` | Rust→PHP | `phandle`, `method_name`, `args` |
-| `0x04` | `CallRustMethod` | PHP→Rust | `rhandle`, `method_name`, `args` |
-| `0x05` | `Return` | both | `value`, `out_params` |
-| `0x06` | `Throw` | both | the exception's description: `exception_class`, `message`, `code`, `properties`, `file`, `line`, `parents` |
-| `0x07` | `ReleaseRustHandle` | PHP→Rust | `rhandle` |
-| `0x08` | `ReleasePhpHandle` | Rust→PHP | `phandle` |
+| `0x01` | `CallStaticMethod` | both | `pclass`, `method_name`, `args` |
+| `0x02` | `NewObject` | both | `pclass`, `ctor_args` |
+| `0x03` | `CallMethod` | both | `handle`, `method_name`, `args` |
+| `0x04` | `Return` | both | `value`, `out_params` |
+| `0x05` | `Throw` | both | the exception's description: `exception_class`, `message`, `code`, `properties`, `file`, `line`, `parents` |
+| `0x06` | `ReleaseHandle` | both | `handle` |
 
-The Rust side allocates odd correlation ids, the PHP side even ones. `NewObject` instantiates
-a class in the worker and returns a `PhpHandle` descriptor for the new P-table entity;
-`CallPhpMethod` invokes a method on such an entity; `ReleasePhpHandle` drops it.
+The Rust side allocates odd correlation ids, the PHP side even ones.
+
+`NewObject`, `CallMethod` and `ReleaseHandle` create, call and drop an entity in the receiver's
+table. The `handle` of a `CallMethod` or a `ReleaseHandle` always names an entry of the receiver's
+table: an R-handle when the PHP side sends it, a P-handle when the Rust side does.
+
+- `NewObject` from the Rust side instantiates a class in the worker and answers with a `PhpHandle`
+  descriptor for the new P-table entity.
+- `NewObject` from the PHP side is sent by a proxy stub's constructor: the Rust side builds a fresh
+  entity of `pclass` (the stub's `static::class`) and answers with its R-handle as a plain integer
+  rather than a descriptor, since the stub under construction binds itself to it.
+
+`CallStaticMethod` from the PHP side is sent by the static methods a proxy stub or a guard forwards
+instead of running them in the worker (see
+[docs/dev/plugin-stub-generation.md](./plugin-stub-generation.md)).
 
 ### Values: `PluginValue` and the codec
 
@@ -108,12 +118,12 @@ Each side keeps a table of its own objects that a handle held by the other side 
 - The P-table is on the PHP side and maps a P-handle to a PHP object.
 
 The R-table (`R_TABLE`) holds each entry strongly while the PHP-side object standing for it
-lives: that object's destructor sends `ReleaseRustHandle`, and the entry is removed. The same Rust
+lives: that object's destructor sends `ReleaseHandle`, and the entry is removed. The same Rust
 object is always sent as the same R-handle.
 
 The P-table (`Shirabe\PhpObjectRegistry`) holds each entry strongly until the Rust side sends
-`ReleasePhpHandle`. `Shirabe\RpcRuntime::toPluginValue` turns any object that is not a proxy stub, a
-promise or a materialized value into a `PhpHandle` descriptor through
+`ReleaseHandle` for it. `Shirabe\RpcRuntime::toPluginValue` turns any object that is not a proxy
+stub, a promise or a materialized value into a `PhpHandle` descriptor through
 `Shirabe\PhpObjectRegistry::descriptor`, which interns by `spl_object_id`, so the same PHP object is
 always sent as the same P-handle. `Shirabe\RpcRuntime::fromPluginValue` resolves a descriptor back to
 the live object through `Shirabe\PhpObjectRegistry::get`.
@@ -123,7 +133,7 @@ codec. All `PhpObjHandle`s for one P-handle share a single reference-counted ent
 descriptor whose P-handle is already held yields another clone of it, however many times and
 inside whichever value the entity arrives. The Rust side therefore holds at most one reference to
 each P-table entry, so the worker needs no reference count. When the last clone drops, the
-P-handle is queued, and `ReleasePhpHandle` for every queued P-handle is written ahead of the next
+P-handle is queued, and `ReleaseHandle` for every queued P-handle is written ahead of the next
 frame the Rust side sends.
 
 ## Calls
@@ -134,7 +144,7 @@ frame the Rust side sends.
 to calling the named PHP function.
 
 Rust handle 0 is reserved for the runtime service endpoint, which answers calls that have no
-receiver entity: a `CallRustMethod` on handle 0 names one of its methods.
+receiver entity: a `CallMethod` the PHP side sends on handle 0 names one of its methods.
 
 Every name Shirabe defines on either side — an entry point, a runtime service method, and a method
 an entity answers beyond its PHP class's own (such as `__shirabe_clone`) — is
@@ -142,9 +152,9 @@ an entity answers beyond its PHP class's own (such as `__shirabe_clone`) — is
 
 ### By-ref parameters
 
-The `Return` answering a `CallRustMethod` carries `out_params`, a map from the positions of the
-called method's by-ref parameters to the value each one holds afterwards, and the calling stub
-assigns those back into its own variables. The worker's `Return` always carries an empty
+The `Return` answering a `CallMethod` from the PHP side carries `out_params`, a map from the
+positions of the called method's by-ref parameters to the value each one holds afterwards, and the
+calling stub assigns those back into its own variables. The worker's `Return` always carries an empty
 `out_params`.
 
 ## Jobs
@@ -179,7 +189,7 @@ hang.
 ### Fatal errors
 
 On the Rust side, the result of a `CallFunction`, `CallStaticMethod`, `NewObject` or
-`CallPhpMethod` is a nested result. The outer `anyhow::Result` carries the fatal errors: no PHP executable,
+`CallMethod` is a nested result. The outer `anyhow::Result` carries the fatal errors: no PHP executable,
 broken framing, oversized frames, and an I/O failure while the worker is still running
 (with its state attached as context).
 

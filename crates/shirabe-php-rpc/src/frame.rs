@@ -17,12 +17,10 @@ pub const MAX_FRAME_LEN: u64 = 256 * 1024 * 1024;
 pub const TAG_CALL_FUNCTION: u8 = 0x00;
 pub const TAG_CALL_STATIC_METHOD: u8 = 0x01;
 pub const TAG_NEW_OBJECT: u8 = 0x02;
-pub const TAG_CALL_PHP_METHOD: u8 = 0x03;
-pub const TAG_CALL_RUST_METHOD: u8 = 0x04;
-pub const TAG_RETURN: u8 = 0x05;
-pub const TAG_THROW: u8 = 0x06;
-pub const TAG_RELEASE_RUST_HANDLE: u8 = 0x07;
-pub const TAG_RELEASE_PHP_HANDLE: u8 = 0x08;
+pub const TAG_CALL_METHOD: u8 = 0x03;
+pub const TAG_RETURN: u8 = 0x04;
+pub const TAG_THROW: u8 = 0x05;
+pub const TAG_RELEASE_HANDLE: u8 = 0x06;
 
 #[derive(Debug)]
 pub enum Frame {
@@ -42,15 +40,11 @@ pub enum Frame {
         pclass: BString,
         ctor_args: Vec<PluginValue>,
     },
-    CallPhpMethod {
+    /// Calls a method of `handle`, an entry of the receiver's table: a P-handle when the Rust
+    /// side sends it, an R-handle (0 being the runtime service endpoint) when the PHP side does.
+    CallMethod {
         corr_id: u64,
-        phandle: u64,
-        method_name: BString,
-        args: Vec<PluginValue>,
-    },
-    CallRustMethod {
-        corr_id: u64,
-        rhandle: u64,
+        handle: u64,
         method_name: BString,
         args: Vec<PluginValue>,
     },
@@ -60,16 +54,10 @@ pub enum Frame {
         out_params: IndexMap<u32, PluginValue>,
     },
     /// The payload is the exception's description (`PhpThrow::to_plugin_value`) itself.
-    Throw {
-        corr_id: u64,
-        throw: PhpThrow,
-    },
-    ReleaseRustHandle {
-        rhandle: u64,
-    },
-    ReleasePhpHandle {
-        phandle: u64,
-    },
+    Throw { corr_id: u64, throw: PhpThrow },
+    /// The sender no longer holds `handle`, an entry of the receiver's table: an R-handle when
+    /// the PHP side sends it, a P-handle when the Rust side does.
+    ReleaseHandle { handle: u64 },
 }
 
 impl Frame {
@@ -78,12 +66,10 @@ impl Frame {
             Frame::CallFunction { .. } => TAG_CALL_FUNCTION,
             Frame::CallStaticMethod { .. } => TAG_CALL_STATIC_METHOD,
             Frame::NewObject { .. } => TAG_NEW_OBJECT,
-            Frame::CallPhpMethod { .. } => TAG_CALL_PHP_METHOD,
-            Frame::CallRustMethod { .. } => TAG_CALL_RUST_METHOD,
+            Frame::CallMethod { .. } => TAG_CALL_METHOD,
             Frame::Return { .. } => TAG_RETURN,
             Frame::Throw { .. } => TAG_THROW,
-            Frame::ReleaseRustHandle { .. } => TAG_RELEASE_RUST_HANDLE,
-            Frame::ReleasePhpHandle { .. } => TAG_RELEASE_PHP_HANDLE,
+            Frame::ReleaseHandle { .. } => TAG_RELEASE_HANDLE,
         }
     }
 
@@ -93,11 +79,10 @@ impl Frame {
             Frame::CallFunction { corr_id, .. }
             | Frame::CallStaticMethod { corr_id, .. }
             | Frame::NewObject { corr_id, .. }
-            | Frame::CallPhpMethod { corr_id, .. }
-            | Frame::CallRustMethod { corr_id, .. }
+            | Frame::CallMethod { corr_id, .. }
             | Frame::Return { corr_id, .. }
             | Frame::Throw { corr_id, .. } => *corr_id,
-            Frame::ReleaseRustHandle { .. } | Frame::ReleasePhpHandle { .. } => 0,
+            Frame::ReleaseHandle { .. } => 0,
         }
     }
 
@@ -127,23 +112,13 @@ impl Frame {
                 PluginValue::string(pclass.clone()),
                 PluginValue::List(ctor_args.clone()),
             ],
-            Frame::CallPhpMethod {
-                phandle,
+            Frame::CallMethod {
+                handle,
                 method_name,
                 args,
                 ..
             } => vec![
-                int_value(*phandle),
-                PluginValue::String(method_name.clone()),
-                PluginValue::List(args.clone()),
-            ],
-            Frame::CallRustMethod {
-                rhandle,
-                method_name,
-                args,
-                ..
-            } => vec![
-                int_value(*rhandle),
+                int_value(*handle),
                 PluginValue::string(method_name.clone()),
                 PluginValue::List(args.clone()),
             ],
@@ -159,8 +134,7 @@ impl Frame {
                 ),
             ],
             Frame::Throw { throw, .. } => throw.payload_fields(),
-            Frame::ReleaseRustHandle { rhandle } => vec![int_value(*rhandle)],
-            Frame::ReleasePhpHandle { phandle } => vec![int_value(*phandle)],
+            Frame::ReleaseHandle { handle } => vec![int_value(*handle)],
         }
     }
 }
@@ -241,15 +215,9 @@ fn decode_frame(tag: u8, corr_id: u64, payload: &[u8]) -> Frame {
             pclass: field(next()),
             ctor_args: field(next()),
         },
-        TAG_CALL_PHP_METHOD => Frame::CallPhpMethod {
+        TAG_CALL_METHOD => Frame::CallMethod {
             corr_id,
-            phandle: expect_id(next()),
-            method_name: field(next()),
-            args: field(next()),
-        },
-        TAG_CALL_RUST_METHOD => Frame::CallRustMethod {
-            corr_id,
-            rhandle: expect_id(next()),
+            handle: expect_id(next()),
             method_name: field(next()),
             args: field(next()),
         },
@@ -262,11 +230,8 @@ fn decode_frame(tag: u8, corr_id: u64, payload: &[u8]) -> Frame {
             corr_id,
             throw: PhpThrow::from_payload_fields(fields.collect()),
         },
-        TAG_RELEASE_RUST_HANDLE => Frame::ReleaseRustHandle {
-            rhandle: expect_id(next()),
-        },
-        TAG_RELEASE_PHP_HANDLE => Frame::ReleasePhpHandle {
-            phandle: expect_id(next()),
+        TAG_RELEASE_HANDLE => Frame::ReleaseHandle {
+            handle: expect_id(next()),
         },
         _ => panic!("PHP RPC: protocol violation — unknown frame tag {tag:#04x}"),
     }
@@ -419,10 +384,10 @@ mod tests {
 
     #[test]
     fn frame_roundtrip_one_way_notification() {
-        let frame = roundtrip(Frame::ReleaseRustHandle { rhandle: 4 });
+        let frame = roundtrip(Frame::ReleaseHandle { handle: 4 });
         match frame {
-            Frame::ReleaseRustHandle { rhandle } => {
-                assert_eq!(rhandle, 4);
+            Frame::ReleaseHandle { handle } => {
+                assert_eq!(handle, 4);
             }
             other => panic!("unexpected frame: {other:?}"),
         }

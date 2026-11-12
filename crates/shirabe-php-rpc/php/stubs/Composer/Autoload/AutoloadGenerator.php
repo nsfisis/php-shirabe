@@ -71,7 +71,7 @@ class AutoloadGenerator implements \Shirabe\RustStub
 
     public function __construct(EventDispatcher $eventDispatcher, ?IOInterface $io = null)
     {
-        $this->__rhandle = \Shirabe\RpcRuntime::callRust(0, '__shirabe_construct', [static::class, [$eventDispatcher, $io]]);
+        $this->__rhandle = \Shirabe\RpcRuntime::newRust(static::class, [$eventDispatcher, $io]);
         \Shirabe\RustObjectRegistry::adopt($this->__rhandle, $this);
     }
 

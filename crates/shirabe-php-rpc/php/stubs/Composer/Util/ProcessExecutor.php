@@ -65,7 +65,7 @@ class ProcessExecutor implements \Shirabe\RustStub
 
     public function __construct(?IOInterface $io = null)
     {
-        $this->__rhandle = \Shirabe\RpcRuntime::callRust(0, '__shirabe_construct', [static::class, [$io]]);
+        $this->__rhandle = \Shirabe\RpcRuntime::newRust(static::class, [$io]);
         \Shirabe\RustObjectRegistry::adopt($this->__rhandle, $this);
     }
 
@@ -146,13 +146,13 @@ class ProcessExecutor implements \Shirabe\RustStub
     // Forwarded rather than materialized: it reads the static property $timeout, whose value the Rust side owns.
     public static function getTimeout(): int
     {
-        return \Shirabe\RpcRuntime::callRust(0, '__shirabe_call_static', [self::class, 'getTimeout', []]);
+        return \Shirabe\RpcRuntime::callRustStatic(self::class, 'getTimeout', []);
     }
 
     // Forwarded rather than materialized: it reads the static property $timeout, whose value the Rust side owns.
     public static function setTimeout(int $timeout): void
     {
-        \Shirabe\RpcRuntime::callRust(0, '__shirabe_call_static', [self::class, 'setTimeout', [$timeout]]);
+        \Shirabe\RpcRuntime::callRustStatic(self::class, 'setTimeout', [$timeout]);
     }
 
     public function execute($command, &$output = null, ?string $cwd = null): int

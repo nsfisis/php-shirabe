@@ -25,7 +25,7 @@ pub struct RustObjHandle {
 ///
 /// The worker's P table keeps the entity alive while any clone of the handle lives. One phandle
 /// has one shared entry on this side however many times its descriptor is decoded, and dropping
-/// the last clone queues a `ReleasePhpHandle`, which goes out ahead of the next frame sent to the
+/// the last clone queues a `ReleaseHandle`, which goes out ahead of the next frame sent to the
 /// worker. Handles compare equal exactly when they name the same entity.
 #[derive(Debug, Clone)]
 pub struct PhpObjHandle(std::sync::Arc<PhpObjHandleEntry>);
@@ -116,7 +116,7 @@ impl Drop for PhpObjHandleEntry {
 }
 
 /// Takes the phandles whose last handle has dropped since the previous call, for the
-/// `ReleasePhpHandle` frames that go out ahead of the next frame.
+/// `ReleaseHandle` frames that go out ahead of the next frame.
 pub(crate) fn take_released_php_handles() -> Vec<u64> {
     std::mem::take(&mut php_handles().released)
 }

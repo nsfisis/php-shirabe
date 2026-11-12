@@ -9,7 +9,7 @@ class CompleteAliasPackage extends AliasPackage implements CompletePackageInterf
 {
     public function __construct(CompletePackage $aliasOf, string $version, string $prettyVersion)
     {
-        $this->__rhandle = \Shirabe\RpcRuntime::callRust(0, '__shirabe_construct', [static::class, [$aliasOf, $version, $prettyVersion]]);
+        $this->__rhandle = \Shirabe\RpcRuntime::newRust(static::class, [$aliasOf, $version, $prettyVersion]);
         \Shirabe\RustObjectRegistry::adopt($this->__rhandle, $this);
     }
 

@@ -15,7 +15,7 @@ class PackageEvent extends Event
 {
     public function __construct(string $eventName, Composer $composer, IOInterface $io, bool $devMode, RepositoryInterface $localRepo, array $operations, OperationInterface $operation)
     {
-        $this->__rhandle = \Shirabe\RpcRuntime::callRust(0, '__shirabe_construct', [static::class, [$eventName, $composer, $io, $devMode, $localRepo, $operations, $operation]]);
+        $this->__rhandle = \Shirabe\RpcRuntime::newRust(static::class, [$eventName, $composer, $io, $devMode, $localRepo, $operations, $operation]);
         \Shirabe\RustObjectRegistry::adopt($this->__rhandle, $this);
     }
 

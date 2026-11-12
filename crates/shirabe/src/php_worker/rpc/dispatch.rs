@@ -1,5 +1,6 @@
-//! Serves `CallRustMethod`: the runtime service endpoint (handle 0), the methods every entity
-//! answers (construction, clone, property access), and the routing to each class's methods.
+//! Serves the worker's `CallMethod` requests: the runtime service endpoint (handle 0), the methods
+//! every entity answers (construction, clone, property access), and the routing to each class's
+//! methods.
 
 use crate::autoload::ClassLoader;
 use crate::php_worker::console::run_worker_reverse_command;
@@ -27,7 +28,7 @@ pub(crate) fn find_file_in_registered_loaders(
     Ok(None)
 }
 
-/// Serves the `CallRustMethod` requests the worker makes while a call into it is in flight:
+/// Serves the `CallMethod` requests the worker makes while a call into it is in flight:
 /// rhandle 0 is the runtime service endpoint, every other rhandle resolves through the R table.
 /// Unsupported methods are explicit errors, never silent fallbacks.
 #[derive(Debug)]
@@ -46,10 +47,23 @@ impl RustMethodDispatcher for RpcDispatcher {
         }
         table::call(rhandle, method_name, &args, out_params)
     }
+
+    fn construct(&mut self, class: &BStr, ctor_args: Vec<PluginValue>) -> Result<u64, PhpThrow> {
+        construct(class, &ctor_args)
+    }
+
+    fn call_static(
+        &mut self,
+        class: &BStr,
+        method_name: &BStr,
+        args: Vec<PluginValue>,
+    ) -> Result<PluginValue, PhpThrow> {
+        call_static(class, method_name, &args)
+    }
 }
 
 /// Serves the runtime service methods (Rust handle 0): autoload lookups, the built-in commands a
-/// plugin-provided command runs, entity construction and static calls, and the job registry.
+/// plugin-provided command runs, and the job registry.
 fn dispatch_runtime_service_method(
     method_name: &BStr,
     args: &[PluginValue],
@@ -67,12 +81,6 @@ fn dispatch_runtime_service_method(
         return Ok(find_file_in_registered_loaders(&class)
             .map_err(|error| error_throw(b"__shirabe_find_file failed", &error))?
             .to_plugin_value());
-    }
-    if method_name == "__shirabe_construct" {
-        return construct(args);
-    }
-    if method_name == "__shirabe_call_static" {
-        return call_static(args);
     }
     if let Some(answer) = dispatch_job_service_method(method_name, args) {
         return answer;
@@ -116,60 +124,27 @@ fn dispatch_job_service_method(
     })
 }
 
-/// Serves `__shirabe_construct`: plugin code writing `new SomeProxiedClass` gets a fresh Rust-side
-/// entity, since the proxied FQCN has no implementation of its own in the child. Classes whose
-/// entity cannot be built here are an explicit error, so a plugin never ends up holding a second,
-/// unconnected instance of a Composer service.
-fn construct(args: &[PluginValue]) -> Result<PluginValue, PhpThrow> {
-    let (class, ctor_args) = match (args.first(), args.get(1)) {
-        (Some(PluginValue::String(class)), Some(PluginValue::List(ctor_args))) => {
-            (class, ctor_args.as_slice())
-        }
-        (Some(PluginValue::String(class)), None | Some(PluginValue::Array(_))) => {
-            (class, [].as_slice())
-        }
-        other => panic!(
-            "protocol violation: __shirabe_construct expects a class name and an argument list, got {other:?}"
-        ),
-    };
+/// Serves a `NewObject` from the worker: plugin code writing `new SomeProxiedClass` gets a fresh
+/// Rust-side entity, since the proxied FQCN has no implementation of its own in the child. Classes
+/// whose entity cannot be built here are an explicit error, so a plugin never ends up holding a
+/// second, unconnected instance of a Composer service.
+fn construct(class: &BStr, ctor_args: &[PluginValue]) -> Result<u64, PhpThrow> {
     let mut out_params = IndexMap::new();
-    let mut call = Call::new(
-        class.as_bstr(),
-        BStr::new("__construct"),
-        ctor_args,
-        &mut out_params,
-    );
-    let rhandle = forwarding::construct(class.as_bstr(), &mut call)?;
-    Ok(PluginValue::Int(rhandle as i64))
+    let mut call = Call::new(class, BStr::new("__construct"), ctor_args, &mut out_params);
+    forwarding::construct(class, &mut call)
 }
 
-/// Serves `__shirabe_call_static`: the static methods a proxy stub forwards instead of running
-/// locally, because their real bodies reach state the Rust side owns or classes the worker has no
-/// code for.
-fn call_static(args: &[PluginValue]) -> Result<PluginValue, PhpThrow> {
-    let (class, method, call_args) = match (args.first(), args.get(1), args.get(2)) {
-        (
-            Some(PluginValue::String(class)),
-            Some(PluginValue::String(method)),
-            Some(PluginValue::List(call_args)),
-        ) => (class, method, call_args.as_slice()),
-        (
-            Some(PluginValue::String(class)),
-            Some(PluginValue::String(method)),
-            None | Some(PluginValue::Array(_)),
-        ) => (class, method, [].as_slice()),
-        other => panic!(
-            "protocol violation: __shirabe_call_static expects a class name, a method name and an argument list, got {other:?}"
-        ),
-    };
+/// Serves a `CallStaticMethod` from the worker: the static methods a proxy stub or a guard forwards
+/// instead of running locally, because their real bodies reach state the Rust side owns or classes
+/// the worker has no code for.
+fn call_static(
+    class: &BStr,
+    method_name: &BStr,
+    args: &[PluginValue],
+) -> Result<PluginValue, PhpThrow> {
     let mut out_params = IndexMap::new();
-    let mut call = Call::new(
-        class.as_bstr(),
-        method.as_bstr(),
-        call_args,
-        &mut out_params,
-    );
-    forwarding::call_static(class.as_bstr(), &mut call)
+    let mut call = Call::new(class, method_name, args, &mut out_params);
+    forwarding::call_static(class, &mut call)
 }
 
 /// The `Throw` a failed Rust-side call crosses the boundary as. An error carrying a ported PHP
@@ -206,9 +181,8 @@ mod tests {
     #[test]
     fn a_subclass_name_that_is_not_utf8_is_not_constructed() {
         // `static::class` of a plugin's subclass of a proxied class.
-        let class =
-            PluginValue::String(BString::from(b"Composer\\Package\\Package\xff".as_slice()));
-        let throw = construct(&[class, PluginValue::List(Vec::new())]).unwrap_err();
+        let class = BStr::new(b"Composer\\Package\\Package\xff");
+        let throw = RpcDispatcher.construct(class, Vec::new()).unwrap_err();
         assert!(
             throw
                 .message

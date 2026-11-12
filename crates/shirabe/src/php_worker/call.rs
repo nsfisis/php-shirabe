@@ -1,7 +1,7 @@
 //! The calls the Rust side makes into the PHP worker.
 //!
 //! This module has no Composer counterpart: it is the Rust-to-PHP half of the plugin runtime
-//! split (see `docs/dev/php-worker.md`). Every call serves the `CallRustMethod` requests the
+//! split (see `docs/dev/php-worker.md`). Every call serves the `CallMethod` requests the
 //! worker makes while it is in flight with the `RpcDispatcher`, and decodes the answer as the
 //! type the caller asks for.
 

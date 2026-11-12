@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Shirabe\PluginStubGenerator;
 
 use PhpParser\Node;
-use PhpParser\Node\Expr\Array_;
 use PhpParser\Node\Expr\PropertyFetch;
 use PhpParser\Node\Expr\StaticCall;
 use PhpParser\Node\Expr\Variable;
@@ -25,10 +24,10 @@ use PhpParser\ParserFactory;
  *
  * The forwarding side is read from the PHP classes the worker resolves proxied FQCNs to (the
  * generated stubs and the hand-written runtime classes): every `\Shirabe\RpcRuntime::callRust` on
- * the instance handle, every `__shirabe_construct` and every `__shirabe_call_static`, plus the
- * `__shirabe_call_static` forwards of the guard classes. The answering side is read from the
- * hand-written forwarding impls (see `RustForwardingImpls`): a member is answered when the impl
- * of the class declaring it overrides the generated default.
+ * the instance handle, every `\Shirabe\RpcRuntime::newRust` and every
+ * `\Shirabe\RpcRuntime::callRustStatic`, plus the `callRustStatic` forwards of the guard classes. The answering side is read from
+ * the hand-written forwarding impls (see `RustForwardingImpls`): a member is answered when the
+ * impl of the class declaring it overrides the generated default.
  *
  * Each row is `<member><TAB><kind><TAB><status>`, sorted. `<kind>` is `constructor`, `method` or
  * `static`; `<status>` is `supported` (the impl answers the member, possibly with an explicit
@@ -192,7 +191,7 @@ final class SurfaceManifest
         return array_keys($methods);
     }
 
-    /** Whether `new $fqcn(...)` reaches `__shirabe_construct`, through its own or an inherited constructor. */
+    /** Whether `new $fqcn(...)` reaches `RpcRuntime::newRust`, through its own or an inherited constructor. */
     private function constructs(string $fqcn): bool
     {
         for ($class = $fqcn; $class !== null && isset($this->classes[$class]); $class = $this->classes[$class]['parent']) {
@@ -256,6 +255,19 @@ final class SurfaceManifest
             foreach ($finder->find($method->stmts ?? [], self::isCallRust(...)) as $call) {
                 $this->readCall($path, $fqcn, $method, $call, $entry);
             }
+            foreach ($finder->find($method->stmts ?? [], self::isCallRustStatic(...)) as $call) {
+                $static = $call->args[1]->value ?? null;
+                if (!$static instanceof String_) {
+                    throw new GenerationError(["$path: $fqcn::{$method->name} forwards a static call without a literal method name"]);
+                }
+                $entry['statics'][] = $static->value;
+            }
+            if ($finder->findFirst($method->stmts ?? [], self::isNewRust(...)) !== null) {
+                if ($method->name->toString() !== '__construct') {
+                    throw new GenerationError(["$path: $fqcn::{$method->name} calls newRust outside a constructor"]);
+                }
+                $entry['constructs'] = true;
+            }
         }
         if ($isGuard) {
             if ($entry['statics'] === []) {
@@ -271,11 +283,26 @@ final class SurfaceManifest
 
     private static function isCallRust(Node $node): bool
     {
+        return self::isRpcRuntimeCall($node, 'callRust');
+    }
+
+    private static function isCallRustStatic(Node $node): bool
+    {
+        return self::isRpcRuntimeCall($node, 'callRustStatic');
+    }
+
+    private static function isNewRust(Node $node): bool
+    {
+        return self::isRpcRuntimeCall($node, 'newRust');
+    }
+
+    private static function isRpcRuntimeCall(Node $node, string $method): bool
+    {
         return $node instanceof StaticCall
             && $node->class instanceof Name
             && $node->class->toString() === 'Shirabe\RpcRuntime'
             && $node->name instanceof Node\Identifier
-            && $node->name->toString() === 'callRust';
+            && $node->name->toString() === $method;
     }
 
     /** @param array{guard: bool, parent: ?string, abstract: bool, methods: list<string>, statics: list<string>, constructs: ?bool} $entry */
@@ -300,19 +327,6 @@ final class SurfaceManifest
         }
         if (!$handle instanceof Int_ || $handle->value !== 0) {
             throw new GenerationError(["$where calls callRust on a handle other than its own or 0"]);
-        }
-        if ($name === '__shirabe_construct') {
-            if ($method->name->toString() !== '__construct') {
-                throw new GenerationError(["$where calls __shirabe_construct outside a constructor"]);
-            }
-            $entry['constructs'] = true;
-        } elseif ($name === '__shirabe_call_static') {
-            $arguments = $call->args[2]->value ?? null;
-            $static = $arguments instanceof Array_ ? ($arguments->items[1]->value ?? null) : null;
-            if (!$static instanceof String_) {
-                throw new GenerationError(["$where forwards a static call without a literal method name"]);
-            }
-            $entry['statics'][] = $static->value;
         }
     }
 }

@@ -12,7 +12,7 @@ use shirabe_php_rpc::{FromPluginValue, PhpObjHandle, PhpThrow, PluginValue, code
 use shirabe_php_shim::PhpMixed;
 
 /// `PluginInterface` adapter for a plugin entity living in the PHP child process: every
-/// lifecycle call is forwarded as a `CallPhpMethod` RPC.
+/// lifecycle call is forwarded as a `CallMethod` RPC.
 #[derive(Debug)]
 pub struct PhpPluginProxy {
     pub(crate) handle: PhpObjHandle,

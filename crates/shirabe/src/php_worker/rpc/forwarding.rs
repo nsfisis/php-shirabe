@@ -8,9 +8,9 @@ use crate::php_worker::rpc::forwarding;
 use bstr::{BStr, ByteSlice as _};
 use shirabe_php_rpc::{PhpThrow, PluginValue};
 
-/// `__shirabe_construct`: builds the entity, registers it and answers its rhandle. A stub's
-/// constructor sends `static::class`, so a plugin's subclass of a proxied class reaches the
-/// last arm.
+/// A `NewObject` from the worker: builds the entity, registers it and answers its rhandle.
+/// A stub's constructor sends `static::class`, so a plugin's subclass of a proxied class
+/// reaches the last arm.
 pub(crate) fn construct(class: &BStr, call: &mut Call<'_>) -> Result<u64, PhpThrow> {
     match class.as_bytes() {
         b"Composer\\Autoload\\AutoloadGenerator" => {
@@ -114,8 +114,8 @@ pub(crate) fn construct(class: &BStr, call: &mut Call<'_>) -> Result<u64, PhpThr
     }
 }
 
-/// `__shirabe_call_static`. A static forwarder sends `self::class`, so the class is always
-/// one that declares the method.
+/// A `CallStaticMethod` from the worker. A static forwarder sends `self::class`, so the class
+/// is always one that declares the method.
 pub(crate) fn call_static(class: &BStr, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
     match class.as_bytes() {
         b"Composer\\Factory" => forwarding::factory::call_static(call),

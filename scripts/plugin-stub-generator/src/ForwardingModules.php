@@ -152,7 +152,7 @@ final class ForwardingModules
         return $code . "}\n";
     }
 
-    /** `__shirabe_construct`: builds the entity, registers it and answers its rhandle. */
+    /** A `NewObject` from the worker: builds the entity, registers it and answers its rhandle. */
     private function construct(): string
     {
         $arms = '';
@@ -164,14 +164,14 @@ final class ForwardingModules
             }
         }
 
-        return "/// `__shirabe_construct`: builds the entity, registers it and answers its rhandle. A stub's\n"
-            . "/// constructor sends `static::class`, so a plugin's subclass of a proxied class reaches the\n"
-            . "/// last arm.\n"
+        return "/// A `NewObject` from the worker: builds the entity, registers it and answers its rhandle.\n"
+            . "/// A stub's constructor sends `static::class`, so a plugin's subclass of a proxied class\n"
+            . "/// reaches the last arm.\n"
             . "pub(crate) fn construct(class: &BStr, call: &mut Call<'_>) -> Result<u64, PhpThrow> {\n"
             . "match class.as_bytes() {\n{$arms}_ => Err(call.unconstructible()),\n}\n}\n";
     }
 
-    /** `__shirabe_call_static`. */
+    /** A `CallStaticMethod` from the worker. */
     private function callStatic(): string
     {
         $arms = '';
@@ -183,8 +183,8 @@ final class ForwardingModules
             }
         }
 
-        return "/// `__shirabe_call_static`. A static forwarder sends `self::class`, so the class is always\n"
-            . "/// one that declares the method.\n"
+        return "/// A `CallStaticMethod` from the worker. A static forwarder sends `self::class`, so the class\n"
+            . "/// is always one that declares the method.\n"
             . "pub(crate) fn call_static(class: &BStr, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {\n"
             . "match class.as_bytes() {\n{$arms}_ => protocol_violation(call),\n}\n}\n";
     }

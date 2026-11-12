@@ -88,8 +88,8 @@ regenerates the report.
   real `extends`/`implements` hierarchy is preserved and `\Shirabe\RustStub` is
   appended to the interface list.
 * **Constructors** reproduce the real class's parameter list and forward to the
-  Rust side (`__shirabe_construct` on handle 0), which allocates the entity and
-  answers with its handle. One is emitted for every root stub and for every subclass
+  Rust side (a `NewObject` sent through `\Shirabe\RpcRuntime::newRust`), which
+  allocates the entity and answers with its handle. One is emitted for every root stub and for every subclass
   that declares a public constructor of its own, so `new SomeProxiedClass(...)`
   in plugin code never yields an unbound stub. Proxy revival does not run them
   (see `__shirabeBind` above).
@@ -126,8 +126,8 @@ regenerates the report.
   One that reads a **static property** — whose value the Rust side owns, as
   `ProcessExecutor::$timeout` does — or that reaches a class a **guard**
   shadows there — as `ProcessExecutor::escape()` reaches `Composer\Util\Platform`
-  — forwards instead, through `__shirabe_call_static` on handle 0, carrying a
-  comment that names the reason.
+  — forwards instead, as a `CallStaticMethod` sent through
+  `\Shirabe\RpcRuntime::callRustStatic`, carrying a comment that names the reason.
 * **Instance properties** are not declared on the stub, whatever their
   visibility: they are entity state. Every root stub instead carries
   `__get`/`__set`/`__isset`/`__unset` forwarders, so each access reaches the
@@ -159,7 +159,7 @@ declares `final` cannot be redeclared, so it keeps running the real
 implementation; the guard's header names each one.
 
 A static method listed in `GuardGenerator::FORWARDED_STATICS` forwards through
-`__shirabe_call_static` on handle 0 instead, like a forwarded static of a stub,
+`\Shirabe\RpcRuntime::callRustStatic` instead, like a forwarded static of a stub,
 and the guard's header names it. An entry qualifies only when the method reads
 no entity, so serving it on the Rust side cannot fork the state of a second
 instance: `Factory::getComposerFile()` reads nothing but the `COMPOSER`

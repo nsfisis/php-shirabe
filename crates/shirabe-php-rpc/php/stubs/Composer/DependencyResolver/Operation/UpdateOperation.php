@@ -12,7 +12,7 @@ class UpdateOperation extends SolverOperation implements OperationInterface
 {
     public function __construct(PackageInterface $initial, PackageInterface $target)
     {
-        $this->__rhandle = \Shirabe\RpcRuntime::callRust(0, '__shirabe_construct', [static::class, [$initial, $target]]);
+        $this->__rhandle = \Shirabe\RpcRuntime::newRust(static::class, [$initial, $target]);
         \Shirabe\RustObjectRegistry::adopt($this->__rhandle, $this);
     }
 

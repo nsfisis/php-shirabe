@@ -13,7 +13,7 @@ use shirabe_php_shim::PhpMixed;
 
 /// `InstallerInterface` adapter for an installer entity living in the PHP child process: the
 /// installer a plugin hands to `InstallationManager::addInstaller`, or the class a legacy
-/// `composer-installer` package names. Every call is forwarded as a `CallPhpMethod` RPC.
+/// `composer-installer` package names. Every call is forwarded as a `CallMethod` RPC.
 #[derive(Debug)]
 pub struct PhpInstallerProxy {
     handle: PhpObjHandle,

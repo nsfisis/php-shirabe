@@ -63,7 +63,7 @@ abstract class BaseIO implements IOInterface, \Shirabe\RustStub
 
     public function __construct()
     {
-        $this->__rhandle = \Shirabe\RpcRuntime::callRust(0, '__shirabe_construct', [static::class, []]);
+        $this->__rhandle = \Shirabe\RpcRuntime::newRust(static::class, []);
         \Shirabe\RustObjectRegistry::adopt($this->__rhandle, $this);
     }
 

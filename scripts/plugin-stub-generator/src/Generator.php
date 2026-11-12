@@ -399,8 +399,8 @@ final class Generator
             $params[] = $rendered;
             $args[] = '$' . $paramName;
         }
-        $call = "\\Shirabe\\RpcRuntime::callRust(0, '__shirabe_construct', [static::class, ["
-            . implode(', ', $args) . ']])';
+        $call = "\\Shirabe\\RpcRuntime::newRust(static::class, ["
+            . implode(', ', $args) . '])';
         return "    public function __construct(" . implode(', ', $params) . ")\n"
             . "    {\n"
             . "        \$this->__rhandle = $call;\n"
@@ -609,7 +609,7 @@ final class Generator
         // self::class, not static::class: the forwarded statics stand for this class's own state,
         // and a plugin subclass redeclaring it is not modelled on the Rust side.
         $body = $this->renderForwardingBody(
-            "\\Shirabe\\RpcRuntime::callRust(0, '__shirabe_call_static', [self::class, '$name', %s]%s)",
+            "\\Shirabe\\RpcRuntime::callRustStatic(self::class, '$name', %s%s)",
             $args,
             $outPositions,
             $this->inspectsArgCount($fqcn, $name, $method),

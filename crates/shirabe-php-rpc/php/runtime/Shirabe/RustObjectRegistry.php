@@ -45,6 +45,6 @@ final class RustObjectRegistry
     public static function release(int $rhandle): void
     {
         unset(self::$internTable[$rhandle]);
-        RpcRuntime::notifyReleaseRustHandle($rhandle);
+        RpcRuntime::notifyReleaseHandle($rhandle);
     }
 }

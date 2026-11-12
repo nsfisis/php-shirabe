@@ -68,7 +68,7 @@ class EventDispatcher implements \Shirabe\RustStub
 
     public function __construct(PartialComposer $composer, IOInterface $io, ?ProcessExecutor $process = null)
     {
-        $this->__rhandle = \Shirabe\RpcRuntime::callRust(0, '__shirabe_construct', [static::class, [$composer, $io, $process]]);
+        $this->__rhandle = \Shirabe\RpcRuntime::newRust(static::class, [$composer, $io, $process]);
         \Shirabe\RustObjectRegistry::adopt($this->__rhandle, $this);
     }
 

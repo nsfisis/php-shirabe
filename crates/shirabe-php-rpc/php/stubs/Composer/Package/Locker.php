@@ -67,14 +67,14 @@ class Locker implements \Shirabe\RustStub
 
     public function __construct(IOInterface $io, JsonFile $lockFile, InstallationManager $installationManager, string $composerFileContents, ?ProcessExecutor $process = null)
     {
-        $this->__rhandle = \Shirabe\RpcRuntime::callRust(0, '__shirabe_construct', [static::class, [$io, $lockFile, $installationManager, $composerFileContents, $process]]);
+        $this->__rhandle = \Shirabe\RpcRuntime::newRust(static::class, [$io, $lockFile, $installationManager, $composerFileContents, $process]);
         \Shirabe\RustObjectRegistry::adopt($this->__rhandle, $this);
     }
 
     // Forwarded rather than materialized: it references Composer\Json\JsonFile, which a guard shadows in the worker.
     public static function getContentHash(string $composerFileContents): string
     {
-        return \Shirabe\RpcRuntime::callRust(0, '__shirabe_call_static', [self::class, 'getContentHash', [$composerFileContents]]);
+        return \Shirabe\RpcRuntime::callRustStatic(self::class, 'getContentHash', [$composerFileContents]);
     }
 
     public function getJsonFile(): JsonFile

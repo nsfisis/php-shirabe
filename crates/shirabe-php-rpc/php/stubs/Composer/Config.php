@@ -66,7 +66,7 @@ class Config implements \Shirabe\RustStub
 
     public function __construct(bool $useEnvironment = true, ?string $baseDir = null)
     {
-        $this->__rhandle = \Shirabe\RpcRuntime::callRust(0, '__shirabe_construct', [static::class, [$useEnvironment, $baseDir]]);
+        $this->__rhandle = \Shirabe\RpcRuntime::newRust(static::class, [$useEnvironment, $baseDir]);
         \Shirabe\RustObjectRegistry::adopt($this->__rhandle, $this);
     }
 

@@ -61,7 +61,7 @@ class Transaction implements \Shirabe\RustStub
 
     public function __construct(array $presentPackages, array $resultPackages)
     {
-        $this->__rhandle = \Shirabe\RpcRuntime::callRust(0, '__shirabe_construct', [static::class, [$presentPackages, $resultPackages]]);
+        $this->__rhandle = \Shirabe\RpcRuntime::newRust(static::class, [$presentPackages, $resultPackages]);
         \Shirabe\RustObjectRegistry::adopt($this->__rhandle, $this);
     }
 

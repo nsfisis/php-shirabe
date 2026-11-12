@@ -51,7 +51,7 @@ class Factory
     // Forwarded rather than guarded: it only reads the COMPOSER environment variable, whose value the Rust side owns.
     public static function getComposerFile(): string
     {
-        return \Shirabe\RpcRuntime::callRust(0, '__shirabe_call_static', [self::class, 'getComposerFile', []]);
+        return \Shirabe\RpcRuntime::callRustStatic(self::class, 'getComposerFile', []);
     }
 
     public static function getLockFile(string $composerFile): string

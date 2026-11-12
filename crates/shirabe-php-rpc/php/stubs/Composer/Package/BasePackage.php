@@ -63,7 +63,7 @@ abstract class BasePackage implements PackageInterface, \Shirabe\RustStub
 
     public function __construct(string $name)
     {
-        $this->__rhandle = \Shirabe\RpcRuntime::callRust(0, '__shirabe_construct', [static::class, [$name]]);
+        $this->__rhandle = \Shirabe\RpcRuntime::newRust(static::class, [$name]);
         \Shirabe\RustObjectRegistry::adopt($this->__rhandle, $this);
     }
 

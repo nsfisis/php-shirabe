@@ -96,10 +96,7 @@ script-class autoloader uses to ask the Rust-side `ClassLoader`s on the autoload
 class file lives,
 `__shirabe_run_rust_command` — the reverse half of the two-world command split: a
 `\Shirabe\RustCommandStub` forwards its stringified input here and the built-in command runs in
-the Rust process, against the Rust-side application state — `__shirabe_construct`, which
-allocates the Rust entity behind a `new SomeProxiedClass(...)` written by plugin code and
-answers with its R-handle, `__shirabe_call_static`, which takes `[class, method, args]`
-and runs a static method no handle identifies a receiver for, and the job methods
+the Rust process, against the Rust-side application state — and the job methods
 `__shirabe_resolve_job` / `__shirabe_reject_job` / `__shirabe_cancel_job` / `__shirabe_abort_jobs`
 ([docs/dev/plugin-async.md](./plugin-async.md)).
 
@@ -184,7 +181,7 @@ The three sets are written into two autoload directories at worker spawn (guards
 resolved with highest priority, so these FQCNs can never be shadowed by the real implementation;
 `__shirabe_require` restores that priority after loading code that prepends its own autoloader.
 Stubs are interned per R-handle so identity (`===`) holds, and
-their destructors send `ReleaseRustHandle`. Reviving a stub for an existing entity bypasses its
+their destructors send `ReleaseHandle`. Reviving a stub for an existing entity bypasses its
 constructor (`newInstanceWithoutConstructor` plus `__shirabeBind`), because the constructor
 carries the real class's own signature and belongs to plugin code building a *new* entity.
 `clone` on a stub calls `__shirabe_clone` on the entity and rebinds the copy to the handle that
@@ -220,8 +217,8 @@ Every proxy stub, runtime class and guard that forwards members to the Rust side
 - `dispatch`, routing a method name to the `Forwarding` of the class declaring it, and `CROSSING`,
   the class and its `dispatch` as the value `Entity::class` returns;
 - `construct` and `call_static` for a class forwarding its constructor or static methods, which
-  the top-level `construct` and `call_static` route `__shirabe_construct` and
-  `__shirabe_call_static` to.
+  the top-level `construct` and `call_static` route a `NewObject` and a `CallStaticMethod` from
+  the worker to.
 
 What the Rust side answers is written by hand, as `impl forwarding::<path>::Forwarding for
 forwarding::<path>::PhpClass` in the submodules of `php_worker::rpc::entities`. Only the members

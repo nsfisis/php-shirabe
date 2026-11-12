@@ -69,7 +69,7 @@ class HttpDownloader implements \Shirabe\RustStub
 
     public function __construct(IOInterface $io, Config $config, array $options = [], bool $disableTls = false)
     {
-        $this->__rhandle = \Shirabe\RpcRuntime::callRust(0, '__shirabe_construct', [static::class, [$io, $config, $options, $disableTls]]);
+        $this->__rhandle = \Shirabe\RpcRuntime::newRust(static::class, [$io, $config, $options, $disableTls]);
         \Shirabe\RustObjectRegistry::adopt($this->__rhandle, $this);
     }
 

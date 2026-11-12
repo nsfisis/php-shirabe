@@ -4,7 +4,7 @@ namespace Shirabe;
 
 /**
  * The P table: PHP-owned entities exposed to Rust, keyed by phandle. Entries are strong
- * references — an entity stays alive until the Rust side sends ReleasePhpHandle.
+ * references — an entity stays alive until the Rust side sends ReleaseHandle for it.
  */
 final class PhpObjectRegistry
 {

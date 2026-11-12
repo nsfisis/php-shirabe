@@ -14,7 +14,7 @@ class InstallerEvent extends Event
 {
     public function __construct(string $eventName, Composer $composer, IOInterface $io, bool $devMode, bool $executeOperations, Transaction $transaction)
     {
-        $this->__rhandle = \Shirabe\RpcRuntime::callRust(0, '__shirabe_construct', [static::class, [$eventName, $composer, $io, $devMode, $executeOperations, $transaction]]);
+        $this->__rhandle = \Shirabe\RpcRuntime::newRust(static::class, [$eventName, $composer, $io, $devMode, $executeOperations, $transaction]);
         \Shirabe\RustObjectRegistry::adopt($this->__rhandle, $this);
     }
 

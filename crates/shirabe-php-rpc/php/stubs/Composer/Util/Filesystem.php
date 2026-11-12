@@ -63,7 +63,7 @@ class Filesystem implements \Shirabe\RustStub
 
     public function __construct(?ProcessExecutor $executor = null)
     {
-        $this->__rhandle = \Shirabe\RpcRuntime::callRust(0, '__shirabe_construct', [static::class, [$executor]]);
+        $this->__rhandle = \Shirabe\RpcRuntime::newRust(static::class, [$executor]);
         \Shirabe\RustObjectRegistry::adopt($this->__rhandle, $this);
     }
 

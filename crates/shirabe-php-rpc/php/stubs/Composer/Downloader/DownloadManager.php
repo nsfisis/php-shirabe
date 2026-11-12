@@ -66,7 +66,7 @@ class DownloadManager implements \Shirabe\RustStub
 
     public function __construct(IOInterface $io, bool $preferSource = false, ?Filesystem $filesystem = null)
     {
-        $this->__rhandle = \Shirabe\RpcRuntime::callRust(0, '__shirabe_construct', [static::class, [$io, $preferSource, $filesystem]]);
+        $this->__rhandle = \Shirabe\RpcRuntime::newRust(static::class, [$io, $preferSource, $filesystem]);
         \Shirabe\RustObjectRegistry::adopt($this->__rhandle, $this);
     }
 

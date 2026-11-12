@@ -121,7 +121,7 @@ impl RTable {
 
 thread_local! {
     /// The R table. Entries are strong references held while the child-side stub lives; a
-    /// ReleaseRustHandle notification (sent by the stub's `__destruct`) removes the entry.
+    /// ReleaseHandle notification (sent by the stub's `__destruct`) removes the entry.
     /// Handles are monotonically increasing and never reused, so a released handle can never
     /// be confused with a later entity (no generation counter is needed). A slot holds its
     /// entity strongly, so the address of a registered entity is not reused either.

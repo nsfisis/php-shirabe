@@ -26,6 +26,23 @@ impl RustMethodDispatcher for NoCallbacks {
     ) -> Result<PluginValue, PhpThrow> {
         panic!("unexpected callback `{method_name:?}`")
     }
+
+    fn construct(
+        &mut self,
+        class: &bstr::BStr,
+        _ctor_args: Vec<PluginValue>,
+    ) -> Result<u64, PhpThrow> {
+        panic!("unexpected construction of `{class:?}`")
+    }
+
+    fn call_static(
+        &mut self,
+        class: &bstr::BStr,
+        method_name: &bstr::BStr,
+        _args: Vec<PluginValue>,
+    ) -> Result<PluginValue, PhpThrow> {
+        panic!("unexpected callback `{class:?}::{method_name:?}`")
+    }
 }
 
 /// Feeds raw serialize() bytes through the PHP core codec and returns what PHP re-serializes.

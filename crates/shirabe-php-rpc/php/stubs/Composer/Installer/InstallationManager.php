@@ -73,7 +73,7 @@ class InstallationManager implements \Shirabe\RustStub
 
     public function __construct(Loop $loop, IOInterface $io, ?EventDispatcher $eventDispatcher = null)
     {
-        $this->__rhandle = \Shirabe\RpcRuntime::callRust(0, '__shirabe_construct', [static::class, [$loop, $io, $eventDispatcher]]);
+        $this->__rhandle = \Shirabe\RpcRuntime::newRust(static::class, [$loop, $io, $eventDispatcher]);
         \Shirabe\RustObjectRegistry::adopt($this->__rhandle, $this);
     }
 

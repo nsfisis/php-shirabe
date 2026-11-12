@@ -12,7 +12,7 @@ class PrePoolCreateEvent extends Event
 {
     public function __construct(string $name, array $repositories, Request $request, array $acceptableStabilities, array $stabilityFlags, array $rootAliases, array $rootReferences, array $packages, array $unacceptableFixedPackages)
     {
-        $this->__rhandle = \Shirabe\RpcRuntime::callRust(0, '__shirabe_construct', [static::class, [$name, $repositories, $request, $acceptableStabilities, $stabilityFlags, $rootAliases, $rootReferences, $packages, $unacceptableFixedPackages]]);
+        $this->__rhandle = \Shirabe\RpcRuntime::newRust(static::class, [$name, $repositories, $request, $acceptableStabilities, $stabilityFlags, $rootAliases, $rootReferences, $packages, $unacceptableFixedPackages]);
         \Shirabe\RustObjectRegistry::adopt($this->__rhandle, $this);
     }
 

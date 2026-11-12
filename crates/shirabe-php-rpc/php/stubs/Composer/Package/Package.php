@@ -9,7 +9,7 @@ class Package extends BasePackage
 {
     public function __construct(string $name, string $version, string $prettyVersion)
     {
-        $this->__rhandle = \Shirabe\RpcRuntime::callRust(0, '__shirabe_construct', [static::class, [$name, $version, $prettyVersion]]);
+        $this->__rhandle = \Shirabe\RpcRuntime::newRust(static::class, [$name, $version, $prettyVersion]);
         \Shirabe\RustObjectRegistry::adopt($this->__rhandle, $this);
     }
 

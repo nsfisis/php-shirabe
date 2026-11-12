@@ -21,7 +21,7 @@ final class GuardGenerator
 {
     /**
      * Static methods of guarded classes that forward to the Rust side through
-     * `__shirabe_call_static` instead of failing, each with the reason it is safe to serve: the
+     * `RpcRuntime::callRustStatic` instead of failing, each with the reason it is safe to serve: the
      * call reads no entity, so there is no second instance for it to fork.
      */
     private const FORWARDED_STATICS = [
@@ -235,7 +235,7 @@ final class GuardGenerator
                 }
             }
             $args = implode(', ', array_map(static fn ($param): string => '$' . $param->var->name, $method->params));
-            $call = "\\Shirabe\\RpcRuntime::callRust(0, '__shirabe_call_static', [self::class, '$name', [$args]])";
+            $call = "\\Shirabe\\RpcRuntime::callRustStatic(self::class, '$name', [$args])";
             $isVoid = $returnType === 'void';
             return "    // Forwarded rather than guarded: " . self::FORWARDED_STATICS[$member] . "\n"
                 . "    $signature\n    {\n"

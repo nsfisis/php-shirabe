@@ -5,7 +5,8 @@
 //! - `table`: the R table holding those entities, and the handles PHP stubs carry for them
 //! - `entity`: what an entity is, and the context a forwarded call is answered in
 //! - `forwarding`: the members each forwarding class routes to the Rust side, generated
-//! - `dispatch`: the `CallRustMethod` dispatcher and the runtime service endpoint (handle 0)
+//! - `dispatch`: the dispatcher of the worker's `CallMethod` requests and the runtime service
+//!   endpoint (handle 0)
 //! - `entities`: the methods each proxied class answers
 //! - `args`: argument decoding for those methods
 

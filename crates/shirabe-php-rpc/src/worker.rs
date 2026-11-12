@@ -154,7 +154,7 @@ fn with_worker<T>(f: impl FnOnce(&mut Worker) -> T) -> anyhow::Result<T> {
 
 /// Writes one frame while holding the worker mutex only for the duration of the write, so the
 /// session owner (see `session`) can interleave sends and blocking reads without keeping the
-/// worker locked across a whole call. A `ReleasePhpHandle` for every P handle dropped since the
+/// worker locked across a whole call. A `ReleaseHandle` for every P handle dropped since the
 /// previous write goes out first.
 pub(crate) fn send_frame(frame: &Frame) -> anyhow::Result<()> {
     with_worker(|worker| {
@@ -165,7 +165,7 @@ pub(crate) fn send_frame(frame: &Frame) -> anyhow::Result<()> {
             })
         };
         for phandle in value::take_released_php_handles() {
-            write(&Frame::ReleasePhpHandle { phandle })?;
+            write(&Frame::ReleaseHandle { handle: phandle })?;
         }
         write(frame)
     })?

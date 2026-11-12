@@ -68,7 +68,7 @@ class RepositoryManager implements \Shirabe\RustStub
 
     public function __construct(IOInterface $io, Config $config, HttpDownloader $httpDownloader, ?EventDispatcher $eventDispatcher = null, ?ProcessExecutor $process = null)
     {
-        $this->__rhandle = \Shirabe\RpcRuntime::callRust(0, '__shirabe_construct', [static::class, [$io, $config, $httpDownloader, $eventDispatcher, $process]]);
+        $this->__rhandle = \Shirabe\RpcRuntime::newRust(static::class, [$io, $config, $httpDownloader, $eventDispatcher, $process]);
         \Shirabe\RustObjectRegistry::adopt($this->__rhandle, $this);
     }
 

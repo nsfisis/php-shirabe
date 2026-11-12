@@ -12,7 +12,7 @@ class PostFileDownloadEvent extends Event
 {
     public function __construct(string $name, ?string $fileName, ?string $checksum, string $url, string $type, $context = null)
     {
-        $this->__rhandle = \Shirabe\RpcRuntime::callRust(0, '__shirabe_construct', [static::class, [$name, $fileName, $checksum, $url, $type, $context]]);
+        $this->__rhandle = \Shirabe\RpcRuntime::newRust(static::class, [$name, $fileName, $checksum, $url, $type, $context]);
         \Shirabe\RustObjectRegistry::adopt($this->__rhandle, $this);
     }
 

@@ -7,12 +7,10 @@ final class RpcRuntime
     private const TAG_CALL_FUNCTION = 0x00;
     private const TAG_CALL_STATIC_METHOD = 0x01;
     private const TAG_NEW_OBJECT = 0x02;
-    private const TAG_CALL_PHP_METHOD = 0x03;
-    private const TAG_CALL_RUST_METHOD = 0x04;
-    private const TAG_RETURN = 0x05;
-    private const TAG_THROW = 0x06;
-    private const TAG_RELEASE_RUST_HANDLE = 0x07;
-    private const TAG_RELEASE_PHP_HANDLE = 0x08;
+    private const TAG_CALL_METHOD = 0x03;
+    private const TAG_RETURN = 0x04;
+    private const TAG_THROW = 0x05;
+    private const TAG_RELEASE_HANDLE = 0x06;
 
     private const MAX_FRAME_LEN = 268435456; // 256 MiB, mirrored on the Rust side.
 
@@ -100,14 +98,14 @@ final class RpcRuntime
         }
     }
 
-    public static function notifyReleaseRustHandle(int $rhandle): void
+    public static function notifyReleaseHandle(int $rhandle): void
     {
         if (self::$shuttingDown) {
             // Destructors run after the socket may already be closed at shutdown; the whole
             // process is going away, so there is nothing left to release remotely.
             return;
         }
-        self::writeFrame(self::TAG_RELEASE_RUST_HANDLE, 0, serialize([$rhandle]));
+        self::writeFrame(self::TAG_RELEASE_HANDLE, 0, serialize([$rhandle]));
     }
 
     /**
@@ -181,7 +179,7 @@ final class RpcRuntime
     }
 
     /**
-     * Sends a CallRustMethod request and drives the cooperative loop until its Return.
+     * Sends a CallMethod request and drives the cooperative loop until its Return.
      *
      * For a method with by-ref parameters, the Rust side answers with the value each of them
      * holds afterwards, keyed by position, and the caller (a generated stub) assigns those back
@@ -195,13 +193,43 @@ final class RpcRuntime
         array $args,
         ?array &$outParams = null
     ) {
+        return self::request(
+            self::TAG_CALL_METHOD,
+            [$rhandle, $method, self::toPluginValue($args)],
+            $outParams
+        );
+    }
+
+    /**
+     * Sends a CallStaticMethod request: the static methods a proxy stub or a guard forwards
+     * instead of running them here, because their real bodies reach state the Rust side owns or
+     * classes the worker has no code for.
+     */
+    public static function callRustStatic(string $class, string $method, array $args)
+    {
+        return self::request(self::TAG_CALL_STATIC_METHOD, [$class, $method, self::toPluginValue($args)]);
+    }
+
+    /**
+     * Sends a NewObject request: the Rust side builds a fresh entity of `$class` (the
+     * `static::class` of a stub's constructor) and answers with its R-handle, which the stub
+     * under construction binds itself to.
+     */
+    public static function newRust(string $class, array $ctorArgs): int
+    {
+        return self::request(self::TAG_NEW_OBJECT, [$class, self::toPluginValue($ctorArgs)]);
+    }
+
+    /**
+     * Sends a request and drives the cooperative loop until its Return.
+     *
+     * @param array<int, mixed>|null $outParams
+     */
+    private static function request(int $tag, array $fields, ?array &$outParams = null)
+    {
         $corrId = self::$nextCorrId;
         self::$nextCorrId += 2;
-        self::writeFrame(
-            self::TAG_CALL_RUST_METHOD,
-            $corrId,
-            serialize([$rhandle, $method, self::toPluginValue($args)])
-        );
+        self::writeFrame($tag, $corrId, serialize($fields));
         while (true) {
             $frame = self::readFrame();
             if ($frame === null) {
@@ -275,7 +303,7 @@ final class RpcRuntime
                     return new $class(...$ctorArgs);
                 });
                 break;
-            case self::TAG_CALL_PHP_METHOD:
+            case self::TAG_CALL_METHOD:
                 [$phandle, $method, $args] = $fields;
                 self::replyWith($corrId, static function () use ($phandle, $method, $args) {
                     $obj = PhpObjectRegistry::get((int) $phandle);
@@ -288,7 +316,7 @@ final class RpcRuntime
                     return $obj->$method(...$args);
                 });
                 break;
-            case self::TAG_RELEASE_PHP_HANDLE:
+            case self::TAG_RELEASE_HANDLE:
                 [$phandle] = $fields;
                 PhpObjectRegistry::release((int) $phandle);
                 break;

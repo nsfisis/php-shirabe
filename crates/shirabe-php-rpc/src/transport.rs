@@ -7,8 +7,9 @@ use bstr::{BStr, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::bformat;
 
-/// Handles `CallRustMethod` requests arriving while a Rust-initiated call is waiting for its
-/// `Return` (the cooperative reentrancy loop). A handler may itself issue nested RPC calls.
+/// Handles the `CallMethod`, `CallStaticMethod` and `NewObject` requests the worker sends while a
+/// Rust-initiated call is waiting for its `Return` (the cooperative reentrancy loop). A handler may
+/// itself issue nested RPC calls.
 ///
 /// A handler whose method takes by-ref parameters writes the value each one holds afterwards into
 /// `out_params` under its position, and the stub copies it back into the caller's variable;
@@ -22,6 +23,18 @@ pub trait RustMethodDispatcher {
         args: Vec<PluginValue>,
         out_params: &mut IndexMap<u32, PluginValue>,
     ) -> Result<PluginValue, PhpThrow>;
+
+    /// Builds a fresh entity of `class` for a proxy stub under construction in the worker, and
+    /// answers its rhandle.
+    fn construct(&mut self, class: &BStr, ctor_args: Vec<PluginValue>) -> Result<u64, PhpThrow>;
+
+    /// Runs a static method of `class` that a proxy stub or a guard in the worker forwards.
+    fn call_static(
+        &mut self,
+        class: &BStr,
+        method_name: &BStr,
+        args: Vec<PluginValue>,
+    ) -> Result<PluginValue, PhpThrow>;
 }
 
 /// The Rust side allocates odd correlation ids; the PHP side allocates even ones. Calls nest
@@ -34,12 +47,13 @@ static NEXT_CORR_ID: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64
 static NEXT_RHANDLE: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
 
 thread_local! {
-    /// Listener for ReleaseRustHandle notifications, thread-local like the R table it prunes.
+    /// Listener for the ReleaseHandle notifications the worker sends, thread-local like the R
+    /// table it prunes.
     static RELEASE_RUST_HANDLE_HOOK: std::cell::RefCell<Option<Box<dyn Fn(u64)>>> =
         const { std::cell::RefCell::new(None) };
 }
 
-/// Registers the listener invoked with the released handle whenever a ReleaseRustHandle
+/// Registers the listener invoked with the released handle whenever a ReleaseHandle
 /// notification arrives on this thread. Replaces any previously registered listener.
 pub fn set_release_rust_handle_hook(hook: impl Fn(u64) + 'static) {
     RELEASE_RUST_HANDLE_HOOK.with(|slot| {
@@ -51,8 +65,8 @@ pub fn alloc_rhandle() -> u64 {
     NEXT_RHANDLE.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
 }
 
-/// Answers every `CallRustMethod` with an explicit error: the dispatcher of calls none of which runs
-/// code that calls back.
+/// Answers every request from the worker with an explicit error: the dispatcher of calls none of
+/// which runs code that calls back.
 #[derive(Debug)]
 pub struct RefuseCallbacks;
 
@@ -68,11 +82,28 @@ impl RustMethodDispatcher for RefuseCallbacks {
             "no Rust method dispatcher is active for this call (rhandle {rhandle}, method `{method_name}`)"
         )))
     }
+
+    fn construct(&mut self, class: &BStr, _ctor_args: Vec<PluginValue>) -> Result<u64, PhpThrow> {
+        Err(PhpThrow::runtime(bformat!(
+            "no Rust method dispatcher is active for this call (new `{class}`)"
+        )))
+    }
+
+    fn call_static(
+        &mut self,
+        class: &BStr,
+        method_name: &BStr,
+        _args: Vec<PluginValue>,
+    ) -> Result<PluginValue, PhpThrow> {
+        Err(PhpThrow::runtime(bformat!(
+            "no Rust method dispatcher is active for this call (`{class}::{method_name}`)"
+        )))
+    }
 }
 
 /// Calls a PHP function in the worker, or the worker's entry point of that name. The outer
 /// `Result` is the fatal lane (dead worker, broken framing); the inner one carries a PHP
-/// exception if the call threw. `dispatcher` serves the `CallRustMethod` requests the worker
+/// exception if the call threw. `dispatcher` serves the `CallMethod` requests the worker
 /// makes while the call is in flight.
 pub fn call_function(
     name: impl AsRef<[u8]>,
@@ -133,9 +164,9 @@ pub fn call_php_method(
     dispatcher: &mut dyn RustMethodDispatcher,
 ) -> anyhow::Result<Result<PluginValue, PhpThrow>> {
     rpc_call(
-        |corr_id| Frame::CallPhpMethod {
+        |corr_id| Frame::CallMethod {
             corr_id,
-            phandle: handle.phandle(),
+            handle: handle.phandle(),
             method_name: method.as_ref().into(),
             args,
         },
@@ -181,9 +212,9 @@ fn rpc_call(
             Frame::Throw { corr_id, throw } if corr_id == my_id => {
                 return Ok(Err(throw));
             }
-            Frame::CallRustMethod {
+            Frame::CallMethod {
                 corr_id,
-                rhandle,
+                handle: rhandle,
                 method_name,
                 args,
             } => {
@@ -200,7 +231,39 @@ fn rpc_call(
                 };
                 send_frame(&reply)?;
             }
-            Frame::ReleaseRustHandle { rhandle } => {
+            Frame::CallStaticMethod {
+                corr_id,
+                pclass,
+                method_name,
+                args,
+            } => {
+                let reply =
+                    match dispatcher.call_static(pclass.as_bstr(), method_name.as_bstr(), args) {
+                        Ok(value) => Frame::Return {
+                            corr_id,
+                            value,
+                            out_params: IndexMap::new(),
+                        },
+                        Err(throw) => Frame::Throw { corr_id, throw },
+                    };
+                send_frame(&reply)?;
+            }
+            Frame::NewObject {
+                corr_id,
+                pclass,
+                ctor_args,
+            } => {
+                let reply = match dispatcher.construct(pclass.as_bstr(), ctor_args) {
+                    Ok(rhandle) => Frame::Return {
+                        corr_id,
+                        value: PluginValue::Int(rhandle as i64),
+                        out_params: IndexMap::new(),
+                    },
+                    Err(throw) => Frame::Throw { corr_id, throw },
+                };
+                send_frame(&reply)?;
+            }
+            Frame::ReleaseHandle { handle: rhandle } => {
                 // A one-way notification sent by a child-side stub's __destruct; the shirabe
                 // crate registers a hook that drops the matching R-table entry. The hook is
                 // installed before any entry exists, so an unhooked release is a no-op.
