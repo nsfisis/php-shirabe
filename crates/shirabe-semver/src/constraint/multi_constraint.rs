@@ -256,6 +256,10 @@ impl MultiConstraint {
     pub fn get_upper_bound(&self) -> Bound {
         self.extract_bounds().1
     }
+
+    pub fn into_parts(self) -> (Vec<AnyConstraint>, bool, Option<BString>) {
+        (self.constraints, self.conjunctive, self.pretty_string)
+    }
 }
 
 impl PhpDisplay for MultiConstraint {

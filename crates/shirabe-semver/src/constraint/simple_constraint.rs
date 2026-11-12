@@ -295,6 +295,18 @@ impl SimpleConstraint {
     pub fn get_upper_bound(&self) -> Bound {
         self.extract_bounds().1
     }
+
+    pub fn into_parts(self) -> (CmpOp, BString, Option<BString>) {
+        (self.operator, self.version, self.pretty_string)
+    }
+
+    pub fn from_parts(operator: CmpOp, version: BString, pretty_string: Option<BString>) -> Self {
+        Self {
+            operator,
+            version,
+            pretty_string,
+        }
+    }
 }
 
 impl PhpDisplay for SimpleConstraint {

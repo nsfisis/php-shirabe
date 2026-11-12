@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/Util/Http/Response.php sha1:03cbb36fbfd3c9aa1dce23627100c2de3bc6a8db
 
 use crate::json::JsonFile;
-use bstr::{BStr, BString, ByteSlice as _};
+use bstr::{BStr, BString};
 use shirabe_php_shim::{PhpMixed, bformat, php_regex, preg_is_match, preg_match, preg_quote};
 
 #[derive(Debug)]
@@ -25,13 +25,6 @@ impl Response {
             headers,
             body,
         }
-    }
-
-    /// The url of the request this response answered. PHP keeps the whole request array in a
-    /// private property with no getter, and the plugin boundary codec needs the url out of it to
-    /// rebuild the value in the child.
-    pub(crate) fn request_url(&self) -> &BStr {
-        self.url.as_bstr()
     }
 
     pub fn get_status_code(&self) -> i64 {
@@ -84,5 +77,9 @@ impl Response {
             }
         }
         value
+    }
+
+    pub fn into_parts(self) -> (BString, i64, Vec<BString>, Option<Vec<u8>>) {
+        (self.url, self.code, self.headers, self.body)
     }
 }

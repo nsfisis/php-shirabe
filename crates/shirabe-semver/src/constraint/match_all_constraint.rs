@@ -34,6 +34,10 @@ impl MatchAllConstraint {
     pub fn get_lower_bound(&self) -> Bound {
         Bound::zero()
     }
+
+    pub fn into_parts(self) -> Option<BString> {
+        self.pretty_string
+    }
 }
 
 impl PhpDisplay for MatchAllConstraint {

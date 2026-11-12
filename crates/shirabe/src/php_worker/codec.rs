@@ -50,22 +50,23 @@ fn property<T: FromPluginValue>(
     })
 }
 
-fn constraint_to_plugin_value(constraint: &AnyConstraint) -> PluginValue {
+fn constraint_to_plugin_value(constraint: AnyConstraint) -> PluginValue {
     // Whether the pretty string was ever set is observable (`getPrettyString()` falls back to the
     // string form), so an unset one crosses as null rather than as an absent property.
-    let pretty_string = match constraint.pretty_string() {
+    let pretty_string = |pretty: Option<BString>| match pretty {
         Some(pretty) => PluginValue::string(pretty),
         None => PluginValue::Null,
     };
     let object = match constraint {
         AnyConstraint::Simple(c) => {
+            let (operator, version, pretty) = c.into_parts();
             let mut object = PhpObject::new(CONSTRAINT_CLASS);
             object.set_protected(
                 "operator",
-                PluginValue::Int(SimpleConstraint::get_operator_constant(c.get_operator())),
+                PluginValue::Int(SimpleConstraint::get_operator_constant(operator)),
             );
-            object.set_protected("version", PluginValue::string(c.get_version()));
-            object.set_protected("prettyString", pretty_string);
+            object.set_protected("version", PluginValue::string(version));
+            object.set_protected("prettyString", pretty_string(pretty));
             // A cold memo rather than missing state: PHP derives the bounds from the operator
             // and the version the first time anything asks for them, and this port keeps no
             // such cache to carry over.
@@ -74,33 +75,34 @@ fn constraint_to_plugin_value(constraint: &AnyConstraint) -> PluginValue {
             object
         }
         AnyConstraint::Multi(c) => {
+            let (constraints, conjunctive, pretty) = c.into_parts();
             let mut object = PhpObject::new(MULTI_CONSTRAINT_CLASS);
             object.set_protected(
                 "constraints",
                 PluginValue::List(
-                    c.get_constraints()
-                        .iter()
+                    constraints
+                        .into_iter()
                         .map(constraint_to_plugin_value)
                         .collect(),
                 ),
             );
-            object.set_protected("prettyString", pretty_string);
+            object.set_protected("prettyString", pretty_string(pretty));
             // A cold memo like the bounds below, of the rendering PHP derives from the
             // constraints and the conjunctive flag.
             object.set_protected("string", PluginValue::Null);
-            object.set_protected("conjunctive", PluginValue::Bool(c.is_conjunctive()));
+            object.set_protected("conjunctive", PluginValue::Bool(conjunctive));
             object.set_protected("lowerBound", PluginValue::Null);
             object.set_protected("upperBound", PluginValue::Null);
             object
         }
-        AnyConstraint::MatchAll(_) => {
+        AnyConstraint::MatchAll(c) => {
             let mut object = PhpObject::new(MATCH_ALL_CLASS);
-            object.set_protected("prettyString", pretty_string);
+            object.set_protected("prettyString", pretty_string(c.into_parts()));
             object
         }
-        AnyConstraint::MatchNone(_) => {
+        AnyConstraint::MatchNone(c) => {
             let mut object = PhpObject::new(MATCH_NONE_CLASS);
-            object.set_protected("prettyString", pretty_string);
+            object.set_protected("prettyString", pretty_string(c.into_parts()));
             object
         }
     };
@@ -127,9 +129,9 @@ pub(crate) fn constraint_from_plugin_value(value: &PluginValue) -> Result<AnyCon
                     "a semver constraint has an unknown operator: {code}"
                 ))
             })?;
-            AnyConstraint::Simple(SimpleConstraint::new(
-                operator.as_str(),
-                property::<BString>("a semver constraint version", object.protected("version"))?,
+            AnyConstraint::Simple(SimpleConstraint::from_parts(
+                operator,
+                property("a semver constraint version", object.protected("version"))?,
                 pretty_string,
             ))
         }
@@ -192,37 +194,29 @@ pub(crate) fn constraint_from_plugin_value(value: &PluginValue) -> Result<AnyCon
 /// carrying the transfer info; the native downloader that takes those requests here flattens its
 /// response into `Response` before the value leaves `HttpDownloader`, so `getCurlInfo()` is gone
 /// and `get_class()` differs.
-pub(crate) fn response_to_plugin_value(response: &Response) -> PluginValue {
-    let mut object = PhpObject::new(RESPONSE_CLASS);
-    let mut request = indexmap::IndexMap::new();
-    request.insert("url".into(), PluginValue::string(response.request_url()));
-    object.set_private(RESPONSE_CLASS, "request", PluginValue::Array(request));
-    object.set_private(
-        RESPONSE_CLASS,
-        "code",
-        PluginValue::Int(response.get_status_code()),
-    );
-    object.set_private(
-        RESPONSE_CLASS,
-        "headers",
-        PluginValue::List(
-            response
-                .get_headers()
-                .iter()
-                .cloned()
-                .map(PluginValue::string)
-                .collect(),
-        ),
-    );
-    object.set_private(
-        RESPONSE_CLASS,
-        "body",
-        match response.get_body() {
-            Some(body) => PluginValue::string(body),
-            None => PluginValue::Null,
-        },
-    );
-    PluginValue::PhpObject(object)
+impl ToPluginValue for Response {
+    fn to_plugin_value(self) -> PluginValue {
+        let (url, code, headers, body) = self.into_parts();
+        let mut object = PhpObject::new(RESPONSE_CLASS);
+        let mut request = indexmap::IndexMap::new();
+        request.insert("url".into(), PluginValue::string(url));
+        object.set_private(RESPONSE_CLASS, "request", PluginValue::Array(request));
+        object.set_private(RESPONSE_CLASS, "code", PluginValue::Int(code));
+        object.set_private(
+            RESPONSE_CLASS,
+            "headers",
+            PluginValue::List(headers.into_iter().map(PluginValue::string).collect()),
+        );
+        object.set_private(
+            RESPONSE_CLASS,
+            "body",
+            match body {
+                Some(body) => PluginValue::string(body),
+                None => PluginValue::Null,
+            },
+        );
+        PluginValue::PhpObject(object)
+    }
 }
 
 /// The class map `AutoloadGenerator::dump()` returns. It is a `php-native` class, so the child
@@ -268,59 +262,37 @@ pub(crate) fn class_map_to_plugin_value(class_map: &ClassMap) -> PluginValue {
     PluginValue::PhpObject(object)
 }
 
-pub(crate) fn link_to_plugin_value(link: &Link) -> PluginValue {
-    let mut object = PhpObject::new(LINK_CLASS);
-    object.set_protected("source", PluginValue::string(link.get_source()));
-    object.set_protected("target", PluginValue::string(link.get_target()));
-    object.set_protected(
-        "constraint",
-        constraint_to_plugin_value(link.get_constraint()),
-    );
-    object.set_protected("description", PluginValue::string(link.get_description()));
-    let pretty_constraint = match link.get_pretty_constraint_for_serialization() {
-        Some(pretty) => PluginValue::string(pretty),
-        None => PluginValue::Null,
-    };
-    object.set_protected("prettyConstraint", pretty_constraint);
-    PluginValue::PhpObject(object)
-}
-
-pub(crate) fn link_from_plugin_value(value: &PluginValue) -> Result<Link, PhpThrow> {
-    let object = as_object(value).ok_or_else(|| {
-        PhpThrow::runtime(bformat!(
-            "expected a Link from the plugin, got {}",
-            display_to_bytes(format_args!("{value:?}"))
-        ))
-    })?;
-    if object.class != LINK_CLASS {
-        // TODO(plugin): Link subclasses have no Rust counterpart; the port models links as a
-        // single value type.
-        return Err(PhpThrow::runtime(bformat!(
-            "the class `{}` cannot cross the plugin boundary as a Link",
-            object.class
-        )));
-    }
-    let constraint = constraint_from_plugin_value(
-        object
-            .protected("constraint")
-            .ok_or_else(|| PhpThrow::runtime("a Link expects a constraint"))?,
-    )?;
-    let pretty_constraint: Option<BString> = property(
-        "a Link pretty constraint",
-        object.protected("prettyConstraint"),
-    )?;
-    Ok(Link::new(
-        property("a Link source", object.protected("source"))?,
-        property("a Link target", object.protected("target"))?,
-        constraint,
-        property("a Link description", object.protected("description"))?,
-        pretty_constraint,
-    ))
-}
-
 impl FromPluginValue for Link {
     fn from_plugin_value(value: &PluginValue) -> Result<Self, PhpThrow> {
-        link_from_plugin_value(value)
+        let object = as_object(value).ok_or_else(|| {
+            PhpThrow::runtime(bformat!(
+                "expected a Link from the plugin, got {}",
+                display_to_bytes(format_args!("{value:?}"))
+            ))
+        })?;
+        if object.class != LINK_CLASS {
+            // TODO(plugin): Link subclasses have no Rust counterpart; the port models links as a
+            // single value type.
+            return Err(PhpThrow::runtime(bformat!(
+                "the class `{}` cannot cross the plugin boundary as a Link",
+                object.class
+            )));
+        }
+        let constraint = constraint_from_plugin_value(
+            object
+                .protected("constraint")
+                .ok_or_else(|| PhpThrow::runtime("a Link expects a constraint"))?,
+        )?;
+        Ok(Link::from_parts(
+            property("a Link source", object.protected("source"))?,
+            property("a Link target", object.protected("target"))?,
+            constraint,
+            property("a Link description", object.protected("description"))?,
+            property(
+                "a Link pretty constraint",
+                object.protected("prettyConstraint"),
+            )?,
+        ))
     }
 }
 
@@ -330,7 +302,18 @@ impl FromPluginValue for Link {
 /// with distinct child-side objects where upstream returns the identical one.
 impl ToPluginValue for Link {
     fn to_plugin_value(self) -> PluginValue {
-        link_to_plugin_value(&self)
+        let (source, target, constraint, description, pretty_constraint) = self.into_parts();
+        let mut object = PhpObject::new(LINK_CLASS);
+        object.set_protected("source", PluginValue::string(source));
+        object.set_protected("target", PluginValue::string(target));
+        object.set_protected("constraint", constraint_to_plugin_value(constraint));
+        object.set_protected("description", PluginValue::string(description));
+        let pretty_constraint = match pretty_constraint {
+            Some(pretty) => PluginValue::string(pretty),
+            None => PluginValue::Null,
+        };
+        object.set_protected("prettyConstraint", pretty_constraint);
+        PluginValue::PhpObject(object)
     }
 }
 
@@ -407,7 +390,7 @@ mod tests {
             Some(BString::from("^1.0")),
         );
         assert_eq!(
-            BStr::new(&serialize(&link_to_plugin_value(&link))),
+            BStr::new(&serialize(&link.clone().to_plugin_value())),
             BStr::new(
                 b"O:21:\"Composer\\Package\\Link\":5:{\
                     s:9:\"\0*\0source\";s:3:\"a/b\";\
@@ -437,7 +420,7 @@ mod tests {
             None,
         );
         assert_eq!(
-            BStr::new(&serialize(&link_to_plugin_value(&link))),
+            BStr::new(&serialize(&link.clone().to_plugin_value())),
             BStr::new(
                 b"O:21:\"Composer\\Package\\Link\":5:{\
                     s:9:\"\0*\0source\";s:3:\"a/b\";\
@@ -448,9 +431,9 @@ mod tests {
                     s:19:\"\0*\0prettyConstraint\";N;}"
             ),
         );
-        let decoded = link_from_plugin_value(&link_to_plugin_value(&link)).expect("decode failed");
-        assert_eq!(None, decoded.get_pretty_constraint_for_serialization());
+        let decoded = Link::from_plugin_value(&link.to_plugin_value()).expect("decode failed");
         assert!(decoded.get_pretty_constraint().is_err());
+        assert_eq!(None, decoded.into_parts().4);
     }
 
     /// The expected bytes are what PHP writes for
@@ -467,7 +450,7 @@ mod tests {
             Some(BString::from("^1.0")),
         ));
         assert_eq!(
-            BStr::new(&serialize(&constraint_to_plugin_value(&constraint))),
+            BStr::new(&serialize(&constraint_to_plugin_value(constraint))),
             BStr::new(
                 b"O:42:\"Composer\\Semver\\Constraint\\MultiConstraint\":6:{\
                     s:14:\"\0*\0constraints\";a:2:{\
@@ -528,7 +511,7 @@ mod tests {
                 Some(BString::from("^1.0")),
             );
             let decoded =
-                link_from_plugin_value(&link_to_plugin_value(&link)).expect("decode failed");
+                Link::from_plugin_value(&link.clone().to_plugin_value()).expect("decode failed");
             assert_eq!(link.to_php_string(), decoded.to_php_string());
             assert_eq!(link.get_description(), decoded.get_description());
             assert_eq!(
@@ -549,7 +532,7 @@ mod tests {
             err.message.display_lossy()
         );
 
-        let err = link_from_plugin_value(&PluginValue::List(Vec::new())).unwrap_err();
+        let err = Link::from_plugin_value(&PluginValue::List(Vec::new())).unwrap_err();
         assert!(
             err.message.contains_str("expected a Link"),
             "{}",

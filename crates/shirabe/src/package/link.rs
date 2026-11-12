@@ -87,10 +87,6 @@ impl Link {
         }
     }
 
-    pub fn get_pretty_constraint_for_serialization(&self) -> Option<&BStr> {
-        self.pretty_constraint.as_ref().map(|s| s.as_bstr())
-    }
-
     pub fn get_pretty_string(&self, source_package: PackageInterfaceHandle) -> BString {
         bformat!(
             "{} {} {} {}",
@@ -99,6 +95,32 @@ impl Link {
             self.target,
             self.constraint.get_pretty_string()
         )
+    }
+
+    pub fn into_parts(self) -> (BString, BString, AnyConstraint, BString, Option<BString>) {
+        (
+            self.source,
+            self.target,
+            self.constraint,
+            self.description,
+            self.pretty_constraint,
+        )
+    }
+
+    pub fn from_parts(
+        source: BString,
+        target: BString,
+        constraint: AnyConstraint,
+        description: BString,
+        pretty_constraint: Option<BString>,
+    ) -> Self {
+        Self {
+            source,
+            target,
+            constraint,
+            description,
+            pretty_constraint,
+        }
     }
 }
 

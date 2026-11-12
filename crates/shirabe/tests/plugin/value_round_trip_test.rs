@@ -237,7 +237,7 @@ fn test_link_without_pretty_constraint_throws_on_both_sides() {
 
     let requires = package.get_requires();
     let link = requires.get(B("bar/unset")).unwrap();
-    assert_eq!(None, link.get_pretty_constraint_for_serialization());
+    assert_eq!(None, link.clone().into_parts().4);
     let error = link.get_pretty_constraint().unwrap_err();
     assert_eq!(
         "Link dummy/root relates to bar/unset (*) has been misconfigured and had no prettyConstraint given.",

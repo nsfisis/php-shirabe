@@ -118,19 +118,6 @@ impl AnyConstraint {
         matches!(self, Self::MatchNone(_))
     }
 
-    /// The pretty string as stored, without the `getPrettyString()` fallback to the
-    /// constraint's string form. PHP has no such reader — `$prettyString` is protected — so
-    /// this exists for callers that must round-trip a constraint without inventing a value
-    /// for the unset case.
-    pub fn pretty_string(&self) -> Option<&BStr> {
-        match self {
-            Self::Simple(c) => c.pretty_string.as_ref().map(|s| s.as_ref()),
-            Self::Multi(c) => c.pretty_string.as_ref().map(|s| s.as_ref()),
-            Self::MatchAll(c) => c.pretty_string.as_ref().map(|s| s.as_ref()),
-            Self::MatchNone(c) => c.pretty_string.as_ref().map(|s| s.as_ref()),
-        }
-    }
-
     /// PHP exposes `ConstraintInterface::setPrettyString()` and defaults the
     /// pretty string to the constraint's string form when unset. This port takes
     /// the pretty string at construction instead; this setter exists only so

@@ -6,7 +6,6 @@
 
 use crate::config::Config;
 use crate::io::IOInterface;
-use crate::php_worker::codec::response_to_plugin_value;
 use crate::php_worker::job;
 use crate::php_worker::job::JobOwner;
 use crate::php_worker::job::rpc::{
@@ -55,9 +54,7 @@ fn add_job(
         )
         .map_err(&failed)?;
     match job {
-        HttpDownloaderJob::Settled(Ok(response)) => {
-            resolved_promise(response_to_plugin_value(&response))
-        }
+        HttpDownloaderJob::Settled(Ok(response)) => resolved_promise(response.to_plugin_value()),
         HttpDownloaderJob::Settled(Err(error)) => rejected_promise(failed(error)),
         HttpDownloaderJob::Pending(future) => {
             let method = call.method().to_owned();
@@ -72,7 +69,7 @@ fn add_job(
                 Box::pin(async move {
                     future
                         .await
-                        .map(|response| response_to_plugin_value(&response))
+                        .map(ToPluginValue::to_plugin_value)
                         .map_err(|error| error_throw(bformat!("{method} failed"), &error))
                 }),
             ))
@@ -117,7 +114,7 @@ impl forwarding::util::http_downloader::Forwarding for forwarding::util::http_do
             .borrow()
             .get(&url, options)
             .map_err(call.failed())?;
-        Ok(response_to_plugin_value(&response))
+        Ok(response.to_plugin_value())
     }
 
     fn copy(downloader: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
@@ -128,7 +125,7 @@ impl forwarding::util::http_downloader::Forwarding for forwarding::util::http_do
             .borrow()
             .copy(&url, path_from_bytes(&to), options)
             .map_err(call.failed())?;
-        Ok(response_to_plugin_value(&response))
+        Ok(response.to_plugin_value())
     }
 
     fn add(downloader: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {

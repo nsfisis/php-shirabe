@@ -34,6 +34,10 @@ impl MatchNoneConstraint {
     pub fn get_lower_bound(&self) -> Bound {
         Bound::new("0.0.0.0-dev", false)
     }
+
+    pub fn into_parts(self) -> Option<BString> {
+        self.pretty_string
+    }
 }
 
 impl PhpDisplay for MatchNoneConstraint {
