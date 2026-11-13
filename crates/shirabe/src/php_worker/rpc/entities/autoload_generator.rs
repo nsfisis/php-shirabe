@@ -14,7 +14,7 @@ use crate::repository::RepositoryInterfaceHandle;
 use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_rpc::{FromPluginValue, PhpThrow, PluginValue, ToPluginValue, codec};
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{E_USER_DEPRECATED, PhpMixed, trigger_error};
 
 impl Entity for std::rc::Rc<std::cell::RefCell<dyn AutoloadGeneratorInterface>> {
     const EXPECTED: &'static [u8] = b"an AutoloadGenerator";
@@ -75,10 +75,11 @@ impl forwarding::autoload::autoload_generator::Forwarding
         generator: &Self::Handle,
         call: &mut Call<'_>,
     ) -> Result<PluginValue, PhpThrow> {
-        // TODO(php-runtime): upstream raises an E_USER_DEPRECATED here
-        // ("AutoloadGenerator::setIgnorePlatformRequirements is deprecated since Composer 2.2,
-        // use setPlatformRequirementFilter instead."), which Composer's ErrorHandler prints as
-        // a deprecation notice; the worker does not run that handler.
+        trigger_error(
+            "AutoloadGenerator::setIgnorePlatformRequirements is deprecated since Composer 2.2, use setPlatformRequirementFilter instead.",
+            E_USER_DEPRECATED,
+        );
+
         let filter = PlatformRequirementFilterFactory::from_bool_or_list(call.arg::<PhpMixed>(0)?)
             .map_err(call.failed())?;
         generator.borrow().set_platform_requirement_filter(filter);

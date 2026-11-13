@@ -853,8 +853,6 @@ fn test_prompt_auth_if_needed_multiple_bitbucket_downloads() {
 }
 
 #[test]
-#[ignore = "addAuthenticationHeader opens with trigger_error(E_USER_DEPRECATED), and \
-shirabe_php_shim::trigger_error is a todo!()"]
 fn test_add_authentication_header_with_custom_headers() {
     let mut f = set_up();
     let headers = vec![
@@ -903,21 +901,15 @@ fn test_add_authentication_header_with_custom_headers() {
 }
 
 #[test]
-#[ignore = "exercises the deprecated addAuthenticationHeader wrapper, which opens with \
-trigger_error(E_USER_DEPRECATED); shirabe_php_shim::trigger_error is a todo!()"]
+#[ignore = "silences the E_USER_DEPRECATED of addAuthenticationHeader with set_error_handler, \
+which the shim does not have"]
 fn test_add_authentication_header_is_working() {
-    // TODO(php-runtime): see test_add_authentication_header_with_custom_headers above — the same
-    // trigger_error(E_USER_DEPRECATED) that opens addAuthenticationHeader.
     todo!()
 }
 
 #[test]
 #[ignore = "asserts that the deprecated addAuthenticationHeader wrapper raises a RuntimeException \
-through a set_error_handler converting E_USER_DEPRECATED; shirabe_php_shim::trigger_error is a \
-todo!() and the shim has no set_error_handler"]
+through a set_error_handler converting E_USER_DEPRECATED, which the shim does not have"]
 fn test_add_authentication_header_deprecation() {
-    // TODO(php-runtime): asserts that calling addAuthenticationHeader itself raises a
-    // RuntimeException via a custom set_error_handler converting E_USER_DEPRECATED; the same
-    // trigger_error todo!() and unmodeled error-handler subsystem as the two tests above.
     todo!()
 }

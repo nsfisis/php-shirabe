@@ -4,6 +4,7 @@ use crate::event_dispatcher::{Event, EventFlags, delegate_event_interface_to_inn
 use crate::package::PackageInterfaceHandle;
 use crate::plugin::FileDownloadContext;
 use bstr::{BStr, BString, ByteSlice as _};
+use shirabe_php_shim::{E_USER_DEPRECATED, trigger_error};
 
 #[derive(Debug)]
 pub struct PostFileDownloadEvent {
@@ -55,9 +56,11 @@ impl PostFileDownloadEvent {
     }
 
     pub fn get_package(&self) -> Option<PackageInterfaceHandle> {
-        // TODO(php-runtime): upstream raises an E_USER_DEPRECATED here ("PostFileDownloadEvent::
-        // getPackage is deprecated since Composer 2.1, use getContext instead."), which Composer's
-        // ErrorHandler prints as a deprecation notice; the error subsystem is not modeled.
+        trigger_error(
+            "PostFileDownloadEvent::getPackage is deprecated since Composer 2.1, use getContext instead.",
+            E_USER_DEPRECATED,
+        );
+
         match self.get_context() {
             Some(FileDownloadContext::Package(package)) => Some(package.clone()),
             _ => None,

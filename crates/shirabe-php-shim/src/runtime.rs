@@ -245,11 +245,10 @@ pub fn php_uname(mode: impl AsRef<[u8]>) -> BString {
     }
 }
 
-pub fn trigger_error(_message: impl AsRef<[u8]>, _error_level: i64) {
-    let _message = BStr::new(_message.as_ref());
-    // TODO(php-runtime): emitting a PHP error obeys error_reporting and the installed error handler
-    // (both runtime state not modeled here); writing unconditionally to stderr would diverge.
-    todo!()
+pub fn trigger_error(message: impl AsRef<[u8]>, _error_level: i64) {
+    let message = BStr::new(message.as_ref());
+    // TODO(port): PHP's error handling is not ported; this only writes the message to stderr.
+    eprintln!("{}", message.display_lossy());
 }
 
 pub fn usleep(microseconds: u64) {
