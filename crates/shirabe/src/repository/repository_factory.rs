@@ -140,7 +140,10 @@ impl RepositoryFactory {
 
         let config = match config {
             Some(c) => c,
-            None => std::rc::Rc::new(std::cell::RefCell::new(Factory::create_config(None, None)?)),
+            None => std::rc::Rc::new(std::cell::RefCell::new(Factory::create_config(
+                io.clone(),
+                None,
+            )?)),
         };
         if let Some(io) = &io {
             io.borrow_mut()
