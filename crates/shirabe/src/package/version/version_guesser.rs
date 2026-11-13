@@ -501,9 +501,9 @@ impl VersionGuesser {
             });
 
             self.process.borrow_mut().set_max_jobs(30);
-            // PHP runs every candidate diff in parallel and cancels the siblings once a zero-length
-            // diff is found; the single-threaded sync bridge block_on's each diff serially and stops
-            // at the first zero-length match.
+            // TODO(async): PHP runs every candidate diff in parallel and cancels the siblings once a
+            // zero-length diff is found. Here each diff is block_on'd serially through the sync
+            // bridge, and the loop stops at the first zero-length match.
             let result: anyhow::Result<()> = (|| -> anyhow::Result<()> {
                 let mut last_index: i64 = -1;
                 for (index, candidate) in branches.iter().enumerate() {
