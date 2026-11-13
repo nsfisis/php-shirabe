@@ -34,7 +34,7 @@ impl Helper {
             "symfony/console",
             "5.3",
             "Method \"%s()\" is deprecated and will be removed in Symfony 6.0. Use Helper::width() or Helper::length() instead.",
-            "Helper::strlen",
+            "Symfony\\Component\\Console\\Helper\\Helper::strlen",
         );
 
         Self::width(string)
@@ -153,7 +153,7 @@ impl Helper {
             "symfony/console",
             "5.3",
             "Method \"%s()\" is deprecated and will be removed in Symfony 6.0. Use Helper::removeDecoration() instead.",
-            "Helper::strlenWithoutDecoration",
+            "Symfony\\Component\\Console\\Helper\\Helper::strlenWithoutDecoration",
         );
 
         Self::width(Self::remove_decoration(formatter, string))

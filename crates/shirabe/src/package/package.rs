@@ -7,7 +7,7 @@ use crate::util::ComposerMirror;
 use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::{IndexMap, IndexSet};
 use shirabe_php_shim::{
-    E_USER_DEPRECATED, LogicException, PhpDisplay, PhpMixed, PregMatches, bformat, ltrim_chars,
+    E_USER_NOTICE, LogicException, PhpDisplay, PhpMixed, PregMatches, bformat, ltrim_chars,
     php_regex, preg_is_match, preg_replace, preg_replace_callback, strpos, strtolower,
     trigger_error,
 };
@@ -529,7 +529,7 @@ impl Package {
             bformat!(
                 "Package::{source} must be called with a map of lowercased package name => Link object, got a indexed array, this is deprecated and you should fix your usage."
             ),
-            E_USER_DEPRECATED,
+            E_USER_NOTICE,
         );
         let mut new_links: IndexMap<BString, Link> = IndexMap::new();
         for (_k, link) in links {

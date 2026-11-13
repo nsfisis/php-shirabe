@@ -12,9 +12,9 @@ use crate::util::{HttpDownloader, ProcessExecutor, StreamContextOptions};
 use bstr::{B, BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    InvalidArgumentException, PATHINFO_EXTENSION, PhpMixed, ToPhpString, UnexpectedValueException,
-    bformat, get_debug_type, json_encode, path_from_bytes, path_to_bytes, pathinfo, php_regex,
-    preg_replace, realpath, strtr,
+    E_USER_DEPRECATED, InvalidArgumentException, PATHINFO_EXTENSION, PhpMixed, ToPhpString,
+    UnexpectedValueException, bformat, get_debug_type, json_encode, path_from_bytes, path_to_bytes,
+    pathinfo, php_regex, preg_replace, realpath, strtr, trigger_error,
 };
 
 pub struct RepositoryFactory;
@@ -106,6 +106,12 @@ impl RepositoryFactory {
         let rm = if let Some(rm) = rm {
             rm
         } else {
+            // TODO(php-runtime): upstream raises this with the @ operator, which lowers
+            // error_reporting() for the installed error handler; the shim has no counterpart.
+            trigger_error(
+                "Not passing a repository manager when calling createRepo is deprecated since Composer 2.3.6",
+                E_USER_DEPRECATED,
+            );
             owned_rm = Self::manager(io, config, None, None, None)?;
             &mut owned_rm
         };
@@ -123,6 +129,15 @@ impl RepositoryFactory {
         config: Option<std::rc::Rc<std::cell::RefCell<Config>>>,
         rm: Option<&mut dyn RepositoryManagerInterface>,
     ) -> anyhow::Result<IndexMap<BString, RepositoryInterfaceHandle>> {
+        if rm.is_none() {
+            // TODO(php-runtime): upstream raises this with the @ operator, which lowers
+            // error_reporting() for the installed error handler; the shim has no counterpart.
+            trigger_error(
+                "Not passing a repository manager when calling defaultRepos is deprecated since Composer 2.3.6, use defaultReposWithDefaultManager() instead if you cannot get a manager.",
+                E_USER_DEPRECATED,
+            );
+        }
+
         let config = match config {
             Some(c) => c,
             None => std::rc::Rc::new(std::cell::RefCell::new(Factory::create_config(None, None)?)),
