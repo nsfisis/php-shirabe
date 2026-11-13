@@ -590,7 +590,7 @@ impl CreateProjectCommand {
                     io.clone(),
                     &config,
                     repo_config.clone(),
-                    None,
+                    Some(&mut *rm.borrow_mut()),
                 )?);
             }
         } else {
