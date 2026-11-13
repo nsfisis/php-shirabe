@@ -252,21 +252,6 @@ pub fn trigger_error(_message: impl AsRef<[u8]>, _error_level: i64) {
     todo!()
 }
 
-pub fn trigger_deprecation(
-    _package: impl AsRef<[u8]>,
-    _version: impl AsRef<[u8]>,
-    _message: impl AsRef<[u8]>,
-    _arg: impl AsRef<[u8]>,
-) {
-    let _package = BStr::new(_package.as_ref());
-    let _version = BStr::new(_version.as_ref());
-    let _message = BStr::new(_message.as_ref());
-    let _arg = BStr::new(_arg.as_ref());
-    // TODO(php-runtime): symfony/deprecation-contracts triggers an E_USER_DEPRECATED via the error
-    // subsystem, which is not modeled (see trigger_error).
-    todo!()
-}
-
 pub fn usleep(microseconds: u64) {
     std::thread::sleep(std::time::Duration::from_micros(microseconds));
 }

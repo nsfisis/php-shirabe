@@ -10,6 +10,7 @@ license.workspace = true
 [dependencies]
 shirabe-php-rpc.workspace = true
 shirabe-php-shim.workspace = true
+shirabe-symfony-deprecation-contracts.workspace = true
 shirabe-symfony-process.workspace = true
 shirabe-symfony-string.workspace = true
 anyhow.workspace = true

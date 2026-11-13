@@ -1,0 +1,15 @@
+[package]
+name = "shirabe-symfony-deprecation-contracts"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "A Rust port of symfony/deprecation-contracts"
+repository.workspace = true
+license.workspace = true
+
+[dependencies]
+shirabe-php-shim.workspace = true
+bstr.workspace = true
+
+[lints]
+workspace = true

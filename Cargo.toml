@@ -22,6 +22,7 @@ shirabe-seld-json-lint = { path = "crates/shirabe-seld-json-lint" }
 shirabe-semver = { path = "crates/shirabe-semver" }
 shirabe-spdx-licenses = { path = "crates/shirabe-spdx-licenses" }
 shirabe-symfony-console = { path = "crates/shirabe-symfony-console" }
+shirabe-symfony-deprecation-contracts = { path = "crates/shirabe-symfony-deprecation-contracts" }
 shirabe-symfony-filesystem = { path = "crates/shirabe-symfony-filesystem" }
 shirabe-symfony-finder = { path = "crates/shirabe-symfony-finder" }
 shirabe-symfony-process = { path = "crates/shirabe-symfony-process" }

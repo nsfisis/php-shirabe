@@ -2483,9 +2483,18 @@ dependencies = [
  "serde",
  "shirabe-php-rpc",
  "shirabe-php-shim",
+ "shirabe-symfony-deprecation-contracts",
  "shirabe-symfony-process",
  "shirabe-symfony-string",
  "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "shirabe-symfony-deprecation-contracts"
+version = "0.2.0"
+dependencies = [
+ "bstr",
+ "shirabe-php-shim",
 ]
 
 [[package]]

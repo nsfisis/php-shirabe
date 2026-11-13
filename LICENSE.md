@@ -29,21 +29,22 @@ Shirabe is a port of Composer v2.9.7 with its dependencies, all of which are
 under The MIT License. Every crate that contains ported code carries the
 license of the package it is ported from:
 
-| Crate                                                                       | Ported from                                 |
-| --------------------------------------------------------------------------- | ------------------------------------------- |
-| [`shirabe`](crates/shirabe/LICENSE)                                         | composer/composer, symfony/console, psr/log |
-| [`shirabe-ca-bundle`](crates/shirabe-ca-bundle/LICENSE)                     | composer/ca-bundle                          |
-| [`shirabe-class-map-generator`](crates/shirabe-class-map-generator/LICENSE) | composer/class-map-generator                |
-| [`shirabe-metadata-minifier`](crates/shirabe-metadata-minifier/LICENSE)     | composer/metadata-minifier                  |
-| [`shirabe-php-rpc`](crates/shirabe-php-rpc/LICENSE)                         | composer/xdebug-handler                     |
-| [`shirabe-seld-json-lint`](crates/shirabe-seld-json-lint/LICENSE)           | seld/jsonlint                               |
-| [`shirabe-semver`](crates/shirabe-semver/LICENSE)                           | composer/semver                             |
-| [`shirabe-spdx-licenses`](crates/shirabe-spdx-licenses/LICENSE)             | composer/spdx-licenses                      |
-| [`shirabe-symfony-console`](crates/shirabe-symfony-console/LICENSE)         | symfony/console                             |
-| [`shirabe-symfony-filesystem`](crates/shirabe-symfony-filesystem/LICENSE)   | symfony/filesystem                          |
-| [`shirabe-symfony-finder`](crates/shirabe-symfony-finder/LICENSE)           | symfony/finder                              |
-| [`shirabe-symfony-process`](crates/shirabe-symfony-process/LICENSE)         | symfony/process                             |
-| [`shirabe-symfony-string`](crates/shirabe-symfony-string/LICENSE)           | symfony/string                              |
+| Crate                                                                                           | Ported from                                 |
+| ----------------------------------------------------------------------------------------------- | ------------------------------------------- |
+| [`shirabe`](crates/shirabe/LICENSE)                                                             | composer/composer, symfony/console, psr/log |
+| [`shirabe-ca-bundle`](crates/shirabe-ca-bundle/LICENSE)                                         | composer/ca-bundle                          |
+| [`shirabe-class-map-generator`](crates/shirabe-class-map-generator/LICENSE)                     | composer/class-map-generator                |
+| [`shirabe-metadata-minifier`](crates/shirabe-metadata-minifier/LICENSE)                         | composer/metadata-minifier                  |
+| [`shirabe-php-rpc`](crates/shirabe-php-rpc/LICENSE)                                             | composer/xdebug-handler                     |
+| [`shirabe-seld-json-lint`](crates/shirabe-seld-json-lint/LICENSE)                               | seld/jsonlint                               |
+| [`shirabe-semver`](crates/shirabe-semver/LICENSE)                                               | composer/semver                             |
+| [`shirabe-spdx-licenses`](crates/shirabe-spdx-licenses/LICENSE)                                 | composer/spdx-licenses                      |
+| [`shirabe-symfony-console`](crates/shirabe-symfony-console/LICENSE)                             | symfony/console                             |
+| [`shirabe-symfony-deprecation-contracts`](crates/shirabe-symfony-deprecation-contracts/LICENSE) | symfony/deprecation-contracts               |
+| [`shirabe-symfony-filesystem`](crates/shirabe-symfony-filesystem/LICENSE)                       | symfony/filesystem                          |
+| [`shirabe-symfony-finder`](crates/shirabe-symfony-finder/LICENSE)                               | symfony/finder                              |
+| [`shirabe-symfony-process`](crates/shirabe-symfony-process/LICENSE)                             | symfony/process                             |
+| [`shirabe-symfony-string`](crates/shirabe-symfony-string/LICENSE)                               | symfony/string                              |
 
 The Shirabe executable embeds these PHP sources into its own binary as the
 Composer runtime bundle ([docs/dev/composer-runtime-bundle.md](docs/dev/composer-runtime-bundle.md)).

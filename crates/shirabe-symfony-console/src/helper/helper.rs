@@ -5,9 +5,9 @@ use crate::helper::HelperSet;
 use bstr::{BStr, BString, ByteSlice as _};
 use shirabe_php_shim::{
     PhpMixed, ToPhpString, bformat, mb_detect_encoding, mb_strlen, mb_strwidth, mb_substr,
-    php_regex, preg_is_match, preg_replace, sprintf, strlen, substr, trigger_deprecation,
-    utf8_text,
+    php_regex, preg_is_match, preg_replace, sprintf, strlen, substr, utf8_text,
 };
+use shirabe_symfony_deprecation_contracts::trigger_deprecation;
 use shirabe_symfony_string::UnicodeString;
 
 /// Helper is the base class for all helper classes.
@@ -33,8 +33,7 @@ impl Helper {
         trigger_deprecation(
             "symfony/console",
             "5.3",
-            "Method \"%s()\" is deprecated and will be removed in Symfony 6.0. Use Helper::width() or Helper::length() instead.",
-            "Symfony\\Component\\Console\\Helper\\Helper::strlen",
+            "Method \"Symfony\\Component\\Console\\Helper\\Helper::strlen()\" is deprecated and will be removed in Symfony 6.0. Use Helper::width() or Helper::length() instead.",
         );
 
         Self::width(string)
@@ -152,8 +151,7 @@ impl Helper {
         trigger_deprecation(
             "symfony/console",
             "5.3",
-            "Method \"%s()\" is deprecated and will be removed in Symfony 6.0. Use Helper::removeDecoration() instead.",
-            "Symfony\\Component\\Console\\Helper\\Helper::strlenWithoutDecoration",
+            "Method \"Symfony\\Component\\Console\\Helper\\Helper::strlenWithoutDecoration()\" is deprecated and will be removed in Symfony 6.0. Use Helper::removeDecoration() instead.",
         );
 
         Self::width(Self::remove_decoration(formatter, string))
