@@ -4,7 +4,7 @@ use crate::composer::ComposerHandle;
 use crate::php_worker::rpc::entities::package::package_value;
 use crate::php_worker::rpc::entity::{Call, Crossing, Entity, entity_value};
 use crate::php_worker::rpc::forwarding;
-use shirabe_php_rpc::{PhpThrow, PluginValue};
+use shirabe_php_rpc::{PhpThrow, RpcValue};
 
 impl Entity for ComposerHandle {
     const EXPECTED: &'static [u8] = b"a Composer";
@@ -19,7 +19,7 @@ impl Entity for ComposerHandle {
 
     // `getLoop()` itself never reaches the Rust side: the Loop is a two-world class, and the stub
     // builds the worker-side one over the two services the Rust-side Loop drives.
-    fn worker_method(&self, call: &mut Call<'_>) -> Option<Result<PluginValue, PhpThrow>> {
+    fn worker_method(&self, call: &mut Call<'_>) -> Option<Result<RpcValue, PhpThrow>> {
         if call.method() != "__shirabe_loop_services" {
             return None;
         }
@@ -27,11 +27,11 @@ impl Entity for ComposerHandle {
         let downloader = r#loop.borrow().get_http_downloader().clone();
         let process = r#loop.borrow().get_process_executor().cloned();
         Some((|| {
-            Ok(PluginValue::List(vec![
+            Ok(RpcValue::List(vec![
                 entity_value(&downloader)?,
                 match process {
                     Some(process) => entity_value(&process)?,
-                    None => PluginValue::Null,
+                    None => RpcValue::Null,
                 },
             ]))
         })())
@@ -43,53 +43,53 @@ impl Entity for ComposerHandle {
 impl forwarding::partial_composer::Forwarding for forwarding::partial_composer::PhpClass {
     type Handle = ComposerHandle;
 
-    fn get_package(composer: &Self::Handle, _: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+    fn get_package(composer: &Self::Handle, _: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         let package = composer.borrow().get_package().as_rc().clone();
         package_value(&package)
     }
 
-    fn get_config(composer: &Self::Handle, _: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+    fn get_config(composer: &Self::Handle, _: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         entity_value(&composer.borrow().get_config())
     }
 
     fn get_repository_manager(
         composer: &Self::Handle,
         _: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    ) -> Result<RpcValue, PhpThrow> {
         entity_value(&composer.borrow().get_repository_manager())
     }
 
     fn get_installation_manager(
         composer: &Self::Handle,
         _: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    ) -> Result<RpcValue, PhpThrow> {
         entity_value(&composer.borrow().get_installation_manager())
     }
 
     fn get_event_dispatcher(
         composer: &Self::Handle,
         _: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    ) -> Result<RpcValue, PhpThrow> {
         entity_value(&composer.borrow().get_event_dispatcher())
     }
 }
 
 impl forwarding::composer::Forwarding for forwarding::composer::PhpClass {
-    fn get_locker(composer: &ComposerHandle, _: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+    fn get_locker(composer: &ComposerHandle, _: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         entity_value(&composer.borrow().get_locker())
     }
 
     fn get_download_manager(
         composer: &ComposerHandle,
         _: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    ) -> Result<RpcValue, PhpThrow> {
         entity_value(&composer.borrow().get_download_manager())
     }
 
     fn get_autoload_generator(
         composer: &ComposerHandle,
         _: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    ) -> Result<RpcValue, PhpThrow> {
         entity_value(&composer.borrow().get_autoload_generator())
     }
 }

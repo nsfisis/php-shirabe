@@ -14,25 +14,25 @@ use Composer\EventDispatcher\EventDispatcher;
 class PartialComposer implements \Shirabe\RustStub
 {
     /** @var int */
-    protected $__rhandle;
+    protected $__entityId;
 
     /**
      * Binds a stub the registry built for an existing entity. Proxy instantiation bypasses
      * the constructor, which belongs to plugin code building a new entity instead.
      */
-    public function __shirabeBind(int $rhandle): void
+    public function __shirabeBind(int $entityId): void
     {
-        $this->__rhandle = $rhandle;
+        $this->__entityId = $entityId;
     }
 
     public function __destruct()
     {
-        \Shirabe\RustObjectRegistry::release($this->__rhandle);
+        \Shirabe\RustStubRegistry::release($this->__entityId);
     }
 
-    public function __shirabeRustHandleDescriptor(): \Shirabe\Wire\RustHandle
+    public function __shirabeRustEntityHandle(): \Shirabe\Rpc\RustEntityHandle
     {
-        return new \Shirabe\Wire\RustHandle($this->__rhandle, static::class);
+        return new \Shirabe\Rpc\RustEntityHandle($this->__entityId, static::class);
     }
 
     public function __clone()
@@ -41,103 +41,103 @@ class PartialComposer implements \Shirabe\RustStub
         // entity and release it twice. The Rust side clones the entity instead, applying
         // whatever __clone semantics the real class defines, and this copy rebinds to the
         // fresh handle. Entities without clone semantics answer with an explicit error.
-        $this->__rhandle = \Shirabe\RpcRuntime::callRust($this->__rhandle, '__shirabe_clone', []);
-        \Shirabe\RustObjectRegistry::adopt($this->__rhandle, $this);
+        $this->__entityId = \Shirabe\RpcRuntime::callRust($this->__entityId, '__shirabe_clone', []);
+        \Shirabe\RustStubRegistry::adopt($this->__entityId, $this);
     }
 
     public function __get($name)
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, '__get', [$name]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, '__get', [$name]);
     }
 
     public function __set($name, $value): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, '__set', [$name, $value]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, '__set', [$name, $value]);
     }
 
     public function __isset($name): bool
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, '__isset', [$name]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, '__isset', [$name]);
     }
 
     public function __unset($name): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, '__unset', [$name]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, '__unset', [$name]);
     }
 
     public function __construct()
     {
-        $this->__rhandle = \Shirabe\RpcRuntime::newRust(static::class, []);
-        \Shirabe\RustObjectRegistry::adopt($this->__rhandle, $this);
+        $this->__entityId = \Shirabe\RpcRuntime::newRust(static::class, []);
+        \Shirabe\RustStubRegistry::adopt($this->__entityId, $this);
     }
 
     public function setPackage(RootPackageInterface $package): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setPackage', [$package]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, 'setPackage', [$package]);
     }
 
     public function getPackage(): RootPackageInterface
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getPackage', []);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'getPackage', []);
     }
 
     public function setConfig(Config $config): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setConfig', [$config]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, 'setConfig', [$config]);
     }
 
     public function getConfig(): Config
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getConfig', []);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'getConfig', []);
     }
 
     public function setLoop(Loop $loop): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setLoop', [$loop]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, 'setLoop', [$loop]);
     }
 
     public function getLoop(): Loop
     {
-        return \Shirabe\RpcRuntime::loopFor($this, $this->__rhandle);
+        return \Shirabe\RpcRuntime::loopFor($this, $this->__entityId);
     }
 
     public function setRepositoryManager(RepositoryManager $manager): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setRepositoryManager', [$manager]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, 'setRepositoryManager', [$manager]);
     }
 
     public function getRepositoryManager(): RepositoryManager
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getRepositoryManager', []);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'getRepositoryManager', []);
     }
 
     public function setInstallationManager(InstallationManager $manager): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setInstallationManager', [$manager]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, 'setInstallationManager', [$manager]);
     }
 
     public function getInstallationManager(): InstallationManager
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getInstallationManager', []);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'getInstallationManager', []);
     }
 
     public function setEventDispatcher(EventDispatcher $eventDispatcher): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setEventDispatcher', [$eventDispatcher]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, 'setEventDispatcher', [$eventDispatcher]);
     }
 
     public function getEventDispatcher(): EventDispatcher
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getEventDispatcher', []);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'getEventDispatcher', []);
     }
 
     public function isGlobal(): bool
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'isGlobal', []);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'isGlobal', []);
     }
 
     public function setGlobal(): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setGlobal', []);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, 'setGlobal', []);
     }
 }

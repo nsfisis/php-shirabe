@@ -1,7 +1,7 @@
 //! The methods a `Composer\Repository\RepositoryInterface` entity answers over RPC.
 
 use crate::package::PackageInterfaceHandle;
-use crate::php_worker::codec::constraint_from_plugin_value;
+use crate::php_worker::codec::constraint_from_rpc_value;
 use crate::php_worker::rpc::entities::package::package_value;
 use crate::php_worker::rpc::entity::{Call, Crossing, Entity};
 use crate::php_worker::rpc::forwarding;
@@ -10,7 +10,7 @@ use crate::repository::{
     LockArrayRepository, RepositoryInterfaceHandle, WritableRepositoryInterface,
 };
 use bstr::{BString, ByteSlice as _};
-use shirabe_php_rpc::{PhpThrow, PluginValue, ToPluginValue};
+use shirabe_php_rpc::{PhpThrow, RpcValue, ToRpcValue};
 use shirabe_php_shim::bformat;
 
 impl Entity for RepositoryInterfaceHandle {
@@ -42,11 +42,11 @@ fn find_package_constraint(
     position: usize,
 ) -> Result<Option<FindPackageConstraint>, PhpThrow> {
     match call.args().get(position) {
-        None | Some(PluginValue::Null) => Ok(None),
-        Some(PluginValue::String(constraint)) => {
+        None | Some(RpcValue::Null) => Ok(None),
+        Some(RpcValue::String(constraint)) => {
             Ok(Some(FindPackageConstraint::String(constraint.clone())))
         }
-        Some(value) => constraint_from_plugin_value(value)
+        Some(value) => constraint_from_rpc_value(value)
             .map(|constraint| Some(FindPackageConstraint::Constraint(constraint)))
             .map_err(|throw| call.arg_throw(position, throw)),
     }
@@ -78,46 +78,37 @@ impl forwarding::repository::array_repository::Forwarding
 {
     type Handle = RepositoryInterfaceHandle;
 
-    fn has_package(
-        repository: &Self::Handle,
-        call: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    fn has_package(repository: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         let package = call.arg::<PackageInterfaceHandle>(0)?;
         let has = repository.has_package(package).map_err(call.failed())?;
-        Ok(has.to_plugin_value())
+        Ok(has.to_rpc_value())
     }
 
-    fn add_package(
-        repository: &Self::Handle,
-        call: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    fn add_package(repository: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         let package = call.arg::<PackageInterfaceHandle>(0)?;
         with_writable(repository, call, |writable| writable.add_package(package))?
             .map_err(call.failed())?;
-        Ok(PluginValue::Null)
+        Ok(RpcValue::Null)
     }
 
     fn remove_package(
         repository: &Self::Handle,
         call: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    ) -> Result<RpcValue, PhpThrow> {
         let package = call.arg::<PackageInterfaceHandle>(0)?;
         with_writable(repository, call, |writable| {
             writable.remove_package(package)
         })?
         .map_err(call.failed())?;
-        Ok(PluginValue::Null)
+        Ok(RpcValue::Null)
     }
 
-    fn get_packages(
-        repository: &Self::Handle,
-        call: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    fn get_packages(repository: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         let packages = repository
             .borrow_mut()
             .get_packages()
             .map_err(call.failed())?;
-        Ok(PluginValue::List(
+        Ok(RpcValue::List(
             packages
                 .iter()
                 .map(|package| package_value(package.as_rc()))
@@ -125,10 +116,7 @@ impl forwarding::repository::array_repository::Forwarding
         ))
     }
 
-    fn find_package(
-        repository: &Self::Handle,
-        call: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    fn find_package(repository: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         let name = call.arg::<BString>(0)?;
         let constraint = find_package_constraint(call, 1)?.ok_or_else(|| {
             call.arg_throw(
@@ -142,21 +130,18 @@ impl forwarding::repository::array_repository::Forwarding
             .map_err(call.failed())?;
         match package {
             Some(package) => package_value(package.as_rc()),
-            None => Ok(PluginValue::Null),
+            None => Ok(RpcValue::Null),
         }
     }
 
-    fn find_packages(
-        repository: &Self::Handle,
-        call: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    fn find_packages(repository: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         let name = call.arg::<BString>(0)?;
         let constraint = find_package_constraint(call, 1)?;
         let packages = repository
             .borrow_mut()
             .find_packages(name.as_bstr(), constraint)
             .map_err(call.failed())?;
-        Ok(PluginValue::List(
+        Ok(RpcValue::List(
             packages
                 .iter()
                 .map(|package| package_value(package.as_rc()))
@@ -171,26 +156,26 @@ impl forwarding::repository::writable_array_repository::Forwarding
     fn get_canonical_packages(
         repository: &RepositoryInterfaceHandle,
         call: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    ) -> Result<RpcValue, PhpThrow> {
         let mut borrowed = repository.borrow_mut();
         let packages = borrowed
             .as_writable_repository_interface_mut()
             .expect("only a writable repository crosses as a WritableArrayRepository")
             .get_canonical_packages()
             .map_err(call.failed())?;
-        Ok(packages.to_plugin_value())
+        Ok(packages.to_rpc_value())
     }
 
     fn get_dev_package_names(
         repository: &RepositoryInterfaceHandle,
         _: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    ) -> Result<RpcValue, PhpThrow> {
         let mut borrowed = repository.borrow_mut();
         Ok(borrowed
             .as_writable_repository_interface_mut()
             .expect("only a writable repository crosses as a WritableArrayRepository")
             .get_dev_package_names()
-            .to_plugin_value())
+            .to_rpc_value())
     }
 }
 

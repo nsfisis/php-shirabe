@@ -7,14 +7,14 @@ use crate::php_worker::rpc::entity::entity_value;
 use crate::php_worker::runtime::{ensure_composer_php_runtime, ensure_script_autoloader};
 use crate::php_worker::throwable::throw_into_error;
 use bstr::{BStr, BString};
-use shirabe_php_rpc::{PhpObjHandle, PhpThrow, PluginValue};
+use shirabe_php_rpc::{PhpEntityHandle, PhpThrow, RpcValue};
 use shirabe_php_shim::{PhpMixed, RuntimeException, bformat, var_export_str};
 
 /// The event as the argument a PHP callable receives: a proxy stub of the event's class.
 fn event_argument(
     event: &std::rc::Rc<std::cell::RefCell<dyn EventInterface>>,
     callee: BString,
-) -> anyhow::Result<PluginValue> {
+) -> anyhow::Result<RpcValue> {
     // TODO(plugin): an event class without a proxy stub cannot cross the boundary.
     entity_value(event).map_err(|_| -> anyhow::Error {
         RuntimeException::new(bformat!(
@@ -28,26 +28,26 @@ fn event_argument(
 /// `is_callable([$object, $method])` for a subscriber's listener, with the script autoloader
 /// active.
 pub(crate) fn is_callable_method(
-    handle: &PhpObjHandle,
+    handle: &PhpEntityHandle,
     method_name: &BStr,
 ) -> anyhow::Result<bool> {
     ensure_script_autoloader()?;
-    PhpCall::Function(BStr::new("is_callable")).run(vec![PluginValue::List(vec![
-        PluginValue::PhpHandle(handle.clone()),
-        PluginValue::string(method_name),
+    PhpCall::Function(BStr::new("is_callable")).run(vec![RpcValue::List(vec![
+        RpcValue::PhpEntityHandle(handle.clone()),
+        RpcValue::string(method_name),
     ])])
 }
 
 /// `$object->$method($event)` for a subscriber's listener. Answers whether the listener returned
 /// `false`.
 pub(crate) fn call_method_with_event(
-    handle: &PhpObjHandle,
+    handle: &PhpEntityHandle,
     method_name: &BStr,
     event: &std::rc::Rc<std::cell::RefCell<dyn EventInterface>>,
 ) -> anyhow::Result<bool> {
     let argument = event_argument(event, bformat!("{}::{method_name}", handle.class()))?;
-    let value: PluginValue = PhpCall::Method(handle, method_name).run(vec![argument])?;
-    Ok(matches!(value, PluginValue::Bool(false)))
+    let value: RpcValue = PhpCall::Method(handle, method_name).run(vec![argument])?;
+    Ok(matches!(value, RpcValue::Bool(false)))
 }
 
 /// `$className::$methodName($event)` for a `Class::method` script.
@@ -67,14 +67,14 @@ pub(crate) fn call_static_with_event(
     PhpCall::StaticMethod(class_name, method_name).run(vec![argument])
 }
 
-shirabe_php_rpc::plugin_value_record! {
+shirabe_php_rpc::rpc_value_record! {
     /// What the snippet hosting a `scripts` Command class reports about its run: the exit status,
     /// or the exception it ended with and whether Composer would have caught that exception.
     #[derive(Debug)]
     struct ScriptCommandResult {
         status: Option<i64>,
         output: BString,
-        throw: Option<PluginValue>,
+        throw: Option<RpcValue>,
         caught: bool,
     }
 }
@@ -108,7 +108,7 @@ pub(crate) fn run_command_script(
     input: &BStr,
 ) -> anyhow::Result<CommandScriptOutcome> {
     let snippet = bformat!(
-        "\n$className = {};\n$app = new \\Symfony\\Component\\Console\\Application();\n$app->setCatchExceptions(false);\nif (method_exists($app, 'setCatchErrors')) {{\n    $app->setCatchErrors(false);\n}}\n$app->setAutoExit(false);\n$cmd = new $className({});\nif (method_exists($app, 'addCommand')) {{\n    $app->addCommand($cmd);\n}} else {{\n    $app->add($cmd);\n}}\n$app->setDefaultCommand((string) $cmd->getName(), true);\n$output = new \\Symfony\\Component\\Console\\Output\\BufferedOutput({verbosity}, {});\ntry {{\n    $status = $app->run(new \\Symfony\\Component\\Console\\Input\\StringInput({}), $output);\n    return ['status' => $status, 'output' => $output->fetch(), 'throw' => null, 'caught' => false];\n}} catch (\\Throwable $e) {{\n    return ['status' => null, 'output' => $output->fetch(), 'throw' => \\Shirabe\\MaterializedThrowable::describe($e), 'caught' => $e instanceof \\Exception];\n}}\n",
+        "\n$className = {};\n$app = new \\Symfony\\Component\\Console\\Application();\n$app->setCatchExceptions(false);\nif (method_exists($app, 'setCatchErrors')) {{\n    $app->setCatchErrors(false);\n}}\n$app->setAutoExit(false);\n$cmd = new $className({});\nif (method_exists($app, 'addCommand')) {{\n    $app->addCommand($cmd);\n}} else {{\n    $app->add($cmd);\n}}\n$app->setDefaultCommand((string) $cmd->getName(), true);\n$output = new \\Symfony\\Component\\Console\\Output\\BufferedOutput({verbosity}, {});\ntry {{\n    $status = $app->run(new \\Symfony\\Component\\Console\\Input\\StringInput({}), $output);\n    return ['status' => $status, 'output' => $output->fetch(), 'throw' => null, 'caught' => false];\n}} catch (\\Throwable $e) {{\n    return ['status' => null, 'output' => $output->fetch(), 'throw' => \\Shirabe\\ThrowableRecord::fromThrowable($e), 'caught' => $e instanceof \\Exception];\n}}\n",
         var_export_str(class_name, true),
         var_export_str(event_name, true),
         if decorated { "true" } else { "false" },
@@ -116,13 +116,13 @@ pub(crate) fn run_command_script(
     );
     ensure_script_autoloader()?;
     let result: ScriptCommandResult =
-        PhpCall::Function(BStr::new("__shirabe_eval")).run(vec![PluginValue::string(snippet)])?;
+        PhpCall::Function(BStr::new("__shirabe_eval")).run(vec![RpcValue::string(snippet)])?;
     Ok(CommandScriptOutcome {
         status: result.status,
         output: result.output,
         throw: result
             .throw
-            .map(|throw| throw_into_error(PhpThrow::from_plugin_value(throw))),
+            .map(|throw| throw_into_error(PhpThrow::from_rpc_value(throw))),
         caught: result.caught,
     })
 }

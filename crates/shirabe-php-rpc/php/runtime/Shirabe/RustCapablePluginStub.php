@@ -12,6 +12,6 @@ class RustCapablePluginStub extends RustPluginStub implements Capable
 {
     public function getCapabilities()
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getCapabilities', []);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'getCapabilities', []);
     }
 }

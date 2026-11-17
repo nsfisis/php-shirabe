@@ -1,8 +1,8 @@
-//! Oracle tests: the `PluginValue` codec against the real PHP `serialize()`/`unserialize()`.
+//! Oracle tests: the `RpcValue` codec against the real PHP `serialize()`/`unserialize()`.
 //!
 //! Encode direction: bytes produced by the Rust encoder are unserialized and re-serialized by
 //! the PHP core implementation; the result must be byte-identical. Decode direction: bytes
-//! produced by PHP `serialize()` must decode into a `PluginValue` whose re-encoding is
+//! produced by PHP `serialize()` must decode into a `RpcValue` whose re-encoding is
 //! byte-identical. Floats (serialize_precision), non-UTF-8 byte strings and deep nesting are the
 //! focus areas.
 
@@ -10,7 +10,7 @@ use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_rpc::value::{serialize, unserialize};
 use shirabe_php_rpc::{
-    PhpObject, PhpThrow, PluginValue, RustMethodDispatcher, RustObjHandle, call_function,
+    PhpObject, PhpThrow, RpcValue, RustEntityHandle, RustMethodDispatcher, call_function,
 };
 
 /// The snippets these tests run never call back into Rust.
@@ -19,26 +19,26 @@ struct NoCallbacks;
 impl RustMethodDispatcher for NoCallbacks {
     fn dispatch(
         &mut self,
-        _rhandle: u64,
+        _entity_id: u64,
         method_name: &bstr::BStr,
-        _args: Vec<PluginValue>,
-        _out_params: &mut IndexMap<u32, PluginValue>,
-    ) -> Result<PluginValue, PhpThrow> {
+        _args: Vec<RpcValue>,
+        _out_params: &mut IndexMap<u32, RpcValue>,
+    ) -> Result<RpcValue, PhpThrow> {
         panic!("unexpected callback `{method_name:?}`")
     }
 
     fn call_function(
         &mut self,
         function_name: &bstr::BStr,
-        _args: Vec<PluginValue>,
-    ) -> Result<PluginValue, PhpThrow> {
+        _args: Vec<RpcValue>,
+    ) -> Result<RpcValue, PhpThrow> {
         panic!("unexpected callback `{function_name:?}`")
     }
 
     fn construct(
         &mut self,
         class: &bstr::BStr,
-        _ctor_args: Vec<PluginValue>,
+        _ctor_args: Vec<RpcValue>,
     ) -> Result<u64, PhpThrow> {
         panic!("unexpected construction of `{class:?}`")
     }
@@ -47,8 +47,8 @@ impl RustMethodDispatcher for NoCallbacks {
         &mut self,
         class: &bstr::BStr,
         method_name: &bstr::BStr,
-        _args: Vec<PluginValue>,
-    ) -> Result<PluginValue, PhpThrow> {
+        _args: Vec<RpcValue>,
+    ) -> Result<RpcValue, PhpThrow> {
         panic!("unexpected callback `{class:?}::{method_name:?}`")
     }
 }
@@ -57,28 +57,28 @@ impl RustMethodDispatcher for NoCallbacks {
 fn php_reserialize(bytes: &[u8]) -> Vec<u8> {
     let outcome = call_function(
         "__shirabe_oracle_roundtrip",
-        vec![PluginValue::String(bytes.into())],
+        vec![RpcValue::String(bytes.into())],
         &mut NoCallbacks,
     )
     .expect("oracle roundtrip request failed");
     match outcome.expect("oracle roundtrip threw") {
-        PluginValue::String(bytes) => bytes.into(),
+        RpcValue::String(bytes) => bytes.into(),
         other => panic!("oracle roundtrip returned a non-string: {other:?}"),
     }
 }
 
 /// Runs a PHP snippet and returns its `return` value.
-fn php_eval(code: impl AsRef<[u8]>) -> PluginValue {
+fn php_eval(code: impl AsRef<[u8]>) -> RpcValue {
     call_function(
         "__shirabe_eval",
-        vec![PluginValue::string(code.as_ref())],
+        vec![RpcValue::string(code.as_ref())],
         &mut NoCallbacks,
     )
     .expect("eval request failed")
     .expect("eval threw")
 }
 
-fn assert_php_agrees(value: &PluginValue) {
+fn assert_php_agrees(value: &RpcValue) {
     let encoded = serialize(value);
     let reserialized = php_reserialize(&encoded);
     assert_eq!(
@@ -132,18 +132,18 @@ fn encode_direction_matches_php_for_scalars_and_floats() {
         f64::NEG_INFINITY,
     ];
     for f in floats {
-        assert_php_agrees(&PluginValue::Float(f));
+        assert_php_agrees(&RpcValue::Float(f));
     }
 
     for value in [
-        PluginValue::Null,
-        PluginValue::Bool(true),
-        PluginValue::Bool(false),
-        PluginValue::Int(0),
-        PluginValue::Int(i64::MAX),
-        PluginValue::Int(i64::MIN),
-        PluginValue::string(""),
-        PluginValue::string("héllo wörld"),
+        RpcValue::Null,
+        RpcValue::Bool(true),
+        RpcValue::Bool(false),
+        RpcValue::Int(0),
+        RpcValue::Int(i64::MAX),
+        RpcValue::Int(i64::MIN),
+        RpcValue::string(""),
+        RpcValue::string("héllo wörld"),
     ] {
         assert_php_agrees(&value);
     }
@@ -151,38 +151,33 @@ fn encode_direction_matches_php_for_scalars_and_floats() {
 
 #[test]
 fn encode_direction_matches_php_for_non_utf8_bytes() {
-    assert_php_agrees(&PluginValue::String(
-        vec![0xff, 0x00, 0xfe, 0x80, b'"'].into(),
-    ));
-    assert_php_agrees(&PluginValue::String((0u8..=255).collect()));
+    assert_php_agrees(&RpcValue::String(vec![0xff, 0x00, 0xfe, 0x80, b'"'].into()));
+    assert_php_agrees(&RpcValue::String((0u8..=255).collect()));
 
-    let mut map: IndexMap<BString, PluginValue> = IndexMap::new();
-    map.insert(
-        vec![0xff, 0x00].into(),
-        PluginValue::String(vec![0x80].into()),
-    );
-    map.insert(b"05".into(), PluginValue::Bool(true));
-    map.insert(b"5".into(), PluginValue::Null);
-    assert_php_agrees(&PluginValue::Array(map));
+    let mut map: IndexMap<BString, RpcValue> = IndexMap::new();
+    map.insert(vec![0xff, 0x00].into(), RpcValue::String(vec![0x80].into()));
+    map.insert(b"05".into(), RpcValue::Bool(true));
+    map.insert(b"5".into(), RpcValue::Null);
+    assert_php_agrees(&RpcValue::Array(map));
 }
 
 #[test]
 fn encode_direction_matches_php_for_nested_arrays() {
-    let mut inner: IndexMap<BString, PluginValue> = IndexMap::new();
-    inner.insert(b"a".into(), PluginValue::Int(1));
+    let mut inner: IndexMap<BString, RpcValue> = IndexMap::new();
+    inner.insert(b"a".into(), RpcValue::Int(1));
     inner.insert(
         b"b".into(),
-        PluginValue::List(vec![
-            PluginValue::Float(0.1),
-            PluginValue::string("x"),
-            PluginValue::List(vec![]),
+        RpcValue::List(vec![
+            RpcValue::Float(0.1),
+            RpcValue::string("x"),
+            RpcValue::List(vec![]),
         ]),
     );
-    assert_php_agrees(&PluginValue::Array(inner));
+    assert_php_agrees(&RpcValue::Array(inner));
 
-    let mut deep = PluginValue::Null;
+    let mut deep = RpcValue::Null;
     for _ in 0..64 {
-        deep = PluginValue::List(vec![deep]);
+        deep = RpcValue::List(vec![deep]);
     }
     assert_php_agrees(&deep);
 }
@@ -193,14 +188,14 @@ fn encode_direction_matches_php_for_nested_arrays() {
 #[test]
 fn encode_direction_matches_php_for_object_records() {
     let mut date = PhpObject::new("DateTimeImmutable");
-    date.set_public("date", PluginValue::string("2024-03-04 05:06:07.123456"));
-    date.set_public("timezone_type", PluginValue::Int(3));
-    date.set_public("timezone", PluginValue::string("UTC"));
-    assert_php_agrees(&PluginValue::PhpObject(date.clone()));
+    date.set_public("date", RpcValue::string("2024-03-04 05:06:07.123456"));
+    date.set_public("timezone_type", RpcValue::Int(3));
+    date.set_public("timezone", RpcValue::string("UTC"));
+    assert_php_agrees(&RpcValue::PhpObject(date.clone()));
 
-    assert_php_agrees(&PluginValue::List(vec![
-        PluginValue::PhpObject(date),
-        PluginValue::Null,
+    assert_php_agrees(&RpcValue::List(vec![
+        RpcValue::PhpObject(date),
+        RpcValue::Null,
     ]));
 }
 
@@ -216,7 +211,7 @@ fn decode_direction_matches_php_for_object_records() {
     ];
 
     for snippet in snippets {
-        let PluginValue::String(php_bytes) = php_eval(snippet) else {
+        let RpcValue::String(php_bytes) = php_eval(snippet) else {
             panic!("snippet did not return a string: {snippet}");
         };
         let decoded = unserialize(&php_bytes)
@@ -229,23 +224,23 @@ fn decode_direction_matches_php_for_object_records() {
     }
 }
 
-/// A descriptor is the record of a class the worker declares, so its bytes are whatever PHP writes
+/// A handle is the record of a class the worker declares, so its bytes are whatever PHP writes
 /// for an instance of that class.
 #[test]
-fn descriptor_records_match_php_in_both_directions() {
-    assert_php_agrees(&PluginValue::RustHandle(RustObjHandle {
-        rhandle: 3,
+fn handle_records_match_php_in_both_directions() {
+    assert_php_agrees(&RpcValue::RustEntityHandle(RustEntityHandle {
+        entity_id: 3,
         class: "Composer\\Script\\Event".into(),
     }));
-    assert_php_agrees(&PluginValue::Job(7));
+    assert_php_agrees(&RpcValue::PromiseHandle(7));
 
     let snippets = [
-        r#"return serialize(new \Shirabe\Wire\RustHandle(3, 'Composer\Script\Event'));"#,
-        r#"return serialize(new \Shirabe\Wire\PhpHandle(1000003, 'MyPlugin', ['Composer\Plugin\PluginInterface']));"#,
-        r#"return serialize(new \Shirabe\Wire\Job(8));"#,
+        r#"return serialize(new \Shirabe\Rpc\RustEntityHandle(3, 'Composer\Script\Event'));"#,
+        r#"return serialize(new \Shirabe\Rpc\PhpEntityHandle(1000003, 'MyPlugin', ['Composer\Plugin\PluginInterface']));"#,
+        r#"return serialize(new \Shirabe\Rpc\PromiseHandle(8));"#,
     ];
     for snippet in snippets {
-        let PluginValue::String(php_bytes) = php_eval(snippet) else {
+        let RpcValue::String(php_bytes) = php_eval(snippet) else {
             panic!("snippet did not return a string: {snippet}");
         };
         let decoded = unserialize(&php_bytes)
@@ -253,7 +248,9 @@ fn descriptor_records_match_php_in_both_directions() {
         assert!(
             matches!(
                 decoded,
-                PluginValue::RustHandle(_) | PluginValue::PhpHandle(_) | PluginValue::Job(_)
+                RpcValue::RustEntityHandle(_)
+                    | RpcValue::PhpEntityHandle(_)
+                    | RpcValue::PromiseHandle(_)
             ),
             "`{snippet}` decoded as {decoded:?}"
         );
@@ -269,17 +266,17 @@ fn descriptor_records_match_php_in_both_directions() {
 /// payload, so decoding one means counting exactly the way PHP counts.
 #[test]
 fn decode_direction_resolves_php_back_references() {
-    let PluginValue::String(php_bytes) = php_eval(
+    let RpcValue::String(php_bytes) = php_eval(
         r#"$c = new stdClass; $c->p = [1, "x"]; $e = new stdClass; $e->q = 2;
            return serialize([$c, $c, $e, [$c, $e]]);"#,
     ) else {
         panic!("expected serialized bytes");
     };
     let decoded = unserialize(&php_bytes).expect("failed to decode PHP output");
-    let PluginValue::List(items) = decoded else {
+    let RpcValue::List(items) = decoded else {
         panic!("expected a list, got {decoded:?}");
     };
-    let PluginValue::List(inner) = &items[3] else {
+    let RpcValue::List(inner) = &items[3] else {
         panic!("expected a nested list, got {:?}", items[3]);
     };
     assert_eq!(items[0], items[1]);
@@ -308,7 +305,7 @@ fn decode_direction_matches_php_serialize_output() {
     ];
 
     for snippet in snippets {
-        let PluginValue::String(php_bytes) = php_eval(snippet) else {
+        let RpcValue::String(php_bytes) = php_eval(snippet) else {
             panic!("snippet did not return a string: {snippet}");
         };
         let decoded = unserialize(&php_bytes)
@@ -324,24 +321,24 @@ fn decode_direction_matches_php_serialize_output() {
 
 #[test]
 fn decode_direction_distinguishes_lists_from_maps() {
-    let PluginValue::String(bytes) = php_eval(r#"return serialize([10, 20, 30]);"#) else {
+    let RpcValue::String(bytes) = php_eval(r#"return serialize([10, 20, 30]);"#) else {
         panic!("expected serialized bytes");
     };
     assert_eq!(
         unserialize(&bytes).unwrap(),
-        PluginValue::List(vec![
-            PluginValue::Int(10),
-            PluginValue::Int(20),
-            PluginValue::Int(30),
+        RpcValue::List(vec![
+            RpcValue::Int(10),
+            RpcValue::Int(20),
+            RpcValue::Int(30),
         ]),
     );
 
-    let PluginValue::String(bytes) = php_eval(r#"return serialize([1 => 10, 0 => 20]);"#) else {
+    let RpcValue::String(bytes) = php_eval(r#"return serialize([1 => 10, 0 => 20]);"#) else {
         panic!("expected serialized bytes");
     };
     let decoded = unserialize(&bytes).unwrap();
     assert!(
-        matches!(decoded, PluginValue::Array(_)),
+        matches!(decoded, RpcValue::Array(_)),
         "out-of-order int keys must not decode as a list: {decoded:?}"
     );
 }

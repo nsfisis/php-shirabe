@@ -41,7 +41,7 @@ final class SurfaceManifest
 {
     private const PROTOCOL_METHODS = ['__get', '__set', '__isset', '__unset'];
 
-    /** What the R table answers for every entity, whatever class it crosses as. */
+    /** What the Rust entity table answers for every entity, whatever class it crosses as. */
     private const GENERIC_METHODS = ['__get', '__set', '__isset', '__unset', '__shirabe_clone'];
 
     /**
@@ -317,7 +317,7 @@ final class SurfaceManifest
         if (
             $handle instanceof PropertyFetch
             && $handle->var instanceof Variable && $handle->var->name === 'this'
-            && $handle->name instanceof Node\Identifier && $handle->name->toString() === '__rhandle'
+            && $handle->name instanceof Node\Identifier && $handle->name->toString() === '__entityId'
         ) {
             if (!in_array($name, self::GENERIC_METHODS, true)) {
                 $entry['methods'][] = $name;

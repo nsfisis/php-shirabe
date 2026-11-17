@@ -11,8 +11,8 @@ class InstallOperation extends SolverOperation implements OperationInterface
 {
     public function __construct(PackageInterface $package)
     {
-        $this->__rhandle = \Shirabe\RpcRuntime::newRust(static::class, [$package]);
-        \Shirabe\RustObjectRegistry::adopt($this->__rhandle, $this);
+        $this->__entityId = \Shirabe\RpcRuntime::newRust(static::class, [$package]);
+        \Shirabe\RustStubRegistry::adopt($this->__entityId, $this);
     }
 
     protected const TYPE = 'install';
@@ -24,6 +24,6 @@ class InstallOperation extends SolverOperation implements OperationInterface
 
     public function getPackage(): PackageInterface
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getPackage', []);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'getPackage', []);
     }
 }

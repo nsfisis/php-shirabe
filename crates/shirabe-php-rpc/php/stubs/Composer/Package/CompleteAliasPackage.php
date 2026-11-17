@@ -9,132 +9,132 @@ class CompleteAliasPackage extends AliasPackage implements CompletePackageInterf
 {
     public function __construct(CompletePackage $aliasOf, string $version, string $prettyVersion)
     {
-        $this->__rhandle = \Shirabe\RpcRuntime::newRust(static::class, [$aliasOf, $version, $prettyVersion]);
-        \Shirabe\RustObjectRegistry::adopt($this->__rhandle, $this);
+        $this->__entityId = \Shirabe\RpcRuntime::newRust(static::class, [$aliasOf, $version, $prettyVersion]);
+        \Shirabe\RustStubRegistry::adopt($this->__entityId, $this);
     }
 
     public function getScripts(): array
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getScripts', []);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'getScripts', []);
     }
 
     public function setScripts(array $scripts): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setScripts', [$scripts]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, 'setScripts', [$scripts]);
     }
 
     public function getRepositories(): array
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getRepositories', []);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'getRepositories', []);
     }
 
     public function setRepositories(array $repositories): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setRepositories', [$repositories]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, 'setRepositories', [$repositories]);
     }
 
     public function getLicense(): array
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getLicense', []);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'getLicense', []);
     }
 
     public function setLicense(array $license): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setLicense', [$license]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, 'setLicense', [$license]);
     }
 
     public function getKeywords(): array
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getKeywords', []);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'getKeywords', []);
     }
 
     public function setKeywords(array $keywords): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setKeywords', [$keywords]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, 'setKeywords', [$keywords]);
     }
 
     public function getDescription(): ?string
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getDescription', []);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'getDescription', []);
     }
 
     public function setDescription(?string $description): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setDescription', [$description]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, 'setDescription', [$description]);
     }
 
     public function getHomepage(): ?string
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getHomepage', []);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'getHomepage', []);
     }
 
     public function setHomepage(?string $homepage): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setHomepage', [$homepage]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, 'setHomepage', [$homepage]);
     }
 
     public function getAuthors(): array
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getAuthors', []);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'getAuthors', []);
     }
 
     public function setAuthors(array $authors): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setAuthors', [$authors]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, 'setAuthors', [$authors]);
     }
 
     public function getSupport(): array
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getSupport', []);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'getSupport', []);
     }
 
     public function setSupport(array $support): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setSupport', [$support]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, 'setSupport', [$support]);
     }
 
     public function getFunding(): array
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getFunding', []);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'getFunding', []);
     }
 
     public function setFunding(array $funding): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setFunding', [$funding]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, 'setFunding', [$funding]);
     }
 
     public function isAbandoned(): bool
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'isAbandoned', []);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'isAbandoned', []);
     }
 
     public function getReplacementPackage(): ?string
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getReplacementPackage', []);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'getReplacementPackage', []);
     }
 
     public function setAbandoned($abandoned): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setAbandoned', [$abandoned]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, 'setAbandoned', [$abandoned]);
     }
 
     public function getArchiveName(): ?string
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getArchiveName', []);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'getArchiveName', []);
     }
 
     public function setArchiveName(?string $name): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setArchiveName', [$name]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, 'setArchiveName', [$name]);
     }
 
     public function getArchiveExcludes(): array
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getArchiveExcludes', []);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'getArchiveExcludes', []);
     }
 
     public function setArchiveExcludes(array $excludes): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setArchiveExcludes', [$excludes]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, 'setArchiveExcludes', [$excludes]);
     }
 }

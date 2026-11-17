@@ -3,27 +3,27 @@
 namespace Shirabe;
 
 /**
- * The worker's half of the job registry (docs/dev/plugin-async.md). A job is an asynchronous
- * operation one side runs and the other side holds a promise for; only its id crosses the wire.
- * The Rust side allocates odd ids, this side even ones.
+ * The worker's half of the promise registry (docs/dev/plugin-async.md). This side holds every
+ * promise object, while one side runs what settles it; only the promise id crosses the wire. The
+ * Rust side allocates odd ids, this side even ones.
  */
-final class JobRegistry
+final class PromiseRegistry
 {
     /**
-     * Rust-owned jobs that have not settled yet. The entry holds the Deferred strongly: it has
+     * Rust-owned promises that have not settled yet. The entry holds the Deferred strongly: it has
      * to outlive the plugin dropping its promise, until the Rust side reports the outcome.
      *
      * @var array<int, \React\Promise\Deferred>
      */
     private static array $deferreds = [];
     /**
-     * PHP-owned jobs that have not settled yet. Holding the promise keeps its object id from
+     * PHP-owned promises that have not settled yet. Holding the promise keeps its object id from
      * being reused while the id is interned.
      *
      * @var array<int, \React\Promise\PromiseInterface>
      */
     private static array $promises = [];
-    /** @var array<int, int> spl_object_id => job id, so one promise keeps one id */
+    /** @var array<int, int> spl_object_id => promise id, so one promise keeps one id */
     private static array $idsByObjectId = [];
     /**
      * Settled promises built here on the Rust side's behalf, each waiting for the answer that
@@ -32,7 +32,7 @@ final class JobRegistry
      * @var array<int, \React\Promise\PromiseInterface>
      */
     private static array $parked = [];
-    /** @var array<int, int> spl_object_id => job id of a parked promise */
+    /** @var array<int, int> spl_object_id => promise id of a parked promise */
     private static array $parkedIdsByObjectId = [];
     private static int $nextId = 2;
 
@@ -45,7 +45,7 @@ final class JobRegistry
         }
     }
 
-    /** The promise standing for a job id that arrived over the wire. */
+    /** The promise standing for a promise id that arrived over the wire. */
     public static function promiseFor(int $id): \React\Promise\PromiseInterface
     {
         if ($id % 2 === 0) {
@@ -55,20 +55,20 @@ final class JobRegistry
                 return $promise;
             }
             if (!isset(self::$promises[$id])) {
-                throw new \RuntimeException("unknown PHP-owned job {$id}");
+                throw new \RuntimeException("unknown PHP-owned promise {$id}");
             }
             return self::$promises[$id];
         }
         if (!isset(self::$deferreds[$id])) {
             self::requireReact();
             self::$deferreds[$id] = new \React\Promise\Deferred(static function () use ($id): void {
-                // The Rust side drops the job, so no settle push follows either way. It answers
-                // with the exception a started job is cancelled with, and with null for one that
-                // had not started, which Composer aborts without rejecting.
+                // The Rust side drops the job behind the promise, so no settle push follows either
+                // way. It answers with the exception a started job is cancelled with, and with null
+                // for one that had not started, which Composer aborts without rejecting.
                 unset(self::$deferreds[$id]);
-                $thrown = RpcRuntime::callRustFunction('__shirabe_cancel_job', [$id]);
+                $thrown = RpcRuntime::callRustFunction('__shirabe_cancel_promise', [$id]);
                 if ($thrown !== null) {
-                    throw MaterializedThrowable::revive($thrown);
+                    throw ThrowableRecord::revive($thrown);
                 }
             });
         }
@@ -78,14 +78,14 @@ final class JobRegistry
     private static function take(int $id): \React\Promise\Deferred
     {
         if (!isset(self::$deferreds[$id])) {
-            throw new \RuntimeException("unknown Rust-owned job {$id}");
+            throw new \RuntimeException("unknown Rust-owned promise {$id}");
         }
         $deferred = self::$deferreds[$id];
         unset(self::$deferreds[$id]);
         return $deferred;
     }
 
-    /** Runs the callbacks chained on the job's promise before it returns. */
+    /** Runs the callbacks chained on the promise before it returns. */
     public static function resolve(int $id, $value): void
     {
         self::take($id)->resolve($value);
@@ -97,7 +97,7 @@ final class JobRegistry
     }
 
     /**
-     * Parks a settled promise the Rust side asked for. Its descriptor names no job: the Rust
+     * Parks a settled promise the Rust side asked for. No job stands behind it: the Rust
      * side passes it on as the answer of the call it is serving, and the promise is handed out
      * when that answer arrives.
      */
@@ -111,18 +111,18 @@ final class JobRegistry
     }
 
     /**
-     * The descriptor of a promise leaving for the Rust side: the id it is parked under, or a
-     * PHP-owned job. The recorder attached to a job reports the outcome when the promise
+     * The handle of a promise leaving for the Rust side: the id it is parked under, or that of a
+     * PHP-owned promise. The recorder attached to a PHP-owned promise reports the outcome when it
      * settles, which is right away for one that already has.
      */
-    public static function descriptor(\React\Promise\PromiseInterface $promise): Wire\Job
+    public static function handle(\React\Promise\PromiseInterface $promise): Rpc\PromiseHandle
     {
         $objectId = spl_object_id($promise);
         if (isset(self::$parkedIdsByObjectId[$objectId])) {
-            return new Wire\Job(self::$parkedIdsByObjectId[$objectId]);
+            return new Rpc\PromiseHandle(self::$parkedIdsByObjectId[$objectId]);
         }
         if (isset(self::$idsByObjectId[$objectId])) {
-            return new Wire\Job(self::$idsByObjectId[$objectId]);
+            return new Rpc\PromiseHandle(self::$idsByObjectId[$objectId]);
         }
         $id = self::$nextId;
         self::$nextId += 2;
@@ -134,7 +134,7 @@ final class JobRegistry
         $promise->then(
             static function ($value) use ($id, $forget): void {
                 $forget();
-                RpcRuntime::callRustFunction('__shirabe_resolve_job', [$id, $value]);
+                RpcRuntime::callRustFunction('__shirabe_resolve_promise', [$id, $value]);
             },
             static function ($reason) use ($id, $forget): void {
                 $forget();
@@ -142,11 +142,11 @@ final class JobRegistry
                     $reason = new \RuntimeException('the promise was rejected with ' . gettype($reason));
                 }
                 RpcRuntime::callRustFunction(
-                    '__shirabe_reject_job',
-                    [$id, MaterializedThrowable::describe($reason)]
+                    '__shirabe_reject_promise',
+                    [$id, ThrowableRecord::fromThrowable($reason)]
                 );
             }
         );
-        return new Wire\Job($id);
+        return new Rpc\PromiseHandle($id);
     }
 }

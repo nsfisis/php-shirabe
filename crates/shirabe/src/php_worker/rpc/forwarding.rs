@@ -6,9 +6,9 @@
 use crate::php_worker::rpc::entity::{Call, protocol_violation};
 use crate::php_worker::rpc::forwarding;
 use bstr::{BStr, ByteSlice as _};
-use shirabe_php_rpc::{PhpThrow, PluginValue};
+use shirabe_php_rpc::{PhpThrow, RpcValue};
 
-/// A `NewObject` from the worker: builds the entity, registers it and answers its rhandle.
+/// A `NewObject` from the worker: builds the entity, registers it and answers its Rust entity id.
 /// A stub's constructor sends `static::class`, so a plugin's subclass of a proxied class
 /// reaches the last arm.
 pub(crate) fn construct(class: &BStr, call: &mut Call<'_>) -> Result<u64, PhpThrow> {
@@ -116,7 +116,7 @@ pub(crate) fn construct(class: &BStr, call: &mut Call<'_>) -> Result<u64, PhpThr
 
 /// A `CallStaticMethod` from the worker. A static forwarder sends `self::class`, so the class
 /// is always one that declares the method.
-pub(crate) fn call_static(class: &BStr, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+pub(crate) fn call_static(class: &BStr, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
     match class.as_bytes() {
         b"Composer\\Factory" => forwarding::factory::call_static(call),
         b"Composer\\Package\\Locker" => forwarding::package::locker::call_static(call),
@@ -131,7 +131,7 @@ pub(crate) mod autoload {
             Call, Crossing, Entity, constructed, protocol_violation,
         };
         use bstr::ByteSlice as _;
-        use shirabe_php_rpc::{PhpThrow, PluginValue};
+        use shirabe_php_rpc::{PhpThrow, RpcValue};
 
         /// `Composer\Autoload\AutoloadGenerator`.
         #[derive(Debug)]
@@ -144,7 +144,7 @@ pub(crate) mod autoload {
             fn set_dev_mode(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -152,12 +152,12 @@ pub(crate) mod autoload {
             fn set_class_map_authoritative(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
 
-            fn set_apcu(this: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+            fn set_apcu(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -165,15 +165,12 @@ pub(crate) mod autoload {
             fn set_run_scripts(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
 
-            fn set_dry_run(
-                this: &Self::Handle,
-                call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            fn set_dry_run(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -181,7 +178,7 @@ pub(crate) mod autoload {
             fn set_ignore_platform_requirements(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -189,12 +186,12 @@ pub(crate) mod autoload {
             fn set_platform_requirement_filter(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
 
-            fn dump(this: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+            fn dump(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -202,7 +199,7 @@ pub(crate) mod autoload {
             fn build_package_map(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -210,7 +207,7 @@ pub(crate) mod autoload {
             fn parse_autoloads(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -218,7 +215,7 @@ pub(crate) mod autoload {
             fn create_loader(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -231,7 +228,7 @@ pub(crate) mod autoload {
         pub(crate) fn dispatch(
             this: &<PhpClass as Forwarding>::Handle,
             call: &mut Call<'_>,
-        ) -> Result<PluginValue, PhpThrow> {
+        ) -> Result<RpcValue, PhpThrow> {
             match call.method().as_bytes() {
                 b"setDevMode" => <PhpClass as Forwarding>::set_dev_mode(this, call),
                 b"setClassMapAuthoritative" => {
@@ -270,7 +267,7 @@ pub(crate) mod composer {
     use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
     use crate::php_worker::rpc::forwarding;
     use bstr::ByteSlice as _;
-    use shirabe_php_rpc::{PhpThrow, PluginValue};
+    use shirabe_php_rpc::{PhpThrow, RpcValue};
 
     /// `Composer\Composer`.
     #[derive(Debug)]
@@ -280,7 +277,7 @@ pub(crate) mod composer {
         fn set_locker(
             this: &<forwarding::partial_composer::PhpClass as forwarding::partial_composer::Forwarding>::Handle,
             call: &mut Call<'_>,
-        ) -> Result<PluginValue, PhpThrow> {
+        ) -> Result<RpcValue, PhpThrow> {
             let _ = this;
             Err(call.unsupported())
         }
@@ -288,7 +285,7 @@ pub(crate) mod composer {
         fn get_locker(
             this: &<forwarding::partial_composer::PhpClass as forwarding::partial_composer::Forwarding>::Handle,
             call: &mut Call<'_>,
-        ) -> Result<PluginValue, PhpThrow> {
+        ) -> Result<RpcValue, PhpThrow> {
             let _ = this;
             Err(call.unsupported())
         }
@@ -296,7 +293,7 @@ pub(crate) mod composer {
         fn set_download_manager(
             this: &<forwarding::partial_composer::PhpClass as forwarding::partial_composer::Forwarding>::Handle,
             call: &mut Call<'_>,
-        ) -> Result<PluginValue, PhpThrow> {
+        ) -> Result<RpcValue, PhpThrow> {
             let _ = this;
             Err(call.unsupported())
         }
@@ -304,7 +301,7 @@ pub(crate) mod composer {
         fn get_download_manager(
             this: &<forwarding::partial_composer::PhpClass as forwarding::partial_composer::Forwarding>::Handle,
             call: &mut Call<'_>,
-        ) -> Result<PluginValue, PhpThrow> {
+        ) -> Result<RpcValue, PhpThrow> {
             let _ = this;
             Err(call.unsupported())
         }
@@ -312,7 +309,7 @@ pub(crate) mod composer {
         fn set_archive_manager(
             this: &<forwarding::partial_composer::PhpClass as forwarding::partial_composer::Forwarding>::Handle,
             call: &mut Call<'_>,
-        ) -> Result<PluginValue, PhpThrow> {
+        ) -> Result<RpcValue, PhpThrow> {
             let _ = this;
             Err(call.unsupported())
         }
@@ -320,7 +317,7 @@ pub(crate) mod composer {
         fn get_archive_manager(
             this: &<forwarding::partial_composer::PhpClass as forwarding::partial_composer::Forwarding>::Handle,
             call: &mut Call<'_>,
-        ) -> Result<PluginValue, PhpThrow> {
+        ) -> Result<RpcValue, PhpThrow> {
             let _ = this;
             Err(call.unsupported())
         }
@@ -328,7 +325,7 @@ pub(crate) mod composer {
         fn set_plugin_manager(
             this: &<forwarding::partial_composer::PhpClass as forwarding::partial_composer::Forwarding>::Handle,
             call: &mut Call<'_>,
-        ) -> Result<PluginValue, PhpThrow> {
+        ) -> Result<RpcValue, PhpThrow> {
             let _ = this;
             Err(call.unsupported())
         }
@@ -336,7 +333,7 @@ pub(crate) mod composer {
         fn get_plugin_manager(
             this: &<forwarding::partial_composer::PhpClass as forwarding::partial_composer::Forwarding>::Handle,
             call: &mut Call<'_>,
-        ) -> Result<PluginValue, PhpThrow> {
+        ) -> Result<RpcValue, PhpThrow> {
             let _ = this;
             Err(call.unsupported())
         }
@@ -344,7 +341,7 @@ pub(crate) mod composer {
         fn set_autoload_generator(
             this: &<forwarding::partial_composer::PhpClass as forwarding::partial_composer::Forwarding>::Handle,
             call: &mut Call<'_>,
-        ) -> Result<PluginValue, PhpThrow> {
+        ) -> Result<RpcValue, PhpThrow> {
             let _ = this;
             Err(call.unsupported())
         }
@@ -352,7 +349,7 @@ pub(crate) mod composer {
         fn get_autoload_generator(
             this: &<forwarding::partial_composer::PhpClass as forwarding::partial_composer::Forwarding>::Handle,
             call: &mut Call<'_>,
-        ) -> Result<PluginValue, PhpThrow> {
+        ) -> Result<RpcValue, PhpThrow> {
             let _ = this;
             Err(call.unsupported())
         }
@@ -365,7 +362,7 @@ pub(crate) mod composer {
     pub(crate) fn dispatch(
         this: &<forwarding::partial_composer::PhpClass as forwarding::partial_composer::Forwarding>::Handle,
         call: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    ) -> Result<RpcValue, PhpThrow> {
         match call.method().as_bytes() {
 b"setLocker" => <PhpClass as Forwarding>::set_locker(this, call),
 b"getLocker" => <PhpClass as Forwarding>::get_locker(this, call),
@@ -408,7 +405,7 @@ dispatch,
 pub(crate) mod config {
     use crate::php_worker::rpc::entity::{Call, Crossing, Entity, constructed, protocol_violation};
     use bstr::ByteSlice as _;
-    use shirabe_php_rpc::{PhpThrow, PluginValue};
+    use shirabe_php_rpc::{PhpThrow, RpcValue};
 
     /// `Composer\Config`.
     #[derive(Debug)]
@@ -418,7 +415,7 @@ pub(crate) mod config {
         /// The handle type of the entities crossing as this class or a subclass.
         type Handle: Entity;
 
-        fn set_base_dir(this: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+        fn set_base_dir(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
             let _ = this;
             Err(call.unsupported())
         }
@@ -426,7 +423,7 @@ pub(crate) mod config {
         fn set_config_source(
             this: &Self::Handle,
             call: &mut Call<'_>,
-        ) -> Result<PluginValue, PhpThrow> {
+        ) -> Result<RpcValue, PhpThrow> {
             let _ = this;
             Err(call.unsupported())
         }
@@ -434,7 +431,7 @@ pub(crate) mod config {
         fn get_config_source(
             this: &Self::Handle,
             call: &mut Call<'_>,
-        ) -> Result<PluginValue, PhpThrow> {
+        ) -> Result<RpcValue, PhpThrow> {
             let _ = this;
             Err(call.unsupported())
         }
@@ -442,7 +439,7 @@ pub(crate) mod config {
         fn set_auth_config_source(
             this: &Self::Handle,
             call: &mut Call<'_>,
-        ) -> Result<PluginValue, PhpThrow> {
+        ) -> Result<RpcValue, PhpThrow> {
             let _ = this;
             Err(call.unsupported())
         }
@@ -450,7 +447,7 @@ pub(crate) mod config {
         fn get_auth_config_source(
             this: &Self::Handle,
             call: &mut Call<'_>,
-        ) -> Result<PluginValue, PhpThrow> {
+        ) -> Result<RpcValue, PhpThrow> {
             let _ = this;
             Err(call.unsupported())
         }
@@ -458,7 +455,7 @@ pub(crate) mod config {
         fn set_local_auth_config_source(
             this: &Self::Handle,
             call: &mut Call<'_>,
-        ) -> Result<PluginValue, PhpThrow> {
+        ) -> Result<RpcValue, PhpThrow> {
             let _ = this;
             Err(call.unsupported())
         }
@@ -466,12 +463,12 @@ pub(crate) mod config {
         fn get_local_auth_config_source(
             this: &Self::Handle,
             call: &mut Call<'_>,
-        ) -> Result<PluginValue, PhpThrow> {
+        ) -> Result<RpcValue, PhpThrow> {
             let _ = this;
             Err(call.unsupported())
         }
 
-        fn merge(this: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+        fn merge(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
             let _ = this;
             Err(call.unsupported())
         }
@@ -479,17 +476,17 @@ pub(crate) mod config {
         fn get_repositories(
             this: &Self::Handle,
             call: &mut Call<'_>,
-        ) -> Result<PluginValue, PhpThrow> {
+        ) -> Result<RpcValue, PhpThrow> {
             let _ = this;
             Err(call.unsupported())
         }
 
-        fn get(this: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+        fn get(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
             let _ = this;
             Err(call.unsupported())
         }
 
-        fn all(this: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+        fn all(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
             let _ = this;
             Err(call.unsupported())
         }
@@ -497,17 +494,17 @@ pub(crate) mod config {
         fn get_source_of_value(
             this: &Self::Handle,
             call: &mut Call<'_>,
-        ) -> Result<PluginValue, PhpThrow> {
+        ) -> Result<RpcValue, PhpThrow> {
             let _ = this;
             Err(call.unsupported())
         }
 
-        fn raw(this: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+        fn raw(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
             let _ = this;
             Err(call.unsupported())
         }
 
-        fn has(this: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+        fn has(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
             let _ = this;
             Err(call.unsupported())
         }
@@ -515,7 +512,7 @@ pub(crate) mod config {
         fn prohibit_url_by_config(
             this: &Self::Handle,
             call: &mut Call<'_>,
-        ) -> Result<PluginValue, PhpThrow> {
+        ) -> Result<RpcValue, PhpThrow> {
             let _ = this;
             Err(call.unsupported())
         }
@@ -528,7 +525,7 @@ pub(crate) mod config {
     pub(crate) fn dispatch(
         this: &<PhpClass as Forwarding>::Handle,
         call: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    ) -> Result<RpcValue, PhpThrow> {
         match call.method().as_bytes() {
             b"setBaseDir" => <PhpClass as Forwarding>::set_base_dir(this, call),
             b"setConfigSource" => <PhpClass as Forwarding>::set_config_source(this, call),
@@ -569,7 +566,7 @@ pub(crate) mod dependency_resolver {
         use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
         use crate::php_worker::rpc::forwarding;
         use bstr::ByteSlice as _;
-        use shirabe_php_rpc::{PhpThrow, PluginValue};
+        use shirabe_php_rpc::{PhpThrow, RpcValue};
 
         /// `Composer\DependencyResolver\LocalRepoTransaction`.
         #[derive(Debug)]
@@ -584,7 +581,7 @@ pub(crate) mod dependency_resolver {
         pub(crate) fn dispatch(
             this: &<forwarding::dependency_resolver::transaction::PhpClass as forwarding::dependency_resolver::transaction::Forwarding>::Handle,
             call: &mut Call<'_>,
-        ) -> Result<PluginValue, PhpThrow> {
+        ) -> Result<RpcValue, PhpThrow> {
             match call.method().as_bytes() {
 b"getOperations" => <forwarding::dependency_resolver::transaction::PhpClass as forwarding::dependency_resolver::transaction::Forwarding>::get_operations(this, call),
 _ => protocol_violation(call),
@@ -606,7 +603,7 @@ dispatch,
             use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
             use crate::php_worker::rpc::forwarding;
             use bstr::ByteSlice as _;
-            use shirabe_php_rpc::{PhpThrow, PluginValue};
+            use shirabe_php_rpc::{PhpThrow, RpcValue};
 
             /// `Composer\DependencyResolver\Operation\InstallOperation`.
             #[derive(Debug)]
@@ -616,7 +613,7 @@ dispatch,
                 fn get_package(
                     this: &<forwarding::dependency_resolver::operation::solver_operation::PhpClass as forwarding::dependency_resolver::operation::solver_operation::Forwarding>::Handle,
                     call: &mut Call<'_>,
-                ) -> Result<PluginValue, PhpThrow> {
+                ) -> Result<RpcValue, PhpThrow> {
                     let _ = this;
                     Err(call.unsupported())
                 }
@@ -629,7 +626,7 @@ dispatch,
             pub(crate) fn dispatch(
                 this: &<forwarding::dependency_resolver::operation::solver_operation::PhpClass as forwarding::dependency_resolver::operation::solver_operation::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 match call.method().as_bytes() {
 b"getPackage" => <PhpClass as Forwarding>::get_package(this, call),
 b"getOperationType" => <forwarding::dependency_resolver::operation::solver_operation::PhpClass as forwarding::dependency_resolver::operation::solver_operation::Forwarding>::get_operation_type(this, call),
@@ -653,7 +650,7 @@ dispatch,
             use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
             use crate::php_worker::rpc::forwarding;
             use bstr::ByteSlice as _;
-            use shirabe_php_rpc::{PhpThrow, PluginValue};
+            use shirabe_php_rpc::{PhpThrow, RpcValue};
 
             /// `Composer\DependencyResolver\Operation\MarkAliasInstalledOperation`.
             #[derive(Debug)]
@@ -663,7 +660,7 @@ dispatch,
                 fn get_package(
                     this: &<forwarding::dependency_resolver::operation::solver_operation::PhpClass as forwarding::dependency_resolver::operation::solver_operation::Forwarding>::Handle,
                     call: &mut Call<'_>,
-                ) -> Result<PluginValue, PhpThrow> {
+                ) -> Result<RpcValue, PhpThrow> {
                     let _ = this;
                     Err(call.unsupported())
                 }
@@ -676,7 +673,7 @@ dispatch,
             pub(crate) fn dispatch(
                 this: &<forwarding::dependency_resolver::operation::solver_operation::PhpClass as forwarding::dependency_resolver::operation::solver_operation::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 match call.method().as_bytes() {
 b"getPackage" => <PhpClass as Forwarding>::get_package(this, call),
 b"getOperationType" => <forwarding::dependency_resolver::operation::solver_operation::PhpClass as forwarding::dependency_resolver::operation::solver_operation::Forwarding>::get_operation_type(this, call),
@@ -700,7 +697,7 @@ dispatch,
             use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
             use crate::php_worker::rpc::forwarding;
             use bstr::ByteSlice as _;
-            use shirabe_php_rpc::{PhpThrow, PluginValue};
+            use shirabe_php_rpc::{PhpThrow, RpcValue};
 
             /// `Composer\DependencyResolver\Operation\MarkAliasUninstalledOperation`.
             #[derive(Debug)]
@@ -710,7 +707,7 @@ dispatch,
                 fn get_package(
                     this: &<forwarding::dependency_resolver::operation::solver_operation::PhpClass as forwarding::dependency_resolver::operation::solver_operation::Forwarding>::Handle,
                     call: &mut Call<'_>,
-                ) -> Result<PluginValue, PhpThrow> {
+                ) -> Result<RpcValue, PhpThrow> {
                     let _ = this;
                     Err(call.unsupported())
                 }
@@ -723,7 +720,7 @@ dispatch,
             pub(crate) fn dispatch(
                 this: &<forwarding::dependency_resolver::operation::solver_operation::PhpClass as forwarding::dependency_resolver::operation::solver_operation::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 match call.method().as_bytes() {
 b"getPackage" => <PhpClass as Forwarding>::get_package(this, call),
 b"getOperationType" => <forwarding::dependency_resolver::operation::solver_operation::PhpClass as forwarding::dependency_resolver::operation::solver_operation::Forwarding>::get_operation_type(this, call),
@@ -746,7 +743,7 @@ dispatch,
         pub(crate) mod solver_operation {
             use crate::php_worker::rpc::entity::{Call, Crossing, Entity, protocol_violation};
             use bstr::ByteSlice as _;
-            use shirabe_php_rpc::{PhpThrow, PluginValue};
+            use shirabe_php_rpc::{PhpThrow, RpcValue};
 
             /// `Composer\DependencyResolver\Operation\SolverOperation`.
             #[derive(Debug)]
@@ -759,12 +756,12 @@ dispatch,
                 fn get_operation_type(
                     this: &Self::Handle,
                     call: &mut Call<'_>,
-                ) -> Result<PluginValue, PhpThrow> {
+                ) -> Result<RpcValue, PhpThrow> {
                     let _ = this;
                     Err(call.unsupported())
                 }
 
-                fn show(this: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+                fn show(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                     let _ = this;
                     Err(call.unsupported())
                 }
@@ -772,7 +769,7 @@ dispatch,
                 fn __to_string(
                     this: &Self::Handle,
                     call: &mut Call<'_>,
-                ) -> Result<PluginValue, PhpThrow> {
+                ) -> Result<RpcValue, PhpThrow> {
                     let _ = this;
                     Err(call.unsupported())
                 }
@@ -781,7 +778,7 @@ dispatch,
             pub(crate) fn dispatch(
                 this: &<PhpClass as Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 match call.method().as_bytes() {
                     b"getOperationType" => <PhpClass as Forwarding>::get_operation_type(this, call),
                     b"show" => <PhpClass as Forwarding>::show(this, call),
@@ -799,7 +796,7 @@ dispatch,
             use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
             use crate::php_worker::rpc::forwarding;
             use bstr::ByteSlice as _;
-            use shirabe_php_rpc::{PhpThrow, PluginValue};
+            use shirabe_php_rpc::{PhpThrow, RpcValue};
 
             /// `Composer\DependencyResolver\Operation\UninstallOperation`.
             #[derive(Debug)]
@@ -809,7 +806,7 @@ dispatch,
                 fn get_package(
                     this: &<forwarding::dependency_resolver::operation::solver_operation::PhpClass as forwarding::dependency_resolver::operation::solver_operation::Forwarding>::Handle,
                     call: &mut Call<'_>,
-                ) -> Result<PluginValue, PhpThrow> {
+                ) -> Result<RpcValue, PhpThrow> {
                     let _ = this;
                     Err(call.unsupported())
                 }
@@ -822,7 +819,7 @@ dispatch,
             pub(crate) fn dispatch(
                 this: &<forwarding::dependency_resolver::operation::solver_operation::PhpClass as forwarding::dependency_resolver::operation::solver_operation::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 match call.method().as_bytes() {
 b"getPackage" => <PhpClass as Forwarding>::get_package(this, call),
 b"getOperationType" => <forwarding::dependency_resolver::operation::solver_operation::PhpClass as forwarding::dependency_resolver::operation::solver_operation::Forwarding>::get_operation_type(this, call),
@@ -846,7 +843,7 @@ dispatch,
             use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
             use crate::php_worker::rpc::forwarding;
             use bstr::ByteSlice as _;
-            use shirabe_php_rpc::{PhpThrow, PluginValue};
+            use shirabe_php_rpc::{PhpThrow, RpcValue};
 
             /// `Composer\DependencyResolver\Operation\UpdateOperation`.
             #[derive(Debug)]
@@ -856,7 +853,7 @@ dispatch,
                 fn get_initial_package(
                     this: &<forwarding::dependency_resolver::operation::solver_operation::PhpClass as forwarding::dependency_resolver::operation::solver_operation::Forwarding>::Handle,
                     call: &mut Call<'_>,
-                ) -> Result<PluginValue, PhpThrow> {
+                ) -> Result<RpcValue, PhpThrow> {
                     let _ = this;
                     Err(call.unsupported())
                 }
@@ -864,7 +861,7 @@ dispatch,
                 fn get_target_package(
                     this: &<forwarding::dependency_resolver::operation::solver_operation::PhpClass as forwarding::dependency_resolver::operation::solver_operation::Forwarding>::Handle,
                     call: &mut Call<'_>,
-                ) -> Result<PluginValue, PhpThrow> {
+                ) -> Result<RpcValue, PhpThrow> {
                     let _ = this;
                     Err(call.unsupported())
                 }
@@ -877,7 +874,7 @@ dispatch,
             pub(crate) fn dispatch(
                 this: &<forwarding::dependency_resolver::operation::solver_operation::PhpClass as forwarding::dependency_resolver::operation::solver_operation::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 match call.method().as_bytes() {
 b"getInitialPackage" => <PhpClass as Forwarding>::get_initial_package(this, call),
 b"getTargetPackage" => <PhpClass as Forwarding>::get_target_package(this, call),
@@ -904,7 +901,7 @@ dispatch,
             Call, Crossing, Entity, constructed, protocol_violation,
         };
         use bstr::ByteSlice as _;
-        use shirabe_php_rpc::{PhpThrow, PluginValue};
+        use shirabe_php_rpc::{PhpThrow, RpcValue};
 
         /// `Composer\DependencyResolver\Transaction`.
         #[derive(Debug)]
@@ -917,7 +914,7 @@ dispatch,
             fn get_operations(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -930,7 +927,7 @@ dispatch,
         pub(crate) fn dispatch(
             this: &<PhpClass as Forwarding>::Handle,
             call: &mut Call<'_>,
-        ) -> Result<PluginValue, PhpThrow> {
+        ) -> Result<RpcValue, PhpThrow> {
             match call.method().as_bytes() {
                 b"getOperations" => <PhpClass as Forwarding>::get_operations(this, call),
                 _ => protocol_violation(call),
@@ -955,7 +952,7 @@ pub(crate) mod downloader {
             Call, Crossing, Entity, constructed, protocol_violation,
         };
         use bstr::ByteSlice as _;
-        use shirabe_php_rpc::{PhpThrow, PluginValue};
+        use shirabe_php_rpc::{PhpThrow, RpcValue};
 
         /// `Composer\Downloader\DownloadManager`.
         #[derive(Debug)]
@@ -968,7 +965,7 @@ pub(crate) mod downloader {
             fn set_prefer_source(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -976,7 +973,7 @@ pub(crate) mod downloader {
             fn set_prefer_dist(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -984,7 +981,7 @@ pub(crate) mod downloader {
             fn set_preferences(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -992,7 +989,7 @@ pub(crate) mod downloader {
             fn set_downloader(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -1000,7 +997,7 @@ pub(crate) mod downloader {
             fn get_downloader(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -1008,7 +1005,7 @@ pub(crate) mod downloader {
             fn get_downloader_for_package(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -1016,37 +1013,37 @@ pub(crate) mod downloader {
             fn get_downloader_type(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
 
-            fn download(this: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+            fn download(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
 
-            fn prepare(this: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+            fn prepare(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
 
-            fn install(this: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+            fn install(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
 
-            fn update(this: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+            fn update(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
 
-            fn remove(this: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+            fn remove(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
 
-            fn cleanup(this: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+            fn cleanup(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -1059,7 +1056,7 @@ pub(crate) mod downloader {
         pub(crate) fn dispatch(
             this: &<PhpClass as Forwarding>::Handle,
             call: &mut Call<'_>,
-        ) -> Result<PluginValue, PhpThrow> {
+        ) -> Result<RpcValue, PhpThrow> {
             match call.method().as_bytes() {
                 b"setPreferSource" => <PhpClass as Forwarding>::set_prefer_source(this, call),
                 b"setPreferDist" => <PhpClass as Forwarding>::set_prefer_dist(this, call),
@@ -1096,7 +1093,7 @@ pub(crate) mod event_dispatcher {
     pub(crate) mod event {
         use crate::php_worker::rpc::entity::{Call, Crossing, Entity, protocol_violation};
         use bstr::ByteSlice as _;
-        use shirabe_php_rpc::{PhpThrow, PluginValue};
+        use shirabe_php_rpc::{PhpThrow, RpcValue};
 
         /// `Composer\EventDispatcher\Event`.
         #[derive(Debug)]
@@ -1106,7 +1103,7 @@ pub(crate) mod event_dispatcher {
             /// The handle type of the entities crossing as this class or a subclass.
             type Handle: Entity;
 
-            fn get_name(this: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+            fn get_name(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -1114,15 +1111,12 @@ pub(crate) mod event_dispatcher {
             fn get_arguments(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
 
-            fn get_flags(
-                this: &Self::Handle,
-                call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            fn get_flags(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -1130,7 +1124,7 @@ pub(crate) mod event_dispatcher {
             fn is_propagation_stopped(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -1138,7 +1132,7 @@ pub(crate) mod event_dispatcher {
             fn stop_propagation(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -1147,7 +1141,7 @@ pub(crate) mod event_dispatcher {
         pub(crate) fn dispatch(
             this: &<PhpClass as Forwarding>::Handle,
             call: &mut Call<'_>,
-        ) -> Result<PluginValue, PhpThrow> {
+        ) -> Result<RpcValue, PhpThrow> {
             match call.method().as_bytes() {
                 b"getName" => <PhpClass as Forwarding>::get_name(this, call),
                 b"getArguments" => <PhpClass as Forwarding>::get_arguments(this, call),
@@ -1170,7 +1164,7 @@ pub(crate) mod event_dispatcher {
             Call, Crossing, Entity, constructed, protocol_violation,
         };
         use bstr::ByteSlice as _;
-        use shirabe_php_rpc::{PhpThrow, PluginValue};
+        use shirabe_php_rpc::{PhpThrow, RpcValue};
 
         /// `Composer\EventDispatcher\EventDispatcher`.
         #[derive(Debug)]
@@ -1183,12 +1177,12 @@ pub(crate) mod event_dispatcher {
             fn set_run_scripts(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
 
-            fn dispatch(this: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+            fn dispatch(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -1196,7 +1190,7 @@ pub(crate) mod event_dispatcher {
             fn dispatch_script(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -1204,7 +1198,7 @@ pub(crate) mod event_dispatcher {
             fn dispatch_package_event(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -1212,7 +1206,7 @@ pub(crate) mod event_dispatcher {
             fn dispatch_installer_event(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -1220,7 +1214,7 @@ pub(crate) mod event_dispatcher {
             fn add_listener(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -1228,7 +1222,7 @@ pub(crate) mod event_dispatcher {
             fn remove_listener(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -1236,7 +1230,7 @@ pub(crate) mod event_dispatcher {
             fn add_subscriber(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -1244,7 +1238,7 @@ pub(crate) mod event_dispatcher {
             fn has_event_listeners(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -1257,7 +1251,7 @@ pub(crate) mod event_dispatcher {
         pub(crate) fn dispatch(
             this: &<PhpClass as Forwarding>::Handle,
             call: &mut Call<'_>,
-        ) -> Result<PluginValue, PhpThrow> {
+        ) -> Result<RpcValue, PhpThrow> {
             match call.method().as_bytes() {
                 b"setRunScripts" => <PhpClass as Forwarding>::set_run_scripts(this, call),
                 b"dispatch" => <PhpClass as Forwarding>::dispatch(this, call),
@@ -1291,19 +1285,19 @@ pub(crate) mod event_dispatcher {
 pub(crate) mod factory {
     use crate::php_worker::rpc::entity::{Call, protocol_violation};
     use bstr::ByteSlice as _;
-    use shirabe_php_rpc::{PhpThrow, PluginValue};
+    use shirabe_php_rpc::{PhpThrow, RpcValue};
 
     /// `Composer\Factory`, whose static methods are forwarded.
     #[derive(Debug)]
     pub(crate) struct PhpClass;
 
     pub(crate) trait Forwarding {
-        fn get_composer_file(call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+        fn get_composer_file(call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
             Err(call.unsupported())
         }
     }
 
-    pub(crate) fn call_static(call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+    pub(crate) fn call_static(call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         match call.method().as_bytes() {
             b"getComposerFile" => <PhpClass as Forwarding>::get_composer_file(call),
             _ => protocol_violation(call),
@@ -1315,7 +1309,7 @@ pub(crate) mod io {
     pub(crate) mod base_io {
         use crate::php_worker::rpc::entity::{Call, Crossing, Entity, protocol_violation};
         use bstr::ByteSlice as _;
-        use shirabe_php_rpc::{PhpThrow, PluginValue};
+        use shirabe_php_rpc::{PhpThrow, RpcValue};
 
         /// `Composer\IO\BaseIO`.
         #[derive(Debug)]
@@ -1328,15 +1322,12 @@ pub(crate) mod io {
             fn is_interactive(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
 
-            fn is_verbose(
-                this: &Self::Handle,
-                call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            fn is_verbose(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -1344,12 +1335,12 @@ pub(crate) mod io {
             fn is_very_verbose(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
 
-            fn is_debug(this: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+            fn is_debug(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -1357,28 +1348,22 @@ pub(crate) mod io {
             fn is_decorated(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
 
-            fn write(this: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+            fn write(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
 
-            fn write_error(
-                this: &Self::Handle,
-                call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            fn write_error(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
 
-            fn write_raw(
-                this: &Self::Handle,
-                call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            fn write_raw(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -1386,15 +1371,12 @@ pub(crate) mod io {
             fn write_error_raw(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
 
-            fn overwrite(
-                this: &Self::Handle,
-                call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            fn overwrite(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -1402,12 +1384,12 @@ pub(crate) mod io {
             fn overwrite_error(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
 
-            fn ask(this: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+            fn ask(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -1415,7 +1397,7 @@ pub(crate) mod io {
             fn ask_confirmation(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -1423,7 +1405,7 @@ pub(crate) mod io {
             fn ask_and_validate(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -1431,12 +1413,12 @@ pub(crate) mod io {
             fn ask_and_hide_answer(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
 
-            fn select(this: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+            fn select(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -1444,7 +1426,7 @@ pub(crate) mod io {
             fn get_authentications(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -1452,7 +1434,7 @@ pub(crate) mod io {
             fn has_authentication(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -1460,7 +1442,7 @@ pub(crate) mod io {
             fn get_authentication(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -1468,7 +1450,7 @@ pub(crate) mod io {
             fn set_authentication(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -1476,55 +1458,52 @@ pub(crate) mod io {
             fn load_configuration(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
 
-            fn emergency(
-                this: &Self::Handle,
-                call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            fn emergency(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
 
-            fn alert(this: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+            fn alert(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
 
-            fn critical(this: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+            fn critical(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
 
-            fn error(this: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+            fn error(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
 
-            fn warning(this: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+            fn warning(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
 
-            fn notice(this: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+            fn notice(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
 
-            fn info(this: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+            fn info(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
 
-            fn debug(this: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+            fn debug(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
 
-            fn log(this: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+            fn log(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -1532,7 +1511,7 @@ pub(crate) mod io {
             fn reset_authentications(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -1541,7 +1520,7 @@ pub(crate) mod io {
         pub(crate) fn dispatch(
             this: &<PhpClass as Forwarding>::Handle,
             call: &mut Call<'_>,
-        ) -> Result<PluginValue, PhpThrow> {
+        ) -> Result<RpcValue, PhpThrow> {
             match call.method().as_bytes() {
                 b"isInteractive" => <PhpClass as Forwarding>::is_interactive(this, call),
                 b"isVerbose" => <PhpClass as Forwarding>::is_verbose(this, call),
@@ -1589,7 +1568,7 @@ pub(crate) mod io {
         use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
         use crate::php_worker::rpc::forwarding;
         use bstr::ByteSlice as _;
-        use shirabe_php_rpc::{PhpThrow, PluginValue};
+        use shirabe_php_rpc::{PhpThrow, RpcValue};
 
         /// `Composer\IO\BufferIO`.
         #[derive(Debug)]
@@ -1599,7 +1578,7 @@ pub(crate) mod io {
             fn get_output(
                 this: &<forwarding::io::base_io::PhpClass as forwarding::io::base_io::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -1607,7 +1586,7 @@ pub(crate) mod io {
             fn set_user_inputs(
                 this: &<forwarding::io::base_io::PhpClass as forwarding::io::base_io::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -1625,7 +1604,7 @@ pub(crate) mod io {
         pub(crate) fn dispatch(
             this: &<forwarding::io::base_io::PhpClass as forwarding::io::base_io::Forwarding>::Handle,
             call: &mut Call<'_>,
-        ) -> Result<PluginValue, PhpThrow> {
+        ) -> Result<RpcValue, PhpThrow> {
             match call.method().as_bytes() {
 b"getOutput" => <PhpClass as Forwarding>::get_output(this, call),
 b"setUserInputs" => <PhpClass as Forwarding>::set_user_inputs(this, call),
@@ -1683,7 +1662,7 @@ _ => protocol_violation(call),
         use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
         use crate::php_worker::rpc::forwarding;
         use bstr::ByteSlice as _;
-        use shirabe_php_rpc::{PhpThrow, PluginValue};
+        use shirabe_php_rpc::{PhpThrow, RpcValue};
 
         /// `Composer\IO\ConsoleIO`.
         #[derive(Debug)]
@@ -1693,7 +1672,7 @@ _ => protocol_violation(call),
             fn enable_debugging(
                 this: &<forwarding::io::base_io::PhpClass as forwarding::io::base_io::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -1701,7 +1680,7 @@ _ => protocol_violation(call),
             fn get_progress_bar(
                 this: &<forwarding::io::base_io::PhpClass as forwarding::io::base_io::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -1709,7 +1688,7 @@ _ => protocol_violation(call),
             fn get_table(
                 this: &<forwarding::io::base_io::PhpClass as forwarding::io::base_io::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -1727,7 +1706,7 @@ _ => protocol_violation(call),
         pub(crate) fn dispatch(
             this: &<forwarding::io::base_io::PhpClass as forwarding::io::base_io::Forwarding>::Handle,
             call: &mut Call<'_>,
-        ) -> Result<PluginValue, PhpThrow> {
+        ) -> Result<RpcValue, PhpThrow> {
             match call.method().as_bytes() {
 b"enableDebugging" => <PhpClass as Forwarding>::enable_debugging(this, call),
 b"getProgressBar" => <PhpClass as Forwarding>::get_progress_bar(this, call),
@@ -1783,7 +1762,7 @@ _ => protocol_violation(call),
         use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
         use crate::php_worker::rpc::forwarding;
         use bstr::ByteSlice as _;
-        use shirabe_php_rpc::{PhpThrow, PluginValue};
+        use shirabe_php_rpc::{PhpThrow, RpcValue};
 
         /// `Composer\IO\NullIO`.
         #[derive(Debug)]
@@ -1803,7 +1782,7 @@ _ => protocol_violation(call),
         pub(crate) fn dispatch(
             this: &<forwarding::io::base_io::PhpClass as forwarding::io::base_io::Forwarding>::Handle,
             call: &mut Call<'_>,
-        ) -> Result<PluginValue, PhpThrow> {
+        ) -> Result<RpcValue, PhpThrow> {
             match call.method().as_bytes() {
 b"isInteractive" => <forwarding::io::base_io::PhpClass as forwarding::io::base_io::Forwarding>::is_interactive(this, call),
 b"isVerbose" => <forwarding::io::base_io::PhpClass as forwarding::io::base_io::Forwarding>::is_verbose(this, call),
@@ -1860,7 +1839,7 @@ pub(crate) mod installer {
             Call, Crossing, Entity, constructed, protocol_violation,
         };
         use bstr::ByteSlice as _;
-        use shirabe_php_rpc::{PhpThrow, PluginValue};
+        use shirabe_php_rpc::{PhpThrow, RpcValue};
 
         /// `Composer\Installer\InstallationManager`.
         #[derive(Debug)]
@@ -1870,7 +1849,7 @@ pub(crate) mod installer {
             /// The handle type of the entities crossing as this class or a subclass.
             type Handle: Entity;
 
-            fn reset(this: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+            fn reset(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -1878,7 +1857,7 @@ pub(crate) mod installer {
             fn add_installer(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -1886,7 +1865,7 @@ pub(crate) mod installer {
             fn remove_installer(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -1894,7 +1873,7 @@ pub(crate) mod installer {
             fn disable_plugins(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -1902,7 +1881,7 @@ pub(crate) mod installer {
             fn get_installer(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -1910,7 +1889,7 @@ pub(crate) mod installer {
             fn is_package_installed(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -1918,35 +1897,32 @@ pub(crate) mod installer {
             fn ensure_binaries_presence(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
 
-            fn execute(this: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+            fn execute(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
 
-            fn download(this: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+            fn download(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
 
-            fn install(this: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+            fn install(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
 
-            fn update(this: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+            fn update(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
 
-            fn uninstall(
-                this: &Self::Handle,
-                call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            fn uninstall(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -1954,7 +1930,7 @@ pub(crate) mod installer {
             fn mark_alias_installed(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -1962,7 +1938,7 @@ pub(crate) mod installer {
             fn mark_alias_uninstalled(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -1970,7 +1946,7 @@ pub(crate) mod installer {
             fn get_install_path(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -1978,7 +1954,7 @@ pub(crate) mod installer {
             fn set_output_progress(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -1986,7 +1962,7 @@ pub(crate) mod installer {
             fn notify_installs(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -1999,7 +1975,7 @@ pub(crate) mod installer {
         pub(crate) fn dispatch(
             this: &<PhpClass as Forwarding>::Handle,
             call: &mut Call<'_>,
-        ) -> Result<PluginValue, PhpThrow> {
+        ) -> Result<RpcValue, PhpThrow> {
             match call.method().as_bytes() {
                 b"reset" => <PhpClass as Forwarding>::reset(this, call),
                 b"addInstaller" => <PhpClass as Forwarding>::add_installer(this, call),
@@ -2040,7 +2016,7 @@ pub(crate) mod installer {
         use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
         use crate::php_worker::rpc::forwarding;
         use bstr::ByteSlice as _;
-        use shirabe_php_rpc::{PhpThrow, PluginValue};
+        use shirabe_php_rpc::{PhpThrow, RpcValue};
 
         /// `Composer\Installer\InstallerEvent`.
         #[derive(Debug)]
@@ -2050,7 +2026,7 @@ pub(crate) mod installer {
             fn get_composer(
                 this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -2058,7 +2034,7 @@ pub(crate) mod installer {
             fn get_io(
                 this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -2066,7 +2042,7 @@ pub(crate) mod installer {
             fn is_dev_mode(
                 this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -2074,7 +2050,7 @@ pub(crate) mod installer {
             fn is_executing_operations(
                 this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -2082,7 +2058,7 @@ pub(crate) mod installer {
             fn get_transaction(
                 this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -2095,7 +2071,7 @@ pub(crate) mod installer {
         pub(crate) fn dispatch(
             this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
             call: &mut Call<'_>,
-        ) -> Result<PluginValue, PhpThrow> {
+        ) -> Result<RpcValue, PhpThrow> {
             match call.method().as_bytes() {
 b"getComposer" => <PhpClass as Forwarding>::get_composer(this, call),
 b"getIO" => <PhpClass as Forwarding>::get_io(this, call),
@@ -2125,7 +2101,7 @@ dispatch,
         use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
         use crate::php_worker::rpc::forwarding;
         use bstr::ByteSlice as _;
-        use shirabe_php_rpc::{PhpThrow, PluginValue};
+        use shirabe_php_rpc::{PhpThrow, RpcValue};
 
         /// `Composer\Installer\PackageEvent`.
         #[derive(Debug)]
@@ -2135,7 +2111,7 @@ dispatch,
             fn get_composer(
                 this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -2143,7 +2119,7 @@ dispatch,
             fn get_io(
                 this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -2151,7 +2127,7 @@ dispatch,
             fn is_dev_mode(
                 this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -2159,7 +2135,7 @@ dispatch,
             fn get_local_repo(
                 this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -2167,7 +2143,7 @@ dispatch,
             fn get_operations(
                 this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -2175,7 +2151,7 @@ dispatch,
             fn get_operation(
                 this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -2188,7 +2164,7 @@ dispatch,
         pub(crate) fn dispatch(
             this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
             call: &mut Call<'_>,
-        ) -> Result<PluginValue, PhpThrow> {
+        ) -> Result<RpcValue, PhpThrow> {
             match call.method().as_bytes() {
 b"getComposer" => <PhpClass as Forwarding>::get_composer(this, call),
 b"getIO" => <PhpClass as Forwarding>::get_io(this, call),
@@ -2222,7 +2198,7 @@ pub(crate) mod package {
         use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
         use crate::php_worker::rpc::forwarding;
         use bstr::ByteSlice as _;
-        use shirabe_php_rpc::{PhpThrow, PluginValue};
+        use shirabe_php_rpc::{PhpThrow, RpcValue};
 
         /// `Composer\Package\AliasPackage`.
         #[derive(Debug)]
@@ -2232,7 +2208,7 @@ pub(crate) mod package {
             fn get_alias_of(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -2240,7 +2216,7 @@ pub(crate) mod package {
             fn set_root_package_alias(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -2248,7 +2224,7 @@ pub(crate) mod package {
             fn is_root_package_alias(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -2256,7 +2232,7 @@ pub(crate) mod package {
             fn has_self_version_requires(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -2269,7 +2245,7 @@ pub(crate) mod package {
         pub(crate) fn dispatch(
             this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
             call: &mut Call<'_>,
-        ) -> Result<PluginValue, PhpThrow> {
+        ) -> Result<RpcValue, PhpThrow> {
             match call.method().as_bytes() {
 b"getAliasOf" => <PhpClass as Forwarding>::get_alias_of(this, call),
 b"setRootPackageAlias" => <PhpClass as Forwarding>::set_root_package_alias(this, call),
@@ -2349,7 +2325,7 @@ dispatch,
     pub(crate) mod base_package {
         use crate::php_worker::rpc::entity::{Call, Crossing, Entity, protocol_violation};
         use bstr::ByteSlice as _;
-        use shirabe_php_rpc::{PhpThrow, PluginValue};
+        use shirabe_php_rpc::{PhpThrow, RpcValue};
 
         /// `Composer\Package\BasePackage`.
         #[derive(Debug)]
@@ -2359,7 +2335,7 @@ dispatch,
             /// The handle type of the entities crossing as this class or a subclass.
             type Handle: Entity;
 
-            fn get_name(this: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+            fn get_name(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -2367,35 +2343,32 @@ dispatch,
             fn get_pretty_name(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
 
-            fn get_names(
-                this: &Self::Handle,
-                call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            fn get_names(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
 
-            fn set_id(this: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+            fn set_id(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
 
-            fn get_id(this: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+            fn get_id(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
 
-            fn is_dev(this: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+            fn is_dev(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
 
-            fn get_type(this: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+            fn get_type(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -2403,15 +2376,12 @@ dispatch,
             fn get_target_dir(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
 
-            fn get_extra(
-                this: &Self::Handle,
-                call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            fn get_extra(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -2419,7 +2389,7 @@ dispatch,
             fn set_installation_source(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -2427,7 +2397,7 @@ dispatch,
             fn get_installation_source(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -2435,7 +2405,7 @@ dispatch,
             fn get_source_type(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -2443,7 +2413,7 @@ dispatch,
             fn get_source_url(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -2451,7 +2421,7 @@ dispatch,
             fn get_source_urls(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -2459,7 +2429,7 @@ dispatch,
             fn get_source_reference(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -2467,7 +2437,7 @@ dispatch,
             fn get_source_mirrors(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -2475,7 +2445,7 @@ dispatch,
             fn set_source_mirrors(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -2483,7 +2453,7 @@ dispatch,
             fn get_dist_type(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -2491,7 +2461,7 @@ dispatch,
             fn get_dist_url(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -2499,7 +2469,7 @@ dispatch,
             fn get_dist_urls(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -2507,7 +2477,7 @@ dispatch,
             fn get_dist_reference(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -2515,7 +2485,7 @@ dispatch,
             fn get_dist_sha1_checksum(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -2523,7 +2493,7 @@ dispatch,
             fn get_dist_mirrors(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -2531,15 +2501,12 @@ dispatch,
             fn set_dist_mirrors(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
 
-            fn get_version(
-                this: &Self::Handle,
-                call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            fn get_version(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -2547,7 +2514,7 @@ dispatch,
             fn get_pretty_version(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -2555,7 +2522,7 @@ dispatch,
             fn get_full_pretty_version(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -2563,7 +2530,7 @@ dispatch,
             fn get_release_date(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -2571,7 +2538,7 @@ dispatch,
             fn get_stability(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -2579,7 +2546,7 @@ dispatch,
             fn get_requires(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -2587,7 +2554,7 @@ dispatch,
             fn get_conflicts(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -2595,7 +2562,7 @@ dispatch,
             fn get_provides(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -2603,7 +2570,7 @@ dispatch,
             fn get_replaces(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -2611,7 +2578,7 @@ dispatch,
             fn get_dev_requires(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -2619,7 +2586,7 @@ dispatch,
             fn get_suggests(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -2627,7 +2594,7 @@ dispatch,
             fn get_autoload(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -2635,7 +2602,7 @@ dispatch,
             fn get_dev_autoload(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -2643,15 +2610,12 @@ dispatch,
             fn get_include_paths(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
 
-            fn get_php_ext(
-                this: &Self::Handle,
-                call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            fn get_php_ext(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -2659,7 +2623,7 @@ dispatch,
             fn set_repository(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -2667,7 +2631,7 @@ dispatch,
             fn get_repository(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -2675,7 +2639,7 @@ dispatch,
             fn get_binaries(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -2683,7 +2647,7 @@ dispatch,
             fn get_unique_name(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -2691,15 +2655,12 @@ dispatch,
             fn get_notification_url(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
 
-            fn __to_string(
-                this: &Self::Handle,
-                call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            fn __to_string(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -2707,7 +2668,7 @@ dispatch,
             fn get_pretty_string(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -2715,7 +2676,7 @@ dispatch,
             fn is_default_branch(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -2723,7 +2684,7 @@ dispatch,
             fn get_transport_options(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -2731,7 +2692,7 @@ dispatch,
             fn set_transport_options(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -2739,7 +2700,7 @@ dispatch,
             fn set_source_reference(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -2747,7 +2708,7 @@ dispatch,
             fn set_dist_url(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -2755,7 +2716,7 @@ dispatch,
             fn set_dist_type(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -2763,7 +2724,7 @@ dispatch,
             fn set_dist_reference(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -2771,20 +2732,17 @@ dispatch,
             fn set_source_dist_references(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
 
-            fn is_platform(
-                this: &Self::Handle,
-                call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            fn is_platform(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
 
-            fn equals(this: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+            fn equals(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -2792,7 +2750,7 @@ dispatch,
             fn get_stability_priority(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -2801,7 +2759,7 @@ dispatch,
         pub(crate) fn dispatch(
             this: &<PhpClass as Forwarding>::Handle,
             call: &mut Call<'_>,
-        ) -> Result<PluginValue, PhpThrow> {
+        ) -> Result<RpcValue, PhpThrow> {
             match call.method().as_bytes() {
                 b"getName" => <PhpClass as Forwarding>::get_name(this, call),
                 b"getPrettyName" => <PhpClass as Forwarding>::get_pretty_name(this, call),
@@ -2889,7 +2847,7 @@ dispatch,
         use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
         use crate::php_worker::rpc::forwarding;
         use bstr::ByteSlice as _;
-        use shirabe_php_rpc::{PhpThrow, PluginValue};
+        use shirabe_php_rpc::{PhpThrow, RpcValue};
 
         /// `Composer\Package\CompleteAliasPackage`.
         #[derive(Debug)]
@@ -2899,7 +2857,7 @@ dispatch,
             fn get_scripts(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -2907,7 +2865,7 @@ dispatch,
             fn set_scripts(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -2915,7 +2873,7 @@ dispatch,
             fn get_repositories(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -2923,7 +2881,7 @@ dispatch,
             fn set_repositories(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -2931,7 +2889,7 @@ dispatch,
             fn get_license(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -2939,7 +2897,7 @@ dispatch,
             fn set_license(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -2947,7 +2905,7 @@ dispatch,
             fn get_keywords(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -2955,7 +2913,7 @@ dispatch,
             fn set_keywords(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -2963,7 +2921,7 @@ dispatch,
             fn get_description(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -2971,7 +2929,7 @@ dispatch,
             fn set_description(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -2979,7 +2937,7 @@ dispatch,
             fn get_homepage(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -2987,7 +2945,7 @@ dispatch,
             fn set_homepage(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -2995,7 +2953,7 @@ dispatch,
             fn get_authors(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -3003,7 +2961,7 @@ dispatch,
             fn set_authors(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -3011,7 +2969,7 @@ dispatch,
             fn get_support(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -3019,7 +2977,7 @@ dispatch,
             fn set_support(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -3027,7 +2985,7 @@ dispatch,
             fn get_funding(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -3035,7 +2993,7 @@ dispatch,
             fn set_funding(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -3043,7 +3001,7 @@ dispatch,
             fn is_abandoned(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -3051,7 +3009,7 @@ dispatch,
             fn get_replacement_package(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -3059,7 +3017,7 @@ dispatch,
             fn set_abandoned(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -3067,7 +3025,7 @@ dispatch,
             fn get_archive_name(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -3075,7 +3033,7 @@ dispatch,
             fn set_archive_name(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -3083,7 +3041,7 @@ dispatch,
             fn get_archive_excludes(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -3091,7 +3049,7 @@ dispatch,
             fn set_archive_excludes(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -3104,7 +3062,7 @@ dispatch,
         pub(crate) fn dispatch(
             this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
             call: &mut Call<'_>,
-        ) -> Result<PluginValue, PhpThrow> {
+        ) -> Result<RpcValue, PhpThrow> {
             match call.method().as_bytes() {
 b"getScripts" => <PhpClass as Forwarding>::get_scripts(this, call),
 b"setScripts" => <PhpClass as Forwarding>::set_scripts(this, call),
@@ -3210,7 +3168,7 @@ dispatch,
         use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
         use crate::php_worker::rpc::forwarding;
         use bstr::ByteSlice as _;
-        use shirabe_php_rpc::{PhpThrow, PluginValue};
+        use shirabe_php_rpc::{PhpThrow, RpcValue};
 
         /// `Composer\Package\CompletePackage`.
         #[derive(Debug)]
@@ -3220,7 +3178,7 @@ dispatch,
             fn get_scripts(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -3228,7 +3186,7 @@ dispatch,
             fn set_scripts(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -3236,7 +3194,7 @@ dispatch,
             fn get_repositories(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -3244,7 +3202,7 @@ dispatch,
             fn set_repositories(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -3252,7 +3210,7 @@ dispatch,
             fn get_license(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -3260,7 +3218,7 @@ dispatch,
             fn set_license(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -3268,7 +3226,7 @@ dispatch,
             fn get_keywords(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -3276,7 +3234,7 @@ dispatch,
             fn set_keywords(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -3284,7 +3242,7 @@ dispatch,
             fn get_description(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -3292,7 +3250,7 @@ dispatch,
             fn set_description(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -3300,7 +3258,7 @@ dispatch,
             fn get_homepage(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -3308,7 +3266,7 @@ dispatch,
             fn set_homepage(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -3316,7 +3274,7 @@ dispatch,
             fn get_authors(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -3324,7 +3282,7 @@ dispatch,
             fn set_authors(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -3332,7 +3290,7 @@ dispatch,
             fn get_support(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -3340,7 +3298,7 @@ dispatch,
             fn set_support(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -3348,7 +3306,7 @@ dispatch,
             fn get_funding(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -3356,7 +3314,7 @@ dispatch,
             fn set_funding(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -3364,7 +3322,7 @@ dispatch,
             fn is_abandoned(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -3372,7 +3330,7 @@ dispatch,
             fn get_replacement_package(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -3380,7 +3338,7 @@ dispatch,
             fn set_abandoned(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -3388,7 +3346,7 @@ dispatch,
             fn get_archive_name(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -3396,7 +3354,7 @@ dispatch,
             fn set_archive_name(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -3404,7 +3362,7 @@ dispatch,
             fn get_archive_excludes(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -3412,7 +3370,7 @@ dispatch,
             fn set_archive_excludes(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -3425,7 +3383,7 @@ dispatch,
         pub(crate) fn dispatch(
             this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
             call: &mut Call<'_>,
-        ) -> Result<PluginValue, PhpThrow> {
+        ) -> Result<RpcValue, PhpThrow> {
             match call.method().as_bytes() {
 b"getScripts" => <PhpClass as Forwarding>::get_scripts(this, call),
 b"setScripts" => <PhpClass as Forwarding>::set_scripts(this, call),
@@ -3549,7 +3507,7 @@ dispatch,
             Call, Crossing, Entity, constructed, protocol_violation,
         };
         use bstr::ByteSlice as _;
-        use shirabe_php_rpc::{PhpThrow, PluginValue};
+        use shirabe_php_rpc::{PhpThrow, RpcValue};
 
         /// `Composer\Package\Locker`.
         #[derive(Debug)]
@@ -3562,20 +3520,17 @@ dispatch,
             fn get_json_file(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
 
-            fn is_locked(
-                this: &Self::Handle,
-                call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            fn is_locked(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
 
-            fn is_fresh(this: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+            fn is_fresh(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -3583,7 +3538,7 @@ dispatch,
             fn get_locked_repository(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -3591,7 +3546,7 @@ dispatch,
             fn get_dev_package_names(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -3599,7 +3554,7 @@ dispatch,
             fn get_platform_requirements(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -3607,7 +3562,7 @@ dispatch,
             fn get_minimum_stability(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -3615,7 +3570,7 @@ dispatch,
             fn get_stability_flags(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -3623,7 +3578,7 @@ dispatch,
             fn get_prefer_stable(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -3631,7 +3586,7 @@ dispatch,
             fn get_prefer_lowest(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -3639,15 +3594,12 @@ dispatch,
             fn get_platform_overrides(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
 
-            fn get_aliases(
-                this: &Self::Handle,
-                call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            fn get_aliases(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -3655,7 +3607,7 @@ dispatch,
             fn get_plugin_api(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -3663,7 +3615,7 @@ dispatch,
             fn get_lock_data(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -3671,15 +3623,12 @@ dispatch,
             fn set_lock_data(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
 
-            fn update_hash(
-                this: &Self::Handle,
-                call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            fn update_hash(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -3687,7 +3636,7 @@ dispatch,
             fn get_missing_requirement_info(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -3696,7 +3645,7 @@ dispatch,
                 Err(call.unconstructible())
             }
 
-            fn get_content_hash(call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+            fn get_content_hash(call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                 Err(call.unsupported())
             }
         }
@@ -3704,7 +3653,7 @@ dispatch,
         pub(crate) fn dispatch(
             this: &<PhpClass as Forwarding>::Handle,
             call: &mut Call<'_>,
-        ) -> Result<PluginValue, PhpThrow> {
+        ) -> Result<RpcValue, PhpThrow> {
             match call.method().as_bytes() {
                 b"getJsonFile" => <PhpClass as Forwarding>::get_json_file(this, call),
                 b"isLocked" => <PhpClass as Forwarding>::is_locked(this, call),
@@ -3749,7 +3698,7 @@ dispatch,
             constructed(call.class(), entity)
         }
 
-        pub(crate) fn call_static(call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+        pub(crate) fn call_static(call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
             match call.method().as_bytes() {
                 b"getContentHash" => <PhpClass as Forwarding>::get_content_hash(call),
                 _ => protocol_violation(call),
@@ -3760,7 +3709,7 @@ dispatch,
         use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
         use crate::php_worker::rpc::forwarding;
         use bstr::ByteSlice as _;
-        use shirabe_php_rpc::{PhpThrow, PluginValue};
+        use shirabe_php_rpc::{PhpThrow, RpcValue};
 
         /// `Composer\Package\Package`.
         #[derive(Debug)]
@@ -3770,7 +3719,7 @@ dispatch,
             fn set_type(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -3778,7 +3727,7 @@ dispatch,
             fn set_target_dir(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -3786,7 +3735,7 @@ dispatch,
             fn set_extra(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -3794,7 +3743,7 @@ dispatch,
             fn set_binaries(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -3802,7 +3751,7 @@ dispatch,
             fn set_source_type(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -3810,7 +3759,7 @@ dispatch,
             fn set_source_url(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -3818,7 +3767,7 @@ dispatch,
             fn set_dist_sha1_checksum(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -3826,7 +3775,7 @@ dispatch,
             fn set_release_date(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -3834,7 +3783,7 @@ dispatch,
             fn set_requires(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -3842,7 +3791,7 @@ dispatch,
             fn set_conflicts(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -3850,7 +3799,7 @@ dispatch,
             fn set_provides(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -3858,7 +3807,7 @@ dispatch,
             fn set_replaces(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -3866,7 +3815,7 @@ dispatch,
             fn set_dev_requires(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -3874,7 +3823,7 @@ dispatch,
             fn set_suggests(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -3882,7 +3831,7 @@ dispatch,
             fn set_autoload(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -3890,7 +3839,7 @@ dispatch,
             fn set_dev_autoload(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -3898,7 +3847,7 @@ dispatch,
             fn set_include_paths(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -3906,7 +3855,7 @@ dispatch,
             fn set_php_ext(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -3914,7 +3863,7 @@ dispatch,
             fn set_notification_url(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -3922,7 +3871,7 @@ dispatch,
             fn set_is_default_branch(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -3930,7 +3879,7 @@ dispatch,
             fn replace_version(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -3943,7 +3892,7 @@ dispatch,
         pub(crate) fn dispatch(
             this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
             call: &mut Call<'_>,
-        ) -> Result<PluginValue, PhpThrow> {
+        ) -> Result<RpcValue, PhpThrow> {
             match call.method().as_bytes() {
 b"setType" => <PhpClass as Forwarding>::set_type(this, call),
 b"setTargetDir" => <PhpClass as Forwarding>::set_target_dir(this, call),
@@ -4041,7 +3990,7 @@ dispatch,
         use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
         use crate::php_worker::rpc::forwarding;
         use bstr::ByteSlice as _;
-        use shirabe_php_rpc::{PhpThrow, PluginValue};
+        use shirabe_php_rpc::{PhpThrow, RpcValue};
 
         /// `Composer\Package\RootAliasPackage`.
         #[derive(Debug)]
@@ -4051,7 +4000,7 @@ dispatch,
             fn get_aliases(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -4059,7 +4008,7 @@ dispatch,
             fn get_minimum_stability(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -4067,7 +4016,7 @@ dispatch,
             fn get_stability_flags(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -4075,7 +4024,7 @@ dispatch,
             fn get_references(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -4083,7 +4032,7 @@ dispatch,
             fn get_prefer_stable(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -4091,7 +4040,7 @@ dispatch,
             fn get_config(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -4099,7 +4048,7 @@ dispatch,
             fn set_requires(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -4107,7 +4056,7 @@ dispatch,
             fn set_dev_requires(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -4115,7 +4064,7 @@ dispatch,
             fn set_conflicts(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -4123,7 +4072,7 @@ dispatch,
             fn set_provides(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -4131,7 +4080,7 @@ dispatch,
             fn set_replaces(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -4139,7 +4088,7 @@ dispatch,
             fn set_autoload(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -4147,7 +4096,7 @@ dispatch,
             fn set_dev_autoload(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -4155,7 +4104,7 @@ dispatch,
             fn set_stability_flags(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -4163,7 +4112,7 @@ dispatch,
             fn set_minimum_stability(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -4171,7 +4120,7 @@ dispatch,
             fn set_prefer_stable(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -4179,7 +4128,7 @@ dispatch,
             fn set_config(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -4187,7 +4136,7 @@ dispatch,
             fn set_references(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -4195,7 +4144,7 @@ dispatch,
             fn set_aliases(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -4203,7 +4152,7 @@ dispatch,
             fn set_suggests(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -4211,7 +4160,7 @@ dispatch,
             fn set_extra(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -4224,7 +4173,7 @@ dispatch,
         pub(crate) fn dispatch(
             this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
             call: &mut Call<'_>,
-        ) -> Result<PluginValue, PhpThrow> {
+        ) -> Result<RpcValue, PhpThrow> {
             match call.method().as_bytes() {
 b"getAliases" => <PhpClass as Forwarding>::get_aliases(this, call),
 b"getMinimumStability" => <PhpClass as Forwarding>::get_minimum_stability(this, call),
@@ -4351,7 +4300,7 @@ dispatch,
         use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
         use crate::php_worker::rpc::forwarding;
         use bstr::ByteSlice as _;
-        use shirabe_php_rpc::{PhpThrow, PluginValue};
+        use shirabe_php_rpc::{PhpThrow, RpcValue};
 
         /// `Composer\Package\RootPackage`.
         #[derive(Debug)]
@@ -4361,7 +4310,7 @@ dispatch,
             fn get_aliases(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -4369,7 +4318,7 @@ dispatch,
             fn get_minimum_stability(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -4377,7 +4326,7 @@ dispatch,
             fn get_stability_flags(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -4385,7 +4334,7 @@ dispatch,
             fn get_references(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -4393,7 +4342,7 @@ dispatch,
             fn get_prefer_stable(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -4401,7 +4350,7 @@ dispatch,
             fn get_config(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -4409,7 +4358,7 @@ dispatch,
             fn set_stability_flags(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -4417,7 +4366,7 @@ dispatch,
             fn set_minimum_stability(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -4425,7 +4374,7 @@ dispatch,
             fn set_prefer_stable(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -4433,7 +4382,7 @@ dispatch,
             fn set_config(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -4441,7 +4390,7 @@ dispatch,
             fn set_references(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -4449,7 +4398,7 @@ dispatch,
             fn set_aliases(
                 this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -4462,7 +4411,7 @@ dispatch,
         pub(crate) fn dispatch(
             this: &<forwarding::package::base_package::PhpClass as forwarding::package::base_package::Forwarding>::Handle,
             call: &mut Call<'_>,
-        ) -> Result<PluginValue, PhpThrow> {
+        ) -> Result<RpcValue, PhpThrow> {
             match call.method().as_bytes() {
 b"getAliases" => <PhpClass as Forwarding>::get_aliases(this, call),
 b"getMinimumStability" => <PhpClass as Forwarding>::get_minimum_stability(this, call),
@@ -4598,7 +4547,7 @@ dispatch,
 pub(crate) mod partial_composer {
     use crate::php_worker::rpc::entity::{Call, Crossing, Entity, constructed, protocol_violation};
     use bstr::ByteSlice as _;
-    use shirabe_php_rpc::{PhpThrow, PluginValue};
+    use shirabe_php_rpc::{PhpThrow, RpcValue};
 
     /// `Composer\PartialComposer`.
     #[derive(Debug)]
@@ -4608,27 +4557,27 @@ pub(crate) mod partial_composer {
         /// The handle type of the entities crossing as this class or a subclass.
         type Handle: Entity;
 
-        fn set_package(this: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+        fn set_package(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
             let _ = this;
             Err(call.unsupported())
         }
 
-        fn get_package(this: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+        fn get_package(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
             let _ = this;
             Err(call.unsupported())
         }
 
-        fn set_config(this: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+        fn set_config(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
             let _ = this;
             Err(call.unsupported())
         }
 
-        fn get_config(this: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+        fn get_config(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
             let _ = this;
             Err(call.unsupported())
         }
 
-        fn set_loop(this: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+        fn set_loop(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
             let _ = this;
             Err(call.unsupported())
         }
@@ -4636,7 +4585,7 @@ pub(crate) mod partial_composer {
         fn set_repository_manager(
             this: &Self::Handle,
             call: &mut Call<'_>,
-        ) -> Result<PluginValue, PhpThrow> {
+        ) -> Result<RpcValue, PhpThrow> {
             let _ = this;
             Err(call.unsupported())
         }
@@ -4644,7 +4593,7 @@ pub(crate) mod partial_composer {
         fn get_repository_manager(
             this: &Self::Handle,
             call: &mut Call<'_>,
-        ) -> Result<PluginValue, PhpThrow> {
+        ) -> Result<RpcValue, PhpThrow> {
             let _ = this;
             Err(call.unsupported())
         }
@@ -4652,7 +4601,7 @@ pub(crate) mod partial_composer {
         fn set_installation_manager(
             this: &Self::Handle,
             call: &mut Call<'_>,
-        ) -> Result<PluginValue, PhpThrow> {
+        ) -> Result<RpcValue, PhpThrow> {
             let _ = this;
             Err(call.unsupported())
         }
@@ -4660,7 +4609,7 @@ pub(crate) mod partial_composer {
         fn get_installation_manager(
             this: &Self::Handle,
             call: &mut Call<'_>,
-        ) -> Result<PluginValue, PhpThrow> {
+        ) -> Result<RpcValue, PhpThrow> {
             let _ = this;
             Err(call.unsupported())
         }
@@ -4668,7 +4617,7 @@ pub(crate) mod partial_composer {
         fn set_event_dispatcher(
             this: &Self::Handle,
             call: &mut Call<'_>,
-        ) -> Result<PluginValue, PhpThrow> {
+        ) -> Result<RpcValue, PhpThrow> {
             let _ = this;
             Err(call.unsupported())
         }
@@ -4676,17 +4625,17 @@ pub(crate) mod partial_composer {
         fn get_event_dispatcher(
             this: &Self::Handle,
             call: &mut Call<'_>,
-        ) -> Result<PluginValue, PhpThrow> {
+        ) -> Result<RpcValue, PhpThrow> {
             let _ = this;
             Err(call.unsupported())
         }
 
-        fn is_global(this: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+        fn is_global(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
             let _ = this;
             Err(call.unsupported())
         }
 
-        fn set_global(this: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+        fn set_global(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
             let _ = this;
             Err(call.unsupported())
         }
@@ -4699,7 +4648,7 @@ pub(crate) mod partial_composer {
     pub(crate) fn dispatch(
         this: &<PhpClass as Forwarding>::Handle,
         call: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    ) -> Result<RpcValue, PhpThrow> {
         match call.method().as_bytes() {
             b"setPackage" => <PhpClass as Forwarding>::set_package(this, call),
             b"getPackage" => <PhpClass as Forwarding>::get_package(this, call),
@@ -4738,7 +4687,7 @@ pub(crate) mod plugin {
         use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
         use crate::php_worker::rpc::forwarding;
         use bstr::ByteSlice as _;
-        use shirabe_php_rpc::{PhpThrow, PluginValue};
+        use shirabe_php_rpc::{PhpThrow, RpcValue};
 
         /// `Composer\Plugin\CommandEvent`.
         #[derive(Debug)]
@@ -4748,7 +4697,7 @@ pub(crate) mod plugin {
             fn get_input(
                 this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -4756,7 +4705,7 @@ pub(crate) mod plugin {
             fn get_output(
                 this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -4764,7 +4713,7 @@ pub(crate) mod plugin {
             fn get_command_name(
                 this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -4777,7 +4726,7 @@ pub(crate) mod plugin {
         pub(crate) fn dispatch(
             this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
             call: &mut Call<'_>,
-        ) -> Result<PluginValue, PhpThrow> {
+        ) -> Result<RpcValue, PhpThrow> {
             match call.method().as_bytes() {
 b"getInput" => <PhpClass as Forwarding>::get_input(this, call),
 b"getOutput" => <PhpClass as Forwarding>::get_output(this, call),
@@ -4805,7 +4754,7 @@ dispatch,
         use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
         use crate::php_worker::rpc::forwarding;
         use bstr::ByteSlice as _;
-        use shirabe_php_rpc::{PhpThrow, PluginValue};
+        use shirabe_php_rpc::{PhpThrow, RpcValue};
 
         /// `Composer\Plugin\PostFileDownloadEvent`.
         #[derive(Debug)]
@@ -4815,7 +4764,7 @@ dispatch,
             fn get_file_name(
                 this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -4823,7 +4772,7 @@ dispatch,
             fn get_checksum(
                 this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -4831,7 +4780,7 @@ dispatch,
             fn get_url(
                 this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -4839,7 +4788,7 @@ dispatch,
             fn get_context(
                 this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -4847,7 +4796,7 @@ dispatch,
             fn get_package(
                 this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -4855,7 +4804,7 @@ dispatch,
             fn get_type(
                 this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -4868,7 +4817,7 @@ dispatch,
         pub(crate) fn dispatch(
             this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
             call: &mut Call<'_>,
-        ) -> Result<PluginValue, PhpThrow> {
+        ) -> Result<RpcValue, PhpThrow> {
             match call.method().as_bytes() {
 b"getFileName" => <PhpClass as Forwarding>::get_file_name(this, call),
 b"getChecksum" => <PhpClass as Forwarding>::get_checksum(this, call),
@@ -4899,7 +4848,7 @@ dispatch,
         use crate::php_worker::rpc::entity::{Call, Crossing, protocol_violation};
         use crate::php_worker::rpc::forwarding;
         use bstr::ByteSlice as _;
-        use shirabe_php_rpc::{PhpThrow, PluginValue};
+        use shirabe_php_rpc::{PhpThrow, RpcValue};
 
         /// `Composer\Plugin\PreCommandRunEvent`.
         #[derive(Debug)]
@@ -4909,7 +4858,7 @@ dispatch,
             fn get_input(
                 this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -4917,7 +4866,7 @@ dispatch,
             fn get_command(
                 this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -4926,7 +4875,7 @@ dispatch,
         pub(crate) fn dispatch(
             this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
             call: &mut Call<'_>,
-        ) -> Result<PluginValue, PhpThrow> {
+        ) -> Result<RpcValue, PhpThrow> {
             match call.method().as_bytes() {
 b"getInput" => <PhpClass as Forwarding>::get_input(this, call),
 b"getCommand" => <PhpClass as Forwarding>::get_command(this, call),
@@ -4948,7 +4897,7 @@ dispatch,
         use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
         use crate::php_worker::rpc::forwarding;
         use bstr::ByteSlice as _;
-        use shirabe_php_rpc::{PhpThrow, PluginValue};
+        use shirabe_php_rpc::{PhpThrow, RpcValue};
 
         /// `Composer\Plugin\PreFileDownloadEvent`.
         #[derive(Debug)]
@@ -4958,7 +4907,7 @@ dispatch,
             fn get_http_downloader(
                 this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -4966,7 +4915,7 @@ dispatch,
             fn get_processed_url(
                 this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -4974,7 +4923,7 @@ dispatch,
             fn set_processed_url(
                 this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -4982,7 +4931,7 @@ dispatch,
             fn get_custom_cache_key(
                 this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -4990,7 +4939,7 @@ dispatch,
             fn set_custom_cache_key(
                 this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -4998,7 +4947,7 @@ dispatch,
             fn get_type(
                 this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -5006,7 +4955,7 @@ dispatch,
             fn get_context(
                 this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -5014,7 +4963,7 @@ dispatch,
             fn get_transport_options(
                 this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -5022,7 +4971,7 @@ dispatch,
             fn set_transport_options(
                 this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -5035,7 +4984,7 @@ dispatch,
         pub(crate) fn dispatch(
             this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
             call: &mut Call<'_>,
-        ) -> Result<PluginValue, PhpThrow> {
+        ) -> Result<RpcValue, PhpThrow> {
             match call.method().as_bytes() {
 b"getHttpDownloader" => <PhpClass as Forwarding>::get_http_downloader(this, call),
 b"getProcessedUrl" => <PhpClass as Forwarding>::get_processed_url(this, call),
@@ -5069,7 +5018,7 @@ dispatch,
         use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
         use crate::php_worker::rpc::forwarding;
         use bstr::ByteSlice as _;
-        use shirabe_php_rpc::{PhpThrow, PluginValue};
+        use shirabe_php_rpc::{PhpThrow, RpcValue};
 
         /// `Composer\Plugin\PrePoolCreateEvent`.
         #[derive(Debug)]
@@ -5079,7 +5028,7 @@ dispatch,
             fn get_repositories(
                 this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -5087,7 +5036,7 @@ dispatch,
             fn get_request(
                 this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -5095,7 +5044,7 @@ dispatch,
             fn get_acceptable_stabilities(
                 this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -5103,7 +5052,7 @@ dispatch,
             fn get_stability_flags(
                 this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -5111,7 +5060,7 @@ dispatch,
             fn get_root_aliases(
                 this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -5119,7 +5068,7 @@ dispatch,
             fn get_root_references(
                 this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -5127,7 +5076,7 @@ dispatch,
             fn get_packages(
                 this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -5135,7 +5084,7 @@ dispatch,
             fn get_unacceptable_fixed_packages(
                 this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -5143,7 +5092,7 @@ dispatch,
             fn set_packages(
                 this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -5151,7 +5100,7 @@ dispatch,
             fn set_unacceptable_fixed_packages(
                 this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -5164,7 +5113,7 @@ dispatch,
         pub(crate) fn dispatch(
             this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
             call: &mut Call<'_>,
-        ) -> Result<PluginValue, PhpThrow> {
+        ) -> Result<RpcValue, PhpThrow> {
             match call.method().as_bytes() {
 b"getRepositories" => <PhpClass as Forwarding>::get_repositories(this, call),
 b"getRequest" => <PhpClass as Forwarding>::get_request(this, call),
@@ -5203,7 +5152,7 @@ pub(crate) mod repository {
             Call, Crossing, Entity, constructed, protocol_violation,
         };
         use bstr::ByteSlice as _;
-        use shirabe_php_rpc::{PhpThrow, PluginValue};
+        use shirabe_php_rpc::{PhpThrow, RpcValue};
 
         /// `Composer\Repository\ArrayRepository`.
         #[derive(Debug)]
@@ -5213,10 +5162,7 @@ pub(crate) mod repository {
             /// The handle type of the entities crossing as this class or a subclass.
             type Handle: Entity;
 
-            fn has_package(
-                this: &Self::Handle,
-                call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            fn has_package(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -5224,7 +5170,7 @@ pub(crate) mod repository {
             fn find_package(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -5232,7 +5178,7 @@ pub(crate) mod repository {
             fn find_packages(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -5240,7 +5186,7 @@ pub(crate) mod repository {
             fn get_packages(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -5248,12 +5194,12 @@ pub(crate) mod repository {
             fn load_packages(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
 
-            fn search(this: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+            fn search(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -5261,7 +5207,7 @@ pub(crate) mod repository {
             fn get_providers(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -5269,15 +5215,12 @@ pub(crate) mod repository {
             fn get_repo_name(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
 
-            fn add_package(
-                this: &Self::Handle,
-                call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            fn add_package(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -5285,12 +5228,12 @@ pub(crate) mod repository {
             fn remove_package(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
 
-            fn count(this: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+            fn count(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -5303,7 +5246,7 @@ pub(crate) mod repository {
         pub(crate) fn dispatch(
             this: &<PhpClass as Forwarding>::Handle,
             call: &mut Call<'_>,
-        ) -> Result<PluginValue, PhpThrow> {
+        ) -> Result<RpcValue, PhpThrow> {
             match call.method().as_bytes() {
                 b"hasPackage" => <PhpClass as Forwarding>::has_package(this, call),
                 b"findPackage" => <PhpClass as Forwarding>::find_package(this, call),
@@ -5334,7 +5277,7 @@ pub(crate) mod repository {
         use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
         use crate::php_worker::rpc::forwarding;
         use bstr::ByteSlice as _;
-        use shirabe_php_rpc::{PhpThrow, PluginValue};
+        use shirabe_php_rpc::{PhpThrow, RpcValue};
 
         /// `Composer\Repository\FilesystemRepository`.
         #[derive(Debug)]
@@ -5349,7 +5292,7 @@ pub(crate) mod repository {
         pub(crate) fn dispatch(
             this: &<forwarding::repository::array_repository::PhpClass as forwarding::repository::array_repository::Forwarding>::Handle,
             call: &mut Call<'_>,
-        ) -> Result<PluginValue, PhpThrow> {
+        ) -> Result<RpcValue, PhpThrow> {
             match call.method().as_bytes() {
 b"write" => <forwarding::repository::writable_array_repository::PhpClass as forwarding::repository::writable_array_repository::Forwarding>::write(this, call),
 b"getCanonicalPackages" => <forwarding::repository::writable_array_repository::PhpClass as forwarding::repository::writable_array_repository::Forwarding>::get_canonical_packages(this, call),
@@ -5386,7 +5329,7 @@ dispatch,
         use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
         use crate::php_worker::rpc::forwarding;
         use bstr::ByteSlice as _;
-        use shirabe_php_rpc::{PhpThrow, PluginValue};
+        use shirabe_php_rpc::{PhpThrow, RpcValue};
 
         /// `Composer\Repository\InstalledArrayRepository`.
         #[derive(Debug)]
@@ -5396,7 +5339,7 @@ dispatch,
             fn is_fresh(
                 this: &<forwarding::repository::array_repository::PhpClass as forwarding::repository::array_repository::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -5409,7 +5352,7 @@ dispatch,
         pub(crate) fn dispatch(
             this: &<forwarding::repository::array_repository::PhpClass as forwarding::repository::array_repository::Forwarding>::Handle,
             call: &mut Call<'_>,
-        ) -> Result<PluginValue, PhpThrow> {
+        ) -> Result<RpcValue, PhpThrow> {
             match call.method().as_bytes() {
 b"isFresh" => <PhpClass as Forwarding>::is_fresh(this, call),
 b"write" => <forwarding::repository::writable_array_repository::PhpClass as forwarding::repository::writable_array_repository::Forwarding>::write(this, call),
@@ -5447,7 +5390,7 @@ dispatch,
         use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
         use crate::php_worker::rpc::forwarding;
         use bstr::ByteSlice as _;
-        use shirabe_php_rpc::{PhpThrow, PluginValue};
+        use shirabe_php_rpc::{PhpThrow, RpcValue};
 
         /// `Composer\Repository\InstalledFilesystemRepository`.
         #[derive(Debug)]
@@ -5457,7 +5400,7 @@ dispatch,
             fn is_fresh(
                 this: &<forwarding::repository::array_repository::PhpClass as forwarding::repository::array_repository::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -5470,7 +5413,7 @@ dispatch,
         pub(crate) fn dispatch(
             this: &<forwarding::repository::array_repository::PhpClass as forwarding::repository::array_repository::Forwarding>::Handle,
             call: &mut Call<'_>,
-        ) -> Result<PluginValue, PhpThrow> {
+        ) -> Result<RpcValue, PhpThrow> {
             match call.method().as_bytes() {
 b"isFresh" => <PhpClass as Forwarding>::is_fresh(this, call),
 b"write" => <forwarding::repository::writable_array_repository::PhpClass as forwarding::repository::writable_array_repository::Forwarding>::write(this, call),
@@ -5508,7 +5451,7 @@ dispatch,
         use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
         use crate::php_worker::rpc::forwarding;
         use bstr::ByteSlice as _;
-        use shirabe_php_rpc::{PhpThrow, PluginValue};
+        use shirabe_php_rpc::{PhpThrow, RpcValue};
 
         /// `Composer\Repository\LockArrayRepository`.
         #[derive(Debug)]
@@ -5523,7 +5466,7 @@ dispatch,
         pub(crate) fn dispatch(
             this: &<forwarding::repository::array_repository::PhpClass as forwarding::repository::array_repository::Forwarding>::Handle,
             call: &mut Call<'_>,
-        ) -> Result<PluginValue, PhpThrow> {
+        ) -> Result<RpcValue, PhpThrow> {
             match call.method().as_bytes() {
 b"hasPackage" => <forwarding::repository::array_repository::PhpClass as forwarding::repository::array_repository::Forwarding>::has_package(this, call),
 b"findPackage" => <forwarding::repository::array_repository::PhpClass as forwarding::repository::array_repository::Forwarding>::find_package(this, call),
@@ -5555,7 +5498,7 @@ dispatch,
             Call, Crossing, Entity, constructed, protocol_violation,
         };
         use bstr::ByteSlice as _;
-        use shirabe_php_rpc::{PhpThrow, PluginValue};
+        use shirabe_php_rpc::{PhpThrow, RpcValue};
 
         /// `Composer\Repository\RepositoryManager`.
         #[derive(Debug)]
@@ -5568,7 +5511,7 @@ dispatch,
             fn find_package(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -5576,7 +5519,7 @@ dispatch,
             fn find_packages(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -5584,7 +5527,7 @@ dispatch,
             fn add_repository(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -5592,7 +5535,7 @@ dispatch,
             fn prepend_repository(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -5600,7 +5543,7 @@ dispatch,
             fn create_repository(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -5608,7 +5551,7 @@ dispatch,
             fn set_repository_class(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -5616,7 +5559,7 @@ dispatch,
             fn get_repositories(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -5624,7 +5567,7 @@ dispatch,
             fn set_local_repository(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -5632,7 +5575,7 @@ dispatch,
             fn get_local_repository(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -5645,7 +5588,7 @@ dispatch,
         pub(crate) fn dispatch(
             this: &<PhpClass as Forwarding>::Handle,
             call: &mut Call<'_>,
-        ) -> Result<PluginValue, PhpThrow> {
+        ) -> Result<RpcValue, PhpThrow> {
             match call.method().as_bytes() {
                 b"findPackage" => <PhpClass as Forwarding>::find_package(this, call),
                 b"findPackages" => <PhpClass as Forwarding>::find_packages(this, call),
@@ -5674,7 +5617,7 @@ dispatch,
         use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
         use crate::php_worker::rpc::forwarding;
         use bstr::ByteSlice as _;
-        use shirabe_php_rpc::{PhpThrow, PluginValue};
+        use shirabe_php_rpc::{PhpThrow, RpcValue};
 
         /// `Composer\Repository\WritableArrayRepository`.
         #[derive(Debug)]
@@ -5684,7 +5627,7 @@ dispatch,
             fn write(
                 this: &<forwarding::repository::array_repository::PhpClass as forwarding::repository::array_repository::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -5692,7 +5635,7 @@ dispatch,
             fn get_canonical_packages(
                 this: &<forwarding::repository::array_repository::PhpClass as forwarding::repository::array_repository::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -5700,7 +5643,7 @@ dispatch,
             fn reload(
                 this: &<forwarding::repository::array_repository::PhpClass as forwarding::repository::array_repository::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -5708,7 +5651,7 @@ dispatch,
             fn set_dev_package_names(
                 this: &<forwarding::repository::array_repository::PhpClass as forwarding::repository::array_repository::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -5716,7 +5659,7 @@ dispatch,
             fn get_dev_package_names(
                 this: &<forwarding::repository::array_repository::PhpClass as forwarding::repository::array_repository::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -5724,7 +5667,7 @@ dispatch,
             fn get_dev_mode(
                 this: &<forwarding::repository::array_repository::PhpClass as forwarding::repository::array_repository::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -5737,7 +5680,7 @@ dispatch,
         pub(crate) fn dispatch(
             this: &<forwarding::repository::array_repository::PhpClass as forwarding::repository::array_repository::Forwarding>::Handle,
             call: &mut Call<'_>,
-        ) -> Result<PluginValue, PhpThrow> {
+        ) -> Result<RpcValue, PhpThrow> {
             match call.method().as_bytes() {
 b"write" => <PhpClass as Forwarding>::write(this, call),
 b"getCanonicalPackages" => <PhpClass as Forwarding>::get_canonical_packages(this, call),
@@ -5777,7 +5720,7 @@ pub(crate) mod script {
         use crate::php_worker::rpc::entity::{Call, Crossing, constructed, protocol_violation};
         use crate::php_worker::rpc::forwarding;
         use bstr::ByteSlice as _;
-        use shirabe_php_rpc::{PhpThrow, PluginValue};
+        use shirabe_php_rpc::{PhpThrow, RpcValue};
 
         /// `Composer\Script\Event`.
         #[derive(Debug)]
@@ -5787,7 +5730,7 @@ pub(crate) mod script {
             fn get_composer(
                 this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -5795,7 +5738,7 @@ pub(crate) mod script {
             fn get_io(
                 this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -5803,7 +5746,7 @@ pub(crate) mod script {
             fn is_dev_mode(
                 this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -5811,7 +5754,7 @@ pub(crate) mod script {
             fn get_originating_event(
                 this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -5819,7 +5762,7 @@ pub(crate) mod script {
             fn set_originating_event(
                 this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -5832,7 +5775,7 @@ pub(crate) mod script {
         pub(crate) fn dispatch(
             this: &<forwarding::event_dispatcher::event::PhpClass as forwarding::event_dispatcher::event::Forwarding>::Handle,
             call: &mut Call<'_>,
-        ) -> Result<PluginValue, PhpThrow> {
+        ) -> Result<RpcValue, PhpThrow> {
             match call.method().as_bytes() {
 b"getComposer" => <PhpClass as Forwarding>::get_composer(this, call),
 b"getIO" => <PhpClass as Forwarding>::get_io(this, call),
@@ -5866,7 +5809,7 @@ pub(crate) mod util {
             Call, Crossing, Entity, constructed, protocol_violation,
         };
         use bstr::ByteSlice as _;
-        use shirabe_php_rpc::{PhpThrow, PluginValue};
+        use shirabe_php_rpc::{PhpThrow, RpcValue};
 
         /// `Composer\Util\Filesystem`.
         #[derive(Debug)]
@@ -5876,7 +5819,7 @@ pub(crate) mod util {
             /// The handle type of the entities crossing as this class or a subclass.
             type Handle: Entity;
 
-            fn remove(this: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+            fn remove(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -5884,7 +5827,7 @@ pub(crate) mod util {
             fn is_dir_empty(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -5892,7 +5835,7 @@ pub(crate) mod util {
             fn empty_directory(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -5900,7 +5843,7 @@ pub(crate) mod util {
             fn remove_directory(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -5908,7 +5851,7 @@ pub(crate) mod util {
             fn remove_directory_async(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -5916,7 +5859,7 @@ pub(crate) mod util {
             fn remove_directory_php(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -5924,17 +5867,17 @@ pub(crate) mod util {
             fn ensure_directory_exists(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
 
-            fn unlink(this: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+            fn unlink(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
 
-            fn rmdir(this: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+            fn rmdir(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -5942,17 +5885,17 @@ pub(crate) mod util {
             fn copy_then_remove(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
 
-            fn copy(this: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+            fn copy(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
 
-            fn rename(this: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+            fn rename(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -5960,7 +5903,7 @@ pub(crate) mod util {
             fn find_shortest_path(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -5968,7 +5911,7 @@ pub(crate) mod util {
             fn find_shortest_path_code(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -5976,12 +5919,12 @@ pub(crate) mod util {
             fn is_absolute_path(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
 
-            fn size(this: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+            fn size(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -5989,7 +5932,7 @@ pub(crate) mod util {
             fn normalize_path(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -5997,7 +5940,7 @@ pub(crate) mod util {
             fn relative_symlink(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -6005,20 +5948,17 @@ pub(crate) mod util {
             fn is_symlinked_directory(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
 
-            fn junction(this: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+            fn junction(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
 
-            fn is_junction(
-                this: &Self::Handle,
-                call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            fn is_junction(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -6026,7 +5966,7 @@ pub(crate) mod util {
             fn remove_junction(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -6034,15 +5974,12 @@ pub(crate) mod util {
             fn file_put_contents_if_modified(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
 
-            fn safe_copy(
-                this: &Self::Handle,
-                call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            fn safe_copy(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -6055,7 +5992,7 @@ pub(crate) mod util {
         pub(crate) fn dispatch(
             this: &<PhpClass as Forwarding>::Handle,
             call: &mut Call<'_>,
-        ) -> Result<PluginValue, PhpThrow> {
+        ) -> Result<RpcValue, PhpThrow> {
             match call.method().as_bytes() {
                 b"remove" => <PhpClass as Forwarding>::remove(this, call),
                 b"isDirEmpty" => <PhpClass as Forwarding>::is_dir_empty(this, call),
@@ -6110,7 +6047,7 @@ pub(crate) mod util {
             Call, Crossing, Entity, constructed, protocol_violation,
         };
         use bstr::ByteSlice as _;
-        use shirabe_php_rpc::{PhpThrow, PluginValue};
+        use shirabe_php_rpc::{PhpThrow, RpcValue};
 
         /// `Composer\Util\HttpDownloader`.
         #[derive(Debug)]
@@ -6120,43 +6057,37 @@ pub(crate) mod util {
             /// The handle type of the entities crossing as this class or a subclass.
             type Handle: Entity;
 
-            fn get(this: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+            fn get(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
 
-            fn add(this: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+            fn add(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
 
-            fn copy(this: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+            fn copy(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
 
-            fn add_copy(this: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+            fn add_copy(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
 
-            fn get_options(
-                this: &Self::Handle,
-                call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            fn get_options(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
 
-            fn set_options(
-                this: &Self::Handle,
-                call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            fn set_options(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
 
-            fn wait(this: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+            fn wait(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -6164,7 +6095,7 @@ pub(crate) mod util {
             fn enable_async(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -6172,7 +6103,7 @@ pub(crate) mod util {
             fn count_active_jobs(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -6185,7 +6116,7 @@ pub(crate) mod util {
         pub(crate) fn dispatch(
             this: &<PhpClass as Forwarding>::Handle,
             call: &mut Call<'_>,
-        ) -> Result<PluginValue, PhpThrow> {
+        ) -> Result<RpcValue, PhpThrow> {
             match call.method().as_bytes() {
                 b"get" => <PhpClass as Forwarding>::get(this, call),
                 b"add" => <PhpClass as Forwarding>::add(this, call),
@@ -6215,7 +6146,7 @@ pub(crate) mod util {
             Call, Crossing, Entity, constructed, protocol_violation,
         };
         use bstr::ByteSlice as _;
-        use shirabe_php_rpc::{PhpThrow, PluginValue};
+        use shirabe_php_rpc::{PhpThrow, RpcValue};
 
         /// `Composer\Util\ProcessExecutor`.
         #[derive(Debug)]
@@ -6225,15 +6156,12 @@ pub(crate) mod util {
             /// The handle type of the entities crossing as this class or a subclass.
             type Handle: Entity;
 
-            fn execute(this: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+            fn execute(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
 
-            fn execute_tty(
-                this: &Self::Handle,
-                call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            fn execute_tty(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -6241,7 +6169,7 @@ pub(crate) mod util {
             fn execute_async(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -6249,7 +6177,7 @@ pub(crate) mod util {
             fn set_max_jobs(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -6257,12 +6185,12 @@ pub(crate) mod util {
             fn reset_max_jobs(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
 
-            fn wait(this: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+            fn wait(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -6270,7 +6198,7 @@ pub(crate) mod util {
             fn enable_async(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -6278,15 +6206,12 @@ pub(crate) mod util {
             fn count_active_jobs(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
 
-            fn split_lines(
-                this: &Self::Handle,
-                call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            fn split_lines(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -6294,7 +6219,7 @@ pub(crate) mod util {
             fn get_error_output(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -6302,7 +6227,7 @@ pub(crate) mod util {
             fn requires_git_dir_env(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -6311,11 +6236,11 @@ pub(crate) mod util {
                 Err(call.unconstructible())
             }
 
-            fn get_timeout(call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+            fn get_timeout(call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                 Err(call.unsupported())
             }
 
-            fn set_timeout(call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+            fn set_timeout(call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                 Err(call.unsupported())
             }
         }
@@ -6323,7 +6248,7 @@ pub(crate) mod util {
         pub(crate) fn dispatch(
             this: &<PhpClass as Forwarding>::Handle,
             call: &mut Call<'_>,
-        ) -> Result<PluginValue, PhpThrow> {
+        ) -> Result<RpcValue, PhpThrow> {
             match call.method().as_bytes() {
                 b"execute" => <PhpClass as Forwarding>::execute(this, call),
                 b"executeTty" => <PhpClass as Forwarding>::execute_tty(this, call),
@@ -6350,7 +6275,7 @@ pub(crate) mod util {
             constructed(call.class(), entity)
         }
 
-        pub(crate) fn call_static(call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+        pub(crate) fn call_static(call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
             match call.method().as_bytes() {
                 b"getTimeout" => <PhpClass as Forwarding>::get_timeout(call),
                 b"setTimeout" => <PhpClass as Forwarding>::set_timeout(call),
@@ -6365,7 +6290,7 @@ pub(crate) mod shirabe {
         use crate::php_worker::rpc::entity::{Call, Crossing, protocol_violation};
         use crate::php_worker::rpc::forwarding;
         use bstr::ByteSlice as _;
-        use shirabe_php_rpc::{PhpThrow, PluginValue};
+        use shirabe_php_rpc::{PhpThrow, RpcValue};
 
         /// `Shirabe\RustCapablePluginStub`.
         #[derive(Debug)]
@@ -6375,7 +6300,7 @@ pub(crate) mod shirabe {
             fn get_capabilities(
                 this: &<forwarding::shirabe::rust_plugin_stub::PhpClass as forwarding::shirabe::rust_plugin_stub::Forwarding>::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -6384,7 +6309,7 @@ pub(crate) mod shirabe {
         pub(crate) fn dispatch(
             this: &<forwarding::shirabe::rust_plugin_stub::PhpClass as forwarding::shirabe::rust_plugin_stub::Forwarding>::Handle,
             call: &mut Call<'_>,
-        ) -> Result<PluginValue, PhpThrow> {
+        ) -> Result<RpcValue, PhpThrow> {
             match call.method().as_bytes() {
 b"getCapabilities" => <PhpClass as Forwarding>::get_capabilities(this, call),
 b"activate" => <forwarding::shirabe::rust_plugin_stub::PhpClass as forwarding::shirabe::rust_plugin_stub::Forwarding>::activate(this, call),
@@ -6402,7 +6327,7 @@ dispatch,
     pub(crate) mod rust_plugin_stub {
         use crate::php_worker::rpc::entity::{Call, Crossing, Entity, protocol_violation};
         use bstr::ByteSlice as _;
-        use shirabe_php_rpc::{PhpThrow, PluginValue};
+        use shirabe_php_rpc::{PhpThrow, RpcValue};
 
         /// `Shirabe\RustPluginStub`.
         #[derive(Debug)]
@@ -6412,23 +6337,17 @@ dispatch,
             /// The handle type of the entities crossing as this class or a subclass.
             type Handle: Entity;
 
-            fn activate(this: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+            fn activate(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
 
-            fn deactivate(
-                this: &Self::Handle,
-                call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            fn deactivate(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
 
-            fn uninstall(
-                this: &Self::Handle,
-                call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            fn uninstall(this: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -6437,7 +6356,7 @@ dispatch,
         pub(crate) fn dispatch(
             this: &<PhpClass as Forwarding>::Handle,
             call: &mut Call<'_>,
-        ) -> Result<PluginValue, PhpThrow> {
+        ) -> Result<RpcValue, PhpThrow> {
             match call.method().as_bytes() {
                 b"activate" => <PhpClass as Forwarding>::activate(this, call),
                 b"deactivate" => <PhpClass as Forwarding>::deactivate(this, call),
@@ -6454,7 +6373,7 @@ dispatch,
     pub(crate) mod rust_process_stub {
         use crate::php_worker::rpc::entity::{Call, Crossing, Entity, protocol_violation};
         use bstr::ByteSlice as _;
-        use shirabe_php_rpc::{PhpThrow, PluginValue};
+        use shirabe_php_rpc::{PhpThrow, RpcValue};
 
         /// `Shirabe\RustProcessStub`.
         #[derive(Debug)]
@@ -6467,7 +6386,7 @@ dispatch,
             fn __shirabe_facts(
                 this: &Self::Handle,
                 call: &mut Call<'_>,
-            ) -> Result<PluginValue, PhpThrow> {
+            ) -> Result<RpcValue, PhpThrow> {
                 let _ = this;
                 Err(call.unsupported())
             }
@@ -6476,7 +6395,7 @@ dispatch,
         pub(crate) fn dispatch(
             this: &<PhpClass as Forwarding>::Handle,
             call: &mut Call<'_>,
-        ) -> Result<PluginValue, PhpThrow> {
+        ) -> Result<RpcValue, PhpThrow> {
             match call.method().as_bytes() {
                 b"__shirabe_facts" => <PhpClass as Forwarding>::__shirabe_facts(this, call),
                 _ => protocol_violation(call),

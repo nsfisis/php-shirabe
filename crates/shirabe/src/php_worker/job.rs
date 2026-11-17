@@ -1,8 +1,9 @@
-//! The Rust half of the job registry at the plugin boundary.
+//! The Rust half of the promise registry at the plugin boundary, and the jobs behind the promises
+//! the Rust side owns.
 //!
-//! This module has no Composer counterpart. A job is an asynchronous operation one side runs and
-//! the other side holds a promise for; only its id crosses the RPC channel. See
-//! `docs/dev/plugin-async.md`.
+//! This module has no Composer counterpart. A promise is held by the worker while one side runs
+//! what settles it; only its id crosses the RPC channel. A Rust-owned promise is backed by a job,
+//! a Rust future counted against a Composer service. See `docs/dev/plugin-async.md`.
 
 pub(crate) mod rpc;
 
@@ -12,7 +13,7 @@ use crate::util::sync_executor::block_on;
 use crate::util::{HttpDownloader, ProcessExecutor};
 use bstr::BStr;
 use indexmap::IndexMap;
-use shirabe_php_rpc::{PhpThrow, PluginValue};
+use shirabe_php_rpc::{PhpThrow, RpcValue};
 use shirabe_php_shim::{bformat, error_chain_message};
 
 /// The service a job is counted against: the one whose `countActiveJobs()` reports it and whose
@@ -46,13 +47,13 @@ impl JobOwner {
     }
 }
 
-/// A job the Rust side runs for a promise the worker holds.
+/// The job behind a Rust-owned promise: the Rust side runs it, and the worker holds the promise.
 struct RustJob {
     owner: JobOwner,
     /// `None` while a tick has taken the future out to poll it. Such a job is on the Rust call
     /// stack rather than waiting in the table, so nothing counts it and an inner tick skips it.
     future:
-        Option<std::pin::Pin<Box<dyn std::future::Future<Output = Result<PluginValue, PhpThrow>>>>>,
+        Option<std::pin::Pin<Box<dyn std::future::Future<Output = Result<RpcValue, PhpThrow>>>>>,
     /// Whether the job got past the job budget, which is when Composer marks it started.
     started: std::rc::Rc<std::cell::Cell<bool>>,
     /// What the canceller of the job's promise throws when the job had started.
@@ -62,17 +63,17 @@ struct RustJob {
     _owner_entity: std::rc::Rc<dyn std::any::Any>,
 }
 
-/// A job the worker runs for a promise plugin code handed to the Rust side.
-enum PhpJob {
+/// A PHP-owned promise: one plugin code handed to the Rust side, settled by the worker.
+enum PhpPromise {
     Pending(Option<std::task::Waker>),
-    Settled(Result<PluginValue, PhpThrow>),
+    Settled(Result<RpcValue, PhpThrow>),
 }
 
 #[derive(Default)]
 struct Registry {
     rust_jobs: IndexMap<u64, RustJob>,
-    php_jobs: IndexMap<u64, PhpJob>,
-    /// The PHP-owned jobs a Rust future is parked on, in the order they parked.
+    php_promises: IndexMap<u64, PhpPromise>,
+    /// The PHP-owned promises a Rust future is parked on, in the order they parked.
     php_waiting: Vec<u64>,
     /// Requests and processes the Rust side started for itself. Their futures belong to whoever
     /// awaits them; the entry lets `Loop::wait()` count them and `abortJobs()` reach the ones that
@@ -85,23 +86,23 @@ struct Registry {
 }
 
 thread_local! {
-    /// One per thread, like the R table whose entities the jobs are counted against.
+    /// One per thread, like the Rust entity table whose entities the jobs are counted against.
     static REGISTRY: std::cell::RefCell<Registry> = std::cell::RefCell::new(Registry::default());
 }
 
-/// The Rust side allocates odd job ids, the worker even ones.
-static NEXT_JOB_ID: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+/// The Rust side allocates odd promise ids, the worker even ones.
+static NEXT_PROMISE_ID: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
 
-/// Registers a job without polling it and answers with the descriptor the worker turns into the
-/// job's promise.
+/// Registers a job without polling it and answers with the handle of the Rust-owned promise the
+/// worker builds for it.
 pub(crate) fn register(
     owner: JobOwner,
     owner_entity: std::rc::Rc<dyn std::any::Any>,
     started: std::rc::Rc<std::cell::Cell<bool>>,
     canceled: PhpThrow,
-    future: std::pin::Pin<Box<dyn std::future::Future<Output = Result<PluginValue, PhpThrow>>>>,
-) -> PluginValue {
-    let id = NEXT_JOB_ID.fetch_add(2, std::sync::atomic::Ordering::Relaxed);
+    future: std::pin::Pin<Box<dyn std::future::Future<Output = Result<RpcValue, PhpThrow>>>>,
+) -> RpcValue {
+    let id = NEXT_PROMISE_ID.fetch_add(2, std::sync::atomic::Ordering::Relaxed);
     REGISTRY.with(|registry| {
         registry.borrow_mut().rust_jobs.insert(
             id,
@@ -114,7 +115,7 @@ pub(crate) fn register(
             },
         );
     });
-    PluginValue::Job(id)
+    RpcValue::PromiseHandle(id)
 }
 
 /// How many jobs wait in the table for `owner`.
@@ -166,7 +167,7 @@ fn another_pass_ran_since(pass: u64) -> bool {
 }
 
 /// Polls every job counted against `owners` once and pushes the outcome of each one that
-/// finished to the worker before polling the next. Returns whether any job settled.
+/// finished to the worker before polling the next. Returns whether any promise settled.
 fn poll_jobs(owners: &[JobOwner], cx: &mut std::task::Context<'_>) -> Result<bool, PhpThrow> {
     let ids: Vec<u64> = REGISTRY.with(|registry| {
         registry
@@ -211,24 +212,24 @@ fn poll_jobs(owners: &[JobOwner], cx: &mut std::task::Context<'_>) -> Result<boo
     Ok(settled)
 }
 
-/// Reports a finished job to the worker, which settles the job's `Deferred` and so runs the
+/// Reports a finished job to the worker, which settles the `Deferred` of its promise and so runs the
 /// callbacks plugin code chained on it before this returns.
-fn push_settle(id: u64, outcome: Result<PluginValue, PhpThrow>) -> Result<(), PhpThrow> {
+fn push_settle(id: u64, outcome: Result<RpcValue, PhpThrow>) -> Result<(), PhpThrow> {
     let (function, args) = match outcome {
         Ok(value) => (
-            "__shirabe_resolve_job",
-            vec![PluginValue::Int(id as i64), value],
+            "__shirabe_resolve_promise",
+            vec![RpcValue::Int(id as i64), value],
         ),
         Err(throw) => (
-            "__shirabe_reject_job",
-            vec![PluginValue::Int(id as i64), throw.to_plugin_value()],
+            "__shirabe_reject_promise",
+            vec![RpcValue::Int(id as i64), throw.to_rpc_value()],
         ),
     };
-    match PhpCall::Function(BStr::new(function)).try_run::<PluginValue>(args) {
+    match PhpCall::Function(BStr::new(function)).try_run::<RpcValue>(args) {
         Ok(Ok(_)) => Ok(()),
         Ok(Err(throw)) => Err(throw),
         Err(error) => Err(PhpThrow::runtime(bformat!(
-            "settling job {id} in the plugin process failed: {}",
+            "settling promise {id} in the plugin process failed: {}",
             error_chain_message(&error)
         ))),
     }
@@ -277,7 +278,7 @@ pub(crate) fn tick(
     })
 }
 
-/// Serves the canceller of a job's promise: drops the job, and answers with what the canceller
+/// Serves the canceller of a Rust-owned promise: drops its job, and answers with what the canceller
 /// throws. Composer's cancellers throw only for a job that had started and abort a queued one
 /// silently.
 pub(crate) fn cancel(id: u64) -> Option<PhpThrow> {
@@ -329,18 +330,18 @@ pub(crate) fn abort_internal_jobs(owners: Option<&[JobOwner]>) {
     }
 }
 
-/// Records the outcome the worker reports for a PHP-owned job and wakes the future parked on it.
+/// Records the outcome the worker reports for a PHP-owned promise and wakes the future parked on it.
 /// The report of a promise that had already settled when it crossed arrives before the Rust side
-/// has decoded the job's descriptor, so an unknown id is recorded too.
-pub(crate) fn settle_php_job(id: u64, outcome: Result<PluginValue, PhpThrow>) {
+/// has decoded the promise's handle, so an unknown id is recorded too.
+pub(crate) fn settle_php_promise(id: u64, outcome: Result<RpcValue, PhpThrow>) {
     let waker = REGISTRY.with(|registry| {
         match registry
             .borrow_mut()
-            .php_jobs
-            .insert(id, PhpJob::Settled(outcome))
+            .php_promises
+            .insert(id, PhpPromise::Settled(outcome))
         {
-            Some(PhpJob::Pending(waker)) => waker,
-            Some(PhpJob::Settled(_)) | None => None,
+            Some(PhpPromise::Pending(waker)) => waker,
+            Some(PhpPromise::Settled(_)) | None => None,
         }
     });
     if let Some(waker) = waker {
@@ -348,13 +349,13 @@ pub(crate) fn settle_php_job(id: u64, outcome: Result<PluginValue, PhpThrow>) {
     }
 }
 
-/// Awaits a PHP-owned job. A promise plugin code built settles only while PHP code runs, and what
-/// gets PHP code to run from here is the settle push of a Rust-owned job, so every poll ticks the
-/// whole job table.
-pub(crate) async fn await_php_job(id: u64) -> anyhow::Result<PluginValue> {
-    let parked = ParkedOnPhpJob(id);
+/// Awaits a PHP-owned promise. A promise plugin code built settles only while PHP code runs, and
+/// what gets PHP code to run from here is the settle push of a Rust-owned promise, so every poll
+/// ticks the whole job table.
+pub(crate) async fn await_php_promise(id: u64) -> anyhow::Result<RpcValue> {
+    let parked = ParkedOnPhpPromise(id);
     let outcome = std::future::poll_fn(|cx| {
-        if let Some(outcome) = take_php_job_outcome(id) {
+        if let Some(outcome) = take_php_promise_outcome(id) {
             return std::task::Poll::Ready(outcome);
         }
         let owners: Vec<JobOwner> = REGISTRY.with(|registry| {
@@ -372,15 +373,15 @@ pub(crate) async fn await_php_job(id: u64) -> anyhow::Result<PluginValue> {
                 Ok(true) => cx.waker().wake_by_ref(),
                 Ok(false) => {}
             }
-            if let Some(outcome) = take_php_job_outcome(id) {
+            if let Some(outcome) = take_php_promise_outcome(id) {
                 return std::task::Poll::Ready(outcome);
             }
         }
         REGISTRY.with(|registry| {
             let mut registry = registry.borrow_mut();
             registry
-                .php_jobs
-                .insert(id, PhpJob::Pending(Some(cx.waker().clone())));
+                .php_promises
+                .insert(id, PhpPromise::Pending(Some(cx.waker().clone())));
             if !registry.php_waiting.contains(&id) {
                 registry.php_waiting.push(id);
             }
@@ -392,42 +393,45 @@ pub(crate) async fn await_php_job(id: u64) -> anyhow::Result<PluginValue> {
     outcome.map_err(throw_into_error)
 }
 
-fn take_php_job_outcome(id: u64) -> Option<Result<PluginValue, PhpThrow>> {
+fn take_php_promise_outcome(id: u64) -> Option<Result<RpcValue, PhpThrow>> {
     REGISTRY.with(|registry| {
         let mut registry = registry.borrow_mut();
-        match registry.php_jobs.get(&id) {
-            Some(PhpJob::Settled(_)) => match registry.php_jobs.shift_remove(&id) {
-                Some(PhpJob::Settled(outcome)) => Some(outcome),
+        match registry.php_promises.get(&id) {
+            Some(PhpPromise::Settled(_)) => match registry.php_promises.shift_remove(&id) {
+                Some(PhpPromise::Settled(outcome)) => Some(outcome),
                 _ => unreachable!("the entry was just seen settled"),
             },
-            Some(PhpJob::Pending(_)) | None => None,
+            Some(PhpPromise::Pending(_)) | None => None,
         }
     })
 }
 
 /// Takes a future off the parked list when it stops waiting, whether it finished or was dropped.
-struct ParkedOnPhpJob(u64);
+struct ParkedOnPhpPromise(u64);
 
-impl Drop for ParkedOnPhpJob {
+impl Drop for ParkedOnPhpPromise {
     fn drop(&mut self) {
         REGISTRY.with(|registry| {
             let mut registry = registry.borrow_mut();
             registry.php_waiting.retain(|id| *id != self.0);
-            if matches!(registry.php_jobs.get(&self.0), Some(PhpJob::Pending(_))) {
-                registry.php_jobs.shift_remove(&self.0);
+            if matches!(
+                registry.php_promises.get(&self.0),
+                Some(PhpPromise::Pending(_))
+            ) {
+                registry.php_promises.shift_remove(&self.0);
             }
         });
     }
 }
 
-/// The PHP-owned jobs a Rust future is parked on and the worker has not reported on yet.
-pub(crate) fn parked_php_jobs() -> Vec<u64> {
+/// The PHP-owned promises a Rust future is parked on and the worker has not reported on yet.
+pub(crate) fn parked_php_promises() -> Vec<u64> {
     REGISTRY.with(|registry| {
         let registry = registry.borrow();
         registry
             .php_waiting
             .iter()
-            .filter(|id| matches!(registry.php_jobs.get(*id), Some(PhpJob::Pending(_))))
+            .filter(|id| matches!(registry.php_promises.get(*id), Some(PhpPromise::Pending(_))))
             .copied()
             .collect()
     })
@@ -435,12 +439,12 @@ pub(crate) fn parked_php_jobs() -> Vec<u64> {
 
 /// Fails the awaits parked on `ids`: nothing is left that could run the PHP code their promises
 /// settle in.
-pub(crate) fn fail_php_jobs(ids: &[u64]) {
+pub(crate) fn fail_php_promises(ids: &[u64]) {
     for id in ids {
-        settle_php_job(
+        settle_php_promise(
             *id,
             Err(PhpThrow::runtime(bformat!(
-                "the promise of plugin job {id} can never settle: no job is left whose completion could run the code that resolves it"
+                "plugin promise {id} can never settle: no job is left whose completion could run the code that resolves it"
             ))),
         );
     }

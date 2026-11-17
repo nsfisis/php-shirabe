@@ -125,7 +125,7 @@ final class Classifier
             'php-native' => $this->isThrowable($fqcn)
                 ? 'exception class: real definition in the child process, crossed by value'
                 : (($this->statelessPureCandidates[$fqcn] ?? false)
-                    ? 'stateless pure class: no instance state, all methods pure, real code answers identically in both worlds'
+                    ? 'stateless pure class: no instance state, all methods pure, real code answers identically on both sides'
                     : 'constants-only class: pure definitions, no state to share'),
             'contract' => 'interface/abstract type: declaration stub, artifacts depend on direction',
             'rust-snapshot' => 'immutable value object: no state referencing living services, all methods pure',
@@ -275,7 +275,7 @@ final class Classifier
         //     none of which references a living service -> rust-snapshot
         //   - stateless pure classes carry no instance state at all;
         //     a snapshot has nothing to copy, and the real code answers
-        //     identically in both worlds -> php-native
+        //     identically on both sides -> php-native
         do {
             $changed = false;
             foreach ($this->closure->reachable as $fqcn => $bits) {

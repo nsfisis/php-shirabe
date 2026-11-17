@@ -2,7 +2,7 @@
 
 use bstr::BString;
 use indexmap::IndexMap;
-use shirabe_php_rpc::PhpObjHandle;
+use shirabe_php_rpc::PhpEntityHandle;
 
 /// Represents one event's subscriber info: method name only, method+priority, or multiple handlers.
 #[derive(Debug)]
@@ -22,6 +22,6 @@ pub trait EventSubscriberInterface {
     fn get_subscribed_events(&self) -> anyhow::Result<IndexMap<BString, SubscribedEventEntry>>;
 
     /// The subscriber as it crosses the wire: PHP's `[$subscriber, $method]` array callables
-    /// capture the subscriber object itself, represented here by its P-table handle.
-    fn subscriber_handle(&self) -> PhpObjHandle;
+    /// capture the subscriber object itself, represented here by its PHP entity handle.
+    fn subscriber_handle(&self) -> PhpEntityHandle;
 }

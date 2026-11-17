@@ -9,13 +9,13 @@ use crate::php_worker::call::PhpCall;
 use crate::php_worker::rpc::entity::entity_value;
 use crate::util::sync_executor::block_on;
 use bstr::{BStr, BString};
-use shirabe_php_rpc::{PhpObjHandle, PluginValue, ToPluginValue};
+use shirabe_php_rpc::{PhpEntityHandle, RpcValue, ToRpcValue};
 use shirabe_php_shim::{RuntimeException, bformat, trim};
 use shirabe_symfony_console::command::Command as SymfonyCommand;
 use shirabe_symfony_console::input::InputInterface;
 use shirabe_symfony_console::output::{ConsoleOutput, OutputInterface};
 
-shirabe_php_rpc::plugin_value_record! {
+shirabe_php_rpc::rpc_value_record! {
     /// Metadata row for one Rust-implemented command, mirrored into the worker as a
     /// `\Shirabe\RustCommandStub` so a worker-hosted command can `find()` and invoke built-in
     /// commands (their execution crosses back into this process).
@@ -28,17 +28,17 @@ shirabe_php_rpc::plugin_value_record! {
     }
 }
 
-shirabe_php_rpc::plugin_value_record! {
+shirabe_php_rpc::rpc_value_record! {
     /// What `__shirabe_console_application_boot` builds the worker-side application from.
     #[derive(Debug)]
     struct ConsoleBootConfig {
-        composer: Option<PluginValue>,
-        io: PluginValue,
+        composer: Option<RpcValue>,
+        io: RpcValue,
         initial_working_directory: Option<std::path::PathBuf>,
         disable_plugins_by_default: bool,
         disable_scripts_by_default: bool,
         rust_commands: Vec<RustCommandMetadata>,
-        plugin_commands: Vec<PhpObjHandle>,
+        plugin_commands: Vec<PhpEntityHandle>,
     }
 }
 
@@ -54,14 +54,14 @@ pub(crate) struct PhpConsoleApplicationContext {
     disable_plugins_by_default: bool,
     disable_scripts_by_default: bool,
     rust_commands: std::cell::RefCell<Vec<RustCommandMetadata>>,
-    plugin_commands: std::cell::RefCell<Vec<PhpObjHandle>>,
-    app: std::cell::RefCell<Option<PhpObjHandle>>,
+    plugin_commands: std::cell::RefCell<Vec<PhpEntityHandle>>,
+    app: std::cell::RefCell<Option<PhpEntityHandle>>,
 }
 
 thread_local! {
     /// Handles of the `PhpCommandProxy` instances built since the last drain; drained into the
     /// console application context by `Application::register_worker_console_commands`.
-    pub(crate) static PENDING_COMMAND_HANDLES: std::cell::RefCell<Vec<PhpObjHandle>> =
+    pub(crate) static PENDING_COMMAND_HANDLES: std::cell::RefCell<Vec<PhpEntityHandle>> =
         const { std::cell::RefCell::new(Vec::new()) };
 
     /// The published context, read by `PhpCommandProxy::run` at execution time.
@@ -74,7 +74,7 @@ pub(crate) fn reset_pending_plugin_command_handles() {
     PENDING_COMMAND_HANDLES.with(|handles| handles.borrow_mut().clear());
 }
 
-pub(crate) fn take_pending_plugin_command_handles() -> Vec<PhpObjHandle> {
+pub(crate) fn take_pending_plugin_command_handles() -> Vec<PhpEntityHandle> {
     PENDING_COMMAND_HANDLES.with(|handles| std::mem::take(&mut *handles.borrow_mut()))
 }
 
@@ -85,7 +85,7 @@ pub(crate) fn publish_console_application_context(
     disable_plugins_by_default: bool,
     disable_scripts_by_default: bool,
     rust_commands: Vec<RustCommandMetadata>,
-    plugin_commands: Vec<PhpObjHandle>,
+    plugin_commands: Vec<PhpEntityHandle>,
 ) {
     let context = std::rc::Rc::new(PhpConsoleApplicationContext {
         composer: composer.cloned(),
@@ -104,7 +104,7 @@ pub(crate) fn publish_console_application_context(
 /// published. A worker-side application that already booted gets them right away, so the two
 /// sides keep the same command set.
 pub(crate) fn extend_console_application_commands(
-    handles: Vec<PhpObjHandle>,
+    handles: Vec<PhpEntityHandle>,
 ) -> anyhow::Result<()> {
     let context = CONSOLE_APP_CONTEXT
         .with(|slot| slot.borrow().clone())
@@ -112,7 +112,7 @@ pub(crate) fn extend_console_application_commands(
     for handle in handles {
         if let Some(app) = context.app.borrow().as_ref() {
             PhpCall::Method(app, BStr::new("add"))
-                .run::<PluginValue>(vec![PluginValue::PhpHandle(handle.clone())])?;
+                .run::<RpcValue>(vec![RpcValue::PhpEntityHandle(handle.clone())])?;
         }
         context.plugin_commands.borrow_mut().push(handle);
     }
@@ -130,10 +130,10 @@ pub(crate) fn extend_console_application_rust_command(
         .expect("only an application that published the handoff extends it");
     let app = context.app.borrow().clone();
     if let Some(app) = app {
-        let stub: PhpObjHandle = PhpCall::New(BStr::new("Shirabe\\RustCommandStub"))
-            .run(vec![metadata.clone().to_plugin_value()])?;
+        let stub: PhpEntityHandle = PhpCall::New(BStr::new("Shirabe\\RustCommandStub"))
+            .run(vec![metadata.clone().to_rpc_value()])?;
         PhpCall::Method(&app, BStr::new("add"))
-            .run::<PluginValue>(vec![PluginValue::PhpHandle(stub)])?;
+            .run::<RpcValue>(vec![RpcValue::PhpEntityHandle(stub)])?;
     }
     context.rust_commands.borrow_mut().push(metadata);
     Ok(())
@@ -141,7 +141,7 @@ pub(crate) fn extend_console_application_rust_command(
 
 impl PhpConsoleApplicationContext {
     /// Boots the worker-side application on first use and returns its handle.
-    pub(crate) fn booted_app(&self) -> anyhow::Result<PhpObjHandle> {
+    pub(crate) fn booted_app(&self) -> anyhow::Result<PhpEntityHandle> {
         if let Some(app) = self.app.borrow().as_ref() {
             return Ok(app.clone());
         }
@@ -154,8 +154,9 @@ impl PhpConsoleApplicationContext {
             rust_commands: self.rust_commands.borrow().clone(),
             plugin_commands: self.plugin_commands.borrow().clone(),
         };
-        let app: PhpObjHandle = PhpCall::Function(BStr::new("__shirabe_console_application_boot"))
-            .run(vec![config.to_plugin_value()])?;
+        let app: PhpEntityHandle =
+            PhpCall::Function(BStr::new("__shirabe_console_application_boot"))
+                .run(vec![config.to_rpc_value()])?;
         *self.app.borrow_mut() = Some(app.clone());
         Ok(app)
     }

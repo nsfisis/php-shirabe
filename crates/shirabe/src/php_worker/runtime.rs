@@ -10,7 +10,7 @@ use crate::php_worker::call::PhpCall;
 use crate::php_worker::{bundle, error_handler, installed_versions};
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
-use shirabe_php_rpc::{FromPluginValue, PhpObjHandle, PluginValue};
+use shirabe_php_rpc::{FromRpcValue, PhpEntityHandle, RpcValue};
 use shirabe_php_shim::bformat;
 
 pub(crate) mod autoloading;
@@ -22,7 +22,7 @@ pub(crate) mod autoloading;
 /// [`ClassLoader`]: crate::autoload::ClassLoader
 pub(crate) fn ensure_script_autoloader() -> anyhow::Result<()> {
     PhpCall::Function(BStr::new("__shirabe_enable_script_autoloader"))
-        .run::<PluginValue>(Vec::new())?;
+        .run::<RpcValue>(Vec::new())?;
     Ok(())
 }
 
@@ -34,7 +34,7 @@ pub(crate) fn ensure_composer_php_runtime(
 ) -> anyhow::Result<()> {
     let autoload = composer_php_runtime_autoload(cache_dir)?;
     PhpCall::Function(BStr::new("__shirabe_require"))
-        .run::<PluginValue>(vec![PluginValue::string(autoload)])?;
+        .run::<RpcValue>(vec![RpcValue::string(autoload)])?;
     error_handler::register_pending()?;
     installed_versions::load_pending()
 }
@@ -58,49 +58,46 @@ fn composer_php_runtime_autoload(
 
 /// `class_exists($class, $autoload)`.
 pub(crate) fn class_exists(class: &BStr, autoload: bool) -> anyhow::Result<bool> {
-    PhpCall::Function(BStr::new("class_exists")).run(vec![
-        PluginValue::string(class),
-        PluginValue::Bool(autoload),
-    ])
+    PhpCall::Function(BStr::new("class_exists"))
+        .run(vec![RpcValue::string(class), RpcValue::Bool(autoload)])
 }
 
 /// `is_a($class, $parent, true)`: whether the class named `class` is `parent` or extends or
 /// implements it.
 pub(crate) fn is_a_class(class: &BStr, parent: &BStr) -> anyhow::Result<bool> {
     PhpCall::Function(BStr::new("is_a")).run(vec![
-        PluginValue::string(class),
-        PluginValue::string(parent),
-        PluginValue::Bool(true),
+        RpcValue::string(class),
+        RpcValue::string(parent),
+        RpcValue::Bool(true),
     ])
 }
 
 /// `is_a($obj, $class)` evaluated in the worker: the child's own class table answers, so
-/// parent classes are covered (a `PhpObjHandle`'s `implements` lists interfaces only).
-pub(crate) fn is_a(handle: &PhpObjHandle, class: &BStr) -> anyhow::Result<bool> {
+/// parent classes are covered (a `PhpEntityHandle`'s `implements` lists interfaces only).
+pub(crate) fn is_a(handle: &PhpEntityHandle, class: &BStr) -> anyhow::Result<bool> {
     PhpCall::Function(BStr::new("is_a")).run(vec![
-        PluginValue::PhpHandle(handle.clone()),
-        PluginValue::string(class),
+        RpcValue::PhpEntityHandle(handle.clone()),
+        RpcValue::string(class),
     ])
 }
 
 /// `eval($code)`.
 pub(crate) fn eval(code: BString) -> anyhow::Result<()> {
-    PhpCall::Function(BStr::new("__shirabe_eval"))
-        .run::<PluginValue>(vec![PluginValue::string(code)])?;
+    PhpCall::Function(BStr::new("__shirabe_eval")).run::<RpcValue>(vec![RpcValue::string(code)])?;
     Ok(())
 }
 
 /// `\Composer\Autoload\composerRequire($fileIdentifier, $file)`.
 pub(crate) fn composer_require(file_identifier: &BStr, file: &BStr) -> anyhow::Result<()> {
-    PhpCall::Function(BStr::new("__shirabe_composer_require")).run::<PluginValue>(vec![
-        PluginValue::string(file_identifier),
-        PluginValue::string(file),
+    PhpCall::Function(BStr::new("__shirabe_composer_require")).run::<RpcValue>(vec![
+        RpcValue::string(file_identifier),
+        RpcValue::string(file),
     ])?;
     Ok(())
 }
 
-/// `new $class(...$args)`, returning the P-table handle of the new entity.
-pub(crate) fn new_object(class: &BStr, args: Vec<PluginValue>) -> anyhow::Result<PhpObjHandle> {
+/// `new $class(...$args)`, returning the PHP entity handle of the new entity.
+pub(crate) fn new_object(class: &BStr, args: Vec<RpcValue>) -> anyhow::Result<PhpEntityHandle> {
     PhpCall::New(class).run(args)
 }
 
@@ -110,26 +107,26 @@ pub(crate) fn new_object(class: &BStr, args: Vec<PluginValue>) -> anyhow::Result
 /// PHP code the worker ran, so the worker's class table answers, and without a worker no such
 /// class exists.
 pub(crate) fn anonymous_class_display_name(class: &BStr) -> anyhow::Result<BString> {
-    let string = || PluginValue::string(class);
+    let string = || RpcValue::string(class);
     let exists = shirabe_php_rpc::worker_is_running()
         && PhpCall::Function(BStr::new("class_exists"))
-            .run::<bool>(vec![string(), PluginValue::Bool(false)])?;
+            .run::<bool>(vec![string(), RpcValue::Bool(false)])?;
     if !exists {
         return Ok(class.to_owned());
     }
 
     let get_parent_class = PhpCall::Function(BStr::new("get_parent_class"));
-    let parent = match get_parent_class.run::<PluginValue>(vec![string()])? {
-        PluginValue::Bool(false) => None,
+    let parent = match get_parent_class.run::<RpcValue>(vec![string()])? {
+        RpcValue::Bool(false) => None,
         value => Some(
-            BString::from_plugin_value(&value)
+            BString::from_rpc_value(&value)
                 .map_err(|throw| get_parent_class.unsupported_shape(throw))?,
         ),
     };
     let name = match parent {
         Some(parent) => parent,
         None => PhpCall::Function(BStr::new("class_implements"))
-            .run::<IndexMap<BString, PluginValue>>(vec![string()])?
+            .run::<IndexMap<BString, RpcValue>>(vec![string()])?
             .into_keys()
             .next()
             .unwrap_or_else(|| BString::from("class")),

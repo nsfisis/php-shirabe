@@ -11,14 +11,14 @@ class MarkAliasUninstalledOperation extends SolverOperation implements Operation
 {
     public function __construct(AliasPackage $package)
     {
-        $this->__rhandle = \Shirabe\RpcRuntime::newRust(static::class, [$package]);
-        \Shirabe\RustObjectRegistry::adopt($this->__rhandle, $this);
+        $this->__entityId = \Shirabe\RpcRuntime::newRust(static::class, [$package]);
+        \Shirabe\RustStubRegistry::adopt($this->__entityId, $this);
     }
 
     protected const TYPE = 'markAliasUninstalled';
 
     public function getPackage(): AliasPackage
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getPackage', []);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'getPackage', []);
     }
 }

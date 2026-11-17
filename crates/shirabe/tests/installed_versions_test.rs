@@ -17,7 +17,7 @@ use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use php_worker::{load_composer_php_runtime, lock_php_worker, php_call_static, php_eval};
 use shirabe::php_worker::call::PhpCall;
-use shirabe_php_rpc::{PluginValue, ToPluginValue};
+use shirabe_php_rpc::{RpcValue, ToRpcValue};
 use shirabe_php_shim::{
     PhpMixed, bformat, path_from_bytes, path_to_bytes, php_str, realpath, var_export_str,
 };
@@ -59,7 +59,7 @@ fn set_up() -> SetUp {
 
 /// `require __DIR__.'/Repository/Fixtures/installed_relative.php'` with `$dir` bound, evaluated in
 /// the worker so the upstream fixture file is used as-is.
-fn fixture_data(dir: &std::path::Path) -> PluginValue {
+fn fixture_data(dir: &std::path::Path) -> RpcValue {
     php_eval(bformat!(
         "$dir = {};\nreturn require {};",
         var_export_str(path_to_bytes(dir), true),
@@ -75,22 +75,22 @@ fn fixture_path(name: impl AsRef<std::path::Path>) -> std::path::PathBuf {
         .expect("the Composer checkout must provide the repository fixtures")
 }
 
-fn call_static(method: &BStr, args: Vec<PluginValue>) -> PluginValue {
+fn call_static(method: &BStr, args: Vec<RpcValue>) -> RpcValue {
     php_call_static(INSTALLED_VERSIONS, method, args)
 }
 
-fn string_of(value: &PluginValue) -> bstr::BString {
+fn string_of(value: &RpcValue) -> bstr::BString {
     match value {
-        PluginValue::String(bytes) => bytes.clone(),
+        RpcValue::String(bytes) => bytes.clone(),
         other => panic!("expected a string, got {other:?}"),
     }
 }
 
-fn string_list(names: &[impl AsRef<[u8]>]) -> PluginValue {
-    PluginValue::List(
+fn string_list(names: &[impl AsRef<[u8]>]) -> RpcValue {
+    RpcValue::List(
         names
             .iter()
-            .map(|name| PluginValue::string(name.as_ref()))
+            .map(|name| RpcValue::string(name.as_ref()))
             .collect(),
     )
 }
@@ -124,12 +124,12 @@ fn test_is_installed() {
 
     for (expected, name, include_dev_requirements) in is_installed_provider() {
         assert_eq!(
-            PluginValue::Bool(expected),
+            RpcValue::Bool(expected),
             call_static(
                 BStr::new("isInstalled"),
                 vec![
-                    PluginValue::string(name),
-                    PluginValue::Bool(include_dev_requirements)
+                    RpcValue::string(name),
+                    RpcValue::Bool(include_dev_requirements)
                 ]
             ),
             "isInstalled({name}, {include_dev_requirements})",
@@ -158,13 +158,13 @@ fn test_satisfies() {
 
     for (expected, name, constraint) in satisfies_provider() {
         assert_eq!(
-            PluginValue::Bool(expected),
+            RpcValue::Bool(expected),
             call_static(
                 BStr::new("satisfies"),
                 vec![
                     new_version_parser(),
-                    PluginValue::string(name),
-                    PluginValue::string(constraint)
+                    RpcValue::string(name),
+                    RpcValue::string(constraint)
                 ]
             ),
             "satisfies({name}, {constraint})",
@@ -174,9 +174,9 @@ fn test_satisfies() {
     }
 }
 
-fn new_version_parser() -> PluginValue {
+fn new_version_parser() -> RpcValue {
     PhpCall::New(BStr::new("Composer\\Semver\\VersionParser"))
-        .try_run::<PluginValue>(vec![])
+        .try_run::<RpcValue>(vec![])
         .expect("VersionParser request failed")
         .expect("VersionParser threw")
 }
@@ -212,11 +212,8 @@ fn test_get_version_ranges() {
 
     for (expected, name) in get_version_ranges_provider() {
         assert_eq!(
-            PluginValue::string(expected),
-            call_static(
-                BStr::new("getVersionRanges"),
-                vec![PluginValue::string(name)]
-            ),
+            RpcValue::string(expected),
+            call_static(BStr::new("getVersionRanges"), vec![RpcValue::string(name)]),
             "getVersionRanges({name})",
             name = name.display_lossy(),
         );
@@ -247,7 +244,7 @@ fn test_get_version() {
     for (expected, name) in get_version_provider() {
         assert_eq!(
             optional_string(expected),
-            call_static(BStr::new("getVersion"), vec![PluginValue::string(name)]),
+            call_static(BStr::new("getVersion"), vec![RpcValue::string(name)]),
             "getVersion({name})",
             name = name.display_lossy(),
         );
@@ -275,10 +272,7 @@ fn test_get_pretty_version() {
     for (expected, name) in get_pretty_version_provider() {
         assert_eq!(
             optional_string(expected),
-            call_static(
-                BStr::new("getPrettyVersion"),
-                vec![PluginValue::string(name)]
-            ),
+            call_static(BStr::new("getPrettyVersion"), vec![RpcValue::string(name)]),
             "getPrettyVersion({name})",
             name = name.display_lossy(),
         );
@@ -298,10 +292,10 @@ fn get_pretty_version_provider() -> Vec<(Option<&'static BStr>, &'static BStr)> 
     ]
 }
 
-fn optional_string(value: Option<&BStr>) -> PluginValue {
+fn optional_string(value: Option<&BStr>) -> RpcValue {
     match value {
-        Some(value) => PluginValue::string(value),
-        None => PluginValue::Null,
+        Some(value) => RpcValue::string(value),
+        None => RpcValue::Null,
     }
 }
 
@@ -311,7 +305,7 @@ fn test_get_version_out_of_bounds() {
     let _set_up = set_up();
 
     let throw = PhpCall::StaticMethod(BStr::new(INSTALLED_VERSIONS), BStr::new("getVersion"))
-        .try_run::<PluginValue>(vec![PluginValue::string("not/installed")])
+        .try_run::<RpcValue>(vec![RpcValue::string("not/installed")])
         .expect("getVersion request failed")
         .expect_err("getVersion must throw for a package that is not installed");
     assert_eq!("OutOfBoundsException", throw.exception_class);
@@ -349,7 +343,7 @@ fn test_get_root_package() {
     ]));
 
     assert_eq!(
-        expected.clone().to_plugin_value(),
+        expected.clone().to_rpc_value(),
         call_static(BStr::new("getRootPackage"), vec![])
     );
 }
@@ -373,7 +367,7 @@ fn test_get_reference() {
     for (expected, name) in get_reference_provider() {
         assert_eq!(
             optional_string(expected),
-            call_static(BStr::new("getReference"), vec![PluginValue::string(name)]),
+            call_static(BStr::new("getReference"), vec![RpcValue::string(name)]),
             "getReference({name})",
             name = name.display_lossy(),
         );
@@ -412,7 +406,7 @@ fn test_get_installed_packages_by_type() {
         string_list(&names),
         call_static(
             BStr::new("getInstalledPackagesByType"),
-            vec![PluginValue::string("library")]
+            vec![RpcValue::string("library")]
         )
     );
 }
@@ -424,7 +418,7 @@ fn test_get_install_path() {
 
     let root_install_path = string_of(&call_static(
         BStr::new("getInstallPath"),
-        vec![PluginValue::string("__root__")],
+        vec![RpcValue::string("__root__")],
     ));
     assert_eq!(
         realpath(set_up.root()).map(|p| bstr::BString::from(path_to_bytes(&p))),
@@ -432,17 +426,14 @@ fn test_get_install_path() {
             .map(|p| bstr::BString::from(path_to_bytes(&p)))
     );
     assert_eq!(
-        PluginValue::string("/foo/bar/vendor/c/c"),
-        call_static(
-            BStr::new("getInstallPath"),
-            vec![PluginValue::string("c/c")]
-        )
+        RpcValue::string("/foo/bar/vendor/c/c"),
+        call_static(BStr::new("getInstallPath"), vec![RpcValue::string("c/c")])
     );
     assert_eq!(
-        PluginValue::Null,
+        RpcValue::Null,
         call_static(
             BStr::new("getInstallPath"),
-            vec![PluginValue::string("foo/impl")]
+            vec![RpcValue::string("foo/impl")]
         )
     );
 }
@@ -466,36 +457,30 @@ fn test_with_class_loader_loaded() {
     );
 
     assert_eq!(
-        PluginValue::Bool(false),
-        call_static(
-            BStr::new("isInstalled"),
-            vec![PluginValue::string("foo/bar")]
-        )
+        RpcValue::Bool(false),
+        call_static(BStr::new("isInstalled"), vec![RpcValue::string("foo/bar")])
     );
-    let reloaded = PluginValue::Array(IndexMap::from([
+    let reloaded = RpcValue::Array(IndexMap::from([
         (
             "root".into(),
             call_static(BStr::new("getRootPackage"), vec![]),
         ),
         (
             "versions".into(),
-            PluginValue::Array(IndexMap::from([(
+            RpcValue::Array(IndexMap::from([(
                 "foo/bar".into(),
                 PhpMixed::Array(IndexMap::from([
                     ("version".into(), PhpMixed::string(BString::from("1.0.0"))),
                     ("dev_requirement".into(), PhpMixed::Bool(false)),
                 ]))
-                .to_plugin_value(),
+                .to_rpc_value(),
             )])),
         ),
     ]));
     call_static(BStr::new("reload"), vec![reloaded]);
     assert_eq!(
-        PluginValue::Bool(true),
-        call_static(
-            BStr::new("isInstalled"),
-            vec![PluginValue::string("foo/bar")]
-        )
+        RpcValue::Bool(true),
+        call_static(BStr::new("isInstalled"), vec![RpcValue::string("foo/bar")])
     );
 
     php_eval(

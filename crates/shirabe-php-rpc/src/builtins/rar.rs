@@ -6,9 +6,9 @@
 //! the available decoders (the `unrar` crate and its bindings) build on the UnRAR library, whose
 //! license is not an open source one. A native decoder could still replace the worker here.
 
-use crate::PhpObjHandle;
+use crate::PhpEntityHandle;
 use crate::builtins::or_false;
-use crate::codec::{ToPluginValue, protocol_value};
+use crate::codec::{ToRpcValue, protocol_value};
 use crate::transport::{RefuseCallbacks, call_php_method, call_static_method};
 use bstr::BStr;
 use shirabe_php_shim::php_str;
@@ -17,7 +17,7 @@ const CLASS: &BStr = php_str(b"RarArchive");
 
 #[derive(Debug)]
 pub struct RarArchive {
-    entity: PhpObjHandle,
+    entity: PhpEntityHandle,
 }
 
 impl RarArchive {
@@ -26,7 +26,7 @@ impl RarArchive {
         let value = call_static_method(
             CLASS,
             "open",
-            vec![file.as_ref().to_plugin_value()],
+            vec![file.as_ref().to_rpc_value()],
             &mut RefuseCallbacks,
         )??;
         Ok(or_false(&value, "RarArchive::open()").map(|entity| RarArchive { entity }))
@@ -36,7 +36,7 @@ impl RarArchive {
     pub fn get_entries(&self) -> anyhow::Result<Option<Vec<RarEntry>>> {
         let value = call_php_method(&self.entity, "getEntries", vec![], &mut RefuseCallbacks)??;
         Ok(
-            or_false::<Vec<PhpObjHandle>>(&value, "RarArchive::getEntries()").map(|entities| {
+            or_false::<Vec<PhpEntityHandle>>(&value, "RarArchive::getEntries()").map(|entities| {
                 entities
                     .into_iter()
                     .map(|entity| RarEntry { entity })
@@ -54,7 +54,7 @@ impl RarArchive {
 
 #[derive(Debug)]
 pub struct RarEntry {
-    entity: PhpObjHandle,
+    entity: PhpEntityHandle,
 }
 
 impl RarEntry {
@@ -63,7 +63,7 @@ impl RarEntry {
         let value = call_php_method(
             &self.entity,
             "extract",
-            vec![dir.as_ref().to_plugin_value()],
+            vec![dir.as_ref().to_rpc_value()],
             &mut RefuseCallbacks,
         )??;
         Ok(protocol_value(&value, "RarEntry::extract()"))

@@ -4,7 +4,7 @@
 use crate::php_worker::call::PhpCall;
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
-use shirabe_php_rpc::{PluginValue, ToPluginValue};
+use shirabe_php_rpc::{RpcValue, ToRpcValue};
 use shirabe_php_shim::{PhpMixed, path_to_bytes};
 
 /// The `installed.php` passed to [`safely_load`], waiting for the Composer PHP runtime to be
@@ -33,7 +33,7 @@ pub(crate) fn load_pending() -> anyhow::Result<()> {
         .take();
     if let Some(path) = path {
         PhpCall::Function(BStr::new("__shirabe_safely_load_installed_versions"))
-            .run::<PluginValue>(vec![PluginValue::string(path_to_bytes(&path))])?;
+            .run::<RpcValue>(vec![RpcValue::string(path_to_bytes(&path))])?;
     }
     Ok(())
 }
@@ -49,11 +49,9 @@ pub(crate) fn reload(
     if !shirabe_php_rpc::worker_is_running() {
         return Ok(());
     }
-    PhpCall::Function(BStr::new("__shirabe_installed_versions_reload")).run::<PluginValue>(
-        vec![
-            PhpMixed::Array(versions).to_plugin_value(),
-            PluginValue::string(path_to_bytes(repo_dir)),
-        ],
-    )?;
+    PhpCall::Function(BStr::new("__shirabe_installed_versions_reload")).run::<RpcValue>(vec![
+        PhpMixed::Array(versions).to_rpc_value(),
+        RpcValue::string(path_to_bytes(repo_dir)),
+    ])?;
     Ok(())
 }

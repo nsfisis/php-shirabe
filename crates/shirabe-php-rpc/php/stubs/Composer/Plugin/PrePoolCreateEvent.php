@@ -12,57 +12,57 @@ class PrePoolCreateEvent extends Event
 {
     public function __construct(string $name, array $repositories, Request $request, array $acceptableStabilities, array $stabilityFlags, array $rootAliases, array $rootReferences, array $packages, array $unacceptableFixedPackages)
     {
-        $this->__rhandle = \Shirabe\RpcRuntime::newRust(static::class, [$name, $repositories, $request, $acceptableStabilities, $stabilityFlags, $rootAliases, $rootReferences, $packages, $unacceptableFixedPackages]);
-        \Shirabe\RustObjectRegistry::adopt($this->__rhandle, $this);
+        $this->__entityId = \Shirabe\RpcRuntime::newRust(static::class, [$name, $repositories, $request, $acceptableStabilities, $stabilityFlags, $rootAliases, $rootReferences, $packages, $unacceptableFixedPackages]);
+        \Shirabe\RustStubRegistry::adopt($this->__entityId, $this);
     }
 
     public function getRepositories(): array
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getRepositories', []);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'getRepositories', []);
     }
 
     public function getRequest(): Request
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getRequest', []);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'getRequest', []);
     }
 
     public function getAcceptableStabilities(): array
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getAcceptableStabilities', []);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'getAcceptableStabilities', []);
     }
 
     public function getStabilityFlags(): array
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getStabilityFlags', []);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'getStabilityFlags', []);
     }
 
     public function getRootAliases(): array
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getRootAliases', []);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'getRootAliases', []);
     }
 
     public function getRootReferences(): array
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getRootReferences', []);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'getRootReferences', []);
     }
 
     public function getPackages(): array
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getPackages', []);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'getPackages', []);
     }
 
     public function getUnacceptableFixedPackages(): array
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getUnacceptableFixedPackages', []);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'getUnacceptableFixedPackages', []);
     }
 
     public function setPackages(array $packages): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setPackages', [$packages]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, 'setPackages', [$packages]);
     }
 
     public function setUnacceptableFixedPackages(array $packages): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setUnacceptableFixedPackages', [$packages]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, 'setUnacceptableFixedPackages', [$packages]);
     }
 }

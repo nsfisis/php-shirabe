@@ -13,33 +13,33 @@ class Event extends BaseEvent
 {
     public function __construct(string $name, Composer $composer, IOInterface $io, bool $devMode = false, array $args = [], array $flags = [])
     {
-        $this->__rhandle = \Shirabe\RpcRuntime::newRust(static::class, [$name, $composer, $io, $devMode, $args, $flags]);
-        \Shirabe\RustObjectRegistry::adopt($this->__rhandle, $this);
+        $this->__entityId = \Shirabe\RpcRuntime::newRust(static::class, [$name, $composer, $io, $devMode, $args, $flags]);
+        \Shirabe\RustStubRegistry::adopt($this->__entityId, $this);
     }
 
     public function getComposer(): Composer
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getComposer', []);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'getComposer', []);
     }
 
     public function getIO(): IOInterface
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getIO', []);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'getIO', []);
     }
 
     public function isDevMode(): bool
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'isDevMode', []);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'isDevMode', []);
     }
 
     public function getOriginatingEvent(): ?BaseEvent
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getOriginatingEvent', []);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'getOriginatingEvent', []);
     }
 
     public function setOriginatingEvent(BaseEvent $event): self
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setOriginatingEvent', [$event]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, 'setOriginatingEvent', [$event]);
         return $this;
     }
 }

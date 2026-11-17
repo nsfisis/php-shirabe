@@ -11,7 +11,7 @@ use shirabe::json::JsonFile;
 use shirabe::package::loader::ArrayLoader;
 use shirabe::package::{Link, PackageInterfaceHandle, RootAliasPackageHandle, RootPackageHandle};
 use shirabe::repository::{FilesystemRepository, RepositoryInterface};
-use shirabe_php_rpc::{PluginValue, ToPluginValue};
+use shirabe_php_rpc::{RpcValue, ToRpcValue};
 use shirabe_php_shim::{
     Catch as _, PhpMixed, ToPhpString, bformat, path_from_bytes, path_to_bytes,
 };
@@ -347,18 +347,18 @@ fn test_safely_load_installed_versions() {
     let result = php_call_static(
         "Composer\\Repository\\FilesystemRepository",
         "safelyLoadInstalledVersions",
-        vec![PluginValue::string(path_to_bytes(
+        vec![RpcValue::string(path_to_bytes(
             &std::path::Path::new(&fixtures_dir).join("installed_complex.php"),
         ))],
     );
     assert_eq!(
-        PluginValue::Bool(true),
+        RpcValue::Bool(true),
         result,
         "The file should be considered valid"
     );
 
     let raw_data = php_call_static("Composer\\InstalledVersions", "getAllRawData", vec![]);
-    let PluginValue::List(datasets) = raw_data else {
+    let RpcValue::List(datasets) = raw_data else {
         panic!("getAllRawData must return a list, got {raw_data:?}")
     };
     let raw_data = datasets.last().cloned().unwrap();
@@ -420,5 +420,5 @@ fn test_safely_load_installed_versions() {
         ),
     ]));
 
-    assert_eq!(expected.clone().to_plugin_value(), raw_data);
+    assert_eq!(expected.clone().to_rpc_value(), raw_data);
 }

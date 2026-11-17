@@ -50,7 +50,7 @@ class Plugin implements PluginInterface, EventSubscriberInterface
         $process = new ProcessExecutor($this->io);
         $lines = ['event=' . $event->getName()];
 
-        // The timeout is process-wide state Composer seeds from the config, so both worlds have
+        // The timeout is process-wide state Composer seeds from the config, so both sides have
         // to report the value this project asked for and to observe each other's writes.
         $original = ProcessExecutor::getTimeout();
         $lines[] = 'timeout=' . $original;

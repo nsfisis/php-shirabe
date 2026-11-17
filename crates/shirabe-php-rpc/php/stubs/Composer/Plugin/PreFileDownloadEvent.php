@@ -12,52 +12,52 @@ class PreFileDownloadEvent extends Event
 {
     public function __construct(string $name, HttpDownloader $httpDownloader, string $processedUrl, string $type, $context = null)
     {
-        $this->__rhandle = \Shirabe\RpcRuntime::newRust(static::class, [$name, $httpDownloader, $processedUrl, $type, $context]);
-        \Shirabe\RustObjectRegistry::adopt($this->__rhandle, $this);
+        $this->__entityId = \Shirabe\RpcRuntime::newRust(static::class, [$name, $httpDownloader, $processedUrl, $type, $context]);
+        \Shirabe\RustStubRegistry::adopt($this->__entityId, $this);
     }
 
     public function getHttpDownloader(): HttpDownloader
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getHttpDownloader', []);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'getHttpDownloader', []);
     }
 
     public function getProcessedUrl(): string
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getProcessedUrl', []);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'getProcessedUrl', []);
     }
 
     public function setProcessedUrl(string $processedUrl): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setProcessedUrl', [$processedUrl]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, 'setProcessedUrl', [$processedUrl]);
     }
 
     public function getCustomCacheKey(): ?string
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getCustomCacheKey', []);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'getCustomCacheKey', []);
     }
 
     public function setCustomCacheKey(?string $customCacheKey): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setCustomCacheKey', [$customCacheKey]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, 'setCustomCacheKey', [$customCacheKey]);
     }
 
     public function getType(): string
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getType', []);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'getType', []);
     }
 
     public function getContext()
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getContext', []);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'getContext', []);
     }
 
     public function getTransportOptions(): array
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getTransportOptions', []);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'getTransportOptions', []);
     }
 
     public function setTransportOptions(array $options): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setTransportOptions', [$options]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, 'setTransportOptions', [$options]);
     }
 }

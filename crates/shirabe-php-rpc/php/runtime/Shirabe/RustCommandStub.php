@@ -5,7 +5,7 @@
 // real implementation executes against its own application state (helper set included). This
 // is how a plugin command that invokes a built-in command crosses back over the process
 // boundary; each command always runs on the side that owns its implementation, so a helper
-// lookup always resolves against the helper set of the world the command was written for.
+// lookup always resolves against the helper set of the side the command was written for.
 
 namespace Shirabe;
 

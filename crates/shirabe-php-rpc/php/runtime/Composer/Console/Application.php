@@ -33,11 +33,11 @@ class Application extends BaseApplication
     private bool $shirabeDisableScriptsByDefault = false;
 
     /**
-     * Builds the worker-side application from the Rust-side handoff. $config keys:
-     * `composer` (Composer proxy stub or null), `io` (IO proxy stub),
-     * `initialWorkingDirectory` (?string), `disablePluginsByDefault` (bool),
-     * `disableScriptsByDefault` (bool), `rustCommands` (metadata rows for
-     * \Shirabe\RustCommandStub), `pluginCommands` (live command entities from the P table).
+     * Builds the worker-side application from the Rust-side handoff. $config keys: `composer`
+     * (Composer proxy stub or null), `io` (IO proxy stub), `initialWorkingDirectory` (?string),
+     * `disablePluginsByDefault` (bool), `disableScriptsByDefault` (bool), `rustCommands` (metadata
+     * rows for \Shirabe\RustCommandStub), `pluginCommands` (live command entities from the PHP
+     * entity table).
      */
     public static function __shirabeBoot(array $config): self
     {
@@ -100,7 +100,7 @@ class Application extends BaseApplication
     public function resetComposer(): void
     {
         // TODO(plugin): the Composer instance is owned by the Rust process; dropping only the
-        // worker-side reference would desynchronize the two worlds, so this needs a
+        // worker-side reference would desynchronize the two sides, so this needs a
         // reset-and-refetch round trip that does not exist yet.
         throw new \RuntimeException(
             'Shirabe does not support resetComposer() inside the plugin process yet'

@@ -9,7 +9,7 @@
 //! TODO(php-runtime): the reverse direction is missing — a write PHP code makes to its own
 //! environment is not reflected back into the Rust-side storages.
 
-use crate::PluginValue;
+use crate::RpcValue;
 use crate::transport::call_internal_function;
 use bstr::BStr;
 use shirabe_php_shim::{EnvStorageKind, env_mutations_since};
@@ -41,17 +41,17 @@ pub(crate) fn flush() -> anyhow::Result<()> {
     let mutations = mutations
         .into_iter()
         .map(|mutation| {
-            PluginValue::List(vec![
-                PluginValue::string(storage_name(mutation.storage)),
-                PluginValue::String(mutation.key.as_bytes().into()),
+            RpcValue::List(vec![
+                RpcValue::string(storage_name(mutation.storage)),
+                RpcValue::String(mutation.key.as_bytes().into()),
                 match mutation.value {
-                    Some(value) => PluginValue::String(value.as_bytes().into()),
-                    None => PluginValue::Null,
+                    Some(value) => RpcValue::String(value.as_bytes().into()),
+                    None => RpcValue::Null,
                 },
             ])
         })
         .collect();
-    let outcome = call_internal_function("__shirabe_sync_env", vec![PluginValue::List(mutations)])?;
+    let outcome = call_internal_function("__shirabe_sync_env", vec![RpcValue::List(mutations)])?;
     // The worker only writes the three storages; nothing it does there can throw.
     outcome.unwrap_or_else(|throw| panic!("PHP RPC: __shirabe_sync_env threw: {throw}"));
     *synced = cursor;

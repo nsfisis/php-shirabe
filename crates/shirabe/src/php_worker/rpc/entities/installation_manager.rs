@@ -7,7 +7,7 @@ use crate::php_worker::rpc::entity::{Call, Crossing, Entity};
 use crate::php_worker::rpc::forwarding;
 use crate::php_worker::runtime;
 use bstr::BStr;
-use shirabe_php_rpc::{PhpObjHandle, PhpThrow, PluginValue, ToPluginValue};
+use shirabe_php_rpc::{PhpEntityHandle, PhpThrow, RpcValue, ToRpcValue};
 use shirabe_php_shim::{bformat, error_chain_message};
 
 impl Entity for std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>> {
@@ -24,8 +24,8 @@ impl Entity for std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>
 
 /// The installer argument of `addInstaller()` / `removeInstaller()`, type-checked the way the PHP
 /// signature does.
-fn installer_arg(call: &Call<'_>) -> Result<PhpObjHandle, PhpThrow> {
-    let handle = call.arg::<PhpObjHandle>(0)?;
+fn installer_arg(call: &Call<'_>) -> Result<PhpEntityHandle, PhpThrow> {
+    let handle = call.arg::<PhpEntityHandle>(0)?;
     let is_installer = runtime::is_a(
         &handle,
         BStr::new("Composer\\Installer\\InstallerInterface"),
@@ -53,22 +53,22 @@ impl forwarding::installer::installation_manager::Forwarding
 {
     type Handle = std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>;
 
-    fn get_install_path(im: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+    fn get_install_path(im: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         let package = call.arg::<PackageInterfaceHandle>(0)?;
-        Ok(im.borrow().get_install_path(package).to_plugin_value())
+        Ok(im.borrow().get_install_path(package).to_rpc_value())
     }
 
-    fn add_installer(im: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+    fn add_installer(im: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         let handle = installer_arg(call)?;
         im.borrow().add_installer(php_installer_proxy(handle));
-        Ok(PluginValue::Null)
+        Ok(RpcValue::Null)
     }
 
-    fn remove_installer(im: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+    fn remove_installer(im: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         let handle = installer_arg(call)?;
         let installer = php_installer_proxy(handle.clone());
         im.borrow().remove_installer(&*installer);
         forget_php_installer_proxy(&handle);
-        Ok(PluginValue::Null)
+        Ok(RpcValue::Null)
     }
 }

@@ -9,20 +9,20 @@ use Shirabe\Lint\Support\FileFinder;
 use Shirabe\Lint\Support\Paths;
 
 /**
- * In the `shirabe` crate, a Rust handle descriptor (`RustObjHandle { ... }`) is built only by
- * `entity_value`, which registers the entity and takes the class from its `Entity::class`, so an
- * rhandle can never cross the boundary under a class its entity does not cross as.
+ * In the `shirabe` crate, a Rust entity handle (`RustEntityHandle { ... }`) is built only by
+ * `entity_value`, which registers the entity and takes the class from its `Entity::class`, so a
+ * Rust entity id can never cross the boundary under a class its entity does not cross as.
  */
-final class RustHandleDescriptorConstruction implements Linter
+final class RustEntityHandleConstruction implements Linter
 {
     public function name(): string
     {
-        return 'rust_handle_descriptor_construction';
+        return 'rust_entity_handle_construction';
     }
 
     public function failureIntro(): string
     {
-        return "Found a `RustObjHandle` built outside `entity_value`.\n"
+        return "Found a `RustEntityHandle` built outside `entity_value`.\n"
             . 'Hand the entity to `crates/shirabe/src/php_worker/rpc/entity.rs` `entity_value` instead:';
     }
 
@@ -35,7 +35,7 @@ final class RustHandleDescriptorConstruction implements Linter
                 continue;
             }
             foreach (file($path) as $idx => $raw) {
-                if (preg_match('/\bRustObjHandle\s*\{/', $raw)) {
+                if (preg_match('/\bRustEntityHandle\s*\{/', $raw)) {
                     $errors[] = "{$relative}:" . ($idx + 1) . ': ' . trim($raw);
                 }
             }

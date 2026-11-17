@@ -14,8 +14,8 @@ class FilesystemRepository extends WritableArrayRepository
 {
     public function __construct(JsonFile $repositoryFile, bool $dumpVersions = false, ?RootPackageInterface $rootPackage = null, ?Filesystem $filesystem = null)
     {
-        $this->__rhandle = \Shirabe\RpcRuntime::newRust(static::class, [$repositoryFile, $dumpVersions, $rootPackage, $filesystem]);
-        \Shirabe\RustObjectRegistry::adopt($this->__rhandle, $this);
+        $this->__entityId = \Shirabe\RpcRuntime::newRust(static::class, [$repositoryFile, $dumpVersions, $rootPackage, $filesystem]);
+        \Shirabe\RustStubRegistry::adopt($this->__entityId, $this);
     }
 
     public static function safelyLoadInstalledVersions(string $path): bool

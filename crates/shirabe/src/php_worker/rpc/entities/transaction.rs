@@ -3,7 +3,7 @@
 use crate::dependency_resolver::AnyTransaction;
 use crate::php_worker::rpc::entity::{Call, Crossing, Entity, entity_value};
 use crate::php_worker::rpc::forwarding;
-use shirabe_php_rpc::{PhpThrow, PluginValue};
+use shirabe_php_rpc::{PhpThrow, RpcValue};
 
 impl Entity for std::rc::Rc<AnyTransaction> {
     const EXPECTED: &'static [u8] = b"a Transaction";
@@ -29,11 +29,8 @@ impl forwarding::dependency_resolver::transaction::Forwarding
 {
     type Handle = std::rc::Rc<AnyTransaction>;
 
-    fn get_operations(
-        transaction: &Self::Handle,
-        _: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
-        Ok(PluginValue::List(
+    fn get_operations(transaction: &Self::Handle, _: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
+        Ok(RpcValue::List(
             transaction
                 .get_operations()
                 .iter()

@@ -2,7 +2,7 @@
 //! (see `docs/dev/php-worker.md`), and the entities it can call back into live here. This module
 //! has no Composer counterpart.
 //!
-//! - `table`: the R table holding those entities, and the handles PHP stubs carry for them
+//! - `table`: the Rust entity table holding those entities, and the ids PHP stubs carry for them
 //! - `entity`: what an entity is, and the context a forwarded call is answered in
 //! - `forwarding`: the members each forwarding class routes to the Rust side, generated
 //! - `dispatch`: the dispatcher of the worker's requests, including the runtime services

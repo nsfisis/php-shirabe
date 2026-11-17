@@ -14,7 +14,7 @@ use crate::php_worker::runtime;
 use crate::util::StreamContextOptions;
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
-use shirabe_php_rpc::{FromPluginValue, PhpObjHandle, PhpThrow, PluginValue, ToPluginValue, codec};
+use shirabe_php_rpc::{FromRpcValue, PhpEntityHandle, PhpThrow, RpcValue, ToRpcValue, codec};
 use shirabe_php_shim::{
     PhpMixed, path_from_bytes, path_to_bytes, php_regex, php_str, preg_match, utf8_text,
 };
@@ -35,7 +35,7 @@ pub struct RemoteFilesystem {
     config: std::rc::Rc<std::cell::RefCell<Config>>,
     options: StreamContextOptions,
     disable_tls: bool,
-    entity: std::cell::OnceCell<PhpObjHandle>,
+    entity: std::cell::OnceCell<PhpEntityHandle>,
 }
 
 impl RemoteFilesystem {
@@ -67,11 +67,11 @@ impl RemoteFilesystem {
         self.call(
             BStr::new("copy"),
             vec![
-                PluginValue::string(origin_url.as_ref()),
-                PluginValue::string(file_url.as_ref()),
-                PluginValue::string(path_to_bytes(file_name.as_ref())),
-                PluginValue::Bool(progress),
-                options.to_plugin_value(),
+                RpcValue::string(origin_url.as_ref()),
+                RpcValue::string(file_url.as_ref()),
+                RpcValue::string(path_to_bytes(file_name.as_ref())),
+                RpcValue::Bool(progress),
+                options.to_rpc_value(),
             ],
         )
     }
@@ -86,10 +86,10 @@ impl RemoteFilesystem {
         self.call(
             BStr::new("getContents"),
             vec![
-                PluginValue::string(origin_url.as_ref()),
-                PluginValue::string(file_url.as_ref()),
-                PluginValue::Bool(progress),
-                options.to_plugin_value(),
+                RpcValue::string(origin_url.as_ref()),
+                RpcValue::string(file_url.as_ref()),
+                RpcValue::Bool(progress),
+                options.to_rpc_value(),
             ],
         )
     }
@@ -99,7 +99,7 @@ impl RemoteFilesystem {
     }
 
     pub fn set_options(&self, options: StreamContextOptions) -> anyhow::Result<()> {
-        self.call::<PluginValue>(BStr::new("setOptions"), vec![options.to_plugin_value()])?;
+        self.call::<RpcValue>(BStr::new("setOptions"), vec![options.to_rpc_value()])?;
         Ok(())
     }
 
@@ -130,12 +130,12 @@ impl RemoteFilesystem {
     pub fn find_status_message(&self, headers: &[BString]) -> anyhow::Result<Option<BString>> {
         self.call(
             BStr::new("findStatusMessage"),
-            vec![headers.to_vec().to_plugin_value()],
+            vec![headers.to_vec().to_rpc_value()],
         )
     }
 
     /// The worker-side instance, built on the first call.
-    fn entity(&self) -> anyhow::Result<&PhpObjHandle> {
+    fn entity(&self) -> anyhow::Result<&PhpEntityHandle> {
         if let Some(entity) = self.entity.get() {
             return Ok(entity);
         }
@@ -144,11 +144,11 @@ impl RemoteFilesystem {
             let cache_dir = self.config.borrow().get_path("cache-dir")?;
             Ok(path_from_bytes(&cache_dir).to_path_buf())
         })?;
-        let handle: PhpObjHandle = PhpCall::New(CLASS).run(vec![
+        let handle: PhpEntityHandle = PhpCall::New(CLASS).run(vec![
             entity_value(&self.io)?,
             entity_value(&self.config)?,
-            self.options.clone().to_plugin_value(),
-            PluginValue::Bool(self.disable_tls),
+            self.options.clone().to_rpc_value(),
+            RpcValue::Bool(self.disable_tls),
         ])?;
 
         Ok(self.entity.get_or_init(|| handle))
@@ -156,7 +156,7 @@ impl RemoteFilesystem {
 
     /// Forwards the call to the PHP instance. An exception it throws comes back as the ported
     /// class, so a caller catching `TransportException` catches it as it would under Composer.
-    fn call<R: FromPluginValue>(&self, method: &BStr, args: Vec<PluginValue>) -> anyhow::Result<R> {
+    fn call<R: FromRpcValue>(&self, method: &BStr, args: Vec<RpcValue>) -> anyhow::Result<R> {
         PhpCall::Method(self.entity()?, method).run(args)
     }
 
@@ -170,8 +170,8 @@ impl RemoteFilesystem {
         self.reflection_invoke(
             BStr::new("getOptionsForUrl"),
             vec![
-                PluginValue::string(origin_url.as_ref()),
-                additional_options.to_plugin_value(),
+                RpcValue::string(origin_url.as_ref()),
+                additional_options.to_rpc_value(),
             ],
         )
     }
@@ -179,7 +179,7 @@ impl RemoteFilesystem {
     /// For testing only. Sets the private `fileUrl` of the PHP instance, mirroring the
     /// `ReflectionProperty` access in `RemoteFilesystemTest::callGetOptionsForUrl`.
     pub fn __set_file_url(&self, file_url: impl AsRef<[u8]>) -> anyhow::Result<()> {
-        self.reflection_set_property(BStr::new("fileUrl"), PluginValue::string(file_url.as_ref()))
+        self.reflection_set_property(BStr::new("fileUrl"), RpcValue::string(file_url.as_ref()))
     }
 
     /// For testing only. Invokes the protected `callbackGet` of the PHP instance, mirroring the
@@ -193,18 +193,18 @@ impl RemoteFilesystem {
         bytes_transferred: i64,
         bytes_max: i64,
     ) -> anyhow::Result<()> {
-        self.reflection_invoke::<PluginValue>(
+        self.reflection_invoke::<RpcValue>(
             BStr::new("callbackGet"),
             vec![
-                PluginValue::Int(notification_code),
-                PluginValue::Int(severity),
+                RpcValue::Int(notification_code),
+                RpcValue::Int(severity),
                 match message {
-                    Some(message) => PluginValue::string(message),
-                    None => PluginValue::Null,
+                    Some(message) => RpcValue::string(message),
+                    None => RpcValue::Null,
                 },
-                PluginValue::Int(message_code),
-                PluginValue::Int(bytes_transferred),
-                PluginValue::Int(bytes_max),
+                RpcValue::Int(message_code),
+                RpcValue::Int(bytes_transferred),
+                RpcValue::Int(bytes_max),
             ],
         )?;
         Ok(())
@@ -217,12 +217,12 @@ impl RemoteFilesystem {
 
     /// For testing only. Sets the private `bytesMax` of the PHP instance.
     pub fn __set_bytes_max(&self, bytes_max: i64) -> anyhow::Result<()> {
-        self.reflection_set_property(BStr::new("bytesMax"), PluginValue::Int(bytes_max))
+        self.reflection_set_property(BStr::new("bytesMax"), RpcValue::Int(bytes_max))
     }
 
     /// For testing only. Sets the private `progress` of the PHP instance.
     pub fn __set_progress(&self, progress: bool) -> anyhow::Result<()> {
-        self.reflection_set_property(BStr::new("progress"), PluginValue::Bool(progress))
+        self.reflection_set_property(BStr::new("progress"), RpcValue::Bool(progress))
     }
 
     /// For testing only. Reads the private `lastProgress` of the PHP instance.
@@ -230,40 +230,43 @@ impl RemoteFilesystem {
         self.reflection_get_property(BStr::new("lastProgress"))
     }
 
-    fn reflection_invoke<R: FromPluginValue>(
+    fn reflection_invoke<R: FromRpcValue>(
         &self,
         method: &BStr,
-        args: Vec<PluginValue>,
+        args: Vec<RpcValue>,
     ) -> anyhow::Result<R> {
-        let entity = PluginValue::PhpHandle(self.entity()?.clone());
+        let entity = RpcValue::PhpEntityHandle(self.entity()?.clone());
         PhpCall::Function(BStr::new("__shirabe_reflection_invoke")).run(vec![
             entity,
-            PluginValue::string(method),
-            PluginValue::List(args),
+            RpcValue::string(method),
+            RpcValue::List(args),
         ])
     }
 
-    fn reflection_get_property<R: FromPluginValue>(&self, name: &BStr) -> anyhow::Result<R> {
-        let entity = PluginValue::PhpHandle(self.entity()?.clone());
+    fn reflection_get_property<R: FromRpcValue>(&self, name: &BStr) -> anyhow::Result<R> {
+        let entity = RpcValue::PhpEntityHandle(self.entity()?.clone());
         PhpCall::Function(BStr::new("__shirabe_reflection_get_property"))
-            .run(vec![entity, PluginValue::string(name)])
+            .run(vec![entity, RpcValue::string(name)])
     }
 
-    fn reflection_set_property(&self, name: &BStr, value: PluginValue) -> anyhow::Result<()> {
-        let entity = PluginValue::PhpHandle(self.entity()?.clone());
-        PhpCall::Function(BStr::new("__shirabe_reflection_set_property"))
-            .run::<PluginValue>(vec![entity, PluginValue::string(name), value])?;
+    fn reflection_set_property(&self, name: &BStr, value: RpcValue) -> anyhow::Result<()> {
+        let entity = RpcValue::PhpEntityHandle(self.entity()?.clone());
+        PhpCall::Function(BStr::new("__shirabe_reflection_set_property")).run::<RpcValue>(vec![
+            entity,
+            RpcValue::string(name),
+            value,
+        ])?;
         Ok(())
     }
 }
 
 /// `string|bool` as `get()` answers it: the content, or whether a copy succeeded.
-impl FromPluginValue for GetResult {
-    fn from_plugin_value(value: &PluginValue) -> Result<Self, PhpThrow> {
+impl FromRpcValue for GetResult {
+    fn from_rpc_value(value: &RpcValue) -> Result<Self, PhpThrow> {
         match value {
-            PluginValue::Bool(true) => Ok(GetResult::True),
-            PluginValue::Bool(false) => Ok(GetResult::False),
-            PluginValue::String(content) => Ok(GetResult::Content(content.to_vec())),
+            RpcValue::Bool(true) => Ok(GetResult::True),
+            RpcValue::Bool(false) => Ok(GetResult::False),
+            RpcValue::String(content) => Ok(GetResult::Content(content.to_vec())),
             other => Err(codec::unexpected("a string or a bool", other)),
         }
     }

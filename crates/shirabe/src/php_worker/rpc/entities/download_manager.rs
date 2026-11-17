@@ -11,7 +11,7 @@ use crate::php_worker::rpc::entity::{Call, Crossing, Entity};
 use crate::php_worker::rpc::{forwarding, table};
 use crate::util::HttpDownloader;
 use bstr::{BStr, BString};
-use shirabe_php_rpc::{PhpThrow, PluginValue, ToPluginValue};
+use shirabe_php_rpc::{PhpThrow, RpcValue, ToRpcValue};
 use shirabe_php_shim::{PhpMixed, bformat, path_from_bytes};
 
 impl Entity for std::rc::Rc<std::cell::RefCell<dyn DownloadManagerInterface>> {
@@ -38,7 +38,7 @@ fn promise(
     dm: &std::rc::Rc<std::cell::RefCell<dyn DownloadManagerInterface>>,
     call: &Call<'_>,
     future: std::pin::Pin<Box<dyn std::future::Future<Output = anyhow::Result<Option<PhpMixed>>>>>,
-) -> Result<PluginValue, PhpThrow> {
+) -> Result<RpcValue, PhpThrow> {
     // Under Composer the promise is a chain over the job the downloader started on the graph's
     // HttpDownloader, so that is the service whose `countActiveJobs()` keeps a wait going until
     // this job is done.
@@ -63,7 +63,7 @@ fn promise(
             started.set(true);
             future
                 .await
-                .map(|resolved| resolved.to_plugin_value())
+                .map(|resolved| resolved.to_rpc_value())
                 .map_err(failed)
         }),
     ))
@@ -77,17 +77,17 @@ impl forwarding::downloader::download_manager::Forwarding
 {
     type Handle = std::rc::Rc<std::cell::RefCell<dyn DownloadManagerInterface>>;
 
-    fn set_prefer_source(dm: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+    fn set_prefer_source(dm: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         dm.borrow().set_prefer_source(call.arg::<bool>(0)?);
-        Ok(PluginValue::Null)
+        Ok(RpcValue::Null)
     }
 
-    fn set_prefer_dist(dm: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+    fn set_prefer_dist(dm: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         dm.borrow().set_prefer_dist(call.arg::<bool>(0)?);
-        Ok(PluginValue::Null)
+        Ok(RpcValue::Null)
     }
 
-    fn download(dm: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+    fn download(dm: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         let (manager, package, path, prev) = (
             dm.clone(),
             call.arg::<PackageInterfaceHandle>(0)?,
@@ -101,7 +101,7 @@ impl forwarding::downloader::download_manager::Forwarding
         )
     }
 
-    fn prepare(dm: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+    fn prepare(dm: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         let (manager, r#type, package, path, prev) = (
             dm.clone(),
             call.arg::<BString>(0)?,
@@ -121,7 +121,7 @@ impl forwarding::downloader::download_manager::Forwarding
         )
     }
 
-    fn install(dm: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+    fn install(dm: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         let (manager, package, path) = (
             dm.clone(),
             call.arg::<PackageInterfaceHandle>(0)?,
@@ -134,7 +134,7 @@ impl forwarding::downloader::download_manager::Forwarding
         )
     }
 
-    fn update(dm: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+    fn update(dm: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         let (manager, initial, target, path) = (
             dm.clone(),
             call.arg::<PackageInterfaceHandle>(0)?,
@@ -148,7 +148,7 @@ impl forwarding::downloader::download_manager::Forwarding
         )
     }
 
-    fn remove(dm: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+    fn remove(dm: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         let (manager, package, path) = (
             dm.clone(),
             call.arg::<PackageInterfaceHandle>(0)?,
@@ -161,7 +161,7 @@ impl forwarding::downloader::download_manager::Forwarding
         )
     }
 
-    fn cleanup(dm: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+    fn cleanup(dm: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         let (manager, r#type, package, path, prev) = (
             dm.clone(),
             call.arg::<BString>(0)?,

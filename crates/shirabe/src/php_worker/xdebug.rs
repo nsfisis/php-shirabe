@@ -4,7 +4,7 @@
 //! this port. See `docs/dev/xdebug.md`.
 
 use bstr::{BStr, BString};
-use shirabe_php_rpc::{PluginValue, WorkerConfig, query};
+use shirabe_php_rpc::{RpcValue, WorkerConfig, query};
 use shirabe_php_shim::{empty, getenv, os_str_from_bytes, php_str};
 
 /// `XdebugHandler::$name.XdebugHandler::SUFFIX_ALLOW`, where the name is the uppercased prefix of
@@ -62,13 +62,13 @@ pub(crate) fn worker_config() -> WorkerConfig {
 /// when scanning is active. The worker runs on the ini files of the machine, so these are the
 /// user's own.
 pub fn get_all_ini_files() -> anyhow::Result<Vec<std::path::PathBuf>> {
-    query("__shirabe_get_all_ini_files", PluginValue::Null)
+    query("__shirabe_get_all_ini_files", RpcValue::Null)
 }
 
 /// `Composer\XdebugHandler\XdebugHandler::isXdebugActive()` as measured in the worker, which is
 /// the process Xdebug is loaded into.
 fn xdebug_active() -> anyhow::Result<bool> {
-    query("__shirabe_xdebug_active", PluginValue::Null)
+    query("__shirabe_xdebug_active", RpcValue::Null)
 }
 
 #[cfg(test)]
@@ -101,9 +101,9 @@ mod tests {
         let value = shirabe_php_rpc::__call_function_in_new_worker(
             &worker_config(),
             BStr::new("getenv"),
-            vec![PluginValue::string("XDEBUG_MODE")],
+            vec![RpcValue::string("XDEBUG_MODE")],
         )
         .expect("failed to ask the worker for its Xdebug mode");
-        assert_eq!(value, PluginValue::string("off"));
+        assert_eq!(value, RpcValue::string("off"));
     }
 }

@@ -14,7 +14,7 @@ use crate::plugin::{
 use crate::script::Event as ScriptEvent;
 use crate::util::StreamContextOptions;
 use bstr::BString;
-use shirabe_php_rpc::{PhpThrow, PluginValue, ToPluginValue};
+use shirabe_php_rpc::{PhpThrow, RpcValue, ToRpcValue};
 use shirabe_php_shim::{PhpMixed, bformat};
 
 impl Entity for std::rc::Rc<std::cell::RefCell<dyn EventInterface>> {
@@ -72,40 +72,40 @@ impl forwarding::event_dispatcher::event::Forwarding
 {
     type Handle = std::rc::Rc<std::cell::RefCell<dyn EventInterface>>;
 
-    fn get_name(event: &Self::Handle, _: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
-        Ok(PluginValue::string(event.borrow().get_name()))
+    fn get_name(event: &Self::Handle, _: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
+        Ok(RpcValue::string(event.borrow().get_name()))
     }
 
-    fn get_arguments(event: &Self::Handle, _: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
-        Ok(PluginValue::List(
+    fn get_arguments(event: &Self::Handle, _: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
+        Ok(RpcValue::List(
             event
                 .borrow()
                 .get_arguments()
                 .iter()
-                .map(|arg| PluginValue::string(arg.clone()))
+                .map(|arg| RpcValue::string(arg.clone()))
                 .collect(),
         ))
     }
 
-    fn get_flags(event: &Self::Handle, _: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
-        Ok(PhpMixed::Array(event.borrow().get_flags().to_php_array()).to_plugin_value())
+    fn get_flags(event: &Self::Handle, _: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
+        Ok(PhpMixed::Array(event.borrow().get_flags().to_php_array()).to_rpc_value())
     }
 
     fn is_propagation_stopped(
         event: &Self::Handle,
         _: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
-        Ok(PluginValue::Bool(event.borrow().is_propagation_stopped()))
+    ) -> Result<RpcValue, PhpThrow> {
+        Ok(RpcValue::Bool(event.borrow().is_propagation_stopped()))
     }
 
-    fn stop_propagation(event: &Self::Handle, _: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+    fn stop_propagation(event: &Self::Handle, _: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         event.borrow_mut().stop_propagation();
-        Ok(PluginValue::Null)
+        Ok(RpcValue::Null)
     }
 }
 
 /// The `$composer` of a script, package or installer event.
-fn composer_value(composer: Option<ComposerHandle>) -> Result<PluginValue, PhpThrow> {
+fn composer_value(composer: Option<ComposerHandle>) -> Result<RpcValue, PhpThrow> {
     let composer =
         composer.ok_or_else(|| PhpThrow::runtime("the Composer instance of this event is gone"))?;
     entity_value(&composer)
@@ -117,7 +117,7 @@ impl forwarding::script::event::Forwarding for forwarding::script::event::PhpCla
     fn get_composer(
         event: &std::rc::Rc<std::cell::RefCell<dyn EventInterface>>,
         _: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    ) -> Result<RpcValue, PhpThrow> {
         let composer = concrete::<ScriptEvent>(event).get_composer().upgrade();
         composer_value(composer)
     }
@@ -125,7 +125,7 @@ impl forwarding::script::event::Forwarding for forwarding::script::event::PhpCla
     fn get_io(
         event: &std::rc::Rc<std::cell::RefCell<dyn EventInterface>>,
         _: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    ) -> Result<RpcValue, PhpThrow> {
         let io = concrete::<ScriptEvent>(event).get_io();
         entity_value(&io)
     }
@@ -133,10 +133,8 @@ impl forwarding::script::event::Forwarding for forwarding::script::event::PhpCla
     fn is_dev_mode(
         event: &std::rc::Rc<std::cell::RefCell<dyn EventInterface>>,
         _: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
-        Ok(PluginValue::Bool(
-            concrete::<ScriptEvent>(event).is_dev_mode(),
-        ))
+    ) -> Result<RpcValue, PhpThrow> {
+        Ok(RpcValue::Bool(concrete::<ScriptEvent>(event).is_dev_mode()))
     }
 }
 
@@ -146,7 +144,7 @@ impl forwarding::installer::package_event::Forwarding
     fn get_composer(
         event: &std::rc::Rc<std::cell::RefCell<dyn EventInterface>>,
         _: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    ) -> Result<RpcValue, PhpThrow> {
         let composer = concrete::<PackageEvent>(event).get_composer().upgrade();
         composer_value(composer)
     }
@@ -154,7 +152,7 @@ impl forwarding::installer::package_event::Forwarding
     fn get_io(
         event: &std::rc::Rc<std::cell::RefCell<dyn EventInterface>>,
         _: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    ) -> Result<RpcValue, PhpThrow> {
         let io = concrete::<PackageEvent>(event).get_io();
         entity_value(&io)
     }
@@ -162,8 +160,8 @@ impl forwarding::installer::package_event::Forwarding
     fn is_dev_mode(
         event: &std::rc::Rc<std::cell::RefCell<dyn EventInterface>>,
         _: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
-        Ok(PluginValue::Bool(
+    ) -> Result<RpcValue, PhpThrow> {
+        Ok(RpcValue::Bool(
             concrete::<PackageEvent>(event).is_dev_mode(),
         ))
     }
@@ -171,7 +169,7 @@ impl forwarding::installer::package_event::Forwarding
     fn get_local_repo(
         event: &std::rc::Rc<std::cell::RefCell<dyn EventInterface>>,
         _: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    ) -> Result<RpcValue, PhpThrow> {
         let repository = concrete::<PackageEvent>(event)
             .get_local_repo()
             .as_repository_handle();
@@ -181,9 +179,9 @@ impl forwarding::installer::package_event::Forwarding
     fn get_operations(
         event: &std::rc::Rc<std::cell::RefCell<dyn EventInterface>>,
         _: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    ) -> Result<RpcValue, PhpThrow> {
         let operations = concrete::<PackageEvent>(event).get_operations().to_vec();
-        Ok(PluginValue::List(
+        Ok(RpcValue::List(
             operations
                 .iter()
                 .map(entity_value)
@@ -194,7 +192,7 @@ impl forwarding::installer::package_event::Forwarding
     fn get_operation(
         event: &std::rc::Rc<std::cell::RefCell<dyn EventInterface>>,
         _: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    ) -> Result<RpcValue, PhpThrow> {
         let operation = concrete::<PackageEvent>(event).get_operation().clone();
         entity_value(&operation)
     }
@@ -206,7 +204,7 @@ impl forwarding::installer::installer_event::Forwarding
     fn get_composer(
         event: &std::rc::Rc<std::cell::RefCell<dyn EventInterface>>,
         _: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    ) -> Result<RpcValue, PhpThrow> {
         let composer = concrete::<InstallerEvent>(event).get_composer().upgrade();
         composer_value(composer)
     }
@@ -214,7 +212,7 @@ impl forwarding::installer::installer_event::Forwarding
     fn get_io(
         event: &std::rc::Rc<std::cell::RefCell<dyn EventInterface>>,
         _: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    ) -> Result<RpcValue, PhpThrow> {
         let io = concrete::<InstallerEvent>(event).get_io();
         entity_value(&io)
     }
@@ -222,8 +220,8 @@ impl forwarding::installer::installer_event::Forwarding
     fn is_dev_mode(
         event: &std::rc::Rc<std::cell::RefCell<dyn EventInterface>>,
         _: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
-        Ok(PluginValue::Bool(
+    ) -> Result<RpcValue, PhpThrow> {
+        Ok(RpcValue::Bool(
             concrete::<InstallerEvent>(event).is_dev_mode(),
         ))
     }
@@ -231,8 +229,8 @@ impl forwarding::installer::installer_event::Forwarding
     fn is_executing_operations(
         event: &std::rc::Rc<std::cell::RefCell<dyn EventInterface>>,
         _: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
-        Ok(PluginValue::Bool(
+    ) -> Result<RpcValue, PhpThrow> {
+        Ok(RpcValue::Bool(
             concrete::<InstallerEvent>(event).is_executing_operations(),
         ))
     }
@@ -240,37 +238,37 @@ impl forwarding::installer::installer_event::Forwarding
     fn get_transaction(
         event: &std::rc::Rc<std::cell::RefCell<dyn EventInterface>>,
         _: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    ) -> Result<RpcValue, PhpThrow> {
         let transaction = concrete::<InstallerEvent>(event).get_transaction().cloned();
         match transaction {
             Some(transaction) => entity_value(&transaction),
-            None => Ok(PluginValue::Null),
+            None => Ok(RpcValue::Null),
         }
     }
 }
 
-// TODO(plugin): symfony/console lives in both worlds independently, and nothing hands the
+// TODO(plugin): symfony/console lives on both sides independently, and nothing hands the
 // Rust-side console input and output to the plugin process yet.
 impl forwarding::plugin::command_event::Forwarding for forwarding::plugin::command_event::PhpClass {
     fn get_input(
         _: &std::rc::Rc<std::cell::RefCell<dyn EventInterface>>,
         call: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    ) -> Result<RpcValue, PhpThrow> {
         Err(call.unavailable("the console input cannot cross the boundary"))
     }
 
     fn get_output(
         _: &std::rc::Rc<std::cell::RefCell<dyn EventInterface>>,
         call: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    ) -> Result<RpcValue, PhpThrow> {
         Err(call.unavailable("the console output cannot cross the boundary"))
     }
 
     fn get_command_name(
         event: &std::rc::Rc<std::cell::RefCell<dyn EventInterface>>,
         _: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
-        Ok(PluginValue::string(
+    ) -> Result<RpcValue, PhpThrow> {
+        Ok(RpcValue::string(
             concrete::<CommandEvent>(event).get_command_name(),
         ))
     }
@@ -279,20 +277,20 @@ impl forwarding::plugin::command_event::Forwarding for forwarding::plugin::comma
 impl forwarding::plugin::pre_command_run_event::Forwarding
     for forwarding::plugin::pre_command_run_event::PhpClass
 {
-    // TODO(plugin): symfony/console lives in both worlds independently, and nothing hands the
+    // TODO(plugin): symfony/console lives on both sides independently, and nothing hands the
     // Rust-side console input to the plugin process yet.
     fn get_input(
         _: &std::rc::Rc<std::cell::RefCell<dyn EventInterface>>,
         call: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    ) -> Result<RpcValue, PhpThrow> {
         Err(call.unavailable("the console input cannot cross the boundary"))
     }
 
     fn get_command(
         event: &std::rc::Rc<std::cell::RefCell<dyn EventInterface>>,
         _: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
-        Ok(PluginValue::string(
+    ) -> Result<RpcValue, PhpThrow> {
+        Ok(RpcValue::string(
             concrete::<PreCommandRunEvent>(event).get_command(),
         ))
     }
@@ -301,10 +299,10 @@ impl forwarding::plugin::pre_command_run_event::Forwarding
 /// The `$context` of a file download event as the PHP value the event stub returns.
 fn file_download_context_value(
     context: Option<&FileDownloadContext>,
-) -> Result<PluginValue, PhpThrow> {
+) -> Result<RpcValue, PhpThrow> {
     match context {
-        None => Ok(PluginValue::Null),
-        Some(FileDownloadContext::Package(package)) => Ok(package.clone().to_plugin_value()),
+        None => Ok(RpcValue::Null),
+        Some(FileDownloadContext::Package(package)) => Ok(package.clone().to_rpc_value()),
         // TODO(plugin): the array a repository passes names the repository itself, which cannot
         // cross the boundary yet.
         Some(FileDownloadContext::Repository) => Err(PhpThrow::runtime(
@@ -319,7 +317,7 @@ impl forwarding::plugin::pre_file_download_event::Forwarding
     fn get_http_downloader(
         event: &std::rc::Rc<std::cell::RefCell<dyn EventInterface>>,
         _: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    ) -> Result<RpcValue, PhpThrow> {
         let downloader = concrete::<PreFileDownloadEvent>(event)
             .get_http_downloader()
             .clone();
@@ -329,72 +327,72 @@ impl forwarding::plugin::pre_file_download_event::Forwarding
     fn get_processed_url(
         event: &std::rc::Rc<std::cell::RefCell<dyn EventInterface>>,
         _: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    ) -> Result<RpcValue, PhpThrow> {
         Ok(concrete::<PreFileDownloadEvent>(event)
             .get_processed_url()
-            .to_plugin_value())
+            .to_rpc_value())
     }
 
     fn set_processed_url(
         event: &std::rc::Rc<std::cell::RefCell<dyn EventInterface>>,
         call: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    ) -> Result<RpcValue, PhpThrow> {
         let url = call.arg::<BString>(0)?;
         concrete::<PreFileDownloadEvent>(event).set_processed_url(url);
-        Ok(PluginValue::Null)
+        Ok(RpcValue::Null)
     }
 
     fn get_custom_cache_key(
         event: &std::rc::Rc<std::cell::RefCell<dyn EventInterface>>,
         _: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    ) -> Result<RpcValue, PhpThrow> {
         Ok(concrete::<PreFileDownloadEvent>(event)
             .get_custom_cache_key()
-            .to_plugin_value())
+            .to_rpc_value())
     }
 
     fn set_custom_cache_key(
         event: &std::rc::Rc<std::cell::RefCell<dyn EventInterface>>,
         call: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    ) -> Result<RpcValue, PhpThrow> {
         let key = call.arg::<Option<BString>>(0)?;
         concrete::<PreFileDownloadEvent>(event).set_custom_cache_key(key);
-        Ok(PluginValue::Null)
+        Ok(RpcValue::Null)
     }
 
     fn get_type(
         event: &std::rc::Rc<std::cell::RefCell<dyn EventInterface>>,
         _: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    ) -> Result<RpcValue, PhpThrow> {
         Ok(concrete::<PreFileDownloadEvent>(event)
             .get_type()
-            .to_plugin_value())
+            .to_rpc_value())
     }
 
     fn get_context(
         event: &std::rc::Rc<std::cell::RefCell<dyn EventInterface>>,
         _: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    ) -> Result<RpcValue, PhpThrow> {
         file_download_context_value(concrete::<PreFileDownloadEvent>(event).get_context())
     }
 
     fn get_transport_options(
         event: &std::rc::Rc<std::cell::RefCell<dyn EventInterface>>,
         _: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    ) -> Result<RpcValue, PhpThrow> {
         Ok(concrete::<PreFileDownloadEvent>(event)
             .get_transport_options()
             .clone()
-            .to_plugin_value())
+            .to_rpc_value())
     }
 
     fn set_transport_options(
         event: &std::rc::Rc<std::cell::RefCell<dyn EventInterface>>,
         call: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    ) -> Result<RpcValue, PhpThrow> {
         let options = call.arg::<StreamContextOptions>(0)?;
         concrete::<PreFileDownloadEvent>(event).set_transport_options(options);
-        Ok(PluginValue::Null)
+        Ok(RpcValue::Null)
     }
 }
 
@@ -404,53 +402,53 @@ impl forwarding::plugin::post_file_download_event::Forwarding
     fn get_file_name(
         event: &std::rc::Rc<std::cell::RefCell<dyn EventInterface>>,
         _: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    ) -> Result<RpcValue, PhpThrow> {
         Ok(concrete::<PostFileDownloadEvent>(event)
             .get_file_name()
-            .to_plugin_value())
+            .to_rpc_value())
     }
 
     fn get_checksum(
         event: &std::rc::Rc<std::cell::RefCell<dyn EventInterface>>,
         _: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    ) -> Result<RpcValue, PhpThrow> {
         Ok(concrete::<PostFileDownloadEvent>(event)
             .get_checksum()
-            .to_plugin_value())
+            .to_rpc_value())
     }
 
     fn get_url(
         event: &std::rc::Rc<std::cell::RefCell<dyn EventInterface>>,
         _: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    ) -> Result<RpcValue, PhpThrow> {
         Ok(concrete::<PostFileDownloadEvent>(event)
             .get_url()
-            .to_plugin_value())
+            .to_rpc_value())
     }
 
     fn get_context(
         event: &std::rc::Rc<std::cell::RefCell<dyn EventInterface>>,
         _: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    ) -> Result<RpcValue, PhpThrow> {
         file_download_context_value(concrete::<PostFileDownloadEvent>(event).get_context())
     }
 
     fn get_package(
         event: &std::rc::Rc<std::cell::RefCell<dyn EventInterface>>,
         _: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    ) -> Result<RpcValue, PhpThrow> {
         Ok(concrete::<PostFileDownloadEvent>(event)
             .get_package()
-            .to_plugin_value())
+            .to_rpc_value())
     }
 
     fn get_type(
         event: &std::rc::Rc<std::cell::RefCell<dyn EventInterface>>,
         _: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    ) -> Result<RpcValue, PhpThrow> {
         Ok(concrete::<PostFileDownloadEvent>(event)
             .get_type()
-            .to_plugin_value())
+            .to_rpc_value())
     }
 }
 
@@ -460,11 +458,11 @@ impl forwarding::plugin::pre_pool_create_event::Forwarding
     fn get_repositories(
         event: &std::rc::Rc<std::cell::RefCell<dyn EventInterface>>,
         _: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    ) -> Result<RpcValue, PhpThrow> {
         let repositories = concrete::<PrePoolCreateEvent>(event)
             .get_repositories()
             .to_vec();
-        Ok(PluginValue::List(
+        Ok(RpcValue::List(
             repositories
                 .iter()
                 .map(entity_value)
@@ -477,85 +475,85 @@ impl forwarding::plugin::pre_pool_create_event::Forwarding
     fn get_request(
         _: &std::rc::Rc<std::cell::RefCell<dyn EventInterface>>,
         call: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    ) -> Result<RpcValue, PhpThrow> {
         Err(call.unavailable("the Request cannot cross the boundary"))
     }
 
     fn get_acceptable_stabilities(
         event: &std::rc::Rc<std::cell::RefCell<dyn EventInterface>>,
         _: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    ) -> Result<RpcValue, PhpThrow> {
         Ok(concrete::<PrePoolCreateEvent>(event)
             .get_acceptable_stabilities()
             .clone()
-            .to_plugin_value())
+            .to_rpc_value())
     }
 
     fn get_stability_flags(
         event: &std::rc::Rc<std::cell::RefCell<dyn EventInterface>>,
         _: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    ) -> Result<RpcValue, PhpThrow> {
         Ok(concrete::<PrePoolCreateEvent>(event)
             .get_stability_flags()
             .clone()
-            .to_plugin_value())
+            .to_rpc_value())
     }
 
     fn get_root_aliases(
         event: &std::rc::Rc<std::cell::RefCell<dyn EventInterface>>,
         _: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    ) -> Result<RpcValue, PhpThrow> {
         Ok(concrete::<PrePoolCreateEvent>(event)
             .get_root_aliases()
             .clone()
-            .to_plugin_value())
+            .to_rpc_value())
     }
 
     fn get_root_references(
         event: &std::rc::Rc<std::cell::RefCell<dyn EventInterface>>,
         _: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    ) -> Result<RpcValue, PhpThrow> {
         Ok(concrete::<PrePoolCreateEvent>(event)
             .get_root_references()
             .clone()
-            .to_plugin_value())
+            .to_rpc_value())
     }
 
     fn get_packages(
         event: &std::rc::Rc<std::cell::RefCell<dyn EventInterface>>,
         _: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    ) -> Result<RpcValue, PhpThrow> {
         Ok(concrete::<PrePoolCreateEvent>(event)
             .get_packages()
             .clone()
-            .to_plugin_value())
+            .to_rpc_value())
     }
 
     fn get_unacceptable_fixed_packages(
         event: &std::rc::Rc<std::cell::RefCell<dyn EventInterface>>,
         _: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    ) -> Result<RpcValue, PhpThrow> {
         Ok(concrete::<PrePoolCreateEvent>(event)
             .get_unacceptable_fixed_packages()
             .clone()
-            .to_plugin_value())
+            .to_rpc_value())
     }
 
     fn set_packages(
         event: &std::rc::Rc<std::cell::RefCell<dyn EventInterface>>,
         call: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    ) -> Result<RpcValue, PhpThrow> {
         let packages = call.arg::<Vec<PackageInterfaceHandle>>(0)?;
         concrete::<PrePoolCreateEvent>(event).set_packages(packages);
-        Ok(PluginValue::Null)
+        Ok(RpcValue::Null)
     }
 
     fn set_unacceptable_fixed_packages(
         event: &std::rc::Rc<std::cell::RefCell<dyn EventInterface>>,
         call: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    ) -> Result<RpcValue, PhpThrow> {
         let packages = call.arg::<Vec<PackageInterfaceHandle>>(0)?;
         concrete::<PrePoolCreateEvent>(event).set_unacceptable_fixed_packages(packages);
-        Ok(PluginValue::Null)
+        Ok(RpcValue::Null)
     }
 }

@@ -1,11 +1,11 @@
 <?php
 
 // Shirabe's own definition of Composer\Plugin\PreCommandRunEvent for the plugin worker, dual-mode
-// like its parent Composer\EventDispatcher\Event: an instance revived from a Rust handle (the
-// event a built-in command dispatches on the Rust side) forwards every call over RPC, while an
-// instance constructed natively — real Composer code in this process does
-// `new PreCommandRunEvent(...)` in BaseCommand::initialize() — is a faithful in-process port of
-// the real class.
+// like its parent Composer\EventDispatcher\Event: an instance revived from a Rust entity handle
+// (the event a built-in command dispatches on the Rust side) forwards every call over RPC, while an
+// instance constructed natively — real Composer code in this process does `new
+// PreCommandRunEvent(...)` in BaseCommand::initialize() — is a faithful in-process port of the real
+// class.
 
 namespace Composer\Plugin;
 
@@ -33,8 +33,8 @@ class PreCommandRunEvent extends Event
 
     public function getInput(): InputInterface
     {
-        if ($this->__rhandle !== null) {
-            return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getInput', []);
+        if ($this->__entityId !== null) {
+            return \Shirabe\RpcRuntime::callRust($this->__entityId, 'getInput', []);
         }
 
         return $this->input;
@@ -42,8 +42,8 @@ class PreCommandRunEvent extends Event
 
     public function getCommand(): string
     {
-        if ($this->__rhandle !== null) {
-            return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getCommand', []);
+        if ($this->__entityId !== null) {
+            return \Shirabe\RpcRuntime::callRust($this->__entityId, 'getCommand', []);
         }
 
         return $this->command;

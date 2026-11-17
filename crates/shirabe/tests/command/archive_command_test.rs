@@ -115,7 +115,7 @@ mod mock_event_dispatcher {
                 &mut self,
                 subscriber: &'a dyn shirabe::event_dispatcher::EventSubscriberInterface,
             ) -> anyhow::Result<()>;
-            fn remove_listener<'a>(&mut self, listener: &'a shirabe_php_rpc::PhpObjHandle);
+            fn remove_listener<'a>(&mut self, listener: &'a shirabe_php_rpc::PhpEntityHandle);
             fn has_event_listeners(&mut self, event: &dyn EventInterface) -> bool;
         }
     }

@@ -1,5 +1,5 @@
-//! The RPC side of the job registry (`docs/dev/plugin-async.md`): ticking the jobs an entity counts
-//! against, and promises answered without a job.
+//! The RPC side of the promise registry (`docs/dev/plugin-async.md`): ticking the jobs an entity
+//! counts against, and promises answered without a job.
 
 use crate::php_worker::call::PhpCall;
 use crate::php_worker::job;
@@ -7,7 +7,7 @@ use crate::php_worker::job::JobOwner;
 use crate::php_worker::rpc::args::arg;
 use crate::util::sync_executor::block_on;
 use bstr::{BStr, ByteSlice as _};
-use shirabe_php_rpc::{PhpThrow, PluginValue};
+use shirabe_php_rpc::{PhpThrow, RpcValue};
 use shirabe_php_shim::{bformat, error_chain_message};
 
 /// Polls a job future that was just built, the one time a job is advanced outside a tick.
@@ -29,31 +29,31 @@ pub(crate) const PROCESS_EXECUTOR_TICK_CAP: std::time::Duration =
     std::time::Duration::from_millis(1);
 
 /// Serves `wait(?int $index)` and `countActiveJobs(?int $index)` of the two services, whose
-/// `$index` is a job id.
+/// `$index` is a job id: the id of the Rust-owned promise the job backs.
 pub(crate) fn dispatch_tick_method(
     owner: JobOwner,
     cap: std::time::Duration,
     method_name: &BStr,
-    args: &[PluginValue],
-) -> Result<PluginValue, PhpThrow> {
+    args: &[RpcValue],
+) -> Result<RpcValue, PhpThrow> {
     let index = match args.first() {
-        None | Some(PluginValue::Null) => None,
+        None | Some(RpcValue::Null) => None,
         _ => Some(arg::<i64>(method_name, args, 0)? as u64),
     };
     match method_name.as_bytes() {
-        b"countActiveJobs" => Ok(PluginValue::Int(job::tick(owner, cap, index)?)),
+        b"countActiveJobs" => Ok(RpcValue::Int(job::tick(owner, cap, index)?)),
         b"wait" => {
             while job::tick(owner, cap, index)? != 0 {}
-            Ok(PluginValue::Null)
+            Ok(RpcValue::Null)
         }
         _ => unreachable!(),
     }
 }
 
 /// A `\React\Promise\PromiseInterface` already fulfilled with `value`, built in the worker so
-/// PHP callers get the object type their signatures declare. The answer is the descriptor the
+/// PHP callers get the object type their signatures declare. The answer is the promise handle the
 /// worker exchanges for that promise, to be passed on as the answer of the call being served.
-pub(crate) fn resolved_promise(value: PluginValue) -> Result<PluginValue, PhpThrow> {
+pub(crate) fn resolved_promise(value: RpcValue) -> Result<RpcValue, PhpThrow> {
     match PhpCall::Function(BStr::new("__shirabe_resolved_promise")).try_run(vec![value]) {
         Ok(Ok(promise)) => Ok(promise),
         Ok(Err(throw)) => Err(throw),
@@ -67,9 +67,9 @@ pub(crate) fn resolved_promise(value: PluginValue) -> Result<PluginValue, PhpThr
 /// A `\React\Promise\PromiseInterface` already rejected with the exception `throw` describes,
 /// built in the worker. A failed request reaches the plugin as a rejection it handles, the way it
 /// does under Composer, rather than as a throw out of the call that started it.
-pub(crate) fn rejected_promise(throw: PhpThrow) -> Result<PluginValue, PhpThrow> {
+pub(crate) fn rejected_promise(throw: PhpThrow) -> Result<RpcValue, PhpThrow> {
     match PhpCall::Function(BStr::new("__shirabe_rejected_promise"))
-        .try_run(vec![throw.to_plugin_value()])
+        .try_run(vec![throw.to_rpc_value()])
     {
         Ok(Ok(promise)) => Ok(promise),
         Ok(Err(throw)) => Err(throw),

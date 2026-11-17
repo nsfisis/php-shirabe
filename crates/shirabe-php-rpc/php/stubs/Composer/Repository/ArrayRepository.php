@@ -10,25 +10,25 @@ use Composer\Package\PackageInterface;
 class ArrayRepository implements RepositoryInterface, \Shirabe\RustStub
 {
     /** @var int */
-    protected $__rhandle;
+    protected $__entityId;
 
     /**
      * Binds a stub the registry built for an existing entity. Proxy instantiation bypasses
      * the constructor, which belongs to plugin code building a new entity instead.
      */
-    public function __shirabeBind(int $rhandle): void
+    public function __shirabeBind(int $entityId): void
     {
-        $this->__rhandle = $rhandle;
+        $this->__entityId = $entityId;
     }
 
     public function __destruct()
     {
-        \Shirabe\RustObjectRegistry::release($this->__rhandle);
+        \Shirabe\RustStubRegistry::release($this->__entityId);
     }
 
-    public function __shirabeRustHandleDescriptor(): \Shirabe\Wire\RustHandle
+    public function __shirabeRustEntityHandle(): \Shirabe\Rpc\RustEntityHandle
     {
-        return new \Shirabe\Wire\RustHandle($this->__rhandle, static::class);
+        return new \Shirabe\Rpc\RustEntityHandle($this->__entityId, static::class);
     }
 
     public function __clone()
@@ -37,88 +37,88 @@ class ArrayRepository implements RepositoryInterface, \Shirabe\RustStub
         // entity and release it twice. The Rust side clones the entity instead, applying
         // whatever __clone semantics the real class defines, and this copy rebinds to the
         // fresh handle. Entities without clone semantics answer with an explicit error.
-        $this->__rhandle = \Shirabe\RpcRuntime::callRust($this->__rhandle, '__shirabe_clone', []);
-        \Shirabe\RustObjectRegistry::adopt($this->__rhandle, $this);
+        $this->__entityId = \Shirabe\RpcRuntime::callRust($this->__entityId, '__shirabe_clone', []);
+        \Shirabe\RustStubRegistry::adopt($this->__entityId, $this);
     }
 
     public function __get($name)
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, '__get', [$name]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, '__get', [$name]);
     }
 
     public function __set($name, $value): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, '__set', [$name, $value]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, '__set', [$name, $value]);
     }
 
     public function __isset($name): bool
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, '__isset', [$name]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, '__isset', [$name]);
     }
 
     public function __unset($name): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, '__unset', [$name]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, '__unset', [$name]);
     }
 
     public function __construct(array $packages = [])
     {
-        $this->__rhandle = \Shirabe\RpcRuntime::newRust(static::class, [$packages]);
-        \Shirabe\RustObjectRegistry::adopt($this->__rhandle, $this);
+        $this->__entityId = \Shirabe\RpcRuntime::newRust(static::class, [$packages]);
+        \Shirabe\RustStubRegistry::adopt($this->__entityId, $this);
     }
 
     public function hasPackage(PackageInterface $package)
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'hasPackage', [$package]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'hasPackage', [$package]);
     }
 
     public function findPackage(string $name, $constraint)
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'findPackage', [$name, $constraint]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'findPackage', [$name, $constraint]);
     }
 
     public function findPackages(string $name, $constraint = null)
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'findPackages', [$name, $constraint]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'findPackages', [$name, $constraint]);
     }
 
     public function getPackages()
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getPackages', []);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'getPackages', []);
     }
 
     public function loadPackages(array $packageNameMap, array $acceptableStabilities, array $stabilityFlags, array $alreadyLoaded = [])
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'loadPackages', [$packageNameMap, $acceptableStabilities, $stabilityFlags, $alreadyLoaded]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'loadPackages', [$packageNameMap, $acceptableStabilities, $stabilityFlags, $alreadyLoaded]);
     }
 
     public function search(string $query, int $mode = 0, ?string $type = null)
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'search', [$query, $mode, $type]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'search', [$query, $mode, $type]);
     }
 
     public function getProviders(string $packageName)
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getProviders', [$packageName]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'getProviders', [$packageName]);
     }
 
     public function getRepoName()
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getRepoName', []);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'getRepoName', []);
     }
 
     public function addPackage(PackageInterface $package)
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'addPackage', [$package]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'addPackage', [$package]);
     }
 
     public function removePackage(PackageInterface $package)
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'removePackage', [$package]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'removePackage', [$package]);
     }
 
     public function count(): int
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'count', []);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'count', []);
     }
 }

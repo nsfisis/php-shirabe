@@ -14,25 +14,25 @@ use Composer\IO\IOInterface;
 class Locker implements \Shirabe\RustStub
 {
     /** @var int */
-    protected $__rhandle;
+    protected $__entityId;
 
     /**
      * Binds a stub the registry built for an existing entity. Proxy instantiation bypasses
      * the constructor, which belongs to plugin code building a new entity instead.
      */
-    public function __shirabeBind(int $rhandle): void
+    public function __shirabeBind(int $entityId): void
     {
-        $this->__rhandle = $rhandle;
+        $this->__entityId = $entityId;
     }
 
     public function __destruct()
     {
-        \Shirabe\RustObjectRegistry::release($this->__rhandle);
+        \Shirabe\RustStubRegistry::release($this->__entityId);
     }
 
-    public function __shirabeRustHandleDescriptor(): \Shirabe\Wire\RustHandle
+    public function __shirabeRustEntityHandle(): \Shirabe\Rpc\RustEntityHandle
     {
-        return new \Shirabe\Wire\RustHandle($this->__rhandle, static::class);
+        return new \Shirabe\Rpc\RustEntityHandle($this->__entityId, static::class);
     }
 
     public function __clone()
@@ -41,34 +41,34 @@ class Locker implements \Shirabe\RustStub
         // entity and release it twice. The Rust side clones the entity instead, applying
         // whatever __clone semantics the real class defines, and this copy rebinds to the
         // fresh handle. Entities without clone semantics answer with an explicit error.
-        $this->__rhandle = \Shirabe\RpcRuntime::callRust($this->__rhandle, '__shirabe_clone', []);
-        \Shirabe\RustObjectRegistry::adopt($this->__rhandle, $this);
+        $this->__entityId = \Shirabe\RpcRuntime::callRust($this->__entityId, '__shirabe_clone', []);
+        \Shirabe\RustStubRegistry::adopt($this->__entityId, $this);
     }
 
     public function __get($name)
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, '__get', [$name]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, '__get', [$name]);
     }
 
     public function __set($name, $value): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, '__set', [$name, $value]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, '__set', [$name, $value]);
     }
 
     public function __isset($name): bool
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, '__isset', [$name]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, '__isset', [$name]);
     }
 
     public function __unset($name): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, '__unset', [$name]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, '__unset', [$name]);
     }
 
     public function __construct(IOInterface $io, JsonFile $lockFile, InstallationManager $installationManager, string $composerFileContents, ?ProcessExecutor $process = null)
     {
-        $this->__rhandle = \Shirabe\RpcRuntime::newRust(static::class, [$io, $lockFile, $installationManager, $composerFileContents, $process]);
-        \Shirabe\RustObjectRegistry::adopt($this->__rhandle, $this);
+        $this->__entityId = \Shirabe\RpcRuntime::newRust(static::class, [$io, $lockFile, $installationManager, $composerFileContents, $process]);
+        \Shirabe\RustStubRegistry::adopt($this->__entityId, $this);
     }
 
     // Forwarded rather than materialized: it references Composer\Json\JsonFile, which a guard shadows in the worker.
@@ -79,86 +79,86 @@ class Locker implements \Shirabe\RustStub
 
     public function getJsonFile(): JsonFile
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getJsonFile', []);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'getJsonFile', []);
     }
 
     public function isLocked(): bool
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'isLocked', []);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'isLocked', []);
     }
 
     public function isFresh(): bool
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'isFresh', []);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'isFresh', []);
     }
 
     public function getLockedRepository(bool $withDevReqs = false): LockArrayRepository
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getLockedRepository', [$withDevReqs]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'getLockedRepository', [$withDevReqs]);
     }
 
     public function getDevPackageNames(): array
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getDevPackageNames', []);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'getDevPackageNames', []);
     }
 
     public function getPlatformRequirements(bool $withDevReqs = false): array
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getPlatformRequirements', [$withDevReqs]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'getPlatformRequirements', [$withDevReqs]);
     }
 
     public function getMinimumStability(): string
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getMinimumStability', []);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'getMinimumStability', []);
     }
 
     public function getStabilityFlags(): array
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getStabilityFlags', []);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'getStabilityFlags', []);
     }
 
     public function getPreferStable(): ?bool
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getPreferStable', []);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'getPreferStable', []);
     }
 
     public function getPreferLowest(): ?bool
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getPreferLowest', []);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'getPreferLowest', []);
     }
 
     public function getPlatformOverrides(): array
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getPlatformOverrides', []);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'getPlatformOverrides', []);
     }
 
     public function getAliases(): array
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getAliases', []);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'getAliases', []);
     }
 
     public function getPluginApi()
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getPluginApi', []);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'getPluginApi', []);
     }
 
     public function getLockData(): array
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getLockData', []);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'getLockData', []);
     }
 
     public function setLockData(array $packages, ?array $devPackages, array $platformReqs, array $platformDevReqs, array $aliases, string $minimumStability, array $stabilityFlags, bool $preferStable, bool $preferLowest, array $platformOverrides, bool $write = true): bool
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setLockData', [$packages, $devPackages, $platformReqs, $platformDevReqs, $aliases, $minimumStability, $stabilityFlags, $preferStable, $preferLowest, $platformOverrides, $write]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'setLockData', [$packages, $devPackages, $platformReqs, $platformDevReqs, $aliases, $minimumStability, $stabilityFlags, $preferStable, $preferLowest, $platformOverrides, $write]);
     }
 
     public function updateHash(JsonFile $composerJson, ?callable $dataProcessor = null): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'updateHash', [$composerJson, $dataProcessor]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, 'updateHash', [$composerJson, $dataProcessor]);
     }
 
     public function getMissingRequirementInfo(RootPackageInterface $package, bool $includeDev): array
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getMissingRequirementInfo', [$package, $includeDev]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'getMissingRequirementInfo', [$package, $includeDev]);
     }
 }

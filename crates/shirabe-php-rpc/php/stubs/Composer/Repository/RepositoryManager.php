@@ -15,25 +15,25 @@ use Composer\Util\ProcessExecutor;
 class RepositoryManager implements \Shirabe\RustStub
 {
     /** @var int */
-    protected $__rhandle;
+    protected $__entityId;
 
     /**
      * Binds a stub the registry built for an existing entity. Proxy instantiation bypasses
      * the constructor, which belongs to plugin code building a new entity instead.
      */
-    public function __shirabeBind(int $rhandle): void
+    public function __shirabeBind(int $entityId): void
     {
-        $this->__rhandle = $rhandle;
+        $this->__entityId = $entityId;
     }
 
     public function __destruct()
     {
-        \Shirabe\RustObjectRegistry::release($this->__rhandle);
+        \Shirabe\RustStubRegistry::release($this->__entityId);
     }
 
-    public function __shirabeRustHandleDescriptor(): \Shirabe\Wire\RustHandle
+    public function __shirabeRustEntityHandle(): \Shirabe\Rpc\RustEntityHandle
     {
-        return new \Shirabe\Wire\RustHandle($this->__rhandle, static::class);
+        return new \Shirabe\Rpc\RustEntityHandle($this->__entityId, static::class);
     }
 
     public function __clone()
@@ -42,78 +42,78 @@ class RepositoryManager implements \Shirabe\RustStub
         // entity and release it twice. The Rust side clones the entity instead, applying
         // whatever __clone semantics the real class defines, and this copy rebinds to the
         // fresh handle. Entities without clone semantics answer with an explicit error.
-        $this->__rhandle = \Shirabe\RpcRuntime::callRust($this->__rhandle, '__shirabe_clone', []);
-        \Shirabe\RustObjectRegistry::adopt($this->__rhandle, $this);
+        $this->__entityId = \Shirabe\RpcRuntime::callRust($this->__entityId, '__shirabe_clone', []);
+        \Shirabe\RustStubRegistry::adopt($this->__entityId, $this);
     }
 
     public function __get($name)
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, '__get', [$name]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, '__get', [$name]);
     }
 
     public function __set($name, $value): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, '__set', [$name, $value]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, '__set', [$name, $value]);
     }
 
     public function __isset($name): bool
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, '__isset', [$name]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, '__isset', [$name]);
     }
 
     public function __unset($name): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, '__unset', [$name]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, '__unset', [$name]);
     }
 
     public function __construct(IOInterface $io, Config $config, HttpDownloader $httpDownloader, ?EventDispatcher $eventDispatcher = null, ?ProcessExecutor $process = null)
     {
-        $this->__rhandle = \Shirabe\RpcRuntime::newRust(static::class, [$io, $config, $httpDownloader, $eventDispatcher, $process]);
-        \Shirabe\RustObjectRegistry::adopt($this->__rhandle, $this);
+        $this->__entityId = \Shirabe\RpcRuntime::newRust(static::class, [$io, $config, $httpDownloader, $eventDispatcher, $process]);
+        \Shirabe\RustStubRegistry::adopt($this->__entityId, $this);
     }
 
     public function findPackage(string $name, $constraint): ?PackageInterface
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'findPackage', [$name, $constraint]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'findPackage', [$name, $constraint]);
     }
 
     public function findPackages(string $name, $constraint): array
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'findPackages', [$name, $constraint]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'findPackages', [$name, $constraint]);
     }
 
     public function addRepository(RepositoryInterface $repository): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'addRepository', [$repository]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, 'addRepository', [$repository]);
     }
 
     public function prependRepository(RepositoryInterface $repository): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'prependRepository', [$repository]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, 'prependRepository', [$repository]);
     }
 
     public function createRepository(string $type, array $config, ?string $name = null): RepositoryInterface
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'createRepository', [$type, $config, $name]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'createRepository', [$type, $config, $name]);
     }
 
     public function setRepositoryClass(string $type, $class): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setRepositoryClass', [$type, $class]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, 'setRepositoryClass', [$type, $class]);
     }
 
     public function getRepositories(): array
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getRepositories', []);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'getRepositories', []);
     }
 
     public function setLocalRepository(InstalledRepositoryInterface $repository): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setLocalRepository', [$repository]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, 'setLocalRepository', [$repository]);
     }
 
     public function getLocalRepository(): InstalledRepositoryInterface
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getLocalRepository', []);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'getLocalRepository', []);
     }
 }

@@ -1,5 +1,5 @@
 //! Rust adapters for entities living in the PHP child process: a plugin, an installer, a
-//! capability, a command, a `RemoteFilesystem`. Each holds the entity's P-table handle and
+//! capability, a command, a `RemoteFilesystem`. Each holds the entity's PHP entity handle and
 //! forwards the Rust trait or methods it implements over RPC.
 
 mod capability;

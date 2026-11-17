@@ -6,7 +6,7 @@
 
 use bstr::BStr;
 use shirabe::php_worker::call::PhpCall;
-use shirabe_php_rpc::PluginValue;
+use shirabe_php_rpc::RpcValue;
 
 /// All tests in one binary share the single PHP worker, whose loaded-class table and class statics
 /// persist across tests just like PHPUnit's single-process runs. Interleaving two tests would let
@@ -33,12 +33,12 @@ pub fn load_composer_php_runtime() {
 pub fn php_call_static(
     class: impl AsRef<[u8]>,
     method: impl AsRef<[u8]>,
-    args: Vec<PluginValue>,
-) -> PluginValue {
+    args: Vec<RpcValue>,
+) -> RpcValue {
     let class = BStr::new(class.as_ref());
     let method = BStr::new(method.as_ref());
     PhpCall::StaticMethod(class, method)
-        .try_run::<PluginValue>(args)
+        .try_run::<RpcValue>(args)
         .unwrap_or_else(|error| {
             panic!(
                 "{}::{} request failed: {error}",
@@ -56,9 +56,9 @@ pub fn php_call_static(
 }
 
 /// Runs a PHP snippet in the worker and returns its `return` value.
-pub fn php_eval(code: impl AsRef<[u8]>) -> PluginValue {
+pub fn php_eval(code: impl AsRef<[u8]>) -> RpcValue {
     PhpCall::Function(BStr::new("__shirabe_eval"))
-        .try_run(vec![PluginValue::string(code.as_ref())])
+        .try_run(vec![RpcValue::string(code.as_ref())])
         .expect("eval request failed")
         .expect("eval threw")
 }

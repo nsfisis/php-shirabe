@@ -94,7 +94,7 @@ final class ReachabilityClosure
     {
         // Two-world classes do not extend the shared boundary: the child
         // process carries their real implementation wholesale, so their
-        // members are world-2-local, not graph seams.
+        // members are local to the PHP side, not graph seams.
         if ($this->lists->isTwoWorld($fqcn)) {
             return;
         }

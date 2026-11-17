@@ -7,7 +7,7 @@ use crate::php_worker::lock_php_worker;
 use bstr::{BStr, ByteSlice as _};
 use shirabe::console::Application;
 use shirabe::php_worker::call::PhpCall;
-use shirabe_php_rpc::PluginValue;
+use shirabe_php_rpc::RpcValue;
 use shirabe_php_shim::path_to_bytes;
 use shirabe_symfony_console::output::{BufferedOutput, VERBOSITY_VERBOSE};
 
@@ -36,7 +36,7 @@ fn anonymous_class_names_in_a_message_are_rendered_by_their_parent() {
     let thrower = dir.path().join("thrower.php");
     std::fs::write(&thrower, THROWER).unwrap();
     let error = PhpCall::Function(BStr::new("__shirabe_require"))
-        .run::<PluginValue>(vec![PluginValue::string(path_to_bytes(&thrower))])
+        .run::<RpcValue>(vec![RpcValue::string(path_to_bytes(&thrower))])
         .expect_err("the required file throws");
 
     let application = Application::new("Shirabe".into(), "".into());
@@ -79,7 +79,7 @@ fn an_anonymous_exception_class_is_titled_by_its_debug_type() {
     let thrower = dir.path().join("anonymous-thrower.php");
     std::fs::write(&thrower, ANONYMOUS_THROWER).unwrap();
     let error = PhpCall::Function(BStr::new("__shirabe_require"))
-        .run::<PluginValue>(vec![PluginValue::string(path_to_bytes(&thrower))])
+        .run::<RpcValue>(vec![RpcValue::string(path_to_bytes(&thrower))])
         .expect_err("the required file throws");
 
     let application = Application::new("Shirabe".into(), "".into());

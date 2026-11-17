@@ -4,10 +4,10 @@ use crate::php_worker::rpc::entity::{Call, Crossing, Entity};
 use crate::php_worker::rpc::forwarding;
 use bstr::BString;
 use indexmap::IndexMap;
-use shirabe_php_rpc::{PhpThrow, PluginValue, ToPluginValue};
+use shirabe_php_rpc::{PhpThrow, RpcValue, ToRpcValue};
 use shirabe_php_shim::PhpMixed;
 
-shirabe_php_rpc::plugin_value_record! {
+shirabe_php_rpc::rpc_value_record! {
     /// Everything `Shirabe\RustProcessStub` answers about the terminated process behind it.
     #[derive(Debug)]
     struct ProcessFacts {
@@ -47,10 +47,7 @@ impl forwarding::shirabe::rust_process_stub::Forwarding
 
     /// Everything the stub answers about the terminated process behind it, read in one round
     /// trip.
-    fn __shirabe_facts(
-        process: &Self::Handle,
-        call: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    fn __shirabe_facts(process: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         let failed = call.failed();
         let mut process = process.borrow_mut();
         Ok(ProcessFacts {
@@ -68,6 +65,6 @@ impl forwarding::shirabe::rust_process_stub::Forwarding
             timeout: process.get_timeout(),
             start_time: process.get_start_time().map_err(&failed)?,
         }
-        .to_plugin_value())
+        .to_rpc_value())
     }
 }

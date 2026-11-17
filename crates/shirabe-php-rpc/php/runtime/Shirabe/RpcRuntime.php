@@ -36,15 +36,15 @@ final class RpcRuntime
      * Serves `Composer::getLoop()`: the Loop is a two-world class, so the one a plugin gets is
      * built here over the proxies of the two services the Rust-side Loop drives.
      */
-    public static function loopFor(object $composer, int $rhandle): \Composer\Util\Loop
+    public static function loopFor(object $composer, int $entityId): \Composer\Util\Loop
     {
-        if (!isset(self::$loops[$rhandle])) {
-            [$httpDownloader, $processExecutor] = self::callRust($rhandle, '__shirabe_loop_services', []);
+        if (!isset(self::$loops[$entityId])) {
+            [$httpDownloader, $processExecutor] = self::callRust($entityId, '__shirabe_loop_services', []);
             $loop = new \Composer\Util\Loop($httpDownloader, $processExecutor);
             $loop->__shirabeBindToExecution();
-            self::$loops[$rhandle] = [$composer, $loop];
+            self::$loops[$entityId] = [$composer, $loop];
         }
-        return self::$loops[$rhandle][1];
+        return self::$loops[$entityId][1];
     }
 
     public static function fail(string $message): void
@@ -98,93 +98,93 @@ final class RpcRuntime
         }
     }
 
-    public static function notifyReleaseHandle(int $rhandle): void
+    public static function notifyReleaseHandle(int $entityId): void
     {
         if (self::$shuttingDown) {
             // Destructors run after the socket may already be closed at shutdown; the whole
             // process is going away, so there is nothing left to release remotely.
             return;
         }
-        self::writeFrame(self::TAG_RELEASE_HANDLE, 0, serialize([$rhandle]));
+        self::writeFrame(self::TAG_RELEASE_HANDLE, 0, serialize([$entityId]));
     }
 
     /**
      * Converts a value about to be serialized onto the wire: a proxy stub, a promise and any
-     * other object without a materialized value become descriptors; scalars and arrays pass
-     * through. Every object crosses as a descriptor or a materialized value, so a descriptor
-     * record on the wire never stands for an object of plugin code, even one of a descriptor
-     * class.
+     * other object that is not a by-value object become handles; scalars and arrays pass through.
+     * Every object crosses as a handle or a by-value object, so a handle record on the wire never
+     * stands for an object of plugin code, even one of a handle class.
      */
-    public static function toPluginValue($value)
+    public static function toRpcValue($value)
     {
         if ($value instanceof RustStub) {
-            $descriptor = $value->__shirabeRustHandleDescriptor();
-            if ($descriptor !== null) {
-                return $descriptor;
+            $handle = $value->__shirabeRustEntityHandle();
+            if ($handle !== null) {
+                return $handle;
             }
-            // A natively-constructed dual-mode instance falls through to the P table below.
+            // A natively-constructed dual-mode instance falls through to the PHP entity table
+            // below.
         }
         if ($value instanceof \React\Promise\PromiseInterface) {
-            return JobRegistry::descriptor($value);
+            return PromiseRegistry::handle($value);
         }
         if (is_object($value)) {
-            // A materialized value needs no descriptor: it crosses as the object record
+            // A by-value object needs no handle: it crosses as the object record
             // serialize() writes for it, which the Rust side decodes into its own value.
-            $materialized = MaterializedValue::forWire($value);
-            if ($materialized !== null) {
-                return $materialized;
+            $byValue = ByValueObject::forWire($value);
+            if ($byValue !== null) {
+                return $byValue;
             }
-            return PhpObjectRegistry::descriptor($value);
+            return PhpEntityTable::handle($value);
         }
         if (is_resource($value)) {
             throw new \RuntimeException('a PHP resource cannot cross the RPC boundary');
         }
         if (is_array($value)) {
-            return array_map([self::class, 'toPluginValue'], $value);
+            return array_map([self::class, 'toRpcValue'], $value);
         }
         return $value;
     }
 
     /**
-     * Converts a decoded plugin value: descriptors become live objects. A materialized value
+     * Converts a decoded RPC value: handles become live objects. A by-value object
      * arrives as a real instance already, revived by unserialize().
      */
-    public static function fromPluginValue($value)
+    public static function fromRpcValue($value)
     {
-        if ($value instanceof Wire\RustHandle) {
-            return RustObjectRegistry::stubFor($value->rhandle, $value->class);
+        if ($value instanceof Rpc\RustEntityHandle) {
+            return RustStubRegistry::stubFor($value->entityId, $value->class);
         }
-        if ($value instanceof Wire\PhpHandle) {
-            return PhpObjectRegistry::get($value->phandle);
+        if ($value instanceof Rpc\PhpEntityHandle) {
+            return PhpEntityTable::get($value->entityId);
         }
-        if ($value instanceof Wire\Job) {
-            return JobRegistry::promiseFor($value->id);
+        if ($value instanceof Rpc\PromiseHandle) {
+            return PromiseRegistry::promiseFor($value->id);
         }
         if (is_array($value)) {
-            return array_map([self::class, 'fromPluginValue'], $value);
+            return array_map([self::class, 'fromRpcValue'], $value);
         }
         return $value;
     }
 
     /**
-     * Decodes a frame payload. The descriptor records and the materialized values are the only
+     * Decodes a frame payload. The handle records and the by-value objects are the only
      * classes a payload may name.
      */
     public static function unserializePayload(string $payload)
     {
         return unserialize($payload, ['allowed_classes' => array_merge(
-            [Wire\RustHandle::class, Wire\PhpHandle::class, Wire\Job::class],
-            MaterializedValue::CLASSES
+            [Rpc\RustEntityHandle::class, Rpc\PhpEntityHandle::class, Rpc\PromiseHandle::class],
+            ByValueObject::CLASSES
         )]);
     }
 
     /**
      * Sends a CallFunction request: the runtime services the Rust side answers without a
-     * receiver entity (autoload lookups, the built-in commands, the job registry).
+     * receiver entity (autoload lookups, the built-in commands, the promise registry).
      */
     public static function callRustFunction(string $name, array $args)
     {
-        return self::request(self::TAG_CALL_FUNCTION, [$name, self::toPluginValue($args)]);
+        return self::request(self::TAG_CALL_FUNCTION, [$name, self::toRpcValue($args)]);
     }
 
     /**
@@ -197,14 +197,14 @@ final class RpcRuntime
      * @param array<int, mixed>|null $outParams
      */
     public static function callRust(
-        int $rhandle,
+        int $entityId,
         string $method,
         array $args,
         ?array &$outParams = null
     ) {
         return self::request(
             self::TAG_CALL_METHOD,
-            [$rhandle, $method, self::toPluginValue($args)],
+            [$entityId, $method, self::toRpcValue($args)],
             $outParams
         );
     }
@@ -216,17 +216,17 @@ final class RpcRuntime
      */
     public static function callRustStatic(string $class, string $method, array $args)
     {
-        return self::request(self::TAG_CALL_STATIC_METHOD, [$class, $method, self::toPluginValue($args)]);
+        return self::request(self::TAG_CALL_STATIC_METHOD, [$class, $method, self::toRpcValue($args)]);
     }
 
     /**
      * Sends a NewObject request: the Rust side builds a fresh entity of `$class` (the
-     * `static::class` of a stub's constructor) and answers with its R-handle, which the stub
+     * `static::class` of a stub's constructor) and answers with its Rust entity id, which the stub
      * under construction binds itself to.
      */
     public static function newRust(string $class, array $ctorArgs): int
     {
-        return self::request(self::TAG_NEW_OBJECT, [$class, self::toPluginValue($ctorArgs)]);
+        return self::request(self::TAG_NEW_OBJECT, [$class, self::toRpcValue($ctorArgs)]);
     }
 
     /**
@@ -254,10 +254,10 @@ final class RpcRuntime
                     self::fail('protocol violation: unparseable response payload');
                 }
                 if ($tag === self::TAG_RETURN) {
-                    $outParams = self::fromPluginValue($fields[1] ?? []);
-                    return self::fromPluginValue($fields[0]);
+                    $outParams = self::fromRpcValue($fields[1] ?? []);
+                    return self::fromRpcValue($fields[0]);
                 }
-                throw MaterializedThrowable::revive(self::fromPluginValue($fields));
+                throw ThrowableRecord::revive(self::fromRpcValue($fields));
             }
             self::dispatchRequest($tag, $inId, $payload);
         }
@@ -282,7 +282,7 @@ final class RpcRuntime
             case self::TAG_CALL_FUNCTION:
                 [$name, $args] = $fields;
                 self::replyWith($corrId, static function () use ($name, $args) {
-                    $args = RpcRuntime::fromPluginValue($args);
+                    $args = RpcRuntime::fromRpcValue($args);
                     if (isset(RpcRuntime::$dispatch[$name])) {
                         return (RpcRuntime::$dispatch[$name])($args);
                     }
@@ -293,10 +293,10 @@ final class RpcRuntime
                 });
                 break;
             case self::TAG_CALL_METHOD:
-                [$phandle, $method, $args] = $fields;
-                self::replyWith($corrId, static function () use ($phandle, $method, $args) {
-                    $obj = PhpObjectRegistry::get((int) $phandle);
-                    $args = RpcRuntime::fromPluginValue($args);
+                [$entityId, $method, $args] = $fields;
+                self::replyWith($corrId, static function () use ($entityId, $method, $args) {
+                    $obj = PhpEntityTable::get((int) $entityId);
+                    $args = RpcRuntime::fromRpcValue($args);
                     if (!is_callable([$obj, $method])) {
                         throw new \RuntimeException(
                             get_class($obj) . "::{$method} is not callable"
@@ -308,7 +308,7 @@ final class RpcRuntime
             case self::TAG_CALL_STATIC_METHOD:
                 [$class, $method, $args] = $fields;
                 self::replyWith($corrId, static function () use ($class, $method, $args) {
-                    $args = RpcRuntime::fromPluginValue($args);
+                    $args = RpcRuntime::fromRpcValue($args);
                     if (!is_callable([$class, $method])) {
                         throw new \RuntimeException("{$class}::{$method} is not callable");
                     }
@@ -318,7 +318,7 @@ final class RpcRuntime
             case self::TAG_NEW_OBJECT:
                 [$class, $ctorArgs] = $fields;
                 self::replyWith($corrId, static function () use ($class, $ctorArgs) {
-                    $ctorArgs = RpcRuntime::fromPluginValue($ctorArgs);
+                    $ctorArgs = RpcRuntime::fromRpcValue($ctorArgs);
                     if (!class_exists($class)) {
                         throw new \RuntimeException("PHP class `{$class}` does not exist");
                     }
@@ -326,8 +326,8 @@ final class RpcRuntime
                 });
                 break;
             case self::TAG_RELEASE_HANDLE:
-                [$phandle] = $fields;
-                PhpObjectRegistry::release((int) $phandle);
+                [$entityId] = $fields;
+                PhpEntityTable::release((int) $entityId);
                 break;
             default:
                 self::fail("protocol violation: unexpected frame tag {$tag}");
@@ -342,13 +342,13 @@ final class RpcRuntime
             self::writeFrame(
                 self::TAG_RETURN,
                 $corrId,
-                serialize([self::toPluginValue($result), []])
+                serialize([self::toRpcValue($result), []])
             );
         } catch (\Throwable $e) {
             self::writeFrame(
                 self::TAG_THROW,
                 $corrId,
-                serialize(self::toPluginValue(MaterializedThrowable::describe($e)))
+                serialize(self::toRpcValue(ThrowableRecord::fromThrowable($e)))
             );
         }
     }

@@ -1,5 +1,5 @@
 use crate::codec::protocol_value;
-use crate::value::PluginValue;
+use crate::value::RpcValue;
 use bstr::BString;
 use indexmap::IndexMap;
 
@@ -14,7 +14,7 @@ pub struct PhpThrow {
     /// its class declares. The receiving side revives them onto the instance it rebuilds.
     ///
     /// Boxed so a `Result<_, PhpThrow>` stays small; every dispatcher returns one.
-    pub properties: Box<IndexMap<BString, PluginValue>>,
+    pub properties: Box<IndexMap<BString, RpcValue>>,
     /// Where the exception was created, as `getFile()` and `getLine()` report it. Empty and 0
     /// for a failure that was no exception.
     pub file: BString,
@@ -47,43 +47,37 @@ impl PhpThrow {
     }
 
     /// The exception as it crosses the boundary wherever it does — as the payload of a `Throw`
-    /// frame, a job rejection, or a value an entry point answers with: `[class, message, code,
-    /// properties, file, line, parents]`. `\Shirabe\MaterializedThrowable::describe()` writes the
+    /// frame, a promise rejection, or a value an entry point answers with: `[class, message, code,
+    /// properties, file, line, parents]`. `\Shirabe\ThrowableRecord::fromThrowable()` writes the
     /// same list on the PHP side.
-    pub fn to_plugin_value(&self) -> PluginValue {
-        PluginValue::List(self.payload_fields())
+    pub fn to_rpc_value(&self) -> RpcValue {
+        RpcValue::List(self.payload_fields())
     }
 
-    /// Rebuilds the exception [`PhpThrow::to_plugin_value`] describes. Both sides write the
-    /// description in the same commit of Shirabe, so one that does not decode is a protocol
+    /// Rebuilds the exception [`PhpThrow::to_rpc_value`] describes. Both sides write the
+    /// throwable record in the same commit of Shirabe, so one that does not decode is a protocol
     /// violation.
-    pub fn from_plugin_value(value: PluginValue) -> PhpThrow {
-        PhpThrow::from_payload_fields(protocol_value(&value, "an exception description"))
+    pub fn from_rpc_value(value: RpcValue) -> PhpThrow {
+        PhpThrow::from_payload_fields(protocol_value(&value, "a throwable record"))
     }
 
-    pub(crate) fn payload_fields(&self) -> Vec<PluginValue> {
+    pub(crate) fn payload_fields(&self) -> Vec<RpcValue> {
         vec![
-            PluginValue::string(self.exception_class.clone()),
-            PluginValue::string(self.message.clone()),
-            PluginValue::Int(self.code),
-            PluginValue::Array((*self.properties).clone()),
-            PluginValue::string(self.file.clone()),
-            PluginValue::Int(self.line),
-            PluginValue::List(
-                self.parents
-                    .iter()
-                    .cloned()
-                    .map(PluginValue::string)
-                    .collect(),
-            ),
+            RpcValue::string(self.exception_class.clone()),
+            RpcValue::string(self.message.clone()),
+            RpcValue::Int(self.code),
+            RpcValue::Array((*self.properties).clone()),
+            RpcValue::string(self.file.clone()),
+            RpcValue::Int(self.line),
+            RpcValue::List(self.parents.iter().cloned().map(RpcValue::string).collect()),
         ]
     }
 
-    pub(crate) fn from_payload_fields(fields: Vec<PluginValue>) -> PhpThrow {
+    pub(crate) fn from_payload_fields(fields: Vec<RpcValue>) -> PhpThrow {
         let Ok([class, message, code, properties, file, line, parents]) =
-            <[PluginValue; 7]>::try_from(fields)
+            <[RpcValue; 7]>::try_from(fields)
         else {
-            panic!("PHP RPC: protocol violation — an exception description has not 7 fields");
+            panic!("PHP RPC: protocol violation — a throwable record has not 7 fields");
         };
         PhpThrow {
             exception_class: protocol_value(&class, "the exception class"),

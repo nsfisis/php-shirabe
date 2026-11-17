@@ -129,7 +129,7 @@ final class ForwardingModules
             . "#![allow(dead_code)]\n\n"
             . "use crate::php_worker::rpc::entity::{Call, protocol_violation};\nuse crate::php_worker::rpc::forwarding;\n"
             . "use bstr::{BStr, ByteSlice as _};\n"
-            . "use shirabe_php_rpc::{PhpThrow, PluginValue};\n\n"
+            . "use shirabe_php_rpc::{PhpThrow, RpcValue};\n\n"
             . $this->construct() . "\n" . $this->callStatic();
         foreach ($tree['children'] ?? [] as $segment => $child) {
             $code .= "\n" . $this->module($segment, $child);
@@ -152,7 +152,7 @@ final class ForwardingModules
         return $code . "}\n";
     }
 
-    /** A `NewObject` from the worker: builds the entity, registers it and answers its rhandle. */
+    /** A `NewObject` from the worker: builds the entity, registers it and answers its Rust entity id. */
     private function construct(): string
     {
         $arms = '';
@@ -164,7 +164,7 @@ final class ForwardingModules
             }
         }
 
-        return "/// A `NewObject` from the worker: builds the entity, registers it and answers its rhandle.\n"
+        return "/// A `NewObject` from the worker: builds the entity, registers it and answers its Rust entity id.\n"
             . "/// A stub's constructor sends `static::class`, so a plugin's subclass of a proxied class\n"
             . "/// reaches the last arm.\n"
             . "pub(crate) fn construct(class: &BStr, call: &mut Call<'_>) -> Result<u64, PhpThrow> {\n"
@@ -185,7 +185,7 @@ final class ForwardingModules
 
         return "/// A `CallStaticMethod` from the worker. A static forwarder sends `self::class`, so the class\n"
             . "/// is always one that declares the method.\n"
-            . "pub(crate) fn call_static(class: &BStr, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {\n"
+            . "pub(crate) fn call_static(class: &BStr, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {\n"
             . "match class.as_bytes() {\n{$arms}_ => protocol_violation(call),\n}\n}\n";
     }
 
@@ -195,10 +195,10 @@ final class ForwardingModules
         $items = [];
         foreach ($this->classes[$fqcn]['statics'] as $method) {
             $name = $this->claim($names, $fqcn, $method);
-            $items[] = "fn $name(call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {\nErr(call.unsupported())\n}\n";
+            $items[] = "fn $name(call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {\nErr(call.unsupported())\n}\n";
         }
 
-        return "use crate::php_worker::rpc::entity::{Call, protocol_violation};\nuse bstr::ByteSlice as _;\nuse shirabe_php_rpc::{PhpThrow, PluginValue};\n\n"
+        return "use crate::php_worker::rpc::entity::{Call, protocol_violation};\nuse bstr::ByteSlice as _;\nuse shirabe_php_rpc::{PhpThrow, RpcValue};\n\n"
             . "/// `$fqcn`, whose static methods are forwarded.\n#[derive(Debug)]\npub(crate) struct PhpClass;\n\n"
             . "pub(crate) trait Forwarding {\n" . implode("\n", $items) . "}\n\n"
             . $this->staticRouter($fqcn);
@@ -229,7 +229,7 @@ final class ForwardingModules
         if (!$isRoot) {
             $code .= "use crate::php_worker::rpc::forwarding;\n";
         }
-        $code .= "use bstr::ByteSlice as _;\nuse shirabe_php_rpc::{PhpThrow, PluginValue};\n\n";
+        $code .= "use bstr::ByteSlice as _;\nuse shirabe_php_rpc::{PhpThrow, RpcValue};\n\n";
 
         $code .= "/// `$fqcn`.\n#[derive(Debug)]\npub(crate) struct PhpClass;\n\n";
 
@@ -240,7 +240,7 @@ final class ForwardingModules
         }
         foreach ($class['methods'] as $method) {
             $name = $this->claim($names, $fqcn, $method);
-            $items[] = "fn $name(this: &$traitHandle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {\n"
+            $items[] = "fn $name(this: &$traitHandle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {\n"
                 . "let _ = this;\nErr(call.unsupported())\n}\n";
         }
         if (!$class['abstract'] && $this->constructs($fqcn)) {
@@ -249,7 +249,7 @@ final class ForwardingModules
         }
         foreach ($class['statics'] as $method) {
             $name = $this->claim($names, $fqcn, $method);
-            $items[] = "fn $name(call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {\nErr(call.unsupported())\n}\n";
+            $items[] = "fn $name(call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {\nErr(call.unsupported())\n}\n";
         }
         $code .= "pub(crate) trait Forwarding {\n" . implode("\n", $items) . "}\n\n";
 
@@ -268,7 +268,7 @@ final class ForwardingModules
                 break;
             }
         }
-        $code .= "pub(crate) fn dispatch(this: &$handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {\n"
+        $code .= "pub(crate) fn dispatch(this: &$handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {\n"
             . "match call.method().as_bytes() {\n{$arms}_ => protocol_violation(call),\n}\n}\n\n";
         $code .= "pub(crate) static CROSSING: Crossing<$handle> = Crossing {\nname: $literal,\ndispatch,\n};\n";
         if ($constructs) {
@@ -289,7 +289,7 @@ final class ForwardingModules
             $arms .= self::byteString($method) . ' => <PhpClass as Forwarding>::' . self::rustName($method) . "(call),\n";
         }
 
-        return "pub(crate) fn call_static(call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {\n"
+        return "pub(crate) fn call_static(call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {\n"
             . "match call.method().as_bytes() {\n{$arms}_ => protocol_violation(call),\n}\n}\n";
     }
 

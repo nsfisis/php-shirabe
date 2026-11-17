@@ -54,7 +54,7 @@ Inputs:
   exemption.
 * `guard-exemptions.list` — the Rust-owned FQCNs that stay resolvable to the real
   Composer class, each with the worker-side mechanism that makes a native
-  instance correct (the materialized-value codec for `Composer\Package\Link`
+  instance correct (the by-value object codec for `Composer\Package\Link`
   and `Composer\Util\Http\Response`).
 
 The same directory holds `surface-manifest`, which reads the forwards in the stubs, the runtime
@@ -62,8 +62,8 @@ classes and the guards, and writes two files:
 
 * `crates/shirabe/src/php_worker/rpc/forwarding.rs` — one Rust module per forwarding class: a
   `Forwarding` trait with a defaulted method per member the class declares, and the generated
-  routing of method names, constructors and static calls to those traits (see the R-table section
-  of `php-worker.md`).
+  routing of method names, constructors and static calls to those traits (see the Rust entity table
+  section of `php-worker.md`).
 * `crates/shirabe/src/php_worker/rpc/surface.tsv` — every forwarded member, `supported` when the
   hand-written forwarding impl of the class declaring it overrides the default, `unsupported`
   otherwise. The impls are found as blocks of the form
@@ -82,9 +82,9 @@ regenerates the report.
 
 * **Root stubs** (targets that extend no class; a target extending another
   target or a `php/runtime/` class inherits the boilerplate from it) carry the
-  proxy boilerplate: the `__rhandle` property, the `__shirabeBind`
+  proxy boilerplate: the `__entityId` property, the `__shirabeBind`
   binder the registry calls when reviving a stub for an existing entity, a
-  destructor releasing the Rust handle, and the Rust handle descriptor helper. The
+  destructor releasing the Rust entity id, and the Rust entity handle helper. The
   real `extends`/`implements` hierarchy is preserved and `\Shirabe\RustStub` is
   appended to the interface list.
 * **Constructors** reproduce the real class's parameter list and forward to the
@@ -137,8 +137,8 @@ regenerates the report.
 * **`__toString`** is forwarded like any other method. **`__clone`** is part of
   the boilerplate on every stub, whether or not the real class declares one:
   PHP has already copied the stub by the time it runs, so the copy asks the
-  Rust side for a clone of the entity and rebinds itself to the fresh handle
-  (`__shirabe_clone`, answered with the fresh R-handle). The clone semantics of
+  Rust side for a clone of the entity and rebinds itself to the fresh Rust
+  entity id (`__shirabe_clone`, answered with that id). The clone semantics of
   the real class live on the Rust side with the entity.
 
 ## What a guard looks like

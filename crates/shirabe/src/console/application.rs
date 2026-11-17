@@ -542,7 +542,7 @@ impl Application {
                 .as_full()
                 .expect("Factory::create and Factory::create_global build a full Composer");
             let pm = composer.borrow().get_plugin_manager();
-            let mut ctor_args: IndexMap<BString, shirabe_php_rpc::PluginValue> = IndexMap::new();
+            let mut ctor_args: IndexMap<BString, shirabe_php_rpc::RpcValue> = IndexMap::new();
             ctor_args.insert(BString::from("composer"), entity_value(&composer)?);
             ctor_args.insert(BString::from("io"), entity_value(&self.io)?);
             let capabilities = pm.borrow().get_plugin_capabilities(
@@ -583,7 +583,7 @@ impl Application {
     fn register_worker_console_commands(
         &mut self,
         composer: Option<&ComposerHandle>,
-        handles: Vec<shirabe_php_rpc::PhpObjHandle>,
+        handles: Vec<shirabe_php_rpc::PhpEntityHandle>,
     ) -> anyhow::Result<()> {
         if self.published_worker_console_context {
             return extend_console_application_commands(handles);

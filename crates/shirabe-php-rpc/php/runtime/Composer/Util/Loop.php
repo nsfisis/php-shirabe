@@ -2,7 +2,7 @@
 
 // Shirabe's own definition of Composer\Util\Loop for the plugin worker: a port of the real
 // class, running here on top of the HttpDownloader and ProcessExecutor proxy stubs. The Rust side
-// keeps a Loop of its own for the execution itself, and the two are siblings over one job
+// keeps a Loop of its own for the execution itself, and the two are siblings over one promise
 // registry (docs/dev/plugin-async.md). The one addition to the original is the forward in
 // abortJobs(), which only the Loop serving Composer::getLoop() makes.
 

@@ -8,7 +8,7 @@ use crate::php_worker::rpc::entity::{Call, Crossing, Entity};
 use crate::php_worker::rpc::forwarding;
 use crate::util::{Filesystem, ProcessExecutor};
 use bstr::BString;
-use shirabe_php_rpc::{PhpThrow, PluginValue, ToPluginValue};
+use shirabe_php_rpc::{PhpThrow, RpcValue, ToRpcValue};
 use shirabe_php_shim::path_from_bytes;
 
 impl Entity for std::rc::Rc<std::cell::RefCell<Filesystem>> {
@@ -42,37 +42,37 @@ impl forwarding::util::filesystem::Forwarding for forwarding::util::filesystem::
         ))))
     }
 
-    fn remove(fs: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+    fn remove(fs: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         Ok(fs
             .borrow_mut()
             .remove(path(call, 0)?)
             .map_err(call.failed())?
-            .to_plugin_value())
+            .to_rpc_value())
     }
 
-    fn is_dir_empty(fs: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
-        Ok(fs.borrow().is_dir_empty(&path(call, 0)?).to_plugin_value())
+    fn is_dir_empty(fs: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
+        Ok(fs.borrow().is_dir_empty(&path(call, 0)?).to_rpc_value())
     }
 
-    fn empty_directory(fs: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+    fn empty_directory(fs: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         fs.borrow_mut()
             .empty_directory(&path(call, 0)?, call.arg::<bool>(1)?)
             .map_err(call.failed())?;
-        Ok(PluginValue::Null)
+        Ok(RpcValue::Null)
     }
 
-    fn remove_directory(fs: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+    fn remove_directory(fs: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         Ok(fs
             .borrow_mut()
             .remove_directory(path(call, 0)?)
             .map_err(call.failed())?
-            .to_plugin_value())
+            .to_rpc_value())
     }
 
     fn remove_directory_async(
         fs: &Self::Handle,
         call: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    ) -> Result<RpcValue, PhpThrow> {
         let directory = path(call, 0)?;
         let executor = fs.borrow_mut().get_process_handle();
         let fs = fs.clone();
@@ -82,7 +82,7 @@ impl forwarding::util::filesystem::Forwarding for forwarding::util::filesystem::
         // raises what goes wrong up to there out of the call.
         match poll_once(&mut future) {
             std::task::Poll::Ready(removed) => {
-                resolved_promise(removed.map_err(call.failed())?.to_plugin_value())
+                resolved_promise(removed.map_err(call.failed())?.to_rpc_value())
             }
             std::task::Poll::Pending => Ok(job::register(
                 JobOwner::process_executor(&executor),
@@ -92,73 +92,70 @@ impl forwarding::util::filesystem::Forwarding for forwarding::util::filesystem::
                 Box::pin(async move {
                     future
                         .await
-                        .map(|removed| removed.to_plugin_value())
+                        .map(|removed| removed.to_rpc_value())
                         .map_err(|error| error_throw(b"removeDirectoryAsync failed", &error))
                 }),
             )),
         }
     }
 
-    fn remove_directory_php(
-        fs: &Self::Handle,
-        call: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    fn remove_directory_php(fs: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         Ok(fs
             .borrow_mut()
             .remove_directory_php(&path(call, 0)?)
             .map_err(call.failed())?
-            .to_plugin_value())
+            .to_rpc_value())
     }
 
     fn ensure_directory_exists(
         fs: &Self::Handle,
         call: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    ) -> Result<RpcValue, PhpThrow> {
         fs.borrow_mut()
             .ensure_directory_exists(&path(call, 0)?)
             .map_err(call.failed())?;
-        Ok(PluginValue::Null)
+        Ok(RpcValue::Null)
     }
 
-    fn unlink(fs: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+    fn unlink(fs: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         Ok(fs
             .borrow()
             .unlink(path(call, 0)?)
             .map_err(call.failed())?
-            .to_plugin_value())
+            .to_rpc_value())
     }
 
-    fn rmdir(fs: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+    fn rmdir(fs: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         Ok(fs
             .borrow()
             .rmdir(path(call, 0)?)
             .map_err(call.failed())?
-            .to_plugin_value())
+            .to_rpc_value())
     }
 
-    fn copy_then_remove(fs: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+    fn copy_then_remove(fs: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         fs.borrow_mut()
             .copy_then_remove(&path(call, 0)?, &path(call, 1)?)
             .map_err(call.failed())?;
-        Ok(PluginValue::Null)
+        Ok(RpcValue::Null)
     }
 
-    fn copy(fs: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+    fn copy(fs: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         Ok(fs
             .borrow_mut()
             .copy(&path(call, 0)?, &path(call, 1)?)
             .map_err(call.failed())?
-            .to_plugin_value())
+            .to_rpc_value())
     }
 
-    fn rename(fs: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+    fn rename(fs: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         fs.borrow_mut()
             .rename(path(call, 0)?, path(call, 1)?)
             .map_err(call.failed())?;
-        Ok(PluginValue::Null)
+        Ok(RpcValue::Null)
     }
 
-    fn find_shortest_path(fs: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+    fn find_shortest_path(fs: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         Ok(fs
             .borrow()
             .find_shortest_path(
@@ -168,13 +165,13 @@ impl forwarding::util::filesystem::Forwarding for forwarding::util::filesystem::
                 call.arg::<bool>(3)?,
             )
             .map_err(call.failed())?
-            .to_plugin_value())
+            .to_rpc_value())
     }
 
     fn find_shortest_path_code(
         fs: &Self::Handle,
         call: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    ) -> Result<RpcValue, PhpThrow> {
         Ok(fs
             .borrow()
             .find_shortest_path_code(
@@ -185,83 +182,77 @@ impl forwarding::util::filesystem::Forwarding for forwarding::util::filesystem::
                 call.arg::<bool>(4)?,
             )
             .map_err(call.failed())?
-            .to_plugin_value())
+            .to_rpc_value())
     }
 
-    fn is_absolute_path(fs: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
-        Ok(fs
-            .borrow()
-            .is_absolute_path(&path(call, 0)?)
-            .to_plugin_value())
+    fn is_absolute_path(fs: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
+        Ok(fs.borrow().is_absolute_path(&path(call, 0)?).to_rpc_value())
     }
 
-    fn size(fs: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+    fn size(fs: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         Ok(fs
             .borrow()
             .size(path(call, 0)?)
             .map_err(call.failed())?
-            .to_plugin_value())
+            .to_rpc_value())
     }
 
-    fn normalize_path(fs: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
-        Ok(fs
-            .borrow()
-            .normalize_path(&path(call, 0)?)
-            .to_plugin_value())
+    fn normalize_path(fs: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
+        Ok(fs.borrow().normalize_path(&path(call, 0)?).to_rpc_value())
     }
 
-    fn relative_symlink(fs: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+    fn relative_symlink(fs: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         Ok(fs
             .borrow()
             .relative_symlink(&path(call, 0)?, &path(call, 1)?)
             .map_err(call.failed())?
-            .to_plugin_value())
+            .to_rpc_value())
     }
 
     fn is_symlinked_directory(
         fs: &Self::Handle,
         call: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    ) -> Result<RpcValue, PhpThrow> {
         Ok(fs
             .borrow()
             .is_symlinked_directory(&path(call, 0)?)
-            .to_plugin_value())
+            .to_rpc_value())
     }
 
-    fn junction(fs: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+    fn junction(fs: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         fs.borrow_mut()
             .junction(&path(call, 0)?, &path(call, 1)?)
             .map_err(call.failed())?;
-        Ok(PluginValue::Null)
+        Ok(RpcValue::Null)
     }
 
-    fn is_junction(fs: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
-        Ok(fs.borrow().is_junction(&path(call, 0)?).to_plugin_value())
+    fn is_junction(fs: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
+        Ok(fs.borrow().is_junction(&path(call, 0)?).to_rpc_value())
     }
 
-    fn remove_junction(fs: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+    fn remove_junction(fs: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         Ok(fs
             .borrow_mut()
             .remove_junction(&path(call, 0)?)
             .map_err(call.failed())?
-            .to_plugin_value())
+            .to_rpc_value())
     }
 
     fn file_put_contents_if_modified(
         fs: &Self::Handle,
         call: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    ) -> Result<RpcValue, PhpThrow> {
         Ok(fs
             .borrow()
             .file_put_contents_if_modified(&path(call, 0)?, call.arg::<BString>(1)?)
             .map_err(call.failed())?
-            .to_plugin_value())
+            .to_rpc_value())
     }
 
-    fn safe_copy(fs: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+    fn safe_copy(fs: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         fs.borrow()
             .safe_copy(&path(call, 0)?, &path(call, 1)?)
             .map_err(call.failed())?;
-        Ok(PluginValue::Null)
+        Ok(RpcValue::Null)
     }
 }

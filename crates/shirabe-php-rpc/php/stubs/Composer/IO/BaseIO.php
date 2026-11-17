@@ -10,25 +10,25 @@ use Composer\Config;
 abstract class BaseIO implements IOInterface, \Shirabe\RustStub
 {
     /** @var int */
-    protected $__rhandle;
+    protected $__entityId;
 
     /**
      * Binds a stub the registry built for an existing entity. Proxy instantiation bypasses
      * the constructor, which belongs to plugin code building a new entity instead.
      */
-    public function __shirabeBind(int $rhandle): void
+    public function __shirabeBind(int $entityId): void
     {
-        $this->__rhandle = $rhandle;
+        $this->__entityId = $entityId;
     }
 
     public function __destruct()
     {
-        \Shirabe\RustObjectRegistry::release($this->__rhandle);
+        \Shirabe\RustStubRegistry::release($this->__entityId);
     }
 
-    public function __shirabeRustHandleDescriptor(): \Shirabe\Wire\RustHandle
+    public function __shirabeRustEntityHandle(): \Shirabe\Rpc\RustEntityHandle
     {
-        return new \Shirabe\Wire\RustHandle($this->__rhandle, static::class);
+        return new \Shirabe\Rpc\RustEntityHandle($this->__entityId, static::class);
     }
 
     public function __clone()
@@ -37,188 +37,188 @@ abstract class BaseIO implements IOInterface, \Shirabe\RustStub
         // entity and release it twice. The Rust side clones the entity instead, applying
         // whatever __clone semantics the real class defines, and this copy rebinds to the
         // fresh handle. Entities without clone semantics answer with an explicit error.
-        $this->__rhandle = \Shirabe\RpcRuntime::callRust($this->__rhandle, '__shirabe_clone', []);
-        \Shirabe\RustObjectRegistry::adopt($this->__rhandle, $this);
+        $this->__entityId = \Shirabe\RpcRuntime::callRust($this->__entityId, '__shirabe_clone', []);
+        \Shirabe\RustStubRegistry::adopt($this->__entityId, $this);
     }
 
     public function __get($name)
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, '__get', [$name]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, '__get', [$name]);
     }
 
     public function __set($name, $value): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, '__set', [$name, $value]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, '__set', [$name, $value]);
     }
 
     public function __isset($name): bool
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, '__isset', [$name]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, '__isset', [$name]);
     }
 
     public function __unset($name): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, '__unset', [$name]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, '__unset', [$name]);
     }
 
     public function __construct()
     {
-        $this->__rhandle = \Shirabe\RpcRuntime::newRust(static::class, []);
-        \Shirabe\RustObjectRegistry::adopt($this->__rhandle, $this);
+        $this->__entityId = \Shirabe\RpcRuntime::newRust(static::class, []);
+        \Shirabe\RustStubRegistry::adopt($this->__entityId, $this);
     }
 
     public function isInteractive()
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'isInteractive', []);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'isInteractive', []);
     }
 
     public function isVerbose()
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'isVerbose', []);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'isVerbose', []);
     }
 
     public function isVeryVerbose()
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'isVeryVerbose', []);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'isVeryVerbose', []);
     }
 
     public function isDebug()
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'isDebug', []);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'isDebug', []);
     }
 
     public function isDecorated()
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'isDecorated', []);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'isDecorated', []);
     }
 
     public function write($messages, bool $newline = true, int $verbosity = self::NORMAL)
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'write', [$messages, $newline, $verbosity]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'write', [$messages, $newline, $verbosity]);
     }
 
     public function writeError($messages, bool $newline = true, int $verbosity = self::NORMAL)
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'writeError', [$messages, $newline, $verbosity]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'writeError', [$messages, $newline, $verbosity]);
     }
 
     public function writeRaw($messages, bool $newline = true, int $verbosity = self::NORMAL)
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'writeRaw', [$messages, $newline, $verbosity]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'writeRaw', [$messages, $newline, $verbosity]);
     }
 
     public function writeErrorRaw($messages, bool $newline = true, int $verbosity = self::NORMAL)
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'writeErrorRaw', [$messages, $newline, $verbosity]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'writeErrorRaw', [$messages, $newline, $verbosity]);
     }
 
     public function overwrite($messages, bool $newline = true, ?int $size = null, int $verbosity = self::NORMAL)
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'overwrite', [$messages, $newline, $size, $verbosity]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'overwrite', [$messages, $newline, $size, $verbosity]);
     }
 
     public function overwriteError($messages, bool $newline = true, ?int $size = null, int $verbosity = self::NORMAL)
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'overwriteError', [$messages, $newline, $size, $verbosity]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'overwriteError', [$messages, $newline, $size, $verbosity]);
     }
 
     public function ask(string $question, $default = null)
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'ask', [$question, $default]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'ask', [$question, $default]);
     }
 
     public function askConfirmation(string $question, bool $default = true)
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'askConfirmation', [$question, $default]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'askConfirmation', [$question, $default]);
     }
 
     public function askAndValidate(string $question, callable $validator, ?int $attempts = null, $default = null)
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'askAndValidate', [$question, $validator, $attempts, $default]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'askAndValidate', [$question, $validator, $attempts, $default]);
     }
 
     public function askAndHideAnswer(string $question)
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'askAndHideAnswer', [$question]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'askAndHideAnswer', [$question]);
     }
 
     public function select(string $question, array $choices, $default, $attempts = false, string $errorMessage = 'Value "%s" is invalid', bool $multiselect = false)
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'select', [$question, $choices, $default, $attempts, $errorMessage, $multiselect]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'select', [$question, $choices, $default, $attempts, $errorMessage, $multiselect]);
     }
 
     public function getAuthentications()
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getAuthentications', []);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'getAuthentications', []);
     }
 
     public function hasAuthentication($repositoryName)
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'hasAuthentication', [$repositoryName]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'hasAuthentication', [$repositoryName]);
     }
 
     public function getAuthentication($repositoryName)
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getAuthentication', [$repositoryName]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'getAuthentication', [$repositoryName]);
     }
 
     public function setAuthentication($repositoryName, $username, $password = null)
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setAuthentication', [$repositoryName, $username, $password]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'setAuthentication', [$repositoryName, $username, $password]);
     }
 
     public function loadConfiguration(Config $config)
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'loadConfiguration', [$config]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'loadConfiguration', [$config]);
     }
 
     public function emergency($message, array $context = []): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'emergency', [$message, $context]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, 'emergency', [$message, $context]);
     }
 
     public function alert($message, array $context = []): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'alert', [$message, $context]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, 'alert', [$message, $context]);
     }
 
     public function critical($message, array $context = []): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'critical', [$message, $context]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, 'critical', [$message, $context]);
     }
 
     public function error($message, array $context = []): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'error', [$message, $context]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, 'error', [$message, $context]);
     }
 
     public function warning($message, array $context = []): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'warning', [$message, $context]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, 'warning', [$message, $context]);
     }
 
     public function notice($message, array $context = []): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'notice', [$message, $context]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, 'notice', [$message, $context]);
     }
 
     public function info($message, array $context = []): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'info', [$message, $context]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, 'info', [$message, $context]);
     }
 
     public function debug($message, array $context = []): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'debug', [$message, $context]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, 'debug', [$message, $context]);
     }
 
     public function log($level, $message, array $context = []): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'log', [$level, $message, $context]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, 'log', [$level, $message, $context]);
     }
 
     public function resetAuthentications()
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'resetAuthentications', []);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'resetAuthentications', []);
     }
 }

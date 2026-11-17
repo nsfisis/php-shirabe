@@ -1,9 +1,9 @@
-//! Plugin-boundary value model and its serialization. The format of the payloads on the wire is
+//! RPC value model and its serialization. The format of the payloads on the wire is
 //! documented in `docs/dev/php-rpc.md`.
 //!
-//! `PluginValue` is the value type crossing the Rust/PHP RPC boundary. It is deliberately
-//! independent from `shirabe_php_shim::PhpMixed`: handles exist only at the plugin boundary, the
-//! one conversion between the two is the `ToPluginValue` / `FromPluginValue` pair of `PhpMixed` in
+//! `RpcValue` is the value type crossing the Rust/PHP RPC boundary. It is deliberately
+//! independent from `shirabe_php_shim::PhpMixed`: handles exist only at the RPC boundary, the
+//! one conversion between the two is the `ToRpcValue` / `FromRpcValue` pair of `PhpMixed` in
 //! `codec.rs`, and the codec below is a separate implementation from
 //! `shirabe_php_shim::var::serialize`.
 //!
@@ -14,67 +14,76 @@ use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{ToPhpString, canonical_int_key, utf8_text};
 
-/// A handle to an object whose entity lives on the Rust side. PHP holds a thin proxy stub.
+/// A Rust entity handle: names an entity that lives on the Rust side. PHP holds a thin proxy
+/// stub.
 #[derive(Debug, Clone, PartialEq)]
-pub struct RustObjHandle {
-    pub rhandle: u64,
+pub struct RustEntityHandle {
+    pub entity_id: u64,
     pub class: BString,
 }
 
-/// An owning handle to an object whose entity lives in the PHP child process.
+/// An owning PHP entity handle: names an entity that lives in the PHP child process.
 ///
-/// The worker's P table keeps the entity alive while any clone of the handle lives. One phandle
-/// has one shared entry on this side however many times its descriptor is decoded, and dropping
-/// the last clone queues a `ReleaseHandle`, which goes out ahead of the next frame sent to the
-/// worker. Handles compare equal exactly when they name the same entity.
+/// The worker's PHP entity table keeps the entity alive while any clone of the handle lives. One
+/// PHP entity id has one shared entry on this side however many times its handle is decoded, and
+/// dropping the last clone queues a `ReleaseHandle`, which goes out ahead of the next frame sent to
+/// the worker. Handles compare equal exactly when they name the same entity.
 #[derive(Debug, Clone)]
-pub struct PhpObjHandle(std::sync::Arc<PhpObjHandleEntry>);
+pub struct PhpEntityHandle(std::sync::Arc<PhpEntityHandleEntry>);
 
 #[derive(Debug)]
-struct PhpObjHandleEntry {
-    phandle: u64,
+struct PhpEntityHandleEntry {
+    entity_id: u64,
     class: BString,
     /// Every interface the entity's class implements (`class_implements` in the worker).
     implements: Vec<BString>,
 }
 
 #[derive(Debug, Default)]
-struct PhpHandleTable {
-    live: IndexMap<u64, std::sync::Weak<PhpObjHandleEntry>>,
+struct PhpEntityHandleTable {
+    live: IndexMap<u64, std::sync::Weak<PhpEntityHandleEntry>>,
     released: Vec<u64>,
 }
 
-static PHP_HANDLES: std::sync::LazyLock<std::sync::Mutex<PhpHandleTable>> =
+static PHP_ENTITY_HANDLES: std::sync::LazyLock<std::sync::Mutex<PhpEntityHandleTable>> =
     std::sync::LazyLock::new(std::sync::Mutex::default);
 
-fn php_handles() -> std::sync::MutexGuard<'static, PhpHandleTable> {
-    PHP_HANDLES
+fn php_entity_handles() -> std::sync::MutexGuard<'static, PhpEntityHandleTable> {
+    PHP_ENTITY_HANDLES
         .lock()
-        .unwrap_or_else(|e| panic!("PHP RPC: P handle table mutex poisoned: {e}"))
+        .unwrap_or_else(|e| panic!("PHP RPC: PHP entity handle table mutex poisoned: {e}"))
 }
 
-impl PhpObjHandle {
-    pub(crate) fn intern(phandle: u64, class: BString, implements: Vec<BString>) -> PhpObjHandle {
-        let mut table = php_handles();
-        if let Some(entry) = table.live.get(&phandle).and_then(std::sync::Weak::upgrade) {
-            return PhpObjHandle(entry);
+impl PhpEntityHandle {
+    pub(crate) fn intern(
+        entity_id: u64,
+        class: BString,
+        implements: Vec<BString>,
+    ) -> PhpEntityHandle {
+        let mut table = php_entity_handles();
+        if let Some(entry) = table
+            .live
+            .get(&entity_id)
+            .and_then(std::sync::Weak::upgrade)
+        {
+            return PhpEntityHandle(entry);
         }
-        // A release still queued for this phandle has not reached the worker, so its P-table
-        // entry is intact and this handle takes it over.
-        table.released.retain(|&released| released != phandle);
-        let entry = std::sync::Arc::new(PhpObjHandleEntry {
-            phandle,
+        // A release still queued for this PHP entity id has not reached the worker, so its PHP
+        // entity table entry is intact and this handle takes it over.
+        table.released.retain(|&released| released != entity_id);
+        let entry = std::sync::Arc::new(PhpEntityHandleEntry {
+            entity_id,
             class,
             implements,
         });
         table
             .live
-            .insert(phandle, std::sync::Arc::downgrade(&entry));
-        PhpObjHandle(entry)
+            .insert(entity_id, std::sync::Arc::downgrade(&entry));
+        PhpEntityHandle(entry)
     }
 
-    pub(crate) fn phandle(&self) -> u64 {
-        self.0.phandle
+    pub(crate) fn entity_id(&self) -> u64 {
+        self.0.entity_id
     }
 
     pub fn class(&self) -> &BStr {
@@ -86,39 +95,40 @@ impl PhpObjHandle {
     }
 }
 
-impl PartialEq for PhpObjHandle {
-    fn eq(&self, other: &PhpObjHandle) -> bool {
+impl PartialEq for PhpEntityHandle {
+    fn eq(&self, other: &PhpEntityHandle) -> bool {
         std::sync::Arc::ptr_eq(&self.0, &other.0)
     }
 }
 
-impl Eq for PhpObjHandle {}
+impl Eq for PhpEntityHandle {}
 
-impl std::hash::Hash for PhpObjHandle {
+impl std::hash::Hash for PhpEntityHandle {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.0.phandle.hash(state);
+        self.0.entity_id.hash(state);
     }
 }
 
-impl Drop for PhpObjHandleEntry {
+impl Drop for PhpEntityHandleEntry {
     fn drop(&mut self) {
-        let mut table = php_handles();
-        // The phandle may already name a newer entry, decoded after this one became unreachable.
+        let mut table = php_entity_handles();
+        // The PHP entity id may already name a newer entry, decoded after this one became
+        // unreachable.
         let current = table
             .live
-            .get(&self.phandle)
+            .get(&self.entity_id)
             .is_some_and(|live| std::ptr::eq(live.as_ptr(), self));
         if current {
-            table.live.swap_remove(&self.phandle);
-            table.released.push(self.phandle);
+            table.live.swap_remove(&self.entity_id);
+            table.released.push(self.entity_id);
         }
     }
 }
 
-/// Takes the phandles whose last handle has dropped since the previous call, for the
+/// Takes the PHP entity ids whose last handle has dropped since the previous call, for the
 /// `ReleaseHandle` frames that go out ahead of the next frame.
-pub(crate) fn take_released_php_handles() -> Vec<u64> {
-    std::mem::take(&mut php_handles().released)
+pub(crate) fn take_released_php_entity_ids() -> Vec<u64> {
+    std::mem::take(&mut php_entity_handles().released)
 }
 
 /// The `O:` record of a serialized PHP object: a class name and a property table, with the
@@ -127,7 +137,7 @@ pub(crate) fn take_released_php_handles() -> Vec<u64> {
 #[derive(Debug, Clone, PartialEq)]
 pub struct PhpObject {
     pub class: BString,
-    pub props: IndexMap<BString, PluginValue>,
+    pub props: IndexMap<BString, RpcValue>,
 }
 
 impl PhpObject {
@@ -139,20 +149,20 @@ impl PhpObject {
     }
 
     /// A public property keeps its declared name.
-    pub fn public(&self, name: impl AsRef<[u8]>) -> Option<&PluginValue> {
+    pub fn public(&self, name: impl AsRef<[u8]>) -> Option<&RpcValue> {
         self.props.get(name.as_ref())
     }
 
-    pub fn set_public(&mut self, name: impl AsRef<[u8]>, value: PluginValue) {
+    pub fn set_public(&mut self, name: impl AsRef<[u8]>, value: RpcValue) {
         self.props.insert(name.as_ref().into(), value);
     }
 
     /// PHP mangles a protected property name to `\0*\0name`.
-    pub fn protected(&self, name: impl AsRef<[u8]>) -> Option<&PluginValue> {
+    pub fn protected(&self, name: impl AsRef<[u8]>) -> Option<&RpcValue> {
         self.props.get(&protected_key(name.as_ref()))
     }
 
-    pub fn set_protected(&mut self, name: impl AsRef<[u8]>, value: PluginValue) {
+    pub fn set_protected(&mut self, name: impl AsRef<[u8]>, value: RpcValue) {
         self.props.insert(protected_key(name.as_ref()), value);
     }
 
@@ -163,7 +173,7 @@ impl PhpObject {
         &self,
         declaring_class: impl AsRef<[u8]>,
         name: impl AsRef<[u8]>,
-    ) -> Option<&PluginValue> {
+    ) -> Option<&RpcValue> {
         self.props
             .get(&private_key(declaring_class.as_ref(), name.as_ref()))
     }
@@ -172,7 +182,7 @@ impl PhpObject {
         &mut self,
         declaring_class: impl AsRef<[u8]>,
         name: impl AsRef<[u8]>,
-        value: PluginValue,
+        value: RpcValue,
     ) {
         self.props
             .insert(private_key(declaring_class.as_ref(), name.as_ref()), value);
@@ -193,30 +203,30 @@ fn private_key(declaring_class: &[u8], name: &[u8]) -> BString {
     key
 }
 
-/// The value model of the plugin RPC boundary: PHP scalars, arrays, object records, and handle
-/// descriptors. An array decodes as `List` when its keys are exactly `0..N` and as `Array`
-/// otherwise. A descriptor crosses as the object record of a class reserved for it (see
-/// `RUST_HANDLE_CLASS` and its siblings), so no array is ever read as one.
+/// The value model of the RPC boundary: PHP scalars, arrays, object records, and handles. An
+/// array decodes as `List` when its keys are exactly `0..N` and as `Array` otherwise. A handle
+/// crosses as the object record of a class reserved for it (see
+/// `RUST_ENTITY_HANDLE_CLASS` and its siblings), so no array is ever read as one.
 #[derive(Debug, Clone, PartialEq)]
-pub enum PluginValue {
+pub enum RpcValue {
     Null,
     Bool(bool),
     Int(i64),
     Float(f64),
     String(BString),
-    List(Vec<PluginValue>),
-    Array(IndexMap<BString, PluginValue>),
+    List(Vec<RpcValue>),
+    Array(IndexMap<BString, RpcValue>),
     PhpObject(PhpObject),
-    RustHandle(RustObjHandle),
-    PhpHandle(PhpObjHandle),
-    /// A job in the registry both sides hold an entry for (see `docs/dev/plugin-async.md`). The
-    /// Rust side allocates odd ids, the worker even ones.
-    Job(u64),
+    RustEntityHandle(RustEntityHandle),
+    PhpEntityHandle(PhpEntityHandle),
+    /// A promise in the registry both sides hold an entry for (see `docs/dev/plugin-async.md`).
+    /// The Rust side allocates odd promise ids, the worker even ones.
+    PromiseHandle(u64),
 }
 
-impl PluginValue {
-    pub fn string(s: impl Into<BString>) -> PluginValue {
-        PluginValue::String(s.into())
+impl RpcValue {
+    pub fn string(s: impl Into<BString>) -> RpcValue {
+        RpcValue::String(s.into())
     }
 }
 
@@ -224,33 +234,33 @@ impl PluginValue {
 /// hostile payload cannot overflow the stack.
 pub const MAX_DECODE_DEPTH: usize = 512;
 
-/// The descriptor classes, declared in the worker's `php/runtime/Shirabe/Wire/`. The worker never
-/// writes an object of its own as one of these records (it crosses as a `PhpHandle` like any other
-/// object), so a record of one of these classes is always a descriptor.
-const RUST_HANDLE_CLASS: &[u8] = b"Shirabe\\Wire\\RustHandle";
-const PHP_HANDLE_CLASS: &[u8] = b"Shirabe\\Wire\\PhpHandle";
-const JOB_CLASS: &[u8] = b"Shirabe\\Wire\\Job";
+/// The handle classes, declared in the worker's `php/runtime/Shirabe/Rpc/`. The worker never
+/// writes an object of its own as one of these records (it crosses as a `PhpEntityHandle` like any
+/// other object), so a record of one of these classes is always a handle.
+const RUST_ENTITY_HANDLE_CLASS: &[u8] = b"Shirabe\\Rpc\\RustEntityHandle";
+const PHP_ENTITY_HANDLE_CLASS: &[u8] = b"Shirabe\\Rpc\\PhpEntityHandle";
+const PROMISE_HANDLE_CLASS: &[u8] = b"Shirabe\\Rpc\\PromiseHandle";
 
-/// Encodes a `PluginValue` in PHP `serialize()` grammar, byte-compatible with what the PHP core
+/// Encodes a `RpcValue` in PHP `serialize()` grammar, byte-compatible with what the PHP core
 /// implementation produces under `serialize_precision=-1`.
-pub fn serialize(value: &PluginValue) -> Vec<u8> {
+pub fn serialize(value: &RpcValue) -> Vec<u8> {
     let mut out = Vec::new();
     serialize_into(value, &mut out);
     out
 }
 
-fn serialize_into(value: &PluginValue, out: &mut Vec<u8>) {
+fn serialize_into(value: &RpcValue, out: &mut Vec<u8>) {
     match value {
-        PluginValue::Null => out.extend_from_slice(b"N;"),
-        PluginValue::Bool(b) => {
+        RpcValue::Null => out.extend_from_slice(b"N;"),
+        RpcValue::Bool(b) => {
             out.extend_from_slice(if *b { b"b:1;" } else { b"b:0;" });
         }
-        PluginValue::Int(n) => {
+        RpcValue::Int(n) => {
             out.extend_from_slice(b"i:");
             out.extend_from_slice(&n.to_php_string());
             out.push(b';');
         }
-        PluginValue::Float(f) => {
+        RpcValue::Float(f) => {
             out.extend_from_slice(b"d:");
             let mut repr = BString::default();
             shirabe_php_src::zend::zend_smart_str::smart_str_append_double(
@@ -259,8 +269,8 @@ fn serialize_into(value: &PluginValue, out: &mut Vec<u8>) {
             out.extend_from_slice(&repr);
             out.push(b';');
         }
-        PluginValue::String(bytes) => serialize_bytes(bytes, out),
-        PluginValue::List(items) => {
+        RpcValue::String(bytes) => serialize_bytes(bytes, out),
+        RpcValue::List(items) => {
             out.extend_from_slice(b"a:");
             out.extend_from_slice(&items.len().to_php_string());
             out.extend_from_slice(b":{");
@@ -272,41 +282,41 @@ fn serialize_into(value: &PluginValue, out: &mut Vec<u8>) {
             }
             out.push(b'}');
         }
-        PluginValue::Array(map) => serialize_map(map, out),
-        PluginValue::PhpObject(object) => serialize_object(object, out),
-        PluginValue::RustHandle(handle) => {
-            let mut record = PhpObject::new(RUST_HANDLE_CLASS);
+        RpcValue::Array(map) => serialize_map(map, out),
+        RpcValue::PhpObject(object) => serialize_object(object, out),
+        RpcValue::RustEntityHandle(handle) => {
+            let mut record = PhpObject::new(RUST_ENTITY_HANDLE_CLASS);
             record.set_public(
-                "rhandle",
-                PluginValue::Int(i64::try_from(handle.rhandle).expect("rhandle exceeds i64")),
+                "entityId",
+                RpcValue::Int(i64::try_from(handle.entity_id).expect("entity_id exceeds i64")),
             );
-            record.set_public("class", PluginValue::string(handle.class.clone()));
+            record.set_public("class", RpcValue::string(handle.class.clone()));
             serialize_object(&record, out);
         }
-        PluginValue::PhpHandle(handle) => {
-            let mut record = PhpObject::new(PHP_HANDLE_CLASS);
+        RpcValue::PhpEntityHandle(handle) => {
+            let mut record = PhpObject::new(PHP_ENTITY_HANDLE_CLASS);
             record.set_public(
-                "phandle",
-                PluginValue::Int(i64::try_from(handle.phandle()).expect("phandle exceeds i64")),
+                "entityId",
+                RpcValue::Int(i64::try_from(handle.entity_id()).expect("entity_id exceeds i64")),
             );
-            record.set_public("class", PluginValue::string(handle.class()));
+            record.set_public("class", RpcValue::string(handle.class()));
             record.set_public(
                 "implements",
-                PluginValue::List(
+                RpcValue::List(
                     handle
                         .implements()
                         .iter()
-                        .map(|name| PluginValue::string(name.clone()))
+                        .map(|name| RpcValue::string(name.clone()))
                         .collect(),
                 ),
             );
             serialize_object(&record, out);
         }
-        PluginValue::Job(id) => {
-            let mut record = PhpObject::new(JOB_CLASS);
+        RpcValue::PromiseHandle(id) => {
+            let mut record = PhpObject::new(PROMISE_HANDLE_CLASS);
             record.set_public(
                 "id",
-                PluginValue::Int(i64::try_from(*id).expect("job id exceeds i64")),
+                RpcValue::Int(i64::try_from(*id).expect("promise id exceeds i64")),
             );
             serialize_object(&record, out);
         }
@@ -338,7 +348,7 @@ fn serialize_bytes(bytes: &[u8], out: &mut Vec<u8>) {
     out.extend_from_slice(b"\";");
 }
 
-fn serialize_map(map: &IndexMap<BString, PluginValue>, out: &mut Vec<u8>) {
+fn serialize_map(map: &IndexMap<BString, RpcValue>, out: &mut Vec<u8>) {
     out.extend_from_slice(b"a:");
     out.extend_from_slice(&map.len().to_php_string());
     out.extend_from_slice(b":{");
@@ -356,12 +366,12 @@ fn serialize_map(map: &IndexMap<BString, PluginValue>, out: &mut Vec<u8>) {
     out.push(b'}');
 }
 
-/// Decodes a whole `serialize()` payload into a `PluginValue`, rejecting trailing garbage.
+/// Decodes a whole `serialize()` payload into a `RpcValue`, rejecting trailing garbage.
 ///
 /// Arrays whose keys are exactly `0..N` decode as `List`; anything else decodes as `Array`. An
-/// `O:` record of a descriptor class decodes as the handle or job it describes, and any other
+/// `O:` record of a handle class decodes as the handle it is, and any other
 /// `O:` record as `PhpObject`.
-pub fn unserialize(payload: &[u8]) -> anyhow::Result<PluginValue> {
+pub fn unserialize(payload: &[u8]) -> anyhow::Result<RpcValue> {
     let mut pos = 0;
     let value = parse_value(payload, &mut pos)?;
     if pos != payload.len() {
@@ -373,7 +383,7 @@ pub fn unserialize(payload: &[u8]) -> anyhow::Result<PluginValue> {
 /// One lexed step of a serialized payload: a complete scalar, the opening of a container whose
 /// entries follow, or a back-reference to an earlier value.
 enum Lex {
-    Value(PluginValue),
+    Value(RpcValue),
     /// The entry count, and the class name of an object record.
     ContainerOpen(usize, Option<BString>),
     BackReference(usize),
@@ -383,7 +393,7 @@ enum Lex {
 /// not recurse: nesting depth must never translate into call stack depth, so a hostile or
 /// corrupted payload cannot overflow the stack (the explicit depth cap exists on top of that).
 struct Frame {
-    entries: IndexMap<BString, PluginValue>,
+    entries: IndexMap<BString, RpcValue>,
     /// The class name of an object record; `None` for an array.
     class: Option<BString>,
     /// This container's own number in the payload's value numbering.
@@ -398,14 +408,14 @@ struct Frame {
     clippy::disallowed_macros,
     reason = "an anyhow error about a malformed payload, raised by the port"
 )]
-fn parse_value(payload: &[u8], pos: &mut usize) -> anyhow::Result<PluginValue> {
+fn parse_value(payload: &[u8], pos: &mut usize) -> anyhow::Result<RpcValue> {
     let mut stack: Vec<Frame> = Vec::new();
-    let mut completed: Option<PluginValue> = None;
+    let mut completed: Option<RpcValue> = None;
     // PHP numbers every value of a payload from 1 in document order — never a key, but including
     // a back-reference itself — and an `r:` record names one of those numbers. Only an object can
     // be named that way (an array crosses by copy), so only objects are kept for resolution;
     // holding every value would cost a slot per scalar for payloads that never reference one.
-    let mut numbered_objects: IndexMap<usize, PluginValue> = IndexMap::new();
+    let mut numbered_objects: IndexMap<usize, RpcValue> = IndexMap::new();
     let mut values = 0;
 
     loop {
@@ -443,11 +453,11 @@ fn parse_value(payload: &[u8], pos: &mut usize) -> anyhow::Result<PluginValue> {
             }
             let index = frame.parsed as i64;
             match lex(payload, pos)? {
-                Lex::Value(PluginValue::Int(n)) => {
+                Lex::Value(RpcValue::Int(n)) => {
                     frame.is_list &= n == index;
                     frame.pending_key = Some(n.to_php_string());
                 }
-                Lex::Value(PluginValue::String(bytes)) => {
+                Lex::Value(RpcValue::String(bytes)) => {
                     frame.is_list = false;
                     frame.pending_key = Some(bytes);
                 }
@@ -504,17 +514,17 @@ fn lex(payload: &[u8], pos: &mut usize) -> anyhow::Result<Lex> {
     };
     *pos += 2;
     match tag {
-        b"N;" => Ok(Lex::Value(PluginValue::Null)),
+        b"N;" => Ok(Lex::Value(RpcValue::Null)),
         b"b:" => match take_until(payload, pos, b';')? {
-            b"0" => Ok(Lex::Value(PluginValue::Bool(false))),
-            b"1" => Ok(Lex::Value(PluginValue::Bool(true))),
+            b"0" => Ok(Lex::Value(RpcValue::Bool(false))),
+            b"1" => Ok(Lex::Value(RpcValue::Bool(true))),
             other => anyhow::bail!("malformed bool payload: {:?}", BStr::new(other)),
         },
         b"i:" => {
             let bytes = take_until(payload, pos, b';')?;
             let n = utf8_text(bytes).and_then(|s| s.parse().ok());
             match n {
-                Some(n) => Ok(Lex::Value(PluginValue::Int(n))),
+                Some(n) => Ok(Lex::Value(RpcValue::Int(n))),
                 None => anyhow::bail!("malformed int payload: {:?}", BStr::new(bytes)),
             }
         }
@@ -529,11 +539,11 @@ fn lex(payload: &[u8], pos: &mut usize) -> anyhow::Result<Lex> {
                 _ => s.parse().ok(),
             });
             match f {
-                Some(f) => Ok(Lex::Value(PluginValue::Float(f))),
+                Some(f) => Ok(Lex::Value(RpcValue::Float(f))),
                 None => anyhow::bail!("malformed float payload: {:?}", BStr::new(bytes)),
             }
         }
-        b"s:" => Ok(Lex::Value(PluginValue::String(parse_string_body(
+        b"s:" => Ok(Lex::Value(RpcValue::String(parse_string_body(
             payload, pos,
         )?))),
         b"a:" => Ok(Lex::ContainerOpen(parse_entry_count(payload, pos)?, None)),
@@ -565,14 +575,14 @@ fn lex(payload: &[u8], pos: &mut usize) -> anyhow::Result<Lex> {
     }
 }
 
-fn finish_frame(frame: Frame) -> anyhow::Result<PluginValue> {
+fn finish_frame(frame: Frame) -> anyhow::Result<RpcValue> {
     if let Some(class) = frame.class {
         return decode_object(class, frame.entries);
     }
     Ok(if frame.is_list {
-        PluginValue::List(frame.entries.into_values().collect())
+        RpcValue::List(frame.entries.into_values().collect())
     } else {
-        PluginValue::Array(frame.entries)
+        RpcValue::Array(frame.entries)
     })
 }
 
@@ -622,12 +632,9 @@ fn parse_quoted(payload: &[u8], pos: &mut usize, terminator: u8) -> anyhow::Resu
     Ok(bytes.into())
 }
 
-/// Decodes an `O:` record: a descriptor class into the handle or job it describes, and any other
+/// Decodes an `O:` record: a handle class into the handle it is, and any other
 /// class into a `PhpObject`.
-fn decode_object(
-    class: BString,
-    props: IndexMap<BString, PluginValue>,
-) -> anyhow::Result<PluginValue> {
+fn decode_object(class: BString, props: IndexMap<BString, RpcValue>) -> anyhow::Result<RpcValue> {
     let expect_props = |names: &[&[u8]]| -> anyhow::Result<()> {
         if props.len() != names.len() || !names.iter().all(|name| props.contains_key(*name)) {
             anyhow::bail!("malformed {class:?} record: {props:?}");
@@ -635,53 +642,53 @@ fn decode_object(
         Ok(())
     };
     match class.as_slice() {
-        RUST_HANDLE_CLASS => {
-            expect_props(&[b"rhandle", b"class"])?;
-            Ok(PluginValue::RustHandle(RustObjHandle {
-                rhandle: descriptor_id(&props[b"rhandle".as_slice()], &class)?,
-                class: descriptor_class(&props[b"class".as_slice()], &class)?,
+        RUST_ENTITY_HANDLE_CLASS => {
+            expect_props(&[b"entityId", b"class"])?;
+            Ok(RpcValue::RustEntityHandle(RustEntityHandle {
+                entity_id: handle_id(&props[b"entityId".as_slice()], &class)?,
+                class: handle_class(&props[b"class".as_slice()], &class)?,
             }))
         }
-        PHP_HANDLE_CLASS => {
-            expect_props(&[b"phandle", b"class", b"implements"])?;
+        PHP_ENTITY_HANDLE_CLASS => {
+            expect_props(&[b"entityId", b"class", b"implements"])?;
             let implements = match &props[b"implements".as_slice()] {
-                PluginValue::List(items) => items
+                RpcValue::List(items) => items
                     .iter()
                     .map(|item| match item {
-                        PluginValue::String(name) => Ok(name.clone()),
+                        RpcValue::String(name) => Ok(name.clone()),
                         other => anyhow::bail!("{class:?} implements a non-string: {other:?}"),
                     })
                     .collect::<anyhow::Result<_>>()?,
                 other => anyhow::bail!("{class:?} implements is not a list: {other:?}"),
             };
-            Ok(PluginValue::PhpHandle(PhpObjHandle::intern(
-                descriptor_id(&props[b"phandle".as_slice()], &class)?,
-                descriptor_class(&props[b"class".as_slice()], &class)?,
+            Ok(RpcValue::PhpEntityHandle(PhpEntityHandle::intern(
+                handle_id(&props[b"entityId".as_slice()], &class)?,
+                handle_class(&props[b"class".as_slice()], &class)?,
                 implements,
             )))
         }
-        JOB_CLASS => {
+        PROMISE_HANDLE_CLASS => {
             expect_props(&[b"id"])?;
-            Ok(PluginValue::Job(descriptor_id(
+            Ok(RpcValue::PromiseHandle(handle_id(
                 &props[b"id".as_slice()],
                 &class,
             )?))
         }
-        _ => Ok(PluginValue::PhpObject(PhpObject { class, props })),
+        _ => Ok(RpcValue::PhpObject(PhpObject { class, props })),
     }
 }
 
-fn descriptor_id(value: &PluginValue, record: &BString) -> anyhow::Result<u64> {
+fn handle_id(value: &RpcValue, record: &BString) -> anyhow::Result<u64> {
     match value {
-        PluginValue::Int(n) => u64::try_from(*n)
+        RpcValue::Int(n) => u64::try_from(*n)
             .map_err(|_| anyhow::anyhow!("{record:?} record holds a negative id: {n}")),
         other => anyhow::bail!("{record:?} record id is not an int: {other:?}"),
     }
 }
 
-fn descriptor_class(value: &PluginValue, record: &BString) -> anyhow::Result<BString> {
+fn handle_class(value: &RpcValue, record: &BString) -> anyhow::Result<BString> {
     match value {
-        PluginValue::String(class) => Ok(class.clone()),
+        RpcValue::String(class) => Ok(class.clone()),
         other => anyhow::bail!("{record:?} record class is not a string: {other:?}"),
     }
 }
@@ -703,27 +710,27 @@ fn take_until<'a>(payload: &'a [u8], pos: &mut usize, terminator: u8) -> anyhow:
 mod tests {
     use super::*;
 
-    fn roundtrip(value: PluginValue) {
+    fn roundtrip(value: RpcValue) {
         let encoded = serialize(&value);
         let decoded = unserialize(&encoded).expect("decode failed");
         assert_eq!(decoded, value, "encoded form: {:?}", BStr::new(&encoded));
     }
 
-    /// Handles compare by identity, and decoding a phandle that is still held yields the held
-    /// entry, so the handle is dropped before decoding to make the decoder read the descriptor.
-    /// Each test uses its own phandle: the handle table is shared by every test thread.
-    fn roundtrip_php_handle(phandle: u64, class: &[u8], implements: &[&[u8]]) {
+    /// Handles compare by identity, and decoding a PHP entity id that is still held yields the
+    /// held entry, so the handle is dropped before decoding to make the decoder read the record.
+    /// Each test uses its own PHP entity id: the handle table is shared by every test thread.
+    fn roundtrip_php_entity_handle(entity_id: u64, class: &[u8], implements: &[&[u8]]) {
         let implements: Vec<BString> = implements.iter().map(|&name| name.into()).collect();
-        let encoded = serialize(&PluginValue::PhpHandle(PhpObjHandle::intern(
-            phandle,
+        let encoded = serialize(&RpcValue::PhpEntityHandle(PhpEntityHandle::intern(
+            entity_id,
             class.into(),
             implements.clone(),
         )));
         let decoded = unserialize(&encoded).expect("decode failed");
-        let PluginValue::PhpHandle(ref handle) = decoded else {
-            panic!("expected a PHP handle, got {decoded:?}");
+        let RpcValue::PhpEntityHandle(ref handle) = decoded else {
+            panic!("expected a PHP entity handle, got {decoded:?}");
         };
-        assert_eq!(handle.phandle(), phandle);
+        assert_eq!(handle.entity_id(), entity_id);
         assert_eq!(handle.class(), class);
         assert_eq!(handle.implements(), implements.as_slice());
         assert_eq!(serialize(&decoded), encoded);
@@ -731,29 +738,29 @@ mod tests {
 
     #[test]
     fn encodes_scalars_like_php() {
-        assert_eq!(serialize(&PluginValue::Null), b"N;");
-        assert_eq!(serialize(&PluginValue::Bool(true)), b"b:1;");
-        assert_eq!(serialize(&PluginValue::Bool(false)), b"b:0;");
-        assert_eq!(serialize(&PluginValue::Int(-42)), b"i:-42;");
-        assert_eq!(serialize(&PluginValue::Float(1.5)), b"d:1.5;");
-        assert_eq!(serialize(&PluginValue::Float(2.0)), b"d:2;");
-        assert_eq!(serialize(&PluginValue::Float(1e17)), b"d:1.0E+17;");
-        assert_eq!(serialize(&PluginValue::string("ab")), b"s:2:\"ab\";");
+        assert_eq!(serialize(&RpcValue::Null), b"N;");
+        assert_eq!(serialize(&RpcValue::Bool(true)), b"b:1;");
+        assert_eq!(serialize(&RpcValue::Bool(false)), b"b:0;");
+        assert_eq!(serialize(&RpcValue::Int(-42)), b"i:-42;");
+        assert_eq!(serialize(&RpcValue::Float(1.5)), b"d:1.5;");
+        assert_eq!(serialize(&RpcValue::Float(2.0)), b"d:2;");
+        assert_eq!(serialize(&RpcValue::Float(1e17)), b"d:1.0E+17;");
+        assert_eq!(serialize(&RpcValue::string("ab")), b"s:2:\"ab\";");
         assert_eq!(
-            serialize(&PluginValue::String(vec![0xff, 0x00, 0xfe].into())),
+            serialize(&RpcValue::String(vec![0xff, 0x00, 0xfe].into())),
             b"s:3:\"\xff\x00\xfe\";"
         );
     }
 
     #[test]
     fn encodes_arrays_with_php_key_canonicalization() {
-        let mut map: IndexMap<BString, PluginValue> = IndexMap::new();
-        map.insert(b"5".into(), PluginValue::Int(1));
-        map.insert(b"05".into(), PluginValue::Int(2));
-        map.insert(b"-0".into(), PluginValue::Int(3));
-        map.insert(b"x".into(), PluginValue::Int(4));
+        let mut map: IndexMap<BString, RpcValue> = IndexMap::new();
+        map.insert(b"5".into(), RpcValue::Int(1));
+        map.insert(b"05".into(), RpcValue::Int(2));
+        map.insert(b"-0".into(), RpcValue::Int(3));
+        map.insert(b"x".into(), RpcValue::Int(4));
         assert_eq!(
-            serialize(&PluginValue::Array(map)),
+            serialize(&RpcValue::Array(map)),
             b"a:4:{i:5;i:1;s:2:\"05\";i:2;s:2:\"-0\";i:3;s:1:\"x\";i:4;}".as_slice(),
         );
     }
@@ -765,31 +772,27 @@ mod tests {
     #[test]
     fn encodes_object_records_like_php() {
         let mut constraint = PhpObject::new("Composer\\Semver\\Constraint\\MatchAllConstraint");
-        constraint.set_protected("prettyString", PluginValue::Null);
+        constraint.set_protected("prettyString", RpcValue::Null);
         assert_eq!(
-            serialize(&PluginValue::PhpObject(constraint)),
+            serialize(&RpcValue::PhpObject(constraint)),
             b"O:45:\"Composer\\Semver\\Constraint\\MatchAllConstraint\":1:{s:15:\"\0*\0prettyString\";N;}".as_slice(),
         );
 
         // A private property carries the declaring class rather than `*`, which is what lets a
         // subclass hold its own property of the same name.
         let mut response = PhpObject::new("Composer\\Util\\Http\\Response");
-        response.set_private(
-            "Composer\\Util\\Http\\Response",
-            "code",
-            PluginValue::Int(200),
-        );
+        response.set_private("Composer\\Util\\Http\\Response", "code", RpcValue::Int(200));
         assert_eq!(
-            serialize(&PluginValue::PhpObject(response)),
+            serialize(&RpcValue::PhpObject(response)),
             b"O:27:\"Composer\\Util\\Http\\Response\":1:{s:33:\"\0Composer\\Util\\Http\\Response\0code\";i:200;}".as_slice(),
         );
 
         let mut date = PhpObject::new("DateTimeImmutable");
-        date.set_public("date", PluginValue::string("2026-08-07 12:34:56.123456"));
-        date.set_public("timezone_type", PluginValue::Int(3));
-        date.set_public("timezone", PluginValue::string("UTC"));
+        date.set_public("date", RpcValue::string("2026-08-07 12:34:56.123456"));
+        date.set_public("timezone_type", RpcValue::Int(3));
+        date.set_public("timezone", RpcValue::string("UTC"));
         assert_eq!(
-            serialize(&PluginValue::PhpObject(date)),
+            serialize(&RpcValue::PhpObject(date)),
             b"O:17:\"DateTimeImmutable\":3:{s:4:\"date\";s:26:\"2026-08-07 12:34:56.123456\";s:13:\"timezone_type\";i:3;s:8:\"timezone\";s:3:\"UTC\";}".as_slice(),
         );
     }
@@ -797,15 +800,15 @@ mod tests {
     #[test]
     fn roundtrips_object_records() {
         let mut inner = PhpObject::new("Composer\\Semver\\Constraint\\Constraint");
-        inner.set_protected("operator", PluginValue::Int(4));
-        inner.set_protected("version", PluginValue::string("1.0.0"));
+        inner.set_protected("operator", RpcValue::Int(4));
+        inner.set_protected("version", RpcValue::string("1.0.0"));
         let mut outer = PhpObject::new("Composer\\Package\\Link");
-        outer.set_protected("source", PluginValue::string("a/b"));
-        outer.set_protected("constraint", PluginValue::PhpObject(inner.clone()));
-        roundtrip(PluginValue::PhpObject(outer.clone()));
+        outer.set_protected("source", RpcValue::string("a/b"));
+        outer.set_protected("constraint", RpcValue::PhpObject(inner.clone()));
+        roundtrip(RpcValue::PhpObject(outer.clone()));
 
         // Visibility is part of the property name: neither accessor sees the other's key.
-        assert_eq!(inner.protected("operator"), Some(&PluginValue::Int(4)));
+        assert_eq!(inner.protected("operator"), Some(&RpcValue::Int(4)));
         assert_eq!(inner.public("operator"), None);
         assert_eq!(outer.protected("prettyConstraint"), None);
 
@@ -813,12 +816,12 @@ mod tests {
         response.set_private(
             "Composer\\Util\\Http\\Response",
             "body",
-            PluginValue::string("{}"),
+            RpcValue::string("{}"),
         );
-        roundtrip(PluginValue::PhpObject(response.clone()));
+        roundtrip(RpcValue::PhpObject(response.clone()));
         assert_eq!(
             response.private("Composer\\Util\\Http\\Response", "body"),
-            Some(&PluginValue::string("{}"))
+            Some(&RpcValue::string("{}"))
         );
         assert_eq!(response.protected("body"), None);
         assert_eq!(response.public("body"), None);
@@ -831,7 +834,7 @@ mod tests {
     fn resolves_back_references_by_phps_value_numbering() {
         let decoded =
             unserialize(b"a:2:{i:0;O:8:\"stdClass\":1:{s:1:\"p\";i:1;}i:1;r:2;}").unwrap();
-        let PluginValue::List(items) = decoded else {
+        let RpcValue::List(items) = decoded else {
             panic!("expected a list, got {decoded:?}");
         };
         assert_eq!(items[0], items[1]);
@@ -840,7 +843,7 @@ mod tests {
             b"a:4:{i:0;O:8:\"stdClass\":1:{s:1:\"p\";i:1;}i:1;r:2;i:2;O:8:\"stdClass\":1:{s:1:\"q\";i:2;}i:3;r:5;}",
         )
         .unwrap();
-        let PluginValue::List(items) = decoded else {
+        let RpcValue::List(items) = decoded else {
             panic!("expected a list, got {decoded:?}");
         };
         assert_eq!(items[0], items[1]);
@@ -866,73 +869,76 @@ mod tests {
 
     #[test]
     fn roundtrips_composites() {
-        roundtrip(PluginValue::List(vec![
-            PluginValue::Null,
-            PluginValue::Bool(true),
-            PluginValue::Int(7),
-            PluginValue::Float(0.5),
-            PluginValue::String(vec![0x80, 0x81].into()),
+        roundtrip(RpcValue::List(vec![
+            RpcValue::Null,
+            RpcValue::Bool(true),
+            RpcValue::Int(7),
+            RpcValue::Float(0.5),
+            RpcValue::String(vec![0x80, 0x81].into()),
         ]));
 
-        let mut inner: IndexMap<BString, PluginValue> = IndexMap::new();
-        inner.insert(vec![0xff, b'k'].into(), PluginValue::string("v"));
-        inner.insert(b"10".into(), PluginValue::List(vec![]));
-        roundtrip(PluginValue::Array(inner));
+        let mut inner: IndexMap<BString, RpcValue> = IndexMap::new();
+        inner.insert(vec![0xff, b'k'].into(), RpcValue::string("v"));
+        inner.insert(b"10".into(), RpcValue::List(vec![]));
+        roundtrip(RpcValue::Array(inner));
     }
 
     #[test]
     fn roundtrips_non_utf8_class_names() {
         let mut object = PhpObject::new(b"Caf\xe9");
-        object.set_private(b"Caf\xe9", "p", PluginValue::Int(1));
-        roundtrip(PluginValue::PhpObject(object));
-        roundtrip(PluginValue::RustHandle(RustObjHandle {
-            rhandle: 3,
+        object.set_private(b"Caf\xe9", "p", RpcValue::Int(1));
+        roundtrip(RpcValue::PhpObject(object));
+        roundtrip(RpcValue::RustEntityHandle(RustEntityHandle {
+            entity_id: 3,
             class: b"Caf\xe9".into(),
         }));
-        roundtrip_php_handle(8, b"Caf\xe9", &[b"Plugin\xff"]);
+        roundtrip_php_entity_handle(8, b"Caf\xe9", &[b"Plugin\xff"]);
     }
 
     #[test]
     fn roundtrips_handles() {
-        roundtrip(PluginValue::RustHandle(RustObjHandle {
-            rhandle: 3,
+        roundtrip(RpcValue::RustEntityHandle(RustEntityHandle {
+            entity_id: 3,
             class: "Composer\\Script\\Event".into(),
         }));
-        roundtrip_php_handle(9, b"MyPlugin", &[b"Composer\\Plugin\\PluginInterface"]);
-        roundtrip(PluginValue::Job(7));
+        roundtrip_php_entity_handle(9, b"MyPlugin", &[b"Composer\\Plugin\\PluginInterface"]);
+        roundtrip(RpcValue::PromiseHandle(7));
     }
 
     #[test]
-    fn decodes_arrays_shaped_like_descriptors_as_data() {
+    fn decodes_arrays_shaped_like_handles_as_data() {
         let mut map = IndexMap::new();
-        map.insert(BString::from("__rhandle"), PluginValue::Int(1));
+        map.insert(BString::from("__entityId"), RpcValue::Int(1));
         map.insert(
             BString::from("__class"),
-            PluginValue::string("Composer\\Script\\Event"),
+            RpcValue::string("Composer\\Script\\Event"),
         );
-        roundtrip(PluginValue::Array(map));
+        roundtrip(RpcValue::Array(map));
         let mut map = IndexMap::new();
-        map.insert(BString::from("__job"), PluginValue::Int(7));
-        roundtrip(PluginValue::Array(map));
+        map.insert(BString::from("__job"), RpcValue::Int(7));
+        roundtrip(RpcValue::Array(map));
     }
 
     #[test]
-    fn rejects_malformed_descriptor_records() {
-        assert!(unserialize(b"O:16:\"Shirabe\\Wire\\Job\":0:{}").is_err());
+    fn rejects_malformed_handle_records() {
+        assert!(unserialize(b"O:25:\"Shirabe\\Rpc\\PromiseHandle\":0:{}").is_err());
         assert!(
-            unserialize(b"O:16:\"Shirabe\\Wire\\Job\":2:{s:2:\"id\";i:7;s:1:\"x\";N;}").is_err()
+            unserialize(b"O:25:\"Shirabe\\Rpc\\PromiseHandle\":2:{s:2:\"id\";i:7;s:1:\"x\";N;}")
+                .is_err()
         );
-        assert!(unserialize(b"O:16:\"Shirabe\\Wire\\Job\":1:{s:2:\"id\";s:1:\"7\";}").is_err());
+        assert!(
+            unserialize(b"O:25:\"Shirabe\\Rpc\\PromiseHandle\":1:{s:2:\"id\";s:1:\"7\";}").is_err()
+        );
     }
 
     #[test]
     fn decodes_sparse_int_keys_as_array_and_reencodes_identically() {
         let serialized = b"a:2:{i:5;i:1;i:0;i:2;}".as_slice();
         let decoded = unserialize(serialized).unwrap();
-        let PluginValue::Array(ref map) = decoded else {
+        let RpcValue::Array(ref map) = decoded else {
             panic!("expected an array, got {decoded:?}");
         };
-        assert_eq!(map.get(b"5".as_slice()), Some(&PluginValue::Int(1)));
+        assert_eq!(map.get(b"5".as_slice()), Some(&RpcValue::Int(1)));
         assert_eq!(serialize(&decoded), serialized);
     }
 

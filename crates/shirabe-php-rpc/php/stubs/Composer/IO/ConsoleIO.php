@@ -15,8 +15,8 @@ class ConsoleIO extends BaseIO
 {
     public function __construct(InputInterface $input, OutputInterface $output, HelperSet $helperSet)
     {
-        $this->__rhandle = \Shirabe\RpcRuntime::newRust(static::class, [$input, $output, $helperSet]);
-        \Shirabe\RustObjectRegistry::adopt($this->__rhandle, $this);
+        $this->__entityId = \Shirabe\RpcRuntime::newRust(static::class, [$input, $output, $helperSet]);
+        \Shirabe\RustStubRegistry::adopt($this->__entityId, $this);
     }
 
     public static function sanitize($messages, bool $allowNewlines = true)
@@ -68,16 +68,16 @@ class ConsoleIO extends BaseIO
 
     public function enableDebugging(float $startTime)
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'enableDebugging', [$startTime]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'enableDebugging', [$startTime]);
     }
 
     public function getProgressBar(int $max = 0)
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getProgressBar', [$max]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'getProgressBar', [$max]);
     }
 
     public function getTable(): Table
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getTable', []);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'getTable', []);
     }
 }

@@ -12,25 +12,25 @@ use React\Promise\PromiseInterface;
 class ProcessExecutor implements \Shirabe\RustStub
 {
     /** @var int */
-    protected $__rhandle;
+    protected $__entityId;
 
     /**
      * Binds a stub the registry built for an existing entity. Proxy instantiation bypasses
      * the constructor, which belongs to plugin code building a new entity instead.
      */
-    public function __shirabeBind(int $rhandle): void
+    public function __shirabeBind(int $entityId): void
     {
-        $this->__rhandle = $rhandle;
+        $this->__entityId = $entityId;
     }
 
     public function __destruct()
     {
-        \Shirabe\RustObjectRegistry::release($this->__rhandle);
+        \Shirabe\RustStubRegistry::release($this->__entityId);
     }
 
-    public function __shirabeRustHandleDescriptor(): \Shirabe\Wire\RustHandle
+    public function __shirabeRustEntityHandle(): \Shirabe\Rpc\RustEntityHandle
     {
-        return new \Shirabe\Wire\RustHandle($this->__rhandle, static::class);
+        return new \Shirabe\Rpc\RustEntityHandle($this->__entityId, static::class);
     }
 
     public function __clone()
@@ -39,34 +39,34 @@ class ProcessExecutor implements \Shirabe\RustStub
         // entity and release it twice. The Rust side clones the entity instead, applying
         // whatever __clone semantics the real class defines, and this copy rebinds to the
         // fresh handle. Entities without clone semantics answer with an explicit error.
-        $this->__rhandle = \Shirabe\RpcRuntime::callRust($this->__rhandle, '__shirabe_clone', []);
-        \Shirabe\RustObjectRegistry::adopt($this->__rhandle, $this);
+        $this->__entityId = \Shirabe\RpcRuntime::callRust($this->__entityId, '__shirabe_clone', []);
+        \Shirabe\RustStubRegistry::adopt($this->__entityId, $this);
     }
 
     public function __get($name)
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, '__get', [$name]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, '__get', [$name]);
     }
 
     public function __set($name, $value): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, '__set', [$name, $value]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, '__set', [$name, $value]);
     }
 
     public function __isset($name): bool
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, '__isset', [$name]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, '__isset', [$name]);
     }
 
     public function __unset($name): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, '__unset', [$name]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, '__unset', [$name]);
     }
 
     public function __construct(?IOInterface $io = null)
     {
-        $this->__rhandle = \Shirabe\RpcRuntime::newRust(static::class, [$io]);
-        \Shirabe\RustObjectRegistry::adopt($this->__rhandle, $this);
+        $this->__entityId = \Shirabe\RpcRuntime::newRust(static::class, [$io]);
+        \Shirabe\RustStubRegistry::adopt($this->__entityId, $this);
     }
 
     private const STATUS_QUEUED = 1;
@@ -160,7 +160,7 @@ class ProcessExecutor implements \Shirabe\RustStub
         $__args = [$command, $output, $cwd];
         array_splice($__args, func_num_args());
         $__out = [];
-        $__result = \Shirabe\RpcRuntime::callRust($this->__rhandle, 'execute', $__args, $__out);
+        $__result = \Shirabe\RpcRuntime::callRust($this->__entityId, 'execute', $__args, $__out);
         if (array_key_exists(1, $__out)) {
             $output = $__out[1];
         }
@@ -169,51 +169,51 @@ class ProcessExecutor implements \Shirabe\RustStub
 
     public function executeTty($command, ?string $cwd = null): int
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'executeTty', [$command, $cwd]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'executeTty', [$command, $cwd]);
     }
 
     public function executeAsync($command, ?string $cwd = null): PromiseInterface
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'executeAsync', [$command, $cwd]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'executeAsync', [$command, $cwd]);
     }
 
     public function setMaxJobs(int $maxJobs): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setMaxJobs', [$maxJobs]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, 'setMaxJobs', [$maxJobs]);
     }
 
     public function resetMaxJobs(): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'resetMaxJobs', []);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, 'resetMaxJobs', []);
     }
 
     public function wait($index = null): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'wait', [$index]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, 'wait', [$index]);
     }
 
     public function enableAsync(): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'enableAsync', []);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, 'enableAsync', []);
     }
 
     public function countActiveJobs($index = null): int
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'countActiveJobs', [$index]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'countActiveJobs', [$index]);
     }
 
     public function splitLines(?string $output): array
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'splitLines', [$output]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'splitLines', [$output]);
     }
 
     public function getErrorOutput(): string
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getErrorOutput', []);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'getErrorOutput', []);
     }
 
     public function requiresGitDirEnv($command): bool
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'requiresGitDirEnv', [$command]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'requiresGitDirEnv', [$command]);
     }
 }

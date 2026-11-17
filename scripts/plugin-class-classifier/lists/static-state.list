@@ -1,5 +1,5 @@
 # Disposition of classes that write static properties.
-#   memo-cache  pure memoization; each world computes its own copy
+#   memo-cache  pure memoization; each side computes its own copy
 #   seed-once   copied from the Rust side once at child startup
 #   needs-sync  genuinely shared process state; must not be php-native
 # A class writing statics without an entry here fails the run.

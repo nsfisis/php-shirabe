@@ -58,8 +58,8 @@ fn test_plugin_owned_process_executor_matches_upstream_composer() {
     assert_eq!(upstream.trace, shirabe.trace);
 
     // Pinned as well as compared, so a run where neither side wrote a trace cannot pass. The
-    // timeout is the project's `process-timeout`, which is what makes it evidence that both
-    // worlds read one value rather than each holding its own default.
+    // timeout is the project's `process-timeout`, which is what makes it evidence that the
+    // Rust side and the worker read one value rather than each holding its own default.
     assert_eq!(
         "\
 event=post-update-cmd

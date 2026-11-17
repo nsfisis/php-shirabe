@@ -20,25 +20,25 @@ final class Generator
 {
     private const BOILERPLATE = <<<'PHP'
         /** @var int */
-        protected $__rhandle;
+        protected $__entityId;
 
         /**
          * Binds a stub the registry built for an existing entity. Proxy instantiation bypasses
          * the constructor, which belongs to plugin code building a new entity instead.
          */
-        public function __shirabeBind(int $rhandle): void
+        public function __shirabeBind(int $entityId): void
         {
-            $this->__rhandle = $rhandle;
+            $this->__entityId = $entityId;
         }
 
         public function __destruct()
         {
-            \Shirabe\RustObjectRegistry::release($this->__rhandle);
+            \Shirabe\RustStubRegistry::release($this->__entityId);
         }
 
-        public function __shirabeRustHandleDescriptor(): \Shirabe\Wire\RustHandle
+        public function __shirabeRustEntityHandle(): \Shirabe\Rpc\RustEntityHandle
         {
-            return new \Shirabe\Wire\RustHandle($this->__rhandle, static::class);
+            return new \Shirabe\Rpc\RustEntityHandle($this->__entityId, static::class);
         }
 
         public function __clone()
@@ -47,30 +47,30 @@ final class Generator
             // entity and release it twice. The Rust side clones the entity instead, applying
             // whatever __clone semantics the real class defines, and this copy rebinds to the
             // fresh handle. Entities without clone semantics answer with an explicit error.
-            $this->__rhandle = \Shirabe\RpcRuntime::callRust($this->__rhandle, '__shirabe_clone', []);
-            \Shirabe\RustObjectRegistry::adopt($this->__rhandle, $this);
+            $this->__entityId = \Shirabe\RpcRuntime::callRust($this->__entityId, '__shirabe_clone', []);
+            \Shirabe\RustStubRegistry::adopt($this->__entityId, $this);
         }
     PHP;
 
     private const PROPERTY_FORWARDERS = <<<'PHP'
         public function __get($name)
         {
-            return \Shirabe\RpcRuntime::callRust($this->__rhandle, '__get', [$name]);
+            return \Shirabe\RpcRuntime::callRust($this->__entityId, '__get', [$name]);
         }
 
         public function __set($name, $value): void
         {
-            \Shirabe\RpcRuntime::callRust($this->__rhandle, '__set', [$name, $value]);
+            \Shirabe\RpcRuntime::callRust($this->__entityId, '__set', [$name, $value]);
         }
 
         public function __isset($name): bool
         {
-            return \Shirabe\RpcRuntime::callRust($this->__rhandle, '__isset', [$name]);
+            return \Shirabe\RpcRuntime::callRust($this->__entityId, '__isset', [$name]);
         }
 
         public function __unset($name): void
         {
-            \Shirabe\RpcRuntime::callRust($this->__rhandle, '__unset', [$name]);
+            \Shirabe\RpcRuntime::callRust($this->__entityId, '__unset', [$name]);
         }
     PHP;
 
@@ -403,8 +403,8 @@ final class Generator
             . implode(', ', $args) . '])';
         return "    public function __construct(" . implode(', ', $params) . ")\n"
             . "    {\n"
-            . "        \$this->__rhandle = $call;\n"
-            . "        \\Shirabe\\RustObjectRegistry::adopt(\$this->__rhandle, \$this);\n"
+            . "        \$this->__entityId = $call;\n"
+            . "        \\Shirabe\\RustStubRegistry::adopt(\$this->__entityId, \$this);\n"
             . "    }";
     }
 
@@ -561,7 +561,7 @@ final class Generator
      * worker-side sibling built over the proxied services (docs/dev/plugin-async.md).
      */
     private const LOCAL_BODIES = [
-        'Composer\\PartialComposer::getLoop' => '        return \\Shirabe\\RpcRuntime::loopFor($this, $this->__rhandle);',
+        'Composer\\PartialComposer::getLoop' => '        return \\Shirabe\\RpcRuntime::loopFor($this, $this->__entityId);',
     ];
 
     /** @var array<string, true> */
@@ -578,7 +578,7 @@ final class Generator
             return "    $signature\n    {\n" . self::LOCAL_BODIES["$fqcn::$name"] . "\n    }";
         }
         $body = $this->renderForwardingBody(
-            "\\Shirabe\\RpcRuntime::callRust(\$this->__rhandle, '$name', %s%s)",
+            "\\Shirabe\\RpcRuntime::callRust(\$this->__entityId, '$name', %s%s)",
             $args,
             $outPositions,
             $this->inspectsArgCount($fqcn, $name, $method),

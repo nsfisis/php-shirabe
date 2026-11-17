@@ -153,8 +153,8 @@ fn with_worker<T>(f: impl FnOnce(&mut Worker) -> T) -> anyhow::Result<T> {
 }
 
 /// Writes one frame while holding the worker mutex only for the duration of the write, so the
-/// session owner (see `session`) can interleave sends and blocking reads without keeping the
-/// worker locked across a whole call. A `ReleaseHandle` for every P handle dropped since the
+/// session owner (see `session`) can interleave sends and blocking reads without keeping the worker
+/// locked across a whole call. A `ReleaseHandle` for every PHP entity handle dropped since the
 /// previous write goes out first.
 pub(crate) fn send_frame(frame: &Frame) -> anyhow::Result<()> {
     with_worker(|worker| {
@@ -164,8 +164,8 @@ pub(crate) fn send_frame(frame: &Frame) -> anyhow::Result<()> {
                 anyhow::Error::new(e).context(worker.worker_state())
             })
         };
-        for phandle in value::take_released_php_handles() {
-            write(&Frame::ReleaseHandle { handle: phandle })?;
+        for entity_id in value::take_released_php_entity_ids() {
+            write(&Frame::ReleaseHandle { entity_id })?;
         }
         write(frame)
     })?
@@ -260,8 +260,8 @@ fn spawn_worker(config: &WorkerConfig) -> anyhow::Result<Worker> {
 pub fn __call_function_in_new_worker(
     config: &WorkerConfig,
     function_name: &BStr,
-    args: Vec<value::PluginValue>,
-) -> anyhow::Result<value::PluginValue> {
+    args: Vec<value::RpcValue>,
+) -> anyhow::Result<value::RpcValue> {
     let mut worker = spawn_worker(config)?;
     let result = (|| {
         frame::write_frame(
@@ -310,7 +310,7 @@ fn install_worker_socket_fd(child_end: &std::os::fd::OwnedFd) -> std::io::Result
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::value::PluginValue;
+    use crate::value::RpcValue;
 
     #[test]
     fn request_error_reports_dead_worker_exit_status() {
@@ -325,7 +325,7 @@ mod tests {
             &Frame::CallFunction {
                 corr_id: 1,
                 function_name: "defined".into(),
-                args: vec![PluginValue::string("PHP_VERSION")],
+                args: vec![RpcValue::string("PHP_VERSION")],
             },
         );
         frame::read_frame(&mut worker.stream).expect_err("reading from a dead worker should fail");

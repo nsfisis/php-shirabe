@@ -10,25 +10,25 @@ use Composer\Pcre\Preg;
 class Filesystem implements \Shirabe\RustStub
 {
     /** @var int */
-    protected $__rhandle;
+    protected $__entityId;
 
     /**
      * Binds a stub the registry built for an existing entity. Proxy instantiation bypasses
      * the constructor, which belongs to plugin code building a new entity instead.
      */
-    public function __shirabeBind(int $rhandle): void
+    public function __shirabeBind(int $entityId): void
     {
-        $this->__rhandle = $rhandle;
+        $this->__entityId = $entityId;
     }
 
     public function __destruct()
     {
-        \Shirabe\RustObjectRegistry::release($this->__rhandle);
+        \Shirabe\RustStubRegistry::release($this->__entityId);
     }
 
-    public function __shirabeRustHandleDescriptor(): \Shirabe\Wire\RustHandle
+    public function __shirabeRustEntityHandle(): \Shirabe\Rpc\RustEntityHandle
     {
-        return new \Shirabe\Wire\RustHandle($this->__rhandle, static::class);
+        return new \Shirabe\Rpc\RustEntityHandle($this->__entityId, static::class);
     }
 
     public function __clone()
@@ -37,34 +37,34 @@ class Filesystem implements \Shirabe\RustStub
         // entity and release it twice. The Rust side clones the entity instead, applying
         // whatever __clone semantics the real class defines, and this copy rebinds to the
         // fresh handle. Entities without clone semantics answer with an explicit error.
-        $this->__rhandle = \Shirabe\RpcRuntime::callRust($this->__rhandle, '__shirabe_clone', []);
-        \Shirabe\RustObjectRegistry::adopt($this->__rhandle, $this);
+        $this->__entityId = \Shirabe\RpcRuntime::callRust($this->__entityId, '__shirabe_clone', []);
+        \Shirabe\RustStubRegistry::adopt($this->__entityId, $this);
     }
 
     public function __get($name)
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, '__get', [$name]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, '__get', [$name]);
     }
 
     public function __set($name, $value): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, '__set', [$name, $value]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, '__set', [$name, $value]);
     }
 
     public function __isset($name): bool
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, '__isset', [$name]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, '__isset', [$name]);
     }
 
     public function __unset($name): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, '__unset', [$name]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, '__unset', [$name]);
     }
 
     public function __construct(?ProcessExecutor $executor = null)
     {
-        $this->__rhandle = \Shirabe\RpcRuntime::newRust(static::class, [$executor]);
-        \Shirabe\RustObjectRegistry::adopt($this->__rhandle, $this);
+        $this->__entityId = \Shirabe\RpcRuntime::newRust(static::class, [$executor]);
+        \Shirabe\RustStubRegistry::adopt($this->__entityId, $this);
     }
 
     public static function trimTrailingSlash(string $path)
@@ -116,121 +116,121 @@ class Filesystem implements \Shirabe\RustStub
 
     public function remove(string $file)
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'remove', [$file]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'remove', [$file]);
     }
 
     public function isDirEmpty(string $dir)
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'isDirEmpty', [$dir]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'isDirEmpty', [$dir]);
     }
 
     public function emptyDirectory(string $dir, bool $ensureDirectoryExists = true)
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'emptyDirectory', [$dir, $ensureDirectoryExists]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'emptyDirectory', [$dir, $ensureDirectoryExists]);
     }
 
     public function removeDirectory(string $directory)
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'removeDirectory', [$directory]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'removeDirectory', [$directory]);
     }
 
     public function removeDirectoryAsync(string $directory)
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'removeDirectoryAsync', [$directory]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'removeDirectoryAsync', [$directory]);
     }
 
     public function removeDirectoryPhp(string $directory)
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'removeDirectoryPhp', [$directory]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'removeDirectoryPhp', [$directory]);
     }
 
     public function ensureDirectoryExists(string $directory)
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'ensureDirectoryExists', [$directory]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'ensureDirectoryExists', [$directory]);
     }
 
     public function unlink(string $path)
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'unlink', [$path]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'unlink', [$path]);
     }
 
     public function rmdir(string $path)
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'rmdir', [$path]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'rmdir', [$path]);
     }
 
     public function copyThenRemove(string $source, string $target)
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'copyThenRemove', [$source, $target]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'copyThenRemove', [$source, $target]);
     }
 
     public function copy(string $source, string $target)
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'copy', [$source, $target]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'copy', [$source, $target]);
     }
 
     public function rename(string $source, string $target)
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'rename', [$source, $target]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'rename', [$source, $target]);
     }
 
     public function findShortestPath(string $from, string $to, bool $directories = false, bool $preferRelative = false)
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'findShortestPath', [$from, $to, $directories, $preferRelative]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'findShortestPath', [$from, $to, $directories, $preferRelative]);
     }
 
     public function findShortestPathCode(string $from, string $to, bool $directories = false, bool $staticCode = false, bool $preferRelative = false)
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'findShortestPathCode', [$from, $to, $directories, $staticCode, $preferRelative]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'findShortestPathCode', [$from, $to, $directories, $staticCode, $preferRelative]);
     }
 
     public function isAbsolutePath(string $path)
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'isAbsolutePath', [$path]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'isAbsolutePath', [$path]);
     }
 
     public function size(string $path)
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'size', [$path]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'size', [$path]);
     }
 
     public function normalizePath(string $path)
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'normalizePath', [$path]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'normalizePath', [$path]);
     }
 
     public function relativeSymlink(string $target, string $link)
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'relativeSymlink', [$target, $link]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'relativeSymlink', [$target, $link]);
     }
 
     public function isSymlinkedDirectory(string $directory)
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'isSymlinkedDirectory', [$directory]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'isSymlinkedDirectory', [$directory]);
     }
 
     public function junction(string $target, string $junction)
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'junction', [$target, $junction]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'junction', [$target, $junction]);
     }
 
     public function isJunction(string $junction)
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'isJunction', [$junction]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'isJunction', [$junction]);
     }
 
     public function removeJunction(string $junction)
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'removeJunction', [$junction]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'removeJunction', [$junction]);
     }
 
     public function filePutContentsIfModified(string $path, string $content)
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'filePutContentsIfModified', [$path, $content]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'filePutContentsIfModified', [$path, $content]);
     }
 
     public function safeCopy(string $source, string $target): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'safeCopy', [$source, $target]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, 'safeCopy', [$source, $target]);
     }
 }

@@ -15,37 +15,37 @@ class PackageEvent extends Event
 {
     public function __construct(string $eventName, Composer $composer, IOInterface $io, bool $devMode, RepositoryInterface $localRepo, array $operations, OperationInterface $operation)
     {
-        $this->__rhandle = \Shirabe\RpcRuntime::newRust(static::class, [$eventName, $composer, $io, $devMode, $localRepo, $operations, $operation]);
-        \Shirabe\RustObjectRegistry::adopt($this->__rhandle, $this);
+        $this->__entityId = \Shirabe\RpcRuntime::newRust(static::class, [$eventName, $composer, $io, $devMode, $localRepo, $operations, $operation]);
+        \Shirabe\RustStubRegistry::adopt($this->__entityId, $this);
     }
 
     public function getComposer(): Composer
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getComposer', []);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'getComposer', []);
     }
 
     public function getIO(): IOInterface
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getIO', []);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'getIO', []);
     }
 
     public function isDevMode(): bool
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'isDevMode', []);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'isDevMode', []);
     }
 
     public function getLocalRepo(): RepositoryInterface
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getLocalRepo', []);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'getLocalRepo', []);
     }
 
     public function getOperations(): array
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getOperations', []);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'getOperations', []);
     }
 
     public function getOperation(): OperationInterface
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getOperation', []);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'getOperation', []);
     }
 }

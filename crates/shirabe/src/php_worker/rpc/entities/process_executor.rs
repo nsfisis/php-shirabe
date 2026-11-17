@@ -12,7 +12,7 @@ use crate::php_worker::rpc::entity::{Call, Crossing, Entity, entity_value};
 use crate::php_worker::rpc::forwarding;
 use crate::util::{CommandLine, ProcessExecutor};
 use bstr::{BStr, BString};
-use shirabe_php_rpc::{FromPluginValue, PhpThrow, PluginValue, ToPluginValue, codec};
+use shirabe_php_rpc::{FromRpcValue, PhpThrow, RpcValue, ToRpcValue, codec};
 use shirabe_php_shim::{Catch as _, LogicException, path_from_bytes};
 
 impl Entity for std::rc::Rc<std::cell::RefCell<ProcessExecutor>> {
@@ -29,7 +29,7 @@ impl Entity for std::rc::Rc<std::cell::RefCell<ProcessExecutor>> {
 
 fn cwd(call: &Call<'_>, position: usize) -> Result<Option<std::path::PathBuf>, PhpThrow> {
     match call.args().get(position) {
-        None | Some(PluginValue::Null) => Ok(None),
+        None | Some(RpcValue::Null) => Ok(None),
         _ => call
             .arg::<BString>(position)
             .map(|cwd| Some(std::path::PathBuf::from(path_from_bytes(&cwd)))),
@@ -39,7 +39,7 @@ fn cwd(call: &Call<'_>, position: usize) -> Result<Option<std::path::PathBuf>, P
 /// Serves the `ProcessExecutor` proxy stub, whether the executor behind it belongs to the object
 /// graph or was built by plugin code writing `new ProcessExecutor(...)`. Both run their children in
 /// the Rust process, which is what keeps the timeout, the executable path cache and the job budget
-/// single-sourced across the boundary instead of forking a copy per world.
+/// single-sourced across the boundary instead of forking a copy per side.
 impl forwarding::util::process_executor::Forwarding
     for forwarding::util::process_executor::PhpClass
 {
@@ -55,7 +55,7 @@ impl forwarding::util::process_executor::Forwarding
         )))
     }
 
-    fn execute(process: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+    fn execute(process: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         let failed = call.failed();
         let command = exec_command_arg(call, 0)?;
         let cwd = cwd(call, 2)?;
@@ -65,7 +65,7 @@ impl forwarding::util::process_executor::Forwarding
             return process
                 .borrow()
                 .execute(command, ProcessExecutor::FORWARD_OUTPUT, cwd.as_deref())
-                .map(|code| code.to_plugin_value())
+                .map(|code| code.to_rpc_value())
                 .map_err(failed);
         };
         if is_php_callable(output).map_err(&failed)? {
@@ -74,14 +74,14 @@ impl forwarding::util::process_executor::Forwarding
                 Box::new(move |r#type: &BStr, buffer: &BStr| {
                     call_php_callable(
                         &callable,
-                        vec![PluginValue::string(r#type), PluginValue::string(buffer)],
+                        vec![RpcValue::string(r#type), RpcValue::string(buffer)],
                     )?;
                     Ok(false)
                 });
             return process
                 .borrow()
                 .execute(command, callback, cwd.as_deref())
-                .map(|code| code.to_plugin_value())
+                .map(|code| code.to_rpc_value())
                 .map_err(failed);
         }
         let mut captured: Option<BString> = None;
@@ -92,61 +92,61 @@ impl forwarding::util::process_executor::Forwarding
         // PHP leaves `$output` alone when the child was signaled before the assignment, which is
         // what leaving it out of the out-params reproduces.
         if let Some(captured) = captured {
-            call.set_out_param(1, PluginValue::string(captured));
+            call.set_out_param(1, RpcValue::string(captured));
         }
-        Ok(code.to_plugin_value())
+        Ok(code.to_rpc_value())
     }
 
-    fn execute_tty(process: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+    fn execute_tty(process: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         Ok(process
             .borrow()
             .execute_tty(exec_command_arg(call, 0)?, cwd(call, 1)?.as_deref())
             .map_err(call.failed())?
-            .to_plugin_value())
+            .to_rpc_value())
     }
 
-    fn split_lines(process: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+    fn split_lines(process: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         let output = call.arg_or(0, BString::default())?;
-        Ok(PluginValue::List(
+        Ok(RpcValue::List(
             process
                 .borrow()
                 .split_lines(&output)
                 .into_iter()
-                .map(PluginValue::string)
+                .map(RpcValue::string)
                 .collect(),
         ))
     }
 
-    fn get_error_output(process: &Self::Handle, _: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
-        Ok(PluginValue::string(process.borrow().get_error_output()))
+    fn get_error_output(process: &Self::Handle, _: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
+        Ok(RpcValue::string(process.borrow().get_error_output()))
     }
 
     fn requires_git_dir_env(
         process: &Self::Handle,
         call: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    ) -> Result<RpcValue, PhpThrow> {
         Ok(process
             .borrow()
             .requires_git_dir_env(&exec_command_arg(call, 0)?)
-            .to_plugin_value())
+            .to_rpc_value())
     }
 
-    fn set_max_jobs(process: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+    fn set_max_jobs(process: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         process.borrow().set_max_jobs(call.arg::<i64>(0)?);
-        Ok(PluginValue::Null)
+        Ok(RpcValue::Null)
     }
 
-    fn reset_max_jobs(process: &Self::Handle, _: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+    fn reset_max_jobs(process: &Self::Handle, _: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         process.borrow().reset_max_jobs();
-        Ok(PluginValue::Null)
+        Ok(RpcValue::Null)
     }
 
-    fn enable_async(process: &Self::Handle, _: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+    fn enable_async(process: &Self::Handle, _: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         process.borrow().enable_async();
-        Ok(PluginValue::Null)
+        Ok(RpcValue::Null)
     }
 
-    fn execute_async(process: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+    fn execute_async(process: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         let failed = call.failed();
         let command = exec_command_arg(call, 0)?;
         let cwd = cwd(call, 1)?;
@@ -159,7 +159,7 @@ impl forwarding::util::process_executor::Forwarding
             entity_value(&std::rc::Rc::new(std::cell::RefCell::new(child)))
         };
         let future: std::pin::Pin<
-            Box<dyn std::future::Future<Output = Result<PluginValue, PhpThrow>>>,
+            Box<dyn std::future::Future<Output = Result<RpcValue, PhpThrow>>>,
         > = match poll_once(&mut future) {
             // PHP raises the async gate out of `executeAsync()` itself, and it is the port's only
             // `LogicException` here; a child that fails to start rejects the promise.
@@ -189,7 +189,7 @@ impl forwarding::util::process_executor::Forwarding
         ))
     }
 
-    fn wait(process: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+    fn wait(process: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         dispatch_tick_method(
             JobOwner::process_executor(process),
             PROCESS_EXECUTOR_TICK_CAP,
@@ -201,7 +201,7 @@ impl forwarding::util::process_executor::Forwarding
     fn count_active_jobs(
         process: &Self::Handle,
         call: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    ) -> Result<RpcValue, PhpThrow> {
         dispatch_tick_method(
             JobOwner::process_executor(process),
             PROCESS_EXECUTOR_TICK_CAP,
@@ -210,13 +210,13 @@ impl forwarding::util::process_executor::Forwarding
         )
     }
 
-    fn get_timeout(_: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
-        Ok(ProcessExecutor::get_timeout().to_plugin_value())
+    fn get_timeout(_: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
+        Ok(ProcessExecutor::get_timeout().to_rpc_value())
     }
 
-    fn set_timeout(call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+    fn set_timeout(call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         ProcessExecutor::set_timeout(call.arg::<i64>(0)?);
-        Ok(PluginValue::Null)
+        Ok(RpcValue::Null)
     }
 }
 
@@ -224,8 +224,8 @@ impl forwarding::util::process_executor::Forwarding
 fn exec_command_arg(call: &Call<'_>, position: usize) -> Result<CommandLine, PhpThrow> {
     let value = call.args().get(position).unwrap_or(&codec::NULL);
     match value {
-        PluginValue::String(bytes) => Ok(CommandLine::Shell(bytes.clone())),
-        PluginValue::List(_) => Vec::<BString>::from_plugin_value(value).map(CommandLine::Args),
+        RpcValue::String(bytes) => Ok(CommandLine::Shell(bytes.clone())),
+        RpcValue::List(_) => Vec::<BString>::from_rpc_value(value).map(CommandLine::Args),
         other => Err(codec::unexpected(
             "a command string or argument list",
             other,
@@ -243,7 +243,7 @@ mod tests {
     fn a_process_command_keeps_its_bytes() {
         let bytes = BString::from(b"echo \xff".as_slice());
 
-        let args = [PluginValue::String(bytes.clone())];
+        let args = [RpcValue::String(bytes.clone())];
         let mut out_params = IndexMap::new();
         let call = Call::new(
             BStr::new("Composer\\Util\\ProcessExecutor"),

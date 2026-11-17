@@ -3,7 +3,7 @@
 use crate::php_worker::rpc::entity::{Call, Crossing, Entity, entity_value};
 use crate::php_worker::rpc::forwarding;
 use crate::repository::RepositoryManagerInterface;
-use shirabe_php_rpc::{PhpThrow, PluginValue};
+use shirabe_php_rpc::{PhpThrow, RpcValue};
 
 impl Entity for std::rc::Rc<std::cell::RefCell<dyn RepositoryManagerInterface>> {
     const EXPECTED: &'static [u8] = b"a RepositoryManager";
@@ -23,7 +23,7 @@ impl forwarding::repository::repository_manager::Forwarding
 {
     type Handle = std::rc::Rc<std::cell::RefCell<dyn RepositoryManagerInterface>>;
 
-    fn get_local_repository(rm: &Self::Handle, _: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+    fn get_local_repository(rm: &Self::Handle, _: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         entity_value(&rm.borrow().get_local_repository())
     }
 }

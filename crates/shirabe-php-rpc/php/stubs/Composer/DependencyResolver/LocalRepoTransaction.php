@@ -12,7 +12,7 @@ class LocalRepoTransaction extends Transaction
 {
     public function __construct(RepositoryInterface $lockedRepository, InstalledRepositoryInterface $localRepository)
     {
-        $this->__rhandle = \Shirabe\RpcRuntime::newRust(static::class, [$lockedRepository, $localRepository]);
-        \Shirabe\RustObjectRegistry::adopt($this->__rhandle, $this);
+        $this->__entityId = \Shirabe\RpcRuntime::newRust(static::class, [$lockedRepository, $localRepository]);
+        \Shirabe\RustStubRegistry::adopt($this->__entityId, $this);
     }
 }

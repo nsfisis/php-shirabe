@@ -16,7 +16,7 @@ use crate::php_worker::rpc::entity::{Call, Crossing, Entity};
 use crate::php_worker::rpc::forwarding;
 use crate::util::{HttpDownloader, HttpDownloaderJob, StreamContextOptions};
 use bstr::{BStr, BString, ByteSlice as _};
-use shirabe_php_rpc::{PhpThrow, PluginValue, ToPluginValue};
+use shirabe_php_rpc::{PhpThrow, RpcValue, ToRpcValue};
 use shirabe_php_shim::{bformat, path_from_bytes};
 
 impl Entity for std::rc::Rc<std::cell::RefCell<HttpDownloader>> {
@@ -37,7 +37,7 @@ fn add_job(
     call: &Call<'_>,
     to: Option<BString>,
     options_position: usize,
-) -> Result<PluginValue, PhpThrow> {
+) -> Result<RpcValue, PhpThrow> {
     let url = call.arg::<BString>(0)?;
     let options = call.arg_or(options_position, StreamContextOptions::new())?;
     let failed = call.failed();
@@ -54,7 +54,7 @@ fn add_job(
         )
         .map_err(&failed)?;
     match job {
-        HttpDownloaderJob::Settled(Ok(response)) => resolved_promise(response.to_plugin_value()),
+        HttpDownloaderJob::Settled(Ok(response)) => resolved_promise(response.to_rpc_value()),
         HttpDownloaderJob::Settled(Err(error)) => rejected_promise(failed(error)),
         HttpDownloaderJob::Pending(future) => {
             let method = call.method().to_owned();
@@ -69,7 +69,7 @@ fn add_job(
                 Box::pin(async move {
                     future
                         .await
-                        .map(ToPluginValue::to_plugin_value)
+                        .map(ToRpcValue::to_rpc_value)
                         .map_err(|error| error_throw(bformat!("{method} failed"), &error))
                 }),
             ))
@@ -94,30 +94,27 @@ impl forwarding::util::http_downloader::Forwarding for forwarding::util::http_do
         Ok(std::rc::Rc::new(std::cell::RefCell::new(downloader)))
     }
 
-    fn get_options(downloader: &Self::Handle, _: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
-        Ok(downloader.borrow().get_options().clone().to_plugin_value())
+    fn get_options(downloader: &Self::Handle, _: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
+        Ok(downloader.borrow().get_options().clone().to_rpc_value())
     }
 
-    fn set_options(
-        downloader: &Self::Handle,
-        call: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    fn set_options(downloader: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         let options = call.arg::<StreamContextOptions>(0)?;
         downloader.borrow_mut().set_options(options);
-        Ok(PluginValue::Null)
+        Ok(RpcValue::Null)
     }
 
-    fn get(downloader: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+    fn get(downloader: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         let url = call.arg::<BString>(0)?;
         let options = call.arg_or(1, StreamContextOptions::new())?;
         let response = downloader
             .borrow()
             .get(&url, options)
             .map_err(call.failed())?;
-        Ok(response.to_plugin_value())
+        Ok(response.to_rpc_value())
     }
 
-    fn copy(downloader: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+    fn copy(downloader: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         let url = call.arg::<BString>(0)?;
         let to = call.arg::<BString>(1)?;
         let options = call.arg_or(2, StreamContextOptions::new())?;
@@ -125,24 +122,24 @@ impl forwarding::util::http_downloader::Forwarding for forwarding::util::http_do
             .borrow()
             .copy(&url, path_from_bytes(&to), options)
             .map_err(call.failed())?;
-        Ok(response.to_plugin_value())
+        Ok(response.to_rpc_value())
     }
 
-    fn add(downloader: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+    fn add(downloader: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         add_job(downloader, call, None, 1)
     }
 
-    fn add_copy(downloader: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+    fn add_copy(downloader: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         let to = call.arg::<BString>(1)?;
         add_job(downloader, call, Some(to), 2)
     }
 
-    fn enable_async(downloader: &Self::Handle, _: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+    fn enable_async(downloader: &Self::Handle, _: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         downloader.borrow_mut().enable_async();
-        Ok(PluginValue::Null)
+        Ok(RpcValue::Null)
     }
 
-    fn wait(downloader: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+    fn wait(downloader: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         dispatch_tick_method(
             JobOwner::http_downloader(downloader),
             HTTP_DOWNLOADER_TICK_CAP,
@@ -154,7 +151,7 @@ impl forwarding::util::http_downloader::Forwarding for forwarding::util::http_do
     fn count_active_jobs(
         downloader: &Self::Handle,
         call: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    ) -> Result<RpcValue, PhpThrow> {
         dispatch_tick_method(
             JobOwner::http_downloader(downloader),
             HTTP_DOWNLOADER_TICK_CAP,

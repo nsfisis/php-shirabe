@@ -8,7 +8,7 @@ use crate::php_worker::rpc::entity::entity_value;
 use crate::repository::InstalledRepositoryInterfaceHandle;
 use bstr::BStr;
 use indexmap::IndexMap;
-use shirabe_php_rpc::{FromPluginValue, PhpObjHandle, PluginValue, ToPluginValue, codec};
+use shirabe_php_rpc::{FromRpcValue, PhpEntityHandle, RpcValue, ToRpcValue, codec};
 use shirabe_php_shim::PhpMixed;
 
 /// `InstallerInterface` adapter for an installer entity living in the PHP child process: the
@@ -16,62 +16,58 @@ use shirabe_php_shim::PhpMixed;
 /// `composer-installer` package names. Every call is forwarded as a `CallMethod` RPC.
 #[derive(Debug)]
 pub struct PhpInstallerProxy {
-    handle: PhpObjHandle,
+    handle: PhpEntityHandle,
 }
 
 impl PhpInstallerProxy {
-    fn new(handle: PhpObjHandle) -> Self {
+    fn new(handle: PhpEntityHandle) -> Self {
         Self { handle }
     }
 
-    fn call<R: FromPluginValue>(&self, method: &BStr, args: Vec<PluginValue>) -> anyhow::Result<R> {
+    fn call<R: FromRpcValue>(&self, method: &BStr, args: Vec<RpcValue>) -> anyhow::Result<R> {
         PhpCall::Method(&self.handle, method).run(args)
     }
 
-    fn package_arg(package: &PackageInterfaceHandle) -> PluginValue {
-        package.clone().to_plugin_value()
+    fn package_arg(package: &PackageInterfaceHandle) -> RpcValue {
+        package.clone().to_rpc_value()
     }
 
-    fn optional_package_arg(package: &Option<PackageInterfaceHandle>) -> PluginValue {
+    fn optional_package_arg(package: &Option<PackageInterfaceHandle>) -> RpcValue {
         match package {
             Some(package) => Self::package_arg(package),
-            None => PluginValue::Null,
+            None => RpcValue::Null,
         }
     }
 
-    fn repo_arg(repo: &InstalledRepositoryInterfaceHandle) -> anyhow::Result<PluginValue> {
+    fn repo_arg(repo: &InstalledRepositoryInterfaceHandle) -> anyhow::Result<RpcValue> {
         Ok(entity_value(&repo.as_repository_handle())?)
     }
 
     /// The `?PromiseInterface` half of the installer contract. The Rust callers await the
     /// installer's effects rather than chaining continuations, so a returned promise is awaited
-    /// here as the PHP-owned job it crossed the boundary as.
+    /// here as the PHP-owned promise it crossed the boundary as.
     async fn promise_result(
         &self,
         method: &BStr,
-        value: PluginValue,
+        value: RpcValue,
     ) -> anyhow::Result<Option<PhpMixed>> {
         let call = PhpCall::Method(&self.handle, method);
         let id = match value {
-            PluginValue::Null => return Ok(None),
-            PluginValue::Job(id) => id,
+            RpcValue::Null => return Ok(None),
+            RpcValue::PromiseHandle(id) => id,
             other => {
                 return Err(call.unsupported_shape(codec::unexpected("a promise or null", &other)));
             }
         };
-        let result = job::await_php_job(id).await?;
-        Option::<PhpMixed>::from_plugin_value(&result)
-            .map_err(|throw| call.unsupported_shape(throw))
+        let result = job::await_php_promise(id).await?;
+        Option::<PhpMixed>::from_rpc_value(&result).map_err(|throw| call.unsupported_shape(throw))
     }
 }
 
 #[async_trait::async_trait(?Send)]
 impl InstallerInterface for PhpInstallerProxy {
     fn supports(&self, package_type: &bstr::BStr) -> anyhow::Result<bool> {
-        self.call(
-            BStr::new("supports"),
-            vec![PluginValue::string(package_type)],
-        )
+        self.call(BStr::new("supports"), vec![RpcValue::string(package_type)])
     }
 
     fn is_installed(
@@ -103,7 +99,7 @@ impl InstallerInterface for PhpInstallerProxy {
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         let args = vec![
-            PluginValue::string(r#type),
+            RpcValue::string(r#type),
             Self::package_arg(&package),
             Self::optional_package_arg(&prev_package),
         ];
@@ -153,7 +149,7 @@ impl InstallerInterface for PhpInstallerProxy {
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         let args = vec![
-            PluginValue::string(r#type),
+            RpcValue::string(r#type),
             Self::package_arg(&package),
             Self::optional_package_arg(&prev_package),
         ];
@@ -181,12 +177,12 @@ thread_local! {
     /// the entity. `removeInstaller` arrives carrying the same entity, and the manager compares
     /// installers by identity, so the adapter it was given has to be found again rather than
     /// rebuilt.
-    static PHP_INSTALLER_PROXIES: std::cell::RefCell<IndexMap<PhpObjHandle, std::rc::Rc<dyn InstallerInterface>>> =
+    static PHP_INSTALLER_PROXIES: std::cell::RefCell<IndexMap<PhpEntityHandle, std::rc::Rc<dyn InstallerInterface>>> =
         std::cell::RefCell::new(IndexMap::new());
 }
 
 /// The adapter for an installer entity, building it on first sight.
-pub(crate) fn php_installer_proxy(handle: PhpObjHandle) -> std::rc::Rc<dyn InstallerInterface> {
+pub(crate) fn php_installer_proxy(handle: PhpEntityHandle) -> std::rc::Rc<dyn InstallerInterface> {
     PHP_INSTALLER_PROXIES.with(|proxies| {
         let mut proxies = proxies.borrow_mut();
         if let Some(existing) = proxies.get(&handle) {
@@ -200,7 +196,7 @@ pub(crate) fn php_installer_proxy(handle: PhpObjHandle) -> std::rc::Rc<dyn Insta
 }
 
 /// Drops the adapter bookkeeping for an installer entity that left the manager.
-pub(crate) fn forget_php_installer_proxy(handle: &PhpObjHandle) {
+pub(crate) fn forget_php_installer_proxy(handle: &PhpEntityHandle) {
     PHP_INSTALLER_PROXIES.with(|proxies| {
         proxies.borrow_mut().shift_remove(handle);
     });

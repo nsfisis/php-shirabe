@@ -57,7 +57,7 @@ The living services: `Composer`, `Config`, `RepositoryManager`,
 State sharing is their essence; every method call round-trips to the Rust
 entity. Not all of them have a stub; those without one are guarded.
 `Composer\EventDispatcher\Event` and `Composer\Plugin\PreCommandRunEvent`
-are dual-mode: an instance revived from a Rust handle forwards over RPC,
+are dual-mode: an instance revived from a Rust entity handle forwards over RPC,
 while one constructed in the worker runs natively (see "Dual
 instantiation").
 
@@ -78,7 +78,7 @@ artifact yet and is guarded.
 value-object rule, which rejects it because `collect()` assigns to `$this`.
 The entity it would otherwise need does not exist: a response is built for
 one request and the graph never retains it, and `collect()` frees the copy
-each world holds, which is what that method is for. Two of its members do
+each side holds, which is what that method is for. Two of its members do
 not work from the child even so: `decodeJson()` reaches
 `Composer\Json\JsonFile`, which a guard shadows, and Composer answers a
 curl request with the `CurlResponse` subclass where this port flattens the
@@ -122,7 +122,7 @@ Rust side reaches the instance through the `InstallerInterface` adapter.
 
 An exception-list category (it cannot be inferred from the sources):
 `Composer\Console\*`, `Composer\Command\*`, the whole symfony/console
-package, and `Composer\Util\Loop` / `Composer\Util\SyncHelper`. Each world runs its own full implementation; instances do not cross
+package, and `Composer\Util\Loop` / `Composer\Util\SyncHelper`. Each side runs its own full implementation; instances do not cross
 the boundary.
 
 #### php-native
@@ -133,7 +133,7 @@ exception classes, constants-only classes, the state-decoupled vendor packages
 (composer/pcre, composer/semver, seld/jsonlint, justinrainbow/json-schema,
 …) — and *reachable* classes that are stateless and pure (`VersionParser`,
 `Auditor`, `Platform\Runtime`): with no instance state to share, the real
-code answers identically in both worlds, and a snapshot would have nothing
+code answers identically on both sides, and a snapshot would have nothing
 to copy.
 
 #### unsupported
@@ -166,7 +166,7 @@ design-sensitive.
 #### mutable-static
 
 The class writes to `static` properties. Sub-classified by the disposition
-list (see exception lists): `memo-cache` (pure memoization, each world may
+list (see exception lists): `memo-cache` (pure memoization, each side may
 compute its own: `Git::$version`, `Hg`, `Svn`, …), `seed-once`
 (copied from the Rust side once at child startup; nothing is filed this way
 today), `needs-sync` (genuinely shared process state: `Platform`'s env table,
@@ -268,7 +268,7 @@ Iterate to a fixed point. Private members and method bodies do not extend the
 closure — the boundary is the declared API surface, not the implementation.
 Two-world classes do not extend it either: the child process carries their
 real implementation wholesale, so a `Command` subclass's protected fields are
-local to world 2, not graph seams.
+local to the PHP side, not graph seams.
 
 ### Direction marking
 
@@ -306,7 +306,7 @@ Assigned in order:
    purity analysis, and the method bodies are locally satisfiable (they
    construct nothing that will be a proxied service). With no state to
    share there is nothing to proxy or snapshot; the real code, run against
-   injected proxies, behaves identically in both worlds. This catches
+   injected proxies, behaves identically on both sides. This catches
    `VersionParser`, `Auditor`, `Platform\Runtime`, `NoopInstaller`.
 7. Value-object test → `rust-snapshot`: same purity and body-locality
    conditions, plus (a) at least one instance property (something to
@@ -425,12 +425,12 @@ the `plugin-constructible` attribute exists to surface.
 `rust-proxy` stub, and a plugin-`new`ed instance allocates a Rust-side entity
 of its own rather than a second, unconnected executor. That is what keeps
 `$timeout` — process-wide state Composer seeds from `process-timeout` and
-`RunScriptCommand` rewrites mid-run — readable and writable from both worlds
+`RunScriptCommand` rewrites mid-run — readable and writable from both sides
 through one value, and it is what lets the executor stay a constructor
 argument of the classes that take one (`new Filesystem($process)` is what
 plugins actually write). Children are spawned in the Rust process either way,
 which is also correct for stdio: the worker inherits the Rust process's
-standard streams, so both worlds see the same terminal.
+standard streams, so both sides see the same terminal.
 
 The async surface — `executeAsync()`, `wait()`, `enableAsync()`,
 `countActiveJobs()` — is served on the same terms, for a graph-owned executor
@@ -446,7 +446,7 @@ that inspects a terminated process. See
 
 `HttpDownloader` is a proxy stub on the same terms and for the same reasons:
 its options, its TLS defaults and the authentication it collects into the
-run's IO are state the two worlds have to share, and a plugin-`new`ed one
+run's IO are state the two sides have to share, and a plugin-`new`ed one
 allocates a Rust-side entity rather than a second downloader the graph knows
 nothing about. `get()` and `copy()` answer with a
 `Composer\Util\Http\Response` the child holds as a value (see below). The
@@ -490,8 +490,8 @@ no reverse adapter.
 writes the lock file through, so it is a `rust-proxy` stub: the lock data a
 plugin reads is the cache the Rust side holds, and an in-memory
 `setLockData(..., false)` is seen by the Rust side's next read. The lock
-contents are sent as plain arrays, the platform requirements as materialized
-`Link` values keyed by package name, and `getLockedRepository()` as a
+contents are sent as plain arrays, the platform requirements as by-value
+`Link` objects keyed by package name, and `getLockedRepository()` as a
 `LockArrayRepository` stub over a fresh Rust-side repository, as upstream
 builds a fresh one per call.
 
@@ -573,7 +573,7 @@ lookup the worker makes walks it, whether a plugin call or a script call is in
 flight, so the loader `EventDispatcher` builds for scripts sits on the same
 stack after the plugin loaders.
 
-### ConsoleIO leaks world-2 objects
+### ConsoleIO leaks PHP-side objects
 
 `ConsoleIO` (rust-proxy) returns real symfony/console instances through the
 seam: `getTable(): Table` / `getProgressBar(): ProgressBar`, and its

@@ -51,7 +51,7 @@ impl Loop {
         let mut uncaught: Option<anyhow::Error> = None;
         let owners = self.job_owners();
         // The awaits a wait further up the stack is parked on are not this group's.
-        let parked_before = job::parked_php_jobs();
+        let parked_before = job::parked_php_promises();
         let mut progress_started = false;
         let mut last_update = 0.0;
         let mut progress_error: Option<anyhow::Error> = None;
@@ -68,8 +68,8 @@ impl Loop {
             }
 
             // PHP's wait ends when the two services report no active job, which covers the jobs
-            // plugin code started on them and never waited on. Those sit in the job registry; it
-            // is empty in a run that never started the plugin worker.
+            // plugin code started on them and never waited on. Those back Rust-owned promises in
+            // the promise registry, which is empty in a run that never started the plugin worker.
             let jobs_left = match job::poll_jobs_in_wait(&owners, cx) {
                 Ok(jobs_left) => jobs_left,
                 Err(e) => {
@@ -107,12 +107,12 @@ impl Loop {
             // push a settle and every remaining future parked on such a promise, nothing can run
             // that code any more; PHP spins in its wait loop forever at this point.
             if !jobs_left && !pending.is_empty() {
-                let parked: Vec<u64> = job::parked_php_jobs()
+                let parked: Vec<u64> = job::parked_php_promises()
                     .into_iter()
                     .filter(|id| !parked_before.contains(id))
                     .collect();
                 if parked.len() >= pending.len() {
-                    job::fail_php_jobs(&parked);
+                    job::fail_php_promises(&parked);
                 }
             }
 

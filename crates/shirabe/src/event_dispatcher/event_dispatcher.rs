@@ -46,7 +46,7 @@ pub enum Callable {
     Closure(std::rc::Rc<dyn Fn(&dyn EventInterface) -> PhpMixed>),
     /// `[$subscriber, $methodName]` array callable whose object half is a plugin entity in the
     /// PHP child process, registered through `addSubscriber`. Invoked over RPC.
-    PhpMethod(shirabe_php_rpc::PhpObjHandle, BString),
+    PhpMethod(shirabe_php_rpc::PhpEntityHandle, BString),
 }
 
 impl std::fmt::Debug for Callable {
@@ -937,10 +937,10 @@ impl EventDispatcher {
 
     /// PHP's parameter is `callable|object`; every caller in Composer and its test suite
     /// passes an object, and no `Callable` shape holds a bare object, so the parameter is
-    /// narrowed to the object's cross-RPC identity (its P-table handle). Of PHP's two match
+    /// narrowed to the object's cross-RPC identity (its PHP entity handle). Of PHP's two match
     /// conditions only `$candidate[0] === $listener` can fire for an object listener; it maps
     /// to handle equality on `Callable::PhpMethod`.
-    pub fn remove_listener(&mut self, listener: &shirabe_php_rpc::PhpObjHandle) {
+    pub fn remove_listener(&mut self, listener: &shirabe_php_rpc::PhpEntityHandle) {
         for priorities in self.listeners.values_mut() {
             for listeners in priorities.values_mut() {
                 // TODO(plugin): an `ArrayCallable`'s object half is a `PhpMixed` without
@@ -1282,7 +1282,7 @@ pub trait EventDispatcherInterface: std::fmt::Debug {
     ) -> anyhow::Result<i64>;
     fn add_listener(&mut self, event_name: &BStr, listener: Callable, priority: i64);
     fn add_subscriber(&mut self, subscriber: &dyn EventSubscriberInterface) -> anyhow::Result<()>;
-    fn remove_listener(&mut self, listener: &shirabe_php_rpc::PhpObjHandle);
+    fn remove_listener(&mut self, listener: &shirabe_php_rpc::PhpEntityHandle);
     fn has_event_listeners(&mut self, event: &dyn EventInterface) -> bool;
 }
 
@@ -1323,7 +1323,7 @@ impl EventDispatcherInterface for EventDispatcher {
         self.add_subscriber(subscriber)
     }
 
-    fn remove_listener(&mut self, listener: &shirabe_php_rpc::PhpObjHandle) {
+    fn remove_listener(&mut self, listener: &shirabe_php_rpc::PhpEntityHandle) {
         self.remove_listener(listener);
     }
 

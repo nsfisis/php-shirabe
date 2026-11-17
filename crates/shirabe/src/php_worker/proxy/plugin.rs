@@ -8,18 +8,18 @@ use crate::php_worker::rpc::entity::entity_value;
 use crate::plugin::{Capable, PluginInterface};
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
-use shirabe_php_rpc::{FromPluginValue, PhpObjHandle, PhpThrow, PluginValue, codec};
+use shirabe_php_rpc::{FromRpcValue, PhpEntityHandle, PhpThrow, RpcValue, codec};
 use shirabe_php_shim::PhpMixed;
 
 /// `PluginInterface` adapter for a plugin entity living in the PHP child process: every
 /// lifecycle call is forwarded as a `CallMethod` RPC.
 #[derive(Debug)]
 pub struct PhpPluginProxy {
-    pub(crate) handle: PhpObjHandle,
+    pub(crate) handle: PhpEntityHandle,
 }
 
 impl PhpPluginProxy {
-    pub fn new(handle: PhpObjHandle) -> Self {
+    pub fn new(handle: PhpEntityHandle) -> Self {
         Self { handle }
     }
 
@@ -30,7 +30,7 @@ impl PhpPluginProxy {
         io: &std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     ) -> anyhow::Result<()> {
         let args = vec![entity_value(composer)?, entity_value(io)?];
-        PhpCall::Method(&self.handle, method).run::<PluginValue>(args)?;
+        PhpCall::Method(&self.handle, method).run::<RpcValue>(args)?;
         Ok(())
     }
 
@@ -38,8 +38,8 @@ impl PhpPluginProxy {
     /// PHPUnit assertions like `$plugins[0]->version`.
     pub fn __get_property(&self, name: &BStr) -> anyhow::Result<PhpMixed> {
         PhpCall::Function(BStr::new("__shirabe_get_property")).run(vec![
-            PluginValue::PhpHandle(self.handle.clone()),
-            PluginValue::string(name),
+            RpcValue::PhpEntityHandle(self.handle.clone()),
+            RpcValue::string(name),
         ])
     }
 }
@@ -110,7 +110,7 @@ impl EventSubscriberInterface for PhpPluginProxy {
         PhpCall::Method(&self.handle, BStr::new("getSubscribedEvents")).run(Vec::new())
     }
 
-    fn subscriber_handle(&self) -> PhpObjHandle {
+    fn subscriber_handle(&self) -> PhpEntityHandle {
         self.handle.clone()
     }
 }
@@ -118,20 +118,19 @@ impl EventSubscriberInterface for PhpPluginProxy {
 impl Capable for PhpPluginProxy {
     fn get_capabilities(&self) -> anyhow::Result<IndexMap<BString, PhpMixed>> {
         let call = PhpCall::Method(&self.handle, BStr::new("getCapabilities"));
-        let value: PluginValue = call.run(Vec::new())?;
+        let value: RpcValue = call.run(Vec::new())?;
         // PHP: `(array) $plugin->getCapabilities()` — the interface declares no return type,
         // so a non-array return is cast. A handle in the map (a plugin putting an object among
         // its capability values) has no PhpMixed image and fails the conversion explicitly.
         let entries = match value {
-            PluginValue::Null => IndexMap::new(),
-            array @ (PluginValue::Array(_) | PluginValue::List(_)) => {
-                IndexMap::<BString, PhpMixed>::from_plugin_value(&array)
+            RpcValue::Null => IndexMap::new(),
+            array @ (RpcValue::Array(_) | RpcValue::List(_)) => {
+                IndexMap::<BString, PhpMixed>::from_rpc_value(&array)
                     .map_err(|throw| call.unsupported_shape(throw))?
             }
             scalar => IndexMap::from([(
                 "0".into(),
-                PhpMixed::from_plugin_value(&scalar)
-                    .map_err(|throw| call.unsupported_shape(throw))?,
+                PhpMixed::from_rpc_value(&scalar).map_err(|throw| call.unsupported_shape(throw))?,
             )]),
         };
         Ok(entries)
@@ -141,24 +140,24 @@ impl Capable for PhpPluginProxy {
 /// One entry of a `getSubscribedEvents()` answer, in the three shapes `addSubscriber`
 /// distinguishes: `'method'`, `['method', priority]`, and `[['method', priority], ...]`. A shape
 /// outside these is an explicit error, never a silently dropped listener.
-impl FromPluginValue for SubscribedEventEntry {
-    fn from_plugin_value(value: &PluginValue) -> Result<Self, PhpThrow> {
-        let listener = |items: &[PluginValue]| -> Result<(BString, Option<i64>), PhpThrow> {
+impl FromRpcValue for SubscribedEventEntry {
+    fn from_rpc_value(value: &RpcValue) -> Result<Self, PhpThrow> {
+        let listener = |items: &[RpcValue]| -> Result<(BString, Option<i64>), PhpThrow> {
             Ok((
-                BString::from_plugin_value(items.first().unwrap_or(&codec::NULL))?,
-                Option::<i64>::from_plugin_value(items.get(1).unwrap_or(&codec::NULL))?,
+                BString::from_rpc_value(items.first().unwrap_or(&codec::NULL))?,
+                Option::<i64>::from_rpc_value(items.get(1).unwrap_or(&codec::NULL))?,
             ))
         };
         match value {
-            PluginValue::String(method) => Ok(SubscribedEventEntry::Method(method.clone())),
-            PluginValue::List(items) if matches!(items.first(), Some(PluginValue::String(_))) => {
+            RpcValue::String(method) => Ok(SubscribedEventEntry::Method(method.clone())),
+            RpcValue::List(items) if matches!(items.first(), Some(RpcValue::String(_))) => {
                 let (method, priority) = listener(items)?;
                 Ok(SubscribedEventEntry::MethodWithPriority(method, priority))
             }
-            PluginValue::List(items) => items
+            RpcValue::List(items) => items
                 .iter()
                 .map(|item| match item {
-                    PluginValue::List(pair) => listener(pair),
+                    RpcValue::List(pair) => listener(pair),
                     other => Err(codec::unexpected("a [method, priority] pair", other)),
                 })
                 .collect::<Result<_, _>>()
@@ -178,24 +177,19 @@ mod tests {
     #[test]
     fn a_listener_method_name_that_is_not_utf8_keeps_its_bytes() {
         let method = BString::from(b"on\xffEvent".as_slice());
-        let events = IndexMap::<BString, SubscribedEventEntry>::from_plugin_value(
-            &PluginValue::Array(IndexMap::from([
-                (BString::from("a"), PluginValue::String(method.clone())),
+        let events = IndexMap::<BString, SubscribedEventEntry>::from_rpc_value(&RpcValue::Array(
+            IndexMap::from([
+                (BString::from("a"), RpcValue::String(method.clone())),
                 (
                     BString::from("b"),
-                    PluginValue::List(vec![
-                        PluginValue::String(method.clone()),
-                        PluginValue::Int(1),
-                    ]),
+                    RpcValue::List(vec![RpcValue::String(method.clone()), RpcValue::Int(1)]),
                 ),
                 (
                     BString::from("c"),
-                    PluginValue::List(vec![PluginValue::List(vec![PluginValue::String(
-                        method.clone(),
-                    )])]),
+                    RpcValue::List(vec![RpcValue::List(vec![RpcValue::String(method.clone())])]),
                 ),
-            ])),
-        )
+            ]),
+        ))
         .unwrap();
         assert!(matches!(&events[bstr::B("a")], SubscribedEventEntry::Method(m) if *m == method));
         assert!(
@@ -209,11 +203,10 @@ mod tests {
     #[test]
     fn an_event_name_that_is_not_utf8_keeps_its_bytes() {
         let name = BString::from(b"event\xE9".as_slice());
-        let events =
-            IndexMap::<BString, SubscribedEventEntry>::from_plugin_value(&PluginValue::Array(
-                IndexMap::from([(name.clone(), PluginValue::String(BString::from("method")))]),
-            ))
-            .unwrap();
+        let events = IndexMap::<BString, SubscribedEventEntry>::from_rpc_value(&RpcValue::Array(
+            IndexMap::from([(name.clone(), RpcValue::String(BString::from("method")))]),
+        ))
+        .unwrap();
         assert!(events.contains_key(&name));
     }
 }

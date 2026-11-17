@@ -1,10 +1,11 @@
 //! The methods a Rust-implemented `Composer\Plugin\PluginInterface` entity answers over RPC. A
-//! PHP-implemented plugin never crosses this way: its entity lives in the child's P table already.
+//! PHP-implemented plugin never crosses this way: its entity lives in the child's PHP entity table
+//! already.
 
 use crate::php_worker::rpc::entity::{Call, Crossing, Entity};
 use crate::php_worker::rpc::forwarding;
 use crate::plugin::PluginInterface;
-use shirabe_php_rpc::{PhpThrow, PluginValue, ToPluginValue};
+use shirabe_php_rpc::{PhpThrow, RpcValue, ToRpcValue};
 
 impl Entity for std::rc::Rc<std::cell::RefCell<dyn PluginInterface>> {
     const EXPECTED: &'static [u8] = b"a plugin";
@@ -25,7 +26,7 @@ impl Entity for std::rc::Rc<std::cell::RefCell<dyn PluginInterface>> {
 }
 
 // TODO(plugin): the lifecycle methods would have to turn the `$composer`/`$io` stubs the child
-// passes back into the Rust handles they stand for; nothing calls them, because Composer
+// passes back into the Rust entities they stand for; nothing calls them, because Composer
 // activates a Rust-implemented plugin on the Rust side.
 impl forwarding::shirabe::rust_plugin_stub::Forwarding
     for forwarding::shirabe::rust_plugin_stub::PhpClass
@@ -39,13 +40,13 @@ impl forwarding::shirabe::rust_capable_plugin_stub::Forwarding
     fn get_capabilities(
         plugin: &std::rc::Rc<std::cell::RefCell<dyn PluginInterface>>,
         call: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    ) -> Result<RpcValue, PhpThrow> {
         let plugin = plugin.borrow();
         let capabilities = plugin
             .as_capable()
             .expect("only a Capable plugin crosses as Shirabe\\RustCapablePluginStub")
             .get_capabilities()
             .map_err(call.failed())?;
-        Ok(capabilities.to_plugin_value())
+        Ok(capabilities.to_rpc_value())
     }
 }

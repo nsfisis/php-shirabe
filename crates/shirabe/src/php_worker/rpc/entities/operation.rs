@@ -8,7 +8,7 @@ use crate::package::{AliasPackageHandle, PackageInterfaceHandle};
 use crate::php_worker::rpc::entities::package::package_value;
 use crate::php_worker::rpc::entity::{Call, Crossing, Entity};
 use crate::php_worker::rpc::forwarding;
-use shirabe_php_rpc::{PhpThrow, PluginValue, ToPluginValue, codec};
+use shirabe_php_rpc::{PhpThrow, RpcValue, ToRpcValue, codec};
 
 impl Entity for std::rc::Rc<AnyOperation> {
     const EXPECTED: &'static [u8] = b"an operation";
@@ -65,16 +65,16 @@ impl forwarding::dependency_resolver::operation::solver_operation::Forwarding
     fn get_operation_type(
         operation: &Self::Handle,
         _: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
-        Ok(operation.get_operation_type().to_plugin_value())
+    ) -> Result<RpcValue, PhpThrow> {
+        Ok(operation.get_operation_type().to_rpc_value())
     }
 
-    fn show(operation: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
-        Ok(operation.show(call.arg::<bool>(0)?).to_plugin_value())
+    fn show(operation: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
+        Ok(operation.show(call.arg::<bool>(0)?).to_rpc_value())
     }
 
-    fn __to_string(operation: &Self::Handle, _: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
-        Ok(operation.show(false).to_plugin_value())
+    fn __to_string(operation: &Self::Handle, _: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
+        Ok(operation.show(false).to_rpc_value())
     }
 }
 
@@ -86,7 +86,7 @@ impl forwarding::dependency_resolver::operation::install_operation::Forwarding
     fn get_package(
         operation: &std::rc::Rc<AnyOperation>,
         _: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    ) -> Result<RpcValue, PhpThrow> {
         let AnyOperation::Install(operation) = &**operation else {
             unreachable!("only an InstallOperation crosses as one");
         };
@@ -106,7 +106,7 @@ impl forwarding::dependency_resolver::operation::update_operation::Forwarding
     fn get_initial_package(
         operation: &std::rc::Rc<AnyOperation>,
         _: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    ) -> Result<RpcValue, PhpThrow> {
         let AnyOperation::Update(operation) = &**operation else {
             unreachable!("only an UpdateOperation crosses as one");
         };
@@ -116,7 +116,7 @@ impl forwarding::dependency_resolver::operation::update_operation::Forwarding
     fn get_target_package(
         operation: &std::rc::Rc<AnyOperation>,
         _: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    ) -> Result<RpcValue, PhpThrow> {
         let AnyOperation::Update(operation) = &**operation else {
             unreachable!("only an UpdateOperation crosses as one");
         };
@@ -137,7 +137,7 @@ impl forwarding::dependency_resolver::operation::uninstall_operation::Forwarding
     fn get_package(
         operation: &std::rc::Rc<AnyOperation>,
         _: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    ) -> Result<RpcValue, PhpThrow> {
         let AnyOperation::Uninstall(operation) = &**operation else {
             unreachable!("only an UninstallOperation crosses as one");
         };
@@ -157,7 +157,7 @@ impl forwarding::dependency_resolver::operation::mark_alias_installed_operation:
     fn get_package(
         operation: &std::rc::Rc<AnyOperation>,
         _: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    ) -> Result<RpcValue, PhpThrow> {
         let AnyOperation::MarkAliasInstalled(operation) = &**operation else {
             unreachable!("only a MarkAliasInstalledOperation crosses as one");
         };
@@ -177,7 +177,7 @@ impl forwarding::dependency_resolver::operation::mark_alias_uninstalled_operatio
     fn get_package(
         operation: &std::rc::Rc<AnyOperation>,
         _: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    ) -> Result<RpcValue, PhpThrow> {
         let AnyOperation::MarkAliasUninstalled(operation) = &**operation else {
             unreachable!("only a MarkAliasUninstalledOperation crosses as one");
         };

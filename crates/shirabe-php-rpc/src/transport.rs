@@ -1,6 +1,6 @@
 use crate::frame::Frame;
 use crate::throw::PhpThrow;
-use crate::value::{PhpObjHandle, PluginValue};
+use crate::value::{PhpEntityHandle, RpcValue};
 use crate::worker::{recv_frame, send_frame};
 use crate::{env, session};
 use bstr::{BStr, ByteSlice as _};
@@ -17,31 +17,31 @@ use shirabe_php_shim::bformat;
 pub trait RustMethodDispatcher {
     fn dispatch(
         &mut self,
-        rhandle: u64,
+        entity_id: u64,
         method_name: &BStr,
-        args: Vec<PluginValue>,
-        out_params: &mut IndexMap<u32, PluginValue>,
-    ) -> Result<PluginValue, PhpThrow>;
+        args: Vec<RpcValue>,
+        out_params: &mut IndexMap<u32, RpcValue>,
+    ) -> Result<RpcValue, PhpThrow>;
 
     /// Runs the runtime service `function_name`: the calls the worker makes that have no receiver
     /// entity.
     fn call_function(
         &mut self,
         function_name: &BStr,
-        args: Vec<PluginValue>,
-    ) -> Result<PluginValue, PhpThrow>;
+        args: Vec<RpcValue>,
+    ) -> Result<RpcValue, PhpThrow>;
 
     /// Builds a fresh entity of `class` for a proxy stub under construction in the worker, and
-    /// answers its rhandle.
-    fn construct(&mut self, class: &BStr, ctor_args: Vec<PluginValue>) -> Result<u64, PhpThrow>;
+    /// answers its Rust entity id.
+    fn construct(&mut self, class: &BStr, ctor_args: Vec<RpcValue>) -> Result<u64, PhpThrow>;
 
     /// Runs a static method of `class` that a proxy stub or a guard in the worker forwards.
     fn call_static(
         &mut self,
         class: &BStr,
         method_name: &BStr,
-        args: Vec<PluginValue>,
-    ) -> Result<PluginValue, PhpThrow>;
+        args: Vec<RpcValue>,
+    ) -> Result<RpcValue, PhpThrow>;
 }
 
 /// The Rust side allocates odd correlation ids; the PHP side allocates even ones. Calls nest
@@ -49,26 +49,26 @@ pub trait RustMethodDispatcher {
 /// attributable to its initiator.
 static NEXT_CORR_ID: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
 
-/// Allocates a Rust-side object handle. Ids start at 1, like the worker's P-handles.
-static NEXT_RHANDLE: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+/// Allocates a Rust entity id. Ids start at 1, like the worker's PHP entity ids.
+static NEXT_ENTITY_ID: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
 
 thread_local! {
-    /// Listener for the ReleaseHandle notifications the worker sends, thread-local like the R
-    /// table it prunes.
-    static RELEASE_RUST_HANDLE_HOOK: std::cell::RefCell<Option<Box<dyn Fn(u64)>>> =
+    /// Listener for the ReleaseHandle notifications the worker sends, thread-local like the Rust
+    /// entity table it prunes.
+    static RELEASE_RUST_ENTITY_HOOK: std::cell::RefCell<Option<Box<dyn Fn(u64)>>> =
         const { std::cell::RefCell::new(None) };
 }
 
-/// Registers the listener invoked with the released handle whenever a ReleaseHandle
+/// Registers the listener invoked with the released Rust entity id whenever a ReleaseHandle
 /// notification arrives on this thread. Replaces any previously registered listener.
-pub fn set_release_rust_handle_hook(hook: impl Fn(u64) + 'static) {
-    RELEASE_RUST_HANDLE_HOOK.with(|slot| {
+pub fn set_release_rust_entity_hook(hook: impl Fn(u64) + 'static) {
+    RELEASE_RUST_ENTITY_HOOK.with(|slot| {
         *slot.borrow_mut() = Some(Box::new(hook));
     });
 }
 
-pub fn alloc_rhandle() -> u64 {
-    NEXT_RHANDLE.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+pub fn alloc_entity_id() -> u64 {
+    NEXT_ENTITY_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
 }
 
 /// Answers every request from the worker with an explicit error: the dispatcher of calls none of
@@ -79,27 +79,27 @@ pub struct RefuseCallbacks;
 impl RustMethodDispatcher for RefuseCallbacks {
     fn dispatch(
         &mut self,
-        rhandle: u64,
+        entity_id: u64,
         method_name: &BStr,
-        _args: Vec<PluginValue>,
-        _out_params: &mut IndexMap<u32, PluginValue>,
-    ) -> Result<PluginValue, PhpThrow> {
+        _args: Vec<RpcValue>,
+        _out_params: &mut IndexMap<u32, RpcValue>,
+    ) -> Result<RpcValue, PhpThrow> {
         Err(PhpThrow::runtime(bformat!(
-            "no Rust method dispatcher is active for this call (rhandle {rhandle}, method `{method_name}`)"
+            "no Rust method dispatcher is active for this call (Rust entity id {entity_id}, method `{method_name}`)"
         )))
     }
 
     fn call_function(
         &mut self,
         function_name: &BStr,
-        _args: Vec<PluginValue>,
-    ) -> Result<PluginValue, PhpThrow> {
+        _args: Vec<RpcValue>,
+    ) -> Result<RpcValue, PhpThrow> {
         Err(PhpThrow::runtime(bformat!(
             "no Rust method dispatcher is active for this call (`{function_name}()`)"
         )))
     }
 
-    fn construct(&mut self, class: &BStr, _ctor_args: Vec<PluginValue>) -> Result<u64, PhpThrow> {
+    fn construct(&mut self, class: &BStr, _ctor_args: Vec<RpcValue>) -> Result<u64, PhpThrow> {
         Err(PhpThrow::runtime(bformat!(
             "no Rust method dispatcher is active for this call (new `{class}`)"
         )))
@@ -109,8 +109,8 @@ impl RustMethodDispatcher for RefuseCallbacks {
         &mut self,
         class: &BStr,
         method_name: &BStr,
-        _args: Vec<PluginValue>,
-    ) -> Result<PluginValue, PhpThrow> {
+        _args: Vec<RpcValue>,
+    ) -> Result<RpcValue, PhpThrow> {
         Err(PhpThrow::runtime(bformat!(
             "no Rust method dispatcher is active for this call (`{class}::{method_name}`)"
         )))
@@ -123,9 +123,9 @@ impl RustMethodDispatcher for RefuseCallbacks {
 /// makes while the call is in flight.
 pub fn call_function(
     name: impl AsRef<[u8]>,
-    args: Vec<PluginValue>,
+    args: Vec<RpcValue>,
     dispatcher: &mut dyn RustMethodDispatcher,
-) -> anyhow::Result<Result<PluginValue, PhpThrow>> {
+) -> anyhow::Result<Result<RpcValue, PhpThrow>> {
     rpc_call(
         |corr_id| Frame::CallFunction {
             corr_id,
@@ -140,9 +140,9 @@ pub fn call_function(
 pub fn call_static_method(
     class: impl AsRef<[u8]>,
     method: impl AsRef<[u8]>,
-    args: Vec<PluginValue>,
+    args: Vec<RpcValue>,
     dispatcher: &mut dyn RustMethodDispatcher,
-) -> anyhow::Result<Result<PluginValue, PhpThrow>> {
+) -> anyhow::Result<Result<RpcValue, PhpThrow>> {
     rpc_call(
         |corr_id| Frame::CallStaticMethod {
             corr_id,
@@ -155,13 +155,13 @@ pub fn call_static_method(
 }
 
 /// Instantiates `new $class(...$ctor_args)` in the worker (autoloading the class if needed).
-/// On success the returned value is a `PluginValue::PhpHandle` registered in the worker's P
+/// On success the returned value is a `RpcValue::PhpEntityHandle` registered in the worker's P
 /// table; the entity stays alive there while the handle does.
 pub fn new_object(
     class: impl AsRef<[u8]>,
-    ctor_args: Vec<PluginValue>,
+    ctor_args: Vec<RpcValue>,
     dispatcher: &mut dyn RustMethodDispatcher,
-) -> anyhow::Result<Result<PluginValue, PhpThrow>> {
+) -> anyhow::Result<Result<RpcValue, PhpThrow>> {
     rpc_call(
         |corr_id| Frame::NewObject {
             corr_id,
@@ -172,17 +172,17 @@ pub fn new_object(
     )
 }
 
-/// Calls `$obj->$method(...$args)` on a P-table entity in the worker.
+/// Calls `$obj->$method(...$args)` on a PHP entity in the worker.
 pub fn call_php_method(
-    handle: &PhpObjHandle,
+    handle: &PhpEntityHandle,
     method: impl AsRef<[u8]>,
-    args: Vec<PluginValue>,
+    args: Vec<RpcValue>,
     dispatcher: &mut dyn RustMethodDispatcher,
-) -> anyhow::Result<Result<PluginValue, PhpThrow>> {
+) -> anyhow::Result<Result<RpcValue, PhpThrow>> {
     rpc_call(
         |corr_id| Frame::CallMethod {
             corr_id,
-            handle: handle.phandle(),
+            entity_id: handle.entity_id(),
             method_name: method.as_ref().into(),
             args,
         },
@@ -193,15 +193,15 @@ pub fn call_php_method(
 /// [`call_function`] for a call that runs no code that calls back.
 pub fn call_internal_function(
     name: impl AsRef<[u8]>,
-    args: Vec<PluginValue>,
-) -> anyhow::Result<Result<PluginValue, PhpThrow>> {
+    args: Vec<RpcValue>,
+) -> anyhow::Result<Result<RpcValue, PhpThrow>> {
     call_function(name, args, &mut RefuseCallbacks)
 }
 
 fn rpc_call(
     request: impl FnOnce(u64) -> Frame,
     dispatcher: &mut dyn RustMethodDispatcher,
-) -> anyhow::Result<Result<PluginValue, PhpThrow>> {
+) -> anyhow::Result<Result<RpcValue, PhpThrow>> {
     // Held for the whole logical call session; nested calls from the same thread (issued by a
     // dispatcher handler) re-enter immediately, other threads are serialized.
     let session = session::SessionGuard::enter();
@@ -230,13 +230,13 @@ fn rpc_call(
             }
             Frame::CallMethod {
                 corr_id,
-                handle: rhandle,
+                entity_id,
                 method_name,
                 args,
             } => {
                 let mut out_params = IndexMap::new();
                 let outcome =
-                    dispatcher.dispatch(rhandle, method_name.as_bstr(), args, &mut out_params);
+                    dispatcher.dispatch(entity_id, method_name.as_bstr(), args, &mut out_params);
                 let reply = match outcome {
                     Ok(value) => Frame::Return {
                         corr_id,
@@ -285,22 +285,22 @@ fn rpc_call(
                 ctor_args,
             } => {
                 let reply = match dispatcher.construct(pclass.as_bstr(), ctor_args) {
-                    Ok(rhandle) => Frame::Return {
+                    Ok(entity_id) => Frame::Return {
                         corr_id,
-                        value: PluginValue::Int(rhandle as i64),
+                        value: RpcValue::Int(entity_id as i64),
                         out_params: IndexMap::new(),
                     },
                     Err(throw) => Frame::Throw { corr_id, throw },
                 };
                 send_frame(&reply)?;
             }
-            Frame::ReleaseHandle { handle: rhandle } => {
-                // A one-way notification sent by a child-side stub's __destruct; the shirabe
-                // crate registers a hook that drops the matching R-table entry. The hook is
+            Frame::ReleaseHandle { entity_id } => {
+                // A one-way notification sent by a child-side stub's __destruct; the shirabe crate
+                // registers a hook that drops the matching Rust entity table entry. The hook is
                 // installed before any entry exists, so an unhooked release is a no-op.
-                RELEASE_RUST_HANDLE_HOOK.with(|hook| {
+                RELEASE_RUST_ENTITY_HOOK.with(|hook| {
                     if let Some(hook) = hook.borrow().as_ref() {
-                        hook(rhandle);
+                        hook(entity_id);
                     }
                 });
                 continue;

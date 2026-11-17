@@ -695,7 +695,7 @@ fn test_dispatcher_remove_listener() {
     // cross-RPC identity `remove_listener` compares, and echoes `Class->method` like PHP does.
     let this =
         match php_eval("return new \\Composer\\Test\\EventDispatcher\\EventDispatcherTest();") {
-            shirabe_php_rpc::PluginValue::PhpHandle(handle) => handle,
+            shirabe_php_rpc::RpcValue::PhpEntityHandle(handle) => handle,
             other => panic!("the worker returned no object handle for the listener: {other:?}"),
         };
     let listener = Callable::PhpMethod(this.clone(), "someMethod".into());

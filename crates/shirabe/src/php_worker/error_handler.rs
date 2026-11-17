@@ -10,7 +10,7 @@ use crate::io::IOInterface;
 use crate::php_worker::call::PhpCall;
 use crate::php_worker::rpc::entity::entity_value;
 use bstr::BStr;
-use shirabe_php_rpc::PluginValue;
+use shirabe_php_rpc::RpcValue;
 
 #[derive(Debug)]
 enum State {
@@ -52,7 +52,7 @@ pub fn restore_error_handler() -> anyhow::Result<()> {
         State::Forwarding => true,
     });
     if forwarding {
-        PhpCall::Function(BStr::new("restore_error_handler")).run::<PluginValue>(Vec::new())?;
+        PhpCall::Function(BStr::new("restore_error_handler")).run::<RpcValue>(Vec::new())?;
     }
     Ok(())
 }
@@ -76,12 +76,12 @@ pub(crate) fn register_pending() -> anyhow::Result<()> {
 fn push(io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>) -> anyhow::Result<()> {
     let io = match io {
         Some(io) => entity_value(&io)?,
-        None => PluginValue::Null,
+        None => RpcValue::Null,
     };
     PhpCall::StaticMethod(
         BStr::new("Composer\\Util\\ErrorHandler"),
         BStr::new("register"),
     )
-    .run::<PluginValue>(vec![io])?;
+    .run::<RpcValue>(vec![io])?;
     Ok(())
 }

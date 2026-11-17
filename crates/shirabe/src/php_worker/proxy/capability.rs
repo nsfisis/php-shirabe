@@ -9,26 +9,26 @@ use crate::plugin::PluginInterface;
 use crate::plugin::capability::{Capability, CommandProvider};
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
-use shirabe_php_rpc::{PhpObjHandle, PluginValue};
+use shirabe_php_rpc::{PhpEntityHandle, RpcValue};
 use shirabe_php_shim::{UnexpectedValueException, bformat};
 
 /// `new $capabilityClass($ctorArgs)` with `$ctorArgs['plugin'] = $plugin`: the capability
 /// constructor receives the plugin instance itself. A PHP-implemented plugin already has an
-/// entity in the child's P table; a Rust-implemented one crosses as a handle to its R-table
-/// entity.
+/// entity in the child's PHP entity table; a Rust-implemented one crosses as a Rust entity handle
+/// to its entity.
 pub(crate) fn new_capability_object(
     capability_class: &BStr,
-    mut ctor_args: IndexMap<BString, PluginValue>,
+    mut ctor_args: IndexMap<BString, RpcValue>,
     plugin: &std::rc::Rc<std::cell::RefCell<dyn PluginInterface>>,
-) -> anyhow::Result<PhpObjHandle> {
-    let plugin_value = match plugin.borrow().__as_php_plugin_proxy() {
-        Some(proxy) => PluginValue::PhpHandle(proxy.handle.clone()),
+) -> anyhow::Result<PhpEntityHandle> {
+    let rpc_value = match plugin.borrow().__as_php_plugin_proxy() {
+        Some(proxy) => RpcValue::PhpEntityHandle(proxy.handle.clone()),
         None => entity_value(plugin)?,
     };
-    ctor_args.insert(BString::from("plugin"), plugin_value);
+    ctor_args.insert(BString::from("plugin"), rpc_value);
     runtime::new_object(
         capability_class,
-        vec![PluginValue::Array(ctor_args.into_iter().collect())],
+        vec![RpcValue::Array(ctor_args.into_iter().collect())],
     )
 }
 
@@ -37,27 +37,27 @@ pub(crate) fn new_capability_object(
 /// `Composer\Plugin\Capability\Capability` marker).
 #[derive(Debug)]
 pub struct PhpCapabilityProxy {
-    handle: PhpObjHandle,
+    handle: PhpEntityHandle,
 }
 
 impl PhpCapabilityProxy {
-    pub(crate) fn new(handle: PhpObjHandle) -> Self {
+    pub(crate) fn new(handle: PhpEntityHandle) -> Self {
         Self { handle }
     }
 
-    /// For testing only: the entity descriptor, whose class and interface list answer the
+    /// For testing only: the PHP entity handle, whose class and interface list answer the
     /// `assertInstanceOf` checks PHPUnit makes on a capability.
-    pub fn __handle(&self) -> &PhpObjHandle {
+    pub fn __handle(&self) -> &PhpEntityHandle {
         &self.handle
     }
 
     /// For testing only: reads a public property of the capability entity in the child. Unlike
-    /// `PhpPluginProxy::__get_property` the value keeps its plugin value form, so a test can assert
+    /// `PhpPluginProxy::__get_property` the value keeps its RPC value form, so a test can assert
     /// the object identity behind a handle instead of only the plain data around it.
-    pub fn __get_property(&self, name: &BStr) -> anyhow::Result<PluginValue> {
+    pub fn __get_property(&self, name: &BStr) -> anyhow::Result<RpcValue> {
         PhpCall::Function(BStr::new("__shirabe_get_property")).run(vec![
-            PluginValue::PhpHandle(self.handle.clone()),
-            PluginValue::string(name),
+            RpcValue::PhpEntityHandle(self.handle.clone()),
+            RpcValue::string(name),
         ])
     }
 }
@@ -71,11 +71,11 @@ impl Capability for PhpCapabilityProxy {
 /// `CommandProvider` adapter for a capability entity living in the PHP child process.
 #[derive(Debug)]
 pub struct PhpCommandProviderProxy {
-    handle: PhpObjHandle,
+    handle: PhpEntityHandle,
 }
 
 impl PhpCommandProviderProxy {
-    pub(crate) fn new(handle: PhpObjHandle) -> Self {
+    pub(crate) fn new(handle: PhpEntityHandle) -> Self {
         Self { handle }
     }
 }
@@ -90,15 +90,15 @@ impl CommandProvider for PhpCommandProviderProxy {
     fn get_commands(
         &self,
     ) -> anyhow::Result<Vec<std::rc::Rc<std::cell::RefCell<dyn BaseCommand>>>> {
-        let value: PluginValue =
+        let value: RpcValue =
             PhpCall::Method(&self.handle, BStr::new("getCommands")).run(Vec::new())?;
         // PHP's getCommands(): array is unenforceable on the wire, and a
         // `Vec<Box<dyn BaseCommand>>` asserts every element up front, so the two checks
         // Application::getPluginCommands performs on the raw value live here, with its
         // messages.
         let items = match value {
-            PluginValue::List(items) => items,
-            PluginValue::Array(map) => map.into_values().collect(),
+            RpcValue::List(items) => items,
+            RpcValue::Array(map) => map.into_values().collect(),
             _ => {
                 return Err(UnexpectedValueException::new(bformat!(
                     "Plugin capability {} failed to return an array from getCommands",
@@ -110,7 +110,7 @@ impl CommandProvider for PhpCommandProviderProxy {
         let mut commands: Vec<std::rc::Rc<std::cell::RefCell<dyn BaseCommand>>> = Vec::new();
         for item in items {
             let command_handle = match item {
-                PluginValue::PhpHandle(handle) => handle,
+                RpcValue::PhpEntityHandle(handle) => handle,
                 _ => return Err(invalid_command_error(&self.handle)),
             };
             if !runtime::is_a(&command_handle, BStr::new("Composer\\Command\\BaseCommand"))? {
@@ -124,7 +124,7 @@ impl CommandProvider for PhpCommandProviderProxy {
     }
 }
 
-fn invalid_command_error(capability: &PhpObjHandle) -> anyhow::Error {
+fn invalid_command_error(capability: &PhpEntityHandle) -> anyhow::Error {
     UnexpectedValueException::new(bformat!("Plugin capability {} returned an invalid value, we expected an array of Composer\\Command\\BaseCommand objects", capability.class()))
     .into()
 }

@@ -13,7 +13,7 @@ use crate::repository::{InvalidRepositoryException, RepositorySecurityException}
 use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_rpc::codec::protocol_value;
-use shirabe_php_rpc::{PhpThrow, PluginValue, ToPluginValue};
+use shirabe_php_rpc::{PhpThrow, RpcValue, ToRpcValue};
 use shirabe_php_shim::{
     AnyThrowable, BadFunctionCallException, BadMethodCallException, Catch as _, Error, Exception,
     InvalidArgumentException, LogicException, OutOfBoundsException, PhpClass as _, PhpMixed,
@@ -222,43 +222,42 @@ pub(crate) fn exception_into_throw(exception: &AnyThrowable, error: &anyhow::Err
 /// TODO(plugin): the state of ProcessFailedException, ProcessSignaledException and
 /// SolverProblemsException is the Process or the solver problems, which do not cross, and an
 /// exception of a class the port has no type for keeps none of its own.
-fn throwable_properties(error: &anyhow::Error) -> IndexMap<bstr::BString, PluginValue> {
-    let byte_strings = |items: &[BString]| {
-        PluginValue::List(items.iter().cloned().map(PluginValue::string).collect())
-    };
+fn throwable_properties(error: &anyhow::Error) -> IndexMap<bstr::BString, RpcValue> {
+    let byte_strings =
+        |items: &[BString]| RpcValue::List(items.iter().cloned().map(RpcValue::string).collect());
     let mut properties = IndexMap::new();
     if let Some(exception) = error.catch::<TransportException>() {
         properties.insert(
             "headers".into(),
             match exception.get_headers() {
                 Some(headers) => {
-                    PluginValue::List(headers.iter().cloned().map(PluginValue::string).collect())
+                    RpcValue::List(headers.iter().cloned().map(RpcValue::string).collect())
                 }
-                None => PluginValue::Null,
+                None => RpcValue::Null,
             },
         );
         properties.insert(
             "response".into(),
             match exception.get_response() {
-                Some(response) => PluginValue::string(response),
-                None => PluginValue::Null,
+                Some(response) => RpcValue::string(response),
+                None => RpcValue::Null,
             },
         );
         properties.insert(
             "statusCode".into(),
             match exception.get_status_code() {
-                Some(status_code) => PluginValue::Int(status_code),
-                None => PluginValue::Null,
+                Some(status_code) => RpcValue::Int(status_code),
+                None => RpcValue::Null,
             },
         );
         properties.insert(
             "responseInfo".into(),
-            PluginValue::List(
+            RpcValue::List(
                 exception
                     .get_response_info()
                     .iter()
                     .cloned()
-                    .map(PhpMixed::to_plugin_value)
+                    .map(PhpMixed::to_rpc_value)
                     .collect(),
             ),
         );
@@ -268,7 +267,7 @@ fn throwable_properties(error: &anyhow::Error) -> IndexMap<bstr::BString, Plugin
         properties.insert("warnings".into(), byte_strings(exception.get_warnings()));
         properties.insert(
             "data".into(),
-            PhpMixed::Array(exception.get_data().clone()).to_plugin_value(),
+            PhpMixed::Array(exception.get_data().clone()).to_rpc_value(),
         );
     }
     if let Some(exception) = error.catch::<JsonValidationException>() {
@@ -345,10 +344,10 @@ mod tests {
         );
         thrown
             .properties
-            .insert(BString::from("statusCode"), PluginValue::Int(404));
+            .insert(BString::from("statusCode"), RpcValue::Int(404));
         thrown
             .properties
-            .insert(BString::from("response"), PluginValue::string("missing"));
+            .insert(BString::from("response"), RpcValue::string("missing"));
         let error = throw_into_error(thrown);
 
         let exception = error.catch::<TransportException>().unwrap();
@@ -357,7 +356,7 @@ mod tests {
 
         let back = exception_into_throw(AnyThrowable::of(&error).unwrap(), &error);
         assert_eq!(
-            Some(&PluginValue::Int(404)),
+            Some(&RpcValue::Int(404)),
             back.properties.get(bstr::B("statusCode"))
         );
     }

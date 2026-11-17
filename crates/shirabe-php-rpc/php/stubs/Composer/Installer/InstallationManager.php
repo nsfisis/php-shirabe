@@ -20,25 +20,25 @@ use React\Promise\PromiseInterface;
 class InstallationManager implements \Shirabe\RustStub
 {
     /** @var int */
-    protected $__rhandle;
+    protected $__entityId;
 
     /**
      * Binds a stub the registry built for an existing entity. Proxy instantiation bypasses
      * the constructor, which belongs to plugin code building a new entity instead.
      */
-    public function __shirabeBind(int $rhandle): void
+    public function __shirabeBind(int $entityId): void
     {
-        $this->__rhandle = $rhandle;
+        $this->__entityId = $entityId;
     }
 
     public function __destruct()
     {
-        \Shirabe\RustObjectRegistry::release($this->__rhandle);
+        \Shirabe\RustStubRegistry::release($this->__entityId);
     }
 
-    public function __shirabeRustHandleDescriptor(): \Shirabe\Wire\RustHandle
+    public function __shirabeRustEntityHandle(): \Shirabe\Rpc\RustEntityHandle
     {
-        return new \Shirabe\Wire\RustHandle($this->__rhandle, static::class);
+        return new \Shirabe\Rpc\RustEntityHandle($this->__entityId, static::class);
     }
 
     public function __clone()
@@ -47,118 +47,118 @@ class InstallationManager implements \Shirabe\RustStub
         // entity and release it twice. The Rust side clones the entity instead, applying
         // whatever __clone semantics the real class defines, and this copy rebinds to the
         // fresh handle. Entities without clone semantics answer with an explicit error.
-        $this->__rhandle = \Shirabe\RpcRuntime::callRust($this->__rhandle, '__shirabe_clone', []);
-        \Shirabe\RustObjectRegistry::adopt($this->__rhandle, $this);
+        $this->__entityId = \Shirabe\RpcRuntime::callRust($this->__entityId, '__shirabe_clone', []);
+        \Shirabe\RustStubRegistry::adopt($this->__entityId, $this);
     }
 
     public function __get($name)
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, '__get', [$name]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, '__get', [$name]);
     }
 
     public function __set($name, $value): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, '__set', [$name, $value]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, '__set', [$name, $value]);
     }
 
     public function __isset($name): bool
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, '__isset', [$name]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, '__isset', [$name]);
     }
 
     public function __unset($name): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, '__unset', [$name]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, '__unset', [$name]);
     }
 
     public function __construct(Loop $loop, IOInterface $io, ?EventDispatcher $eventDispatcher = null)
     {
-        $this->__rhandle = \Shirabe\RpcRuntime::newRust(static::class, [$loop, $io, $eventDispatcher]);
-        \Shirabe\RustObjectRegistry::adopt($this->__rhandle, $this);
+        $this->__entityId = \Shirabe\RpcRuntime::newRust(static::class, [$loop, $io, $eventDispatcher]);
+        \Shirabe\RustStubRegistry::adopt($this->__entityId, $this);
     }
 
     public function reset(): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'reset', []);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, 'reset', []);
     }
 
     public function addInstaller(InstallerInterface $installer): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'addInstaller', [$installer]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, 'addInstaller', [$installer]);
     }
 
     public function removeInstaller(InstallerInterface $installer): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'removeInstaller', [$installer]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, 'removeInstaller', [$installer]);
     }
 
     public function disablePlugins(): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'disablePlugins', []);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, 'disablePlugins', []);
     }
 
     public function getInstaller(string $type): InstallerInterface
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getInstaller', [$type]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'getInstaller', [$type]);
     }
 
     public function isPackageInstalled(InstalledRepositoryInterface $repo, PackageInterface $package): bool
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'isPackageInstalled', [$repo, $package]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'isPackageInstalled', [$repo, $package]);
     }
 
     public function ensureBinariesPresence(PackageInterface $package): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'ensureBinariesPresence', [$package]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, 'ensureBinariesPresence', [$package]);
     }
 
     public function execute(InstalledRepositoryInterface $repo, array $operations, bool $devMode = true, bool $runScripts = true, bool $downloadOnly = false): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'execute', [$repo, $operations, $devMode, $runScripts, $downloadOnly]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, 'execute', [$repo, $operations, $devMode, $runScripts, $downloadOnly]);
     }
 
     public function download(PackageInterface $package): ?PromiseInterface
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'download', [$package]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'download', [$package]);
     }
 
     public function install(InstalledRepositoryInterface $repo, InstallOperation $operation): ?PromiseInterface
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'install', [$repo, $operation]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'install', [$repo, $operation]);
     }
 
     public function update(InstalledRepositoryInterface $repo, UpdateOperation $operation): ?PromiseInterface
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'update', [$repo, $operation]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'update', [$repo, $operation]);
     }
 
     public function uninstall(InstalledRepositoryInterface $repo, UninstallOperation $operation): ?PromiseInterface
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'uninstall', [$repo, $operation]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'uninstall', [$repo, $operation]);
     }
 
     public function markAliasInstalled(InstalledRepositoryInterface $repo, MarkAliasInstalledOperation $operation): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'markAliasInstalled', [$repo, $operation]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, 'markAliasInstalled', [$repo, $operation]);
     }
 
     public function markAliasUninstalled(InstalledRepositoryInterface $repo, MarkAliasUninstalledOperation $operation): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'markAliasUninstalled', [$repo, $operation]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, 'markAliasUninstalled', [$repo, $operation]);
     }
 
     public function getInstallPath(PackageInterface $package): ?string
     {
-        return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getInstallPath', [$package]);
+        return \Shirabe\RpcRuntime::callRust($this->__entityId, 'getInstallPath', [$package]);
     }
 
     public function setOutputProgress(bool $outputProgress): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setOutputProgress', [$outputProgress]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, 'setOutputProgress', [$outputProgress]);
     }
 
     public function notifyInstalls(IOInterface $io): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'notifyInstalls', [$io]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, 'notifyInstalls', [$io]);
     }
 }

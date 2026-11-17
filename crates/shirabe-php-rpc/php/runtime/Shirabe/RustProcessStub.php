@@ -18,7 +18,7 @@ use Symfony\Component\Process\Process;
 class RustProcessStub extends Process implements \Shirabe\RustStub
 {
     /** @var int */
-    protected $__rhandle;
+    protected $__entityId;
     /** @var ?array<string, mixed> What the Rust side reports about the process, read once */
     private $__shirabeFacts;
     /** @var string */
@@ -34,19 +34,19 @@ class RustProcessStub extends Process implements \Shirabe\RustStub
      * Binds the stub to the Rust-side process. An instance is never constructed: the real
      * constructor would describe a process this side is about to start.
      */
-    public function __shirabeBind(int $rhandle): void
+    public function __shirabeBind(int $entityId): void
     {
-        $this->__rhandle = $rhandle;
+        $this->__entityId = $entityId;
     }
 
     public function __destruct()
     {
-        \Shirabe\RustObjectRegistry::release($this->__rhandle);
+        \Shirabe\RustStubRegistry::release($this->__entityId);
     }
 
-    public function __shirabeRustHandleDescriptor(): \Shirabe\Wire\RustHandle
+    public function __shirabeRustEntityHandle(): \Shirabe\Rpc\RustEntityHandle
     {
-        return new \Shirabe\Wire\RustHandle($this->__rhandle, static::class);
+        return new \Shirabe\Rpc\RustEntityHandle($this->__entityId, static::class);
     }
 
     public function __clone()
@@ -64,7 +64,7 @@ class RustProcessStub extends Process implements \Shirabe\RustStub
     private function __shirabeFacts(): array
     {
         if ($this->__shirabeFacts === null) {
-            $this->__shirabeFacts = \Shirabe\RpcRuntime::callRust($this->__rhandle, '__shirabe_facts', []);
+            $this->__shirabeFacts = \Shirabe\RpcRuntime::callRust($this->__entityId, '__shirabe_facts', []);
             $this->__shirabeOutput = $this->__shirabeFacts['output'];
             $this->__shirabeErrorOutput = $this->__shirabeFacts['error_output'];
         }

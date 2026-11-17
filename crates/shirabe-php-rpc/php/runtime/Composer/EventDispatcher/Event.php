@@ -1,20 +1,20 @@
 <?php
 
 // Shirabe's own definition of Composer\EventDispatcher\Event for the plugin worker. This class
-// lives in both worlds at once: an instance revived from a Rust handle proxies every call over RPC
-// (like a generated stub), while an instance constructed natively — real Composer code in this
-// process does `new PreCommandRunEvent(...)`, whose parent constructor lands here — is a faithful
-// in-process port of the real base class. Proxy revival binds the handle without running the
-// constructor, so the constructor below is the native mode alone; `__shirabeRustHandleDescriptor()`
-// returns null there so `Shirabe\RpcRuntime::toPluginValue` registers the object in the P table
-// instead of treating it as a Rust handle.
+// lives on both sides at once: an instance revived from a Rust entity handle proxies every call
+// over RPC (like a generated stub), while an instance constructed natively — real Composer code in
+// this process does `new PreCommandRunEvent(...)`, whose parent constructor lands here — is a
+// faithful in-process port of the real base class. Proxy revival binds the handle without running
+// the constructor, so the constructor below is the native mode alone; `__shirabeRustEntityHandle()`
+// returns null there so `Shirabe\RpcRuntime::toRpcValue` registers the object in the PHP entity
+// table instead of treating it as a Rust entity.
 
 namespace Composer\EventDispatcher;
 
 class Event implements \Shirabe\RustStub
 {
     /** @var int|null Null in native mode. */
-    protected $__rhandle;
+    protected $__entityId;
     /** @var string This event's name (native mode) */
     protected $name;
 
@@ -29,37 +29,37 @@ class Event implements \Shirabe\RustStub
 
     public function __construct(string $name, array $args = [], array $flags = [])
     {
-        $this->__rhandle = null;
+        $this->__entityId = null;
         $this->name = $name;
         $this->args = $args;
         $this->flags = $flags;
     }
 
-    public function __shirabeBind(int $rhandle): void
+    public function __shirabeBind(int $entityId): void
     {
-        $this->__rhandle = $rhandle;
+        $this->__entityId = $entityId;
     }
 
     public function __destruct()
     {
-        if ($this->__rhandle !== null) {
-            \Shirabe\RustObjectRegistry::release($this->__rhandle);
+        if ($this->__entityId !== null) {
+            \Shirabe\RustStubRegistry::release($this->__entityId);
         }
     }
 
-    public function __shirabeRustHandleDescriptor(): ?\Shirabe\Wire\RustHandle
+    public function __shirabeRustEntityHandle(): ?\Shirabe\Rpc\RustEntityHandle
     {
-        if ($this->__rhandle === null) {
+        if ($this->__entityId === null) {
             return null;
         }
 
-        return new \Shirabe\Wire\RustHandle($this->__rhandle, static::class);
+        return new \Shirabe\Rpc\RustEntityHandle($this->__entityId, static::class);
     }
 
     public function getName(): string
     {
-        if ($this->__rhandle !== null) {
-            return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getName', []);
+        if ($this->__entityId !== null) {
+            return \Shirabe\RpcRuntime::callRust($this->__entityId, 'getName', []);
         }
 
         return $this->name;
@@ -67,8 +67,8 @@ class Event implements \Shirabe\RustStub
 
     public function getArguments(): array
     {
-        if ($this->__rhandle !== null) {
-            return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getArguments', []);
+        if ($this->__entityId !== null) {
+            return \Shirabe\RpcRuntime::callRust($this->__entityId, 'getArguments', []);
         }
 
         return $this->args;
@@ -76,8 +76,8 @@ class Event implements \Shirabe\RustStub
 
     public function getFlags(): array
     {
-        if ($this->__rhandle !== null) {
-            return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'getFlags', []);
+        if ($this->__entityId !== null) {
+            return \Shirabe\RpcRuntime::callRust($this->__entityId, 'getFlags', []);
         }
 
         return $this->flags;
@@ -85,8 +85,8 @@ class Event implements \Shirabe\RustStub
 
     public function isPropagationStopped(): bool
     {
-        if ($this->__rhandle !== null) {
-            return \Shirabe\RpcRuntime::callRust($this->__rhandle, 'isPropagationStopped', []);
+        if ($this->__entityId !== null) {
+            return \Shirabe\RpcRuntime::callRust($this->__entityId, 'isPropagationStopped', []);
         }
 
         return $this->propagationStopped;
@@ -94,8 +94,8 @@ class Event implements \Shirabe\RustStub
 
     public function stopPropagation(): void
     {
-        if ($this->__rhandle !== null) {
-            \Shirabe\RpcRuntime::callRust($this->__rhandle, 'stopPropagation', []);
+        if ($this->__entityId !== null) {
+            \Shirabe\RpcRuntime::callRust($this->__entityId, 'stopPropagation', []);
 
             return;
         }

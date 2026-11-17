@@ -225,37 +225,37 @@ final class EntryPoints
                 return true;
             },
             // An already-fulfilled promise for a Rust-side call whose PHP signature declares
-            // PromiseInterface and that has the value before a job exists.
+            // PromiseInterface and that has the value before a promise handle exists.
             '__shirabe_resolved_promise' => static function ($args) {
                 if (!function_exists('React\\Promise\\resolve')) {
                     throw new \RuntimeException(
                         'react/promise is not loaded in the plugin process, so a PromiseInterface cannot be built'
                     );
                 }
-                return JobRegistry::park(\React\Promise\resolve($args[0]));
+                return PromiseRegistry::park(\React\Promise\resolve($args[0]));
             },
-            // The failure half: a job that failed before it could be registered surfaces to the caller
-            // as a rejection it handles, the way it does under Composer, rather than as a throw out of
-            // the call that started it.
+            // The failure half: a promise that failed before it could be registered surfaces to the
+            // caller as a rejection it handles, the way it does under Composer, rather than as a
+            // throw out of the call that started it.
             '__shirabe_rejected_promise' => static function ($args) {
                 if (!function_exists('React\\Promise\\reject')) {
                     throw new \RuntimeException(
                         'react/promise is not loaded in the plugin process, so a PromiseInterface cannot be built'
                     );
                 }
-                return JobRegistry::park(\React\Promise\reject(
-                    MaterializedThrowable::revive($args[0])
+                return PromiseRegistry::park(\React\Promise\reject(
+                    ThrowableRecord::revive($args[0])
                 ));
             },
-            // The settle pushes of a Rust-owned job, sent from inside the tick that saw it finish. The
-            // callbacks plugin code chained on the job's promise run before these return.
-            '__shirabe_resolve_job' => static function ($args) {
-                JobRegistry::resolve((int) $args[0], $args[1]);
+            // The settle pushes of a Rust-owned promise, sent from inside the tick that saw it
+            // finish. The callbacks plugin code chained on the promise run before these return.
+            '__shirabe_resolve_promise' => static function ($args) {
+                PromiseRegistry::resolve((int) $args[0], $args[1]);
                 return null;
             },
-            '__shirabe_reject_job' => static function ($args) {
-                [$id, $description] = $args;
-                JobRegistry::reject((int) $id, MaterializedThrowable::revive($description));
+            '__shirabe_reject_promise' => static function ($args) {
+                [$id, $record] = $args;
+                PromiseRegistry::reject((int) $id, ThrowableRecord::revive($record));
                 return null;
             },
             // Replays environment writes the Rust side made after this process was spawned, which only
@@ -352,30 +352,30 @@ final class EntryPoints
             '__shirabe_oracle_roundtrip' => static fn($args) => serialize(
                 RpcRuntime::unserializePayload($args[0])
             ),
-            // For testing: reads a public property of a P-table entity (PHPUnit asserts like
+            // For testing: reads a public property of a PHP entity (PHPUnit asserts like
             // `$plugins[0]->version` have no method to call).
             '__shirabe_get_property' => static function ($args) {
-                $obj = RpcRuntime::fromPluginValue($args[0]);
+                $obj = RpcRuntime::fromRpcValue($args[0]);
                 if (!is_object($obj)) {
                     throw new \RuntimeException('__shirabe_get_property expects a handle argument');
                 }
                 return $obj->{$args[1]};
             },
-            // For testing: invokes a non-public method of a P-table entity through ReflectionMethod.
+            // For testing: invokes a non-public method of a PHP entity through ReflectionMethod.
             '__shirabe_reflection_invoke' => static function ($args) {
                 [$obj, $method, $methodArgs] = $args;
                 $reflMethod = new \ReflectionMethod($obj, $method);
                 (\PHP_VERSION_ID < 80100) and $reflMethod->setAccessible(true);
                 return $reflMethod->invokeArgs($obj, $methodArgs);
             },
-            // For testing: reads a non-public property of a P-table entity through ReflectionProperty.
+            // For testing: reads a non-public property of a PHP entity through ReflectionProperty.
             '__shirabe_reflection_get_property' => static function ($args) {
                 [$obj, $name] = $args;
                 $reflProp = new \ReflectionProperty($obj, $name);
                 (\PHP_VERSION_ID < 80100) and $reflProp->setAccessible(true);
                 return $reflProp->getValue($obj);
             },
-            // For testing: writes a non-public property of a P-table entity through ReflectionProperty.
+            // For testing: writes a non-public property of a PHP entity through ReflectionProperty.
             '__shirabe_reflection_set_property' => static function ($args) {
                 [$obj, $name, $value] = $args;
                 $reflProp = new \ReflectionProperty($obj, $name);

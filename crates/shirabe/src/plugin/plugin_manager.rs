@@ -25,7 +25,7 @@ use crate::repository::{
 use crate::util::PackageSorter;
 use bstr::{B, BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
-use shirabe_php_rpc::PluginValue;
+use shirabe_php_rpc::RpcValue;
 use shirabe_php_shim::{
     CmpOp, E_USER_DEPRECATED, PhpMixed, RuntimeException, UnexpectedValueException, bformat,
     boolval, dirname, empty, file_get_contents, implode, ksort, path_from_bytes, php_regex,
@@ -703,7 +703,7 @@ impl PluginManager {
             .borrow_mut()
             .deactivate(self.composer_full(), self.io.clone())?;
 
-        // PHP passes the plugin object itself; its cross-RPC identity (the P-table handle) is
+        // PHP passes the plugin object itself; its cross-RPC identity (the PHP entity handle) is
         // carried by the subscriber accessor, and `addSubscriber` is the only source of
         // listeners capturing a plugin object today.
         // TODO(plugin): a plugin registering `[$this, 'method']` listeners directly through an
@@ -926,7 +926,7 @@ impl PluginManager {
         &self,
         plugin: &std::rc::Rc<std::cell::RefCell<dyn PluginInterface>>,
         capability_class_name: &BStr,
-        ctor_args: IndexMap<BString, PluginValue>,
+        ctor_args: IndexMap<BString, RpcValue>,
     ) -> anyhow::Result<Option<Box<dyn Capability>>> {
         let capability_class = match self
             .get_capability_implementation_class_name(&*plugin.borrow(), capability_class_name)?
@@ -974,7 +974,7 @@ impl PluginManager {
     pub fn get_plugin_capabilities(
         &self,
         capability_class_name: &BStr,
-        ctor_args: IndexMap<BString, PluginValue>,
+        ctor_args: IndexMap<BString, RpcValue>,
     ) -> anyhow::Result<Vec<Box<dyn Capability>>> {
         let mut capabilities: Vec<Box<dyn Capability>> = vec![];
         for plugin in self.get_plugins() {

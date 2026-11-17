@@ -4,7 +4,7 @@ use crate::io::{BufferIO, ConsoleIO, IOInterface, NORMAL, NullIO};
 use crate::php_worker::rpc::entity::{Call, Crossing, Entity};
 use crate::php_worker::rpc::forwarding;
 use bstr::{BString, ByteSlice as _};
-use shirabe_php_rpc::{PhpThrow, PluginValue, ToPluginValue};
+use shirabe_php_rpc::{PhpThrow, RpcValue, ToRpcValue};
 use shirabe_symfony_console::output::VERBOSITY_NORMAL;
 
 impl Entity for std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
@@ -37,7 +37,7 @@ impl Entity for std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
 /// strings in PHP.
 fn write_args(call: &Call<'_>) -> Result<(Vec<BString>, bool, i64), PhpThrow> {
     let messages = match call.args().first() {
-        Some(PluginValue::String(_)) => vec![call.arg::<BString>(0)?],
+        Some(RpcValue::String(_)) => vec![call.arg::<BString>(0)?],
         _ => call.arg::<Vec<BString>>(0)?,
     };
     Ok((messages, call.arg_or(1, true)?, call.arg_or(2, NORMAL)?))
@@ -49,42 +49,42 @@ fn write_args(call: &Call<'_>) -> Result<(Vec<BString>, bool, i64), PhpThrow> {
 impl forwarding::io::base_io::Forwarding for forwarding::io::base_io::PhpClass {
     type Handle = std::rc::Rc<std::cell::RefCell<dyn IOInterface>>;
 
-    fn is_interactive(io: &Self::Handle, _: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
-        Ok(io.borrow().is_interactive().to_plugin_value())
+    fn is_interactive(io: &Self::Handle, _: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
+        Ok(io.borrow().is_interactive().to_rpc_value())
     }
 
-    fn is_verbose(io: &Self::Handle, _: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
-        Ok(io.borrow().is_verbose().to_plugin_value())
+    fn is_verbose(io: &Self::Handle, _: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
+        Ok(io.borrow().is_verbose().to_rpc_value())
     }
 
-    fn is_very_verbose(io: &Self::Handle, _: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
-        Ok(io.borrow().is_very_verbose().to_plugin_value())
+    fn is_very_verbose(io: &Self::Handle, _: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
+        Ok(io.borrow().is_very_verbose().to_rpc_value())
     }
 
-    fn is_debug(io: &Self::Handle, _: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
-        Ok(io.borrow().is_debug().to_plugin_value())
+    fn is_debug(io: &Self::Handle, _: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
+        Ok(io.borrow().is_debug().to_rpc_value())
     }
 
-    fn is_decorated(io: &Self::Handle, _: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
-        Ok(io.borrow().is_decorated().to_plugin_value())
+    fn is_decorated(io: &Self::Handle, _: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
+        Ok(io.borrow().is_decorated().to_rpc_value())
     }
 
-    fn write(io: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+    fn write(io: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         let (messages, newline, verbosity) = write_args(call)?;
         let io = io.borrow();
         for message in &messages {
             io.write_bytes(message.as_bstr(), newline, verbosity);
         }
-        Ok(PluginValue::Null)
+        Ok(RpcValue::Null)
     }
 
-    fn write_error(io: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+    fn write_error(io: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         let (messages, newline, verbosity) = write_args(call)?;
         let io = io.borrow();
         for message in &messages {
             io.write_error_bytes(message.as_bstr(), newline, verbosity);
         }
-        Ok(PluginValue::Null)
+        Ok(RpcValue::Null)
     }
 }
 
@@ -102,19 +102,19 @@ impl forwarding::io::buffer_io::Forwarding for forwarding::io::buffer_io::PhpCla
     fn get_output(
         io: &std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         _: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
-        Ok(PluginValue::string(buffer_io(&*io.borrow()).get_output()))
+    ) -> Result<RpcValue, PhpThrow> {
+        Ok(RpcValue::string(buffer_io(&*io.borrow()).get_output()))
     }
 
     fn set_user_inputs(
         io: &std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         call: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    ) -> Result<RpcValue, PhpThrow> {
         let inputs = call.arg::<Vec<BString>>(0)?;
         buffer_io(&*io.borrow())
             .set_user_inputs(inputs)
             .map_err(call.failed())?;
-        Ok(PluginValue::Null)
+        Ok(RpcValue::Null)
     }
 
     // A BufferIO writes into a memory stream of its own and reads from its own string input, so a
@@ -124,7 +124,7 @@ impl forwarding::io::buffer_io::Forwarding for forwarding::io::buffer_io::PhpCla
     ) -> Result<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>, PhpThrow> {
         // TODO(plugin): an OutputFormatterInterface is a Symfony object the plugin builds in its
         // own process, and no proxy carries one to the Rust side.
-        if !matches!(call.args().get(2), None | Some(PluginValue::Null)) {
+        if !matches!(call.args().get(2), None | Some(RpcValue::Null)) {
             return Err(PhpThrow::runtime(
                 "Shirabe does not support passing an output formatter to Composer\\IO\\BufferIO inside the plugin process yet",
             ));

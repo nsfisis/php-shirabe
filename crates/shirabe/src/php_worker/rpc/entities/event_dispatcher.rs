@@ -5,18 +5,18 @@ use crate::php_worker::call::PhpCall;
 use crate::php_worker::rpc::entity::{Call, Crossing, Entity};
 use crate::php_worker::rpc::forwarding;
 use bstr::{BStr, BString};
-use shirabe_php_rpc::{PhpThrow, PluginValue};
+use shirabe_php_rpc::{PhpThrow, RpcValue};
 use shirabe_php_shim::bformat;
 
 /// PHP's `is_callable($value)`, answered by the worker because only its own function and class
 /// tables can say whether a string or a `[$object, 'method']` pair names something callable.
 /// Values that cannot name a callable at all are answered here rather than over a round trip.
-pub(crate) fn is_php_callable(value: &PluginValue) -> anyhow::Result<bool> {
+pub(crate) fn is_php_callable(value: &RpcValue) -> anyhow::Result<bool> {
     match value {
-        PluginValue::String(_)
-        | PluginValue::List(_)
-        | PluginValue::Array(_)
-        | PluginValue::PhpHandle(_) => {
+        RpcValue::String(_)
+        | RpcValue::List(_)
+        | RpcValue::Array(_)
+        | RpcValue::PhpEntityHandle(_) => {
             PhpCall::Function(BStr::new("is_callable")).run(vec![value.clone()])
         }
         _ => Ok(false),
@@ -27,9 +27,9 @@ pub(crate) fn is_php_callable(value: &PluginValue) -> anyhow::Result<bool> {
 /// closure, a function name and an `[$object, 'method']` pair exactly as the original call site
 /// would have.
 pub(crate) fn call_php_callable(
-    callable: &PluginValue,
-    args: Vec<PluginValue>,
-) -> anyhow::Result<PluginValue> {
+    callable: &RpcValue,
+    args: Vec<RpcValue>,
+) -> anyhow::Result<RpcValue> {
     let mut call_args = Vec::with_capacity(args.len() + 1);
     call_args.push(callable.clone());
     call_args.extend(args);
@@ -53,7 +53,7 @@ impl forwarding::event_dispatcher::event_dispatcher::Forwarding
 {
     type Handle = std::rc::Rc<std::cell::RefCell<dyn EventDispatcherInterface>>;
 
-    fn dispatch(dispatcher: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+    fn dispatch(dispatcher: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         let name = call.arg::<BString>(0)?;
         let probe = Event::from_name(name.clone());
         if dispatcher.borrow_mut().has_event_listeners(&probe) {
@@ -68,6 +68,6 @@ impl forwarding::event_dispatcher::event_dispatcher::Forwarding
         // listener loop, and upstream does both regardless of the listener count: the
         // `COMPOSER_DEBUG_EVENTS` trace line, and `push_event`'s circular-call detection (a
         // nested dispatch of the same event name throws there even with no listeners).
-        Ok(PluginValue::Int(0))
+        Ok(RpcValue::Int(0))
     }
 }

@@ -6,13 +6,13 @@ use crate::php_worker::call::PhpCall;
 use crate::php_worker::console::{CONSOLE_APP_CONTEXT, PENDING_COMMAND_HANDLES};
 use crate::php_worker::runtime;
 use bstr::{BStr, BString, ByteSlice as _};
-use shirabe_php_rpc::{FromPluginValue, PhpObjHandle, PluginValue};
+use shirabe_php_rpc::{FromRpcValue, PhpEntityHandle, RpcValue};
 use shirabe_php_shim::{PhpClass, PhpMixed, RuntimeException, ToPhpString, bformat};
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::{InputInterface, InputValue};
 use shirabe_symfony_console::output::OutputInterface;
 
-shirabe_php_rpc::plugin_value_record! {
+shirabe_php_rpc::rpc_value_record! {
     /// A command's input definition, help text and extra usages, as
     /// `__shirabe_read_command_definition` reads them.
     #[derive(Debug)]
@@ -24,7 +24,7 @@ shirabe_php_rpc::plugin_value_record! {
     }
 }
 
-shirabe_php_rpc::plugin_value_record! {
+shirabe_php_rpc::rpc_value_record! {
     /// One `InputArgument` of a [`CommandDefinition`].
     #[derive(Debug)]
     struct CommandArgument {
@@ -36,7 +36,7 @@ shirabe_php_rpc::plugin_value_record! {
     }
 }
 
-shirabe_php_rpc::plugin_value_record! {
+shirabe_php_rpc::rpc_value_record! {
     /// One `InputOption` of a [`CommandDefinition`].
     #[derive(Debug)]
     struct CommandOption {
@@ -59,19 +59,19 @@ shirabe_php_rpc::plugin_value_record! {
 #[derive(Debug)]
 pub struct PhpCommandProxy {
     base_command_data: BaseCommandData,
-    handle: PhpObjHandle,
+    handle: PhpEntityHandle,
     proxy_command: bool,
 }
 
 impl PhpCommandProxy {
-    pub(crate) fn new(handle: PhpObjHandle) -> anyhow::Result<Self> {
+    pub(crate) fn new(handle: PhpEntityHandle) -> anyhow::Result<Self> {
         let proxy_command = Self::call_metadata_getter(&handle, BStr::new("isProxyCommand"))?;
         Self::build(handle, proxy_command)
     }
 
     /// A command class named by a `composer.json` script only has to extend Symfony's `Command`,
     /// so `isProxyCommand()` is asked for only when it also extends Composer's `BaseCommand`.
-    pub(crate) fn new_script_command(handle: PhpObjHandle) -> anyhow::Result<Self> {
+    pub(crate) fn new_script_command(handle: PhpEntityHandle) -> anyhow::Result<Self> {
         let proxy_command = if runtime::is_a(&handle, BStr::new("Composer\\Command\\BaseCommand"))?
         {
             Self::call_metadata_getter(&handle, BStr::new("isProxyCommand"))?
@@ -86,38 +86,38 @@ impl PhpCommandProxy {
     pub(crate) fn instantiate_script_command(
         class: &BStr,
         name: &BStr,
-    ) -> anyhow::Result<PhpObjHandle> {
-        runtime::autoloading::new_object(class, vec![PluginValue::string(name)])
+    ) -> anyhow::Result<PhpEntityHandle> {
+        runtime::autoloading::new_object(class, vec![RpcValue::string(name)])
     }
 
     /// `$command->getName()` on a command entity no proxy is built for yet.
-    pub(crate) fn command_get_name(handle: &PhpObjHandle) -> anyhow::Result<Option<BString>> {
+    pub(crate) fn command_get_name(handle: &PhpEntityHandle) -> anyhow::Result<Option<BString>> {
         PhpCall::Method(handle, BStr::new("getName")).run(Vec::new())
     }
 
     /// `$command->setName($name)` on a command entity no proxy is built for yet.
-    pub(crate) fn command_set_name(handle: &PhpObjHandle, name: &BStr) -> anyhow::Result<()> {
+    pub(crate) fn command_set_name(handle: &PhpEntityHandle, name: &BStr) -> anyhow::Result<()> {
         PhpCall::Method(handle, BStr::new("setName"))
-            .run::<PluginValue>(vec![PluginValue::string(name)])?;
+            .run::<RpcValue>(vec![RpcValue::string(name)])?;
         Ok(())
     }
 
     /// `$command->getDescription()` on a command entity no proxy is built for yet.
-    pub(crate) fn command_get_description(handle: &PhpObjHandle) -> anyhow::Result<BString> {
+    pub(crate) fn command_get_description(handle: &PhpEntityHandle) -> anyhow::Result<BString> {
         PhpCall::Method(handle, BStr::new("getDescription")).run(Vec::new())
     }
 
     /// `$command->setDescription($description)` on a command entity no proxy is built for yet.
     pub(crate) fn command_set_description(
-        handle: &PhpObjHandle,
+        handle: &PhpEntityHandle,
         description: &BStr,
     ) -> anyhow::Result<()> {
         PhpCall::Method(handle, BStr::new("setDescription"))
-            .run::<PluginValue>(vec![PluginValue::string(description)])?;
+            .run::<RpcValue>(vec![RpcValue::string(description)])?;
         Ok(())
     }
 
-    fn build(handle: PhpObjHandle, proxy_command: bool) -> anyhow::Result<Self> {
+    fn build(handle: PhpEntityHandle, proxy_command: bool) -> anyhow::Result<Self> {
         let data = BaseCommandData::new(None);
         let name: Option<BString> = Self::call_metadata_getter(&handle, BStr::new("getName"))?;
         if let Some(name) = name {
@@ -141,14 +141,17 @@ impl PhpCommandProxy {
 
     /// Mirrors the command's input definition (plus help text and extra usages) into the
     /// Rust-side command state, so `help`/`list` render it without touching the worker.
-    fn read_back_definition(handle: &PhpObjHandle, data: &BaseCommandData) -> anyhow::Result<()> {
+    fn read_back_definition(
+        handle: &PhpEntityHandle,
+        data: &BaseCommandData,
+    ) -> anyhow::Result<()> {
         use shirabe_symfony_console::input::{
             DefinitionItem, InputArgument, InputDefinition, InputOption,
         };
 
         let definition: CommandDefinition =
             PhpCall::Function(BStr::new("__shirabe_read_command_definition"))
-                .run(vec![PluginValue::PhpHandle(handle.clone())])?;
+                .run(vec![RpcValue::PhpEntityHandle(handle.clone())])?;
 
         let mut items: Vec<DefinitionItem> = Vec::new();
         for argument in definition.arguments {
@@ -211,8 +214,8 @@ impl PhpCommandProxy {
         Ok(())
     }
 
-    fn call_metadata_getter<R: FromPluginValue>(
-        handle: &PhpObjHandle,
+    fn call_metadata_getter<R: FromRpcValue>(
+        handle: &PhpEntityHandle,
         method: &BStr,
     ) -> anyhow::Result<R> {
         PhpCall::Method(handle, method).run(Vec::new())
@@ -240,8 +243,8 @@ impl Command for PhpCommandProxy {
         let app = context.booted_app()?;
         let input_line = input.borrow().to_php_string();
         PhpCall::Function(BStr::new("__shirabe_run_console_application")).run(vec![
-            PluginValue::PhpHandle(app),
-            PluginValue::string(input_line),
+            RpcValue::PhpEntityHandle(app),
+            RpcValue::string(input_line),
         ])
     }
 

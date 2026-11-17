@@ -10,12 +10,12 @@ use crate::php_worker::rpc::dispatch::error_throw;
 use crate::php_worker::rpc::table;
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
-use shirabe_php_rpc::{FromPluginValue, PhpThrow, PluginValue, RustObjHandle, codec};
+use shirabe_php_rpc::{FromRpcValue, PhpThrow, RpcValue, RustEntityHandle, codec};
 use shirabe_php_shim::bformat;
 
 /// A handle type pointing to a Rust-side entity that crosses the boundary.
 pub trait Entity: Clone + 'static {
-    /// How an rhandle naming another kind of entity is reported ("a Locker").
+    /// How a Rust entity id naming another kind of entity is reported ("a Locker").
     const EXPECTED: &'static [u8];
 
     /// The allocation that is the PHP object's identity (`===`).
@@ -33,7 +33,7 @@ pub trait Entity: Clone + 'static {
     }
 
     /// `__get` / `__set` / `__isset` / `__unset`.
-    fn property(&self, access: PropertyAccess<'_>) -> Result<PluginValue, PhpThrow> {
+    fn property(&self, access: PropertyAccess<'_>) -> Result<RpcValue, PhpThrow> {
         // TODO(plugin): the instance properties the proxied classes expose are widened on
         // demand. Each one has to decide how the state the real class keeps in that property is
         // served from the Rust-side entity.
@@ -45,7 +45,7 @@ pub trait Entity: Clone + 'static {
 
     /// A method only the worker runtime itself calls on this entity (`__shirabe_loop_services` on the
     /// Composer instance); `None` for every other name.
-    fn worker_method(&self, call: &mut Call<'_>) -> Option<Result<PluginValue, PhpThrow>> {
+    fn worker_method(&self, call: &mut Call<'_>) -> Option<Result<RpcValue, PhpThrow>> {
         let _ = call;
         None
     }
@@ -54,19 +54,10 @@ pub trait Entity: Clone + 'static {
 /// One of the property forwarders every stub carries.
 #[derive(Debug)]
 pub enum PropertyAccess<'a> {
-    Get {
-        name: &'a BStr,
-    },
-    Set {
-        name: &'a BStr,
-        value: &'a PluginValue,
-    },
-    Isset {
-        name: &'a BStr,
-    },
-    Unset {
-        name: &'a BStr,
-    },
+    Get { name: &'a BStr },
+    Set { name: &'a BStr, value: &'a RpcValue },
+    Isset { name: &'a BStr },
+    Unset { name: &'a BStr },
 }
 
 impl<'a> PropertyAccess<'a> {
@@ -84,7 +75,7 @@ impl<'a> PropertyAccess<'a> {
 /// routing of the members that class forwards.
 pub struct Crossing<H: 'static> {
     pub name: &'static [u8],
-    pub dispatch: fn(&H, &mut Call<'_>) -> Result<PluginValue, PhpThrow>,
+    pub dispatch: fn(&H, &mut Call<'_>) -> Result<RpcValue, PhpThrow>,
 }
 
 impl<H> std::fmt::Debug for Crossing<H> {
@@ -102,16 +93,16 @@ pub struct Call<'a> {
     class: &'a BStr,
     /// The method, static method or `__construct` being called.
     method: &'a BStr,
-    args: &'a [PluginValue],
-    out_params: &'a mut IndexMap<u32, PluginValue>,
+    args: &'a [RpcValue],
+    out_params: &'a mut IndexMap<u32, RpcValue>,
 }
 
 impl<'a> Call<'a> {
     pub(crate) fn new(
         class: &'a BStr,
         method: &'a BStr,
-        args: &'a [PluginValue],
-        out_params: &'a mut IndexMap<u32, PluginValue>,
+        args: &'a [RpcValue],
+        out_params: &'a mut IndexMap<u32, RpcValue>,
     ) -> Self {
         Self {
             class,
@@ -130,24 +121,24 @@ impl<'a> Call<'a> {
     }
 
     /// The arguments as they came over the wire, for a parameter `arg` cannot decode alone.
-    pub fn args(&self) -> &'a [PluginValue] {
+    pub fn args(&self) -> &'a [RpcValue] {
         self.args
     }
 
     /// Decodes the argument at `position`. A missing argument decodes the same way PHP's `null`
     /// does; a parameter's own default belongs to `arg_or`.
-    pub fn arg<T: FromPluginValue>(&self, position: usize) -> Result<T, PhpThrow> {
-        T::from_plugin_value(self.args.get(position).unwrap_or(&codec::NULL))
+    pub fn arg<T: FromRpcValue>(&self, position: usize) -> Result<T, PhpThrow> {
+        T::from_rpc_value(self.args.get(position).unwrap_or(&codec::NULL))
             .map_err(|throw| self.arg_throw(position, throw))
     }
 
     /// Decodes the argument at `position` for a parameter whose PHP declaration carries a
     /// default: an omitted argument, and the `null` PHP passes in its place, take `default`.
-    pub fn arg_or<T: FromPluginValue>(&self, position: usize, default: T) -> Result<T, PhpThrow> {
+    pub fn arg_or<T: FromRpcValue>(&self, position: usize, default: T) -> Result<T, PhpThrow> {
         match self.args.get(position) {
-            None | Some(PluginValue::Null) => Ok(default),
+            None | Some(RpcValue::Null) => Ok(default),
             Some(value) => {
-                T::from_plugin_value(value).map_err(|throw| self.arg_throw(position, throw))
+                T::from_rpc_value(value).map_err(|throw| self.arg_throw(position, throw))
             }
         }
     }
@@ -162,7 +153,7 @@ impl<'a> Call<'a> {
     }
 
     /// The value written back to the by-reference argument at `position`.
-    pub fn set_out_param(&mut self, position: u32, value: PluginValue) {
+    pub fn set_out_param(&mut self, position: u32, value: RpcValue) {
         self.out_params.insert(position, value);
     }
 
@@ -226,42 +217,43 @@ pub fn protocol_violation(call: &Call<'_>) -> ! {
     )
 }
 
-/// Registers an entity a forwarded constructor of `class` built, and answers its rhandle.
+/// Registers an entity a forwarded constructor of `class` built, and answers its Rust entity id.
 pub(crate) fn constructed<H: Entity>(class: &BStr, entity: H) -> Result<u64, PhpThrow> {
-    let (rhandle, crossing) = table::register(entity)?;
+    let (entity_id, crossing) = table::register(entity)?;
     assert_eq!(
         class,
         BStr::new(crossing.name),
         "a constructor builds an entity of its own class"
     );
-    Ok(rhandle)
+    Ok(entity_id)
 }
 
-/// Registers `entity` in the R table and answers the descriptor the child builds its stub from.
-pub fn entity_value<H: Entity>(entity: &H) -> Result<PluginValue, PhpThrow> {
-    let (rhandle, class) = table::register(entity.clone())?;
-    Ok(PluginValue::RustHandle(RustObjHandle {
-        rhandle,
+/// Registers `entity` in the Rust entity table and answers the Rust entity handle the child builds
+/// its stub from.
+pub fn entity_value<H: Entity>(entity: &H) -> Result<RpcValue, PhpThrow> {
+    let (entity_id, class) = table::register(entity.clone())?;
+    Ok(RpcValue::RustEntityHandle(RustEntityHandle {
+        entity_id,
         class: BString::from(class.name),
     }))
 }
 
-/// An argument naming an entity of the R table.
+/// An argument naming an entity of the Rust entity table.
 #[derive(Debug)]
 pub struct EntityArg<H>(pub H);
 
-impl<H: Entity> FromPluginValue for EntityArg<H> {
-    fn from_plugin_value(value: &PluginValue) -> Result<Self, PhpThrow> {
-        let PluginValue::RustHandle(handle) = value else {
+impl<H: Entity> FromRpcValue for EntityArg<H> {
+    fn from_rpc_value(value: &RpcValue) -> Result<Self, PhpThrow> {
+        let RpcValue::RustEntityHandle(handle) = value else {
             return Err(codec::unexpected(H::EXPECTED, value));
         };
-        table::lookup::<H>(handle.rhandle)
+        table::lookup::<H>(handle.entity_id)
             .map(EntityArg)
             .ok_or_else(|| {
                 PhpThrow::runtime(bformat!(
-                    "expected {}, got Rust handle {}",
+                    "expected {}, got Rust entity id {}",
                     BStr::new(H::EXPECTED),
-                    handle.rhandle
+                    handle.entity_id
                 ))
             })
     }

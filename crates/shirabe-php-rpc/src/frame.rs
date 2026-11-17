@@ -3,8 +3,8 @@
 //! fields as a PHP-serialized list. See `docs/dev/php-rpc.md`.
 
 use crate::PhpThrow;
-use crate::codec::{FromPluginValue, protocol_value};
-use crate::value::{self, PluginValue};
+use crate::codec::{FromRpcValue, protocol_value};
+use crate::value::{self, RpcValue};
 use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::{ToPhpString, utf8_text};
@@ -27,37 +27,37 @@ pub enum Frame {
     CallFunction {
         corr_id: u64,
         function_name: BString,
-        args: Vec<PluginValue>,
+        args: Vec<RpcValue>,
     },
-    /// Calls a method of `handle`, an entry of the receiver's table: a P-handle when the Rust
-    /// side sends it, an R-handle when the PHP side does.
+    /// Calls a method of the entity `entity_id` names in the receiver's entity table: a PHP entity
+    /// id when the Rust side sends it, a Rust entity id when the PHP side does.
     CallMethod {
         corr_id: u64,
-        handle: u64,
+        entity_id: u64,
         method_name: BString,
-        args: Vec<PluginValue>,
+        args: Vec<RpcValue>,
     },
     CallStaticMethod {
         corr_id: u64,
         pclass: BString,
         method_name: BString,
-        args: Vec<PluginValue>,
+        args: Vec<RpcValue>,
     },
     NewObject {
         corr_id: u64,
         pclass: BString,
-        ctor_args: Vec<PluginValue>,
+        ctor_args: Vec<RpcValue>,
     },
     Return {
         corr_id: u64,
-        value: PluginValue,
-        out_params: IndexMap<u32, PluginValue>,
+        value: RpcValue,
+        out_params: IndexMap<u32, RpcValue>,
     },
-    /// The payload is the exception's description (`PhpThrow::to_plugin_value`) itself.
+    /// The payload is the exception's throwable record (`PhpThrow::to_rpc_value`) itself.
     Throw { corr_id: u64, throw: PhpThrow },
-    /// The sender no longer holds `handle`, an entry of the receiver's table: an R-handle when
-    /// the PHP side sends it, a P-handle when the Rust side does.
-    ReleaseHandle { handle: u64 },
+    /// The sender no longer holds the entity `entity_id` names in the receiver's entity table: a
+    /// Rust entity id when the PHP side sends it, a PHP entity id when the Rust side does.
+    ReleaseHandle { entity_id: u64 },
 }
 
 impl Frame {
@@ -86,25 +86,25 @@ impl Frame {
         }
     }
 
-    fn fields(&self) -> Vec<PluginValue> {
+    fn fields(&self) -> Vec<RpcValue> {
         match self {
             Frame::CallFunction {
                 function_name,
                 args,
                 ..
             } => vec![
-                PluginValue::string(function_name.clone()),
-                PluginValue::List(args.clone()),
+                RpcValue::string(function_name.clone()),
+                RpcValue::List(args.clone()),
             ],
             Frame::CallMethod {
-                handle,
+                entity_id,
                 method_name,
                 args,
                 ..
             } => vec![
-                int_value(*handle),
-                PluginValue::string(method_name.clone()),
-                PluginValue::List(args.clone()),
+                int_value(*entity_id),
+                RpcValue::string(method_name.clone()),
+                RpcValue::List(args.clone()),
             ],
             Frame::CallStaticMethod {
                 pclass,
@@ -112,21 +112,21 @@ impl Frame {
                 args,
                 ..
             } => vec![
-                PluginValue::string(pclass.clone()),
-                PluginValue::string(method_name.clone()),
-                PluginValue::List(args.clone()),
+                RpcValue::string(pclass.clone()),
+                RpcValue::string(method_name.clone()),
+                RpcValue::List(args.clone()),
             ],
             Frame::NewObject {
                 pclass, ctor_args, ..
             } => vec![
-                PluginValue::string(pclass.clone()),
-                PluginValue::List(ctor_args.clone()),
+                RpcValue::string(pclass.clone()),
+                RpcValue::List(ctor_args.clone()),
             ],
             Frame::Return {
                 value, out_params, ..
             } => vec![
                 value.clone(),
-                PluginValue::Array(
+                RpcValue::Array(
                     out_params
                         .iter()
                         .map(|(pos, v)| (pos.to_php_string(), v.clone()))
@@ -134,20 +134,20 @@ impl Frame {
                 ),
             ],
             Frame::Throw { throw, .. } => throw.payload_fields(),
-            Frame::ReleaseHandle { handle } => vec![int_value(*handle)],
+            Frame::ReleaseHandle { entity_id } => vec![int_value(*entity_id)],
         }
     }
 }
 
-fn int_value(id: u64) -> PluginValue {
-    PluginValue::Int(i64::try_from(id).expect("handle id exceeds i64"))
+fn int_value(id: u64) -> RpcValue {
+    RpcValue::Int(i64::try_from(id).expect("entity id exceeds i64"))
 }
 
 pub fn write_frame(
     stream: &mut std::os::unix::net::UnixStream,
     frame: &Frame,
 ) -> std::io::Result<()> {
-    let payload = value::serialize(&PluginValue::List(frame.fields()));
+    let payload = value::serialize(&RpcValue::List(frame.fields()));
     let len = 1 + 8 + payload.len() as u64;
     stream.write_all(&len.to_le_bytes())?;
     stream.write_all(&[frame.tag()])?;
@@ -189,7 +189,7 @@ pub fn read_frame(stream: &mut std::os::unix::net::UnixStream) -> std::io::Resul
 /// not decode is a programming error, not a runtime condition; every mismatch panics.
 fn decode_frame(tag: u8, corr_id: u64, payload: &[u8]) -> Frame {
     let fields = match value::unserialize(payload) {
-        Ok(PluginValue::List(fields)) => fields,
+        Ok(RpcValue::List(fields)) => fields,
         other => panic!("PHP RPC: protocol violation — frame payload is not a list: {other:?}"),
     };
     let mut fields = fields.into_iter();
@@ -206,7 +206,7 @@ fn decode_frame(tag: u8, corr_id: u64, payload: &[u8]) -> Frame {
         },
         TAG_CALL_METHOD => Frame::CallMethod {
             corr_id,
-            handle: expect_id(next()),
+            entity_id: expect_id(next()),
             method_name: field(next()),
             args: field(next()),
         },
@@ -231,24 +231,24 @@ fn decode_frame(tag: u8, corr_id: u64, payload: &[u8]) -> Frame {
             throw: PhpThrow::from_payload_fields(fields.collect()),
         },
         TAG_RELEASE_HANDLE => Frame::ReleaseHandle {
-            handle: expect_id(next()),
+            entity_id: expect_id(next()),
         },
         _ => panic!("PHP RPC: protocol violation — unknown frame tag {tag:#04x}"),
     }
 }
 
-fn field<T: FromPluginValue>(value: PluginValue) -> T {
+fn field<T: FromRpcValue>(value: RpcValue) -> T {
     protocol_value(&value, "a frame field")
 }
 
-fn expect_id(value: PluginValue) -> u64 {
+fn expect_id(value: RpcValue) -> u64 {
     let id: i64 = field(value);
     u64::try_from(id)
-        .unwrap_or_else(|_| panic!("PHP RPC: protocol violation — negative handle id {id}"))
+        .unwrap_or_else(|_| panic!("PHP RPC: protocol violation — negative entity id {id}"))
 }
 
-fn expect_out_params(value: PluginValue) -> IndexMap<u32, PluginValue> {
-    field::<IndexMap<BString, PluginValue>>(value)
+fn expect_out_params(value: RpcValue) -> IndexMap<u32, RpcValue> {
+    field::<IndexMap<BString, RpcValue>>(value)
         .into_iter()
         .map(|(key, item)| {
             let position = utf8_text(&key)
@@ -276,7 +276,7 @@ mod tests {
         let frame = roundtrip(Frame::CallFunction {
             corr_id: 7,
             function_name: "defined".into(),
-            args: vec![PluginValue::string("PHP_VERSION")],
+            args: vec![RpcValue::string("PHP_VERSION")],
         });
         match frame {
             Frame::CallFunction {
@@ -286,7 +286,7 @@ mod tests {
             } => {
                 assert_eq!(corr_id, 7);
                 assert_eq!(function_name, "defined");
-                assert_eq!(args, vec![PluginValue::string("PHP_VERSION")]);
+                assert_eq!(args, vec![RpcValue::string("PHP_VERSION")]);
             }
             other => panic!("unexpected frame: {other:?}"),
         }
@@ -321,8 +321,8 @@ mod tests {
             401,
         );
         *throw.properties = [
-            ("statusCode".into(), PluginValue::Int(401)),
-            ("response".into(), PluginValue::Null),
+            ("statusCode".into(), RpcValue::Int(401)),
+            ("response".into(), RpcValue::Null),
         ]
         .into_iter()
         .collect();
@@ -350,11 +350,11 @@ mod tests {
                 assert_eq!(throw.code, 401);
                 assert_eq!(
                     throw.properties.get(bstr::B("statusCode")),
-                    Some(&PluginValue::Int(401))
+                    Some(&RpcValue::Int(401))
                 );
                 assert_eq!(
                     throw.properties.get(bstr::B("response")),
-                    Some(&PluginValue::Null)
+                    Some(&RpcValue::Null)
                 );
             }
             other => panic!("unexpected frame: {other:?}"),
@@ -365,8 +365,8 @@ mod tests {
     fn frame_roundtrip_return_with_out_params() {
         let frame = roundtrip(Frame::Return {
             corr_id: 9,
-            value: PluginValue::Bool(true),
-            out_params: [(2u32, PluginValue::string("x"))].into_iter().collect(),
+            value: RpcValue::Bool(true),
+            out_params: [(2u32, RpcValue::string("x"))].into_iter().collect(),
         });
         match frame {
             Frame::Return {
@@ -375,8 +375,8 @@ mod tests {
                 out_params,
             } => {
                 assert_eq!(corr_id, 9);
-                assert_eq!(value, PluginValue::Bool(true));
-                assert_eq!(out_params.get(&2), Some(&PluginValue::string("x")));
+                assert_eq!(value, RpcValue::Bool(true));
+                assert_eq!(out_params.get(&2), Some(&RpcValue::string("x")));
             }
             other => panic!("unexpected frame: {other:?}"),
         }
@@ -384,10 +384,10 @@ mod tests {
 
     #[test]
     fn frame_roundtrip_one_way_notification() {
-        let frame = roundtrip(Frame::ReleaseHandle { handle: 4 });
+        let frame = roundtrip(Frame::ReleaseHandle { entity_id: 4 });
         match frame {
-            Frame::ReleaseHandle { handle } => {
-                assert_eq!(handle, 4);
+            Frame::ReleaseHandle { entity_id } => {
+                assert_eq!(entity_id, 4);
             }
             other => panic!("unexpected frame: {other:?}"),
         }

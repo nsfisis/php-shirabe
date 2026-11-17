@@ -5,7 +5,7 @@ use crate::php_worker::rpc::entity::{Call, Crossing, Entity};
 use crate::php_worker::rpc::forwarding;
 use bstr::BString;
 use indexmap::IndexMap;
-use shirabe_php_rpc::{PhpThrow, PluginValue, ToPluginValue};
+use shirabe_php_rpc::{PhpThrow, RpcValue, ToRpcValue};
 use shirabe_php_shim::PhpMixed;
 
 impl Entity for std::rc::Rc<std::cell::RefCell<Config>> {
@@ -26,52 +26,49 @@ impl Entity for std::rc::Rc<std::cell::RefCell<Config>> {
 impl forwarding::config::Forwarding for forwarding::config::PhpClass {
     type Handle = std::rc::Rc<std::cell::RefCell<Config>>;
 
-    fn get(config: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+    fn get(config: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         let value = config
             .borrow()
             .get_with_flags(&call.arg::<BString>(0)?, call.arg_or(1, 0)?)
             .map_err(call.failed())?;
-        Ok(value.to_plugin_value())
+        Ok(value.to_rpc_value())
     }
 
-    fn all(config: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+    fn all(config: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         let all = config
             .borrow()
             .all(call.arg_or(0, 0)?)
             .map_err(call.failed())?;
-        Ok(all.to_plugin_value())
+        Ok(all.to_rpc_value())
     }
 
-    fn raw(config: &Self::Handle, _: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
-        Ok(config.borrow().raw().to_plugin_value())
+    fn raw(config: &Self::Handle, _: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
+        Ok(config.borrow().raw().to_rpc_value())
     }
 
-    fn has(config: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
-        Ok(config
-            .borrow()
-            .has(&call.arg::<BString>(0)?)
-            .to_plugin_value())
+    fn has(config: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
+        Ok(config.borrow().has(&call.arg::<BString>(0)?).to_rpc_value())
     }
 
-    fn get_repositories(config: &Self::Handle, _: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
-        Ok(config.borrow().get_repositories().to_plugin_value())
+    fn get_repositories(config: &Self::Handle, _: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
+        Ok(config.borrow().get_repositories().to_rpc_value())
     }
 
     fn get_source_of_value(
         config: &Self::Handle,
         call: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    ) -> Result<RpcValue, PhpThrow> {
         let source = config
             .borrow()
             .get_source_of_value(&call.arg::<BString>(0)?)
             .map_err(call.failed())?;
-        Ok(source.to_plugin_value())
+        Ok(source.to_rpc_value())
     }
 
-    fn merge(config: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+    fn merge(config: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         let values = call.arg::<IndexMap<BString, PhpMixed>>(0)?;
         let source = call.arg_or::<BString>(1, Config::SOURCE_UNKNOWN.to_owned())?;
         config.borrow_mut().merge(&values, &source);
-        Ok(PluginValue::Null)
+        Ok(RpcValue::Null)
     }
 }

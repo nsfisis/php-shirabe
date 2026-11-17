@@ -6,12 +6,12 @@ namespace Shirabe;
 interface RustStub
 {
     /**
-     * Null when this instance holds no Rust handle: a dual-mode class (see php/runtime/) that
-     * was constructed natively in this process crosses the wire as a P-table entity instead.
+     * Null when this instance holds no Rust entity id: a dual-mode class (see php/runtime/) that
+     * was constructed natively in this process crosses the wire as a PHP entity instead.
      *
      */
-    public function __shirabeRustHandleDescriptor(): ?Wire\RustHandle;
+    public function __shirabeRustEntityHandle(): ?Rpc\RustEntityHandle;
 
     /** Binds this stub to an existing Rust entity, in place of running its constructor. */
-    public function __shirabeBind(int $rhandle): void;
+    public function __shirabeBind(int $entityId): void;
 }

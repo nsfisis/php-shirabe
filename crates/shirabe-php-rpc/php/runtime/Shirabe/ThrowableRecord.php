@@ -1,14 +1,14 @@
 <?php
 
-// The PHP half of the exception codec (`PhpThrow::to_plugin_value` / `PhpThrow::from_plugin_value`
-// on the Rust side), used wherever an exception crosses: a Throw frame, a job rejection, or a value
-// an entry point answers with. A failure crosses with the class it was thrown as, so
-// `catch (TransportException $e)` on either side catches what it would catch under Composer, plus
-// the state that class declares beyond message and code and the place it was thrown at.
+// The PHP half of the throwable record codec (`PhpThrow::to_rpc_value` / `PhpThrow::from_rpc_value`
+// on the Rust side), used wherever an exception crosses: a Throw frame, a promise rejection, or a
+// value an entry point answers with. A failure crosses with the class it was thrown as, so `catch
+// (TransportException $e)` on either side catches what it would catch under Composer, plus the
+// state that class declares beyond message and code and the place it was thrown at.
 
 namespace Shirabe;
 
-final class MaterializedThrowable
+final class ThrowableRecord
 {
     /**
      * The state each class whose state the Rust side ports declares beyond message and code, by
@@ -22,12 +22,12 @@ final class MaterializedThrowable
     ];
 
     /**
-     * The description of an exception raised in this process: class, message, code, declared
-     * state, file, line and the superclasses, nearest first.
+     * The throwable record of an exception raised in this process: its fields are the class,
+     * message, code, declared state, file, line and the superclasses, nearest first.
      *
      * @return array{string, string, int, array<string, mixed>, string, int, list<string>}
      */
-    public static function describe(\Throwable $e): array
+    public static function fromThrowable(\Throwable $e): array
     {
         $properties = [];
         foreach (self::PROPERTIES as $class => $names) {
@@ -53,16 +53,16 @@ final class MaterializedThrowable
     }
 
     /**
-     * Rebuilds the exception a description in the shape describe() writes stands for. The
+     * Rebuilds the exception a throwable record in the shape fromThrowable() writes stands for. The
      * superclasses only matter to the Rust side, which has no type for every class. A class the
-     * child cannot construct keeps the RuntimeException shape, which is all the description
+     * child cannot construct keeps the RuntimeException shape, which is all the record
      * guarantees.
      *
-     * @param array{string, string, int, array<string, mixed>, string, int, list<string>} $description
+     * @param array{string, string, int, array<string, mixed>, string, int, list<string>} $record
      */
-    public static function revive(array $description): \Throwable
+    public static function revive(array $record): \Throwable
     {
-        [$class, $message, $code, $properties, $file, $line] = $description;
+        [$class, $message, $code, $properties, $file, $line] = $record;
         $exception = self::instantiate($class, $message, $code);
         foreach ($properties as $name => $value) {
             // A name the class does not declare is a Shirabe bug rather than a plugin one, and

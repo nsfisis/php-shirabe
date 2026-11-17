@@ -5,7 +5,7 @@ use indexmap::IndexMap;
 use shirabe_php_rpc::{cached, query};
 use shirabe_php_shim::php_str;
 
-shirabe_php_rpc::plugin_value_record! {
+shirabe_php_rpc::rpc_value_record! {
     /// `curl_version()`, together with the `CURL_*` constants the `diagnose` command consults.
     /// Every `Option` field is `None` when the corresponding array key or constant is absent.
     #[derive(Debug)]
@@ -22,7 +22,7 @@ shirabe_php_rpc::plugin_value_record! {
     }
 }
 
-shirabe_php_rpc::plugin_value_record! {
+shirabe_php_rpc::rpc_value_record! {
     /// Everything the `diagnose` command needs to know about the PHP runtime, fetched in a single
     /// round trip because the command would otherwise query the same runtime dozens of times.
     #[derive(Debug)]
@@ -54,7 +54,7 @@ shirabe_php_rpc::plugin_value_record! {
     }
 }
 
-shirabe_php_rpc::plugin_value_record! {
+shirabe_php_rpc::rpc_value_record! {
     /// The names the `__shirabe_diagnose` payload reports on.
     struct DiagnoseQuery {
         extensions: Vec<BString>,

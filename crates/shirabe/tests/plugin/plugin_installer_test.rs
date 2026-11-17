@@ -30,7 +30,7 @@ use shirabe::repository::{
 };
 use shirabe::util::r#loop::Loop;
 use shirabe::util::{HttpDownloader, Platform, ProcessExecutor};
-use shirabe_php_rpc::PluginValue;
+use shirabe_php_rpc::RpcValue;
 use shirabe_php_shim::{
     Catch as _, PhpMixed, RuntimeException, ToPhpString, UnexpectedValueException, bformat,
     path_from_bytes, path_to_bytes,
@@ -862,7 +862,7 @@ fn load_mock_capability_class() {
         .canonicalize()
         .expect("the Composer checkout must provide the plugin test mocks");
     PhpCall::Function(BStr::new("__shirabe_require"))
-        .try_run::<PluginValue>(vec![PluginValue::string(path_to_bytes(&path))])
+        .try_run::<RpcValue>(vec![RpcValue::string(path_to_bytes(&path))])
         .unwrap()
         .unwrap();
 }
@@ -893,8 +893,8 @@ fn test_capability_implements_composer_plugin_api_class_and_is_constructed_with_
             &plugin,
             BStr::new(capability_api),
             IndexMap::from([
-                (BString::from("a"), PluginValue::Int(1)),
-                (BString::from("b"), PluginValue::Int(2)),
+                (BString::from("a"), RpcValue::Int(1)),
+                (BString::from("b"), RpcValue::Int(2)),
             ]),
         )
         .unwrap()
@@ -915,9 +915,9 @@ fn test_capability_implements_composer_plugin_api_class_and_is_constructed_with_
     assert_eq!(capability_implementation, capability.__handle().class());
     // PHP: assertSame(['a' => 1, 'b' => 2, 'plugin' => $plugin], $capability->args)
     assert_eq!(
-        PluginValue::Array(IndexMap::from([
-            ("a".into(), PluginValue::Int(1)),
-            ("b".into(), PluginValue::Int(2)),
+        RpcValue::Array(IndexMap::from([
+            ("a".into(), RpcValue::Int(1)),
+            ("b".into(), RpcValue::Int(2)),
             ("plugin".into(), entity_value(&plugin).unwrap()),
         ])),
         capability.__get_property(BStr::new("args")).unwrap()

@@ -9,112 +9,112 @@ class Package extends BasePackage
 {
     public function __construct(string $name, string $version, string $prettyVersion)
     {
-        $this->__rhandle = \Shirabe\RpcRuntime::newRust(static::class, [$name, $version, $prettyVersion]);
-        \Shirabe\RustObjectRegistry::adopt($this->__rhandle, $this);
+        $this->__entityId = \Shirabe\RpcRuntime::newRust(static::class, [$name, $version, $prettyVersion]);
+        \Shirabe\RustStubRegistry::adopt($this->__entityId, $this);
     }
 
     public function setType(string $type): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setType', [$type]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, 'setType', [$type]);
     }
 
     public function setTargetDir(?string $targetDir): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setTargetDir', [$targetDir]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, 'setTargetDir', [$targetDir]);
     }
 
     public function setExtra(array $extra): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setExtra', [$extra]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, 'setExtra', [$extra]);
     }
 
     public function setBinaries(array $binaries): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setBinaries', [$binaries]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, 'setBinaries', [$binaries]);
     }
 
     public function setSourceType(?string $type): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setSourceType', [$type]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, 'setSourceType', [$type]);
     }
 
     public function setSourceUrl(?string $url): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setSourceUrl', [$url]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, 'setSourceUrl', [$url]);
     }
 
     public function setDistSha1Checksum(?string $sha1checksum): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setDistSha1Checksum', [$sha1checksum]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, 'setDistSha1Checksum', [$sha1checksum]);
     }
 
     public function setReleaseDate(?\DateTimeInterface $releaseDate): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setReleaseDate', [$releaseDate]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, 'setReleaseDate', [$releaseDate]);
     }
 
     public function setRequires(array $requires): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setRequires', [$requires]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, 'setRequires', [$requires]);
     }
 
     public function setConflicts(array $conflicts): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setConflicts', [$conflicts]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, 'setConflicts', [$conflicts]);
     }
 
     public function setProvides(array $provides): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setProvides', [$provides]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, 'setProvides', [$provides]);
     }
 
     public function setReplaces(array $replaces): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setReplaces', [$replaces]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, 'setReplaces', [$replaces]);
     }
 
     public function setDevRequires(array $devRequires): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setDevRequires', [$devRequires]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, 'setDevRequires', [$devRequires]);
     }
 
     public function setSuggests(array $suggests): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setSuggests', [$suggests]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, 'setSuggests', [$suggests]);
     }
 
     public function setAutoload(array $autoload): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setAutoload', [$autoload]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, 'setAutoload', [$autoload]);
     }
 
     public function setDevAutoload(array $devAutoload): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setDevAutoload', [$devAutoload]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, 'setDevAutoload', [$devAutoload]);
     }
 
     public function setIncludePaths(array $includePaths): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setIncludePaths', [$includePaths]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, 'setIncludePaths', [$includePaths]);
     }
 
     public function setPhpExt(?array $phpExt): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setPhpExt', [$phpExt]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, 'setPhpExt', [$phpExt]);
     }
 
     public function setNotificationUrl(string $notificationUrl): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setNotificationUrl', [$notificationUrl]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, 'setNotificationUrl', [$notificationUrl]);
     }
 
     public function setIsDefaultBranch(bool $defaultBranch): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'setIsDefaultBranch', [$defaultBranch]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, 'setIsDefaultBranch', [$defaultBranch]);
     }
 
     public function replaceVersion(string $version, string $prettyVersion): void
     {
-        \Shirabe\RpcRuntime::callRust($this->__rhandle, 'replaceVersion', [$version, $prettyVersion]);
+        \Shirabe\RpcRuntime::callRust($this->__entityId, 'replaceVersion', [$version, $prettyVersion]);
     }
 }

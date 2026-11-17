@@ -1,10 +1,10 @@
-//! The plugin values standing for the domain values that cross the worker boundary by value.
+//! The RPC values standing for the domain values that cross the worker boundary by value.
 //!
 //! Most of them are immutable values that cross as real PHP objects. A proxied entity crosses as a handle, but a value object has no
 //! entity to point at — the child has to hold a genuine instance of the real class. Each value
 //! therefore crosses as the object record PHP's `serialize()` writes for it: the class name and
 //! the property table, which `unserialize()` revives on the other side without running a
-//! constructor. `Shirabe\MaterializedValue` in the worker is the PHP half of the same protocol,
+//! constructor. `Shirabe\ByValueObject` in the worker is the PHP half of the same protocol,
 //! and names the classes allowed to cross.
 //!
 //! Writing the fields directly is what makes the two sides equivalent: a constructor normalizes
@@ -18,7 +18,7 @@ use crate::util::http::Response;
 use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_class_map_generator::class_map::ClassMap;
-use shirabe_php_rpc::{FromPluginValue, PhpObject, PhpThrow, PluginValue, ToPluginValue, codec};
+use shirabe_php_rpc::{FromRpcValue, PhpObject, PhpThrow, RpcValue, ToRpcValue, codec};
 use shirabe_php_shim::{PhpMixed, bformat, display_to_bytes, error_message, php_str};
 use shirabe_semver::constraint::{
     AnyConstraint, MatchAllConstraint, MatchNoneConstraint, MultiConstraint, SimpleConstraint,
@@ -32,30 +32,30 @@ const MULTI_CONSTRAINT_CLASS: &BStr = php_str(b"Composer\\Semver\\Constraint\\Mu
 const MATCH_ALL_CLASS: &BStr = php_str(b"Composer\\Semver\\Constraint\\MatchAllConstraint");
 const MATCH_NONE_CLASS: &BStr = php_str(b"Composer\\Semver\\Constraint\\MatchNoneConstraint");
 
-fn as_object(value: &PluginValue) -> Option<&PhpObject> {
+fn as_object(value: &RpcValue) -> Option<&PhpObject> {
     match value {
-        PluginValue::PhpObject(object) => Some(object),
+        RpcValue::PhpObject(object) => Some(object),
         _ => None,
     }
 }
 
 /// Decodes the property `value`, if any, `context` names.
-fn property<T: FromPluginValue>(
+fn property<T: FromRpcValue>(
     context: impl AsRef<[u8]>,
-    value: Option<&PluginValue>,
+    value: Option<&RpcValue>,
 ) -> Result<T, PhpThrow> {
-    T::from_plugin_value(value.unwrap_or(&codec::NULL)).map_err(|throw| PhpThrow {
+    T::from_rpc_value(value.unwrap_or(&codec::NULL)).map_err(|throw| PhpThrow {
         message: bformat!("{}: {}", context.as_ref(), throw.message),
         ..throw
     })
 }
 
-fn constraint_to_plugin_value(constraint: AnyConstraint) -> PluginValue {
+fn constraint_to_rpc_value(constraint: AnyConstraint) -> RpcValue {
     // Whether the pretty string was ever set is observable (`getPrettyString()` falls back to the
     // string form), so an unset one crosses as null rather than as an absent property.
     let pretty_string = |pretty: Option<BString>| match pretty {
-        Some(pretty) => PluginValue::string(pretty),
-        None => PluginValue::Null,
+        Some(pretty) => RpcValue::string(pretty),
+        None => RpcValue::Null,
     };
     let object = match constraint {
         AnyConstraint::Simple(c) => {
@@ -63,15 +63,15 @@ fn constraint_to_plugin_value(constraint: AnyConstraint) -> PluginValue {
             let mut object = PhpObject::new(CONSTRAINT_CLASS);
             object.set_protected(
                 "operator",
-                PluginValue::Int(SimpleConstraint::get_operator_constant(operator)),
+                RpcValue::Int(SimpleConstraint::get_operator_constant(operator)),
             );
-            object.set_protected("version", PluginValue::string(version));
+            object.set_protected("version", RpcValue::string(version));
             object.set_protected("prettyString", pretty_string(pretty));
             // A cold memo rather than missing state: PHP derives the bounds from the operator
             // and the version the first time anything asks for them, and this port keeps no
             // such cache to carry over.
-            object.set_protected("lowerBound", PluginValue::Null);
-            object.set_protected("upperBound", PluginValue::Null);
+            object.set_protected("lowerBound", RpcValue::Null);
+            object.set_protected("upperBound", RpcValue::Null);
             object
         }
         AnyConstraint::Multi(c) => {
@@ -79,20 +79,20 @@ fn constraint_to_plugin_value(constraint: AnyConstraint) -> PluginValue {
             let mut object = PhpObject::new(MULTI_CONSTRAINT_CLASS);
             object.set_protected(
                 "constraints",
-                PluginValue::List(
+                RpcValue::List(
                     constraints
                         .into_iter()
-                        .map(constraint_to_plugin_value)
+                        .map(constraint_to_rpc_value)
                         .collect(),
                 ),
             );
             object.set_protected("prettyString", pretty_string(pretty));
             // A cold memo like the bounds below, of the rendering PHP derives from the
             // constraints and the conjunctive flag.
-            object.set_protected("string", PluginValue::Null);
-            object.set_protected("conjunctive", PluginValue::Bool(conjunctive));
-            object.set_protected("lowerBound", PluginValue::Null);
-            object.set_protected("upperBound", PluginValue::Null);
+            object.set_protected("string", RpcValue::Null);
+            object.set_protected("conjunctive", RpcValue::Bool(conjunctive));
+            object.set_protected("lowerBound", RpcValue::Null);
+            object.set_protected("upperBound", RpcValue::Null);
             object
         }
         AnyConstraint::MatchAll(c) => {
@@ -106,10 +106,10 @@ fn constraint_to_plugin_value(constraint: AnyConstraint) -> PluginValue {
             object
         }
     };
-    PluginValue::PhpObject(object)
+    RpcValue::PhpObject(object)
 }
 
-pub(crate) fn constraint_from_plugin_value(value: &PluginValue) -> Result<AnyConstraint, PhpThrow> {
+pub(crate) fn constraint_from_rpc_value(value: &RpcValue) -> Result<AnyConstraint, PhpThrow> {
     let object = as_object(value).ok_or_else(|| {
         PhpThrow::runtime(bformat!(
             "expected a semver constraint from the plugin, got {}",
@@ -137,14 +137,14 @@ pub(crate) fn constraint_from_plugin_value(value: &PluginValue) -> Result<AnyCon
         }
         class if class == MULTI_CONSTRAINT_CLASS => {
             let constraints = match object.protected("constraints") {
-                Some(PluginValue::List(items)) => items
+                Some(RpcValue::List(items)) => items
                     .iter()
-                    .map(constraint_from_plugin_value)
+                    .map(constraint_from_rpc_value)
                     .collect::<Result<Vec<_>, _>>()?,
                 // A MultiConstraint built from a PHP associative array crosses as a map.
-                Some(PluginValue::Array(items)) => items
+                Some(RpcValue::Array(items)) => items
                     .values()
-                    .map(constraint_from_plugin_value)
+                    .map(constraint_from_rpc_value)
                     .collect::<Result<Vec<_>, _>>()?,
                 other => {
                     return Err(PhpThrow::runtime(bformat!(
@@ -194,76 +194,76 @@ pub(crate) fn constraint_from_plugin_value(value: &PluginValue) -> Result<AnyCon
 /// carrying the transfer info; the native downloader that takes those requests here flattens its
 /// response into `Response` before the value leaves `HttpDownloader`, so `getCurlInfo()` is gone
 /// and `get_class()` differs.
-impl ToPluginValue for Response {
-    fn to_plugin_value(self) -> PluginValue {
+impl ToRpcValue for Response {
+    fn to_rpc_value(self) -> RpcValue {
         let (url, code, headers, body) = self.into_parts();
         let mut object = PhpObject::new(RESPONSE_CLASS);
         let mut request = indexmap::IndexMap::new();
-        request.insert("url".into(), PluginValue::string(url));
-        object.set_private(RESPONSE_CLASS, "request", PluginValue::Array(request));
-        object.set_private(RESPONSE_CLASS, "code", PluginValue::Int(code));
+        request.insert("url".into(), RpcValue::string(url));
+        object.set_private(RESPONSE_CLASS, "request", RpcValue::Array(request));
+        object.set_private(RESPONSE_CLASS, "code", RpcValue::Int(code));
         object.set_private(
             RESPONSE_CLASS,
             "headers",
-            PluginValue::List(headers.into_iter().map(PluginValue::string).collect()),
+            RpcValue::List(headers.into_iter().map(RpcValue::string).collect()),
         );
         object.set_private(
             RESPONSE_CLASS,
             "body",
             match body {
-                Some(body) => PluginValue::string(body),
-                None => PluginValue::Null,
+                Some(body) => RpcValue::string(body),
+                None => RpcValue::Null,
             },
         );
-        PluginValue::PhpObject(object)
+        RpcValue::PhpObject(object)
     }
 }
 
 /// The class map `AutoloadGenerator::dump()` returns. It is a `php-native` class, so the child
 /// owns the revived instance outright: the Rust side keeps no entity behind it.
-pub(crate) fn class_map_to_plugin_value(class_map: &ClassMap) -> PluginValue {
+pub(crate) fn class_map_to_rpc_value(class_map: &ClassMap) -> RpcValue {
     let mut object = PhpObject::new(CLASS_MAP_CLASS);
-    object.set_public("map", class_map.get_map().clone().to_plugin_value());
+    object.set_public("map", class_map.get_map().clone().to_rpc_value());
     let ambiguous_classes = class_map
         .get_ambiguous_classes(None)
         .expect("no duplicates filter is applied");
     object.set_private(
         CLASS_MAP_CLASS,
         "ambiguousClasses",
-        ambiguous_classes.to_plugin_value(),
+        ambiguous_classes.to_rpc_value(),
     );
-    let psr_violations: indexmap::IndexMap<bstr::BString, PluginValue> = class_map
+    let psr_violations: indexmap::IndexMap<bstr::BString, RpcValue> = class_map
         .get_raw_psr_violations()
         .iter()
         .map(|(path, violations)| {
             let violations = violations
                 .iter()
                 .map(|violation| {
-                    PluginValue::Array(indexmap::IndexMap::from([
+                    RpcValue::Array(indexmap::IndexMap::from([
                         (
                             "warning".into(),
-                            PluginValue::string(violation.warning.as_bstr()),
+                            RpcValue::string(violation.warning.as_bstr()),
                         ),
                         (
                             "className".into(),
-                            PluginValue::string(violation.class_name.clone()),
+                            RpcValue::string(violation.class_name.clone()),
                         ),
                     ]))
                 })
                 .collect();
-            (path.clone(), PluginValue::List(violations))
+            (path.clone(), RpcValue::List(violations))
         })
         .collect();
     object.set_private(
         CLASS_MAP_CLASS,
         "psrViolations",
-        psr_violations.to_plugin_value(),
+        psr_violations.to_rpc_value(),
     );
-    PluginValue::PhpObject(object)
+    RpcValue::PhpObject(object)
 }
 
-impl FromPluginValue for Link {
-    fn from_plugin_value(value: &PluginValue) -> Result<Self, PhpThrow> {
+impl FromRpcValue for Link {
+    fn from_rpc_value(value: &RpcValue) -> Result<Self, PhpThrow> {
         let object = as_object(value).ok_or_else(|| {
             PhpThrow::runtime(bformat!(
                 "expected a Link from the plugin, got {}",
@@ -278,7 +278,7 @@ impl FromPluginValue for Link {
                 object.class
             )));
         }
-        let constraint = constraint_from_plugin_value(
+        let constraint = constraint_from_rpc_value(
             object
                 .protected("constraint")
                 .ok_or_else(|| PhpThrow::runtime("a Link expects a constraint"))?,
@@ -300,64 +300,64 @@ impl FromPluginValue for Link {
 ///
 /// TODO(plugin): links have no entity to intern against, so two calls of the same getter answer
 /// with distinct child-side objects where upstream returns the identical one.
-impl ToPluginValue for Link {
-    fn to_plugin_value(self) -> PluginValue {
+impl ToRpcValue for Link {
+    fn to_rpc_value(self) -> RpcValue {
         let (source, target, constraint, description, pretty_constraint) = self.into_parts();
         let mut object = PhpObject::new(LINK_CLASS);
-        object.set_protected("source", PluginValue::string(source));
-        object.set_protected("target", PluginValue::string(target));
-        object.set_protected("constraint", constraint_to_plugin_value(constraint));
-        object.set_protected("description", PluginValue::string(description));
+        object.set_protected("source", RpcValue::string(source));
+        object.set_protected("target", RpcValue::string(target));
+        object.set_protected("constraint", constraint_to_rpc_value(constraint));
+        object.set_protected("description", RpcValue::string(description));
         let pretty_constraint = match pretty_constraint {
-            Some(pretty) => PluginValue::string(pretty),
-            None => PluginValue::Null,
+            Some(pretty) => RpcValue::string(pretty),
+            None => RpcValue::Null,
         };
         object.set_protected("prettyConstraint", pretty_constraint);
-        PluginValue::PhpObject(object)
+        RpcValue::PhpObject(object)
     }
 }
 
 /// `array{url: string, preferred: bool}` as PHP shapes it.
-impl FromPluginValue for Mirror {
-    fn from_plugin_value(value: &PluginValue) -> Result<Self, PhpThrow> {
-        let row = IndexMap::<BString, PluginValue>::from_plugin_value(value)?;
+impl FromRpcValue for Mirror {
+    fn from_rpc_value(value: &RpcValue) -> Result<Self, PhpThrow> {
+        let row = IndexMap::<BString, RpcValue>::from_rpc_value(value)?;
         let field = |key: &[u8]| row.get(key).unwrap_or(&codec::NULL);
         Ok(Mirror {
-            url: BString::from_plugin_value(field(b"url"))?,
-            preferred: Option::<bool>::from_plugin_value(field(b"preferred"))?.unwrap_or(false),
+            url: BString::from_rpc_value(field(b"url"))?,
+            preferred: Option::<bool>::from_rpc_value(field(b"preferred"))?.unwrap_or(false),
         })
     }
 }
 
-impl ToPluginValue for Mirror {
-    fn to_plugin_value(self) -> PluginValue {
-        PluginValue::Array(IndexMap::from([
-            ("url".into(), PluginValue::string(self.url)),
-            ("preferred".into(), PluginValue::Bool(self.preferred)),
+impl ToRpcValue for Mirror {
+    fn to_rpc_value(self) -> RpcValue {
+        RpcValue::Array(IndexMap::from([
+            ("url".into(), RpcValue::string(self.url)),
+            ("preferred".into(), RpcValue::Bool(self.preferred)),
         ]))
     }
 }
 
-impl FromPluginValue for DisplayMode {
-    fn from_plugin_value(value: &PluginValue) -> Result<Self, PhpThrow> {
+impl FromRpcValue for DisplayMode {
+    fn from_rpc_value(value: &RpcValue) -> Result<Self, PhpThrow> {
         match value {
-            PluginValue::Int(0) => Ok(DisplayMode::SourceRefIfDev),
-            PluginValue::Int(1) => Ok(DisplayMode::SourceRef),
-            PluginValue::Int(2) => Ok(DisplayMode::DistRef),
+            RpcValue::Int(0) => Ok(DisplayMode::SourceRefIfDev),
+            RpcValue::Int(1) => Ok(DisplayMode::SourceRef),
+            RpcValue::Int(2) => Ok(DisplayMode::DistRef),
             other => Err(codec::unexpected("a display mode of 0..=2", other)),
         }
     }
 }
 
-impl ToPluginValue for StreamContextOptions {
-    fn to_plugin_value(self) -> PluginValue {
-        PhpMixed::Array(self.into_array()).to_plugin_value()
+impl ToRpcValue for StreamContextOptions {
+    fn to_rpc_value(self) -> RpcValue {
+        PhpMixed::Array(self.into_array()).to_rpc_value()
     }
 }
 
-impl FromPluginValue for StreamContextOptions {
-    fn from_plugin_value(value: &PluginValue) -> Result<Self, PhpThrow> {
-        Self::from_array(IndexMap::<BString, PhpMixed>::from_plugin_value(value)?)
+impl FromRpcValue for StreamContextOptions {
+    fn from_rpc_value(value: &RpcValue) -> Result<Self, PhpThrow> {
+        Self::from_array(IndexMap::<BString, PhpMixed>::from_rpc_value(value)?)
             .map_err(|error| PhpThrow::new("TypeError", error_message(&error), 0))
     }
 }
@@ -390,7 +390,7 @@ mod tests {
             Some(BString::from("^1.0")),
         );
         assert_eq!(
-            BStr::new(&serialize(&link.clone().to_plugin_value())),
+            BStr::new(&serialize(&link.clone().to_rpc_value())),
             BStr::new(
                 b"O:21:\"Composer\\Package\\Link\":5:{\
                     s:9:\"\0*\0source\";s:3:\"a/b\";\
@@ -420,7 +420,7 @@ mod tests {
             None,
         );
         assert_eq!(
-            BStr::new(&serialize(&link.clone().to_plugin_value())),
+            BStr::new(&serialize(&link.clone().to_rpc_value())),
             BStr::new(
                 b"O:21:\"Composer\\Package\\Link\":5:{\
                     s:9:\"\0*\0source\";s:3:\"a/b\";\
@@ -431,7 +431,7 @@ mod tests {
                     s:19:\"\0*\0prettyConstraint\";N;}"
             ),
         );
-        let decoded = Link::from_plugin_value(&link.to_plugin_value()).expect("decode failed");
+        let decoded = Link::from_rpc_value(&link.to_rpc_value()).expect("decode failed");
         assert!(decoded.get_pretty_constraint().is_err());
         assert_eq!(None, decoded.into_parts().4);
     }
@@ -450,7 +450,7 @@ mod tests {
             Some(BString::from("^1.0")),
         ));
         assert_eq!(
-            BStr::new(&serialize(&constraint_to_plugin_value(constraint))),
+            BStr::new(&serialize(&constraint_to_rpc_value(constraint))),
             BStr::new(
                 b"O:42:\"Composer\\Semver\\Constraint\\MultiConstraint\":6:{\
                     s:14:\"\0*\0constraints\";a:2:{\
@@ -511,7 +511,7 @@ mod tests {
                 Some(BString::from("^1.0")),
             );
             let decoded =
-                Link::from_plugin_value(&link.clone().to_plugin_value()).expect("decode failed");
+                Link::from_rpc_value(&link.clone().to_rpc_value()).expect("decode failed");
             assert_eq!(link.to_php_string(), decoded.to_php_string());
             assert_eq!(link.get_description(), decoded.get_description());
             assert_eq!(
@@ -524,15 +524,15 @@ mod tests {
     #[test]
     fn a_foreign_class_cannot_cross_as_a_value() {
         let mut object = PhpObject::new("MyPlugin\\OddConstraint");
-        object.set_protected("prettyString", PluginValue::Null);
-        let err = constraint_from_plugin_value(&PluginValue::PhpObject(object)).unwrap_err();
+        object.set_protected("prettyString", RpcValue::Null);
+        let err = constraint_from_rpc_value(&RpcValue::PhpObject(object)).unwrap_err();
         assert!(
             err.message.contains_str("OddConstraint"),
             "{}",
             err.message.display_lossy()
         );
 
-        let err = Link::from_plugin_value(&PluginValue::List(Vec::new())).unwrap_err();
+        let err = Link::from_rpc_value(&RpcValue::List(Vec::new())).unwrap_err();
         assert!(
             err.message.contains_str("expected a Link"),
             "{}",

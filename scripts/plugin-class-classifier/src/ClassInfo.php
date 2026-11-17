@@ -26,8 +26,8 @@ final class ClassInfo
 
     /**
      * Types referenced statically in method bodies (`X::method()`, writes
-     * to `X::$prop`). Satisfied by any executable presence in the child
-     * world, including a generated proxy stub.
+     * to `X::$prop`). Satisfied by any executable presence on the PHP
+     * side, including a generated proxy stub.
      *
      * @var list<string>
      */

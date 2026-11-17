@@ -8,7 +8,7 @@
 use crate::php_worker::rpc::dispatch::RpcDispatcher;
 use crate::php_worker::throwable::throw_into_error;
 use bstr::BStr;
-use shirabe_php_rpc::{FromPluginValue, PhpObjHandle, PhpThrow, PluginValue};
+use shirabe_php_rpc::{FromRpcValue, PhpEntityHandle, PhpThrow, RpcValue};
 use shirabe_php_shim::{RuntimeException, bformat};
 
 /// What a call into the worker runs.
@@ -16,25 +16,25 @@ use shirabe_php_shim::{RuntimeException, bformat};
 pub enum PhpCall<'a> {
     /// `$name(...$args)`, or the worker's entry point of that name.
     Function(&'a BStr),
-    /// `$object->$method(...$args)` on a P-table entity.
-    Method(&'a PhpObjHandle, &'a BStr),
+    /// `$object->$method(...$args)` on an entity of the PHP entity table.
+    Method(&'a PhpEntityHandle, &'a BStr),
     /// `$class::$method(...$args)`.
     StaticMethod(&'a BStr, &'a BStr),
-    /// `new $class(...$args)`, answering with the P-table handle of the new entity.
+    /// `new $class(...$args)`, answering with the PHP entity handle of the new entity.
     New(&'a BStr),
 }
 
 impl PhpCall<'_> {
     /// Runs the call. A PHP exception becomes the error of the ported exception it stands for.
-    pub fn run<R: FromPluginValue>(self, args: Vec<PluginValue>) -> anyhow::Result<R> {
+    pub fn run<R: FromRpcValue>(self, args: Vec<RpcValue>) -> anyhow::Result<R> {
         self.try_run(args)?.map_err(throw_into_error)
     }
 
     /// [`PhpCall::run`], for a caller that catches the PHP exception itself. An answer that is
     /// not an `R` is the error [`PhpCall::unsupported_shape`] describes.
-    pub fn try_run<R: FromPluginValue>(
+    pub fn try_run<R: FromRpcValue>(
         self,
-        args: Vec<PluginValue>,
+        args: Vec<RpcValue>,
     ) -> anyhow::Result<Result<R, PhpThrow>> {
         let dispatcher = &mut RpcDispatcher;
         let outcome = match self {
@@ -49,7 +49,7 @@ impl PhpCall<'_> {
         }?;
         Ok(match outcome {
             Ok(value) => {
-                Ok(R::from_plugin_value(&value).map_err(|throw| self.unsupported_shape(throw))?)
+                Ok(R::from_rpc_value(&value).map_err(|throw| self.unsupported_shape(throw))?)
             }
             Err(throw) => Err(throw),
         })

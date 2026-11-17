@@ -7,7 +7,7 @@ use crate::php_worker::rpc::forwarding;
 use crate::repository::RepositoryInterfaceHandle;
 use bstr::BString;
 use indexmap::IndexMap;
-use shirabe_php_rpc::{PhpThrow, PluginValue, ToPluginValue};
+use shirabe_php_rpc::{PhpThrow, RpcValue, ToRpcValue};
 use shirabe_php_shim::PhpMixed;
 
 impl Entity for std::rc::Rc<std::cell::RefCell<dyn LockerInterface>> {
@@ -25,22 +25,22 @@ impl Entity for std::rc::Rc<std::cell::RefCell<dyn LockerInterface>> {
 impl forwarding::package::locker::Forwarding for forwarding::package::locker::PhpClass {
     type Handle = std::rc::Rc<std::cell::RefCell<dyn LockerInterface>>;
 
-    fn is_locked(locker: &Self::Handle, _: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
-        Ok(locker.borrow_mut().is_locked().to_plugin_value())
+    fn is_locked(locker: &Self::Handle, _: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
+        Ok(locker.borrow_mut().is_locked().to_rpc_value())
     }
 
-    fn is_fresh(locker: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+    fn is_fresh(locker: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         Ok(locker
             .borrow_mut()
             .is_fresh()
             .map_err(call.failed())?
-            .to_plugin_value())
+            .to_rpc_value())
     }
 
     fn get_locked_repository(
         locker: &Self::Handle,
         call: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    ) -> Result<RpcValue, PhpThrow> {
         let repository = locker
             .borrow_mut()
             .get_locked_repository(call.arg_or(0, false)?)
@@ -51,105 +51,99 @@ impl forwarding::package::locker::Forwarding for forwarding::package::locker::Ph
     fn get_dev_package_names(
         locker: &Self::Handle,
         call: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    ) -> Result<RpcValue, PhpThrow> {
         Ok(locker
             .borrow_mut()
             .get_dev_package_names()
             .map_err(call.failed())?
-            .to_plugin_value())
+            .to_rpc_value())
     }
 
     fn get_platform_requirements(
         locker: &Self::Handle,
         call: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    ) -> Result<RpcValue, PhpThrow> {
         Ok(locker
             .borrow_mut()
             .get_platform_requirements(call.arg_or(0, false)?)
             .map_err(call.failed())?
-            .to_plugin_value())
+            .to_rpc_value())
     }
 
     fn get_minimum_stability(
         locker: &Self::Handle,
         call: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    ) -> Result<RpcValue, PhpThrow> {
         Ok(locker
             .borrow_mut()
             .get_minimum_stability()
             .map_err(call.failed())?
-            .to_plugin_value())
+            .to_rpc_value())
     }
 
     fn get_stability_flags(
         locker: &Self::Handle,
         call: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    ) -> Result<RpcValue, PhpThrow> {
         Ok(locker
             .borrow_mut()
             .get_stability_flags()
             .map_err(call.failed())?
-            .to_plugin_value())
+            .to_rpc_value())
     }
 
-    fn get_prefer_stable(
-        locker: &Self::Handle,
-        call: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    fn get_prefer_stable(locker: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         Ok(locker
             .borrow_mut()
             .get_prefer_stable()
             .map_err(call.failed())?
-            .to_plugin_value())
+            .to_rpc_value())
     }
 
-    fn get_prefer_lowest(
-        locker: &Self::Handle,
-        call: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    fn get_prefer_lowest(locker: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         Ok(locker
             .borrow_mut()
             .get_prefer_lowest()
             .map_err(call.failed())?
-            .to_plugin_value())
+            .to_rpc_value())
     }
 
     fn get_platform_overrides(
         locker: &Self::Handle,
         call: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    ) -> Result<RpcValue, PhpThrow> {
         Ok(locker
             .borrow_mut()
             .get_platform_overrides()
             .map_err(call.failed())?
-            .to_plugin_value())
+            .to_rpc_value())
     }
 
-    fn get_aliases(locker: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+    fn get_aliases(locker: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         Ok(locker
             .borrow_mut()
             .get_aliases()
             .map_err(call.failed())?
-            .to_plugin_value())
+            .to_rpc_value())
     }
 
-    fn get_plugin_api(locker: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+    fn get_plugin_api(locker: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         Ok(locker
             .borrow_mut()
             .get_plugin_api()
             .map_err(call.failed())?
-            .to_plugin_value())
+            .to_rpc_value())
     }
 
-    fn get_lock_data(locker: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+    fn get_lock_data(locker: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         Ok(locker
             .borrow_mut()
             .get_lock_data()
             .map_err(call.failed())?
-            .to_plugin_value())
+            .to_rpc_value())
     }
 
-    fn set_lock_data(locker: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+    fn set_lock_data(locker: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         let written = locker
             .borrow_mut()
             .set_lock_data(
@@ -166,35 +160,35 @@ impl forwarding::package::locker::Forwarding for forwarding::package::locker::Ph
                 call.arg_or::<bool>(10, true)?,
             )
             .map_err(call.failed())?;
-        Ok(written.to_plugin_value())
+        Ok(written.to_rpc_value())
     }
 
     fn get_missing_requirement_info(
         locker: &Self::Handle,
         call: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    ) -> Result<RpcValue, PhpThrow> {
         let package = root_package(call, 0)?;
         let include_dev = call.arg::<bool>(1)?;
         Ok(locker
             .borrow_mut()
             .get_missing_requirement_info(package, include_dev)
             .map_err(call.failed())?
-            .to_plugin_value())
+            .to_rpc_value())
     }
 
-    fn get_content_hash(call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+    fn get_content_hash(call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         Locker::get_content_hash(call.arg::<BString>(0)?)
-            .map(PluginValue::string)
+            .map(RpcValue::string)
             .map_err(call.failed())
     }
 
     // TODO(plugin): `JsonFile` has no proxy stub, so the lock file cannot be handed out.
-    fn get_json_file(_: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+    fn get_json_file(_: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         Err(call.unavailable("JsonFile cannot cross the boundary"))
     }
 
     // TODO(plugin): `JsonFile` has no proxy stub, so no plugin holds a JsonFile it could pass.
-    fn update_hash(_: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+    fn update_hash(_: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         Err(call.unavailable("JsonFile cannot cross the boundary"))
     }
 }

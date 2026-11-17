@@ -3,7 +3,7 @@
 //! See `docs/dev/composer-runtime-bundle.md`.
 
 use bstr::{BStr, BString};
-use shirabe_php_rpc::{PluginValue, call_internal_function};
+use shirabe_php_rpc::{RpcValue, call_internal_function};
 use shirabe_php_shim::{
     AnyThrowable, Phar, RuntimeException, bformat, display_to_bytes, getenv, os_str_from_bytes,
     path_from_bytes, path_to_bytes, php_str,
@@ -77,17 +77,17 @@ fn worker_opens_bundle() -> anyhow::Result<bool> {
     let opened = call_internal_function(
         "__shirabe_open_runtime_bundle",
         vec![
-            PluginValue::string(path_to_bytes(&executable)),
-            PluginValue::string(ALIAS),
-            PluginValue::string(SENTINEL_PATH),
-            PluginValue::string(BUNDLE_ID),
+            RpcValue::string(path_to_bytes(&executable)),
+            RpcValue::string(ALIAS),
+            RpcValue::string(SENTINEL_PATH),
+            RpcValue::string(BUNDLE_ID),
         ],
     )?
     .map_err(|throw| {
         RuntimeException::new(bformat!("{}: {}", throw.exception_class, throw.message))
     })?;
     match opened {
-        PluginValue::Bool(opened) => Ok(opened),
+        RpcValue::Bool(opened) => Ok(opened),
         other => Err(anyhow::anyhow!(
             "opening the Composer PHP runtime bundle did not answer with a bool: {other:?}"
         )),
@@ -215,7 +215,7 @@ mod tests {
             .join("vendor/autoload.php");
         call_internal_function(
             "__shirabe_require",
-            vec![PluginValue::string(path_to_bytes(&autoload))],
+            vec![RpcValue::string(path_to_bytes(&autoload))],
         )
         .unwrap()
         .unwrap();
@@ -224,10 +224,10 @@ mod tests {
         // stub autoloader.
         let exists = call_internal_function(
             "class_exists",
-            vec![PluginValue::string(r"Composer\Util\Filesystem")],
+            vec![RpcValue::string(r"Composer\Util\Filesystem")],
         )
         .unwrap()
         .unwrap();
-        assert_eq!(exists, PluginValue::Bool(true));
+        assert_eq!(exists, RpcValue::Bool(true));
     }
 }

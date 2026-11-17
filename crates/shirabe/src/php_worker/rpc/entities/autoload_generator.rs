@@ -6,14 +6,14 @@ use crate::filter::platform_requirement_filter::PlatformRequirementFilterFactory
 use crate::installer::InstallationManagerInterface;
 use crate::package::{LockerInterface, PackageInterfaceHandle, RootPackageInterfaceHandle};
 use crate::php_worker::call::PhpCall;
-use crate::php_worker::codec::class_map_to_plugin_value;
+use crate::php_worker::codec::class_map_to_rpc_value;
 use crate::php_worker::rpc::entity::{Call, Crossing, Entity};
 use crate::php_worker::rpc::forwarding;
 use crate::php_worker::runtime::autoloading;
 use crate::repository::RepositoryInterfaceHandle;
 use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
-use shirabe_php_rpc::{FromPluginValue, PhpThrow, PluginValue, ToPluginValue, codec};
+use shirabe_php_rpc::{FromRpcValue, PhpThrow, RpcValue, ToRpcValue, codec};
 use shirabe_php_shim::{E_USER_DEPRECATED, PhpMixed, trigger_error};
 
 impl Entity for std::rc::Rc<std::cell::RefCell<dyn AutoloadGeneratorInterface>> {
@@ -33,48 +33,45 @@ impl forwarding::autoload::autoload_generator::Forwarding
 {
     type Handle = std::rc::Rc<std::cell::RefCell<dyn AutoloadGeneratorInterface>>;
 
-    fn set_dev_mode(
-        generator: &Self::Handle,
-        call: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    fn set_dev_mode(generator: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         generator.borrow().set_dev_mode(call.arg_or(0, true)?);
-        Ok(PluginValue::Null)
+        Ok(RpcValue::Null)
     }
 
     fn set_class_map_authoritative(
         generator: &Self::Handle,
         call: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    ) -> Result<RpcValue, PhpThrow> {
         generator
             .borrow()
             .set_class_map_authoritative(call.arg::<bool>(0)?);
-        Ok(PluginValue::Null)
+        Ok(RpcValue::Null)
     }
 
-    fn set_apcu(generator: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+    fn set_apcu(generator: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         generator
             .borrow()
             .set_apcu(call.arg::<bool>(0)?, call.arg::<Option<BString>>(1)?);
-        Ok(PluginValue::Null)
+        Ok(RpcValue::Null)
     }
 
     fn set_run_scripts(
         generator: &Self::Handle,
         call: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    ) -> Result<RpcValue, PhpThrow> {
         generator.borrow().set_run_scripts(call.arg_or(0, true)?);
-        Ok(PluginValue::Null)
+        Ok(RpcValue::Null)
     }
 
-    fn set_dry_run(generator: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+    fn set_dry_run(generator: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         generator.borrow().set_dry_run(call.arg_or(0, true)?);
-        Ok(PluginValue::Null)
+        Ok(RpcValue::Null)
     }
 
     fn set_ignore_platform_requirements(
         generator: &Self::Handle,
         call: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    ) -> Result<RpcValue, PhpThrow> {
         trigger_error(
             "AutoloadGenerator::setIgnorePlatformRequirements is deprecated since Composer 2.2, use setPlatformRequirementFilter instead.",
             E_USER_DEPRECATED,
@@ -83,7 +80,7 @@ impl forwarding::autoload::autoload_generator::Forwarding
         let filter = PlatformRequirementFilterFactory::from_bool_or_list(call.arg::<PhpMixed>(0)?)
             .map_err(call.failed())?;
         generator.borrow().set_platform_requirement_filter(filter);
-        Ok(PluginValue::Null)
+        Ok(RpcValue::Null)
     }
 
     // TODO(plugin): no PlatformRequirementFilterInterface implementation crosses the boundary:
@@ -92,11 +89,11 @@ impl forwarding::autoload::autoload_generator::Forwarding
     fn set_platform_requirement_filter(
         _: &Self::Handle,
         call: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    ) -> Result<RpcValue, PhpThrow> {
         Err(call.unavailable("no platform requirement filter can cross the boundary"))
     }
 
-    fn dump(generator: &Self::Handle, call: &mut Call<'_>) -> Result<PluginValue, PhpThrow> {
+    fn dump(generator: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         let config = call.entity::<std::rc::Rc<std::cell::RefCell<Config>>>(0)?;
         let local_repo = call.arg::<RepositoryInterfaceHandle>(1)?;
         let root_package = root_package(call, 2)?;
@@ -122,13 +119,13 @@ impl forwarding::autoload::autoload_generator::Forwarding
                 strict_ambiguous,
             )
             .map_err(call.failed())?;
-        Ok(class_map_to_plugin_value(&class_map))
+        Ok(class_map_to_rpc_value(&class_map))
     }
 
     fn build_package_map(
         generator: &Self::Handle,
         call: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    ) -> Result<RpcValue, PhpThrow> {
         let installation_manager =
             call.entity::<std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>>(0)?;
         // TODO(type-model): PHP takes any PackageInterface as the root package here, while the
@@ -145,20 +142,17 @@ impl forwarding::autoload::autoload_generator::Forwarding
     fn parse_autoloads(
         generator: &Self::Handle,
         call: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    ) -> Result<RpcValue, PhpThrow> {
         let package_map = package_map_arg(call, 0)?;
         let root_package = root_package(call, 1)?;
         let filtered_dev_packages = call.arg_or(2, PhpMixed::Bool(false))?;
         Ok(generator
             .borrow()
             .parse_autoloads(package_map, root_package, filtered_dev_packages)
-            .to_plugin_value())
+            .to_rpc_value())
     }
 
-    fn create_loader(
-        generator: &Self::Handle,
-        call: &mut Call<'_>,
-    ) -> Result<PluginValue, PhpThrow> {
+    fn create_loader(generator: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         let autoloads = call.arg::<IndexMap<BString, PhpMixed>>(0)?;
         let vendor_dir = call.arg::<Option<BString>>(1)?;
         let loader = generator
@@ -193,16 +187,16 @@ fn package_map_arg(
     call: &Call<'_>,
     position: usize,
 ) -> Result<Vec<(PackageInterfaceHandle, Option<std::path::PathBuf>)>, PhpThrow> {
-    call.arg::<Vec<Vec<PluginValue>>>(position)?
+    call.arg::<Vec<Vec<RpcValue>>>(position)?
         .into_iter()
-        .map(|pair| match <[PluginValue; 2]>::try_from(pair) {
+        .map(|pair| match <[RpcValue; 2]>::try_from(pair) {
             Ok([package, install_path]) => Ok((
-                PackageInterfaceHandle::from_plugin_value(&package)?,
-                Option::<std::path::PathBuf>::from_plugin_value(&install_path)?,
+                PackageInterfaceHandle::from_rpc_value(&package)?,
+                Option::<std::path::PathBuf>::from_rpc_value(&install_path)?,
             )),
             Err(pair) => Err(codec::unexpected(
                 "a [package, install path] pair",
-                &PluginValue::List(pair),
+                &RpcValue::List(pair),
             )),
         })
         .collect::<Result<_, PhpThrow>>()
@@ -211,15 +205,12 @@ fn package_map_arg(
 
 fn package_map_value(
     package_map: Vec<(PackageInterfaceHandle, Option<std::path::PathBuf>)>,
-) -> PluginValue {
-    PluginValue::List(
+) -> RpcValue {
+    RpcValue::List(
         package_map
             .into_iter()
             .map(|(package, install_path)| {
-                PluginValue::List(vec![
-                    package.to_plugin_value(),
-                    install_path.to_plugin_value(),
-                ])
+                RpcValue::List(vec![package.to_rpc_value(), install_path.to_rpc_value()])
             })
             .collect(),
     )
@@ -231,16 +222,16 @@ fn package_map_value(
 fn class_loader_to_php(
     loader: &ClassLoader,
     vendor_dir: Option<BString>,
-) -> anyhow::Result<PluginValue> {
+) -> anyhow::Result<RpcValue> {
     let handle = autoloading::new_object(
         BStr::new("Composer\\Autoload\\ClassLoader"),
-        vec![vendor_dir.to_plugin_value()],
+        vec![vendor_dir.to_rpc_value()],
     )?;
     let add = |method: &[u8], prefix: &[u8], paths: &[BString]| {
         PhpCall::Method(&handle, BStr::new(method))
-            .run::<PluginValue>(vec![
-                PluginValue::string(prefix),
-                paths.to_vec().to_plugin_value(),
+            .run::<RpcValue>(vec![
+                RpcValue::string(prefix),
+                paths.to_vec().to_rpc_value(),
             ])
             .map(|_| ())
     };
@@ -258,7 +249,7 @@ fn class_loader_to_php(
     }
     if !loader.get_class_map().is_empty() {
         PhpCall::Method(&handle, BStr::new("addClassMap"))
-            .run::<PluginValue>(vec![loader.get_class_map().clone().to_plugin_value()])?;
+            .run::<RpcValue>(vec![loader.get_class_map().clone().to_rpc_value()])?;
     }
-    Ok(PluginValue::PhpHandle(handle))
+    Ok(RpcValue::PhpEntityHandle(handle))
 }

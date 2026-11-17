@@ -9,7 +9,7 @@ use bstr::{BStr, ByteSlice as _};
 use shirabe::php_worker::call::PhpCall;
 use shirabe::php_worker::error_handler::restore_error_handler;
 use shirabe::util::ErrorHandler;
-use shirabe_php_rpc::{PhpThrow, PluginValue};
+use shirabe_php_rpc::{PhpThrow, RpcValue};
 
 fn set_up() -> TearDown {
     load_composer_php_runtime();
@@ -31,7 +31,7 @@ impl Drop for TearDown {
 
 fn php_version_id() -> i64 {
     match php_eval("return \\PHP_VERSION_ID;") {
-        PluginValue::Int(id) => id,
+        RpcValue::Int(id) => id,
         other => panic!("expected an int, got {other:?}"),
     }
 }
@@ -39,7 +39,7 @@ fn php_version_id() -> i64 {
 /// Runs a PHP snippet in the worker, expecting it to throw.
 fn php_eval_throw(code: impl AsRef<[u8]>) -> PhpThrow {
     match PhpCall::Function(BStr::new("__shirabe_eval"))
-        .try_run::<PluginValue>(vec![PluginValue::string(code.as_ref())])
+        .try_run::<RpcValue>(vec![RpcValue::string(code.as_ref())])
         .expect("eval request failed")
     {
         Ok(value) => panic!("expected an exception, got {value:?}"),
