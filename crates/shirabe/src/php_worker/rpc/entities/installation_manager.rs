@@ -3,7 +3,7 @@
 use crate::installer::InstallationManagerInterface;
 use crate::package::PackageInterfaceHandle;
 use crate::php_worker::proxy::{forget_php_installer_proxy, php_installer_proxy};
-use crate::php_worker::rpc::entity::{Call, Crossing, Entity};
+use crate::php_worker::rpc::entity::{Bindings, Call, Entity};
 use crate::php_worker::rpc::forwarding;
 use crate::php_worker::runtime;
 use bstr::BStr;
@@ -17,8 +17,8 @@ impl Entity for std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>
         std::rc::Rc::as_ptr(self) as *const ()
     }
 
-    fn class(&self) -> Result<&'static Crossing<Self>, PhpThrow> {
-        Ok(&forwarding::installer::installation_manager::CROSSING)
+    fn class(&self) -> Result<&'static Bindings<Self>, PhpThrow> {
+        Ok(&forwarding::installer::installation_manager::BINDINGS)
     }
 }
 

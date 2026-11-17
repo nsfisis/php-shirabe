@@ -12,7 +12,7 @@ use crate::php_worker::job::rpc::{
     HTTP_DOWNLOADER_TICK_CAP, dispatch_tick_method, rejected_promise, resolved_promise,
 };
 use crate::php_worker::rpc::dispatch::error_throw;
-use crate::php_worker::rpc::entity::{Call, Crossing, Entity};
+use crate::php_worker::rpc::entity::{Bindings, Call, Entity};
 use crate::php_worker::rpc::forwarding;
 use crate::util::{HttpDownloader, HttpDownloaderJob, StreamContextOptions};
 use bstr::{BStr, BString, ByteSlice as _};
@@ -26,8 +26,8 @@ impl Entity for std::rc::Rc<std::cell::RefCell<HttpDownloader>> {
         std::rc::Rc::as_ptr(self) as *const ()
     }
 
-    fn class(&self) -> Result<&'static Crossing<Self>, PhpThrow> {
-        Ok(&forwarding::util::http_downloader::CROSSING)
+    fn class(&self) -> Result<&'static Bindings<Self>, PhpThrow> {
+        Ok(&forwarding::util::http_downloader::BINDINGS)
     }
 }
 

@@ -7,7 +7,7 @@ use crate::installer::InstallationManagerInterface;
 use crate::package::{LockerInterface, PackageInterfaceHandle, RootPackageInterfaceHandle};
 use crate::php_worker::call::PhpCall;
 use crate::php_worker::codec::class_map_to_rpc_value;
-use crate::php_worker::rpc::entity::{Call, Crossing, Entity};
+use crate::php_worker::rpc::entity::{Bindings, Call, Entity};
 use crate::php_worker::rpc::forwarding;
 use crate::php_worker::runtime::autoloading;
 use crate::repository::RepositoryInterfaceHandle;
@@ -23,8 +23,8 @@ impl Entity for std::rc::Rc<std::cell::RefCell<dyn AutoloadGeneratorInterface>> 
         std::rc::Rc::as_ptr(self) as *const ()
     }
 
-    fn class(&self) -> Result<&'static Crossing<Self>, PhpThrow> {
-        Ok(&forwarding::autoload::autoload_generator::CROSSING)
+    fn class(&self) -> Result<&'static Bindings<Self>, PhpThrow> {
+        Ok(&forwarding::autoload::autoload_generator::BINDINGS)
     }
 }
 

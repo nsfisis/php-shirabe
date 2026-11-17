@@ -1,7 +1,7 @@
 //! The methods a `Composer\Config` entity answers over RPC.
 
 use crate::config::Config;
-use crate::php_worker::rpc::entity::{Call, Crossing, Entity};
+use crate::php_worker::rpc::entity::{Bindings, Call, Entity};
 use crate::php_worker::rpc::forwarding;
 use bstr::BString;
 use indexmap::IndexMap;
@@ -15,8 +15,8 @@ impl Entity for std::rc::Rc<std::cell::RefCell<Config>> {
         std::rc::Rc::as_ptr(self) as *const ()
     }
 
-    fn class(&self) -> Result<&'static Crossing<Self>, PhpThrow> {
-        Ok(&forwarding::config::CROSSING)
+    fn class(&self) -> Result<&'static Bindings<Self>, PhpThrow> {
+        Ok(&forwarding::config::BINDINGS)
     }
 }
 

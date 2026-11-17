@@ -1,6 +1,6 @@
 //! The methods a `Symfony\Component\Process\Process` entity answers over RPC.
 
-use crate::php_worker::rpc::entity::{Call, Crossing, Entity};
+use crate::php_worker::rpc::entity::{Bindings, Call, Entity};
 use crate::php_worker::rpc::forwarding;
 use bstr::BString;
 use indexmap::IndexMap;
@@ -35,8 +35,8 @@ impl Entity for std::rc::Rc<std::cell::RefCell<shirabe_symfony_process::Process>
         std::rc::Rc::as_ptr(self) as *const ()
     }
 
-    fn class(&self) -> Result<&'static Crossing<Self>, PhpThrow> {
-        Ok(&forwarding::shirabe::rust_process_stub::CROSSING)
+    fn class(&self) -> Result<&'static Bindings<Self>, PhpThrow> {
+        Ok(&forwarding::shirabe::rust_process_stub::BINDINGS)
     }
 }
 

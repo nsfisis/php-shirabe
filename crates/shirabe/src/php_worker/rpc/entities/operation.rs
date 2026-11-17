@@ -6,7 +6,7 @@ use crate::dependency_resolver::operation::{
 };
 use crate::package::{AliasPackageHandle, PackageInterfaceHandle};
 use crate::php_worker::rpc::entities::package::package_value;
-use crate::php_worker::rpc::entity::{Call, Crossing, Entity};
+use crate::php_worker::rpc::entity::{Bindings, Call, Entity};
 use crate::php_worker::rpc::forwarding;
 use shirabe_php_rpc::{PhpThrow, RpcValue, ToRpcValue, codec};
 
@@ -17,22 +17,22 @@ impl Entity for std::rc::Rc<AnyOperation> {
         std::rc::Rc::as_ptr(self) as *const ()
     }
 
-    fn class(&self) -> Result<&'static Crossing<Self>, PhpThrow> {
+    fn class(&self) -> Result<&'static Bindings<Self>, PhpThrow> {
         Ok(match &**self {
             AnyOperation::Install(_) => {
-                &forwarding::dependency_resolver::operation::install_operation::CROSSING
+                &forwarding::dependency_resolver::operation::install_operation::BINDINGS
             }
             AnyOperation::Update(_) => {
-                &forwarding::dependency_resolver::operation::update_operation::CROSSING
+                &forwarding::dependency_resolver::operation::update_operation::BINDINGS
             }
             AnyOperation::Uninstall(_) => {
-                &forwarding::dependency_resolver::operation::uninstall_operation::CROSSING
+                &forwarding::dependency_resolver::operation::uninstall_operation::BINDINGS
             }
             AnyOperation::MarkAliasInstalled(_) => {
-                &forwarding::dependency_resolver::operation::mark_alias_installed_operation::CROSSING
+                &forwarding::dependency_resolver::operation::mark_alias_installed_operation::BINDINGS
             }
             AnyOperation::MarkAliasUninstalled(_) => {
-                &forwarding::dependency_resolver::operation::mark_alias_uninstalled_operation::CROSSING
+                &forwarding::dependency_resolver::operation::mark_alias_uninstalled_operation::BINDINGS
             }
         })
     }

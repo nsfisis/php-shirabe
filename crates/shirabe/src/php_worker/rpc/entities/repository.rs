@@ -3,7 +3,7 @@
 use crate::package::PackageInterfaceHandle;
 use crate::php_worker::codec::constraint_from_rpc_value;
 use crate::php_worker::rpc::entities::package::package_value;
-use crate::php_worker::rpc::entity::{Call, Crossing, Entity};
+use crate::php_worker::rpc::entity::{Bindings, Call, Entity};
 use crate::php_worker::rpc::forwarding;
 use crate::repository::{
     FindPackageConstraint, InstalledArrayRepository, InstalledFilesystemRepository,
@@ -20,13 +20,13 @@ impl Entity for RepositoryInterfaceHandle {
         self.ptr_id() as *const ()
     }
 
-    fn class(&self) -> Result<&'static Crossing<Self>, PhpThrow> {
+    fn class(&self) -> Result<&'static Bindings<Self>, PhpThrow> {
         if self.is::<InstalledFilesystemRepository>() {
-            Ok(&forwarding::repository::installed_filesystem_repository::CROSSING)
+            Ok(&forwarding::repository::installed_filesystem_repository::BINDINGS)
         } else if self.is::<InstalledArrayRepository>() {
-            Ok(&forwarding::repository::installed_array_repository::CROSSING)
+            Ok(&forwarding::repository::installed_array_repository::BINDINGS)
         } else if self.is::<LockArrayRepository>() {
-            Ok(&forwarding::repository::lock_array_repository::CROSSING)
+            Ok(&forwarding::repository::lock_array_repository::BINDINGS)
         } else {
             // TODO(plugin): the remaining repository classes get stubs on demand.
             Err(PhpThrow::runtime(

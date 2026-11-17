@@ -8,7 +8,7 @@ use crate::php_worker::job::rpc::{
 };
 use crate::php_worker::rpc::dispatch::error_throw;
 use crate::php_worker::rpc::entities::event_dispatcher::{call_php_callable, is_php_callable};
-use crate::php_worker::rpc::entity::{Call, Crossing, Entity, entity_value};
+use crate::php_worker::rpc::entity::{Bindings, Call, Entity, entity_value};
 use crate::php_worker::rpc::forwarding;
 use crate::util::{CommandLine, ProcessExecutor};
 use bstr::{BStr, BString};
@@ -22,8 +22,8 @@ impl Entity for std::rc::Rc<std::cell::RefCell<ProcessExecutor>> {
         std::rc::Rc::as_ptr(self) as *const ()
     }
 
-    fn class(&self) -> Result<&'static Crossing<Self>, PhpThrow> {
-        Ok(&forwarding::util::process_executor::CROSSING)
+    fn class(&self) -> Result<&'static Bindings<Self>, PhpThrow> {
+        Ok(&forwarding::util::process_executor::BINDINGS)
     }
 }
 

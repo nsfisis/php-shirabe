@@ -5,7 +5,7 @@ use crate::composer::ComposerHandle;
 use crate::event_dispatcher::{Event, EventInterface};
 use crate::installer::{InstallerEvent, PackageEvent};
 use crate::package::PackageInterfaceHandle;
-use crate::php_worker::rpc::entity::{Call, Crossing, Entity, entity_value};
+use crate::php_worker::rpc::entity::{Bindings, Call, Entity, entity_value};
 use crate::php_worker::rpc::forwarding;
 use crate::plugin::{
     CommandEvent, FileDownloadContext, PostFileDownloadEvent, PreCommandRunEvent,
@@ -24,27 +24,27 @@ impl Entity for std::rc::Rc<std::cell::RefCell<dyn EventInterface>> {
         std::rc::Rc::as_ptr(self) as *const ()
     }
 
-    fn class(&self) -> Result<&'static Crossing<Self>, PhpThrow> {
+    fn class(&self) -> Result<&'static Bindings<Self>, PhpThrow> {
         let event = self.borrow();
         let any = event.as_any();
         if any.is::<ScriptEvent>() {
-            Ok(&forwarding::script::event::CROSSING)
+            Ok(&forwarding::script::event::BINDINGS)
         } else if any.is::<PackageEvent>() {
-            Ok(&forwarding::installer::package_event::CROSSING)
+            Ok(&forwarding::installer::package_event::BINDINGS)
         } else if any.is::<InstallerEvent>() {
-            Ok(&forwarding::installer::installer_event::CROSSING)
+            Ok(&forwarding::installer::installer_event::BINDINGS)
         } else if any.is::<PreFileDownloadEvent>() {
-            Ok(&forwarding::plugin::pre_file_download_event::CROSSING)
+            Ok(&forwarding::plugin::pre_file_download_event::BINDINGS)
         } else if any.is::<PostFileDownloadEvent>() {
-            Ok(&forwarding::plugin::post_file_download_event::CROSSING)
+            Ok(&forwarding::plugin::post_file_download_event::BINDINGS)
         } else if any.is::<PrePoolCreateEvent>() {
-            Ok(&forwarding::plugin::pre_pool_create_event::CROSSING)
+            Ok(&forwarding::plugin::pre_pool_create_event::BINDINGS)
         } else if any.is::<CommandEvent>() {
-            Ok(&forwarding::plugin::command_event::CROSSING)
+            Ok(&forwarding::plugin::command_event::BINDINGS)
         } else if any.is::<PreCommandRunEvent>() {
-            Ok(&forwarding::plugin::pre_command_run_event::CROSSING)
+            Ok(&forwarding::plugin::pre_command_run_event::BINDINGS)
         } else if any.is::<Event>() {
-            Ok(&forwarding::event_dispatcher::event::CROSSING)
+            Ok(&forwarding::event_dispatcher::event::BINDINGS)
         } else {
             // TODO(plugin): an event class without a proxy stub cannot cross the boundary.
             Err(PhpThrow::runtime(bformat!(

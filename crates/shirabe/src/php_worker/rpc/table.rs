@@ -2,7 +2,7 @@
 //! name them in frames.
 
 use crate::package::PackageInterfaceHandle;
-use crate::php_worker::rpc::entity::{Call, Crossing, Entity, EntityArg, PropertyAccess};
+use crate::php_worker::rpc::entity::{Bindings, Call, Entity, EntityArg, PropertyAccess};
 use crate::repository::RepositoryInterfaceHandle;
 use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
@@ -24,7 +24,7 @@ trait Slot: std::fmt::Debug {
 struct Registered<H: Entity> {
     entity: H,
     /// The class the child's stub was built as, fixed when the entity was registered.
-    class: &'static Crossing<H>,
+    class: &'static Bindings<H>,
 }
 
 impl<H: Entity> std::fmt::Debug for Registered<H> {
@@ -140,7 +140,7 @@ thread_local! {
 
 /// Registers an entity in the Rust entity table, interned by the allocation it points to, and
 /// answers its Rust entity id and the class it crosses as.
-pub(crate) fn register<H: Entity>(entity: H) -> Result<(u64, &'static Crossing<H>), PhpThrow> {
+pub(crate) fn register<H: Entity>(entity: H) -> Result<(u64, &'static Bindings<H>), PhpThrow> {
     let class = entity.class()?;
     let slot: std::rc::Rc<dyn Slot> = std::rc::Rc::new(Registered { entity, class });
     let (entity_id, slot) = RUST_ENTITY_TABLE.with(|table| {

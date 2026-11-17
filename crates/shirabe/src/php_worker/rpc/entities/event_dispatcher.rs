@@ -2,7 +2,7 @@
 
 use crate::event_dispatcher::{Event, EventDispatcherInterface};
 use crate::php_worker::call::PhpCall;
-use crate::php_worker::rpc::entity::{Call, Crossing, Entity};
+use crate::php_worker::rpc::entity::{Bindings, Call, Entity};
 use crate::php_worker::rpc::forwarding;
 use bstr::{BStr, BString};
 use shirabe_php_rpc::{PhpThrow, RpcValue};
@@ -43,8 +43,8 @@ impl Entity for std::rc::Rc<std::cell::RefCell<dyn EventDispatcherInterface>> {
         std::rc::Rc::as_ptr(self) as *const ()
     }
 
-    fn class(&self) -> Result<&'static Crossing<Self>, PhpThrow> {
-        Ok(&forwarding::event_dispatcher::event_dispatcher::CROSSING)
+    fn class(&self) -> Result<&'static Bindings<Self>, PhpThrow> {
+        Ok(&forwarding::event_dispatcher::event_dispatcher::BINDINGS)
     }
 }
 

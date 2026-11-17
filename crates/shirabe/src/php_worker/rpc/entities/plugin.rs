@@ -2,7 +2,7 @@
 //! PHP-implemented plugin never crosses this way: its entity lives in the child's PHP entity table
 //! already.
 
-use crate::php_worker::rpc::entity::{Call, Crossing, Entity};
+use crate::php_worker::rpc::entity::{Bindings, Call, Entity};
 use crate::php_worker::rpc::forwarding;
 use crate::plugin::PluginInterface;
 use shirabe_php_rpc::{PhpThrow, RpcValue, ToRpcValue};
@@ -17,10 +17,10 @@ impl Entity for std::rc::Rc<std::cell::RefCell<dyn PluginInterface>> {
     // TODO(plugin): a Rust-implemented plugin that is also an EventSubscriberInterface crosses as
     // one of these two classes, so `instanceof EventSubscriberInterface` is false in the child;
     // Composer's own subscriber dispatch runs on the Rust side and never asks.
-    fn class(&self) -> Result<&'static Crossing<Self>, PhpThrow> {
+    fn class(&self) -> Result<&'static Bindings<Self>, PhpThrow> {
         Ok(match self.borrow().as_capable() {
-            Some(_) => &forwarding::shirabe::rust_capable_plugin_stub::CROSSING,
-            None => &forwarding::shirabe::rust_plugin_stub::CROSSING,
+            Some(_) => &forwarding::shirabe::rust_capable_plugin_stub::BINDINGS,
+            None => &forwarding::shirabe::rust_plugin_stub::BINDINGS,
         })
     }
 }

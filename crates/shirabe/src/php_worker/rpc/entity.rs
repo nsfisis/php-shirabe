@@ -23,7 +23,7 @@ pub trait Entity: Clone + 'static {
 
     /// The class this entity crosses as. An error for a concrete type no forwarding class
     /// stands for.
-    fn class(&self) -> Result<&'static Crossing<Self>, PhpThrow>;
+    fn class(&self) -> Result<&'static Bindings<Self>, PhpThrow>;
 
     /// `__clone`. Only the kinds of entity whose Rust type models the PHP clone override this.
     fn clone_entity(&self) -> Result<Self, PhpThrow> {
@@ -73,14 +73,14 @@ impl<'a> PropertyAccess<'a> {
 
 /// An entity crossing as one forwarding class: the name the child builds its stub as, and the
 /// routing of the members that class forwards.
-pub struct Crossing<H: 'static> {
+pub struct Bindings<H: 'static> {
     pub name: &'static [u8],
     pub dispatch: fn(&H, &mut Call<'_>) -> Result<RpcValue, PhpThrow>,
 }
 
-impl<H> std::fmt::Debug for Crossing<H> {
+impl<H> std::fmt::Debug for Bindings<H> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Crossing")
+        f.debug_struct("Bindings")
             .field("name", &BStr::new(self.name))
             .finish_non_exhaustive()
     }
@@ -219,10 +219,10 @@ pub fn protocol_violation(call: &Call<'_>) -> ! {
 
 /// Registers an entity a forwarded constructor of `class` built, and answers its Rust entity id.
 pub(crate) fn constructed<H: Entity>(class: &BStr, entity: H) -> Result<u64, PhpThrow> {
-    let (entity_id, crossing) = table::register(entity)?;
+    let (entity_id, bindings) = table::register(entity)?;
     assert_eq!(
         class,
-        BStr::new(crossing.name),
+        BStr::new(bindings.name),
         "a constructor builds an entity of its own class"
     );
     Ok(entity_id)

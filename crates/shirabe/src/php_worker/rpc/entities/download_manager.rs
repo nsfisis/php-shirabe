@@ -7,7 +7,7 @@ use crate::package::PackageInterfaceHandle;
 use crate::php_worker::job;
 use crate::php_worker::job::JobOwner;
 use crate::php_worker::rpc::dispatch::error_throw;
-use crate::php_worker::rpc::entity::{Call, Crossing, Entity};
+use crate::php_worker::rpc::entity::{Bindings, Call, Entity};
 use crate::php_worker::rpc::{forwarding, table};
 use crate::util::HttpDownloader;
 use bstr::{BStr, BString};
@@ -21,8 +21,8 @@ impl Entity for std::rc::Rc<std::cell::RefCell<dyn DownloadManagerInterface>> {
         std::rc::Rc::as_ptr(self) as *const ()
     }
 
-    fn class(&self) -> Result<&'static Crossing<Self>, PhpThrow> {
-        Ok(&forwarding::downloader::download_manager::CROSSING)
+    fn class(&self) -> Result<&'static Bindings<Self>, PhpThrow> {
+        Ok(&forwarding::downloader::download_manager::BINDINGS)
     }
 }
 

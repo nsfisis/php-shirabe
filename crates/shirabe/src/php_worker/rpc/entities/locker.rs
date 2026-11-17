@@ -2,7 +2,7 @@
 
 use crate::package::{Locker, LockerInterface, PackageInterfaceHandle};
 use crate::php_worker::rpc::entities::autoload_generator::root_package;
-use crate::php_worker::rpc::entity::{Call, Crossing, Entity, entity_value};
+use crate::php_worker::rpc::entity::{Bindings, Call, Entity, entity_value};
 use crate::php_worker::rpc::forwarding;
 use crate::repository::RepositoryInterfaceHandle;
 use bstr::BString;
@@ -17,8 +17,8 @@ impl Entity for std::rc::Rc<std::cell::RefCell<dyn LockerInterface>> {
         std::rc::Rc::as_ptr(self) as *const ()
     }
 
-    fn class(&self) -> Result<&'static Crossing<Self>, PhpThrow> {
-        Ok(&forwarding::package::locker::CROSSING)
+    fn class(&self) -> Result<&'static Bindings<Self>, PhpThrow> {
+        Ok(&forwarding::package::locker::BINDINGS)
     }
 }
 

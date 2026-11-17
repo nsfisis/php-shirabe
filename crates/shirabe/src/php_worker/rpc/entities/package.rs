@@ -5,7 +5,7 @@ use crate::package::{
     AliasPackage, AnyPackage, CompleteAliasPackage, CompletePackage, DisplayMode, Link, Mirror,
     Package, PackageInterfaceHandle, RootAliasPackage, STABILITY_STABLE, stability_priority,
 };
-use crate::php_worker::rpc::entity::{Call, Crossing, Entity, PropertyAccess, entity_value};
+use crate::php_worker::rpc::entity::{Bindings, Call, Entity, PropertyAccess, entity_value};
 use crate::php_worker::rpc::forwarding;
 use crate::repository::{PlatformRepository, RepositoryInterfaceHandle};
 use bstr::BString;
@@ -20,16 +20,16 @@ impl Entity for PackageInterfaceHandle {
         std::rc::Rc::as_ptr(self.as_rc()) as *const ()
     }
 
-    fn class(&self) -> Result<&'static Crossing<Self>, PhpThrow> {
+    fn class(&self) -> Result<&'static Bindings<Self>, PhpThrow> {
         Ok(match &*self.as_rc().borrow() {
-            AnyPackage::Package(_) => &forwarding::package::package::CROSSING,
-            AnyPackage::CompletePackage(_) => &forwarding::package::complete_package::CROSSING,
-            AnyPackage::RootPackage(_) => &forwarding::package::root_package::CROSSING,
-            AnyPackage::AliasPackage(_) => &forwarding::package::alias_package::CROSSING,
+            AnyPackage::Package(_) => &forwarding::package::package::BINDINGS,
+            AnyPackage::CompletePackage(_) => &forwarding::package::complete_package::BINDINGS,
+            AnyPackage::RootPackage(_) => &forwarding::package::root_package::BINDINGS,
+            AnyPackage::AliasPackage(_) => &forwarding::package::alias_package::BINDINGS,
             AnyPackage::CompleteAliasPackage(_) => {
-                &forwarding::package::complete_alias_package::CROSSING
+                &forwarding::package::complete_alias_package::BINDINGS
             }
-            AnyPackage::RootAliasPackage(_) => &forwarding::package::root_alias_package::CROSSING,
+            AnyPackage::RootAliasPackage(_) => &forwarding::package::root_alias_package::BINDINGS,
         })
     }
 

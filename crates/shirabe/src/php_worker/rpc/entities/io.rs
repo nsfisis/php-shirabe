@@ -1,7 +1,7 @@
 //! The methods a `Composer\IO\IOInterface` entity answers over RPC.
 
 use crate::io::{BufferIO, ConsoleIO, IOInterface, NORMAL, NullIO};
-use crate::php_worker::rpc::entity::{Call, Crossing, Entity};
+use crate::php_worker::rpc::entity::{Bindings, Call, Entity};
 use crate::php_worker::rpc::forwarding;
 use bstr::{BString, ByteSlice as _};
 use shirabe_php_rpc::{PhpThrow, RpcValue, ToRpcValue};
@@ -14,15 +14,15 @@ impl Entity for std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
         std::rc::Rc::as_ptr(self) as *const ()
     }
 
-    fn class(&self) -> Result<&'static Crossing<Self>, PhpThrow> {
+    fn class(&self) -> Result<&'static Bindings<Self>, PhpThrow> {
         let borrowed = self.borrow();
         let any = borrowed.as_any();
         if any.is::<BufferIO>() {
-            Ok(&forwarding::io::buffer_io::CROSSING)
+            Ok(&forwarding::io::buffer_io::BINDINGS)
         } else if any.is::<ConsoleIO>() {
-            Ok(&forwarding::io::console_io::CROSSING)
+            Ok(&forwarding::io::console_io::BINDINGS)
         } else if any.is::<NullIO>() {
-            Ok(&forwarding::io::null_io::CROSSING)
+            Ok(&forwarding::io::null_io::BINDINGS)
         } else {
             // TODO(plugin): only IO implementations with a generated proxy stub can cross the
             // boundary; the rest are an explicit error until stubs of their own are generated.

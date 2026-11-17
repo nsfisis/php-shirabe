@@ -2,7 +2,7 @@
 
 use crate::composer::ComposerHandle;
 use crate::php_worker::rpc::entities::package::package_value;
-use crate::php_worker::rpc::entity::{Call, Crossing, Entity, entity_value};
+use crate::php_worker::rpc::entity::{Bindings, Call, Entity, entity_value};
 use crate::php_worker::rpc::forwarding;
 use shirabe_php_rpc::{PhpThrow, RpcValue};
 
@@ -13,8 +13,8 @@ impl Entity for ComposerHandle {
         std::rc::Rc::as_ptr(self.as_rc()) as *const ()
     }
 
-    fn class(&self) -> Result<&'static Crossing<Self>, PhpThrow> {
-        Ok(&forwarding::composer::CROSSING)
+    fn class(&self) -> Result<&'static Bindings<Self>, PhpThrow> {
+        Ok(&forwarding::composer::BINDINGS)
     }
 
     // `getLoop()` itself never reaches the Rust side: the Loop is a two-world class, and the stub

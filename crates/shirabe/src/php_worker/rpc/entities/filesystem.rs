@@ -4,7 +4,7 @@ use crate::php_worker::job;
 use crate::php_worker::job::JobOwner;
 use crate::php_worker::job::rpc::{poll_once, resolved_promise};
 use crate::php_worker::rpc::dispatch::error_throw;
-use crate::php_worker::rpc::entity::{Call, Crossing, Entity};
+use crate::php_worker::rpc::entity::{Bindings, Call, Entity};
 use crate::php_worker::rpc::forwarding;
 use crate::util::{Filesystem, ProcessExecutor};
 use bstr::BString;
@@ -18,8 +18,8 @@ impl Entity for std::rc::Rc<std::cell::RefCell<Filesystem>> {
         std::rc::Rc::as_ptr(self) as *const ()
     }
 
-    fn class(&self) -> Result<&'static Crossing<Self>, PhpThrow> {
-        Ok(&forwarding::util::filesystem::CROSSING)
+    fn class(&self) -> Result<&'static Bindings<Self>, PhpThrow> {
+        Ok(&forwarding::util::filesystem::BINDINGS)
     }
 }
 

@@ -217,7 +217,7 @@ Every proxy stub, runtime class and guard that forwards members to the Rust side
 - `Forwarding`, a trait with one method per member the class itself declares and forwards, whose
   default answers that the member is not available. The trait of a class whose parent forwards
   nothing names the handle type (`type Handle`) every descendant takes;
-- `dispatch`, routing a method name to the `Forwarding` of the class declaring it, and `CROSSING`,
+- `dispatch`, routing a method name to the `Forwarding` of the class declaring it, and `BINDINGS`,
   the class and its `dispatch` as the value `Entity::class` returns;
 - `construct` and `call_static` for a class forwarding its constructor or static methods, which
   the top-level `construct` and `call_static` route a `NewObject` and a `CallStaticMethod` from
