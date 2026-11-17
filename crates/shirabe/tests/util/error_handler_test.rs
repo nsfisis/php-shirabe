@@ -2,7 +2,7 @@
 //!
 //! `ErrorHandler` runs in the PHP worker, where plugin and script code raises PHP errors. These
 //! tests register it through the Rust-side `ErrorHandler::register` and run the body of each
-//! upstream test method there, so the exception PHPUnit would catch comes back over the wire.
+//! upstream test method there, so the exception PHPUnit would catch comes back over RPC.
 
 use crate::php_worker::{load_composer_php_runtime, lock_php_worker, php_eval};
 use bstr::{BStr, ByteSlice as _};

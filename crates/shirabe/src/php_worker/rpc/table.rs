@@ -1,5 +1,5 @@
 //! The Rust entity table: the Rust-side entities a PHP proxy stub points back to, and the ids that
-//! name them on the wire.
+//! name them in frames.
 
 use crate::package::PackageInterfaceHandle;
 use crate::php_worker::rpc::entity::{Call, Crossing, Entity, EntityArg, PropertyAccess};

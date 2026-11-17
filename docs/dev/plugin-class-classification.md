@@ -36,7 +36,7 @@ exactly one category.
 | Category | Entity lives | PHP child process sees | Rust obligation |
 |---|---|---|---|
 | `rust-proxy` | Rust | generated proxy stub (methods RPC to Rust) | full-fidelity reproduction; every public/protected method needs an RPC handler |
-| `rust-snapshot` | Rust | the real class, revived from the object record the wire carries (no handle, getters answer locally) | full-fidelity reproduction; both halves of the value codec |
+| `rust-snapshot` | Rust | the real class, revived from the object record a frame carries (no handle, getters answer locally) | full-fidelity reproduction; both halves of the value codec |
 | `contract` | n/a (interface / abstract type) | generated declaration preserving the `extends`/`implements` hierarchy | depends on direction attributes |
 | `two-world` | both, independent siblings | the real PHP implementation (same FQCN, re-defined or vendor-loaded) | independent Rust implementation; only the seam objects (composer / io / dispatcher) are shared |
 | `php-native` | PHP | the real, unmodified PHP source | none — Rust may or may not have its own port for internal use, and that port is free to diverge in shape |
@@ -64,7 +64,7 @@ instantiation").
 #### rust-snapshot
 
 Immutable value objects, e.g. `Link` and the security-advisory family. A
-value has no entity to point at, so it gets no handle and no stub: the wire
+value has no entity to point at, so it gets no handle and no stub: a frame
 carries the object record `serialize()` writes for it, `unserialize()`
 revives a genuine instance of the real class without running a constructor,
 and getters answer locally with zero round-trips. Identity is not preserved
@@ -289,8 +289,8 @@ Assigned in order:
 
 1. On the two-world exception list → `two-world`.
 2. Subclass of `\Throwable` → `php-native` with the `throwable` attribute
-   (exception classes are flat data; the child gets real definitions, the
-   wire carries them by value).
+   (exception classes are flat data; the child gets real definitions, a
+   frame carries them by value).
 3. Interface or abstract class → `contract` (+ direction attributes). This
    outranks the constants-only rule below: a marker interface such as
    `Capability` still needs direction attributes.

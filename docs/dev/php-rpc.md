@@ -238,7 +238,7 @@ runs it in its own process.
 ## Trust model
 
 The worker runs plugin code, which Shirabe trusts exactly as Composer does: there is no sandbox.
-The limits on the wire, such as the closed list of classes `unserialize()` may revive, guard
-against bugs in Shirabe's own glue code, which is the only code that writes frames, not against an
+The limits on what a frame may carry, such as the closed list of classes `unserialize()` may
+revive, guard against bugs in Shirabe's own glue code, which is the only code that writes frames, not against an
 attacker. The socket has no name on the filesystem,
 so only the two processes holding its file descriptors can reach it.

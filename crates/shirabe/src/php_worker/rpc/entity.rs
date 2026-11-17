@@ -120,7 +120,7 @@ impl<'a> Call<'a> {
         self.method
     }
 
-    /// The arguments as they came over the wire, for a parameter `arg` cannot decode alone.
+    /// The arguments as they arrived in the frame, for a parameter `arg` cannot decode alone.
     pub fn args(&self) -> &'a [RpcValue] {
         self.args
     }

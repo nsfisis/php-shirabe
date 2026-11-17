@@ -7,8 +7,8 @@ use bstr::{BStr, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::bformat;
 
-/// Handles the requests the worker sends while a Rust-initiated call is waiting for its `Return`
-/// (the cooperative reentrancy loop). A handler may itself issue nested RPC calls.
+/// Handles the requests the worker sends while a Rust-initiated call is waiting for its `Return`.
+/// A handler may itself issue nested RPC calls.
 ///
 /// A handler whose method takes by-ref parameters writes the value each one holds afterwards into
 /// `out_params` under its position, and the stub copies it back into the caller's variable;

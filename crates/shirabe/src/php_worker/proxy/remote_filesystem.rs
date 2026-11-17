@@ -40,7 +40,7 @@ pub struct RemoteFilesystem {
 
 impl RemoteFilesystem {
     /// TODO(plugin): PHP's trailing `?AuthHelper $authHelper` parameter is not offered: a Rust
-    /// `AuthHelper` cannot cross the wire, so the PHP instance always builds its own.
+    /// `AuthHelper` cannot be passed over RPC, so the PHP instance always builds its own.
     pub fn new(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,

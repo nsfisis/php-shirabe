@@ -92,7 +92,7 @@ impl CommandProvider for PhpCommandProviderProxy {
     ) -> anyhow::Result<Vec<std::rc::Rc<std::cell::RefCell<dyn BaseCommand>>>> {
         let value: RpcValue =
             PhpCall::Method(&self.handle, BStr::new("getCommands")).run(Vec::new())?;
-        // PHP's getCommands(): array is unenforceable on the wire, and a
+        // PHP's getCommands(): array is unenforceable over RPC, and a
         // `Vec<Box<dyn BaseCommand>>` asserts every element up front, so the two checks
         // Application::getPluginCommands performs on the raw value live here, with its
         // messages.

@@ -21,7 +21,7 @@ pub trait EventSubscriberInterface {
     /// Returns an array of event names this subscriber wants to listen to.
     fn get_subscribed_events(&self) -> anyhow::Result<IndexMap<BString, SubscribedEventEntry>>;
 
-    /// The subscriber as it crosses the wire: PHP's `[$subscriber, $method]` array callables
+    /// The subscriber as it is passed over RPC: PHP's `[$subscriber, $method]` array callables
     /// capture the subscriber object itself, represented here by its PHP entity handle.
     fn subscriber_handle(&self) -> PhpEntityHandle;
 }

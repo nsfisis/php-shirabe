@@ -4,8 +4,8 @@ namespace Shirabe;
 
 /**
  * The worker's half of the promise registry (docs/dev/plugin-async.md). This side holds every
- * promise object, while one side runs what settles it; only the promise id crosses the wire. The
- * Rust side allocates odd ids, this side even ones.
+ * promise object, while one side runs what settles it; only the promise id is sent to the other
+ * side. The Rust side allocates odd ids, this side even ones.
  */
 final class PromiseRegistry
 {
@@ -45,7 +45,7 @@ final class PromiseRegistry
         }
     }
 
-    /** The promise standing for a promise id that arrived over the wire. */
+    /** The promise standing for a promise id that arrived in a frame. */
     public static function promiseFor(int $id): \React\Promise\PromiseInterface
     {
         if ($id % 2 === 0) {

@@ -3,7 +3,7 @@
 // The PHP half of the by-value object codec (crates/shirabe/src/php_worker/codec.rs).
 // An object whose entity lives on the Rust side crosses as a handle, but an immutable value
 // has no entity to point at: the child holds a genuine instance of the real class instead, and
-// the wire carries the object record `serialize()` writes for it, which `unserialize()` revives
+// a frame carries the object record `serialize()` writes for it, which `unserialize()` revives
 // without running a constructor.
 //
 // CLASSES is the whole vocabulary that may cross this way: it is both the set of classes handed
@@ -36,10 +36,10 @@ final class ByValueObject
     ];
 
     /**
-     * The object to serialize onto the wire in place of $value, or null when the Rust side has
-     * no value to rebuild it as (it then crosses as a PHP entity).
+     * The object to serialize into a frame payload in place of $value, or null when the Rust side
+     * has no value to rebuild it as (it then crosses as a PHP entity).
      */
-    public static function forWire(object $value): ?object
+    public static function of(object $value): ?object
     {
         if ($value instanceof \DateTimeInterface) {
             // The Rust side holds instants in UTC and carries no timezone database, so the date

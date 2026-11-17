@@ -23,7 +23,7 @@ React settles synchronously, so a promise resolved inside a tick runs its `then`
 
 One more property matters at the boundary. **`Loop::wait($promises)` does not wait for `$promises`; it waits until the services have no active jobs.** `all($promises)` is used only to pick up a rejection. So `wait([$a])` runs every job to completion, `$b` included, and a promise a plugin got from `add()` and returned without waiting on settles the next time anyone calls `wait()`.
 
-This is what makes the boundary tractable. Shirabe needs no promise sent over the wire unresolved, no event loop in the worker, and no way for Rust to wake the worker up. It needs one primitive.
+This is what makes the boundary tractable. Shirabe needs no promise sent to the other side unresolved, no event loop in the worker, and no way for Rust to wake the worker up. It needs one primitive.
 
 > **tick**: advance the outstanding jobs, settle the ones that finished, and report how many remain.
 
@@ -57,7 +57,7 @@ Six rules follow.
 
 *Eager settling.* This would be a correctness bug, not just a performance problem. When every job settles before the call that started it returns, `countActiveJobs()` can only answer `0`, `abortJobs()` has nothing to cancel, the progress bar has nothing to advance, and a plugin that starts ten downloads gets them run one after another. The whole observable surface of the async API degenerates.
 
-## Wire protocol
+## RPC protocol
 
 The additions to [docs/dev/php-rpc.md](./php-rpc.md) are small, deliberately. There is no new frame tag and no new message direction.
 

@@ -39,7 +39,7 @@ fn set_up() -> SetUp {
     load_composer_php_runtime();
 
     // setUpBeforeClass: disable the multiple-ClassLoader-based checks of InstalledVersions by
-    // making it seem like no class loaders are registered. A ClassLoader cannot cross the wire,
+    // making it seem like no class loaders are registered. A ClassLoader cannot be passed over RPC,
     // so the snapshot the upstream tearDownAfterClass restores stays in the worker.
     php_eval(
         r"$prop = new \ReflectionProperty('Composer\Autoload\ClassLoader', 'registeredLoaders');

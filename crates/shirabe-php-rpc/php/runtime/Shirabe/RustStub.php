@@ -7,7 +7,7 @@ interface RustStub
 {
     /**
      * Null when this instance holds no Rust entity id: a dual-mode class (see php/runtime/) that
-     * was constructed natively in this process crosses the wire as a PHP entity instead.
+     * was constructed natively in this process is passed to the Rust side as a PHP entity instead.
      *
      */
     public function __shirabeRustEntityHandle(): ?Rpc\RustEntityHandle;

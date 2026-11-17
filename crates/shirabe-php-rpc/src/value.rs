@@ -1,5 +1,5 @@
-//! RPC value model and its serialization. The format of the payloads on the wire is
-//! documented in `docs/dev/php-rpc.md`.
+//! RPC value model and its serialization. The format of the frame payloads is documented
+//! in `docs/dev/php-rpc.md`.
 //!
 //! `RpcValue` is the value type crossing the Rust/PHP RPC boundary. It is deliberately
 //! independent from `shirabe_php_shim::PhpMixed`: handles exist only at the RPC boundary, the

@@ -254,7 +254,7 @@ impl<T: FromRpcValue> FromRpcValue for Vec<T> {
 }
 
 /// An `array<string, T>` as PHP shapes it: an empty map crosses as a list, since an empty PHP
-/// array is indistinguishable from an empty list on the wire.
+/// array is indistinguishable from an empty list.
 impl<K: Into<BString>, T: ToRpcValue> ToRpcValue for IndexMap<K, T> {
     fn to_rpc_value(self) -> RpcValue {
         if self.is_empty() {
@@ -269,8 +269,8 @@ impl<K: Into<BString>, T: ToRpcValue> ToRpcValue for IndexMap<K, T> {
     }
 }
 
-/// A PHP array as a map. An empty PHP array is indistinguishable from an empty list on the
-/// wire, so it decodes here as an empty map; a non-empty list decodes under its int keys.
+/// A PHP array as a map. An empty PHP array is indistinguishable from an empty list, so it
+/// decodes here as an empty map; a non-empty list decodes under its int keys.
 impl<T: FromRpcValue> FromRpcValue for IndexMap<BString, T> {
     fn from_rpc_value(value: &RpcValue) -> Result<Self, PhpThrow> {
         match value {

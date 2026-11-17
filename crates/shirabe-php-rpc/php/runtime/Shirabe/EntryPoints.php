@@ -299,8 +299,8 @@ final class EntryPoints
                 return \Composer\Console\Application::__shirabeBoot($args[0]);
             },
             // Runs one command line (the stringified input of the Rust-side run) through a booted
-            // worker-side application; output goes to the inherited stdio, the exit code returns
-            // over the wire, and a command failure propagates as an RPC throw (catchExceptions is
+            // worker-side application; output goes to the inherited stdio, the exit code is the
+            // return value, and a command failure propagates as an RPC throw (catchExceptions is
             // off on the booted application).
             '__shirabe_run_console_application' => static function ($args) {
                 [$app, $inputString] = $args;

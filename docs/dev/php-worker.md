@@ -76,8 +76,8 @@ Notable internal helpers:
   `\Shirabe\RustCommandStub` rows mirroring the built-in commands, and the live plugin-provided
   command entities.
 - `__shirabe_run_console_application` — runs one stringified command line through a booted
-  worker-side application; output goes to the inherited stdio, the exit code returns over the
-  wire, and a failure propagates as a Throw (the booted application does not catch exceptions).
+  worker-side application; output goes to the inherited stdio, the exit code is the return
+  value, and a failure propagates as a Throw (the booted application does not catch exceptions).
 - `__shirabe_read_command_definition` — reads a command's input definition (plus help text and
   extra usages) as plain data, so the Rust side mirrors it for `help`/`list` rendering.
 

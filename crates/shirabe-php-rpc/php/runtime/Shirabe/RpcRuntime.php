@@ -109,9 +109,9 @@ final class RpcRuntime
     }
 
     /**
-     * Converts a value about to be serialized onto the wire: a proxy stub, a promise and any
+     * Converts a value about to be serialized into a frame payload: a proxy stub, a promise and any
      * other object that is not a by-value object become handles; scalars and arrays pass through.
-     * Every object crosses as a handle or a by-value object, so a handle record on the wire never
+     * Every object crosses as a handle or a by-value object, so a handle record in a payload never
      * stands for an object of plugin code, even one of a handle class.
      */
     public static function toRpcValue($value)
@@ -130,7 +130,7 @@ final class RpcRuntime
         if (is_object($value)) {
             // A by-value object needs no handle: it crosses as the object record
             // serialize() writes for it, which the Rust side decodes into its own value.
-            $byValue = ByValueObject::forWire($value);
+            $byValue = ByValueObject::of($value);
             if ($byValue !== null) {
                 return $byValue;
             }
@@ -188,7 +188,8 @@ final class RpcRuntime
     }
 
     /**
-     * Sends a CallMethod request and drives the cooperative loop until its Return.
+     * Sends a CallMethod request and waits for its Return, serving the requests that arrive in
+     * the meantime.
      *
      * For a method with by-ref parameters, the Rust side answers with the value each of them
      * holds afterwards, keyed by position, and the caller (a generated stub) assigns those back
@@ -230,7 +231,7 @@ final class RpcRuntime
     }
 
     /**
-     * Sends a request and drives the cooperative loop until its Return.
+     * Sends a request and waits for its Return, serving the requests that arrive in the meantime.
      *
      * @param array<int, mixed>|null $outParams
      */

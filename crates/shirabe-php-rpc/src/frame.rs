@@ -1,6 +1,6 @@
-//! Wire framing: `[u64 length LE][u8 tag][u64 corr_id LE][payload]`, where `length` counts
-//! everything after itself (tag + corr_id + payload) and the payload is the frame's remaining
-//! fields as a PHP-serialized list. See `docs/dev/php-rpc.md`.
+//! Frame layout on the transport: `[u64 length LE][u8 tag][u64 corr_id LE][payload]`, where
+//! `length` counts everything after itself (tag + corr_id + payload) and the payload is the
+//! frame's remaining fields as a PHP-serialized list. See `docs/dev/php-rpc.md`.
 
 use crate::PhpThrow;
 use crate::codec::{FromRpcValue, protocol_value};
@@ -73,7 +73,7 @@ impl Frame {
         }
     }
 
-    /// One-way notifications carry no correlation id; the field is 0 on the wire.
+    /// One-way notifications carry no correlation id; the field is 0 in the frame.
     fn corr_id(&self) -> u64 {
         match self {
             Frame::CallFunction { corr_id, .. }

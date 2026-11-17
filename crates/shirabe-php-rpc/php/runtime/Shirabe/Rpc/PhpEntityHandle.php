@@ -4,7 +4,8 @@ namespace Shirabe\Rpc;
 
 /**
  * The handle of an entity in the worker's PHP entity table. Only `Shirabe\RpcRuntime::toRpcValue`
- * builds one, so a record of this class on the wire is always a handle (see docs/dev/php-rpc.md).
+ * builds one, so a record of this class in a frame payload is always a handle (see
+ * docs/dev/php-rpc.md).
  */
 final class PhpEntityHandle
 {
