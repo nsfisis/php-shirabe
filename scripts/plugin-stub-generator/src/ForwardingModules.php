@@ -135,7 +135,7 @@ final class ForwardingModules
             $code .= "\n" . $this->module($segment, $child);
         }
 
-        return self::rustfmt($code);
+        return self::rustfmt(self::indent($code));
     }
 
     /** @param array{children?: array<string, mixed>, class?: string} $node */
@@ -331,6 +331,26 @@ final class ForwardingModules
     private static function byteString(string $value): string
     {
         return 'b"' . addcslashes($value, "\\\"") . '"';
+    }
+
+    /**
+     * Indents the code by its brace depth. rustfmt leaves an item it cannot fit in its maximum
+     * width as it is, so the code must already be indented when it reaches rustfmt.
+     */
+    private static function indent(string $code): string
+    {
+        $depth = 0;
+        $lines = [];
+        foreach (explode("\n", $code) as $line) {
+            $closing = strspn($line, '}');
+            $lines[] = $line === '' ? '' : str_repeat('    ', $depth - $closing) . $line;
+            $depth += substr_count($line, '{') - substr_count($line, '}');
+        }
+        if ($depth !== 0) {
+            throw new GenerationError(['unbalanced braces in the generated forwarding modules']);
+        }
+
+        return implode("\n", $lines);
     }
 
     private static function rustfmt(string $code): string
