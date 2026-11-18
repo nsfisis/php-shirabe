@@ -1,0 +1,249 @@
+{
+    "fqcn": "Composer\\Repository\\Vcs\\VcsDriverInterface",
+    "rustModule": [
+        "repository",
+        "vcs",
+        "vcs_driver_interface"
+    ],
+    "kind": "interface",
+    "interfaces": [],
+    "treatment": "real",
+    "methods": [
+        {
+            "name": "cleanup",
+            "rust": "cleanup",
+            "declaredIn": "Composer\\Repository\\Vcs\\VcsDriverInterface",
+            "static": false,
+            "params": [],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false
+        },
+        {
+            "name": "getBranches",
+            "rust": "get_branches",
+            "declaredIn": "Composer\\Repository\\Vcs\\VcsDriverInterface",
+            "static": false,
+            "params": [],
+            "returnType": "array",
+            "docReturnType": "array<int|string, string>",
+            "funcNumArgs": false
+        },
+        {
+            "name": "getChangeDate",
+            "rust": "get_change_date",
+            "declaredIn": "Composer\\Repository\\Vcs\\VcsDriverInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "identifier",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": null
+                }
+            ],
+            "returnType": "?\\DateTimeImmutable",
+            "docReturnType": null,
+            "funcNumArgs": false
+        },
+        {
+            "name": "getComposerInformation",
+            "rust": "get_composer_information",
+            "declaredIn": "Composer\\Repository\\Vcs\\VcsDriverInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "identifier",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": "string"
+                }
+            ],
+            "returnType": "?array",
+            "docReturnType": "mixed[]|null",
+            "funcNumArgs": false
+        },
+        {
+            "name": "getDist",
+            "rust": "get_dist",
+            "declaredIn": "Composer\\Repository\\Vcs\\VcsDriverInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "identifier",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": "string"
+                }
+            ],
+            "returnType": "?array",
+            "docReturnType": "array{type: string, url: string, reference: string, shasum: string}|null",
+            "funcNumArgs": false
+        },
+        {
+            "name": "getFileContent",
+            "rust": "get_file_content",
+            "declaredIn": "Composer\\Repository\\Vcs\\VcsDriverInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "file",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": null
+                },
+                {
+                    "name": "identifier",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": null
+                }
+            ],
+            "returnType": "?string",
+            "docReturnType": null,
+            "funcNumArgs": false
+        },
+        {
+            "name": "getRootIdentifier",
+            "rust": "get_root_identifier",
+            "declaredIn": "Composer\\Repository\\Vcs\\VcsDriverInterface",
+            "static": false,
+            "params": [],
+            "returnType": "string",
+            "docReturnType": "string",
+            "funcNumArgs": false
+        },
+        {
+            "name": "getSource",
+            "rust": "get_source",
+            "declaredIn": "Composer\\Repository\\Vcs\\VcsDriverInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "identifier",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": "string"
+                }
+            ],
+            "returnType": "array",
+            "docReturnType": "array{type: string, url: string, reference: string}",
+            "funcNumArgs": false
+        },
+        {
+            "name": "getTags",
+            "rust": "get_tags",
+            "declaredIn": "Composer\\Repository\\Vcs\\VcsDriverInterface",
+            "static": false,
+            "params": [],
+            "returnType": "array",
+            "docReturnType": "array<int|string, string>",
+            "funcNumArgs": false
+        },
+        {
+            "name": "getUrl",
+            "rust": "get_url",
+            "declaredIn": "Composer\\Repository\\Vcs\\VcsDriverInterface",
+            "static": false,
+            "params": [],
+            "returnType": "string",
+            "docReturnType": null,
+            "funcNumArgs": false
+        },
+        {
+            "name": "hasComposerFile",
+            "rust": "has_composer_file",
+            "declaredIn": "Composer\\Repository\\Vcs\\VcsDriverInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "identifier",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": "string"
+                }
+            ],
+            "returnType": "bool",
+            "docReturnType": "bool",
+            "funcNumArgs": false
+        },
+        {
+            "name": "initialize",
+            "rust": "initialize",
+            "declaredIn": "Composer\\Repository\\Vcs\\VcsDriverInterface",
+            "static": false,
+            "params": [],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false
+        },
+        {
+            "name": "supports",
+            "rust": "supports",
+            "declaredIn": "Composer\\Repository\\Vcs\\VcsDriverInterface",
+            "static": true,
+            "params": [
+                {
+                    "name": "io",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\IO\\IOInterface",
+                    "docType": "IOInterface"
+                },
+                {
+                    "name": "config",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Config",
+                    "docType": "Config"
+                },
+                {
+                    "name": "url",
+                    "position": 2,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": "string"
+                },
+                {
+                    "name": "deep",
+                    "position": 3,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "bool",
+                    "docType": "bool"
+                }
+            ],
+            "returnType": "bool",
+            "docReturnType": null,
+            "funcNumArgs": false
+        }
+    ]
+}

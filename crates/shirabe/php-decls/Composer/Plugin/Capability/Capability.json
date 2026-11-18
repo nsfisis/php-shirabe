@@ -1,0 +1,12 @@
+{
+    "fqcn": "Composer\\Plugin\\Capability\\Capability",
+    "rustModule": [
+        "plugin",
+        "capability",
+        "capability"
+    ],
+    "kind": "interface",
+    "interfaces": [],
+    "treatment": "real",
+    "methods": []
+}

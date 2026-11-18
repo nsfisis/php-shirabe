@@ -1,0 +1,250 @@
+{
+    "fqcn": "Composer\\Downloader\\DownloaderInterface",
+    "rustModule": [
+        "downloader",
+        "downloader_interface"
+    ],
+    "kind": "interface",
+    "interfaces": [],
+    "treatment": "real",
+    "methods": [
+        {
+            "name": "cleanup",
+            "rust": "cleanup",
+            "declaredIn": "Composer\\Downloader\\DownloaderInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "type",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": "string"
+                },
+                {
+                    "name": "package",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Package\\PackageInterface",
+                    "docType": "PackageInterface"
+                },
+                {
+                    "name": "path",
+                    "position": 2,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": "string"
+                },
+                {
+                    "name": "prevPackage",
+                    "position": 3,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": "?\\Composer\\Package\\PackageInterface",
+                    "docType": "PackageInterface"
+                }
+            ],
+            "returnType": "\\React\\Promise\\PromiseInterface",
+            "docReturnType": "PromiseInterface<void|null>",
+            "funcNumArgs": false
+        },
+        {
+            "name": "download",
+            "rust": "download",
+            "declaredIn": "Composer\\Downloader\\DownloaderInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "package",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Package\\PackageInterface",
+                    "docType": null
+                },
+                {
+                    "name": "path",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": "string"
+                },
+                {
+                    "name": "prevPackage",
+                    "position": 2,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": "?\\Composer\\Package\\PackageInterface",
+                    "docType": null
+                }
+            ],
+            "returnType": "\\React\\Promise\\PromiseInterface",
+            "docReturnType": "PromiseInterface<void|null|string>",
+            "funcNumArgs": false
+        },
+        {
+            "name": "getInstallationSource",
+            "rust": "get_installation_source",
+            "declaredIn": "Composer\\Downloader\\DownloaderInterface",
+            "static": false,
+            "params": [],
+            "returnType": "string",
+            "docReturnType": "string",
+            "funcNumArgs": false
+        },
+        {
+            "name": "install",
+            "rust": "install",
+            "declaredIn": "Composer\\Downloader\\DownloaderInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "package",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Package\\PackageInterface",
+                    "docType": "PackageInterface"
+                },
+                {
+                    "name": "path",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": "string"
+                }
+            ],
+            "returnType": "\\React\\Promise\\PromiseInterface",
+            "docReturnType": "PromiseInterface<void|null>",
+            "funcNumArgs": false
+        },
+        {
+            "name": "prepare",
+            "rust": "prepare",
+            "declaredIn": "Composer\\Downloader\\DownloaderInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "type",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": "string"
+                },
+                {
+                    "name": "package",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Package\\PackageInterface",
+                    "docType": "PackageInterface"
+                },
+                {
+                    "name": "path",
+                    "position": 2,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": "string"
+                },
+                {
+                    "name": "prevPackage",
+                    "position": 3,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": "?\\Composer\\Package\\PackageInterface",
+                    "docType": "PackageInterface"
+                }
+            ],
+            "returnType": "\\React\\Promise\\PromiseInterface",
+            "docReturnType": "PromiseInterface<void|null>",
+            "funcNumArgs": false
+        },
+        {
+            "name": "remove",
+            "rust": "remove",
+            "declaredIn": "Composer\\Downloader\\DownloaderInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "package",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Package\\PackageInterface",
+                    "docType": "PackageInterface"
+                },
+                {
+                    "name": "path",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": "string"
+                }
+            ],
+            "returnType": "\\React\\Promise\\PromiseInterface",
+            "docReturnType": "PromiseInterface<void|null>",
+            "funcNumArgs": false
+        },
+        {
+            "name": "update",
+            "rust": "update",
+            "declaredIn": "Composer\\Downloader\\DownloaderInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "initial",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Package\\PackageInterface",
+                    "docType": "PackageInterface"
+                },
+                {
+                    "name": "target",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Package\\PackageInterface",
+                    "docType": "PackageInterface"
+                },
+                {
+                    "name": "path",
+                    "position": 2,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": "string"
+                }
+            ],
+            "returnType": "\\React\\Promise\\PromiseInterface",
+            "docReturnType": "PromiseInterface<void|null>",
+            "funcNumArgs": false
+        }
+    ]
+}

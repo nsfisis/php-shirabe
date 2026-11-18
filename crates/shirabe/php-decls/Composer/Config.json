@@ -1,0 +1,387 @@
+{
+    "fqcn": "Composer\\Config",
+    "rustModule": [
+        "config"
+    ],
+    "kind": "class",
+    "abstract": false,
+    "parent": null,
+    "interfaces": [],
+    "treatment": "stub",
+    "methods": [
+        {
+            "name": "all",
+            "rust": "all",
+            "declaredIn": "Composer\\Config",
+            "static": false,
+            "params": [
+                {
+                    "name": "flags",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "int",
+                    "docType": null
+                }
+            ],
+            "returnType": "array",
+            "docReturnType": "array<string, mixed[]>",
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "disableProcessTimeout",
+            "rust": "disable_process_timeout",
+            "declaredIn": "Composer\\Config",
+            "static": true,
+            "params": [],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": false
+        },
+        {
+            "name": "get",
+            "rust": "get",
+            "declaredIn": "Composer\\Config",
+            "static": false,
+            "params": [
+                {
+                    "name": "key",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": null
+                },
+                {
+                    "name": "flags",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "int",
+                    "docType": "int"
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "mixed",
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getAuthConfigSource",
+            "rust": "get_auth_config_source",
+            "declaredIn": "Composer\\Config",
+            "static": false,
+            "params": [],
+            "returnType": "\\Composer\\Config\\ConfigSourceInterface",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "unimplemented"
+        },
+        {
+            "name": "getConfigSource",
+            "rust": "get_config_source",
+            "declaredIn": "Composer\\Config",
+            "static": false,
+            "params": [],
+            "returnType": "\\Composer\\Config\\ConfigSourceInterface",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "unimplemented"
+        },
+        {
+            "name": "getLocalAuthConfigSource",
+            "rust": "get_local_auth_config_source",
+            "declaredIn": "Composer\\Config",
+            "static": false,
+            "params": [],
+            "returnType": "?\\Composer\\Config\\ConfigSourceInterface",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "unimplemented"
+        },
+        {
+            "name": "getRepositories",
+            "rust": "get_repositories",
+            "declaredIn": "Composer\\Config",
+            "static": false,
+            "params": [],
+            "returnType": "array",
+            "docReturnType": "array<int|string, mixed>",
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getSourceOfValue",
+            "rust": "get_source_of_value",
+            "declaredIn": "Composer\\Config",
+            "static": false,
+            "params": [
+                {
+                    "name": "key",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": null
+                }
+            ],
+            "returnType": "string",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "has",
+            "rust": "has",
+            "declaredIn": "Composer\\Config",
+            "static": false,
+            "params": [
+                {
+                    "name": "key",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": null
+                }
+            ],
+            "returnType": "bool",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "merge",
+            "rust": "merge",
+            "declaredIn": "Composer\\Config",
+            "static": false,
+            "params": [
+                {
+                    "name": "config",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "array",
+                    "docType": "array{config?: array<string, mixed>, repositories?: array<mixed>}"
+                },
+                {
+                    "name": "source",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": null
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "prohibitUrlByConfig",
+            "rust": "prohibit_url_by_config",
+            "declaredIn": "Composer\\Config",
+            "static": false,
+            "params": [
+                {
+                    "name": "url",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": null
+                },
+                {
+                    "name": "io",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": "?\\Composer\\IO\\IOInterface",
+                    "docType": null
+                },
+                {
+                    "name": "repoOptions",
+                    "position": 2,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "array",
+                    "docType": "mixed[]"
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "unimplemented"
+        },
+        {
+            "name": "raw",
+            "rust": "raw",
+            "declaredIn": "Composer\\Config",
+            "static": false,
+            "params": [],
+            "returnType": "array",
+            "docReturnType": "array<string, mixed[]>",
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "setAuthConfigSource",
+            "rust": "set_auth_config_source",
+            "declaredIn": "Composer\\Config",
+            "static": false,
+            "params": [
+                {
+                    "name": "source",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Config\\ConfigSourceInterface",
+                    "docType": null
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "unimplemented"
+        },
+        {
+            "name": "setBaseDir",
+            "rust": "set_base_dir",
+            "declaredIn": "Composer\\Config",
+            "static": false,
+            "params": [
+                {
+                    "name": "baseDir",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": "?string",
+                    "docType": "non-empty-string|null"
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "unimplemented"
+        },
+        {
+            "name": "setConfigSource",
+            "rust": "set_config_source",
+            "declaredIn": "Composer\\Config",
+            "static": false,
+            "params": [
+                {
+                    "name": "source",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Config\\ConfigSourceInterface",
+                    "docType": null
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "unimplemented"
+        },
+        {
+            "name": "setLocalAuthConfigSource",
+            "rust": "set_local_auth_config_source",
+            "declaredIn": "Composer\\Config",
+            "static": false,
+            "params": [
+                {
+                    "name": "source",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Config\\ConfigSourceInterface",
+                    "docType": null
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "unimplemented"
+        }
+    ],
+    "constructor": {
+        "declaredIn": "Composer\\Config",
+        "public": true,
+        "params": [
+            {
+                "name": "useEnvironment",
+                "position": 0,
+                "byRef": false,
+                "variadic": false,
+                "nullable": false,
+                "type": "bool",
+                "docType": "bool"
+            },
+            {
+                "name": "baseDir",
+                "position": 1,
+                "byRef": false,
+                "variadic": false,
+                "nullable": true,
+                "type": "?string",
+                "docType": "?string"
+            }
+        ],
+        "funcNumArgs": false,
+        "forwarded": true,
+        "status": "unimplemented"
+    },
+    "properties": [
+        {
+            "name": "defaultConfig",
+            "declaredIn": "Composer\\Config",
+            "visibility": "public",
+            "static": true,
+            "readonly": false,
+            "type": null,
+            "docType": "array<string, mixed>"
+        },
+        {
+            "name": "defaultRepositories",
+            "declaredIn": "Composer\\Config",
+            "visibility": "public",
+            "static": true,
+            "readonly": false,
+            "type": null,
+            "docType": "array<string, mixed>"
+        }
+    ]
+}

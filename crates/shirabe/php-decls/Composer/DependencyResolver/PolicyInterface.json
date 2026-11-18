@@ -1,0 +1,88 @@
+{
+    "fqcn": "Composer\\DependencyResolver\\PolicyInterface",
+    "rustModule": [
+        "dependency_resolver",
+        "policy_interface"
+    ],
+    "kind": "interface",
+    "interfaces": [],
+    "treatment": "real",
+    "methods": [
+        {
+            "name": "selectPreferredPackages",
+            "rust": "select_preferred_packages",
+            "declaredIn": "Composer\\DependencyResolver\\PolicyInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "pool",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\DependencyResolver\\Pool",
+                    "docType": null
+                },
+                {
+                    "name": "literals",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "array",
+                    "docType": "non-empty-list<int>"
+                },
+                {
+                    "name": "requiredPackage",
+                    "position": 2,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": "?string",
+                    "docType": null
+                }
+            ],
+            "returnType": "array",
+            "docReturnType": "non-empty-list<int>",
+            "funcNumArgs": false
+        },
+        {
+            "name": "versionCompare",
+            "rust": "version_compare",
+            "declaredIn": "Composer\\DependencyResolver\\PolicyInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "a",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Package\\PackageInterface",
+                    "docType": null
+                },
+                {
+                    "name": "b",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Package\\PackageInterface",
+                    "docType": null
+                },
+                {
+                    "name": "operator",
+                    "position": 2,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": "Constraint::STR_OP_*"
+                }
+            ],
+            "returnType": "bool",
+            "docReturnType": null,
+            "funcNumArgs": false
+        }
+    ]
+}

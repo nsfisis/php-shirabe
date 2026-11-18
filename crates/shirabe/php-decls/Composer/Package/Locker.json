@@ -1,0 +1,455 @@
+{
+    "fqcn": "Composer\\Package\\Locker",
+    "rustModule": [
+        "package",
+        "locker"
+    ],
+    "kind": "class",
+    "abstract": false,
+    "parent": null,
+    "interfaces": [],
+    "treatment": "stub",
+    "methods": [
+        {
+            "name": "getAliases",
+            "rust": "get_aliases",
+            "declaredIn": "Composer\\Package\\Locker",
+            "static": false,
+            "params": [],
+            "returnType": "array",
+            "docReturnType": "list<array{package: string, version: string, alias: string, alias_normalized: string}>",
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getContentHash",
+            "rust": "get_content_hash",
+            "declaredIn": "Composer\\Package\\Locker",
+            "static": true,
+            "params": [
+                {
+                    "name": "composerFileContents",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": "string"
+                }
+            ],
+            "returnType": "string",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getDevPackageNames",
+            "rust": "get_dev_package_names",
+            "declaredIn": "Composer\\Package\\Locker",
+            "static": false,
+            "params": [],
+            "returnType": "array",
+            "docReturnType": "string[]",
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getJsonFile",
+            "rust": "get_json_file",
+            "declaredIn": "Composer\\Package\\Locker",
+            "static": false,
+            "params": [],
+            "returnType": "\\Composer\\Json\\JsonFile",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "refused",
+            "reason": "JsonFile cannot cross the boundary"
+        },
+        {
+            "name": "getLockData",
+            "rust": "get_lock_data",
+            "declaredIn": "Composer\\Package\\Locker",
+            "static": false,
+            "params": [],
+            "returnType": "array",
+            "docReturnType": "array<string, mixed>",
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getLockedRepository",
+            "rust": "get_locked_repository",
+            "declaredIn": "Composer\\Package\\Locker",
+            "static": false,
+            "params": [
+                {
+                    "name": "withDevReqs",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "bool",
+                    "docType": "bool"
+                }
+            ],
+            "returnType": "\\Composer\\Repository\\LockArrayRepository",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getMinimumStability",
+            "rust": "get_minimum_stability",
+            "declaredIn": "Composer\\Package\\Locker",
+            "static": false,
+            "params": [],
+            "returnType": "string",
+            "docReturnType": "key-of<BasePackage::STABILITIES>",
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getMissingRequirementInfo",
+            "rust": "get_missing_requirement_info",
+            "declaredIn": "Composer\\Package\\Locker",
+            "static": false,
+            "params": [
+                {
+                    "name": "package",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Package\\RootPackageInterface",
+                    "docType": null
+                },
+                {
+                    "name": "includeDev",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "bool",
+                    "docType": null
+                }
+            ],
+            "returnType": "array",
+            "docReturnType": "array<string>",
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getPlatformOverrides",
+            "rust": "get_platform_overrides",
+            "declaredIn": "Composer\\Package\\Locker",
+            "static": false,
+            "params": [],
+            "returnType": "array",
+            "docReturnType": "array<string, string>",
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getPlatformRequirements",
+            "rust": "get_platform_requirements",
+            "declaredIn": "Composer\\Package\\Locker",
+            "static": false,
+            "params": [
+                {
+                    "name": "withDevReqs",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "bool",
+                    "docType": "bool"
+                }
+            ],
+            "returnType": "array",
+            "docReturnType": "Link[]",
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getPluginApi",
+            "rust": "get_plugin_api",
+            "declaredIn": "Composer\\Package\\Locker",
+            "static": false,
+            "params": [],
+            "returnType": null,
+            "docReturnType": "string",
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getPreferLowest",
+            "rust": "get_prefer_lowest",
+            "declaredIn": "Composer\\Package\\Locker",
+            "static": false,
+            "params": [],
+            "returnType": "?bool",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getPreferStable",
+            "rust": "get_prefer_stable",
+            "declaredIn": "Composer\\Package\\Locker",
+            "static": false,
+            "params": [],
+            "returnType": "?bool",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getStabilityFlags",
+            "rust": "get_stability_flags",
+            "declaredIn": "Composer\\Package\\Locker",
+            "static": false,
+            "params": [],
+            "returnType": "array",
+            "docReturnType": "array<string, string>",
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "isFresh",
+            "rust": "is_fresh",
+            "declaredIn": "Composer\\Package\\Locker",
+            "static": false,
+            "params": [],
+            "returnType": "bool",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "isLocked",
+            "rust": "is_locked",
+            "declaredIn": "Composer\\Package\\Locker",
+            "static": false,
+            "params": [],
+            "returnType": "bool",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "setLockData",
+            "rust": "set_lock_data",
+            "declaredIn": "Composer\\Package\\Locker",
+            "static": false,
+            "params": [
+                {
+                    "name": "packages",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "array",
+                    "docType": "PackageInterface[]"
+                },
+                {
+                    "name": "devPackages",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": "?array",
+                    "docType": "PackageInterface[]|null"
+                },
+                {
+                    "name": "platformReqs",
+                    "position": 2,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "array",
+                    "docType": "array<string, string>"
+                },
+                {
+                    "name": "platformDevReqs",
+                    "position": 3,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "array",
+                    "docType": "array<string, string>"
+                },
+                {
+                    "name": "aliases",
+                    "position": 4,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "array",
+                    "docType": "list<array{package: string, version: string, alias: string, alias_normalized: string}>"
+                },
+                {
+                    "name": "minimumStability",
+                    "position": 5,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": null
+                },
+                {
+                    "name": "stabilityFlags",
+                    "position": 6,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "array",
+                    "docType": "array<string, int>"
+                },
+                {
+                    "name": "preferStable",
+                    "position": 7,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "bool",
+                    "docType": null
+                },
+                {
+                    "name": "preferLowest",
+                    "position": 8,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "bool",
+                    "docType": null
+                },
+                {
+                    "name": "platformOverrides",
+                    "position": 9,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "array",
+                    "docType": "array<string, string|false>"
+                },
+                {
+                    "name": "write",
+                    "position": 10,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "bool",
+                    "docType": "bool"
+                }
+            ],
+            "returnType": "bool",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "updateHash",
+            "rust": "update_hash",
+            "declaredIn": "Composer\\Package\\Locker",
+            "static": false,
+            "params": [
+                {
+                    "name": "composerJson",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Json\\JsonFile",
+                    "docType": null
+                },
+                {
+                    "name": "dataProcessor",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": "?callable",
+                    "docType": "(callable(array<string, mixed>): array<string, mixed>)|null"
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "refused",
+            "reason": "JsonFile cannot cross the boundary"
+        }
+    ],
+    "constructor": {
+        "declaredIn": "Composer\\Package\\Locker",
+        "public": true,
+        "params": [
+            {
+                "name": "io",
+                "position": 0,
+                "byRef": false,
+                "variadic": false,
+                "nullable": false,
+                "type": "\\Composer\\IO\\IOInterface",
+                "docType": null
+            },
+            {
+                "name": "lockFile",
+                "position": 1,
+                "byRef": false,
+                "variadic": false,
+                "nullable": false,
+                "type": "\\Composer\\Json\\JsonFile",
+                "docType": "JsonFile"
+            },
+            {
+                "name": "installationManager",
+                "position": 2,
+                "byRef": false,
+                "variadic": false,
+                "nullable": false,
+                "type": "\\Composer\\Installer\\InstallationManager",
+                "docType": "InstallationManager"
+            },
+            {
+                "name": "composerFileContents",
+                "position": 3,
+                "byRef": false,
+                "variadic": false,
+                "nullable": false,
+                "type": "string",
+                "docType": "string"
+            },
+            {
+                "name": "process",
+                "position": 4,
+                "byRef": false,
+                "variadic": false,
+                "nullable": true,
+                "type": "?\\Composer\\Util\\ProcessExecutor",
+                "docType": null
+            }
+        ],
+        "funcNumArgs": false,
+        "forwarded": true,
+        "status": "unimplemented"
+    },
+    "properties": []
+}

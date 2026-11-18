@@ -1,0 +1,373 @@
+{
+    "fqcn": "Composer\\Util\\ProcessExecutor",
+    "rustModule": [
+        "util",
+        "process_executor"
+    ],
+    "kind": "class",
+    "abstract": false,
+    "parent": null,
+    "interfaces": [],
+    "treatment": "stub",
+    "methods": [
+        {
+            "name": "countActiveJobs",
+            "rust": "count_active_jobs",
+            "declaredIn": "Composer\\Util\\ProcessExecutor",
+            "static": false,
+            "params": [
+                {
+                    "name": "index",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": null,
+                    "docType": "?int"
+                }
+            ],
+            "returnType": "int",
+            "docReturnType": "int",
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "enableAsync",
+            "rust": "enable_async",
+            "declaredIn": "Composer\\Util\\ProcessExecutor",
+            "static": false,
+            "params": [],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "escape",
+            "rust": "escape",
+            "declaredIn": "Composer\\Util\\ProcessExecutor",
+            "static": true,
+            "params": [
+                {
+                    "name": "argument",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": null,
+                    "docType": "string|false|null"
+                }
+            ],
+            "returnType": "string",
+            "docReturnType": "string",
+            "funcNumArgs": false,
+            "forwarded": false
+        },
+        {
+            "name": "execute",
+            "rust": "execute",
+            "declaredIn": "Composer\\Util\\ProcessExecutor",
+            "static": false,
+            "params": [
+                {
+                    "name": "command",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": null,
+                    "docType": "string|non-empty-list<string>"
+                },
+                {
+                    "name": "output",
+                    "position": 1,
+                    "byRef": true,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": null,
+                    "docType": "mixed"
+                },
+                {
+                    "name": "cwd",
+                    "position": 2,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": "?string",
+                    "docType": "null|string"
+                }
+            ],
+            "returnType": "int",
+            "docReturnType": "int",
+            "funcNumArgs": true,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "executeAsync",
+            "rust": "execute_async",
+            "declaredIn": "Composer\\Util\\ProcessExecutor",
+            "static": false,
+            "params": [
+                {
+                    "name": "command",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": null,
+                    "docType": "string|list<string>"
+                },
+                {
+                    "name": "cwd",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": "?string",
+                    "docType": "string"
+                }
+            ],
+            "returnType": "\\React\\Promise\\PromiseInterface",
+            "docReturnType": "PromiseInterface<Process>",
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "executeTty",
+            "rust": "execute_tty",
+            "declaredIn": "Composer\\Util\\ProcessExecutor",
+            "static": false,
+            "params": [
+                {
+                    "name": "command",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": null,
+                    "docType": "string|non-empty-list<string>"
+                },
+                {
+                    "name": "cwd",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": "?string",
+                    "docType": "null|string"
+                }
+            ],
+            "returnType": "int",
+            "docReturnType": "int",
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getErrorOutput",
+            "rust": "get_error_output",
+            "declaredIn": "Composer\\Util\\ProcessExecutor",
+            "static": false,
+            "params": [],
+            "returnType": "string",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getTimeout",
+            "rust": "get_timeout",
+            "declaredIn": "Composer\\Util\\ProcessExecutor",
+            "static": true,
+            "params": [],
+            "returnType": "int",
+            "docReturnType": "int",
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "requiresGitDirEnv",
+            "rust": "requires_git_dir_env",
+            "declaredIn": "Composer\\Util\\ProcessExecutor",
+            "static": false,
+            "params": [
+                {
+                    "name": "command",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": null,
+                    "docType": "string[]|string"
+                }
+            ],
+            "returnType": "bool",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "resetMaxJobs",
+            "rust": "reset_max_jobs",
+            "declaredIn": "Composer\\Util\\ProcessExecutor",
+            "static": false,
+            "params": [],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "setMaxJobs",
+            "rust": "set_max_jobs",
+            "declaredIn": "Composer\\Util\\ProcessExecutor",
+            "static": false,
+            "params": [
+                {
+                    "name": "maxJobs",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "int",
+                    "docType": null
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "setTimeout",
+            "rust": "set_timeout",
+            "declaredIn": "Composer\\Util\\ProcessExecutor",
+            "static": true,
+            "params": [
+                {
+                    "name": "timeout",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "int",
+                    "docType": "int"
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "splitLines",
+            "rust": "split_lines",
+            "declaredIn": "Composer\\Util\\ProcessExecutor",
+            "static": false,
+            "params": [
+                {
+                    "name": "output",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": "?string",
+                    "docType": null
+                }
+            ],
+            "returnType": "array",
+            "docReturnType": "string[]",
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "wait",
+            "rust": "wait",
+            "declaredIn": "Composer\\Util\\ProcessExecutor",
+            "static": false,
+            "params": [
+                {
+                    "name": "index",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": null,
+                    "docType": "?int"
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        }
+    ],
+    "constructor": {
+        "declaredIn": "Composer\\Util\\ProcessExecutor",
+        "public": true,
+        "params": [
+            {
+                "name": "io",
+                "position": 0,
+                "byRef": false,
+                "variadic": false,
+                "nullable": true,
+                "type": "?\\Composer\\IO\\IOInterface",
+                "docType": null
+            }
+        ],
+        "funcNumArgs": false,
+        "forwarded": true,
+        "status": "implemented"
+    },
+    "properties": [
+        {
+            "name": "captureOutput",
+            "declaredIn": "Composer\\Util\\ProcessExecutor",
+            "visibility": "protected",
+            "static": false,
+            "readonly": false,
+            "type": null,
+            "docType": "bool"
+        },
+        {
+            "name": "errorOutput",
+            "declaredIn": "Composer\\Util\\ProcessExecutor",
+            "visibility": "protected",
+            "static": false,
+            "readonly": false,
+            "type": null,
+            "docType": "string"
+        },
+        {
+            "name": "io",
+            "declaredIn": "Composer\\Util\\ProcessExecutor",
+            "visibility": "protected",
+            "static": false,
+            "readonly": false,
+            "type": null,
+            "docType": "?IOInterface"
+        },
+        {
+            "name": "timeout",
+            "declaredIn": "Composer\\Util\\ProcessExecutor",
+            "visibility": "protected",
+            "static": true,
+            "readonly": false,
+            "type": null,
+            "docType": "int"
+        }
+    ]
+}

@@ -1,0 +1,363 @@
+{
+    "fqcn": "Composer\\Util\\HttpDownloader",
+    "rustModule": [
+        "util",
+        "http_downloader"
+    ],
+    "kind": "class",
+    "abstract": false,
+    "parent": null,
+    "interfaces": [],
+    "treatment": "stub",
+    "methods": [
+        {
+            "name": "add",
+            "rust": "add",
+            "declaredIn": "Composer\\Util\\HttpDownloader",
+            "static": false,
+            "params": [
+                {
+                    "name": "url",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": "string"
+                },
+                {
+                    "name": "options",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "array",
+                    "docType": "mixed[]"
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "PromiseInterface<Response>",
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "addCopy",
+            "rust": "add_copy",
+            "declaredIn": "Composer\\Util\\HttpDownloader",
+            "static": false,
+            "params": [
+                {
+                    "name": "url",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": "string"
+                },
+                {
+                    "name": "to",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": "string"
+                },
+                {
+                    "name": "options",
+                    "position": 2,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "array",
+                    "docType": "mixed[]"
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "PromiseInterface<Response>",
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "copy",
+            "rust": "copy",
+            "declaredIn": "Composer\\Util\\HttpDownloader",
+            "static": false,
+            "params": [
+                {
+                    "name": "url",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": "string"
+                },
+                {
+                    "name": "to",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": "string"
+                },
+                {
+                    "name": "options",
+                    "position": 2,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "array",
+                    "docType": "mixed[]"
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "Response",
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "countActiveJobs",
+            "rust": "count_active_jobs",
+            "declaredIn": "Composer\\Util\\HttpDownloader",
+            "static": false,
+            "params": [
+                {
+                    "name": "index",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": "?int",
+                    "docType": "int|null"
+                }
+            ],
+            "returnType": "int",
+            "docReturnType": "int",
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "enableAsync",
+            "rust": "enable_async",
+            "declaredIn": "Composer\\Util\\HttpDownloader",
+            "static": false,
+            "params": [],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "get",
+            "rust": "get",
+            "declaredIn": "Composer\\Util\\HttpDownloader",
+            "static": false,
+            "params": [
+                {
+                    "name": "url",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": "string"
+                },
+                {
+                    "name": "options",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "array",
+                    "docType": "mixed[]"
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "Response",
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getExceptionHints",
+            "rust": "get_exception_hints",
+            "declaredIn": "Composer\\Util\\HttpDownloader",
+            "static": true,
+            "params": [
+                {
+                    "name": "e",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Throwable",
+                    "docType": null
+                }
+            ],
+            "returnType": "?array",
+            "docReturnType": "?string[]",
+            "funcNumArgs": false,
+            "forwarded": false
+        },
+        {
+            "name": "getOptions",
+            "rust": "get_options",
+            "declaredIn": "Composer\\Util\\HttpDownloader",
+            "static": false,
+            "params": [],
+            "returnType": null,
+            "docReturnType": "mixed[]",
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "isCurlEnabled",
+            "rust": "is_curl_enabled",
+            "declaredIn": "Composer\\Util\\HttpDownloader",
+            "static": true,
+            "params": [],
+            "returnType": "bool",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": false
+        },
+        {
+            "name": "outputWarnings",
+            "rust": "output_warnings",
+            "declaredIn": "Composer\\Util\\HttpDownloader",
+            "static": true,
+            "params": [
+                {
+                    "name": "io",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\IO\\IOInterface",
+                    "docType": null
+                },
+                {
+                    "name": "url",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": null
+                },
+                {
+                    "name": "data",
+                    "position": 2,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": null,
+                    "docType": "array{warning?: string, info?: string, warning-versions?: string, info-versions?: string, warnings?: array<array{versions: string, message: string}>, infos?: array<array{versions: string, message: string}>}"
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": false
+        },
+        {
+            "name": "setOptions",
+            "rust": "set_options",
+            "declaredIn": "Composer\\Util\\HttpDownloader",
+            "static": false,
+            "params": [
+                {
+                    "name": "options",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "array",
+                    "docType": "mixed[]"
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "void",
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "wait",
+            "rust": "wait",
+            "declaredIn": "Composer\\Util\\HttpDownloader",
+            "static": false,
+            "params": [
+                {
+                    "name": "index",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": "?int",
+                    "docType": "int|null"
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "void",
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        }
+    ],
+    "constructor": {
+        "declaredIn": "Composer\\Util\\HttpDownloader",
+        "public": true,
+        "params": [
+            {
+                "name": "io",
+                "position": 0,
+                "byRef": false,
+                "variadic": false,
+                "nullable": false,
+                "type": "\\Composer\\IO\\IOInterface",
+                "docType": "IOInterface"
+            },
+            {
+                "name": "config",
+                "position": 1,
+                "byRef": false,
+                "variadic": false,
+                "nullable": false,
+                "type": "\\Composer\\Config",
+                "docType": "Config"
+            },
+            {
+                "name": "options",
+                "position": 2,
+                "byRef": false,
+                "variadic": false,
+                "nullable": false,
+                "type": "array",
+                "docType": "mixed[]"
+            },
+            {
+                "name": "disableTls",
+                "position": 3,
+                "byRef": false,
+                "variadic": false,
+                "nullable": false,
+                "type": "bool",
+                "docType": null
+            }
+        ],
+        "funcNumArgs": false,
+        "forwarded": true,
+        "status": "implemented"
+    },
+    "properties": []
+}

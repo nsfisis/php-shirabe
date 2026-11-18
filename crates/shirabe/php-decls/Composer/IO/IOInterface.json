@@ -1,0 +1,606 @@
+{
+    "fqcn": "Composer\\IO\\IOInterface",
+    "rustModule": [
+        "io",
+        "io_interface"
+    ],
+    "kind": "interface",
+    "interfaces": [],
+    "treatment": "real",
+    "methods": [
+        {
+            "name": "ask",
+            "rust": "ask",
+            "declaredIn": "Composer\\IO\\IOInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "question",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": "string"
+                },
+                {
+                    "name": "default",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": null,
+                    "docType": "string|bool|int|float|null"
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "mixed",
+            "funcNumArgs": false
+        },
+        {
+            "name": "askAndHideAnswer",
+            "rust": "ask_and_hide_answer",
+            "declaredIn": "Composer\\IO\\IOInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "question",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": "string"
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "string|null",
+            "funcNumArgs": false
+        },
+        {
+            "name": "askAndValidate",
+            "rust": "ask_and_validate",
+            "declaredIn": "Composer\\IO\\IOInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "question",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": "string"
+                },
+                {
+                    "name": "validator",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "callable",
+                    "docType": "callable"
+                },
+                {
+                    "name": "attempts",
+                    "position": 2,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": "?int",
+                    "docType": "null|int"
+                },
+                {
+                    "name": "default",
+                    "position": 3,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": null,
+                    "docType": "mixed"
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "mixed",
+            "funcNumArgs": false
+        },
+        {
+            "name": "askConfirmation",
+            "rust": "ask_confirmation",
+            "declaredIn": "Composer\\IO\\IOInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "question",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": "string"
+                },
+                {
+                    "name": "default",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "bool",
+                    "docType": "bool"
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "bool",
+            "funcNumArgs": false
+        },
+        {
+            "name": "getAuthentication",
+            "rust": "get_authentication",
+            "declaredIn": "Composer\\IO\\IOInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "repositoryName",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": "string"
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "array{username: string|null, password: string|null}",
+            "funcNumArgs": false
+        },
+        {
+            "name": "getAuthentications",
+            "rust": "get_authentications",
+            "declaredIn": "Composer\\IO\\IOInterface",
+            "static": false,
+            "params": [],
+            "returnType": null,
+            "docReturnType": "array<string, array{username: string|null, password: string|null}>",
+            "funcNumArgs": false
+        },
+        {
+            "name": "hasAuthentication",
+            "rust": "has_authentication",
+            "declaredIn": "Composer\\IO\\IOInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "repositoryName",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": "string"
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "bool",
+            "funcNumArgs": false
+        },
+        {
+            "name": "isDebug",
+            "rust": "is_debug",
+            "declaredIn": "Composer\\IO\\IOInterface",
+            "static": false,
+            "params": [],
+            "returnType": null,
+            "docReturnType": "bool",
+            "funcNumArgs": false
+        },
+        {
+            "name": "isDecorated",
+            "rust": "is_decorated",
+            "declaredIn": "Composer\\IO\\IOInterface",
+            "static": false,
+            "params": [],
+            "returnType": null,
+            "docReturnType": "bool",
+            "funcNumArgs": false
+        },
+        {
+            "name": "isInteractive",
+            "rust": "is_interactive",
+            "declaredIn": "Composer\\IO\\IOInterface",
+            "static": false,
+            "params": [],
+            "returnType": null,
+            "docReturnType": "bool",
+            "funcNumArgs": false
+        },
+        {
+            "name": "isVerbose",
+            "rust": "is_verbose",
+            "declaredIn": "Composer\\IO\\IOInterface",
+            "static": false,
+            "params": [],
+            "returnType": null,
+            "docReturnType": "bool",
+            "funcNumArgs": false
+        },
+        {
+            "name": "isVeryVerbose",
+            "rust": "is_very_verbose",
+            "declaredIn": "Composer\\IO\\IOInterface",
+            "static": false,
+            "params": [],
+            "returnType": null,
+            "docReturnType": "bool",
+            "funcNumArgs": false
+        },
+        {
+            "name": "loadConfiguration",
+            "rust": "load_configuration",
+            "declaredIn": "Composer\\IO\\IOInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "config",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Config",
+                    "docType": null
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "void",
+            "funcNumArgs": false
+        },
+        {
+            "name": "overwrite",
+            "rust": "overwrite",
+            "declaredIn": "Composer\\IO\\IOInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "messages",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": null,
+                    "docType": "string|string[]"
+                },
+                {
+                    "name": "newline",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "bool",
+                    "docType": "bool"
+                },
+                {
+                    "name": "size",
+                    "position": 2,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": "?int",
+                    "docType": "int"
+                },
+                {
+                    "name": "verbosity",
+                    "position": 3,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "int",
+                    "docType": "int"
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "void",
+            "funcNumArgs": false
+        },
+        {
+            "name": "overwriteError",
+            "rust": "overwrite_error",
+            "declaredIn": "Composer\\IO\\IOInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "messages",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": null,
+                    "docType": "string|string[]"
+                },
+                {
+                    "name": "newline",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "bool",
+                    "docType": "bool"
+                },
+                {
+                    "name": "size",
+                    "position": 2,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": "?int",
+                    "docType": "int"
+                },
+                {
+                    "name": "verbosity",
+                    "position": 3,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "int",
+                    "docType": "int"
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "void",
+            "funcNumArgs": false
+        },
+        {
+            "name": "select",
+            "rust": "select",
+            "declaredIn": "Composer\\IO\\IOInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "question",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": "string"
+                },
+                {
+                    "name": "choices",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "array",
+                    "docType": "string[]"
+                },
+                {
+                    "name": "default",
+                    "position": 2,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": null,
+                    "docType": "bool|string"
+                },
+                {
+                    "name": "attempts",
+                    "position": 3,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": null,
+                    "docType": "bool|int"
+                },
+                {
+                    "name": "errorMessage",
+                    "position": 4,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": "string"
+                },
+                {
+                    "name": "multiselect",
+                    "position": 5,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "bool",
+                    "docType": "bool"
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "($multiselect is true ? list<string> : string|int|bool)",
+            "funcNumArgs": false
+        },
+        {
+            "name": "setAuthentication",
+            "rust": "set_authentication",
+            "declaredIn": "Composer\\IO\\IOInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "repositoryName",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": "string"
+                },
+                {
+                    "name": "username",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": "string"
+                },
+                {
+                    "name": "password",
+                    "position": 2,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": "?string",
+                    "docType": "null|string"
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "void",
+            "funcNumArgs": false
+        },
+        {
+            "name": "write",
+            "rust": "write",
+            "declaredIn": "Composer\\IO\\IOInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "messages",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": null,
+                    "docType": "string|string[]"
+                },
+                {
+                    "name": "newline",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "bool",
+                    "docType": "bool"
+                },
+                {
+                    "name": "verbosity",
+                    "position": 2,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "int",
+                    "docType": "int"
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "void",
+            "funcNumArgs": false
+        },
+        {
+            "name": "writeError",
+            "rust": "write_error",
+            "declaredIn": "Composer\\IO\\IOInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "messages",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": null,
+                    "docType": "string|string[]"
+                },
+                {
+                    "name": "newline",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "bool",
+                    "docType": "bool"
+                },
+                {
+                    "name": "verbosity",
+                    "position": 2,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "int",
+                    "docType": "int"
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "void",
+            "funcNumArgs": false
+        },
+        {
+            "name": "writeErrorRaw",
+            "rust": "write_error_raw",
+            "declaredIn": "Composer\\IO\\IOInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "messages",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": null,
+                    "docType": "string|string[]"
+                },
+                {
+                    "name": "newline",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "bool",
+                    "docType": "bool"
+                },
+                {
+                    "name": "verbosity",
+                    "position": 2,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "int",
+                    "docType": "int"
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "void",
+            "funcNumArgs": false
+        },
+        {
+            "name": "writeRaw",
+            "rust": "write_raw",
+            "declaredIn": "Composer\\IO\\IOInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "messages",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": null,
+                    "docType": "string|string[]"
+                },
+                {
+                    "name": "newline",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "bool",
+                    "docType": "bool"
+                },
+                {
+                    "name": "verbosity",
+                    "position": 2,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "int",
+                    "docType": "int"
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "void",
+            "funcNumArgs": false
+        }
+    ]
+}

@@ -1,0 +1,32 @@
+{
+    "fqcn": "Composer\\Installer\\BinaryPresenceInterface",
+    "rustModule": [
+        "installer",
+        "binary_presence_interface"
+    ],
+    "kind": "interface",
+    "interfaces": [],
+    "treatment": "real",
+    "methods": [
+        {
+            "name": "ensureBinariesPresence",
+            "rust": "ensure_binaries_presence",
+            "declaredIn": "Composer\\Installer\\BinaryPresenceInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "package",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Package\\PackageInterface",
+                    "docType": "PackageInterface"
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "void",
+            "funcNumArgs": false
+        }
+    ]
+}

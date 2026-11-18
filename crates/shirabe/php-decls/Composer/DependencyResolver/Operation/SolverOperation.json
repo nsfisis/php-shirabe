@@ -1,0 +1,71 @@
+{
+    "fqcn": "Composer\\DependencyResolver\\Operation\\SolverOperation",
+    "rustModule": [
+        "dependency_resolver",
+        "operation",
+        "solver_operation"
+    ],
+    "kind": "class",
+    "abstract": true,
+    "parent": null,
+    "interfaces": [
+        "Composer\\DependencyResolver\\Operation\\OperationInterface"
+    ],
+    "treatment": "stub",
+    "methods": [
+        {
+            "name": "__toString",
+            "rust": "__to_string",
+            "declaredIn": "Composer\\DependencyResolver\\Operation\\OperationInterface",
+            "static": false,
+            "params": [],
+            "returnType": null,
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getOperationType",
+            "rust": "get_operation_type",
+            "declaredIn": "Composer\\DependencyResolver\\Operation\\OperationInterface",
+            "static": false,
+            "params": [],
+            "returnType": "string",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "show",
+            "rust": "show",
+            "declaredIn": "Composer\\DependencyResolver\\Operation\\OperationInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "lock",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "bool",
+                    "docType": "bool"
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "string",
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        }
+    ],
+    "constructor": {
+        "declaredIn": null,
+        "public": true,
+        "params": [],
+        "funcNumArgs": false,
+        "forwarded": false
+    },
+    "properties": []
+}

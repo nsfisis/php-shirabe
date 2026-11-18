@@ -1,0 +1,1587 @@
+{
+    "fqcn": "Composer\\Package\\CompleteAliasPackage",
+    "rustModule": [
+        "package",
+        "complete_alias_package"
+    ],
+    "kind": "class",
+    "abstract": false,
+    "parent": "Composer\\Package\\AliasPackage",
+    "interfaces": [
+        "Composer\\Package\\CompletePackageInterface"
+    ],
+    "treatment": "stub",
+    "methods": [
+        {
+            "name": "__toString",
+            "rust": "__to_string",
+            "declaredIn": "Composer\\Package\\PackageInterface",
+            "static": false,
+            "params": [],
+            "returnType": "string",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "equals",
+            "rust": "equals",
+            "declaredIn": "Composer\\Package\\BasePackage",
+            "static": false,
+            "params": [
+                {
+                    "name": "package",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Package\\PackageInterface",
+                    "docType": null
+                }
+            ],
+            "returnType": "bool",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getAliasOf",
+            "rust": "get_alias_of",
+            "declaredIn": "Composer\\Package\\AliasPackage",
+            "static": false,
+            "params": [],
+            "returnType": null,
+            "docReturnType": "CompletePackage",
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getArchiveExcludes",
+            "rust": "get_archive_excludes",
+            "declaredIn": "Composer\\Package\\CompletePackageInterface",
+            "static": false,
+            "params": [],
+            "returnType": "array",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getArchiveName",
+            "rust": "get_archive_name",
+            "declaredIn": "Composer\\Package\\CompletePackageInterface",
+            "static": false,
+            "params": [],
+            "returnType": "?string",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getAuthors",
+            "rust": "get_authors",
+            "declaredIn": "Composer\\Package\\CompletePackageInterface",
+            "static": false,
+            "params": [],
+            "returnType": "array",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getAutoload",
+            "rust": "get_autoload",
+            "declaredIn": "Composer\\Package\\PackageInterface",
+            "static": false,
+            "params": [],
+            "returnType": "array",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getBinaries",
+            "rust": "get_binaries",
+            "declaredIn": "Composer\\Package\\PackageInterface",
+            "static": false,
+            "params": [],
+            "returnType": "array",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getConflicts",
+            "rust": "get_conflicts",
+            "declaredIn": "Composer\\Package\\PackageInterface",
+            "static": false,
+            "params": [],
+            "returnType": "array",
+            "docReturnType": "array<string|int, Link>",
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getDescription",
+            "rust": "get_description",
+            "declaredIn": "Composer\\Package\\CompletePackageInterface",
+            "static": false,
+            "params": [],
+            "returnType": "?string",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getDevAutoload",
+            "rust": "get_dev_autoload",
+            "declaredIn": "Composer\\Package\\PackageInterface",
+            "static": false,
+            "params": [],
+            "returnType": "array",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getDevRequires",
+            "rust": "get_dev_requires",
+            "declaredIn": "Composer\\Package\\PackageInterface",
+            "static": false,
+            "params": [],
+            "returnType": "array",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getDistMirrors",
+            "rust": "get_dist_mirrors",
+            "declaredIn": "Composer\\Package\\PackageInterface",
+            "static": false,
+            "params": [],
+            "returnType": "?array",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getDistReference",
+            "rust": "get_dist_reference",
+            "declaredIn": "Composer\\Package\\PackageInterface",
+            "static": false,
+            "params": [],
+            "returnType": "?string",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getDistSha1Checksum",
+            "rust": "get_dist_sha1_checksum",
+            "declaredIn": "Composer\\Package\\PackageInterface",
+            "static": false,
+            "params": [],
+            "returnType": "?string",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getDistType",
+            "rust": "get_dist_type",
+            "declaredIn": "Composer\\Package\\PackageInterface",
+            "static": false,
+            "params": [],
+            "returnType": "?string",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getDistUrl",
+            "rust": "get_dist_url",
+            "declaredIn": "Composer\\Package\\PackageInterface",
+            "static": false,
+            "params": [],
+            "returnType": "?string",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getDistUrls",
+            "rust": "get_dist_urls",
+            "declaredIn": "Composer\\Package\\PackageInterface",
+            "static": false,
+            "params": [],
+            "returnType": "array",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getExtra",
+            "rust": "get_extra",
+            "declaredIn": "Composer\\Package\\PackageInterface",
+            "static": false,
+            "params": [],
+            "returnType": "array",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getFullPrettyVersion",
+            "rust": "get_full_pretty_version",
+            "declaredIn": "Composer\\Package\\PackageInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "truncate",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "bool",
+                    "docType": null
+                },
+                {
+                    "name": "displayMode",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "int",
+                    "docType": null
+                }
+            ],
+            "returnType": "string",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getFunding",
+            "rust": "get_funding",
+            "declaredIn": "Composer\\Package\\CompletePackageInterface",
+            "static": false,
+            "params": [],
+            "returnType": "array",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getHomepage",
+            "rust": "get_homepage",
+            "declaredIn": "Composer\\Package\\CompletePackageInterface",
+            "static": false,
+            "params": [],
+            "returnType": "?string",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getId",
+            "rust": "get_id",
+            "declaredIn": "Composer\\Package\\PackageInterface",
+            "static": false,
+            "params": [],
+            "returnType": "int",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getIncludePaths",
+            "rust": "get_include_paths",
+            "declaredIn": "Composer\\Package\\PackageInterface",
+            "static": false,
+            "params": [],
+            "returnType": "array",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getInstallationSource",
+            "rust": "get_installation_source",
+            "declaredIn": "Composer\\Package\\PackageInterface",
+            "static": false,
+            "params": [],
+            "returnType": "?string",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getKeywords",
+            "rust": "get_keywords",
+            "declaredIn": "Composer\\Package\\CompletePackageInterface",
+            "static": false,
+            "params": [],
+            "returnType": "array",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getLicense",
+            "rust": "get_license",
+            "declaredIn": "Composer\\Package\\CompletePackageInterface",
+            "static": false,
+            "params": [],
+            "returnType": "array",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getName",
+            "rust": "get_name",
+            "declaredIn": "Composer\\Package\\PackageInterface",
+            "static": false,
+            "params": [],
+            "returnType": "string",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getNames",
+            "rust": "get_names",
+            "declaredIn": "Composer\\Package\\PackageInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "provides",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": null,
+                    "docType": null
+                }
+            ],
+            "returnType": "array",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getNotificationUrl",
+            "rust": "get_notification_url",
+            "declaredIn": "Composer\\Package\\PackageInterface",
+            "static": false,
+            "params": [],
+            "returnType": "?string",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getPhpExt",
+            "rust": "get_php_ext",
+            "declaredIn": "Composer\\Package\\PackageInterface",
+            "static": false,
+            "params": [],
+            "returnType": "?array",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getPrettyName",
+            "rust": "get_pretty_name",
+            "declaredIn": "Composer\\Package\\PackageInterface",
+            "static": false,
+            "params": [],
+            "returnType": "string",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getPrettyString",
+            "rust": "get_pretty_string",
+            "declaredIn": "Composer\\Package\\PackageInterface",
+            "static": false,
+            "params": [],
+            "returnType": "string",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getPrettyVersion",
+            "rust": "get_pretty_version",
+            "declaredIn": "Composer\\Package\\PackageInterface",
+            "static": false,
+            "params": [],
+            "returnType": "string",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getProvides",
+            "rust": "get_provides",
+            "declaredIn": "Composer\\Package\\PackageInterface",
+            "static": false,
+            "params": [],
+            "returnType": "array",
+            "docReturnType": "array<string|int, Link>",
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getReleaseDate",
+            "rust": "get_release_date",
+            "declaredIn": "Composer\\Package\\PackageInterface",
+            "static": false,
+            "params": [],
+            "returnType": "?\\DateTimeInterface",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getReplacementPackage",
+            "rust": "get_replacement_package",
+            "declaredIn": "Composer\\Package\\CompletePackageInterface",
+            "static": false,
+            "params": [],
+            "returnType": "?string",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getReplaces",
+            "rust": "get_replaces",
+            "declaredIn": "Composer\\Package\\PackageInterface",
+            "static": false,
+            "params": [],
+            "returnType": "array",
+            "docReturnType": "array<string|int, Link>",
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getRepositories",
+            "rust": "get_repositories",
+            "declaredIn": "Composer\\Package\\CompletePackageInterface",
+            "static": false,
+            "params": [],
+            "returnType": "array",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getRepository",
+            "rust": "get_repository",
+            "declaredIn": "Composer\\Package\\PackageInterface",
+            "static": false,
+            "params": [],
+            "returnType": "?\\Composer\\Repository\\RepositoryInterface",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getRequires",
+            "rust": "get_requires",
+            "declaredIn": "Composer\\Package\\PackageInterface",
+            "static": false,
+            "params": [],
+            "returnType": "array",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getScripts",
+            "rust": "get_scripts",
+            "declaredIn": "Composer\\Package\\CompletePackageInterface",
+            "static": false,
+            "params": [],
+            "returnType": "array",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getSourceMirrors",
+            "rust": "get_source_mirrors",
+            "declaredIn": "Composer\\Package\\PackageInterface",
+            "static": false,
+            "params": [],
+            "returnType": "?array",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getSourceReference",
+            "rust": "get_source_reference",
+            "declaredIn": "Composer\\Package\\PackageInterface",
+            "static": false,
+            "params": [],
+            "returnType": "?string",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getSourceType",
+            "rust": "get_source_type",
+            "declaredIn": "Composer\\Package\\PackageInterface",
+            "static": false,
+            "params": [],
+            "returnType": "?string",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getSourceUrl",
+            "rust": "get_source_url",
+            "declaredIn": "Composer\\Package\\PackageInterface",
+            "static": false,
+            "params": [],
+            "returnType": "?string",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getSourceUrls",
+            "rust": "get_source_urls",
+            "declaredIn": "Composer\\Package\\PackageInterface",
+            "static": false,
+            "params": [],
+            "returnType": "array",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getStability",
+            "rust": "get_stability",
+            "declaredIn": "Composer\\Package\\PackageInterface",
+            "static": false,
+            "params": [],
+            "returnType": "string",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getStabilityPriority",
+            "rust": "get_stability_priority",
+            "declaredIn": "Composer\\Package\\BasePackage",
+            "static": false,
+            "params": [],
+            "returnType": "int",
+            "docReturnType": "self::STABILITY_*",
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getSuggests",
+            "rust": "get_suggests",
+            "declaredIn": "Composer\\Package\\PackageInterface",
+            "static": false,
+            "params": [],
+            "returnType": "array",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getSupport",
+            "rust": "get_support",
+            "declaredIn": "Composer\\Package\\CompletePackageInterface",
+            "static": false,
+            "params": [],
+            "returnType": "array",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getTargetDir",
+            "rust": "get_target_dir",
+            "declaredIn": "Composer\\Package\\PackageInterface",
+            "static": false,
+            "params": [],
+            "returnType": "?string",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getTransportOptions",
+            "rust": "get_transport_options",
+            "declaredIn": "Composer\\Package\\PackageInterface",
+            "static": false,
+            "params": [],
+            "returnType": "array",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getType",
+            "rust": "get_type",
+            "declaredIn": "Composer\\Package\\PackageInterface",
+            "static": false,
+            "params": [],
+            "returnType": "string",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getUniqueName",
+            "rust": "get_unique_name",
+            "declaredIn": "Composer\\Package\\PackageInterface",
+            "static": false,
+            "params": [],
+            "returnType": "string",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getVersion",
+            "rust": "get_version",
+            "declaredIn": "Composer\\Package\\PackageInterface",
+            "static": false,
+            "params": [],
+            "returnType": "string",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "hasSelfVersionRequires",
+            "rust": "has_self_version_requires",
+            "declaredIn": "Composer\\Package\\AliasPackage",
+            "static": false,
+            "params": [],
+            "returnType": "bool",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "isAbandoned",
+            "rust": "is_abandoned",
+            "declaredIn": "Composer\\Package\\CompletePackageInterface",
+            "static": false,
+            "params": [],
+            "returnType": "bool",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "isDefaultBranch",
+            "rust": "is_default_branch",
+            "declaredIn": "Composer\\Package\\PackageInterface",
+            "static": false,
+            "params": [],
+            "returnType": "bool",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "isDev",
+            "rust": "is_dev",
+            "declaredIn": "Composer\\Package\\PackageInterface",
+            "static": false,
+            "params": [],
+            "returnType": "bool",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "isPlatform",
+            "rust": "is_platform",
+            "declaredIn": "Composer\\Package\\BasePackage",
+            "static": false,
+            "params": [],
+            "returnType": "bool",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "isRootPackageAlias",
+            "rust": "is_root_package_alias",
+            "declaredIn": "Composer\\Package\\AliasPackage",
+            "static": false,
+            "params": [],
+            "returnType": "bool",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "packageNameToRegexp",
+            "rust": "package_name_to_regexp",
+            "declaredIn": "Composer\\Package\\BasePackage",
+            "static": true,
+            "params": [
+                {
+                    "name": "allowPattern",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": null
+                },
+                {
+                    "name": "wrap",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": "non-empty-string"
+                }
+            ],
+            "returnType": "string",
+            "docReturnType": "non-empty-string",
+            "funcNumArgs": false,
+            "forwarded": false
+        },
+        {
+            "name": "packageNamesToRegexp",
+            "rust": "package_names_to_regexp",
+            "declaredIn": "Composer\\Package\\BasePackage",
+            "static": true,
+            "params": [
+                {
+                    "name": "packageNames",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "array",
+                    "docType": "string[]"
+                },
+                {
+                    "name": "wrap",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": "non-empty-string"
+                }
+            ],
+            "returnType": "string",
+            "docReturnType": "non-empty-string",
+            "funcNumArgs": false,
+            "forwarded": false
+        },
+        {
+            "name": "setAbandoned",
+            "rust": "set_abandoned",
+            "declaredIn": "Composer\\Package\\CompletePackageInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "abandoned",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": null,
+                    "docType": null
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "setArchiveExcludes",
+            "rust": "set_archive_excludes",
+            "declaredIn": "Composer\\Package\\CompletePackageInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "excludes",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "array",
+                    "docType": null
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "setArchiveName",
+            "rust": "set_archive_name",
+            "declaredIn": "Composer\\Package\\CompletePackageInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "name",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": "?string",
+                    "docType": null
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "setAuthors",
+            "rust": "set_authors",
+            "declaredIn": "Composer\\Package\\CompletePackageInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "authors",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "array",
+                    "docType": null
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "setDescription",
+            "rust": "set_description",
+            "declaredIn": "Composer\\Package\\CompletePackageInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "description",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": "?string",
+                    "docType": null
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "setDistMirrors",
+            "rust": "set_dist_mirrors",
+            "declaredIn": "Composer\\Package\\PackageInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "mirrors",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": "?array",
+                    "docType": null
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "setDistReference",
+            "rust": "set_dist_reference",
+            "declaredIn": "Composer\\Package\\PackageInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "reference",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": "?string",
+                    "docType": null
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "setDistType",
+            "rust": "set_dist_type",
+            "declaredIn": "Composer\\Package\\PackageInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "type",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": "?string",
+                    "docType": null
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "setDistUrl",
+            "rust": "set_dist_url",
+            "declaredIn": "Composer\\Package\\PackageInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "url",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": "?string",
+                    "docType": null
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "setFunding",
+            "rust": "set_funding",
+            "declaredIn": "Composer\\Package\\CompletePackageInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "funding",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "array",
+                    "docType": null
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "setHomepage",
+            "rust": "set_homepage",
+            "declaredIn": "Composer\\Package\\CompletePackageInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "homepage",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": "?string",
+                    "docType": null
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "setId",
+            "rust": "set_id",
+            "declaredIn": "Composer\\Package\\PackageInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "id",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "int",
+                    "docType": null
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "setInstallationSource",
+            "rust": "set_installation_source",
+            "declaredIn": "Composer\\Package\\PackageInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "type",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": "?string",
+                    "docType": null
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "setKeywords",
+            "rust": "set_keywords",
+            "declaredIn": "Composer\\Package\\CompletePackageInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "keywords",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "array",
+                    "docType": null
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "setLicense",
+            "rust": "set_license",
+            "declaredIn": "Composer\\Package\\CompletePackageInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "license",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "array",
+                    "docType": null
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "setRepositories",
+            "rust": "set_repositories",
+            "declaredIn": "Composer\\Package\\CompletePackageInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "repositories",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "array",
+                    "docType": null
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "setRepository",
+            "rust": "set_repository",
+            "declaredIn": "Composer\\Package\\PackageInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "repository",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Repository\\RepositoryInterface",
+                    "docType": null
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "setRootPackageAlias",
+            "rust": "set_root_package_alias",
+            "declaredIn": "Composer\\Package\\AliasPackage",
+            "static": false,
+            "params": [
+                {
+                    "name": "value",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "bool",
+                    "docType": null
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "setScripts",
+            "rust": "set_scripts",
+            "declaredIn": "Composer\\Package\\CompletePackageInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "scripts",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "array",
+                    "docType": null
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "setSourceDistReferences",
+            "rust": "set_source_dist_references",
+            "declaredIn": "Composer\\Package\\PackageInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "reference",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": null
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "setSourceMirrors",
+            "rust": "set_source_mirrors",
+            "declaredIn": "Composer\\Package\\PackageInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "mirrors",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": "?array",
+                    "docType": null
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "setSourceReference",
+            "rust": "set_source_reference",
+            "declaredIn": "Composer\\Package\\PackageInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "reference",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": "?string",
+                    "docType": null
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "setSupport",
+            "rust": "set_support",
+            "declaredIn": "Composer\\Package\\CompletePackageInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "support",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "array",
+                    "docType": null
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "setTransportOptions",
+            "rust": "set_transport_options",
+            "declaredIn": "Composer\\Package\\PackageInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "options",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "array",
+                    "docType": null
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        }
+    ],
+    "constructor": {
+        "declaredIn": "Composer\\Package\\CompleteAliasPackage",
+        "public": true,
+        "params": [
+            {
+                "name": "aliasOf",
+                "position": 0,
+                "byRef": false,
+                "variadic": false,
+                "nullable": false,
+                "type": "\\Composer\\Package\\CompletePackage",
+                "docType": "CompletePackage"
+            },
+            {
+                "name": "version",
+                "position": 1,
+                "byRef": false,
+                "variadic": false,
+                "nullable": false,
+                "type": "string",
+                "docType": "string"
+            },
+            {
+                "name": "prettyVersion",
+                "position": 2,
+                "byRef": false,
+                "variadic": false,
+                "nullable": false,
+                "type": "string",
+                "docType": "string"
+            }
+        ],
+        "funcNumArgs": false,
+        "forwarded": true,
+        "status": "implemented"
+    },
+    "properties": [
+        {
+            "name": "aliasOf",
+            "declaredIn": "Composer\\Package\\CompleteAliasPackage",
+            "visibility": "protected",
+            "static": false,
+            "readonly": false,
+            "type": null,
+            "docType": "CompletePackage"
+        },
+        {
+            "name": "conflicts",
+            "declaredIn": "Composer\\Package\\AliasPackage",
+            "visibility": "protected",
+            "static": false,
+            "readonly": false,
+            "type": null,
+            "docType": "Link[]"
+        },
+        {
+            "name": "dev",
+            "declaredIn": "Composer\\Package\\AliasPackage",
+            "visibility": "protected",
+            "static": false,
+            "readonly": false,
+            "type": null,
+            "docType": "bool"
+        },
+        {
+            "name": "devRequires",
+            "declaredIn": "Composer\\Package\\AliasPackage",
+            "visibility": "protected",
+            "static": false,
+            "readonly": false,
+            "type": null,
+            "docType": "Link[]"
+        },
+        {
+            "name": "hasSelfVersionRequires",
+            "declaredIn": "Composer\\Package\\AliasPackage",
+            "visibility": "protected",
+            "static": false,
+            "readonly": false,
+            "type": null,
+            "docType": "bool"
+        },
+        {
+            "name": "id",
+            "declaredIn": "Composer\\Package\\BasePackage",
+            "visibility": "public",
+            "static": false,
+            "readonly": false,
+            "type": null,
+            "docType": "int"
+        },
+        {
+            "name": "name",
+            "declaredIn": "Composer\\Package\\BasePackage",
+            "visibility": "protected",
+            "static": false,
+            "readonly": false,
+            "type": null,
+            "docType": "string"
+        },
+        {
+            "name": "prettyName",
+            "declaredIn": "Composer\\Package\\BasePackage",
+            "visibility": "protected",
+            "static": false,
+            "readonly": false,
+            "type": null,
+            "docType": "string"
+        },
+        {
+            "name": "prettyVersion",
+            "declaredIn": "Composer\\Package\\AliasPackage",
+            "visibility": "protected",
+            "static": false,
+            "readonly": false,
+            "type": null,
+            "docType": "string"
+        },
+        {
+            "name": "provides",
+            "declaredIn": "Composer\\Package\\AliasPackage",
+            "visibility": "protected",
+            "static": false,
+            "readonly": false,
+            "type": null,
+            "docType": "Link[]"
+        },
+        {
+            "name": "replaces",
+            "declaredIn": "Composer\\Package\\AliasPackage",
+            "visibility": "protected",
+            "static": false,
+            "readonly": false,
+            "type": null,
+            "docType": "Link[]"
+        },
+        {
+            "name": "repository",
+            "declaredIn": "Composer\\Package\\BasePackage",
+            "visibility": "protected",
+            "static": false,
+            "readonly": false,
+            "type": null,
+            "docType": "?RepositoryInterface"
+        },
+        {
+            "name": "requires",
+            "declaredIn": "Composer\\Package\\AliasPackage",
+            "visibility": "protected",
+            "static": false,
+            "readonly": false,
+            "type": null,
+            "docType": "Link[]"
+        },
+        {
+            "name": "rootPackageAlias",
+            "declaredIn": "Composer\\Package\\AliasPackage",
+            "visibility": "protected",
+            "static": false,
+            "readonly": false,
+            "type": null,
+            "docType": "bool"
+        },
+        {
+            "name": "stabilities",
+            "declaredIn": "Composer\\Package\\BasePackage",
+            "visibility": "public",
+            "static": true,
+            "readonly": false,
+            "type": null,
+            "docType": "array<key-of<BasePackage::STABILITIES>, self::STABILITY_*>"
+        },
+        {
+            "name": "stability",
+            "declaredIn": "Composer\\Package\\AliasPackage",
+            "visibility": "protected",
+            "static": false,
+            "readonly": false,
+            "type": null,
+            "docType": "'stable'|'RC'|'beta'|'alpha'|'dev'"
+        },
+        {
+            "name": "supportedLinkTypes",
+            "declaredIn": "Composer\\Package\\BasePackage",
+            "visibility": "public",
+            "static": true,
+            "readonly": false,
+            "type": null,
+            "docType": "array<non-empty-string, array{description: string, method: Link::TYPE_*}>"
+        },
+        {
+            "name": "version",
+            "declaredIn": "Composer\\Package\\AliasPackage",
+            "visibility": "protected",
+            "static": false,
+            "readonly": false,
+            "type": null,
+            "docType": "string"
+        }
+    ]
+}

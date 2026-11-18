@@ -1,0 +1,356 @@
+{
+    "fqcn": "Composer\\Repository\\InstalledRepositoryInterface",
+    "rustModule": [
+        "repository",
+        "installed_repository_interface"
+    ],
+    "kind": "interface",
+    "interfaces": [
+        "Composer\\Repository\\WritableRepositoryInterface"
+    ],
+    "treatment": "real",
+    "methods": [
+        {
+            "name": "addPackage",
+            "rust": "add_package",
+            "declaredIn": "Composer\\Repository\\WritableRepositoryInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "package",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Package\\PackageInterface",
+                    "docType": "PackageInterface"
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "void",
+            "funcNumArgs": false
+        },
+        {
+            "name": "findPackage",
+            "rust": "find_package",
+            "declaredIn": "Composer\\Repository\\RepositoryInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "name",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": "string"
+                },
+                {
+                    "name": "constraint",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": null,
+                    "docType": "string|ConstraintInterface"
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "BasePackage|null",
+            "funcNumArgs": false
+        },
+        {
+            "name": "findPackages",
+            "rust": "find_packages",
+            "declaredIn": "Composer\\Repository\\RepositoryInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "name",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": "string"
+                },
+                {
+                    "name": "constraint",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": null,
+                    "docType": "string|ConstraintInterface"
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "BasePackage[]",
+            "funcNumArgs": false
+        },
+        {
+            "name": "getCanonicalPackages",
+            "rust": "get_canonical_packages",
+            "declaredIn": "Composer\\Repository\\WritableRepositoryInterface",
+            "static": false,
+            "params": [],
+            "returnType": null,
+            "docReturnType": "PackageInterface[]",
+            "funcNumArgs": false
+        },
+        {
+            "name": "getDevMode",
+            "rust": "get_dev_mode",
+            "declaredIn": "Composer\\Repository\\InstalledRepositoryInterface",
+            "static": false,
+            "params": [],
+            "returnType": null,
+            "docReturnType": "bool|null",
+            "funcNumArgs": false
+        },
+        {
+            "name": "getDevPackageNames",
+            "rust": "get_dev_package_names",
+            "declaredIn": "Composer\\Repository\\WritableRepositoryInterface",
+            "static": false,
+            "params": [],
+            "returnType": null,
+            "docReturnType": "string[]",
+            "funcNumArgs": false
+        },
+        {
+            "name": "getPackages",
+            "rust": "get_packages",
+            "declaredIn": "Composer\\Repository\\RepositoryInterface",
+            "static": false,
+            "params": [],
+            "returnType": null,
+            "docReturnType": "BasePackage[]",
+            "funcNumArgs": false
+        },
+        {
+            "name": "getProviders",
+            "rust": "get_providers",
+            "declaredIn": "Composer\\Repository\\RepositoryInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "packageName",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": "string"
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "array<string, array{name: string, description: string|null, type: string}>",
+            "funcNumArgs": false
+        },
+        {
+            "name": "getRepoName",
+            "rust": "get_repo_name",
+            "declaredIn": "Composer\\Repository\\RepositoryInterface",
+            "static": false,
+            "params": [],
+            "returnType": null,
+            "docReturnType": "string",
+            "funcNumArgs": false
+        },
+        {
+            "name": "hasPackage",
+            "rust": "has_package",
+            "declaredIn": "Composer\\Repository\\RepositoryInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "package",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Package\\PackageInterface",
+                    "docType": "PackageInterface"
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "bool",
+            "funcNumArgs": false
+        },
+        {
+            "name": "isFresh",
+            "rust": "is_fresh",
+            "declaredIn": "Composer\\Repository\\InstalledRepositoryInterface",
+            "static": false,
+            "params": [],
+            "returnType": null,
+            "docReturnType": "bool",
+            "funcNumArgs": false
+        },
+        {
+            "name": "loadPackages",
+            "rust": "load_packages",
+            "declaredIn": "Composer\\Repository\\RepositoryInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "packageNameMap",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "array",
+                    "docType": "array<string, ConstraintInterface|null>"
+                },
+                {
+                    "name": "acceptableStabilities",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "array",
+                    "docType": "array<key-of<BasePackage::STABILITIES>, BasePackage::STABILITY_*>"
+                },
+                {
+                    "name": "stabilityFlags",
+                    "position": 2,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "array",
+                    "docType": "array<string, BasePackage::STABILITY_*>"
+                },
+                {
+                    "name": "alreadyLoaded",
+                    "position": 3,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "array",
+                    "docType": "array<string, array<string, PackageInterface>>"
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "array{namesFound: array<string>, packages: array<BasePackage>}",
+            "funcNumArgs": false
+        },
+        {
+            "name": "reload",
+            "rust": "reload",
+            "declaredIn": "Composer\\Repository\\WritableRepositoryInterface",
+            "static": false,
+            "params": [],
+            "returnType": null,
+            "docReturnType": "void",
+            "funcNumArgs": false
+        },
+        {
+            "name": "removePackage",
+            "rust": "remove_package",
+            "declaredIn": "Composer\\Repository\\WritableRepositoryInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "package",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Package\\PackageInterface",
+                    "docType": "PackageInterface"
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "void",
+            "funcNumArgs": false
+        },
+        {
+            "name": "search",
+            "rust": "search",
+            "declaredIn": "Composer\\Repository\\RepositoryInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "query",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": "string"
+                },
+                {
+                    "name": "mode",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "int",
+                    "docType": "int"
+                },
+                {
+                    "name": "type",
+                    "position": 2,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": "?string",
+                    "docType": "?string"
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "list<array{name: string, description: ?string, abandoned?: string|true, url?: string}>",
+            "funcNumArgs": false
+        },
+        {
+            "name": "setDevPackageNames",
+            "rust": "set_dev_package_names",
+            "declaredIn": "Composer\\Repository\\WritableRepositoryInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "devPackageNames",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "array",
+                    "docType": "string[]"
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "void",
+            "funcNumArgs": false
+        },
+        {
+            "name": "write",
+            "rust": "write",
+            "declaredIn": "Composer\\Repository\\WritableRepositoryInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "devMode",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "bool",
+                    "docType": "bool"
+                },
+                {
+                    "name": "installationManager",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Installer\\InstallationManager",
+                    "docType": null
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "void",
+            "funcNumArgs": false
+        }
+    ]
+}

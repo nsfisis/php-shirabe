@@ -1,0 +1,22 @@
+{
+    "fqcn": "Composer\\EventDispatcher\\EventSubscriberInterface",
+    "rustModule": [
+        "event_dispatcher",
+        "event_subscriber_interface"
+    ],
+    "kind": "interface",
+    "interfaces": [],
+    "treatment": "real",
+    "methods": [
+        {
+            "name": "getSubscribedEvents",
+            "rust": "get_subscribed_events",
+            "declaredIn": "Composer\\EventDispatcher\\EventSubscriberInterface",
+            "static": true,
+            "params": [],
+            "returnType": null,
+            "docReturnType": "array<string, string|array{0: string, 1?: int}|array<array{0: string, 1?: int}>>",
+            "funcNumArgs": false
+        }
+    ]
+}

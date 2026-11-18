@@ -1,0 +1,53 @@
+{
+    "fqcn": "Composer\\Filter\\PlatformRequirementFilter\\PlatformRequirementFilterInterface",
+    "rustModule": [
+        "filter",
+        "platform_requirement_filter",
+        "platform_requirement_filter_interface"
+    ],
+    "kind": "interface",
+    "interfaces": [],
+    "treatment": "real",
+    "methods": [
+        {
+            "name": "isIgnored",
+            "rust": "is_ignored",
+            "declaredIn": "Composer\\Filter\\PlatformRequirementFilter\\PlatformRequirementFilterInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "req",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": null
+                }
+            ],
+            "returnType": "bool",
+            "docReturnType": null,
+            "funcNumArgs": false
+        },
+        {
+            "name": "isUpperBoundIgnored",
+            "rust": "is_upper_bound_ignored",
+            "declaredIn": "Composer\\Filter\\PlatformRequirementFilter\\PlatformRequirementFilterInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "req",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": null
+                }
+            ],
+            "returnType": "bool",
+            "docReturnType": null,
+            "funcNumArgs": false
+        }
+    ]
+}

@@ -1,0 +1,41 @@
+{
+    "fqcn": "Composer\\Repository\\VersionCacheInterface",
+    "rustModule": [
+        "repository",
+        "version_cache_interface"
+    ],
+    "kind": "interface",
+    "interfaces": [],
+    "treatment": "real",
+    "methods": [
+        {
+            "name": "getVersionPackage",
+            "rust": "get_version_package",
+            "declaredIn": "Composer\\Repository\\VersionCacheInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "version",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": null
+                },
+                {
+                    "name": "identifier",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": null
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "mixed[]|null|false",
+            "funcNumArgs": false
+        }
+    ]
+}

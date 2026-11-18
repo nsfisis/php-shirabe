@@ -1,0 +1,22 @@
+{
+    "fqcn": "Composer\\Repository\\ConfigurableRepositoryInterface",
+    "rustModule": [
+        "repository",
+        "configurable_repository_interface"
+    ],
+    "kind": "interface",
+    "interfaces": [],
+    "treatment": "real",
+    "methods": [
+        {
+            "name": "getRepoConfig",
+            "rust": "get_repo_config",
+            "declaredIn": "Composer\\Repository\\ConfigurableRepositoryInterface",
+            "static": false,
+            "params": [],
+            "returnType": null,
+            "docReturnType": "mixed[]",
+            "funcNumArgs": false
+        }
+    ]
+}

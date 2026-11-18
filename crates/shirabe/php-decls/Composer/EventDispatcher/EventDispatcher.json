@@ -1,0 +1,421 @@
+{
+    "fqcn": "Composer\\EventDispatcher\\EventDispatcher",
+    "rustModule": [
+        "event_dispatcher",
+        "event_dispatcher"
+    ],
+    "kind": "class",
+    "abstract": false,
+    "parent": null,
+    "interfaces": [],
+    "treatment": "stub",
+    "methods": [
+        {
+            "name": "addListener",
+            "rust": "add_listener",
+            "declaredIn": "Composer\\EventDispatcher\\EventDispatcher",
+            "static": false,
+            "params": [
+                {
+                    "name": "eventName",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": "string"
+                },
+                {
+                    "name": "listener",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": null,
+                    "docType": "callable|string"
+                },
+                {
+                    "name": "priority",
+                    "position": 2,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "int",
+                    "docType": "int"
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "unimplemented"
+        },
+        {
+            "name": "addSubscriber",
+            "rust": "add_subscriber",
+            "declaredIn": "Composer\\EventDispatcher\\EventDispatcher",
+            "static": false,
+            "params": [
+                {
+                    "name": "subscriber",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\EventDispatcher\\EventSubscriberInterface",
+                    "docType": null
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "unimplemented"
+        },
+        {
+            "name": "dispatch",
+            "rust": "dispatch",
+            "declaredIn": "Composer\\EventDispatcher\\EventDispatcher",
+            "static": false,
+            "params": [
+                {
+                    "name": "eventName",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": "?string",
+                    "docType": "string|null"
+                },
+                {
+                    "name": "event",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": "?\\Composer\\EventDispatcher\\Event",
+                    "docType": "Event"
+                }
+            ],
+            "returnType": "int",
+            "docReturnType": "int",
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "dispatchInstallerEvent",
+            "rust": "dispatch_installer_event",
+            "declaredIn": "Composer\\EventDispatcher\\EventDispatcher",
+            "static": false,
+            "params": [
+                {
+                    "name": "eventName",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": "string"
+                },
+                {
+                    "name": "devMode",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "bool",
+                    "docType": "bool"
+                },
+                {
+                    "name": "executeOperations",
+                    "position": 2,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "bool",
+                    "docType": "bool"
+                },
+                {
+                    "name": "transaction",
+                    "position": 3,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\DependencyResolver\\Transaction",
+                    "docType": "Transaction"
+                }
+            ],
+            "returnType": "int",
+            "docReturnType": "int",
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "unimplemented"
+        },
+        {
+            "name": "dispatchPackageEvent",
+            "rust": "dispatch_package_event",
+            "declaredIn": "Composer\\EventDispatcher\\EventDispatcher",
+            "static": false,
+            "params": [
+                {
+                    "name": "eventName",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": "string"
+                },
+                {
+                    "name": "devMode",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "bool",
+                    "docType": "bool"
+                },
+                {
+                    "name": "localRepo",
+                    "position": 2,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Repository\\RepositoryInterface",
+                    "docType": "RepositoryInterface"
+                },
+                {
+                    "name": "operations",
+                    "position": 3,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "array",
+                    "docType": "OperationInterface[]"
+                },
+                {
+                    "name": "operation",
+                    "position": 4,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\DependencyResolver\\Operation\\OperationInterface",
+                    "docType": "OperationInterface"
+                }
+            ],
+            "returnType": "int",
+            "docReturnType": "int",
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "unimplemented"
+        },
+        {
+            "name": "dispatchScript",
+            "rust": "dispatch_script",
+            "declaredIn": "Composer\\EventDispatcher\\EventDispatcher",
+            "static": false,
+            "params": [
+                {
+                    "name": "eventName",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": "string"
+                },
+                {
+                    "name": "devMode",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "bool",
+                    "docType": null
+                },
+                {
+                    "name": "additionalArgs",
+                    "position": 2,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "array",
+                    "docType": "array<int, mixed>"
+                },
+                {
+                    "name": "flags",
+                    "position": 3,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "array",
+                    "docType": "array<string, mixed>"
+                }
+            ],
+            "returnType": "int",
+            "docReturnType": "int",
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "unimplemented"
+        },
+        {
+            "name": "hasEventListeners",
+            "rust": "has_event_listeners",
+            "declaredIn": "Composer\\EventDispatcher\\EventDispatcher",
+            "static": false,
+            "params": [
+                {
+                    "name": "event",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\EventDispatcher\\Event",
+                    "docType": null
+                }
+            ],
+            "returnType": "bool",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "unimplemented"
+        },
+        {
+            "name": "removeListener",
+            "rust": "remove_listener",
+            "declaredIn": "Composer\\EventDispatcher\\EventDispatcher",
+            "static": false,
+            "params": [
+                {
+                    "name": "listener",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": null,
+                    "docType": "callable|object"
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "unimplemented"
+        },
+        {
+            "name": "setRunScripts",
+            "rust": "set_run_scripts",
+            "declaredIn": "Composer\\EventDispatcher\\EventDispatcher",
+            "static": false,
+            "params": [
+                {
+                    "name": "runScripts",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "bool",
+                    "docType": null
+                }
+            ],
+            "returnType": "self",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "unimplemented"
+        }
+    ],
+    "constructor": {
+        "declaredIn": "Composer\\EventDispatcher\\EventDispatcher",
+        "public": true,
+        "params": [
+            {
+                "name": "composer",
+                "position": 0,
+                "byRef": false,
+                "variadic": false,
+                "nullable": false,
+                "type": "\\Composer\\PartialComposer",
+                "docType": "PartialComposer"
+            },
+            {
+                "name": "io",
+                "position": 1,
+                "byRef": false,
+                "variadic": false,
+                "nullable": false,
+                "type": "\\Composer\\IO\\IOInterface",
+                "docType": "IOInterface"
+            },
+            {
+                "name": "process",
+                "position": 2,
+                "byRef": false,
+                "variadic": false,
+                "nullable": true,
+                "type": "?\\Composer\\Util\\ProcessExecutor",
+                "docType": null
+            }
+        ],
+        "funcNumArgs": false,
+        "forwarded": true,
+        "status": "unimplemented"
+    },
+    "properties": [
+        {
+            "name": "composer",
+            "declaredIn": "Composer\\EventDispatcher\\EventDispatcher",
+            "visibility": "protected",
+            "static": false,
+            "readonly": false,
+            "type": null,
+            "docType": "PartialComposer"
+        },
+        {
+            "name": "io",
+            "declaredIn": "Composer\\EventDispatcher\\EventDispatcher",
+            "visibility": "protected",
+            "static": false,
+            "readonly": false,
+            "type": null,
+            "docType": "IOInterface"
+        },
+        {
+            "name": "listeners",
+            "declaredIn": "Composer\\EventDispatcher\\EventDispatcher",
+            "visibility": "protected",
+            "static": false,
+            "readonly": false,
+            "type": null,
+            "docType": "array<string, array<int, array<callable|string>>>"
+        },
+        {
+            "name": "loader",
+            "declaredIn": "Composer\\EventDispatcher\\EventDispatcher",
+            "visibility": "protected",
+            "static": false,
+            "readonly": false,
+            "type": null,
+            "docType": "?ClassLoader"
+        },
+        {
+            "name": "process",
+            "declaredIn": "Composer\\EventDispatcher\\EventDispatcher",
+            "visibility": "protected",
+            "static": false,
+            "readonly": false,
+            "type": null,
+            "docType": "ProcessExecutor"
+        },
+        {
+            "name": "runScripts",
+            "declaredIn": "Composer\\EventDispatcher\\EventDispatcher",
+            "visibility": "protected",
+            "static": false,
+            "readonly": false,
+            "type": null,
+            "docType": "bool"
+        }
+    ]
+}

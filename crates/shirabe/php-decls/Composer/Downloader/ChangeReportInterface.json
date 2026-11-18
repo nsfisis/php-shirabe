@@ -1,0 +1,41 @@
+{
+    "fqcn": "Composer\\Downloader\\ChangeReportInterface",
+    "rustModule": [
+        "downloader",
+        "change_report_interface"
+    ],
+    "kind": "interface",
+    "interfaces": [],
+    "treatment": "real",
+    "methods": [
+        {
+            "name": "getLocalChanges",
+            "rust": "get_local_changes",
+            "declaredIn": "Composer\\Downloader\\ChangeReportInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "package",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Package\\PackageInterface",
+                    "docType": "PackageInterface"
+                },
+                {
+                    "name": "path",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": "string"
+                }
+            ],
+            "returnType": "?string",
+            "docReturnType": "string|null",
+            "funcNumArgs": false
+        }
+    ]
+}

@@ -1,0 +1,51 @@
+{
+    "fqcn": "Composer\\Repository\\AdvisoryProviderInterface",
+    "rustModule": [
+        "repository",
+        "advisory_provider_interface"
+    ],
+    "kind": "interface",
+    "interfaces": [],
+    "treatment": "real",
+    "methods": [
+        {
+            "name": "getSecurityAdvisories",
+            "rust": "get_security_advisories",
+            "declaredIn": "Composer\\Repository\\AdvisoryProviderInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "packageConstraintMap",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "array",
+                    "docType": "array<string, ConstraintInterface>"
+                },
+                {
+                    "name": "allowPartialAdvisories",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "bool",
+                    "docType": null
+                }
+            ],
+            "returnType": "array",
+            "docReturnType": "($allowPartialAdvisories is true ? array{namesFound: string[], advisories: array<string, list<PartialSecurityAdvisory|SecurityAdvisory>>} : array{namesFound: string[], advisories: array<string, list<SecurityAdvisory>>})",
+            "funcNumArgs": false
+        },
+        {
+            "name": "hasSecurityAdvisories",
+            "rust": "has_security_advisories",
+            "declaredIn": "Composer\\Repository\\AdvisoryProviderInterface",
+            "static": false,
+            "params": [],
+            "returnType": "bool",
+            "docReturnType": null,
+            "funcNumArgs": false
+        }
+    ]
+}

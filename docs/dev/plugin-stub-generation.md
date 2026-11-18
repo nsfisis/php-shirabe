@@ -22,6 +22,8 @@ needs that can be derived mechanically:
     * `crates/shirabe/src/php_worker/by_value.rs`: the codec functions of every by-value class,
     * `crates/shirabe/src/php_worker/pushed_statics.rs`: the function that pushes each shared
       static property whose state lives in the worker.
+* the **PHP declarations** under `crates/shirabe/php-decls/`: the PHP surface of the Composer
+  types the Rust bindings answer for, as JSON (see "Declarations").
 
 None of these files is edited by hand. The crate's `build.rs` embeds whatever the PHP directories
 hold.
@@ -168,6 +170,40 @@ The members come from the report. The worker runtime's own classes under `php/ru
 Rust-side objects no Composer class describes, so the classifier knows nothing of them; their
 modules are built from the `RpcRuntime::callRust` calls in their PHP, and the Rust side answers
 every one of those members.
+
+## Declarations
+
+`crates/shirabe/php-decls/<namespace path>/<class>.json` (`Composer/Package/Locker.json` for
+`Composer\Package\Locker`) describes one Composer class or interface: every interface of the
+report and every class forwarding members, together with their Composer supertypes. A Composer
+type is one whose source lives under `composer/src/`. PHP's builtin types and vendor types are not
+described and not traversed: a member only they declare is not part of the surface, and a member
+they declare along with a Composer type counts as the Composer type's.
+
+Each file holds:
+
+* `fqcn`, the forwarding module path (`rustModule`, `["package", "locker"]`), `kind` (`class` or
+  `interface`), `abstract`, `parent`, the direct `interfaces`, and the report's `treatment`;
+* `methods`: the public methods, static ones included, the type declares, inherits or takes from a
+  trait, sorted by name (magic methods other than `__toString` are left out). Each has its PHP
+  `name` and its Rust name (`rust`, the name the forwarding modules use), `declaredIn`, `static`,
+  `params`, the native `returnType` and the `docReturnType`, and `funcNumArgs` (whether the body
+  calls `func_num_args()`). `declaredIn` is the topmost Composer declaration: the interface
+  declaring the method that no Composer interface it extends declares too, or the topmost class
+  when no interface declares it. Unrelated interfaces declaring one method fail generation. The
+  parameters and types are those of the nearest declaration, which is what the stub of the type
+  reproduces;
+* each parameter's `name`, `position`, `byRef`, `variadic`, `nullable` (null can arrive: the
+  parameter is untyped, its type admits null, or it defaults to null), the native `type` with
+  class names fully qualified, and the `docType` of its `@param` tag as written (a `@phpstan-` or
+  `@psalm-` tag wins). Default values are not described: a stub sends every declared parameter,
+  except that one of a method calling `func_num_args()` sends what the caller passed;
+* for a class, `constructor` (`declaredIn` is null for PHP's implicit one) and `properties`, the
+  public and protected properties, promoted ones included;
+* for a class forwarding members, `forwarded` on each method and on the constructor: whether a
+  call reaches the Rust side. It is false for a static method materialized in the worker and for
+  a method answered there (`Generator::LOCAL_BODIES`). A forwarded member also has the `status`
+  the report gives it (`implemented`, `unimplemented`, or `refused` with its `reason`).
 
 ## Codec and push tables
 

@@ -1,0 +1,334 @@
+{
+    "fqcn": "Composer\\Plugin\\PrePoolCreateEvent",
+    "rustModule": [
+        "plugin",
+        "pre_pool_create_event"
+    ],
+    "kind": "class",
+    "abstract": false,
+    "parent": "Composer\\EventDispatcher\\Event",
+    "interfaces": [],
+    "treatment": "stub",
+    "methods": [
+        {
+            "name": "getAcceptableStabilities",
+            "rust": "get_acceptable_stabilities",
+            "declaredIn": "Composer\\Plugin\\PrePoolCreateEvent",
+            "static": false,
+            "params": [],
+            "returnType": "array",
+            "docReturnType": "array<string, BasePackage::STABILITY_*>",
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getArguments",
+            "rust": "get_arguments",
+            "declaredIn": "Composer\\EventDispatcher\\Event",
+            "static": false,
+            "params": [],
+            "returnType": "array",
+            "docReturnType": "string[]",
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getFlags",
+            "rust": "get_flags",
+            "declaredIn": "Composer\\EventDispatcher\\Event",
+            "static": false,
+            "params": [],
+            "returnType": "array",
+            "docReturnType": "mixed[]",
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getName",
+            "rust": "get_name",
+            "declaredIn": "Composer\\EventDispatcher\\Event",
+            "static": false,
+            "params": [],
+            "returnType": "string",
+            "docReturnType": "string",
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getPackages",
+            "rust": "get_packages",
+            "declaredIn": "Composer\\Plugin\\PrePoolCreateEvent",
+            "static": false,
+            "params": [],
+            "returnType": "array",
+            "docReturnType": "BasePackage[]",
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getRepositories",
+            "rust": "get_repositories",
+            "declaredIn": "Composer\\Plugin\\PrePoolCreateEvent",
+            "static": false,
+            "params": [],
+            "returnType": "array",
+            "docReturnType": "RepositoryInterface[]",
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getRequest",
+            "rust": "get_request",
+            "declaredIn": "Composer\\Plugin\\PrePoolCreateEvent",
+            "static": false,
+            "params": [],
+            "returnType": "\\Composer\\DependencyResolver\\Request",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "refused",
+            "reason": "the Request cannot cross the boundary"
+        },
+        {
+            "name": "getRootAliases",
+            "rust": "get_root_aliases",
+            "declaredIn": "Composer\\Plugin\\PrePoolCreateEvent",
+            "static": false,
+            "params": [],
+            "returnType": "array",
+            "docReturnType": "array<string, array<string, array{alias: string, alias_normalized: string}>>",
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getRootReferences",
+            "rust": "get_root_references",
+            "declaredIn": "Composer\\Plugin\\PrePoolCreateEvent",
+            "static": false,
+            "params": [],
+            "returnType": "array",
+            "docReturnType": "array<string, string>",
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getStabilityFlags",
+            "rust": "get_stability_flags",
+            "declaredIn": "Composer\\Plugin\\PrePoolCreateEvent",
+            "static": false,
+            "params": [],
+            "returnType": "array",
+            "docReturnType": "array<string, BasePackage::STABILITY_*>",
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getUnacceptableFixedPackages",
+            "rust": "get_unacceptable_fixed_packages",
+            "declaredIn": "Composer\\Plugin\\PrePoolCreateEvent",
+            "static": false,
+            "params": [],
+            "returnType": "array",
+            "docReturnType": "BasePackage[]",
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "isPropagationStopped",
+            "rust": "is_propagation_stopped",
+            "declaredIn": "Composer\\EventDispatcher\\Event",
+            "static": false,
+            "params": [],
+            "returnType": "bool",
+            "docReturnType": "bool",
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "setPackages",
+            "rust": "set_packages",
+            "declaredIn": "Composer\\Plugin\\PrePoolCreateEvent",
+            "static": false,
+            "params": [
+                {
+                    "name": "packages",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "array",
+                    "docType": "BasePackage[]"
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "setUnacceptableFixedPackages",
+            "rust": "set_unacceptable_fixed_packages",
+            "declaredIn": "Composer\\Plugin\\PrePoolCreateEvent",
+            "static": false,
+            "params": [
+                {
+                    "name": "packages",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "array",
+                    "docType": "BasePackage[]"
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "stopPropagation",
+            "rust": "stop_propagation",
+            "declaredIn": "Composer\\EventDispatcher\\Event",
+            "static": false,
+            "params": [],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        }
+    ],
+    "constructor": {
+        "declaredIn": "Composer\\Plugin\\PrePoolCreateEvent",
+        "public": true,
+        "params": [
+            {
+                "name": "name",
+                "position": 0,
+                "byRef": false,
+                "variadic": false,
+                "nullable": false,
+                "type": "string",
+                "docType": "string"
+            },
+            {
+                "name": "repositories",
+                "position": 1,
+                "byRef": false,
+                "variadic": false,
+                "nullable": false,
+                "type": "array",
+                "docType": "RepositoryInterface[]"
+            },
+            {
+                "name": "request",
+                "position": 2,
+                "byRef": false,
+                "variadic": false,
+                "nullable": false,
+                "type": "\\Composer\\DependencyResolver\\Request",
+                "docType": null
+            },
+            {
+                "name": "acceptableStabilities",
+                "position": 3,
+                "byRef": false,
+                "variadic": false,
+                "nullable": false,
+                "type": "array",
+                "docType": "array<string, BasePackage::STABILITY_*>"
+            },
+            {
+                "name": "stabilityFlags",
+                "position": 4,
+                "byRef": false,
+                "variadic": false,
+                "nullable": false,
+                "type": "array",
+                "docType": "array<string, BasePackage::STABILITY_*>"
+            },
+            {
+                "name": "rootAliases",
+                "position": 5,
+                "byRef": false,
+                "variadic": false,
+                "nullable": false,
+                "type": "array",
+                "docType": "array<string, array<string, array{alias: string, alias_normalized: string}>>"
+            },
+            {
+                "name": "rootReferences",
+                "position": 6,
+                "byRef": false,
+                "variadic": false,
+                "nullable": false,
+                "type": "array",
+                "docType": "array<string, string>"
+            },
+            {
+                "name": "packages",
+                "position": 7,
+                "byRef": false,
+                "variadic": false,
+                "nullable": false,
+                "type": "array",
+                "docType": "BasePackage[]"
+            },
+            {
+                "name": "unacceptableFixedPackages",
+                "position": 8,
+                "byRef": false,
+                "variadic": false,
+                "nullable": false,
+                "type": "array",
+                "docType": "BasePackage[]"
+            }
+        ],
+        "funcNumArgs": false,
+        "forwarded": true,
+        "status": "unimplemented"
+    },
+    "properties": [
+        {
+            "name": "args",
+            "declaredIn": "Composer\\EventDispatcher\\Event",
+            "visibility": "protected",
+            "static": false,
+            "readonly": false,
+            "type": null,
+            "docType": "string[]"
+        },
+        {
+            "name": "flags",
+            "declaredIn": "Composer\\EventDispatcher\\Event",
+            "visibility": "protected",
+            "static": false,
+            "readonly": false,
+            "type": null,
+            "docType": "mixed[]"
+        },
+        {
+            "name": "name",
+            "declaredIn": "Composer\\EventDispatcher\\Event",
+            "visibility": "protected",
+            "static": false,
+            "readonly": false,
+            "type": null,
+            "docType": "string"
+        }
+    ]
+}

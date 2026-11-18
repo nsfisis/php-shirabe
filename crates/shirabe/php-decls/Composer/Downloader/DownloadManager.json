@@ -1,0 +1,454 @@
+{
+    "fqcn": "Composer\\Downloader\\DownloadManager",
+    "rustModule": [
+        "downloader",
+        "download_manager"
+    ],
+    "kind": "class",
+    "abstract": false,
+    "parent": null,
+    "interfaces": [],
+    "treatment": "stub",
+    "methods": [
+        {
+            "name": "cleanup",
+            "rust": "cleanup",
+            "declaredIn": "Composer\\Downloader\\DownloadManager",
+            "static": false,
+            "params": [
+                {
+                    "name": "type",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": "string"
+                },
+                {
+                    "name": "package",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Package\\PackageInterface",
+                    "docType": "PackageInterface"
+                },
+                {
+                    "name": "targetDir",
+                    "position": 2,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": "string"
+                },
+                {
+                    "name": "prevPackage",
+                    "position": 3,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": "?\\Composer\\Package\\PackageInterface",
+                    "docType": "PackageInterface|null"
+                }
+            ],
+            "returnType": "\\React\\Promise\\PromiseInterface",
+            "docReturnType": "PromiseInterface<void|null>",
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "download",
+            "rust": "download",
+            "declaredIn": "Composer\\Downloader\\DownloadManager",
+            "static": false,
+            "params": [
+                {
+                    "name": "package",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Package\\PackageInterface",
+                    "docType": "PackageInterface"
+                },
+                {
+                    "name": "targetDir",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": "string"
+                },
+                {
+                    "name": "prevPackage",
+                    "position": 2,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": "?\\Composer\\Package\\PackageInterface",
+                    "docType": "PackageInterface|null"
+                }
+            ],
+            "returnType": "\\React\\Promise\\PromiseInterface",
+            "docReturnType": "PromiseInterface<void|null>",
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getDownloader",
+            "rust": "get_downloader",
+            "declaredIn": "Composer\\Downloader\\DownloadManager",
+            "static": false,
+            "params": [
+                {
+                    "name": "type",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": "string"
+                }
+            ],
+            "returnType": "\\Composer\\Downloader\\DownloaderInterface",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "unimplemented"
+        },
+        {
+            "name": "getDownloaderForPackage",
+            "rust": "get_downloader_for_package",
+            "declaredIn": "Composer\\Downloader\\DownloadManager",
+            "static": false,
+            "params": [
+                {
+                    "name": "package",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Package\\PackageInterface",
+                    "docType": "PackageInterface"
+                }
+            ],
+            "returnType": "?\\Composer\\Downloader\\DownloaderInterface",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "unimplemented"
+        },
+        {
+            "name": "getDownloaderType",
+            "rust": "get_downloader_type",
+            "declaredIn": "Composer\\Downloader\\DownloadManager",
+            "static": false,
+            "params": [
+                {
+                    "name": "downloader",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Downloader\\DownloaderInterface",
+                    "docType": null
+                }
+            ],
+            "returnType": "string",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "unimplemented"
+        },
+        {
+            "name": "install",
+            "rust": "install",
+            "declaredIn": "Composer\\Downloader\\DownloadManager",
+            "static": false,
+            "params": [
+                {
+                    "name": "package",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Package\\PackageInterface",
+                    "docType": "PackageInterface"
+                },
+                {
+                    "name": "targetDir",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": "string"
+                }
+            ],
+            "returnType": "\\React\\Promise\\PromiseInterface",
+            "docReturnType": "PromiseInterface<void|null>",
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "prepare",
+            "rust": "prepare",
+            "declaredIn": "Composer\\Downloader\\DownloadManager",
+            "static": false,
+            "params": [
+                {
+                    "name": "type",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": "string"
+                },
+                {
+                    "name": "package",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Package\\PackageInterface",
+                    "docType": "PackageInterface"
+                },
+                {
+                    "name": "targetDir",
+                    "position": 2,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": "string"
+                },
+                {
+                    "name": "prevPackage",
+                    "position": 3,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": "?\\Composer\\Package\\PackageInterface",
+                    "docType": "PackageInterface|null"
+                }
+            ],
+            "returnType": "\\React\\Promise\\PromiseInterface",
+            "docReturnType": "PromiseInterface<void|null>",
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "remove",
+            "rust": "remove",
+            "declaredIn": "Composer\\Downloader\\DownloadManager",
+            "static": false,
+            "params": [
+                {
+                    "name": "package",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Package\\PackageInterface",
+                    "docType": "PackageInterface"
+                },
+                {
+                    "name": "targetDir",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": "string"
+                }
+            ],
+            "returnType": "\\React\\Promise\\PromiseInterface",
+            "docReturnType": "PromiseInterface<void|null>",
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "setDownloader",
+            "rust": "set_downloader",
+            "declaredIn": "Composer\\Downloader\\DownloadManager",
+            "static": false,
+            "params": [
+                {
+                    "name": "type",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": "string"
+                },
+                {
+                    "name": "downloader",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Downloader\\DownloaderInterface",
+                    "docType": "DownloaderInterface"
+                }
+            ],
+            "returnType": "self",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "unimplemented"
+        },
+        {
+            "name": "setPreferDist",
+            "rust": "set_prefer_dist",
+            "declaredIn": "Composer\\Downloader\\DownloadManager",
+            "static": false,
+            "params": [
+                {
+                    "name": "preferDist",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "bool",
+                    "docType": "bool"
+                }
+            ],
+            "returnType": "self",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "setPreferSource",
+            "rust": "set_prefer_source",
+            "declaredIn": "Composer\\Downloader\\DownloadManager",
+            "static": false,
+            "params": [
+                {
+                    "name": "preferSource",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "bool",
+                    "docType": "bool"
+                }
+            ],
+            "returnType": "self",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "setPreferences",
+            "rust": "set_preferences",
+            "declaredIn": "Composer\\Downloader\\DownloadManager",
+            "static": false,
+            "params": [
+                {
+                    "name": "preferences",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "array",
+                    "docType": "array<string, string>"
+                }
+            ],
+            "returnType": "self",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "unimplemented"
+        },
+        {
+            "name": "update",
+            "rust": "update",
+            "declaredIn": "Composer\\Downloader\\DownloadManager",
+            "static": false,
+            "params": [
+                {
+                    "name": "initial",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Package\\PackageInterface",
+                    "docType": "PackageInterface"
+                },
+                {
+                    "name": "target",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Package\\PackageInterface",
+                    "docType": "PackageInterface"
+                },
+                {
+                    "name": "targetDir",
+                    "position": 2,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": "string"
+                }
+            ],
+            "returnType": "\\React\\Promise\\PromiseInterface",
+            "docReturnType": "PromiseInterface<void|null>",
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        }
+    ],
+    "constructor": {
+        "declaredIn": "Composer\\Downloader\\DownloadManager",
+        "public": true,
+        "params": [
+            {
+                "name": "io",
+                "position": 0,
+                "byRef": false,
+                "variadic": false,
+                "nullable": false,
+                "type": "\\Composer\\IO\\IOInterface",
+                "docType": "IOInterface"
+            },
+            {
+                "name": "preferSource",
+                "position": 1,
+                "byRef": false,
+                "variadic": false,
+                "nullable": false,
+                "type": "bool",
+                "docType": "bool"
+            },
+            {
+                "name": "filesystem",
+                "position": 2,
+                "byRef": false,
+                "variadic": false,
+                "nullable": true,
+                "type": "?\\Composer\\Util\\Filesystem",
+                "docType": "Filesystem|null"
+            }
+        ],
+        "funcNumArgs": false,
+        "forwarded": true,
+        "status": "unimplemented"
+    },
+    "properties": []
+}

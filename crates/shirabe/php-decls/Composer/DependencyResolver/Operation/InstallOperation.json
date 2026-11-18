@@ -1,0 +1,134 @@
+{
+    "fqcn": "Composer\\DependencyResolver\\Operation\\InstallOperation",
+    "rustModule": [
+        "dependency_resolver",
+        "operation",
+        "install_operation"
+    ],
+    "kind": "class",
+    "abstract": false,
+    "parent": "Composer\\DependencyResolver\\Operation\\SolverOperation",
+    "interfaces": [
+        "Composer\\DependencyResolver\\Operation\\OperationInterface"
+    ],
+    "treatment": "stub",
+    "methods": [
+        {
+            "name": "__toString",
+            "rust": "__to_string",
+            "declaredIn": "Composer\\DependencyResolver\\Operation\\OperationInterface",
+            "static": false,
+            "params": [],
+            "returnType": null,
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "format",
+            "rust": "format",
+            "declaredIn": "Composer\\DependencyResolver\\Operation\\InstallOperation",
+            "static": true,
+            "params": [
+                {
+                    "name": "package",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Package\\PackageInterface",
+                    "docType": null
+                },
+                {
+                    "name": "lock",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "bool",
+                    "docType": null
+                }
+            ],
+            "returnType": "string",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": false
+        },
+        {
+            "name": "getOperationType",
+            "rust": "get_operation_type",
+            "declaredIn": "Composer\\DependencyResolver\\Operation\\OperationInterface",
+            "static": false,
+            "params": [],
+            "returnType": "string",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getPackage",
+            "rust": "get_package",
+            "declaredIn": "Composer\\DependencyResolver\\Operation\\InstallOperation",
+            "static": false,
+            "params": [],
+            "returnType": "\\Composer\\Package\\PackageInterface",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "show",
+            "rust": "show",
+            "declaredIn": "Composer\\DependencyResolver\\Operation\\OperationInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "lock",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": null,
+                    "docType": null
+                }
+            ],
+            "returnType": "string",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        }
+    ],
+    "constructor": {
+        "declaredIn": "Composer\\DependencyResolver\\Operation\\InstallOperation",
+        "public": true,
+        "params": [
+            {
+                "name": "package",
+                "position": 0,
+                "byRef": false,
+                "variadic": false,
+                "nullable": false,
+                "type": "\\Composer\\Package\\PackageInterface",
+                "docType": null
+            }
+        ],
+        "funcNumArgs": false,
+        "forwarded": true,
+        "status": "implemented"
+    },
+    "properties": [
+        {
+            "name": "package",
+            "declaredIn": "Composer\\DependencyResolver\\Operation\\InstallOperation",
+            "visibility": "protected",
+            "static": false,
+            "readonly": false,
+            "type": null,
+            "docType": "PackageInterface"
+        }
+    ]
+}

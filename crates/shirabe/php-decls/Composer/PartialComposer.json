@@ -1,0 +1,249 @@
+{
+    "fqcn": "Composer\\PartialComposer",
+    "rustModule": [
+        "partial_composer"
+    ],
+    "kind": "class",
+    "abstract": false,
+    "parent": null,
+    "interfaces": [],
+    "treatment": "stub",
+    "methods": [
+        {
+            "name": "getConfig",
+            "rust": "get_config",
+            "declaredIn": "Composer\\PartialComposer",
+            "static": false,
+            "params": [],
+            "returnType": "\\Composer\\Config",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getEventDispatcher",
+            "rust": "get_event_dispatcher",
+            "declaredIn": "Composer\\PartialComposer",
+            "static": false,
+            "params": [],
+            "returnType": "\\Composer\\EventDispatcher\\EventDispatcher",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getInstallationManager",
+            "rust": "get_installation_manager",
+            "declaredIn": "Composer\\PartialComposer",
+            "static": false,
+            "params": [],
+            "returnType": "\\Composer\\Installer\\InstallationManager",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getLoop",
+            "rust": "get_loop",
+            "declaredIn": "Composer\\PartialComposer",
+            "static": false,
+            "params": [],
+            "returnType": "\\Composer\\Util\\Loop",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": false
+        },
+        {
+            "name": "getPackage",
+            "rust": "get_package",
+            "declaredIn": "Composer\\PartialComposer",
+            "static": false,
+            "params": [],
+            "returnType": "\\Composer\\Package\\RootPackageInterface",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getRepositoryManager",
+            "rust": "get_repository_manager",
+            "declaredIn": "Composer\\PartialComposer",
+            "static": false,
+            "params": [],
+            "returnType": "\\Composer\\Repository\\RepositoryManager",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "isGlobal",
+            "rust": "is_global",
+            "declaredIn": "Composer\\PartialComposer",
+            "static": false,
+            "params": [],
+            "returnType": "bool",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "unimplemented"
+        },
+        {
+            "name": "setConfig",
+            "rust": "set_config",
+            "declaredIn": "Composer\\PartialComposer",
+            "static": false,
+            "params": [
+                {
+                    "name": "config",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Config",
+                    "docType": null
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "unimplemented"
+        },
+        {
+            "name": "setEventDispatcher",
+            "rust": "set_event_dispatcher",
+            "declaredIn": "Composer\\PartialComposer",
+            "static": false,
+            "params": [
+                {
+                    "name": "eventDispatcher",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\EventDispatcher\\EventDispatcher",
+                    "docType": null
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "unimplemented"
+        },
+        {
+            "name": "setGlobal",
+            "rust": "set_global",
+            "declaredIn": "Composer\\PartialComposer",
+            "static": false,
+            "params": [],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "unimplemented"
+        },
+        {
+            "name": "setInstallationManager",
+            "rust": "set_installation_manager",
+            "declaredIn": "Composer\\PartialComposer",
+            "static": false,
+            "params": [
+                {
+                    "name": "manager",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Installer\\InstallationManager",
+                    "docType": null
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "unimplemented"
+        },
+        {
+            "name": "setLoop",
+            "rust": "set_loop",
+            "declaredIn": "Composer\\PartialComposer",
+            "static": false,
+            "params": [
+                {
+                    "name": "loop",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Util\\Loop",
+                    "docType": null
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "unimplemented"
+        },
+        {
+            "name": "setPackage",
+            "rust": "set_package",
+            "declaredIn": "Composer\\PartialComposer",
+            "static": false,
+            "params": [
+                {
+                    "name": "package",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Package\\RootPackageInterface",
+                    "docType": null
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "unimplemented"
+        },
+        {
+            "name": "setRepositoryManager",
+            "rust": "set_repository_manager",
+            "declaredIn": "Composer\\PartialComposer",
+            "static": false,
+            "params": [
+                {
+                    "name": "manager",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Repository\\RepositoryManager",
+                    "docType": null
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "unimplemented"
+        }
+    ],
+    "constructor": {
+        "declaredIn": null,
+        "public": true,
+        "params": [],
+        "funcNumArgs": false,
+        "forwarded": true,
+        "status": "unimplemented"
+    },
+    "properties": []
+}

@@ -7,9 +7,10 @@ namespace Shirabe\Lint\Linters;
 use Shirabe\Lint\Linter;
 
 /**
- * The committed proxy stub and guard classes, the by-value class list and the Rust forwarding
- * modules have to match what `scripts/plugin-stub-generator/generate-stubs` emits from the
- * current Composer checkout and classifier report.
+ * The committed proxy stub and guard classes, the by-value class list, the Rust forwarding
+ * modules and the PHP declarations have to match what
+ * `scripts/plugin-stub-generator/generate-stubs` emits from the current Composer checkout and
+ * classifier report.
  */
 final class PluginGeneratedStubs implements Linter
 {

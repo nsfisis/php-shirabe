@@ -1,0 +1,99 @@
+{
+    "fqcn": "Composer\\Plugin\\PluginInterface",
+    "rustModule": [
+        "plugin",
+        "plugin_interface"
+    ],
+    "kind": "interface",
+    "interfaces": [],
+    "treatment": "real",
+    "methods": [
+        {
+            "name": "activate",
+            "rust": "activate",
+            "declaredIn": "Composer\\Plugin\\PluginInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "composer",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Composer",
+                    "docType": null
+                },
+                {
+                    "name": "io",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\IO\\IOInterface",
+                    "docType": null
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "void",
+            "funcNumArgs": false
+        },
+        {
+            "name": "deactivate",
+            "rust": "deactivate",
+            "declaredIn": "Composer\\Plugin\\PluginInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "composer",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Composer",
+                    "docType": null
+                },
+                {
+                    "name": "io",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\IO\\IOInterface",
+                    "docType": null
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "void",
+            "funcNumArgs": false
+        },
+        {
+            "name": "uninstall",
+            "rust": "uninstall",
+            "declaredIn": "Composer\\Plugin\\PluginInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "composer",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Composer",
+                    "docType": null
+                },
+                {
+                    "name": "io",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\IO\\IOInterface",
+                    "docType": null
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "void",
+            "funcNumArgs": false
+        }
+    ]
+}

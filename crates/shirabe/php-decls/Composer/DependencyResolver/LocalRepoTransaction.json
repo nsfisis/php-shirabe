@@ -1,0 +1,91 @@
+{
+    "fqcn": "Composer\\DependencyResolver\\LocalRepoTransaction",
+    "rustModule": [
+        "dependency_resolver",
+        "local_repo_transaction"
+    ],
+    "kind": "class",
+    "abstract": false,
+    "parent": "Composer\\DependencyResolver\\Transaction",
+    "interfaces": [],
+    "treatment": "stub",
+    "methods": [
+        {
+            "name": "getOperations",
+            "rust": "get_operations",
+            "declaredIn": "Composer\\DependencyResolver\\Transaction",
+            "static": false,
+            "params": [],
+            "returnType": "array",
+            "docReturnType": "OperationInterface[]",
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        }
+    ],
+    "constructor": {
+        "declaredIn": "Composer\\DependencyResolver\\LocalRepoTransaction",
+        "public": true,
+        "params": [
+            {
+                "name": "lockedRepository",
+                "position": 0,
+                "byRef": false,
+                "variadic": false,
+                "nullable": false,
+                "type": "\\Composer\\Repository\\RepositoryInterface",
+                "docType": null
+            },
+            {
+                "name": "localRepository",
+                "position": 1,
+                "byRef": false,
+                "variadic": false,
+                "nullable": false,
+                "type": "\\Composer\\Repository\\InstalledRepositoryInterface",
+                "docType": null
+            }
+        ],
+        "funcNumArgs": false,
+        "forwarded": true,
+        "status": "unimplemented"
+    },
+    "properties": [
+        {
+            "name": "operations",
+            "declaredIn": "Composer\\DependencyResolver\\Transaction",
+            "visibility": "protected",
+            "static": false,
+            "readonly": false,
+            "type": null,
+            "docType": "OperationInterface[]"
+        },
+        {
+            "name": "presentPackages",
+            "declaredIn": "Composer\\DependencyResolver\\Transaction",
+            "visibility": "protected",
+            "static": false,
+            "readonly": false,
+            "type": null,
+            "docType": "PackageInterface[]"
+        },
+        {
+            "name": "resultPackageMap",
+            "declaredIn": "Composer\\DependencyResolver\\Transaction",
+            "visibility": "protected",
+            "static": false,
+            "readonly": false,
+            "type": null,
+            "docType": "array<string, PackageInterface>"
+        },
+        {
+            "name": "resultPackagesByName",
+            "declaredIn": "Composer\\DependencyResolver\\Transaction",
+            "visibility": "protected",
+            "static": false,
+            "readonly": false,
+            "type": null,
+            "docType": "array<string, PackageInterface[]>"
+        }
+    ]
+}
