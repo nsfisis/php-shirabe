@@ -55,7 +55,11 @@ impl forwarding::installer::installation_manager::Forwarding
 
     fn get_install_path(im: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         let package = call.arg::<PackageInterfaceHandle>(0)?;
-        Ok(im.borrow().get_install_path(package).to_rpc_value())
+        Ok(im
+            .borrow()
+            .get_install_path(package)
+            .map_err(call.failed())?
+            .to_rpc_value())
     }
 
     fn add_installer(im: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {

@@ -27,10 +27,11 @@ use bstr::{B, BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_rpc::RpcValue;
 use shirabe_php_shim::{
-    CmpOp, E_USER_DEPRECATED, PhpMixed, RuntimeException, UnexpectedValueException, bformat,
-    boolval, dirname, empty, file_get_contents, implode, ksort, path_from_bytes, php_regex,
-    preg_is_match, preg_quote, preg_replace_with_limit_and_count, strrpos, strtr_array, substr,
-    trigger_error, trim_chars, var_export, var_export_str, version_compare,
+    CmpOp, E_USER_DEPRECATED, E_WARNING, ErrorException, PhpMixed, RuntimeException, TypeError,
+    UnexpectedValueException, bformat, boolval, dirname, display_to_bytes, empty,
+    file_get_contents, get_debug_type, implode, ksort, path_from_bytes, php_regex, preg_is_match,
+    preg_quote, preg_replace_with_limit_and_count, strrpos, strtr_array, substr, trigger_error,
+    trim_chars, var_export, var_export_str, version_compare,
 };
 use shirabe_semver::constraint::SimpleConstraint;
 use shirabe_symfony_console::input::InputValue;
@@ -296,17 +297,11 @@ impl PluginManager {
             return Err(UnexpectedValueException::new(bformat!("Error while installing {}, composer-plugin packages should have a class defined in their extra key to be usable.", package.get_pretty_name())).into());
         }
         // PHP: is_array($extra['class']) ? $extra['class'] : [$extra['class']] — an associative
-        // array iterates its values too, and a non-string entry reaches class_exists() where it
-        // raises a TypeError (an Error, not caught by the plugin installer's rollback).
-        let expect_class_name = |value: &PhpMixed| -> BString {
-            value.as_string().map(BString::from).unwrap_or_else(|| {
-                panic!("extra.class entries must be strings (PHP raises a TypeError): {value:?}")
-            })
-        };
-        let classes: Vec<BString> = match class_value {
-            Some(PhpMixed::List(items)) => items.iter().map(expect_class_name).collect(),
-            Some(PhpMixed::Array(map)) => map.values().map(expect_class_name).collect(),
-            Some(other) => vec![expect_class_name(other)],
+        // array iterates its values too.
+        let classes: Vec<PhpMixed> = match class_value {
+            Some(PhpMixed::List(items)) => items.clone(),
+            Some(PhpMixed::Array(map)) => map.values().cloned().collect(),
+            Some(other) => vec![other.clone()],
             None => unreachable!("empty() above rejected a missing extra.class"),
         };
 
@@ -362,7 +357,8 @@ impl PluginManager {
                 Some(gr) => gr.borrow_mut().has_package(autoload_package.clone())?,
                 None => false,
             };
-            let install_path = self.get_install_path(autoload_package.clone(), is_global_package);
+            let install_path =
+                self.get_install_path(autoload_package.clone(), is_global_package)?;
             let install_path = match install_path {
                 Some(p) => p,
                 None => continue,
@@ -410,24 +406,46 @@ impl PluginManager {
         }
 
         for class in classes {
-            let mut class = class;
+            // PHP: class_exists() under strict_types rejects a non-string entry with a TypeError.
+            let Some(class) = class.as_string() else {
+                return Err(TypeError::new(bformat!(
+                    "class_exists(): Argument #1 ($class) must be of type string, {} given",
+                    get_debug_type(&class)
+                ))
+                .into());
+            };
+            let mut class = BString::from(class);
             if runtime::class_exists(class.as_bstr(), false)? {
                 class = trim_chars(&class, "\\");
-                let path = class_loader
-                    .borrow_mut()
-                    .find_file(&class)?
-                    .unwrap_or_else(|| {
-                        panic!(
-                            "plugin class `{}` is already defined but has no autoloadable file",
-                            class.display_lossy()
-                        )
-                    });
-                let code = file_get_contents(path_from_bytes(&path)).unwrap_or_else(|_| {
-                    panic!(
-                        "unable to read the plugin class file `{}`",
-                        path.display_lossy()
+                // PHP: findFile() answers false, which file_get_contents() under strict_types
+                // rejects with a TypeError.
+                let Some(path) = class_loader.borrow_mut().find_file(&class)? else {
+                    return Err(TypeError::new(
+                        "file_get_contents(): Argument #1 ($filename) must be of type string, bool given",
                     )
-                });
+                    .into());
+                };
+                // PHP: the warning of a failed read becomes an ErrorException through Composer's
+                // error handler.
+                // TODO(php-semantics): the reason is the text of Rust's io::Error rather than
+                // PHP's stream error message.
+                let code = match file_get_contents(path_from_bytes(&path)) {
+                    Ok(code) => code,
+                    Err(error) => {
+                        return Err(ErrorException::new(
+                            bformat!(
+                                "file_get_contents({path}): Failed to open stream: {}",
+                                display_to_bytes(error)
+                            ),
+                            0,
+                            E_WARNING,
+                            BString::default(),
+                            0,
+                            None,
+                        )
+                        .into());
+                    }
+                };
                 let class_counter = CLASS_COUNTER.load(std::sync::atomic::Ordering::Relaxed);
                 let separator_pos = strrpos(&class, "\\");
                 let mut class_name = class.clone();
@@ -864,7 +882,7 @@ impl PluginManager {
         &mut self,
         package: PackageInterfaceHandle,
         global: bool,
-    ) -> Option<std::path::PathBuf> {
+    ) -> anyhow::Result<Option<std::path::PathBuf>> {
         if !global {
             return self
                 .composer_full()

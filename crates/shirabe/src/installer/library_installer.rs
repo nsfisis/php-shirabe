@@ -94,7 +94,7 @@ impl LibraryInstaller {
 
     /// Make sure binaries are installed for a given package.
     pub fn ensure_binaries_presence(&self, package: PackageInterfaceHandle) -> anyhow::Result<()> {
-        let install_path = self.get_install_path(package.clone()).unwrap();
+        let install_path = self.get_install_path(package.clone())?.unwrap();
         self.binary_installer
             .borrow_mut()
             .install_binaries(package, &install_path, false)
@@ -104,31 +104,34 @@ impl LibraryInstaller {
     ///
     /// It is used for BC as getInstallPath tends to be overridden by
     /// installer plugins but not getPackageBasePath
-    fn get_package_base_path(&self, package: PackageInterfaceHandle) -> std::path::PathBuf {
-        let install_path = self.get_install_path(package.clone()).unwrap();
+    fn get_package_base_path(
+        &self,
+        package: PackageInterfaceHandle,
+    ) -> anyhow::Result<std::path::PathBuf> {
+        let install_path = self.get_install_path(package.clone())?.unwrap();
         let target_dir = package.get_target_dir();
 
         if let Some(target_dir) = target_dir
             && !target_dir.is_empty()
         {
-            return std::path::PathBuf::from(path_from_bytes(&preg_replace(
+            return Ok(std::path::PathBuf::from(path_from_bytes(&preg_replace(
                 bformat!(
                     "{{/*{}/?$}}",
                     str_replace("/", "/+", preg_quote(&target_dir, None))
                 ),
                 "",
                 path_to_bytes(&install_path),
-            )));
+            ))));
         }
 
-        install_path
+        Ok(install_path)
     }
 
     async fn install_code(
         &self,
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
-        let download_path = self.get_install_path(package.clone()).unwrap();
+        let download_path = self.get_install_path(package.clone())?.unwrap();
 
         self.get_download_manager()
             .borrow()
@@ -141,8 +144,8 @@ impl LibraryInstaller {
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
-        let initial_download_path = self.get_install_path(initial.clone()).unwrap();
-        let target_download_path = self.get_install_path(target.clone()).unwrap();
+        let initial_download_path = self.get_install_path(initial.clone())?.unwrap();
+        let target_download_path = self.get_install_path(target.clone())?.unwrap();
         if target_download_path.as_os_str() != initial_download_path.as_os_str() {
             // if the target and initial dirs intersect, we force a remove + install
             // to avoid the rename wiping the target dir as part of the initial dir cleanup
@@ -171,7 +174,7 @@ impl LibraryInstaller {
         &self,
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
-        let download_path = self.get_package_base_path(package.clone());
+        let download_path = self.get_package_base_path(package.clone())?;
 
         self.get_download_manager()
             .borrow()
@@ -220,7 +223,7 @@ impl InstallerInterface for LibraryInstaller {
             return Ok(false);
         }
 
-        let install_path = self.get_install_path(package).unwrap();
+        let install_path = self.get_install_path(package)?.unwrap();
 
         if Filesystem::is_readable(&install_path) {
             return Ok(true);
@@ -247,7 +250,7 @@ impl InstallerInterface for LibraryInstaller {
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         self.initialize_vendor_dir();
-        let download_path = self.get_install_path(package.clone()).unwrap();
+        let download_path = self.get_install_path(package.clone())?.unwrap();
 
         self.get_download_manager()
             .borrow()
@@ -262,7 +265,7 @@ impl InstallerInterface for LibraryInstaller {
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         self.initialize_vendor_dir();
-        let download_path = self.get_install_path(package.clone()).unwrap();
+        let download_path = self.get_install_path(package.clone())?.unwrap();
 
         self.get_download_manager()
             .borrow()
@@ -277,7 +280,7 @@ impl InstallerInterface for LibraryInstaller {
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         self.initialize_vendor_dir();
-        let download_path = self.get_install_path(package.clone()).unwrap();
+        let download_path = self.get_install_path(package.clone())?.unwrap();
 
         self.get_download_manager()
             .borrow()
@@ -291,7 +294,7 @@ impl InstallerInterface for LibraryInstaller {
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
         self.initialize_vendor_dir();
-        let download_path = self.get_install_path(package.clone()).unwrap();
+        let download_path = self.get_install_path(package.clone())?.unwrap();
 
         // remove the binaries if it appears the package files are missing
         if !Filesystem::is_readable(&download_path)
@@ -304,7 +307,7 @@ impl InstallerInterface for LibraryInstaller {
 
         let _ = self.install_code(package.clone()).await?;
 
-        let install_path = self.get_install_path(package.clone()).unwrap();
+        let install_path = self.get_install_path(package.clone())?.unwrap();
         self.binary_installer.borrow_mut().install_binaries(
             package.clone(),
             &install_path,
@@ -339,7 +342,7 @@ impl InstallerInterface for LibraryInstaller {
             .remove_binaries(initial.clone());
         let _ = self.update_code(initial.clone(), target.clone()).await?;
 
-        let install_path = self.get_install_path(target.clone()).unwrap();
+        let install_path = self.get_install_path(target.clone())?.unwrap();
         self.binary_installer
             .borrow_mut()
             .install_binaries(target.clone(), &install_path, true)?;
@@ -367,7 +370,7 @@ impl InstallerInterface for LibraryInstaller {
 
         let _ = self.remove_code(package.clone()).await?;
 
-        let download_path = self.get_package_base_path(package.clone());
+        let download_path = self.get_package_base_path(package.clone())?;
         self.binary_installer
             .borrow_mut()
             .remove_binaries(package.clone());
@@ -388,7 +391,10 @@ impl InstallerInterface for LibraryInstaller {
         Ok(None)
     }
 
-    fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<std::path::PathBuf> {
+    fn get_install_path(
+        &self,
+        package: PackageInterfaceHandle,
+    ) -> anyhow::Result<Option<std::path::PathBuf>> {
         self.initialize_vendor_dir();
 
         let vendor_dir = self.vendor_dir.borrow();
@@ -412,7 +418,9 @@ impl InstallerInterface for LibraryInstaller {
         } else {
             base_path
         };
-        Some(std::path::PathBuf::from(path_from_bytes(&install_path)))
+        Ok(Some(std::path::PathBuf::from(path_from_bytes(
+            &install_path,
+        ))))
     }
 
     fn as_binary_presence_interface(&self) -> Option<&dyn BinaryPresenceInterface> {

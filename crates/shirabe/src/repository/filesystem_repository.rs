@@ -230,7 +230,7 @@ impl FilesystemRepository {
 
         for package in self.inner.get_canonical_packages() {
             let mut pkg_array = dumper.dump(package.clone())?;
-            let path = installation_manager.get_install_path(package.clone());
+            let path = installation_manager.get_install_path(package.clone())?;
             let mut install_path: Option<BString> = None;
             if let Some(path_str) = &path
                 && !path_str.as_os_str().is_empty()

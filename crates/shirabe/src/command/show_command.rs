@@ -447,13 +447,13 @@ impl ShowCommand {
             package.get_dist_reference().unwrap_or_default()
         ));
         if is_installed_package {
-            let path = self.require_composer(None, None).ok().and_then(|c| {
-                let installation_manager = c.borrow_partial().get_installation_manager();
-
-                installation_manager
-                    .borrow_mut()
-                    .get_install_path(package.clone().into())
-            });
+            let installation_manager = self
+                .require_composer(None, None)?
+                .borrow_partial()
+                .get_installation_manager();
+            let path = installation_manager
+                .borrow_mut()
+                .get_install_path(package.clone().into())?;
             if let Some(p) = path {
                 self.get_io().write(bformat!(
                     "<info>path</info>     : {}",
@@ -688,7 +688,7 @@ impl ShowCommand {
             let installation_manager = composer.borrow_partial().get_installation_manager();
             let path = installation_manager
                 .borrow_mut()
-                .get_install_path(package.clone().into());
+                .get_install_path(package.clone().into())?;
             match path {
                 Some(p) => {
                     if let Some(r) = realpath(&p) {
@@ -1965,7 +1965,7 @@ impl Command for ShowCommand {
                         .borrow_partial()
                         .get_installation_manager()
                         .borrow_mut()
-                        .get_install_path(package.clone().into())
+                        .get_install_path(package.clone().into())?
                 };
                 if let Some(path) = path {
                     let real = realpath(&path).unwrap_or_default();
@@ -2344,7 +2344,7 @@ impl Command for ShowCommand {
                                 .get_installation_manager();
                             let path = installation_manager
                                 .borrow_mut()
-                                .get_install_path(package.clone());
+                                .get_install_path(package.clone())?;
                             if let Some(p) = path {
                                 let r = realpath(&p).unwrap_or_default();
                                 package_view_data.path = Some(Some(BString::from(

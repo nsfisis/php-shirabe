@@ -123,7 +123,10 @@ impl InstallerInterface for ProjectInstaller {
         Err(InvalidArgumentException::new(BString::from("not supported")).into())
     }
 
-    fn get_install_path(&self, _package: PackageInterfaceHandle) -> Option<std::path::PathBuf> {
-        Some(self.install_path.clone())
+    fn get_install_path(
+        &self,
+        _package: PackageInterfaceHandle,
+    ) -> anyhow::Result<Option<std::path::PathBuf>> {
+        Ok(Some(self.install_path.clone()))
     }
 }

@@ -800,7 +800,7 @@ impl AutoloadGenerator {
             self.validate_package(package.clone())?;
             let install_path = installation_manager
                 .borrow()
-                .get_install_path(package.clone());
+                .get_install_path(package.clone())?;
             package_map.push((package, install_path));
         }
 

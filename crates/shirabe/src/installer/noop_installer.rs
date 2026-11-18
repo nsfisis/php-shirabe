@@ -103,7 +103,10 @@ impl InstallerInterface for NoopInstaller {
         Ok(None)
     }
 
-    fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<std::path::PathBuf> {
+    fn get_install_path(
+        &self,
+        package: PackageInterfaceHandle,
+    ) -> anyhow::Result<Option<std::path::PathBuf>> {
         let target_dir = package.get_target_dir();
 
         let install_path = if let Some(dir) = target_dir {
@@ -111,6 +114,8 @@ impl InstallerInterface for NoopInstaller {
         } else {
             package.get_pretty_name()
         };
-        Some(std::path::PathBuf::from(path_from_bytes(&install_path)))
+        Ok(Some(std::path::PathBuf::from(path_from_bytes(
+            &install_path,
+        ))))
     }
 }

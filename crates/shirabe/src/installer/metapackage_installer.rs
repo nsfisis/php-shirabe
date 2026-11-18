@@ -126,7 +126,10 @@ impl InstallerInterface for MetapackageInstaller {
         Ok(None)
     }
 
-    fn get_install_path(&self, _package: PackageInterfaceHandle) -> Option<std::path::PathBuf> {
-        None
+    fn get_install_path(
+        &self,
+        _package: PackageInterfaceHandle,
+    ) -> anyhow::Result<Option<std::path::PathBuf>> {
+        Ok(None)
     }
 }

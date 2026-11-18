@@ -157,18 +157,12 @@ impl InstallerInterface for PhpInstallerProxy {
         self.promise_result(BStr::new("cleanup"), value).await
     }
 
-    fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<std::path::PathBuf> {
-        // PHP declares `getInstallPath(): string`; a failure here is a plugin error the
-        // infallible signature cannot carry, so it aborts rather than answering a path that
-        // would silently install the package in the wrong place.
+    fn get_install_path(
+        &self,
+        package: PackageInterfaceHandle,
+    ) -> anyhow::Result<Option<std::path::PathBuf>> {
         let args = vec![Self::package_arg(&package)];
         self.call(BStr::new("getInstallPath"), args)
-            .unwrap_or_else(|error| {
-                panic!(
-                    "{}::getInstallPath failed over RPC: {error:#}",
-                    self.handle.class().display_lossy()
-                )
-            })
     }
 }
 

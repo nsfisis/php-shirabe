@@ -187,13 +187,18 @@ impl InstallationManagerInterface for MockInstallationManager {
         Ok(())
     }
 
-    fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<std::path::PathBuf> {
+    fn get_install_path(
+        &self,
+        package: PackageInterfaceHandle,
+    ) -> anyhow::Result<Option<std::path::PathBuf>> {
         let upstream = fixtures_dir().join(path_from_bytes(&package.get_pretty_name()));
         if upstream.exists() {
-            return Some(upstream);
+            return Ok(Some(upstream));
         }
         // Shirabe-specific fixtures (subscriber_test) live next to this test binary.
-        Some(shirabe_fixtures_dir().join(path_from_bytes(&package.get_pretty_name())))
+        Ok(Some(
+            shirabe_fixtures_dir().join(path_from_bytes(&package.get_pretty_name())),
+        ))
     }
 
     fn set_output_progress(&mut self, _output_progress: bool) {}

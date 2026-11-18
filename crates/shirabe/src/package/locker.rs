@@ -779,7 +779,7 @@ impl Locker {
         let path = self
             .installation_manager
             .borrow_mut()
-            .get_install_path(package.clone());
+            .get_install_path(package.clone())?;
         if path.is_none() {
             return Ok(None);
         }

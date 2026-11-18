@@ -10,7 +10,9 @@ use crate::plugin::PluginManager;
 use crate::repository::InstalledRepositoryInterfaceHandle;
 use crate::util::{Filesystem, Platform};
 use bstr::{B, BStr};
-use shirabe_php_shim::{PhpMixed, UnexpectedValueException, bformat, empty, error_message};
+use shirabe_php_shim::{
+    Catch as _, Error, PhpMixed, UnexpectedValueException, bformat, empty, error_message,
+};
 
 #[derive(Debug)]
 pub struct PluginInstaller {
@@ -137,6 +139,9 @@ impl InstallerInterface for PluginInstaller {
                 .borrow_mut()
                 .register_package(package.clone(), true, false);
         if let Err(e) = result {
+            if e.is_instanceof::<Error>() {
+                return Err(e);
+            }
             self.rollback_install(e, repo, package).await?;
         }
         Ok(None)
@@ -163,6 +168,9 @@ impl InstallerInterface for PluginInstaller {
             Ok(())
         })();
         if let Err(e) = result {
+            if e.is_instanceof::<Error>() {
+                return Err(e);
+            }
             self.rollback_install(e, repo, target).await?;
         }
         Ok(None)
@@ -189,7 +197,10 @@ impl InstallerInterface for PluginInstaller {
         self.inner.cleanup(r#type, package, prev_package).await
     }
 
-    fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<std::path::PathBuf> {
+    fn get_install_path(
+        &self,
+        package: PackageInterfaceHandle,
+    ) -> anyhow::Result<Option<std::path::PathBuf>> {
         self.inner.get_install_path(package)
     }
 

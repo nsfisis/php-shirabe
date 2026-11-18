@@ -571,7 +571,7 @@ mod mock_installation_manager {
                 run_scripts: bool,
                 download_only: bool,
             ) -> anyhow::Result<()>;
-            fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<std::path::PathBuf>;
+            fn get_install_path(&self, package: PackageInterfaceHandle) -> anyhow::Result<Option<std::path::PathBuf>>;
             fn set_output_progress(&mut self, output_progress: bool);
             async fn notify_installs(&mut self, io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>);
         }

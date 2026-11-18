@@ -811,16 +811,19 @@ impl InstallationManager {
     }
 
     /// Returns the installation path of a package
-    pub fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<std::path::PathBuf> {
+    pub fn get_install_path(
+        &self,
+        package: PackageInterfaceHandle,
+    ) -> anyhow::Result<Option<std::path::PathBuf>> {
         // For testing only (ref InstallationManagerMock::getInstallPath).
         if self.mock.is_some() {
-            return Some(std::path::PathBuf::from(path_from_bytes(&bformat!(
+            return Ok(Some(std::path::PathBuf::from(path_from_bytes(&bformat!(
                 "vendor/{}",
                 package.get_name()
-            ))));
+            )))));
         }
 
-        let installer = self.get_installer(package.get_type()).ok()?;
+        let installer = self.get_installer(package.get_type())?;
 
         installer.get_install_path(package)
     }
@@ -1060,7 +1063,10 @@ pub trait InstallationManagerInterface: std::fmt::Debug {
         run_scripts: bool,
         download_only: bool,
     ) -> anyhow::Result<()>;
-    fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<std::path::PathBuf>;
+    fn get_install_path(
+        &self,
+        package: PackageInterfaceHandle,
+    ) -> anyhow::Result<Option<std::path::PathBuf>>;
     fn set_output_progress(&mut self, output_progress: bool);
     async fn notify_installs(&mut self, io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>);
 }
@@ -1107,7 +1113,10 @@ impl InstallationManagerInterface for InstallationManager {
             .await
     }
 
-    fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<std::path::PathBuf> {
+    fn get_install_path(
+        &self,
+        package: PackageInterfaceHandle,
+    ) -> anyhow::Result<Option<std::path::PathBuf>> {
         self.get_install_path(package)
     }
 

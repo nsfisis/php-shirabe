@@ -100,9 +100,12 @@ impl InstallerInterface for InstallPathStubInstaller {
         Ok(None)
     }
 
-    fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<std::path::PathBuf> {
+    fn get_install_path(
+        &self,
+        package: PackageInterfaceHandle,
+    ) -> anyhow::Result<Option<std::path::PathBuf>> {
         if package.get_type() == "metapackage" {
-            return None;
+            return Ok(None);
         }
 
         let mut path = self.vendor_dir.join(path_from_bytes(&package.get_name()));
@@ -112,7 +115,7 @@ impl InstallerInterface for InstallPathStubInstaller {
             path = path.join(path_from_bytes(&dir));
         }
 
-        Some(path.to_path_buf())
+        Ok(Some(path.to_path_buf()))
     }
 }
 

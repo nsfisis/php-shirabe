@@ -139,8 +139,11 @@ impl InstallerInterface for MockInstaller {
         Ok(None)
     }
 
-    fn get_install_path(&self, _package: PackageInterfaceHandle) -> Option<std::path::PathBuf> {
-        None
+    fn get_install_path(
+        &self,
+        _package: PackageInterfaceHandle,
+    ) -> anyhow::Result<Option<std::path::PathBuf>> {
+        Ok(None)
     }
 }
 
@@ -239,8 +242,11 @@ impl InstallerInterface for BinaryInstaller {
         Ok(None)
     }
 
-    fn get_install_path(&self, _package: PackageInterfaceHandle) -> Option<std::path::PathBuf> {
-        None
+    fn get_install_path(
+        &self,
+        _package: PackageInterfaceHandle,
+    ) -> anyhow::Result<Option<std::path::PathBuf>> {
+        Ok(None)
     }
 
     fn as_binary_presence_interface(&self) -> Option<&dyn BinaryPresenceInterface> {

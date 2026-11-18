@@ -404,7 +404,11 @@ fn test_get_install_path_without_target_dir() {
             .vendor_dir
             .join(path_from_bytes(&package.get_pretty_name()))
             .as_os_str(),
-        library.get_install_path(package).unwrap().as_os_str()
+        library
+            .get_install_path(package)
+            .unwrap()
+            .unwrap()
+            .as_os_str()
     );
 
     tear_down(&mut setup);
@@ -424,7 +428,11 @@ fn test_get_install_path_with_target_dir() {
             .join(path_from_bytes(&package.get_pretty_name()))
             .join("Some/Namespace")
             .as_os_str(),
-        library.get_install_path(package).unwrap().as_os_str()
+        library
+            .get_install_path(package)
+            .unwrap()
+            .unwrap()
+            .as_os_str()
     );
 
     tear_down(&mut setup);
@@ -442,7 +450,7 @@ fn test_ensure_binaries_installed() {
     )
     .unwrap();
     let package = get_package("foo/bar", "1.0.0");
-    let expected_path = library.get_install_path(package.clone()).unwrap();
+    let expected_path = library.get_install_path(package.clone()).unwrap().unwrap();
 
     let mut binary_installer = MockBinaryInstaller::new();
     // PHP asserts removeBinaries is never called.

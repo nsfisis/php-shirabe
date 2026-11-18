@@ -55,7 +55,10 @@ pub trait InstallerInterface: std::fmt::Debug {
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>>;
 
-    fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<std::path::PathBuf>;
+    fn get_install_path(
+        &self,
+        package: PackageInterfaceHandle,
+    ) -> anyhow::Result<Option<std::path::PathBuf>>;
 
     fn as_binary_presence_interface(&self) -> Option<&dyn BinaryPresenceInterface> {
         None

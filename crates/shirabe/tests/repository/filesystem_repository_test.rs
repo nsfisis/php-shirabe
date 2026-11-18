@@ -104,7 +104,7 @@ mod mock_installation_manager {
                 run_scripts: bool,
                 download_only: bool,
             ) -> anyhow::Result<()>;
-            fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<std::path::PathBuf>;
+            fn get_install_path(&self, package: PackageInterfaceHandle) -> anyhow::Result<Option<std::path::PathBuf>>;
             fn set_output_progress(&mut self, output_progress: bool);
             async fn notify_installs(&mut self, io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>);
         }
@@ -128,7 +128,7 @@ fn test_repository_write() {
     let fixed_path = repo_dir.join("vendor/woop/woop").to_path_buf();
     im.expect_get_install_path()
         .times(2)
-        .returning(move |_| Some(fixed_path.clone()));
+        .returning(move |_| Ok(Some(fixed_path.clone())));
 
     repository.set_dev_package_names(vec![BString::from("mypkg2")]);
     repository
@@ -298,21 +298,25 @@ fn test_repository_writes_installed_php() {
     im.expect_get_install_path().returning(move |package| {
         // check for empty paths handling
         if package.get_type() == "metapackage" {
-            return Some(std::path::PathBuf::from(""));
+            return Ok(Some(std::path::PathBuf::from("")));
         }
         if package.get_name() == "c/c" {
             // check for absolute paths
-            return Some(std::path::PathBuf::from("/foo/bar/ven\\do{}r/c/c${}"));
+            return Ok(Some(std::path::PathBuf::from("/foo/bar/ven\\do{}r/c/c${}")));
         }
         if package.get_name() == "a/provider" {
-            return Some(std::path::PathBuf::from("vendor/{${passthru('bash -i')}}"));
+            return Ok(Some(std::path::PathBuf::from(
+                "vendor/{${passthru('bash -i')}}",
+            )));
         }
         // check for cwd
         if package.as_root().is_some() {
-            return Some(cwd.clone());
+            return Ok(Some(cwd.clone()));
         }
         // check for relative paths
-        Some(path_from_bytes(&bformat!("vendor/{}", package.get_name())).to_path_buf())
+        Ok(Some(
+            path_from_bytes(&bformat!("vendor/{}", package.get_name())).to_path_buf(),
+        ))
     });
 
     repository.write(true, &im).unwrap();
