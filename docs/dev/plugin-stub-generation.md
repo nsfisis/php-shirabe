@@ -205,6 +205,10 @@ Each file holds:
   a method answered there (`Generator::LOCAL_BODIES`). A forwarded member also has the `status`
   the report gives it (`implemented`, `unimplemented`, or `refused` with its `reason`).
 
+The `shirabe-php-binding-macros` crate reads these files at compile time: `#[php_binding]`
+generates the adapters of a Rust trait or inherent impl standing for a type, and `php_entity!` the
+`Entity` and `Forwarding` impls of a handle type routing each implemented member to them.
+
 ## Codec and push tables
 
 `crates/shirabe/src/php_worker/by_value.rs` names, for every by-value class, the functions

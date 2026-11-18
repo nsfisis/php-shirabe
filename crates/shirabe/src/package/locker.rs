@@ -18,6 +18,7 @@ use crate::repository::{
 use crate::util::{Git as GitUtil, ProcessExecutor};
 use bstr::{B, BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
+use shirabe_php_binding_macros::php_binding;
 use shirabe_php_shim::{
     Catch as _, DATE_RFC3339, LogicException, PhpMixed, RuntimeException, ToPhpString,
     array_intersect, array_keys, array_map, array_merge, bformat, display_to_bytes, empty,
@@ -40,6 +41,7 @@ pub struct Locker {
     virtual_file_written: bool,
 }
 
+#[php_binding(r"Composer\Package\Locker", members = static)]
 impl Locker {
     /// Initializes packages locker.
     pub fn new(
@@ -68,7 +70,9 @@ impl Locker {
     }
 
     /// Returns the md5 hash of the sorted content of the composer file.
-    pub fn get_content_hash(composer_file_contents: impl AsRef<[u8]>) -> anyhow::Result<BString> {
+    pub fn get_content_hash(
+        #[php(decode = BString)] composer_file_contents: impl AsRef<[u8]>,
+    ) -> anyhow::Result<BString> {
         let content = JsonFile::parse_json(
             Some(composer_file_contents),
             Some(bstr::BStr::new("composer.json")),
@@ -959,7 +963,9 @@ impl Locker {
 // Composer's Composer::setLocker() accepts any Locker subclass, so plugins may swap in a
 // replacement. The interface captures the methods reached through Composer's accessor and through
 // the `&mut dyn LockerInterface` / `&dyn LockerInterface` references fed from it.
+#[php_binding(r"Composer\Package\Locker")]
 pub trait LockerInterface: std::fmt::Debug {
+    #[php(skip)]
     fn get_json_file(&self) -> &JsonFile;
     fn is_locked(&mut self) -> bool;
     fn is_fresh(&mut self) -> anyhow::Result<bool>;
@@ -995,6 +1001,7 @@ pub trait LockerInterface: std::fmt::Debug {
         platform_overrides: IndexMap<BString, PhpMixed>,
         write: bool,
     ) -> anyhow::Result<bool>;
+    #[php(skip)]
     fn update_hash(
         &mut self,
         composer_json: &JsonFile,

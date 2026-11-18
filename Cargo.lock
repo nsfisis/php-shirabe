@@ -2336,6 +2336,7 @@ dependencies = [
  "shirabe-ca-bundle",
  "shirabe-class-map-generator",
  "shirabe-metadata-minifier",
+ "shirabe-php-binding-macros",
  "shirabe-php-rpc",
  "shirabe-php-shim",
  "shirabe-seld-json-lint",
@@ -2379,6 +2380,17 @@ dependencies = [
  "bstr",
  "indexmap",
  "shirabe-php-shim",
+]
+
+[[package]]
+name = "shirabe-php-binding-macros"
+version = "0.2.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "serde",
+ "serde_json",
+ "syn 3.0.9",
 ]
 
 [[package]]

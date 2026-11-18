@@ -1,0 +1,604 @@
+//! `#[php_binding]`: the adapters through which the members of a PHP type reach the Rust trait or
+//! inherent impl standing for it.
+
+use crate::decls::{self, Param};
+use syn::spanned::Spanned as _;
+
+/// The kinds of member of a PHP type an item answers.
+#[derive(Debug, Clone, Copy)]
+struct Members {
+    instance: bool,
+    statics: bool,
+    constructor: bool,
+}
+
+struct Args {
+    fqcn: syn::LitStr,
+    members: Members,
+}
+
+impl syn::parse::Parse for Args {
+    fn parse(input: syn::parse::ParseStream<'_>) -> syn::Result<Self> {
+        let fqcn: syn::LitStr = input.parse()?;
+        let mut members = Members {
+            instance: true,
+            statics: true,
+            constructor: true,
+        };
+        while !input.is_empty() {
+            input.parse::<syn::Token![,]>()?;
+            if input.is_empty() {
+                break;
+            }
+            let key: syn::Ident = syn::ext::IdentExt::parse_any(input)?;
+            input.parse::<syn::Token![=]>()?;
+            match key.to_string().as_str() {
+                "members" => {
+                    let kinds: Vec<syn::Ident> = if input.peek(syn::token::Paren) {
+                        let content;
+                        syn::parenthesized!(content in input);
+                        content
+                            .parse_terminated(syn::ext::IdentExt::parse_any, syn::Token![,])?
+                            .into_iter()
+                            .collect()
+                    } else {
+                        vec![syn::ext::IdentExt::parse_any(input)?]
+                    };
+                    members = Members {
+                        instance: false,
+                        statics: false,
+                        constructor: false,
+                    };
+                    for kind in kinds {
+                        match kind.to_string().as_str() {
+                            "instance" => members.instance = true,
+                            "static" => members.statics = true,
+                            "constructor" => members.constructor = true,
+                            _ => {
+                                return Err(syn::Error::new(
+                                    kind.span(),
+                                    "expected `instance`, `static` or `constructor`",
+                                ));
+                            }
+                        }
+                    }
+                }
+                _ => return Err(syn::Error::new(key.span(), "expected `members`")),
+            }
+        }
+
+        Ok(Args { fqcn, members })
+    }
+}
+
+/// The `#[php(...)]` annotations of a method.
+#[derive(Default)]
+struct MethodAttrs {
+    name: Option<syn::LitStr>,
+    custom: Option<syn::Path>,
+    skip: bool,
+}
+
+/// Removes the `#[php(...)]` annotations of a method and its parameters, and reads them.
+fn take_attrs(
+    sig: &mut syn::Signature,
+    attrs: &mut Vec<syn::Attribute>,
+) -> syn::Result<(MethodAttrs, Vec<Option<syn::Type>>)> {
+    let mut method = MethodAttrs::default();
+    for attr in take_php(attrs) {
+        attr.parse_nested_meta(|meta| {
+            if meta.path.is_ident("name") {
+                method.name = Some(meta.value()?.parse()?);
+            } else if meta.path.is_ident("custom") {
+                method.custom = Some(meta.value()?.parse()?);
+            } else if meta.path.is_ident("skip") {
+                method.skip = true;
+            } else {
+                return Err(meta.error("expected `name`, `custom` or `skip`"));
+            }
+            Ok(())
+        })?;
+    }
+    let mut decodes = Vec::new();
+    for input in &mut sig.inputs {
+        let syn::FnArg::Typed(pat_type) = input else {
+            continue;
+        };
+        let mut decode = None;
+        for attr in take_php(&mut pat_type.attrs) {
+            attr.parse_nested_meta(|meta| {
+                if meta.path.is_ident("decode") {
+                    decode = Some(meta.value()?.parse()?);
+                    Ok(())
+                } else {
+                    Err(meta.error("expected `decode`"))
+                }
+            })?;
+        }
+        decodes.push(decode);
+    }
+
+    Ok((method, decodes))
+}
+
+fn take_php(attrs: &mut Vec<syn::Attribute>) -> Vec<syn::Attribute> {
+    let (php, rest) = std::mem::take(attrs)
+        .into_iter()
+        .partition(|attr| attr.path().is_ident("php"));
+    *attrs = rest;
+    php
+}
+
+/// A Rust method of the annotated item.
+struct RustMethod {
+    sig: syn::Signature,
+    attrs: MethodAttrs,
+    decodes: Vec<Option<syn::Type>>,
+    matched: bool,
+}
+
+pub fn expand(
+    attr: proc_macro2::TokenStream,
+    item: proc_macro2::TokenStream,
+) -> proc_macro2::TokenStream {
+    let mut item: syn::Item = match syn::parse2(item.clone()) {
+        Ok(item) => item,
+        Err(error) => return error.to_compile_error(),
+    };
+    match expand_item(attr, &mut item) {
+        Ok(generated) => quote::quote! { #item #generated },
+        Err(error) => {
+            let error = error.to_compile_error();
+            quote::quote! { #item #error }
+        }
+    }
+}
+
+fn expand_item(
+    attr: proc_macro2::TokenStream,
+    item: &mut syn::Item,
+) -> syn::Result<proc_macro2::TokenStream> {
+    let args: Args = syn::parse2(attr)?;
+    let mut methods = Vec::new();
+    let (target, call_base, module_name) = match item {
+        syn::Item::Trait(item) => {
+            if !item.generics.params.is_empty() {
+                return Err(syn::Error::new(
+                    item.generics.span(),
+                    "#[php_binding] does not support a generic trait",
+                ));
+            }
+            for trait_item in &mut item.items {
+                if let syn::TraitItem::Fn(function) = trait_item {
+                    let (attrs, decodes) = take_attrs(&mut function.sig, &mut function.attrs)?;
+                    methods.push(RustMethod {
+                        sig: function.sig.clone(),
+                        attrs,
+                        decodes,
+                        matched: false,
+                    });
+                }
+            }
+            let ident = &item.ident;
+            (
+                quote::quote! { dyn #ident + 'static },
+                quote::quote! { <dyn #ident as #ident> },
+                snake_case(&ident.to_string()),
+            )
+        }
+        syn::Item::Impl(item) if item.trait_.is_none() => {
+            if !item.generics.params.is_empty() {
+                return Err(syn::Error::new(
+                    item.generics.span(),
+                    "#[php_binding] does not support a generic impl",
+                ));
+            }
+            for impl_item in &mut item.items {
+                if let syn::ImplItem::Fn(function) = impl_item {
+                    let (attrs, decodes) = take_attrs(&mut function.sig, &mut function.attrs)?;
+                    methods.push(RustMethod {
+                        sig: function.sig.clone(),
+                        attrs,
+                        decodes,
+                        matched: false,
+                    });
+                }
+            }
+            let self_ty = &item.self_ty;
+            let syn::Type::Path(path) = &**self_ty else {
+                return Err(syn::Error::new(
+                    self_ty.span(),
+                    "#[php_binding] expects an impl of a named type",
+                ));
+            };
+            let name = path
+                .path
+                .segments
+                .last()
+                .expect("a path has a segment")
+                .ident
+                .to_string();
+            (
+                quote::quote! { #self_ty },
+                quote::quote! { <#self_ty> },
+                snake_case(&name),
+            )
+        }
+        _ => {
+            return Err(syn::Error::new(
+                proc_macro2::Span::call_site(),
+                "#[php_binding] goes on a trait or an inherent impl",
+            ));
+        }
+    };
+
+    let fqcn = args.fqcn.value();
+    let span = args.fqcn.span();
+    let loaded = decls::load(&fqcn, span)?;
+    let mut adapters = Vec::new();
+    for method in &loaded.decl.methods {
+        let answers = if method.is_static {
+            args.members.statics
+        } else {
+            args.members.instance
+        };
+        if !answers {
+            continue;
+        }
+        let Some(rust) = find(&mut methods, &method.name, &method.rust) else {
+            continue;
+        };
+        if rust.attrs.skip {
+            continue;
+        }
+        let adapter_name = decls::ident(&method.rust, rust.sig.ident.span())?;
+        if let Some(custom) = &rust.attrs.custom {
+            adapters.push(quote::quote! { pub(crate) use #custom as #adapter_name; });
+            continue;
+        }
+        if method.func_num_args {
+            return Err(syn::Error::new(
+                rust.sig.span(),
+                format!(
+                    "{fqcn}::{} branches on func_num_args(); answer it with #[php(custom = ...)]",
+                    method.name
+                ),
+            ));
+        }
+        adapters.push(adapter(
+            &fqcn,
+            &method.name,
+            method.is_static,
+            &method.params,
+            rust,
+            &adapter_name,
+            &target,
+            &call_base,
+        )?);
+    }
+    if let Some(constructor) = methods.iter().find(|method| {
+        method
+            .attrs
+            .name
+            .as_ref()
+            .is_some_and(|name| name.value() == "__construct")
+    }) {
+        if !args.members.constructor || loaded.decl.constructor.is_none() {
+            return Err(syn::Error::new(
+                constructor.sig.span(),
+                format!("{fqcn} has no constructor this item answers"),
+            ));
+        }
+        return Err(syn::Error::new(
+            constructor.sig.span(),
+            "#[php_binding] does not generate constructors yet",
+        ));
+    }
+    for method in &methods {
+        if let (Some(name), false) = (&method.attrs.name, method.matched) {
+            return Err(syn::Error::new(
+                name.span(),
+                format!("{fqcn} has no member `{}` this item answers", name.value()),
+            ));
+        }
+    }
+
+    let module = quote::format_ident!("__php_binding_{}", module_name);
+    let tracking = loaded.tracking;
+
+    Ok(quote::quote! {
+        #[doc(hidden)]
+        pub(crate) mod #module {
+            #[allow(unused_imports)]
+            use super::*;
+
+            #tracking
+
+            #(#adapters)*
+        }
+    })
+}
+
+/// The Rust method answering a PHP member: the one naming it with `#[php(name = ...)]`, or else
+/// the one with its Rust name that names no member itself.
+fn find<'a>(
+    methods: &'a mut [RustMethod],
+    php_name: &str,
+    rust_name: &str,
+) -> Option<&'a mut RustMethod> {
+    let index = methods
+        .iter()
+        .position(|method| {
+            method
+                .attrs
+                .name
+                .as_ref()
+                .is_some_and(|name| name.value() == php_name)
+        })
+        .or_else(|| {
+            methods.iter().position(|method| {
+                method.attrs.name.is_none()
+                    && method.sig.ident == rust_name.trim_start_matches("r#")
+            })
+        })?;
+    let method = &mut methods[index];
+    method.matched = true;
+
+    Some(method)
+}
+
+/// How an adapter decodes one argument and hands it to the Rust method.
+enum ArgShape {
+    /// The parameter's own type.
+    Owned(syn::Type),
+    /// `&T`, decoded as `T::Owned` and lent.
+    Borrowed(syn::Type),
+    /// `Option<&T>`, decoded as `Option<T::Owned>` and lent.
+    OptionBorrowed(syn::Type),
+}
+
+#[allow(clippy::too_many_arguments, reason = "the parts of one adapter")]
+fn adapter(
+    fqcn: &str,
+    php_name: &str,
+    is_static: bool,
+    params: &[Param],
+    rust: &RustMethod,
+    adapter_name: &syn::Ident,
+    target: &proc_macro2::TokenStream,
+    call_base: &proc_macro2::TokenStream,
+) -> syn::Result<proc_macro2::TokenStream> {
+    let sig = &rust.sig;
+    let span = sig.span();
+    let member = format!("{fqcn}::{php_name}");
+    if sig.asyncness.is_some() {
+        return Err(syn::Error::new(
+            span,
+            format!("{member}: #[php_binding] does not generate async adapters yet"),
+        ));
+    }
+    let mut receiver = None;
+    let mut typed = Vec::new();
+    for input in &sig.inputs {
+        match input {
+            syn::FnArg::Receiver(r) => receiver = Some(r),
+            syn::FnArg::Typed(pat_type) => typed.push(pat_type),
+        }
+    }
+    let receiver_mut = match (is_static, receiver) {
+        (true, None) => None,
+        (true, Some(r)) => {
+            return Err(syn::Error::new(
+                r.span(),
+                format!("{member} is static in PHP, so it takes no receiver"),
+            ));
+        }
+        (false, None) => {
+            return Err(syn::Error::new(
+                span,
+                format!(
+                    "{member} is an instance method in PHP, so it takes `&self` or `&mut self`"
+                ),
+            ));
+        }
+        (false, Some(r)) => match &r.kind {
+            syn::ReceiverKind::Reference(_, _, mutability) => Some(mutability.is_some()),
+            _ => {
+                return Err(syn::Error::new(
+                    r.span(),
+                    format!(
+                        "{member}: an adapter borrows its receiver, so it takes `&self` or `&mut self`"
+                    ),
+                ));
+            }
+        },
+    };
+    if typed.len() != params.len() {
+        return Err(syn::Error::new(
+            span,
+            format!(
+                "{member} takes {} parameters in PHP, {} here",
+                params.len(),
+                typed.len()
+            ),
+        ));
+    }
+
+    let mut decodes = Vec::new();
+    let mut passes = Vec::new();
+    for (position, ((pat_type, param), decode)) in
+        typed.iter().zip(params).zip(&rust.decodes).enumerate()
+    {
+        let ty_span = pat_type.ty.span();
+        let what = format!("{member} parameter ${}", param.name);
+        if param.variadic {
+            return Err(syn::Error::new(
+                ty_span,
+                format!("{what} is variadic, which an adapter does not decode yet"),
+            ));
+        }
+        let shape = match decode {
+            Some(decode) => ArgShape::Owned(decode.clone()),
+            None => shape_of(&pat_type.ty, &what)?,
+        };
+        if param.by_ref {
+            return Err(syn::Error::new(
+                ty_span,
+                format!("{what} is passed by reference, which an adapter does not decode yet"),
+            ));
+        }
+        let admits_null = match &shape {
+            ArgShape::Owned(ty) => admits_null(ty),
+            ArgShape::Borrowed(_) => false,
+            ArgShape::OptionBorrowed(_) => true,
+        };
+        if param.nullable && !admits_null {
+            return Err(syn::Error::new(
+                ty_span,
+                format!(
+                    "null can arrive in {what}, which this type does not hold; give a #[php(decode = ...)] type or answer it with #[php(custom = ...)]"
+                ),
+            ));
+        }
+        let var = quote::format_ident!("__arg{}", position);
+        let (decoded, pass) = match &shape {
+            ArgShape::Owned(ty) => (quote::quote! { #ty }, quote::quote! { #var }),
+            ArgShape::Borrowed(ty) => (
+                quote::quote! { <#ty as ::std::borrow::ToOwned>::Owned },
+                quote::quote! { ::std::borrow::Borrow::<#ty>::borrow(&#var) },
+            ),
+            ArgShape::OptionBorrowed(ty) => (
+                quote::quote! { ::core::option::Option<<#ty as ::std::borrow::ToOwned>::Owned> },
+                quote::quote! { #var.as_ref().map(::std::borrow::Borrow::<#ty>::borrow) },
+            ),
+        };
+        decodes.push(quote::quote_spanned! {ty_span=>
+            let #var: #decoded = crate::php_worker::rpc::binding::decode_arg(call, #position)?;
+        });
+        passes.push(pass);
+    }
+
+    let fn_ident = &sig.ident;
+    let lends = match &sig.output {
+        syn::ReturnType::Default => false,
+        syn::ReturnType::Type(_, ty) => has_reference(ty),
+    };
+    let answer = quote::quote! { crate::php_worker::rpc::binding::IntoRpcAnswer::into_rpc_answer };
+    let (this, invoke) = match receiver_mut {
+        None => (
+            quote::quote! {},
+            quote::quote! { #call_base::#fn_ident(#(#passes),*) },
+        ),
+        Some(true) => (
+            quote::quote! { this: &impl crate::php_worker::rpc::binding::ReceiverMut<#target>, },
+            quote::quote! { #call_base::#fn_ident(&mut *crate::php_worker::rpc::binding::ReceiverMut::get_mut(this), #(#passes),*) },
+        ),
+        Some(false) => (
+            quote::quote! { this: &impl crate::php_worker::rpc::binding::Receiver<#target>, },
+            quote::quote! { #call_base::#fn_ident(&*crate::php_worker::rpc::binding::Receiver::get(this), #(#passes),*) },
+        ),
+    };
+    let body = if lends {
+        quote::quote! { #answer(#invoke, call) }
+    } else {
+        quote::quote! {
+            let __answer = #invoke;
+            #answer(__answer, call)
+        }
+    };
+
+    Ok(quote::quote! {
+        pub(crate) fn #adapter_name(
+            #this
+            call: &mut crate::php_worker::rpc::entity::Call<'_>,
+        ) -> ::core::result::Result<::shirabe_php_rpc::RpcValue, ::shirabe_php_rpc::PhpThrow> {
+            #(#decodes)*
+            #body
+        }
+    })
+}
+
+fn shape_of(ty: &syn::Type, what: &str) -> syn::Result<ArgShape> {
+    match ty {
+        syn::Type::Reference(reference) => {
+            if reference.mutability.is_some() {
+                return Err(syn::Error::new(
+                    ty.span(),
+                    format!("{what} is `&mut`, which an adapter does not decode yet"),
+                ));
+            }
+            Ok(ArgShape::Borrowed((*reference.elem).clone()))
+        }
+        syn::Type::ImplTrait(_) => Err(syn::Error::new(
+            ty.span(),
+            format!("{what} is generic; give the type to decode with #[php(decode = ...)]"),
+        )),
+        syn::Type::Path(path) => {
+            let last = path.path.segments.last().expect("a path has a segment");
+            if last.ident == "Option"
+                && let syn::PathArguments::AngleBracketed(args) = &last.arguments
+                && let Some(syn::GenericArgument::Type(syn::Type::Reference(reference))) =
+                    args.args.first()
+            {
+                if reference.mutability.is_some() {
+                    return Err(syn::Error::new(
+                        ty.span(),
+                        format!("{what} is `&mut`, which an adapter does not decode yet"),
+                    ));
+                }
+                return Ok(ArgShape::OptionBorrowed((*reference.elem).clone()));
+            }
+            Ok(ArgShape::Owned(ty.clone()))
+        }
+        _ => Ok(ArgShape::Owned(ty.clone())),
+    }
+}
+
+/// Whether a decoded type holds PHP's null: an `Option`, or a type standing for any PHP value.
+fn admits_null(ty: &syn::Type) -> bool {
+    let syn::Type::Path(path) = ty else {
+        return false;
+    };
+    let last = path.path.segments.last().expect("a path has a segment");
+
+    ["Option", "PhpMixed", "RpcValue"]
+        .iter()
+        .any(|name| last.ident == name)
+}
+
+/// Whether a type borrows: it holds a `&` or a lifetime.
+fn has_reference(ty: &syn::Type) -> bool {
+    fn scan(tokens: proc_macro2::TokenStream) -> bool {
+        tokens.into_iter().any(|token| match token {
+            proc_macro2::TokenTree::Punct(punct) => {
+                punct.as_char() == '&' || punct.as_char() == '\''
+            }
+            proc_macro2::TokenTree::Group(group) => scan(group.stream()),
+            _ => false,
+        })
+    }
+
+    scan(quote::quote! { #ty })
+}
+
+pub fn snake_case(name: &str) -> String {
+    let mut out = String::new();
+    let chars: Vec<char> = name.chars().collect();
+    for (index, &c) in chars.iter().enumerate() {
+        if c.is_ascii_uppercase() {
+            let after_lower = index > 0
+                && (chars[index - 1].is_ascii_lowercase() || chars[index - 1].is_ascii_digit());
+            let before_lower = index > 0
+                && chars[index - 1].is_ascii_uppercase()
+                && chars.get(index + 1).is_some_and(char::is_ascii_lowercase);
+            if after_lower || before_lower {
+                out.push('_');
+            }
+            out.push(c.to_ascii_lowercase());
+        } else {
+            out.push(c);
+        }
+    }
+
+    out
+}

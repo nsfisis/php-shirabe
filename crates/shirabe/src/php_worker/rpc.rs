@@ -8,8 +8,10 @@
 //! - `dispatch`: the dispatcher of the worker's requests, including the runtime services
 //! - `entities`: the methods each proxied class answers
 //! - `args`: argument decoding for those methods
+//! - `binding`: what the generated bindings build on: receivers and argument and answer conversion
 
 pub(crate) mod args;
+pub mod binding;
 pub(crate) mod dispatch;
 pub(crate) mod entities;
 pub mod entity;
