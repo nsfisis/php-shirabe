@@ -39,10 +39,10 @@ use crate::util::{ErrorHandler, Filesystem, HttpDownloader, Platform};
 use bstr::{B, BStr, BString, ByteSlice as _, ByteVec as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    AnyThrowable, AsAny, Catch as _, Error, ExitException, InvalidArgumentException,
+    AnyThrowable, AsAny, Catch as _, Error, InvalidArgumentException,
     LogicException as ShimLogicException, PHP_ENV, PHP_SERVER, PhpMixed, PregMatches,
     RuntimeException, STDIN, STR_PAD_RIGHT, ToPhpString, basename, bformat, bin2hex, boolval,
-    chdir, defined, dirname, disk_free_space, display_to_bytes, empty, error_message, exec,
+    chdir, defined, dirname, disk_free_space, display_to_bytes, empty, error_message, exec, exit,
     explode, explode_limit, file_exists, file_get_contents, file_put_contents, function_exists,
     get_debug_type_obj, getcwd, getenv, getmypid, glob, implode, intval, is_dir, is_file,
     is_numeric_string, is_string, json_decode_assoc, levenshtein, ltrim_chars, mb_convert_encoding,
@@ -352,10 +352,7 @@ impl Application {
                         if required {
                             self.io.write_error(error_message(&e));
                             if self.are_exceptions_caught() {
-                                // PHP calls `exit(1)` here, terminating before parent::run() can
-                                // re-render the exception. Propagate it as an ExitException so the
-                                // top-level handler turns it into exit code 1 without re-rendering.
-                                return Err(ExitException { code: 1 }.into());
+                                exit(1);
                             }
                             return Err(e);
                         }
@@ -2456,11 +2453,6 @@ impl ApplicationHandle {
         let outcome = match result_outcome {
             Ok(r) => Ok(r),
             Err(mut e) => {
-                // PHP's `exit` bypasses parent::doRun()'s catch entirely; re-raise it untouched so
-                // the GitHub Actions annotation and error hints below are skipped.
-                if e.downcast_ref::<ExitException>().is_some() {
-                    return Err(e);
-                }
                 if let Some(see) = e.catch::<ScriptExecutionException>() {
                     if application.borrow().get_disable_plugins_by_default()
                         && application.borrow().is_running_as_root()
@@ -2588,12 +2580,6 @@ impl ApplicationHandle {
         let exit_code = match result {
             Ok(exit_code) => exit_code,
             Err(e) => {
-                // PHP's `exit` bypasses Symfony's try/catch: it never renders and forces the exit
-                // code it carries. The message, if any, has already been written at the exit site.
-                if let Some(exit) = e.downcast_ref::<ExitException>() {
-                    return Ok(exit.code as i32);
-                }
-
                 if !application.borrow().catch_exceptions {
                     return Err(e);
                 }

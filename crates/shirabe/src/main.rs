@@ -1,6 +1,6 @@
 //! ref: composer/bin/composer sha1:ccaa40f848b5fa236d5cd8d824b315e2fea2d819
 
-use shirabe_php_shim::{PHP_ENV, PHP_SERVER, getenv, path_to_bytes, utf8_text};
+use shirabe_php_shim::{Exit, PHP_ENV, PHP_SERVER, getenv, path_to_bytes, utf8_text};
 use std::io::IsTerminal as _;
 
 /// Initialize a tracing subscriber from the environment variable `$SHIRABE_TRACING`.
@@ -66,11 +66,20 @@ fn main() {
 
     init_tracing();
 
-    let result = runtime.block_on(shirabe::run(
-        std::env::args_os()
-            .map(|arg| bstr::BString::from(path_to_bytes(&arg)))
-            .collect(),
-    ));
+    // Nothing the unwind left half-updated is observed: an `Exit` ends the process right away.
+    let result = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        runtime.block_on(shirabe::run(
+            std::env::args_os()
+                .map(|arg| bstr::BString::from(path_to_bytes(&arg)))
+                .collect(),
+        ))
+    })) {
+        Ok(result) => result,
+        Err(payload) => match payload.downcast::<Exit>() {
+            Ok(exit) => exit.terminate(),
+            Err(payload) => std::panic::resume_unwind(payload),
+        },
+    };
     let exit_code = match result {
         Ok(exit_code) => exit_code,
         Err(e) => {

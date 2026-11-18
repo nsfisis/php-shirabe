@@ -85,7 +85,15 @@ module_inception = "allow"
 multiple_inherent_impl = "warn"
 type_complexity = "allow"
 
+# PHP's `exit` is ported as an unwind that the top-level frame catches (see
+# `shirabe_php_shim::exit`), so that no port of a `catch` intercepts it and `Drop` runs on the
+# way out the way PHP runs destructors. Under `panic = "abort"` every `exit` would abort the
+# process instead.
+[profile.dev]
+panic = "unwind"
+
 [profile.release]
+panic = "unwind"
 codegen-units = 1
 lto = "fat"
 strip = "debuginfo"
