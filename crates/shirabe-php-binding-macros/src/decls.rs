@@ -6,6 +6,8 @@
 pub struct Decl {
     pub fqcn: String,
     pub rust_module: Vec<String>,
+    #[serde(default)]
+    pub parent: Option<String>,
     pub methods: Vec<Method>,
     #[serde(default)]
     pub constructor: Option<Constructor>,
@@ -30,6 +32,7 @@ pub struct Method {
 #[derive(Debug, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Constructor {
+    pub declared_in: Option<String>,
     pub params: Vec<Param>,
     pub func_num_args: bool,
     #[serde(default)]
@@ -45,6 +48,28 @@ pub struct Param {
     pub by_ref: bool,
     pub variadic: bool,
     pub nullable: bool,
+    #[serde(rename = "type")]
+    pub native_type: Option<String>,
+}
+
+impl Param {
+    /// The parameter's PHP type as a binding compares it: the native type (`mixed` when there is
+    /// none), and whether null can arrive.
+    pub fn signature(&self) -> String {
+        format!(
+            "{}{}",
+            self.native_type.as_deref().unwrap_or("mixed"),
+            if self.nullable { "|null" } else { "" }
+        )
+    }
+}
+
+/// The signatures of a parameter list, as a `&[&[u8]]` expression.
+pub fn signatures(params: &[Param]) -> proc_macro2::TokenStream {
+    let signatures = params.iter().map(|param| {
+        syn::LitByteStr::new(param.signature().as_bytes(), proc_macro2::Span::call_site())
+    });
+    quote::quote! { &[#(#signatures),*] }
 }
 
 /// A loaded declaration, with the item that makes the calling crate rebuild when it changes.

@@ -7,7 +7,7 @@
 //! the answer names may borrow other entities, or the receiver itself.
 
 use crate::package::{
-    DisplayMode, Link, Mirror, PackageInterfaceHandle, RootPackageInterfaceHandle,
+    DisplayMode, Link, Mirror, PackageHandle, PackageInterfaceHandle, RootPackageInterfaceHandle,
 };
 use crate::php_worker::rpc::entity::{Call, Entity, EntityArg, entity_value};
 use crate::repository::{LockArrayRepositoryHandle, RepositoryInterfaceHandle};
@@ -76,6 +76,7 @@ from_rpc_value_args!(
     Link,
     Mirror,
     DisplayMode,
+    chrono::DateTime<chrono::Utc>,
 );
 
 impl<T: FromRpcArg> FromRpcArg for Option<T> {
@@ -195,9 +196,69 @@ impl<T: IntoRpcAnswer> IntoRpcAnswer for IndexMap<BString, T> {
     }
 }
 
+/// A real package crosses as a package entity.
+impl IntoRpcAnswer for PackageHandle {
+    fn into_rpc_answer(self, _: &Call<'_>) -> Result<RpcValue, PhpThrow> {
+        entity_value(&PackageInterfaceHandle::from(self))
+    }
+}
+
 /// A `LockArrayRepository` crosses as a repository entity.
 impl IntoRpcAnswer for LockArrayRepositoryHandle {
     fn into_rpc_answer(self, _: &Call<'_>) -> Result<RpcValue, PhpThrow> {
         entity_value(&RepositoryInterfaceHandle::from(self))
     }
+}
+
+impl IntoRpcAnswer for &bstr::BStr {
+    fn into_rpc_answer(self, _: &Call<'_>) -> Result<RpcValue, PhpThrow> {
+        Ok(self.to_rpc_value())
+    }
+}
+
+impl IntoRpcAnswer for chrono::DateTime<chrono::Utc> {
+    fn into_rpc_answer(self, _: &Call<'_>) -> Result<RpcValue, PhpThrow> {
+        Ok(self.to_rpc_value())
+    }
+}
+
+/// A map the Rust side shares between readers crosses as a copy.
+impl<T: IntoRpcAnswer + Clone> IntoRpcAnswer for std::rc::Rc<IndexMap<BString, T>> {
+    fn into_rpc_answer(self, call: &Call<'_>) -> Result<RpcValue, PhpThrow> {
+        std::rc::Rc::unwrap_or_clone(self).into_rpc_answer(call)
+    }
+}
+
+/// Whether the stub of a class declares the parameters an adapter decodes its arguments against
+/// (`checked`, `None` for a hand-written adapter, which decodes whatever arrives): both are lists
+/// of the PHP types `php-decls/` spells.
+pub const fn params_match(checked: Option<&[&[u8]]>, declared: &[&[u8]]) -> bool {
+    let Some(checked) = checked else {
+        return true;
+    };
+    if checked.len() != declared.len() {
+        return false;
+    }
+    let mut index = 0;
+    while index < checked.len() {
+        if !bytes_eq(checked[index], declared[index]) {
+            return false;
+        }
+        index += 1;
+    }
+    true
+}
+
+const fn bytes_eq(a: &[u8], b: &[u8]) -> bool {
+    if a.len() != b.len() {
+        return false;
+    }
+    let mut index = 0;
+    while index < a.len() {
+        if a[index] != b[index] {
+            return false;
+        }
+        index += 1;
+    }
+    true
 }

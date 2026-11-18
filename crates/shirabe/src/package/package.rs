@@ -6,6 +6,7 @@ use crate::repository::{RepositoryInterfaceHandle, RepositoryInterfaceWeakHandle
 use crate::util::ComposerMirror;
 use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::{IndexMap, IndexSet};
+use shirabe_php_binding_macros::php_binding;
 use shirabe_php_shim::{
     E_USER_NOTICE, LogicException, PhpDisplay, PhpMixed, PregMatches, bformat, ltrim_chars,
     php_regex, preg_is_match, preg_replace, preg_replace_callback, strpos, strtolower,
@@ -65,8 +66,10 @@ pub struct Package {
     php_ext: Option<IndexMap<BString, PhpMixed>>,
 }
 
+#[php_binding(r"Composer\Package\Package", members = (instance, constructor))]
 impl Package {
     /// Creates a new in memory package.
+    #[php(name = "__construct")]
     pub fn new(name: BString, version: BString, pretty_version: BString) -> Self {
         let stability = VersionParser::parse_stability(&version);
         let dev = stability == "dev";

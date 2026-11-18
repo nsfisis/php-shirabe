@@ -3,8 +3,10 @@
 use crate::package::PackageInterface;
 use bstr::BString;
 use indexmap::IndexMap;
+use shirabe_php_binding_macros::php_binding;
 use shirabe_php_shim::PhpMixed;
 
+#[php_binding(r"Composer\Package\CompletePackageInterface")]
 pub trait CompletePackageInterface: PackageInterface {
     fn get_scripts(&self) -> IndexMap<BString, Vec<BString>>;
 

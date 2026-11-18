@@ -5,6 +5,7 @@ use crate::package::{BasePackage, DisplayMode, Link, Mirror, PackageHandle, Pack
 use crate::repository::{RepositoryInterfaceHandle, RepositoryInterfaceWeakHandle};
 use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::{IndexMap, IndexSet};
+use shirabe_php_binding_macros::php_binding;
 use shirabe_php_shim::{
     LogicException, PhpDisplay, PhpMixed, ToPhpString, bformat, bwrite, strtolower,
 };
@@ -33,6 +34,7 @@ pub struct AliasPackage {
     pub(crate) replaces: std::rc::Rc<IndexMap<BString, Link>>,
 }
 
+#[php_binding(r"Composer\Package\AliasPackage", members = instance)]
 impl AliasPackage {
     /// All descendants' constructors should call this parent constructor
     pub fn new(

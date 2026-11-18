@@ -21,7 +21,7 @@ pub enum AnyPackage {
 }
 
 impl AnyPackage {
-    pub fn as_package_interface(&self) -> &dyn PackageInterface {
+    pub fn as_package_interface(&self) -> &(dyn PackageInterface + 'static) {
         match self {
             Self::Package(p) => p,
             Self::CompletePackage(p) => p,
@@ -32,7 +32,7 @@ impl AnyPackage {
         }
     }
 
-    pub fn as_package_interface_mut(&mut self) -> &mut dyn PackageInterface {
+    pub fn as_package_interface_mut(&mut self) -> &mut (dyn PackageInterface + 'static) {
         match self {
             Self::Package(p) => p,
             Self::CompletePackage(p) => p,
@@ -43,7 +43,9 @@ impl AnyPackage {
         }
     }
 
-    pub fn as_complete_package_interface(&self) -> Option<&dyn CompletePackageInterface> {
+    pub fn as_complete_package_interface(
+        &self,
+    ) -> Option<&(dyn CompletePackageInterface + 'static)> {
         match self {
             Self::CompletePackage(p) => Some(p),
             Self::RootPackage(p) => Some(p),
@@ -55,7 +57,7 @@ impl AnyPackage {
 
     pub fn as_complete_package_interface_mut(
         &mut self,
-    ) -> Option<&mut dyn CompletePackageInterface> {
+    ) -> Option<&mut (dyn CompletePackageInterface + 'static)> {
         match self {
             Self::CompletePackage(p) => Some(p),
             Self::RootPackage(p) => Some(p),
@@ -97,7 +99,7 @@ impl AnyPackage {
         }
     }
 
-    pub fn as_root_package_interface(&self) -> Option<&dyn RootPackageInterface> {
+    pub fn as_root_package_interface(&self) -> Option<&(dyn RootPackageInterface + 'static)> {
         match self {
             Self::RootPackage(p) => Some(p),
             Self::RootAliasPackage(p) => Some(p),
@@ -105,7 +107,9 @@ impl AnyPackage {
         }
     }
 
-    pub fn as_root_package_interface_mut(&mut self) -> Option<&mut dyn RootPackageInterface> {
+    pub fn as_root_package_interface_mut(
+        &mut self,
+    ) -> Option<&mut (dyn RootPackageInterface + 'static)> {
         match self {
             Self::RootPackage(p) => Some(p),
             Self::RootAliasPackage(p) => Some(p),

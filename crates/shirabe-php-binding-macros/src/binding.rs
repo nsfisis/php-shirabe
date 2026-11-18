@@ -160,6 +160,7 @@ fn expand_item(
 ) -> syn::Result<proc_macro2::TokenStream> {
     let args: Args = syn::parse2(attr)?;
     let mut methods = Vec::new();
+    let mut self_ty = None;
     let (target, call_base, module_name) = match item {
         syn::Item::Trait(item) => {
             if !item.generics.params.is_empty() {
@@ -204,6 +205,7 @@ fn expand_item(
                     });
                 }
             }
+            self_ty = Some((*item.self_ty).clone());
             let self_ty = &item.self_ty;
             let syn::Type::Path(path) = &**self_ty else {
                 return Err(syn::Error::new(
@@ -236,13 +238,14 @@ fn expand_item(
     let span = args.fqcn.span();
     let loaded = decls::load(&fqcn, span)?;
     let mut adapters = Vec::new();
+    let mut checked = Vec::new();
     for method in &loaded.decl.methods {
         let answers = if method.is_static {
             args.members.statics
         } else {
             args.members.instance
         };
-        if !answers {
+        if !answers || method.declared_in != fqcn {
             continue;
         }
         let Some(rust) = find(&mut methods, &method.name, &method.rust) else {
@@ -254,6 +257,7 @@ fn expand_item(
         let adapter_name = decls::ident(&method.rust, rust.sig.ident.span())?;
         if let Some(custom) = &rust.attrs.custom {
             adapters.push(quote::quote! { pub(crate) use #custom as #adapter_name; });
+            checked.push(quote::quote! { pub(crate) const #adapter_name: ::core::option::Option<&[&[u8]]> = ::core::option::Option::None; });
             continue;
         }
         if method.func_num_args {
@@ -275,24 +279,49 @@ fn expand_item(
             &target,
             &call_base,
         )?);
+        let signatures = decls::signatures(&method.params);
+        checked.push(quote::quote! { pub(crate) const #adapter_name: ::core::option::Option<&[&[u8]]> = ::core::option::Option::Some(#signatures); });
     }
-    if let Some(constructor) = methods.iter().find(|method| {
+    if let Some(index) = methods.iter().position(|method| {
         method
             .attrs
             .name
             .as_ref()
             .is_some_and(|name| name.value() == "__construct")
     }) {
-        if !args.members.constructor || loaded.decl.constructor.is_none() {
+        let constructor = &mut methods[index];
+        constructor.matched = true;
+        let span = constructor.sig.span();
+        let (Some(self_ty), true, Some(declared)) =
+            (&self_ty, args.members.constructor, &loaded.decl.constructor)
+        else {
             return Err(syn::Error::new(
-                constructor.sig.span(),
+                span,
                 format!("{fqcn} has no constructor this item answers"),
             ));
+        };
+        if declared.func_num_args {
+            return Err(syn::Error::new(
+                span,
+                format!(
+                    "{fqcn}::__construct branches on func_num_args(); answer it with #[php(custom = ...)]"
+                ),
+            ));
         }
-        return Err(syn::Error::new(
-            constructor.sig.span(),
-            "#[php_binding] does not generate constructors yet",
-        ));
+        let adapter_name = quote::format_ident!("__construct");
+        if let Some(custom) = &constructor.attrs.custom {
+            adapters.push(quote::quote! { pub(crate) use #custom as #adapter_name; });
+            checked.push(quote::quote! { pub(crate) const #adapter_name: ::core::option::Option<&[&[u8]]> = ::core::option::Option::None; });
+        } else {
+            adapters.push(constructor_adapter(
+                &fqcn,
+                &declared.params,
+                constructor,
+                self_ty,
+            )?);
+            let signatures = decls::signatures(&declared.params);
+            checked.push(quote::quote! { pub(crate) const #adapter_name: ::core::option::Option<&[&[u8]]> = ::core::option::Option::Some(#signatures); });
+        }
     }
     for method in &methods {
         if let (Some(name), false) = (&method.attrs.name, method.matched) {
@@ -315,6 +344,13 @@ fn expand_item(
             #tracking
 
             #(#adapters)*
+
+            /// The PHP parameter types each adapter decodes its arguments against, or `None`
+            /// for a hand-written one.
+            #[allow(non_upper_case_globals)]
+            pub(crate) mod __php_params {
+                #(#checked)*
+            }
         }
     })
 }
@@ -413,6 +449,56 @@ fn adapter(
             }
         },
     };
+    let (decodes, passes) = decode_args(&member, span, params, &typed, &rust.decodes)?;
+
+    let fn_ident = &sig.ident;
+    let lends = match &sig.output {
+        syn::ReturnType::Default => false,
+        syn::ReturnType::Type(_, ty) => has_reference(ty),
+    };
+    let answer = quote::quote! { crate::php_worker::rpc::binding::IntoRpcAnswer::into_rpc_answer };
+    let (this, invoke) = match receiver_mut {
+        None => (
+            quote::quote! {},
+            quote::quote! { #call_base::#fn_ident(#(#passes),*) },
+        ),
+        Some(true) => (
+            quote::quote! { this: &impl crate::php_worker::rpc::binding::ReceiverMut<#target>, },
+            quote::quote! { #call_base::#fn_ident(&mut *crate::php_worker::rpc::binding::ReceiverMut::get_mut(this), #(#passes),*) },
+        ),
+        Some(false) => (
+            quote::quote! { this: &impl crate::php_worker::rpc::binding::Receiver<#target>, },
+            quote::quote! { #call_base::#fn_ident(&*crate::php_worker::rpc::binding::Receiver::get(this), #(#passes),*) },
+        ),
+    };
+    let body = if lends {
+        quote::quote! { #answer(#invoke, call) }
+    } else {
+        quote::quote! {
+            let __answer = #invoke;
+            #answer(__answer, call)
+        }
+    };
+
+    Ok(quote::quote! {
+        pub(crate) fn #adapter_name(
+            #this
+            call: &mut crate::php_worker::rpc::entity::Call<'_>,
+        ) -> ::core::result::Result<::shirabe_php_rpc::RpcValue, ::shirabe_php_rpc::PhpThrow> {
+            #(#decodes)*
+            #body
+        }
+    })
+}
+
+/// The statements decoding a forwarded call's arguments, and the expressions passing them on.
+fn decode_args(
+    member: &str,
+    span: proc_macro2::Span,
+    params: &[Param],
+    typed: &[&syn::PatType],
+    decode_types: &[Option<syn::Type>],
+) -> syn::Result<(Vec<proc_macro2::TokenStream>, Vec<proc_macro2::TokenStream>)> {
     if typed.len() != params.len() {
         return Err(syn::Error::new(
             span,
@@ -427,7 +513,7 @@ fn adapter(
     let mut decodes = Vec::new();
     let mut passes = Vec::new();
     for (position, ((pat_type, param), decode)) in
-        typed.iter().zip(params).zip(&rust.decodes).enumerate()
+        typed.iter().zip(params).zip(decode_types).enumerate()
     {
         let ty_span = pat_type.ty.span();
         let what = format!("{member} parameter ${}", param.name);
@@ -478,42 +564,61 @@ fn adapter(
         passes.push(pass);
     }
 
-    let fn_ident = &sig.ident;
-    let lends = match &sig.output {
-        syn::ReturnType::Default => false,
-        syn::ReturnType::Type(_, ty) => has_reference(ty),
-    };
-    let answer = quote::quote! { crate::php_worker::rpc::binding::IntoRpcAnswer::into_rpc_answer };
-    let (this, invoke) = match receiver_mut {
-        None => (
-            quote::quote! {},
-            quote::quote! { #call_base::#fn_ident(#(#passes),*) },
-        ),
-        Some(true) => (
-            quote::quote! { this: &impl crate::php_worker::rpc::binding::ReceiverMut<#target>, },
-            quote::quote! { #call_base::#fn_ident(&mut *crate::php_worker::rpc::binding::ReceiverMut::get_mut(this), #(#passes),*) },
-        ),
-        Some(false) => (
-            quote::quote! { this: &impl crate::php_worker::rpc::binding::Receiver<#target>, },
-            quote::quote! { #call_base::#fn_ident(&*crate::php_worker::rpc::binding::Receiver::get(this), #(#passes),*) },
-        ),
-    };
-    let body = if lends {
-        quote::quote! { #answer(#invoke, call) }
-    } else {
-        quote::quote! {
-            let __answer = #invoke;
-            #answer(__answer, call)
+    Ok((decodes, passes))
+}
+
+/// The adapter of a constructor: decodes the arguments and builds the Rust value, which the
+/// entity declaration turns into a handle.
+fn constructor_adapter(
+    fqcn: &str,
+    params: &[Param],
+    rust: &RustMethod,
+    self_ty: &syn::Type,
+) -> syn::Result<proc_macro2::TokenStream> {
+    let sig = &rust.sig;
+    let span = sig.span();
+    let member = format!("{fqcn}::__construct");
+    let mut typed = Vec::new();
+    for input in &sig.inputs {
+        match input {
+            syn::FnArg::Receiver(r) => {
+                return Err(syn::Error::new(
+                    r.span(),
+                    format!("{member} builds a value, so it takes no receiver"),
+                ));
+            }
+            syn::FnArg::Typed(pat_type) => typed.push(pat_type),
         }
+    }
+    let fallible = match &sig.output {
+        syn::ReturnType::Type(_, ty) => match &**ty {
+            syn::Type::Path(path) => {
+                let last = path.path.segments.last().expect("a path has a segment");
+                last.ident == "Result"
+            }
+            _ => false,
+        },
+        syn::ReturnType::Default => {
+            return Err(syn::Error::new(
+                span,
+                format!("{member} has to return the value it builds"),
+            ));
+        }
+    };
+    let (decodes, passes) = decode_args(&member, span, params, &typed, &rust.decodes)?;
+    let fn_ident = &sig.ident;
+    let built = if fallible {
+        quote::quote! { ::core::result::Result::map_err(<#self_ty>::#fn_ident(#(#passes),*), call.failed()) }
+    } else {
+        quote::quote! { ::core::result::Result::Ok(<#self_ty>::#fn_ident(#(#passes),*)) }
     };
 
     Ok(quote::quote! {
-        pub(crate) fn #adapter_name(
-            #this
+        pub(crate) fn __construct(
             call: &mut crate::php_worker::rpc::entity::Call<'_>,
-        ) -> ::core::result::Result<::shirabe_php_rpc::RpcValue, ::shirabe_php_rpc::PhpThrow> {
+        ) -> ::core::result::Result<#self_ty, ::shirabe_php_rpc::PhpThrow> {
             #(#decodes)*
-            #body
+            #built
         }
     })
 }
