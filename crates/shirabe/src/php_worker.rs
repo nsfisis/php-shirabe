@@ -3,6 +3,7 @@
 //! Composer counterpart.
 
 pub mod bundle;
+mod by_value;
 pub mod call;
 pub(crate) mod callable;
 pub mod codec;
@@ -13,6 +14,7 @@ pub(crate) mod installed_versions;
 pub(crate) mod job;
 pub mod platform_info;
 pub mod proxy;
+mod pushed_statics;
 pub mod rpc;
 pub mod runtime;
 pub(crate) mod throwable;

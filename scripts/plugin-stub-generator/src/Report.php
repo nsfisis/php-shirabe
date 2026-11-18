@@ -120,6 +120,23 @@ final class Report
         return $out;
     }
 
+    /**
+     * The static properties of a class the worker and the Rust side share, with how each is kept
+     * in sync.
+     *
+     * @return list<array{name: string, disposition: string, sync: ?string}>
+     */
+    public function staticProperties(string $fqcn): array
+    {
+        return $this->classes[$fqcn]['staticProperties'] ?? [];
+    }
+
+    /** @return list<string> every class of the report, in report order */
+    public function classes(): array
+    {
+        return array_keys($this->classes);
+    }
+
     public function isAbstract(string $fqcn): bool
     {
         return $this->classes[$fqcn]['abstract'] ?? false;

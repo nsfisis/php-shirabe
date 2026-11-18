@@ -37,7 +37,7 @@ pub(crate) fn register(
         State::Forwarding => Some(io),
     });
     match io {
-        Some(io) => push(io),
+        Some(io) => push_io(io),
         None => Ok(()),
     }
 }
@@ -68,12 +68,15 @@ pub(crate) fn register_pending() -> anyhow::Result<()> {
             },
         );
     for io in pending {
-        push(io)?;
+        push_io(io)?;
     }
     Ok(())
 }
 
-fn push(io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>) -> anyhow::Result<()> {
+/// Pushes `ErrorHandler::$io` into the worker through `ErrorHandler::register($io)`.
+pub(crate) fn push_io(
+    io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
+) -> anyhow::Result<()> {
     let io = match io {
         Some(io) => entity_value(&io)?,
         None => RpcValue::Null,
