@@ -147,6 +147,25 @@ through `$this->`, a method that a child overrides, port it with the following p
       Re-export functions that are themselves derived from php-src with `pub use`, so that the API
       seen from outside does not change.
 
+## Plugin bindings
+
+The answers the Rust side gives the PHP worker, and the adapters of PHP objects the Rust side
+calls, are generated from the PHP declarations under `crates/shirabe/php-decls/` (see
+[php-worker.md](php-worker.md) and [plugin-stub-generation.md](plugin-stub-generation.md)). Port a
+type that crosses the boundary so that its bindings can be generated:
+
+* Put `#[php_binding(r"<PHP FQCN>")]` on the trait or inherent impl standing for the PHP type, above
+  `#[async_trait]`. A Rust method answers the PHP method with its snake-case name. When the port
+  splits a method by arity (`write`, `write2`, `write3`), name the PHP method on the version taking
+  every argument with `#[php(name = "...")]`: the stub always sends every declared argument.
+* Keep the parameter types the PHP declaration allows. Where PHP lets null or an untyped value
+  arrive, take an `Option` or `PhpMixed`; give a generic parameter the type to decode with
+  `#[php(decode = T)]`.
+* Mark with `#[php(skip)]` a method whose types cannot cross, and list it as `refused` (or
+  `unimplemented`) in the entity declaration.
+* Write a binding by hand (`#[php(custom = ...)]`, or a `custom` entry of the entity declaration)
+  only where the shape of the PHP API and of the Rust port really differ.
+
 ## Regular expressions
 
 See [regex-porting.md](regex-porting.md).
