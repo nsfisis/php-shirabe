@@ -25,6 +25,31 @@ final class BodyAnalyzer extends NodeVisitorAbstract
     /** @var list<string> */
     public array $staticRefs = [];
 
+    /**
+     * The members behind $newRefs and $staticRefs: `new X` names X's
+     * constructor, `X::m()` names m, and a write to `X::$p` names `$p`.
+     *
+     * @var list<array{kind: 'new'|'static', class: string, member: string}>
+     */
+    public array $hardRefs = [];
+
+    /** @var list<string> own static properties the body writes; `*` for a dynamic name */
+    public array $ownStaticWrites = [];
+
+    /** Whether the body reads or writes any static property, its own or another class's. */
+    public bool $touchesStaticProps = false;
+
+    /**
+     * Classes the body names in a static call, a class constant fetch or a
+     * `new`, self-like names excluded.
+     *
+     * @var list<string>
+     */
+    public array $classRefs = [];
+
+    /** @var list<string> lowercase names of static methods called through self::, static:: or the own class name */
+    public array $ownStaticCalls = [];
+
     /** @var list<string> */
     public array $benignRefs = [];
 
@@ -87,8 +112,10 @@ final class BodyAnalyzer extends NodeVisitorAbstract
         } elseif ($node instanceof Expr\ClassConstFetch) {
             if ($node->class instanceof Name && !$this->isSelfLike($node->class)) {
                 $this->benignRefs[] = $node->class->toString();
+                $this->classRefs[] = $node->class->toString();
             }
         } elseif ($node instanceof Expr\StaticPropertyFetch) {
+            $this->touchesStaticProps = true;
             // Reads are benign; writes are caught via handleAssignTarget.
             if ($node->class instanceof Name && !$this->isSelfLike($node->class)) {
                 $this->benignRefs[] = $node->class->toString();
@@ -119,10 +146,13 @@ final class BodyAnalyzer extends NodeVisitorAbstract
 
         $root = $this->rootOf($target);
         if ($root instanceof Expr\StaticPropertyFetch && $root->class instanceof Name) {
+            $property = $root->name instanceof Node\VarLikeIdentifier ? $root->name->toString() : '*';
             if ($this->isSelfLike($root->class) || $root->class->toString() === $this->currentClass) {
                 $this->writesOwnStaticProps = true;
+                $this->ownStaticWrites[] = $property;
             } else {
                 $this->staticRefs[] = $root->class->toString();
+                $this->hardRefs[] = ['kind' => 'static', 'class' => $root->class->toString(), 'member' => '$' . $property];
             }
         }
     }
@@ -212,6 +242,11 @@ final class BodyAnalyzer extends NodeVisitorAbstract
         $thisArgs = $this->thisArgPositions($call->args);
         $literalName = $call->name instanceof Node\Identifier ? strtolower($call->name->toString()) : null;
 
+        if ($call->class instanceof Name && $literalName !== null
+            && ($this->isSelfLike($call->class) || $call->class->toString() === $this->currentClass)) {
+            $this->ownStaticCalls[] = $literalName;
+        }
+
         if ($call->class instanceof Name && $this->isSelfLike($call->class)) {
             if ($literalName === null) {
                 $this->method->thisEscapesUnresolved = true;
@@ -226,6 +261,12 @@ final class BodyAnalyzer extends NodeVisitorAbstract
         if ($call->class instanceof Name) {
             $className = $call->class->toString();
             $this->staticRefs[] = $className;
+            $this->classRefs[] = $className;
+            $this->hardRefs[] = [
+                'kind' => 'static',
+                'class' => $className,
+                'member' => $call->name instanceof Node\Identifier ? $call->name->toString() : '*',
+            ];
             if ($thisArgs !== []) {
                 if ($literalName === null) {
                     $this->method->thisEscapesUnresolved = true;
@@ -260,6 +301,8 @@ final class BodyAnalyzer extends NodeVisitorAbstract
 
         $className = $new->class->toString();
         $this->newRefs[] = $className;
+        $this->classRefs[] = $className;
+        $this->hardRefs[] = ['kind' => 'new', 'class' => $className, 'member' => '__construct'];
         if ($thisArgs !== []) {
             $this->method->externalCalls[] = ['class' => $className, 'method' => '__construct', 'thisArgs' => $thisArgs];
         }

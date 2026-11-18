@@ -37,6 +37,25 @@ final class MethodInfo
      */
     public bool $thisEscapesUnresolved = false;
 
+    /** Filled by BodyAnalyzer: whether the body reads or writes any static property. */
+    public bool $touchesStaticProps = false;
+
+    /**
+     * Filled by BodyAnalyzer: classes named in a static call, a class
+     * constant fetch or a `new`.
+     *
+     * @var list<string>
+     */
+    public array $classRefs = [];
+
+    /**
+     * Filled by BodyAnalyzer: lowercase names of the static methods called
+     * through self::, static:: or the own class name.
+     *
+     * @var list<string>
+     */
+    public array $ownStaticCalls = [];
+
     public function __construct(
         public readonly string $name,
         /** 'public' | 'protected' | 'private' */
