@@ -40,14 +40,9 @@ Do not merge multiple PHP files into a single Rust file, except in rare cases. W
 `ref:` line for every PHP file.
 
 The hash records the version of the upstream file that the port follows, so that a change upstream
-is detected when `composer/` is updated:
-
-* The `upstream_file_hash` rule of `scripts/linters/lint` recomputes the hash of every `//! ref:`
-  line from the current `composer/` sources. It fails on a line without a hash, on a file that does
-  not exist under `composer/`, and on a hash mismatch, printing both hashes.
-* `scripts/linters/upstream-file-hash update <rust-file>...` writes the current hash into every
-  `//! ref:` line of the files, adding it where it is missing. On a mismatch, compare the upstream
-  change with the Rust port and update the port first.
+is detected when `composer/` is updated. `scripts/linters/upstream-file-hash update <rust-file>...`
+writes the current hash into every `//! ref:` line of the files, adding it where it is missing. On
+a mismatch, compare the upstream change with the Rust port and update the port first.
 
 ## Identifiers and class structure
 

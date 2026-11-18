@@ -43,24 +43,15 @@ Paths and binary data are not affected: they stay in the types below.
 
 ### Recording a reason
 
-Clippy's `disallowed_types` and `disallowed_macros` lints flag every `String`, `str` and `format!`, so
-a value that stays UTF-8 says why, where it does. The set of `reason`s can be reviewed with one grep:
+A value that stays UTF-8 says why, where it does. The set of `reason`s can be reviewed with one grep:
 
 ```rust
 #[expect(clippy::disallowed_types, reason = "regex takes a text pattern")]
 fn compile(pattern: &str) -> Result<regex::Regex, regex::Error> { ... }
 ```
 
-Literals (`let x = "abc"`), `panic!("{n}")` and types inferred from an API are not flagged.
-`to_string()` and `std::fs::read_to_string()` are flagged by `disallowed_methods`. A value that gets
-its type from `.into()`, `.collect()` or a `str` method that returns `String` is flagged only where
-it reaches a signature or a field.
-
 An impl for `&str` whose only purpose is to accept a Rust string literal where bytes are expected
 (`PhpDisplay for str`, `From<&str> for PhpMixed`, ...) records `reason = "a string literal"`.
-
-rustc ignores a lint attribute on a macro statement such as `assert!(...);`, so `#[expect]` goes on
-the enclosing `let`, expression statement or function.
 
 ## Types
 
@@ -82,8 +73,7 @@ the enclosing `let`, expression statement or function.
 
 Do not call `from_utf8()`, `from_utf8_lossy()`, `to_str()`, `to_str_lossy()`, `to_string_lossy()` or
 `into_string()`: a lossy conversion corrupts bytes that are not valid UTF-8, and a strict one fails
-where PHP does not. Clippy's `disallowed_methods` lint enforces this; the methods are listed in
-`clippy.toml`. `utf8_text()` is the one exemption, for reasons 1 and 2 above.
+where PHP does not. `utf8_text()` is the one exemption, for reasons 1 and 2 above.
 
 Boundaries with Rust APIs:
 
@@ -110,8 +100,8 @@ its behavior. Use the shim of the PHP function:
 * `lines()` also splits at `\r\n` and drops a trailing empty line; `explode("\n", ...)` does
   neither.
 
-The `ByteSlice` methods among these are listed under `disallowed-methods` in `clippy.toml`. The shim of an `mb_*()` function,
-which decodes UTF-8 as PHP does, records that reason where it calls one.
+The shim of an `mb_*()` function, which decodes UTF-8 as PHP does, records that reason where it
+calls one.
 
 ## Building strings
 

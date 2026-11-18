@@ -49,9 +49,7 @@ Inputs:
 The generator reads nothing else. In particular, it does not decide a treatment from what exists
 in `php/runtime/` or on the Rust side: it checks that the implementation agrees with the report.
 
-The `plugin_generated_stubs` rule of `scripts/linters/lint` runs the `--check` form; the
-`plugin_classification` rule checks that the report itself is fresh. `just setup` installs both
-tools' dependencies.
+`just setup` installs both tools' dependencies.
 
 ## What a stub looks like
 

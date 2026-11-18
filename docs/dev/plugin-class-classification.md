@@ -541,8 +541,7 @@ The first form reads `composer/src/Composer` and the inputs and writes `report.j
 ordering), prints a summary to stdout and the backlog counts to stderr, and exits non-zero on a
 violation (an input error, an unfiled static property, a reachable type that resolves to nothing
 known); the report is still written so the violation can be reviewed. `--check` instead fails
-unless the committed report equals the one the inputs give; the `plugin_classification` rule of
-`scripts/linters/lint` runs it.
+unless the committed report equals the one the inputs give.
 
 On a Composer upgrade, regenerate the report and review its diff: a class whose value changed
 needs either the new value accepted (and its treatment with it, which changes what plugins can do)
