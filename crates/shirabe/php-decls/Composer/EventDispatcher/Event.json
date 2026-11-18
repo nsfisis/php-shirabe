@@ -19,8 +19,7 @@
             "returnType": "array",
             "docReturnType": "string[]",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getFlags",
@@ -31,8 +30,7 @@
             "returnType": "array",
             "docReturnType": "mixed[]",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getName",
@@ -43,8 +41,7 @@
             "returnType": "string",
             "docReturnType": "string",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "isPropagationStopped",
@@ -55,8 +52,7 @@
             "returnType": "bool",
             "docReturnType": "bool",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "stopPropagation",
@@ -67,8 +63,7 @@
             "returnType": "void",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         }
     ],
     "constructor": {

@@ -18,8 +18,7 @@
             "returnType": "\\Composer\\Package\\Archiver\\ArchiveManager",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "unimplemented"
+            "forwarded": true
         },
         {
             "name": "getAutoloadGenerator",
@@ -30,8 +29,7 @@
             "returnType": "\\Composer\\Autoload\\AutoloadGenerator",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getConfig",
@@ -42,8 +40,7 @@
             "returnType": "\\Composer\\Config",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getDownloadManager",
@@ -54,8 +51,7 @@
             "returnType": "\\Composer\\Downloader\\DownloadManager",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getEventDispatcher",
@@ -66,8 +62,7 @@
             "returnType": "\\Composer\\EventDispatcher\\EventDispatcher",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getInstallationManager",
@@ -78,8 +73,7 @@
             "returnType": "\\Composer\\Installer\\InstallationManager",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getLocker",
@@ -90,8 +84,7 @@
             "returnType": "\\Composer\\Package\\Locker",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getLoop",
@@ -113,8 +106,7 @@
             "returnType": "\\Composer\\Package\\RootPackageInterface",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getPluginManager",
@@ -125,8 +117,7 @@
             "returnType": "\\Composer\\Plugin\\PluginManager",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "unimplemented"
+            "forwarded": true
         },
         {
             "name": "getRepositoryManager",
@@ -137,8 +128,7 @@
             "returnType": "\\Composer\\Repository\\RepositoryManager",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getVersion",
@@ -160,8 +150,7 @@
             "returnType": "bool",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "unimplemented"
+            "forwarded": true
         },
         {
             "name": "setArchiveManager",
@@ -182,8 +171,7 @@
             "returnType": "void",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "unimplemented"
+            "forwarded": true
         },
         {
             "name": "setAutoloadGenerator",
@@ -204,8 +192,7 @@
             "returnType": "void",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "unimplemented"
+            "forwarded": true
         },
         {
             "name": "setConfig",
@@ -226,8 +213,7 @@
             "returnType": "void",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "unimplemented"
+            "forwarded": true
         },
         {
             "name": "setDownloadManager",
@@ -248,8 +234,7 @@
             "returnType": "void",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "unimplemented"
+            "forwarded": true
         },
         {
             "name": "setEventDispatcher",
@@ -270,8 +255,7 @@
             "returnType": "void",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "unimplemented"
+            "forwarded": true
         },
         {
             "name": "setGlobal",
@@ -282,8 +266,7 @@
             "returnType": "void",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "unimplemented"
+            "forwarded": true
         },
         {
             "name": "setInstallationManager",
@@ -304,8 +287,7 @@
             "returnType": "void",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "unimplemented"
+            "forwarded": true
         },
         {
             "name": "setLocker",
@@ -326,8 +308,7 @@
             "returnType": "void",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "unimplemented"
+            "forwarded": true
         },
         {
             "name": "setLoop",
@@ -348,8 +329,7 @@
             "returnType": "void",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "unimplemented"
+            "forwarded": true
         },
         {
             "name": "setPackage",
@@ -370,8 +350,7 @@
             "returnType": "void",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "unimplemented"
+            "forwarded": true
         },
         {
             "name": "setPluginManager",
@@ -392,8 +371,7 @@
             "returnType": "void",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "unimplemented"
+            "forwarded": true
         },
         {
             "name": "setRepositoryManager",
@@ -414,8 +392,7 @@
             "returnType": "void",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "unimplemented"
+            "forwarded": true
         }
     ],
     "constructor": {
@@ -423,8 +400,7 @@
         "public": true,
         "params": [],
         "funcNumArgs": false,
-        "forwarded": true,
-        "status": "unimplemented"
+        "forwarded": true
     },
     "properties": []
 }

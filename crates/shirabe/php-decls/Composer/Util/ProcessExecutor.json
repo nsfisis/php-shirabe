@@ -29,8 +29,7 @@
             "returnType": "int",
             "docReturnType": "int",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "enableAsync",
@@ -41,8 +40,7 @@
             "returnType": "void",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "escape",
@@ -102,8 +100,7 @@
             "returnType": "int",
             "docReturnType": "int",
             "funcNumArgs": true,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "executeAsync",
@@ -133,8 +130,7 @@
             "returnType": "\\React\\Promise\\PromiseInterface",
             "docReturnType": "PromiseInterface<Process>",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "executeTty",
@@ -164,8 +160,7 @@
             "returnType": "int",
             "docReturnType": "int",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getErrorOutput",
@@ -176,8 +171,7 @@
             "returnType": "string",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getTimeout",
@@ -188,8 +182,7 @@
             "returnType": "int",
             "docReturnType": "int",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "requiresGitDirEnv",
@@ -210,8 +203,7 @@
             "returnType": "bool",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "resetMaxJobs",
@@ -222,8 +214,7 @@
             "returnType": "void",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "setMaxJobs",
@@ -244,8 +235,7 @@
             "returnType": "void",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "setTimeout",
@@ -266,8 +256,7 @@
             "returnType": "void",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "splitLines",
@@ -288,8 +277,7 @@
             "returnType": "array",
             "docReturnType": "string[]",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "wait",
@@ -310,8 +298,7 @@
             "returnType": "void",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         }
     ],
     "constructor": {
@@ -329,8 +316,7 @@
             }
         ],
         "funcNumArgs": false,
-        "forwarded": true,
-        "status": "implemented"
+        "forwarded": true
     },
     "properties": [
         {

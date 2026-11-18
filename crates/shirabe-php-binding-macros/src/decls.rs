@@ -27,8 +27,6 @@ pub struct Method {
     /// through the classes implementing it.
     #[serde(rename = "forwarded")]
     pub forwarded_flag: Option<bool>,
-    #[serde(default)]
-    pub status: Option<String>,
 }
 
 impl Method {
@@ -50,8 +48,6 @@ pub struct Constructor {
     pub func_num_args: bool,
     #[serde(default)]
     pub forwarded: bool,
-    #[serde(default)]
-    pub status: Option<String>,
 }
 
 #[derive(Debug, serde::Deserialize)]

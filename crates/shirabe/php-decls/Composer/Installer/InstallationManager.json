@@ -29,8 +29,7 @@
             "returnType": "void",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "disablePlugins",
@@ -41,8 +40,7 @@
             "returnType": "void",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "unimplemented"
+            "forwarded": true
         },
         {
             "name": "download",
@@ -63,8 +61,7 @@
             "returnType": "?\\React\\Promise\\PromiseInterface",
             "docReturnType": "PromiseInterface<void|null>|null",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "unimplemented"
+            "forwarded": true
         },
         {
             "name": "ensureBinariesPresence",
@@ -85,8 +82,7 @@
             "returnType": "void",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "unimplemented"
+            "forwarded": true
         },
         {
             "name": "execute",
@@ -143,8 +139,7 @@
             "returnType": "void",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "unimplemented"
+            "forwarded": true
         },
         {
             "name": "getInstallPath",
@@ -165,8 +160,7 @@
             "returnType": "?string",
             "docReturnType": "string|null",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getInstaller",
@@ -187,8 +181,7 @@
             "returnType": "\\Composer\\Installer\\InstallerInterface",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "unimplemented"
+            "forwarded": true
         },
         {
             "name": "install",
@@ -218,8 +211,7 @@
             "returnType": "?\\React\\Promise\\PromiseInterface",
             "docReturnType": "PromiseInterface<void|null>|null",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "unimplemented"
+            "forwarded": true
         },
         {
             "name": "isPackageInstalled",
@@ -249,8 +241,7 @@
             "returnType": "bool",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "unimplemented"
+            "forwarded": true
         },
         {
             "name": "markAliasInstalled",
@@ -280,8 +271,7 @@
             "returnType": "void",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "unimplemented"
+            "forwarded": true
         },
         {
             "name": "markAliasUninstalled",
@@ -311,8 +301,7 @@
             "returnType": "void",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "unimplemented"
+            "forwarded": true
         },
         {
             "name": "notifyInstalls",
@@ -333,8 +322,7 @@
             "returnType": "void",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "unimplemented"
+            "forwarded": true
         },
         {
             "name": "removeInstaller",
@@ -355,8 +343,7 @@
             "returnType": "void",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "reset",
@@ -367,8 +354,7 @@
             "returnType": "void",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "unimplemented"
+            "forwarded": true
         },
         {
             "name": "setOutputProgress",
@@ -389,8 +375,7 @@
             "returnType": "void",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "unimplemented"
+            "forwarded": true
         },
         {
             "name": "uninstall",
@@ -420,8 +405,7 @@
             "returnType": "?\\React\\Promise\\PromiseInterface",
             "docReturnType": "PromiseInterface<void|null>|null",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "unimplemented"
+            "forwarded": true
         },
         {
             "name": "update",
@@ -451,8 +435,7 @@
             "returnType": "?\\React\\Promise\\PromiseInterface",
             "docReturnType": "PromiseInterface<void|null>|null",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "unimplemented"
+            "forwarded": true
         }
     ],
     "constructor": {
@@ -488,8 +471,7 @@
             }
         ],
         "funcNumArgs": false,
-        "forwarded": true,
-        "status": "unimplemented"
+        "forwarded": true
     },
     "properties": []
 }

@@ -47,8 +47,7 @@
             "returnType": null,
             "docReturnType": "non-empty-array<int, array{0: PackageInterface, 1: string|null}>",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "createLoader",
@@ -78,8 +77,7 @@
             "returnType": null,
             "docReturnType": "ClassLoader",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "dump",
@@ -172,8 +170,7 @@
             "returnType": null,
             "docReturnType": "ClassMap",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "parseAutoloads",
@@ -212,8 +209,7 @@
             "returnType": null,
             "docReturnType": "array{ 'psr-0': array<string, array<string>>, 'psr-4': array<string, array<string>>, 'classmap': array<int, string>, 'files': array<string, string>, 'exclude-from-classmap': array<int, string>, }",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "setApcu",
@@ -243,8 +239,7 @@
             "returnType": null,
             "docReturnType": "void",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "setClassMapAuthoritative",
@@ -265,8 +260,7 @@
             "returnType": null,
             "docReturnType": "void",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "setDevMode",
@@ -287,8 +281,7 @@
             "returnType": null,
             "docReturnType": "void",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "setDryRun",
@@ -309,8 +302,7 @@
             "returnType": "void",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "setIgnorePlatformRequirements",
@@ -331,8 +323,7 @@
             "returnType": null,
             "docReturnType": "void",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "setPlatformRequirementFilter",
@@ -353,9 +344,7 @@
             "returnType": null,
             "docReturnType": "void",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "refused",
-            "reason": "no platform requirement filter can cross the boundary"
+            "forwarded": true
         },
         {
             "name": "setRunScripts",
@@ -376,8 +365,7 @@
             "returnType": null,
             "docReturnType": "void",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         }
     ],
     "constructor": {
@@ -404,8 +392,7 @@
             }
         ],
         "funcNumArgs": false,
-        "forwarded": true,
-        "status": "unimplemented"
+        "forwarded": true
     },
     "properties": []
 }

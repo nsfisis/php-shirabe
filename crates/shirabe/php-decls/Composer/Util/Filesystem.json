@@ -38,8 +38,7 @@
             "returnType": null,
             "docReturnType": "bool",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "copyThenRemove",
@@ -69,8 +68,7 @@
             "returnType": null,
             "docReturnType": "void",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "emptyDirectory",
@@ -100,8 +98,7 @@
             "returnType": null,
             "docReturnType": "void",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "ensureDirectoryExists",
@@ -122,8 +119,7 @@
             "returnType": null,
             "docReturnType": "void",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "filePutContentsIfModified",
@@ -153,8 +149,7 @@
             "returnType": null,
             "docReturnType": "int|false",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "findShortestPath",
@@ -202,8 +197,7 @@
             "returnType": null,
             "docReturnType": "string",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "findShortestPathCode",
@@ -260,8 +254,7 @@
             "returnType": null,
             "docReturnType": "string",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getPlatformPath",
@@ -303,8 +296,7 @@
             "returnType": null,
             "docReturnType": "bool",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "isDirEmpty",
@@ -325,8 +317,7 @@
             "returnType": null,
             "docReturnType": "bool",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "isJunction",
@@ -347,8 +338,7 @@
             "returnType": null,
             "docReturnType": "bool",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "isLocalPath",
@@ -411,8 +401,7 @@
             "returnType": null,
             "docReturnType": "bool",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "junction",
@@ -442,8 +431,7 @@
             "returnType": null,
             "docReturnType": "void",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "normalizePath",
@@ -464,8 +452,7 @@
             "returnType": null,
             "docReturnType": "string",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "relativeSymlink",
@@ -495,8 +482,7 @@
             "returnType": null,
             "docReturnType": "bool",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "remove",
@@ -517,8 +503,7 @@
             "returnType": null,
             "docReturnType": "bool",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "removeDirectory",
@@ -539,8 +524,7 @@
             "returnType": null,
             "docReturnType": "bool",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "removeDirectoryAsync",
@@ -561,8 +545,7 @@
             "returnType": null,
             "docReturnType": "PromiseInterface<bool>",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "removeDirectoryPhp",
@@ -583,8 +566,7 @@
             "returnType": null,
             "docReturnType": "bool",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "removeJunction",
@@ -605,8 +587,7 @@
             "returnType": null,
             "docReturnType": "bool",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "rename",
@@ -636,8 +617,7 @@
             "returnType": null,
             "docReturnType": "void",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "rmdir",
@@ -658,8 +638,7 @@
             "returnType": null,
             "docReturnType": "bool",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "safeCopy",
@@ -689,8 +668,7 @@
             "returnType": "void",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "size",
@@ -711,8 +689,7 @@
             "returnType": null,
             "docReturnType": "int",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "trimTrailingSlash",
@@ -754,8 +731,7 @@
             "returnType": null,
             "docReturnType": "bool",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         }
     ],
     "constructor": {
@@ -773,8 +749,7 @@
             }
         ],
         "funcNumArgs": false,
-        "forwarded": true,
-        "status": "implemented"
+        "forwarded": true
     },
     "properties": []
 }

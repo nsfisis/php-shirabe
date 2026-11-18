@@ -40,6 +40,17 @@ php_entity! {
     handle: std::rc::Rc<std::cell::RefCell<dyn EventDispatcherInterface>>,
     expected: "an EventDispatcher",
     class: r"Composer\EventDispatcher\EventDispatcher",
+    unimplemented: [
+        "__construct",
+        "addListener",
+        "addSubscriber",
+        "dispatchInstallerEvent",
+        "dispatchPackageEvent",
+        "dispatchScript",
+        "hasEventListeners",
+        "removeListener",
+        "setRunScripts",
+    ],
     types: {
         r"Composer\EventDispatcher\EventDispatcher": custom self,
     },

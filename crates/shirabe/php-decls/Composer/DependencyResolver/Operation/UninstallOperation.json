@@ -22,8 +22,7 @@
             "returnType": null,
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "format",
@@ -64,8 +63,7 @@
             "returnType": "string",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getPackage",
@@ -76,8 +74,7 @@
             "returnType": "\\Composer\\Package\\PackageInterface",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "show",
@@ -98,8 +95,7 @@
             "returnType": "string",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         }
     ],
     "constructor": {
@@ -117,8 +113,7 @@
             }
         ],
         "funcNumArgs": false,
-        "forwarded": true,
-        "status": "implemented"
+        "forwarded": true
     },
     "properties": [
         {

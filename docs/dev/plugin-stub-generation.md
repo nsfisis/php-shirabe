@@ -149,21 +149,15 @@ defines every member the report says it forwards.
 forwards members to the Rust side, laid out by the class's namespace (`Composer\Package\Locker` is
 `package::locker`). Each module has:
 
-* `PhpClass`, a marker type standing for the class;
-* `Forwarding`, a trait with one method per member the class declares and the Rust side answers
-  (`implemented` in the report), with no default. The hand-written
-  `impl forwarding::<path>::Forwarding for forwarding::<path>::PhpClass` therefore has to answer
-  each of them, and cannot answer a member the report marks `unimplemented` or `refused`: either
-  mistake is a compile error. The trait of a class whose parent forwards nothing also names the
-  handle type of the entities crossing as it or as a descendant (`type Handle`);
-* `dispatch`, which routes a method name to the `Forwarding` of the class declaring it, the class
-  itself or an ancestor, and answers an `unimplemented` member with the "not available over RPC
-  yet" error and a `refused` one with that error and the reason from `forced.json`;
-* `BINDINGS`, the class and its `dispatch` as one value;
-* `construct` and `call_static` for the classes with a forwarded constructor or static methods. The
-  top-level `construct` routes a `NewObject` to them; a class whose constructor is
-  `unimplemented`, and a plugin's subclass of a stub, reach its last arm, the "cannot construct"
-  error.
+* `PhpClass`, a marker type standing for the class.
+
+The top-level `construct` routes a `NewObject` to the `ForwardedClass` impl of every class whose
+stub forwards its constructor; a plugin's subclass of a stub reaches its last arm, the "cannot
+construct" error. The top-level `call_static` routes a `CallStaticMethod` to the class declaring the
+static method. The `ForwardedClass` impls, the dispatch of each class's methods and its `Bindings`
+are generated on the Rust side by the entity declarations (`php_entity!`, `php_statics!`) from the
+PHP declarations below, so a forwarding class with a constructor or static methods and no
+declaration does not compile.
 
 The members come from the report. The worker runtime's own classes under `php/runtime/Shirabe/`
 (`Shirabe\RustPluginStub`, `Shirabe\RustCapablePluginStub`, `Shirabe\RustProcessStub`) stand for
@@ -206,12 +200,13 @@ Each file holds:
   (`workerOnly`, `__shirabe_facts` of `Shirabe\RustProcessStub`), without parameters;
 * for a class forwarding members, `forwarded` on each method and on the constructor: whether a
   call reaches the Rust side. It is false for a static method materialized in the worker and for
-  a method answered there (`Generator::LOCAL_BODIES`). A forwarded member also has the `status`
-  the report gives it (`implemented`, `unimplemented`, or `refused` with its `reason`).
+  a method answered there (`Generator::LOCAL_BODIES`).
 
 The `shirabe-php-binding-macros` crate reads these files at compile time: `#[php_binding]`
 generates the adapters of a Rust trait or inherent impl standing for a type, and `php_entity!` the
-`Entity` and `Forwarding` impls of a handle type routing each implemented member to them.
+`Entity` impl of a handle type and, for each class its entities cross as, the dispatch routing each
+forwarded member to an adapter, to a hand-written function, or to the error of a member it lists as
+`unimplemented` or `refused`.
 
 ## Codec and push tables
 

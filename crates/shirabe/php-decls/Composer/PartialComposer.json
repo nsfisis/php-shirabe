@@ -18,8 +18,7 @@
             "returnType": "\\Composer\\Config",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getEventDispatcher",
@@ -30,8 +29,7 @@
             "returnType": "\\Composer\\EventDispatcher\\EventDispatcher",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getInstallationManager",
@@ -42,8 +40,7 @@
             "returnType": "\\Composer\\Installer\\InstallationManager",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getLoop",
@@ -65,8 +62,7 @@
             "returnType": "\\Composer\\Package\\RootPackageInterface",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getRepositoryManager",
@@ -77,8 +73,7 @@
             "returnType": "\\Composer\\Repository\\RepositoryManager",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "isGlobal",
@@ -89,8 +84,7 @@
             "returnType": "bool",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "unimplemented"
+            "forwarded": true
         },
         {
             "name": "setConfig",
@@ -111,8 +105,7 @@
             "returnType": "void",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "unimplemented"
+            "forwarded": true
         },
         {
             "name": "setEventDispatcher",
@@ -133,8 +126,7 @@
             "returnType": "void",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "unimplemented"
+            "forwarded": true
         },
         {
             "name": "setGlobal",
@@ -145,8 +137,7 @@
             "returnType": "void",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "unimplemented"
+            "forwarded": true
         },
         {
             "name": "setInstallationManager",
@@ -167,8 +158,7 @@
             "returnType": "void",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "unimplemented"
+            "forwarded": true
         },
         {
             "name": "setLoop",
@@ -189,8 +179,7 @@
             "returnType": "void",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "unimplemented"
+            "forwarded": true
         },
         {
             "name": "setPackage",
@@ -211,8 +200,7 @@
             "returnType": "void",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "unimplemented"
+            "forwarded": true
         },
         {
             "name": "setRepositoryManager",
@@ -233,8 +221,7 @@
             "returnType": "void",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "unimplemented"
+            "forwarded": true
         }
     ],
     "constructor": {
@@ -242,8 +229,7 @@
         "public": true,
         "params": [],
         "funcNumArgs": false,
-        "forwarded": true,
-        "status": "unimplemented"
+        "forwarded": true
     },
     "properties": []
 }

@@ -7,6 +7,13 @@ php_entity! {
     handle: std::rc::Rc<std::cell::RefCell<dyn LockerInterface>>,
     expected: "a Locker",
     class: r"Composer\Package\Locker",
+    unimplemented: [
+        "__construct",
+    ],
+    refused: {
+        "getJsonFile": "JsonFile cannot cross the boundary",
+        "updateHash": "JsonFile cannot cross the boundary",
+    },
     types: {
         r"Composer\Package\Locker": instance __php_binding_locker_interface
             for dyn LockerInterface {

@@ -29,8 +29,7 @@
             "returnType": null,
             "docReturnType": "void",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "count",
@@ -41,8 +40,7 @@
             "returnType": "int",
             "docReturnType": "0|positive-int",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "unimplemented"
+            "forwarded": true
         },
         {
             "name": "findPackage",
@@ -72,8 +70,7 @@
             "returnType": null,
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "findPackages",
@@ -103,8 +100,7 @@
             "returnType": null,
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getCanonicalPackages",
@@ -115,8 +111,7 @@
             "returnType": null,
             "docReturnType": "PackageInterface[]",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getDevMode",
@@ -127,8 +122,7 @@
             "returnType": null,
             "docReturnType": "bool|null",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "unimplemented"
+            "forwarded": true
         },
         {
             "name": "getDevPackageNames",
@@ -139,8 +133,7 @@
             "returnType": null,
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getPackages",
@@ -151,8 +144,7 @@
             "returnType": null,
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getProviders",
@@ -173,8 +165,7 @@
             "returnType": null,
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "unimplemented"
+            "forwarded": true
         },
         {
             "name": "getRepoName",
@@ -185,8 +176,7 @@
             "returnType": null,
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "unimplemented"
+            "forwarded": true
         },
         {
             "name": "hasPackage",
@@ -207,8 +197,7 @@
             "returnType": null,
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "loadPackages",
@@ -256,8 +245,7 @@
             "returnType": null,
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "unimplemented"
+            "forwarded": true
         },
         {
             "name": "reload",
@@ -268,8 +256,7 @@
             "returnType": null,
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "unimplemented"
+            "forwarded": true
         },
         {
             "name": "removePackage",
@@ -290,8 +277,7 @@
             "returnType": null,
             "docReturnType": "void",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "safelyLoadInstalledVersions",
@@ -351,8 +337,7 @@
             "returnType": null,
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "unimplemented"
+            "forwarded": true
         },
         {
             "name": "setDevPackageNames",
@@ -373,8 +358,7 @@
             "returnType": null,
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "unimplemented"
+            "forwarded": true
         },
         {
             "name": "write",
@@ -404,8 +388,7 @@
             "returnType": null,
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "unimplemented"
+            "forwarded": true
         }
     ],
     "constructor": {
@@ -450,8 +433,7 @@
             }
         ],
         "funcNumArgs": false,
-        "forwarded": true,
-        "status": "unimplemented"
+        "forwarded": true
     },
     "properties": [
         {

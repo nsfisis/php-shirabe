@@ -56,8 +56,7 @@
             "returnType": "\\React\\Promise\\PromiseInterface",
             "docReturnType": "PromiseInterface<void|null>",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "download",
@@ -96,8 +95,7 @@
             "returnType": "\\React\\Promise\\PromiseInterface",
             "docReturnType": "PromiseInterface<void|null>",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getDownloader",
@@ -118,8 +116,7 @@
             "returnType": "\\Composer\\Downloader\\DownloaderInterface",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "unimplemented"
+            "forwarded": true
         },
         {
             "name": "getDownloaderForPackage",
@@ -140,8 +137,7 @@
             "returnType": "?\\Composer\\Downloader\\DownloaderInterface",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "unimplemented"
+            "forwarded": true
         },
         {
             "name": "getDownloaderType",
@@ -162,8 +158,7 @@
             "returnType": "string",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "unimplemented"
+            "forwarded": true
         },
         {
             "name": "install",
@@ -193,8 +188,7 @@
             "returnType": "\\React\\Promise\\PromiseInterface",
             "docReturnType": "PromiseInterface<void|null>",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "prepare",
@@ -242,8 +236,7 @@
             "returnType": "\\React\\Promise\\PromiseInterface",
             "docReturnType": "PromiseInterface<void|null>",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "remove",
@@ -273,8 +266,7 @@
             "returnType": "\\React\\Promise\\PromiseInterface",
             "docReturnType": "PromiseInterface<void|null>",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "setDownloader",
@@ -304,8 +296,7 @@
             "returnType": "self",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "unimplemented"
+            "forwarded": true
         },
         {
             "name": "setPreferDist",
@@ -326,8 +317,7 @@
             "returnType": "self",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "setPreferSource",
@@ -348,8 +338,7 @@
             "returnType": "self",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "setPreferences",
@@ -370,8 +359,7 @@
             "returnType": "self",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "unimplemented"
+            "forwarded": true
         },
         {
             "name": "update",
@@ -410,8 +398,7 @@
             "returnType": "\\React\\Promise\\PromiseInterface",
             "docReturnType": "PromiseInterface<void|null>",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         }
     ],
     "constructor": {
@@ -447,8 +434,7 @@
             }
         ],
         "funcNumArgs": false,
-        "forwarded": true,
-        "status": "unimplemented"
+        "forwarded": true
     },
     "properties": []
 }

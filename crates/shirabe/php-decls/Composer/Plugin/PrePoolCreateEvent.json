@@ -19,8 +19,7 @@
             "returnType": "array",
             "docReturnType": "array<string, BasePackage::STABILITY_*>",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getArguments",
@@ -31,8 +30,7 @@
             "returnType": "array",
             "docReturnType": "string[]",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getFlags",
@@ -43,8 +41,7 @@
             "returnType": "array",
             "docReturnType": "mixed[]",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getName",
@@ -55,8 +52,7 @@
             "returnType": "string",
             "docReturnType": "string",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getPackages",
@@ -67,8 +63,7 @@
             "returnType": "array",
             "docReturnType": "BasePackage[]",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getRepositories",
@@ -79,8 +74,7 @@
             "returnType": "array",
             "docReturnType": "RepositoryInterface[]",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getRequest",
@@ -91,9 +85,7 @@
             "returnType": "\\Composer\\DependencyResolver\\Request",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "refused",
-            "reason": "the Request cannot cross the boundary"
+            "forwarded": true
         },
         {
             "name": "getRootAliases",
@@ -104,8 +96,7 @@
             "returnType": "array",
             "docReturnType": "array<string, array<string, array{alias: string, alias_normalized: string}>>",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getRootReferences",
@@ -116,8 +107,7 @@
             "returnType": "array",
             "docReturnType": "array<string, string>",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getStabilityFlags",
@@ -128,8 +118,7 @@
             "returnType": "array",
             "docReturnType": "array<string, BasePackage::STABILITY_*>",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getUnacceptableFixedPackages",
@@ -140,8 +129,7 @@
             "returnType": "array",
             "docReturnType": "BasePackage[]",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "isPropagationStopped",
@@ -152,8 +140,7 @@
             "returnType": "bool",
             "docReturnType": "bool",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "setPackages",
@@ -174,8 +161,7 @@
             "returnType": "void",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "setUnacceptableFixedPackages",
@@ -196,8 +182,7 @@
             "returnType": "void",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "stopPropagation",
@@ -208,8 +193,7 @@
             "returnType": "void",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         }
     ],
     "constructor": {
@@ -299,8 +283,7 @@
             }
         ],
         "funcNumArgs": false,
-        "forwarded": true,
-        "status": "unimplemented"
+        "forwarded": true
     },
     "properties": [
         {

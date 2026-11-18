@@ -151,7 +151,6 @@ final class DeclsGenerator
                     'funcNumArgs' => false,
                     'workerOnly' => true,
                     'forwarded' => true,
-                    'status' => 'implemented',
                 ];
             }
         }
@@ -582,10 +581,9 @@ final class DeclsGenerator
     /**
      * Whether a call on an instance of the class (or on the class, for a static method) reaches
      * the Rust side, which it does when the stub or runtime class, or an ancestor stub, forwards
-     * it; and if so, whether the Rust side answers it (`status`, as `forced.json` records it:
-     * `implemented`, `unimplemented`, or `refused` with its `reason`).
+     * it.
      *
-     * @return array{forwarded: bool, status?: string, reason?: string}
+     * @return array{forwarded: bool}
      */
     private function forwarding(string $fqcn, string $name, string $kind): array
     {
@@ -601,14 +599,7 @@ final class DeclsGenerator
         foreach ($types as $type) {
             foreach ($this->forwardedMembers($type) as $member) {
                 if ($member['kind'] === $kind && $member['member'] === $name) {
-                    $row = [
-                        'forwarded' => true,
-                        'status' => $member['status'] === 'forward' ? 'implemented' : $member['status'],
-                    ];
-                    if ($member['status'] === 'refused') {
-                        $row['reason'] = $member['reason'];
-                    }
-                    return $row;
+                    return ['forwarded' => true];
                 }
             }
         }
@@ -649,12 +640,12 @@ final class DeclsGenerator
         }
     }
 
-    /** @return list<array{member: string, kind: string, status: string, reason?: string}> */
+    /** @return list<array{member: string, kind: string, reason?: string}> */
     private function forwardedMembers(string $fqcn): array
     {
         if (isset($this->runtimeForwarded[$fqcn])) {
             return array_map(
-                static fn (string $method): array => ['member' => $method, 'kind' => 'method', 'status' => 'forward'],
+                static fn (string $method): array => ['member' => $method, 'kind' => 'method'],
                 $this->runtimeForwarded[$fqcn],
             );
         }

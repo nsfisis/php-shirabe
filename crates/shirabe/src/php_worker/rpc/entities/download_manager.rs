@@ -25,6 +25,14 @@ php_entity! {
     handle: std::rc::Rc<std::cell::RefCell<dyn DownloadManagerInterface>>,
     expected: "a DownloadManager",
     class: r"Composer\Downloader\DownloadManager",
+    unimplemented: [
+        "__construct",
+        "getDownloader",
+        "getDownloaderForPackage",
+        "getDownloaderType",
+        "setDownloader",
+        "setPreferences",
+    ],
     types: {
         r"Composer\Downloader\DownloadManager": instance __php_binding_download_manager_interface
             for dyn DownloadManagerInterface {

@@ -50,9 +50,8 @@ pub fn php_binding(
     binding::expand(attr.into(), item.into()).into()
 }
 
-/// Generates the `Entity` impl of a handle type, and the `Forwarding` impl of each class its
-/// entities cross as, routing each member the class forwards and the Rust side answers to the
-/// adapter of the type declaring it.
+/// Generates the `Entity` impl of a handle type, and for each class its entities cross as, the
+/// routing of each member the class forwards to the adapter of the type declaring it.
 ///
 /// ```ignore
 /// php_entity! {
@@ -87,15 +86,24 @@ pub fn php_binding(
 ///   the adapter of the inherent impl and how the value it builds becomes a handle
 ///   (`module => |value| ...`), or a hand-written function (`custom path`).
 ///
-/// A generated route is checked at compile time against the stub of the class: an adapter whose
-/// parameter types differ from the ones the stub declares fails the build.
+/// * `unimplemented: [...]` and `refused: { "member": "reason" }` list the forwarded members the
+///   Rust side does not answer: the "not available over RPC yet" error, with the reason for a
+///   refused one. An entry names a member of every class (`"getFoo"`), or of a class and its
+///   subclasses (`r"Composer\Foo::getFoo"`; a constructor of that class alone).
+///
+/// For each class, the declaration generates the dispatch of the methods its stub forwards, its
+/// `Bindings`, and the `ForwardedClass` impl answering its constructor and static methods. A
+/// forwarded member neither routed nor listed, and an entry naming no forwarded member, fail the
+/// build, as does a generated route whose adapter decodes other parameter types than the stub of
+/// the class declares.
 #[proc_macro]
 pub fn php_entity(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     entity::expand(input.into()).into()
 }
 
-/// Generates the `Forwarding` impl of a class no entity crosses as, a guard whose static methods
-/// are forwarded, routing each of them to the adapter of the type declaring it.
+/// Generates the `ForwardedClass` impl of a class no entity crosses as, a guard whose static
+/// methods are forwarded, routing each of them to the adapter of the type declaring it. It takes
+/// `unimplemented` and `refused` as `php_entity!` does.
 ///
 /// ```ignore
 /// php_statics! {

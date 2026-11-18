@@ -397,8 +397,7 @@
             "returnType": "string",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getLockFile",

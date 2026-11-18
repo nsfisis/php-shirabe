@@ -10,6 +10,17 @@ php_entity! {
     handle: std::rc::Rc<std::cell::RefCell<Config>>,
     expected: "a Config",
     class: r"Composer\Config",
+    unimplemented: [
+        "__construct",
+        "getAuthConfigSource",
+        "getConfigSource",
+        "getLocalAuthConfigSource",
+        "prohibitUrlByConfig",
+        "setAuthConfigSource",
+        "setBaseDir",
+        "setConfigSource",
+        "setLocalAuthConfigSource",
+    ],
     types: {
         r"Composer\Config": instance __php_binding_config for Config {
             via: |config| config.borrow(),

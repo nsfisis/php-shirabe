@@ -56,7 +56,7 @@ final class GuardGenerator
         foreach ($targets as $fqcn) {
             $this->guardSet[$fqcn] = true;
             foreach ($report->forwarded($fqcn) as $member) {
-                if ($member['status'] === 'forward') {
+                if ($member['kind'] === 'static') {
                     $this->forwardedStatics[$fqcn . '::' . $member['member']] = $member['reason'];
                 }
             }

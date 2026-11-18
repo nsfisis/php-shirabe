@@ -21,8 +21,7 @@
             "returnType": "string",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "equals",
@@ -43,8 +42,7 @@
             "returnType": "bool",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getAutoload",
@@ -55,8 +53,7 @@
             "returnType": "array",
             "docReturnType": "AutoloadRules",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getBinaries",
@@ -67,8 +64,7 @@
             "returnType": "array",
             "docReturnType": "string[]",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getConflicts",
@@ -79,8 +75,7 @@
             "returnType": "array",
             "docReturnType": "Link[]",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getDevAutoload",
@@ -91,8 +86,7 @@
             "returnType": "array",
             "docReturnType": "DevAutoloadRules",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getDevRequires",
@@ -103,8 +97,7 @@
             "returnType": "array",
             "docReturnType": "array<string, Link>",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getDistMirrors",
@@ -115,8 +108,7 @@
             "returnType": "?array",
             "docReturnType": "?list<array{url: non-empty-string, preferred: bool}>",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getDistReference",
@@ -127,8 +119,7 @@
             "returnType": "?string",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getDistSha1Checksum",
@@ -139,8 +130,7 @@
             "returnType": "?string",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getDistType",
@@ -151,8 +141,7 @@
             "returnType": "?string",
             "docReturnType": "?string",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getDistUrl",
@@ -163,8 +152,7 @@
             "returnType": "?string",
             "docReturnType": "?non-empty-string",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getDistUrls",
@@ -175,8 +163,7 @@
             "returnType": "array",
             "docReturnType": "non-empty-string[]",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getExtra",
@@ -187,8 +174,7 @@
             "returnType": "array",
             "docReturnType": "mixed[]",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getFullPrettyVersion",
@@ -218,8 +204,7 @@
             "returnType": "string",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getId",
@@ -230,8 +215,7 @@
             "returnType": "int",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getIncludePaths",
@@ -242,8 +226,7 @@
             "returnType": "array",
             "docReturnType": "string[]",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getInstallationSource",
@@ -254,8 +237,7 @@
             "returnType": "?string",
             "docReturnType": "'source'|'dist'|null",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getName",
@@ -266,8 +248,7 @@
             "returnType": "string",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getNames",
@@ -288,8 +269,7 @@
             "returnType": "array",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getNotificationUrl",
@@ -300,8 +280,7 @@
             "returnType": "?string",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getPhpExt",
@@ -312,8 +291,7 @@
             "returnType": "?array",
             "docReturnType": "PhpExtConfig|null",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getPrettyName",
@@ -324,8 +302,7 @@
             "returnType": "string",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getPrettyString",
@@ -336,8 +313,7 @@
             "returnType": "string",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getPrettyVersion",
@@ -348,8 +324,7 @@
             "returnType": "string",
             "docReturnType": "string",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getProvides",
@@ -360,8 +335,7 @@
             "returnType": "array",
             "docReturnType": "Link[]",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getReleaseDate",
@@ -372,8 +346,7 @@
             "returnType": "?\\DateTimeInterface",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getReplaces",
@@ -384,8 +357,7 @@
             "returnType": "array",
             "docReturnType": "Link[]",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getRepository",
@@ -396,8 +368,7 @@
             "returnType": "?\\Composer\\Repository\\RepositoryInterface",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getRequires",
@@ -408,8 +379,7 @@
             "returnType": "array",
             "docReturnType": "array<string, Link>",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getSourceMirrors",
@@ -420,8 +390,7 @@
             "returnType": "?array",
             "docReturnType": "?list<array{url: non-empty-string, preferred: bool}>",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getSourceReference",
@@ -432,8 +401,7 @@
             "returnType": "?string",
             "docReturnType": "?string",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getSourceType",
@@ -444,8 +412,7 @@
             "returnType": "?string",
             "docReturnType": "?string",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getSourceUrl",
@@ -456,8 +423,7 @@
             "returnType": "?string",
             "docReturnType": "?string",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getSourceUrls",
@@ -468,8 +434,7 @@
             "returnType": "array",
             "docReturnType": "list<string>",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getStability",
@@ -480,8 +445,7 @@
             "returnType": "string",
             "docReturnType": "'stable'|'RC'|'beta'|'alpha'|'dev'",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getStabilityPriority",
@@ -492,8 +456,7 @@
             "returnType": "int",
             "docReturnType": "self::STABILITY_*",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getSuggests",
@@ -504,8 +467,7 @@
             "returnType": "array",
             "docReturnType": "array<string, string>",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getTargetDir",
@@ -516,8 +478,7 @@
             "returnType": "?string",
             "docReturnType": "?string",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getTransportOptions",
@@ -528,8 +489,7 @@
             "returnType": "array",
             "docReturnType": "mixed[]",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getType",
@@ -540,8 +500,7 @@
             "returnType": "string",
             "docReturnType": "string",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getUniqueName",
@@ -552,8 +511,7 @@
             "returnType": "string",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getVersion",
@@ -564,8 +522,7 @@
             "returnType": "string",
             "docReturnType": "string",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "isDefaultBranch",
@@ -576,8 +533,7 @@
             "returnType": "bool",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "isDev",
@@ -588,8 +544,7 @@
             "returnType": "bool",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "isPlatform",
@@ -600,8 +555,7 @@
             "returnType": "bool",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "packageNameToRegexp",
@@ -682,8 +636,7 @@
             "returnType": "void",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "setDistReference",
@@ -704,8 +657,7 @@
             "returnType": "void",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "setDistType",
@@ -726,8 +678,7 @@
             "returnType": "void",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "setDistUrl",
@@ -748,8 +699,7 @@
             "returnType": "void",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "setId",
@@ -770,8 +720,7 @@
             "returnType": "void",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "setInstallationSource",
@@ -792,8 +741,7 @@
             "returnType": "void",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "setRepository",
@@ -814,8 +762,7 @@
             "returnType": "void",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "setSourceDistReferences",
@@ -836,8 +783,7 @@
             "returnType": "void",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "setSourceMirrors",
@@ -858,8 +804,7 @@
             "returnType": "void",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "setSourceReference",
@@ -880,8 +825,7 @@
             "returnType": "void",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "setTransportOptions",
@@ -902,8 +846,7 @@
             "returnType": "void",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         }
     ],
     "constructor": {

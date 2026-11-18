@@ -19,8 +19,7 @@
             "returnType": "array",
             "docReturnType": "string[]",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getComposer",
@@ -31,8 +30,7 @@
             "returnType": "\\Composer\\Composer",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getFlags",
@@ -43,8 +41,7 @@
             "returnType": "array",
             "docReturnType": "mixed[]",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getIO",
@@ -55,8 +52,7 @@
             "returnType": "\\Composer\\IO\\IOInterface",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getName",
@@ -67,8 +63,7 @@
             "returnType": "string",
             "docReturnType": "string",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getOriginatingEvent",
@@ -79,8 +74,7 @@
             "returnType": "?\\Composer\\EventDispatcher\\Event",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "unimplemented"
+            "forwarded": true
         },
         {
             "name": "isDevMode",
@@ -91,8 +85,7 @@
             "returnType": "bool",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "isPropagationStopped",
@@ -103,8 +96,7 @@
             "returnType": "bool",
             "docReturnType": "bool",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "setOriginatingEvent",
@@ -125,8 +117,7 @@
             "returnType": "self",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "unimplemented"
+            "forwarded": true
         },
         {
             "name": "stopPropagation",
@@ -137,8 +128,7 @@
             "returnType": "void",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         }
     ],
     "constructor": {
@@ -201,8 +191,7 @@
             }
         ],
         "funcNumArgs": false,
-        "forwarded": true,
-        "status": "unimplemented"
+        "forwarded": true
     },
     "properties": [
         {

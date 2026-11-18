@@ -45,6 +45,23 @@ php_entity! {
         r"Composer\Plugin\PostFileDownloadEvent",
         r"Composer\Plugin\PrePoolCreateEvent",
     ],
+    unimplemented: [
+        r"Composer\Installer\InstallerEvent::__construct",
+        r"Composer\Installer\PackageEvent::__construct",
+        r"Composer\Plugin\CommandEvent::__construct",
+        r"Composer\Plugin\PostFileDownloadEvent::__construct",
+        r"Composer\Plugin\PreFileDownloadEvent::__construct",
+        r"Composer\Plugin\PrePoolCreateEvent::__construct",
+        r"Composer\Script\Event::__construct",
+        r"Composer\Script\Event::getOriginatingEvent",
+        r"Composer\Script\Event::setOriginatingEvent",
+    ],
+    refused: {
+        r"Composer\Plugin\CommandEvent::getInput": "the console input cannot cross the boundary",
+        r"Composer\Plugin\CommandEvent::getOutput": "the console output cannot cross the boundary",
+        r"Composer\Plugin\PreCommandRunEvent::getInput": "the console input cannot cross the boundary",
+        r"Composer\Plugin\PrePoolCreateEvent::getRequest": "the Request cannot cross the boundary",
+    },
     types: {
         r"Composer\EventDispatcher\Event": instance __php_binding_event_interface
             for dyn EventInterface {

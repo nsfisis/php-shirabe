@@ -215,29 +215,26 @@ Every proxy stub, runtime class and guard that forwards members to the Rust side
 `forwarding::package::locker`). The module holds:
 
 - `PhpClass`, a marker type standing for the class;
-- `Forwarding`, a trait with one method per member the class itself declares and the Rust side
-  answers, with no default. The trait of a class whose parent forwards nothing names the handle
-  type (`type Handle`) every descendant takes;
-- `dispatch`, routing a method name to the `Forwarding` of the class declaring it, and answering
-  the members the report records as unimplemented or refused with an error, and `BINDINGS`, the
-  class and its `dispatch` as the value `Entity::class` returns;
-- `construct` and `call_static` for a class forwarding its constructor or static methods, which
-  the top-level `construct` and `call_static` route a `NewObject` and a `CallStaticMethod` from
-  the worker to.
 
-What the Rust side answers is written by hand, as `impl forwarding::<path>::Forwarding for
-forwarding::<path>::PhpClass` in the submodules of `php_worker::rpc::entities`. The impl answers
-exactly the members of the trait: a member the report lists as answered but the impl lacks, and one
-the impl answers but the report marks unimplemented or refused (`forced.json` of the classifier),
-are both compile errors. An impl reads its arguments with `FromRpcValue`. A value that is absent
-where PHP would read null, such as an omitted argument or a missing property, decodes from
-`RpcValue::Null`.
+and the top-level `construct` and `call_static` route a `NewObject` and a `CallStaticMethod` from
+the worker to the class's `ForwardedClass` impl.
 
-To serve a new class: remove the `guard` treatment `forced.json` gives it (recording the members
-the Rust side does not answer yet), regenerate the classifier report and the generated files, and
-write its forwarding impl. A new kind of entity also needs an `Entity` impl for its
-handle type; a new class of an existing kind needs a branch in that impl's `class`. A missing impl
-does not compile.
+What the Rust side answers is declared in the submodules of `php_worker::rpc::entities`, one
+`php_entity!` per handle type (`php_statics!` for a guard forwarding static methods only), and
+generated from the PHP declarations under `crates/shirabe/php-decls/` (see
+[plugin-stub-generation.md](./plugin-stub-generation.md)): the `Entity` impl of the handle type,
+and for each class the entities cross as, the dispatch of its methods, its `Bindings` and its
+`ForwardedClass` impl. Each forwarded member is routed to the adapter `#[php_binding]` generates
+next to the Rust trait or type of the PHP type declaring it, or to a hand-written function, or is
+listed as `unimplemented` (the "not available over RPC yet" error) or `refused` (that error with a
+reason). A forwarded member none of these covers, and a listed member no class forwards, are
+compile errors. An argument is decoded with `FromRpcArg`; a value that is absent where PHP would
+read null, such as an omitted argument or a missing property, decodes from `RpcValue::Null`.
+
+To serve a new class: remove the `guard` treatment `forced.json` gives it, regenerate the
+classifier report and the generated files, and declare it in an entity declaration, listing the
+members the Rust side does not answer yet. A class with a constructor or static methods the
+worker forwards and no declaration does not compile.
 
 ## Two-world console application
 

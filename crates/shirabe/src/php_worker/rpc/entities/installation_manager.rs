@@ -17,6 +17,23 @@ php_entity! {
     handle: std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>,
     expected: "an InstallationManager",
     class: r"Composer\Installer\InstallationManager",
+    unimplemented: [
+        "__construct",
+        "disablePlugins",
+        "download",
+        "ensureBinariesPresence",
+        "execute",
+        "getInstaller",
+        "install",
+        "isPackageInstalled",
+        "markAliasInstalled",
+        "markAliasUninstalled",
+        "notifyInstalls",
+        "reset",
+        "setOutputProgress",
+        "uninstall",
+        "update",
+    ],
     types: {
         r"Composer\Installer\InstallationManager": custom self
             only [addInstaller, removeInstaller],

@@ -816,8 +816,7 @@
             "docReturnType": null,
             "funcNumArgs": false,
             "workerOnly": true,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         }
     ],
     "constructor": {

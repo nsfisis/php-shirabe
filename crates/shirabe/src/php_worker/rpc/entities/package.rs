@@ -46,6 +46,9 @@ php_entity! {
     ],
     clone: clone_package,
     property: package_property,
+    unimplemented: [
+        r"Composer\Package\RootPackage::__construct",
+    ],
     types: {
         r"Composer\Package\PackageInterface": custom base_package only [getNames, __toString],
         r"Composer\Package\PackageInterface": instance __php_binding_package_interface

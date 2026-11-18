@@ -10,9 +10,8 @@ final class Report
         1 => 'guarded classes the Rust side owns: a stub or a codec is missing',
         2 => 'references the upstream code in the worker cannot follow',
         3 => 'worker classes the guard propagation guards',
-        4 => 'forwarded members the Rust side does not answer',
-        5 => 'real classes whose Rust-side instances cannot cross',
-        6 => 'shared static properties no mechanism keeps in sync',
+        4 => 'real classes whose Rust-side instances cannot cross',
+        5 => 'shared static properties no mechanism keeps in sync',
     ];
 
     public function __construct(private readonly Classifier $classifier)

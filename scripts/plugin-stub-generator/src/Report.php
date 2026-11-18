@@ -101,7 +101,7 @@ final class Report
     /**
      * What the worker-side definition of a class forwards to the Rust side.
      *
-     * @return list<array{member: string, kind: string, status: string, reason?: string}>
+     * @return list<array{member: string, kind: string, reason?: string}>
      */
     public function forwarded(string $fqcn): array
     {

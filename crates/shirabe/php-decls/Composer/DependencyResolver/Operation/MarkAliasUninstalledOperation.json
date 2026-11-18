@@ -22,8 +22,7 @@
             "returnType": null,
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getOperationType",
@@ -34,8 +33,7 @@
             "returnType": "string",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getPackage",
@@ -46,8 +44,7 @@
             "returnType": "\\Composer\\Package\\AliasPackage",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "show",
@@ -68,8 +65,7 @@
             "returnType": "string",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         }
     ],
     "constructor": {
@@ -87,8 +83,7 @@
             }
         ],
         "funcNumArgs": false,
-        "forwarded": true,
-        "status": "implemented"
+        "forwarded": true
     },
     "properties": [
         {

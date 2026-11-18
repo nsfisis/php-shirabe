@@ -11,78 +11,8 @@
     "Composer\\Advisory\\SecurityAdvisory": {
         "treatment": "guard"
     },
-    "Composer\\Autoload\\AutoloadGenerator": {
-        "members": {
-            "__construct": {
-                "status": "unimplemented"
-            },
-            "setPlatformRequirementFilter": {
-                "status": "refused",
-                "reason": "no platform requirement filter can cross the boundary"
-            }
-        }
-    },
     "Composer\\Cache": {
         "treatment": "guard"
-    },
-    "Composer\\Composer": {
-        "members": {
-            "__construct": {
-                "status": "unimplemented"
-            },
-            "getArchiveManager": {
-                "status": "unimplemented"
-            },
-            "getPluginManager": {
-                "status": "unimplemented"
-            },
-            "setArchiveManager": {
-                "status": "unimplemented"
-            },
-            "setAutoloadGenerator": {
-                "status": "unimplemented"
-            },
-            "setDownloadManager": {
-                "status": "unimplemented"
-            },
-            "setLocker": {
-                "status": "unimplemented"
-            },
-            "setPluginManager": {
-                "status": "unimplemented"
-            }
-        }
-    },
-    "Composer\\Config": {
-        "members": {
-            "__construct": {
-                "status": "unimplemented"
-            },
-            "getAuthConfigSource": {
-                "status": "unimplemented"
-            },
-            "getConfigSource": {
-                "status": "unimplemented"
-            },
-            "getLocalAuthConfigSource": {
-                "status": "unimplemented"
-            },
-            "prohibitUrlByConfig": {
-                "status": "unimplemented"
-            },
-            "setAuthConfigSource": {
-                "status": "unimplemented"
-            },
-            "setBaseDir": {
-                "status": "unimplemented"
-            },
-            "setConfigSource": {
-                "status": "unimplemented"
-            },
-            "setLocalAuthConfigSource": {
-                "status": "unimplemented"
-            }
-        }
     },
     "Composer\\Config\\JsonConfigSource": {
         "treatment": "guard"
@@ -108,13 +38,6 @@
     },
     "Composer\\DependencyResolver\\GenericRule": {
         "treatment": "guard"
-    },
-    "Composer\\DependencyResolver\\LocalRepoTransaction": {
-        "members": {
-            "__construct": {
-                "status": "unimplemented"
-            }
-        }
     },
     "Composer\\DependencyResolver\\LockTransaction": {
         "treatment": "guard"
@@ -147,38 +70,9 @@
     "Composer\\DependencyResolver\\SecurityAdvisoryPoolFilter": {
         "treatment": "guard"
     },
-    "Composer\\DependencyResolver\\Transaction": {
-        "members": {
-            "__construct": {
-                "status": "unimplemented"
-            }
-        }
-    },
     "Composer\\Downloader\\ArchiveDownloader": {
         "treatment": "real",
         "reason": "an abstract base class plugins extend, with no stub yet; the real definition stays so that plugin subclasses load"
-    },
-    "Composer\\Downloader\\DownloadManager": {
-        "members": {
-            "__construct": {
-                "status": "unimplemented"
-            },
-            "getDownloader": {
-                "status": "unimplemented"
-            },
-            "getDownloaderForPackage": {
-                "status": "unimplemented"
-            },
-            "getDownloaderType": {
-                "status": "unimplemented"
-            },
-            "setDownloader": {
-                "status": "unimplemented"
-            },
-            "setPreferences": {
-                "status": "unimplemented"
-            }
-        }
     },
     "Composer\\Downloader\\FileDownloader": {
         "treatment": "guard",
@@ -231,37 +125,6 @@
         "treatment": "runtime",
         "reason": "dual-mode: an instance revived from a Rust entity handle forwards to its entity, while one constructed in the worker runs the real code; a generated stub cannot be both"
     },
-    "Composer\\EventDispatcher\\EventDispatcher": {
-        "members": {
-            "__construct": {
-                "status": "unimplemented"
-            },
-            "addListener": {
-                "status": "unimplemented"
-            },
-            "addSubscriber": {
-                "status": "unimplemented"
-            },
-            "dispatchInstallerEvent": {
-                "status": "unimplemented"
-            },
-            "dispatchPackageEvent": {
-                "status": "unimplemented"
-            },
-            "dispatchScript": {
-                "status": "unimplemented"
-            },
-            "hasEventListeners": {
-                "status": "unimplemented"
-            },
-            "removeListener": {
-                "status": "unimplemented"
-            },
-            "setRunScripts": {
-                "status": "unimplemented"
-            }
-        }
-    },
     "Composer\\Factory": {
         "statics": {
             "getComposerFile": {
@@ -277,164 +140,9 @@
         "treatment": "real",
         "reason": "plugins build the filters Composer offers through it; fromBoolOrList() with a list reaches the guarded IgnoreListPlatformRequirementFilter"
     },
-    "Composer\\IO\\BaseIO": {
-        "members": {
-            "alert": {
-                "status": "unimplemented"
-            },
-            "ask": {
-                "status": "unimplemented"
-            },
-            "askAndHideAnswer": {
-                "status": "unimplemented"
-            },
-            "askAndValidate": {
-                "status": "unimplemented"
-            },
-            "askConfirmation": {
-                "status": "unimplemented"
-            },
-            "critical": {
-                "status": "unimplemented"
-            },
-            "debug": {
-                "status": "unimplemented"
-            },
-            "emergency": {
-                "status": "unimplemented"
-            },
-            "error": {
-                "status": "unimplemented"
-            },
-            "getAuthentication": {
-                "status": "unimplemented"
-            },
-            "getAuthentications": {
-                "status": "unimplemented"
-            },
-            "hasAuthentication": {
-                "status": "unimplemented"
-            },
-            "info": {
-                "status": "unimplemented"
-            },
-            "loadConfiguration": {
-                "status": "unimplemented"
-            },
-            "log": {
-                "status": "unimplemented"
-            },
-            "notice": {
-                "status": "unimplemented"
-            },
-            "overwrite": {
-                "status": "unimplemented"
-            },
-            "overwriteError": {
-                "status": "unimplemented"
-            },
-            "resetAuthentications": {
-                "status": "unimplemented"
-            },
-            "select": {
-                "status": "unimplemented"
-            },
-            "setAuthentication": {
-                "status": "unimplemented"
-            },
-            "warning": {
-                "status": "unimplemented"
-            },
-            "writeErrorRaw": {
-                "status": "unimplemented"
-            },
-            "writeRaw": {
-                "status": "unimplemented"
-            }
-        }
-    },
-    "Composer\\IO\\ConsoleIO": {
-        "members": {
-            "__construct": {
-                "status": "unimplemented"
-            },
-            "enableDebugging": {
-                "status": "unimplemented"
-            },
-            "getProgressBar": {
-                "status": "unimplemented"
-            },
-            "getTable": {
-                "status": "unimplemented"
-            }
-        }
-    },
-    "Composer\\IO\\NullIO": {
-        "members": {
-            "__construct": {
-                "status": "unimplemented"
-            }
-        }
-    },
     "Composer\\Installer\\BinaryInstaller": {
         "treatment": "real",
         "reason": "constructed by the real LibraryInstaller for the same plugin-owned instance; it holds only stubs (IO, Filesystem) and its own configuration strings"
-    },
-    "Composer\\Installer\\InstallationManager": {
-        "members": {
-            "__construct": {
-                "status": "unimplemented"
-            },
-            "disablePlugins": {
-                "status": "unimplemented"
-            },
-            "download": {
-                "status": "unimplemented"
-            },
-            "ensureBinariesPresence": {
-                "status": "unimplemented"
-            },
-            "execute": {
-                "status": "unimplemented"
-            },
-            "getInstaller": {
-                "status": "unimplemented"
-            },
-            "install": {
-                "status": "unimplemented"
-            },
-            "isPackageInstalled": {
-                "status": "unimplemented"
-            },
-            "markAliasInstalled": {
-                "status": "unimplemented"
-            },
-            "markAliasUninstalled": {
-                "status": "unimplemented"
-            },
-            "notifyInstalls": {
-                "status": "unimplemented"
-            },
-            "reset": {
-                "status": "unimplemented"
-            },
-            "setOutputProgress": {
-                "status": "unimplemented"
-            },
-            "uninstall": {
-                "status": "unimplemented"
-            },
-            "update": {
-                "status": "unimplemented"
-            }
-        }
-    },
-    "Composer\\Installer\\InstallerEvent": {
-        "members": {
-            "__construct": {
-                "status": "unimplemented"
-            }
-        }
     },
     "Composer\\Installer\\LibraryInstaller": {
         "treatment": "real",
@@ -442,13 +150,6 @@
     },
     "Composer\\Installer\\MetapackageInstaller": {
         "treatment": "guard"
-    },
-    "Composer\\Installer\\PackageEvent": {
-        "members": {
-            "__construct": {
-                "status": "unimplemented"
-            }
-        }
     },
     "Composer\\Installer\\PluginInstaller": {
         "treatment": "guard"
@@ -474,141 +175,20 @@
     "Composer\\Package\\Loader\\ValidatingArrayLoader": {
         "treatment": "guard"
     },
-    "Composer\\Package\\Locker": {
-        "members": {
-            "__construct": {
-                "status": "unimplemented"
-            },
-            "getJsonFile": {
-                "status": "refused",
-                "reason": "JsonFile cannot cross the boundary"
-            },
-            "updateHash": {
-                "status": "refused",
-                "reason": "JsonFile cannot cross the boundary"
-            }
-        }
-    },
-    "Composer\\Package\\RootPackage": {
-        "members": {
-            "__construct": {
-                "status": "unimplemented"
-            }
-        }
-    },
     "Composer\\Package\\Version\\VersionGuesser": {
         "treatment": "real",
         "reason": "stateless computation over VCS output, reached only as a constructor parameter of RootPackageLoader; no Rust-side instance is ever handed to plugins"
-    },
-    "Composer\\PartialComposer": {
-        "members": {
-            "__construct": {
-                "status": "unimplemented"
-            },
-            "isGlobal": {
-                "status": "unimplemented"
-            },
-            "setConfig": {
-                "status": "unimplemented"
-            },
-            "setEventDispatcher": {
-                "status": "unimplemented"
-            },
-            "setGlobal": {
-                "status": "unimplemented"
-            },
-            "setInstallationManager": {
-                "status": "unimplemented"
-            },
-            "setLoop": {
-                "status": "unimplemented"
-            },
-            "setPackage": {
-                "status": "unimplemented"
-            },
-            "setRepositoryManager": {
-                "status": "unimplemented"
-            }
-        }
     },
     "Composer\\Platform\\HhvmDetector": {
         "treatment": "real",
         "reason": "stateless environment probe, reached only as a constructor parameter of PlatformRepository; no Rust-side instance is ever handed to plugins"
     },
-    "Composer\\Plugin\\CommandEvent": {
-        "members": {
-            "__construct": {
-                "status": "unimplemented"
-            },
-            "getInput": {
-                "status": "refused",
-                "reason": "the console input cannot cross the boundary"
-            },
-            "getOutput": {
-                "status": "refused",
-                "reason": "the console output cannot cross the boundary"
-            }
-        }
-    },
     "Composer\\Plugin\\PluginManager": {
         "treatment": "guard"
     },
-    "Composer\\Plugin\\PostFileDownloadEvent": {
-        "members": {
-            "__construct": {
-                "status": "unimplemented"
-            }
-        }
-    },
     "Composer\\Plugin\\PreCommandRunEvent": {
         "treatment": "runtime",
-        "reason": "dual-mode, like its parent Event: the worker's real code constructs it natively, while the Rust side hands its own instances over as entities",
-        "members": {
-            "getInput": {
-                "status": "refused",
-                "reason": "the console input cannot cross the boundary"
-            }
-        }
-    },
-    "Composer\\Plugin\\PreFileDownloadEvent": {
-        "members": {
-            "__construct": {
-                "status": "unimplemented"
-            }
-        }
-    },
-    "Composer\\Plugin\\PrePoolCreateEvent": {
-        "members": {
-            "__construct": {
-                "status": "unimplemented"
-            },
-            "getRequest": {
-                "status": "refused",
-                "reason": "the Request cannot cross the boundary"
-            }
-        }
-    },
-    "Composer\\Repository\\ArrayRepository": {
-        "members": {
-            "__construct": {
-                "status": "unimplemented"
-            },
-            "count": {
-                "status": "unimplemented"
-            },
-            "getProviders": {
-                "status": "unimplemented"
-            },
-            "getRepoName": {
-                "status": "unimplemented"
-            },
-            "loadPackages": {
-                "status": "unimplemented"
-            },
-            "search": {
-                "status": "unimplemented"
-            }
-        }
+        "reason": "dual-mode, like its parent Event: the worker's real code constructs it natively, while the Rust side hands its own instances over as entities"
     },
     "Composer\\Repository\\ArtifactRepository": {
         "treatment": "guard"
@@ -619,45 +199,11 @@
     "Composer\\Repository\\CompositeRepository": {
         "treatment": "guard"
     },
-    "Composer\\Repository\\FilesystemRepository": {
-        "members": {
-            "__construct": {
-                "status": "unimplemented"
-            }
-        }
-    },
     "Composer\\Repository\\FilterRepository": {
         "treatment": "guard"
     },
-    "Composer\\Repository\\InstalledArrayRepository": {
-        "members": {
-            "__construct": {
-                "status": "unimplemented"
-            },
-            "isFresh": {
-                "status": "unimplemented"
-            }
-        }
-    },
-    "Composer\\Repository\\InstalledFilesystemRepository": {
-        "members": {
-            "__construct": {
-                "status": "unimplemented"
-            },
-            "isFresh": {
-                "status": "unimplemented"
-            }
-        }
-    },
     "Composer\\Repository\\InstalledRepository": {
         "treatment": "guard"
-    },
-    "Composer\\Repository\\LockArrayRepository": {
-        "members": {
-            "__construct": {
-                "status": "unimplemented"
-            }
-        }
     },
     "Composer\\Repository\\PackageRepository": {
         "treatment": "guard"
@@ -670,37 +216,6 @@
     },
     "Composer\\Repository\\PlatformRepository": {
         "treatment": "guard"
-    },
-    "Composer\\Repository\\RepositoryManager": {
-        "members": {
-            "__construct": {
-                "status": "unimplemented"
-            },
-            "addRepository": {
-                "status": "unimplemented"
-            },
-            "createRepository": {
-                "status": "unimplemented"
-            },
-            "findPackage": {
-                "status": "unimplemented"
-            },
-            "findPackages": {
-                "status": "unimplemented"
-            },
-            "getRepositories": {
-                "status": "unimplemented"
-            },
-            "prependRepository": {
-                "status": "unimplemented"
-            },
-            "setLocalRepository": {
-                "status": "unimplemented"
-            },
-            "setRepositoryClass": {
-                "status": "unimplemented"
-            }
-        }
     },
     "Composer\\Repository\\RepositorySet": {
         "treatment": "guard"
@@ -741,38 +256,6 @@
     "Composer\\Repository\\Vcs\\VcsDriver": {
         "treatment": "real",
         "reason": "an abstract base class plugins extend, with no stub yet; the real definition stays so that plugin subclasses load"
-    },
-    "Composer\\Repository\\WritableArrayRepository": {
-        "members": {
-            "__construct": {
-                "status": "unimplemented"
-            },
-            "getDevMode": {
-                "status": "unimplemented"
-            },
-            "reload": {
-                "status": "unimplemented"
-            },
-            "setDevPackageNames": {
-                "status": "unimplemented"
-            },
-            "write": {
-                "status": "unimplemented"
-            }
-        }
-    },
-    "Composer\\Script\\Event": {
-        "members": {
-            "__construct": {
-                "status": "unimplemented"
-            },
-            "getOriginatingEvent": {
-                "status": "unimplemented"
-            },
-            "setOriginatingEvent": {
-                "status": "unimplemented"
-            }
-        }
     },
     "Composer\\Util\\Http\\CurlDownloader": {
         "treatment": "real",

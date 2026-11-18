@@ -23,6 +23,12 @@ php_entity! {
     handle: std::rc::Rc<std::cell::RefCell<dyn AutoloadGeneratorInterface>>,
     expected: "an AutoloadGenerator",
     class: r"Composer\Autoload\AutoloadGenerator",
+    unimplemented: [
+        "__construct",
+    ],
+    refused: {
+        "setPlatformRequirementFilter": "no platform requirement filter can cross the boundary",
+    },
     types: {
         r"Composer\Autoload\AutoloadGenerator": custom self only [
             setIgnorePlatformRequirements,

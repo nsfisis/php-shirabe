@@ -16,6 +16,10 @@ php_entity! {
         r"Composer\DependencyResolver\Transaction",
         r"Composer\DependencyResolver\LocalRepoTransaction",
     ],
+    unimplemented: [
+        r"Composer\DependencyResolver\LocalRepoTransaction::__construct",
+        r"Composer\DependencyResolver\Transaction::__construct",
+    ],
     types: {
         r"Composer\DependencyResolver\Transaction": instance __php_binding_any_transaction
             for AnyTransaction {

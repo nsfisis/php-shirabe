@@ -19,8 +19,7 @@
             "returnType": "array",
             "docReturnType": "list<array{package: string, version: string, alias: string, alias_normalized: string}>",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getContentHash",
@@ -41,8 +40,7 @@
             "returnType": "string",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getDevPackageNames",
@@ -53,8 +51,7 @@
             "returnType": "array",
             "docReturnType": "string[]",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getJsonFile",
@@ -65,9 +62,7 @@
             "returnType": "\\Composer\\Json\\JsonFile",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "refused",
-            "reason": "JsonFile cannot cross the boundary"
+            "forwarded": true
         },
         {
             "name": "getLockData",
@@ -78,8 +73,7 @@
             "returnType": "array",
             "docReturnType": "array<string, mixed>",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getLockedRepository",
@@ -100,8 +94,7 @@
             "returnType": "\\Composer\\Repository\\LockArrayRepository",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getMinimumStability",
@@ -112,8 +105,7 @@
             "returnType": "string",
             "docReturnType": "key-of<BasePackage::STABILITIES>",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getMissingRequirementInfo",
@@ -143,8 +135,7 @@
             "returnType": "array",
             "docReturnType": "array<string>",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getPlatformOverrides",
@@ -155,8 +146,7 @@
             "returnType": "array",
             "docReturnType": "array<string, string>",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getPlatformRequirements",
@@ -177,8 +167,7 @@
             "returnType": "array",
             "docReturnType": "Link[]",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getPluginApi",
@@ -189,8 +178,7 @@
             "returnType": null,
             "docReturnType": "string",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getPreferLowest",
@@ -201,8 +189,7 @@
             "returnType": "?bool",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getPreferStable",
@@ -213,8 +200,7 @@
             "returnType": "?bool",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getStabilityFlags",
@@ -225,8 +211,7 @@
             "returnType": "array",
             "docReturnType": "array<string, string>",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "isFresh",
@@ -237,8 +222,7 @@
             "returnType": "bool",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "isLocked",
@@ -249,8 +233,7 @@
             "returnType": "bool",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "setLockData",
@@ -361,8 +344,7 @@
             "returnType": "bool",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "updateHash",
@@ -392,9 +374,7 @@
             "returnType": "void",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "refused",
-            "reason": "JsonFile cannot cross the boundary"
+            "forwarded": true
         }
     ],
     "constructor": {
@@ -448,8 +428,7 @@
             }
         ],
         "funcNumArgs": false,
-        "forwarded": true,
-        "status": "unimplemented"
+        "forwarded": true
     },
     "properties": []
 }

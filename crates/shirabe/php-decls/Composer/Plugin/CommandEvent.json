@@ -19,8 +19,7 @@
             "returnType": "array",
             "docReturnType": "string[]",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getCommandName",
@@ -31,8 +30,7 @@
             "returnType": "string",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getFlags",
@@ -43,8 +41,7 @@
             "returnType": "array",
             "docReturnType": "mixed[]",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getInput",
@@ -55,9 +52,7 @@
             "returnType": "\\Symfony\\Component\\Console\\Input\\InputInterface",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "refused",
-            "reason": "the console input cannot cross the boundary"
+            "forwarded": true
         },
         {
             "name": "getName",
@@ -68,8 +63,7 @@
             "returnType": "string",
             "docReturnType": "string",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "getOutput",
@@ -80,9 +74,7 @@
             "returnType": "\\Symfony\\Component\\Console\\Output\\OutputInterface",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "refused",
-            "reason": "the console output cannot cross the boundary"
+            "forwarded": true
         },
         {
             "name": "isPropagationStopped",
@@ -93,8 +85,7 @@
             "returnType": "bool",
             "docReturnType": "bool",
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         },
         {
             "name": "stopPropagation",
@@ -105,8 +96,7 @@
             "returnType": "void",
             "docReturnType": null,
             "funcNumArgs": false,
-            "forwarded": true,
-            "status": "implemented"
+            "forwarded": true
         }
     ],
     "constructor": {
@@ -169,8 +159,7 @@
             }
         ],
         "funcNumArgs": false,
-        "forwarded": true,
-        "status": "unimplemented"
+        "forwarded": true
     },
     "properties": [
         {

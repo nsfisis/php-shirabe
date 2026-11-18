@@ -188,6 +188,106 @@ fn with_static_bound(ty: syn::Type) -> syn::Type {
     }
 }
 
+/// The members the Rust side does not answer: `unimplemented: [...]` and `refused: { ... }`,
+/// each naming a member (`"getFoo"`, for every class) or a member of a class and its subclasses
+/// (`"Composer\\Foo::getFoo"`; a constructor only for that class).
+#[derive(Default)]
+struct Statuses {
+    unimplemented: Vec<syn::LitStr>,
+    refused: Vec<(syn::LitStr, syn::LitStr)>,
+}
+
+enum Status<'a> {
+    Unimplemented,
+    Refused(&'a syn::LitStr),
+}
+
+impl Statuses {
+    fn parse_unimplemented(&mut self, input: syn::parse::ParseStream<'_>) -> syn::Result<()> {
+        let content;
+        syn::bracketed!(content in input);
+        self.unimplemented.extend(
+            content.parse_terminated(<syn::LitStr as syn::parse::Parse>::parse, syn::Token![,])?,
+        );
+        Ok(())
+    }
+
+    fn parse_refused(&mut self, input: syn::parse::ParseStream<'_>) -> syn::Result<()> {
+        let content;
+        syn::braced!(content in input);
+        while !content.is_empty() {
+            let member: syn::LitStr = content.parse()?;
+            content.parse::<syn::Token![:]>()?;
+            let reason: syn::LitStr = content.parse()?;
+            self.refused.push((member, reason));
+            if !content.is_empty() {
+                content.parse::<syn::Token![,]>()?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Whether `entry` names `member` of a class whose ancestors (itself first) are `chain`.
+    fn names(entry: &str, chain: &[&str], member: &str) -> bool {
+        match entry.rsplit_once("::") {
+            None => entry == member,
+            Some((class, name)) => {
+                name == member
+                    && if member == "__construct" {
+                        chain.first() == Some(&class)
+                    } else {
+                        chain.contains(&class)
+                    }
+            }
+        }
+    }
+
+    fn of(&self, chain: &[&str], member: &str) -> Option<Status<'_>> {
+        if self
+            .unimplemented
+            .iter()
+            .any(|entry| Self::names(&entry.value(), chain, member))
+        {
+            return Some(Status::Unimplemented);
+        }
+        self.refused
+            .iter()
+            .find(|(entry, _)| Self::names(&entry.value(), chain, member))
+            .map(|(_, reason)| Status::Refused(reason))
+    }
+
+    /// Fails on an entry naming no member a class forwards, so that the lists cannot go stale.
+    fn check_used(&self, forwarded: &[(Vec<&str>, Vec<&str>)]) -> syn::Result<()> {
+        let entries = self
+            .unimplemented
+            .iter()
+            .chain(self.refused.iter().map(|(entry, _)| entry));
+        for entry in entries {
+            let used = forwarded.iter().any(|(chain, members)| {
+                members
+                    .iter()
+                    .any(|member| Self::names(&entry.value(), chain, member))
+            });
+            if !used {
+                return Err(syn::Error::new(
+                    entry.span(),
+                    format!("`{}` names no member these classes forward", entry.value()),
+                ));
+            }
+        }
+        Ok(())
+    }
+}
+
+fn status_answer(status: &Status<'_>) -> proc_macro2::TokenStream {
+    match status {
+        Status::Unimplemented => quote::quote! { ::core::result::Result::Err(call.unsupported()) },
+        Status::Refused(reason) => {
+            quote::quote! { ::core::result::Result::Err(call.unavailable(#reason)) }
+        }
+    }
+}
+
 /// The class an entity crosses as: always one, or one chosen from the handle.
 enum Class {
     Fixed(syn::LitStr),
@@ -205,6 +305,7 @@ struct Input {
     worker_method: Option<syn::Path>,
     types: Vec<Entry>,
     constructors: Vec<ConstructEntry>,
+    statuses: Statuses,
 }
 
 impl syn::parse::Parse for Input {
@@ -219,6 +320,7 @@ impl syn::parse::Parse for Input {
         let mut worker_method = None;
         let mut types = None;
         let mut constructors = Vec::new();
+        let mut statuses = Statuses::default();
         while !input.is_empty() {
             let key: syn::Ident = input.parse()?;
             input.parse::<syn::Token![:]>()?;
@@ -252,6 +354,8 @@ impl syn::parse::Parse for Input {
                 "clone" => clone = Some(input.parse()?),
                 "property" => property = Some(input.parse()?),
                 "worker_method" => worker_method = Some(input.parse()?),
+                "unimplemented" => statuses.parse_unimplemented(input)?,
+                "refused" => statuses.parse_refused(input)?,
                 "types" => {
                     let content;
                     syn::braced!(content in input);
@@ -276,7 +380,7 @@ impl syn::parse::Parse for Input {
                 _ => {
                     return Err(syn::Error::new(
                         key.span(),
-                        "expected `handle`, `expected`, `address`, `class`, `classes`, `clone`, `property`, `worker_method`, `types` or `constructors`",
+                        "expected `handle`, `expected`, `address`, `class`, `classes`, `clone`, `property`, `worker_method`, `types`, `constructors`, `unimplemented` or `refused`",
                     ));
                 }
             }
@@ -311,6 +415,7 @@ impl syn::parse::Parse for Input {
             worker_method,
             types: types.ok_or_else(|| missing("types"))?,
             constructors,
+            statuses,
         })
     }
 }
@@ -419,15 +524,18 @@ fn expand_input(input: Input) -> syn::Result<proc_macro2::TokenStream> {
     let mut impls = Vec::new();
     let mut checks = Vec::new();
     let mut kinds = Vec::new();
-    for class in &classes {
-        impls.push(forwarding_impl(
+    let mut forwarded = Vec::new();
+    for (index, class) in classes.iter().enumerate() {
+        impls.push(class_items(
             &input,
             &classes,
-            class,
+            index,
             &mut checks,
             &mut kinds,
         )?);
+        forwarded.push((chain(&classes, class), forwarded_members(class)));
     }
+    input.statuses.check_used(&forwarded)?;
     checks.push(quote::quote! {
         const _: () = assert!(
             !crate::php_worker::rpc::binding::mixes_async_and_mut(&[#(#kinds),*]),
@@ -440,16 +548,13 @@ fn expand_input(input: Input) -> syn::Result<proc_macro2::TokenStream> {
         None => quote::quote! {{ ::std::rc::Rc::as_ptr(self) as *const () }},
     };
     let class_body = match &input.class {
-        Class::Fixed(_) => {
-            let forwarding = &classes[0].forwarding;
-            quote::quote! { ::core::result::Result::Ok(&#forwarding::BINDINGS) }
-        }
+        Class::Fixed(_) => quote::quote! { ::core::result::Result::Ok(&__PHP_BINDINGS_0) },
         Class::Chosen(choose) => {
             let chosen = choose.apply(quote::quote! { self });
-            let arms = classes.iter().map(|class| {
+            let arms = classes.iter().enumerate().map(|(index, class)| {
                 let literal = syn::LitByteStr::new(class.fqcn.as_bytes(), class.span);
-                let forwarding = &class.forwarding;
-                quote::quote! { #literal => ::core::result::Result::Ok(&#forwarding::BINDINGS), }
+                let bindings = quote::format_ident!("__PHP_BINDINGS_{}", index);
+                quote::quote! { #literal => ::core::result::Result::Ok(&#bindings), }
             });
             quote::quote! {
                 let class: ::core::result::Result<&'static [u8], ::shirabe_php_rpc::PhpThrow> = #chosen;
@@ -529,168 +634,250 @@ fn expand_input(input: Input) -> syn::Result<proc_macro2::TokenStream> {
     })
 }
 
-/// The impl of a class's `Forwarding` trait: the members the class forwards and its parent does
-/// not, each routed to the adapter of the type declaring it.
-fn forwarding_impl(
+/// A class and its ancestors among `classes`, the class first.
+fn chain<'a>(classes: &'a [ClassDecl], class: &'a ClassDecl) -> Vec<&'a str> {
+    let mut chain = vec![class.fqcn.as_str()];
+    let mut current = class;
+    while let Some(parent) = current
+        .loaded
+        .decl
+        .parent
+        .as_ref()
+        .and_then(|parent| classes.iter().find(|other| &other.fqcn == parent))
+    {
+        chain.push(parent.fqcn.as_str());
+        current = parent;
+    }
+    chain
+}
+
+/// The members a class's stub sends to the Rust side.
+fn forwarded_members(class: &ClassDecl) -> Vec<&str> {
+    let decl = &class.loaded.decl;
+    let mut members: Vec<&str> = decl
+        .methods
+        .iter()
+        .filter(|method| method.forwarded())
+        .map(|method| method.name.as_str())
+        .collect();
+    if decl
+        .constructor
+        .as_ref()
+        .is_some_and(|constructor| constructor.forwarded)
+    {
+        members.push("__construct");
+    }
+    members
+}
+
+/// The answer of a method routed to `types`, with the checks of the adapter it calls.
+fn route(
+    input: &Input,
+    class: &ClassDecl,
+    method: &decls::Method,
+    checks: &mut Vec<proc_macro2::TokenStream>,
+    kinds: &mut Vec<proc_macro2::TokenStream>,
+) -> syn::Result<proc_macro2::TokenStream> {
+    let fqcn = &class.fqcn;
+    let span = class.span;
+    let name = decls::ident(&method.rust, span)?;
+    let found = input.types.iter().enumerate().find(|(_, entry)| {
+        entry.fqcn.value() == method.declared_in
+            && entry
+                .only
+                .as_ref()
+                .is_none_or(|only| only.contains(&method.name))
+            && matches!(
+                (&entry.source, method.is_static),
+                (Source::Instance { .. } | Source::Custom { .. }, false)
+                    | (Source::Static { .. }, true)
+            )
+    });
+    let Some((index, entry)) = found else {
+        return Err(syn::Error::new(
+            span,
+            format!(
+                "{fqcn}::{} is declared by {}, whose {} methods no entry of `types` answers; route it, or list it in `unimplemented` or `refused`",
+                method.name,
+                method.declared_in,
+                if method.is_static {
+                    "static"
+                } else {
+                    "instance"
+                },
+            ),
+        ));
+    };
+    Ok(match &entry.source {
+        Source::Instance { module, .. } => {
+            let route = quote::format_ident!("__PhpRoute{}", index);
+            checks.push(params_check(
+                module,
+                &name,
+                &method.params,
+                fqcn,
+                &method.name,
+            ));
+            kinds.push(quote::quote! { #module::__php_kinds::#name });
+            quote::quote! { #module::#name(&#route(::core::clone::Clone::clone(this)), call) }
+        }
+        Source::Custom { module } => quote::quote! { #module::#name(this, call) },
+        Source::Static { module } => {
+            checks.push(params_check(
+                module,
+                &name,
+                &method.params,
+                fqcn,
+                &method.name,
+            ));
+            quote::quote! { #module::#name(call) }
+        }
+    })
+}
+
+/// The answer of a `CallStaticMethod` sent as a class: its forwarded static methods.
+fn static_router(
+    input: &Input,
+    class: &ClassDecl,
+    chain: &[&str],
+    checks: &mut Vec<proc_macro2::TokenStream>,
+    kinds: &mut Vec<proc_macro2::TokenStream>,
+) -> syn::Result<proc_macro2::TokenStream> {
+    let mut arms = Vec::new();
+    for method in &class.loaded.decl.methods {
+        if !method.is_static || !method.forwarded() {
+            continue;
+        }
+        let literal = syn::LitByteStr::new(method.name.as_bytes(), class.span);
+        let answer = match input.statuses.of(chain, &method.name) {
+            Some(status) => status_answer(&status),
+            None => route(input, class, method, checks, kinds)?,
+        };
+        arms.push(quote::quote! { #literal => #answer, });
+    }
+
+    Ok(quote::quote! {
+        fn call_static(
+            call: &mut crate::php_worker::rpc::entity::Call<'_>,
+        ) -> ::core::result::Result<::shirabe_php_rpc::RpcValue, ::shirabe_php_rpc::PhpThrow> {
+            match &**call.method() {
+                #(#arms)*
+                _ => crate::php_worker::rpc::entity::protocol_violation(call),
+            }
+        }
+    })
+}
+
+/// A class's dispatch of the calls an entity crossing as it receives, its `Bindings`, and the
+/// answers of its constructor and static methods.
+fn class_items(
     input: &Input,
     classes: &[ClassDecl],
-    class: &ClassDecl,
+    index: usize,
     checks: &mut Vec<proc_macro2::TokenStream>,
     kinds: &mut Vec<proc_macro2::TokenStream>,
 ) -> syn::Result<proc_macro2::TokenStream> {
     let handle = &input.handle;
+    let class = &classes[index];
     let decl = &class.loaded.decl;
     let span = class.span;
     let fqcn = &class.fqcn;
-    let parent = decl
-        .parent
-        .as_ref()
-        .and_then(|parent| classes.iter().find(|other| &other.fqcn == parent));
-    let inherited: Vec<&str> = parent
-        .map(|parent| {
-            parent
-                .loaded
-                .decl
-                .methods
-                .iter()
-                .filter(|method| method.forwarded() && !method.is_static)
-                .map(|method| method.name.as_str())
-                .collect()
-        })
-        .unwrap_or_default();
+    let chain = chain(classes, class);
 
-    let mut members = Vec::new();
+    let mut arms = Vec::new();
     for method in &decl.methods {
-        if !method.forwarded()
-            || method.status.as_deref() != Some("implemented")
-            || (!method.is_static && inherited.contains(&method.name.as_str()))
-        {
+        if method.is_static || !method.forwarded() {
             continue;
         }
-        let name = decls::ident(&method.rust, span)?;
-        let found = input.types.iter().enumerate().find(|(_, entry)| {
-            entry.fqcn.value() == method.declared_in
-                && entry
-                    .only
-                    .as_ref()
-                    .is_none_or(|only| only.contains(&method.name))
-                && matches!(
-                    (&entry.source, method.is_static),
-                    (Source::Instance { .. } | Source::Custom { .. }, false)
-                        | (Source::Static { .. }, true)
-                )
-        });
-        let Some((index, entry)) = found else {
-            return Err(syn::Error::new(
-                span,
-                format!(
-                    "{fqcn}::{} is declared by {}, whose {} methods no entry of `types` answers",
-                    method.name,
-                    method.declared_in,
-                    if method.is_static {
-                        "static"
-                    } else {
-                        "instance"
-                    },
-                ),
-            ));
+        let literal = syn::LitByteStr::new(method.name.as_bytes(), span);
+        let answer = match input.statuses.of(&chain, &method.name) {
+            Some(status) => status_answer(&status),
+            None => route(input, class, method, checks, kinds)?,
         };
-        let answer = quote::quote! {
-            ::core::result::Result<::shirabe_php_rpc::RpcValue, ::shirabe_php_rpc::PhpThrow>
-        };
-        let call = quote::quote! { call: &mut crate::php_worker::rpc::entity::Call<'_> };
-        members.push(match &entry.source {
-            Source::Instance { module, .. } => {
-                let route = quote::format_ident!("__PhpRoute{}", index);
-                checks.push(params_check(
-                    module,
-                    &name,
-                    &method.params,
-                    fqcn,
-                    &method.name,
-                ));
-                kinds.push(quote::quote! { #module::__php_kinds::#name });
-                quote::quote! {
-                    fn #name(this: &#handle, #call) -> #answer {
-                        #module::#name(&#route(::core::clone::Clone::clone(this)), call)
-                    }
-                }
-            }
-            Source::Custom { module } => quote::quote! {
-                fn #name(this: &#handle, #call) -> #answer {
-                    #module::#name(this, call)
-                }
-            },
-            Source::Static { module } => {
-                checks.push(params_check(
-                    module,
-                    &name,
-                    &method.params,
-                    fqcn,
-                    &method.name,
-                ));
-                quote::quote! {
-                    fn #name(#call) -> #answer {
-                        #module::#name(call)
-                    }
-                }
-            }
-        });
+        arms.push(quote::quote! { #literal => #answer, });
     }
 
-    if let Some(constructor) = &decl.constructor
-        && constructor.forwarded
-        && constructor.status.as_deref() == Some("implemented")
-    {
-        let Some(entry) = input
-            .constructors
-            .iter()
-            .find(|entry| entry.fqcn.value() == *fqcn)
-        else {
-            return Err(syn::Error::new(
-                span,
-                format!(
-                    "{fqcn} forwards its constructor, which no entry of `constructors` answers"
-                ),
-            ));
-        };
-        let body = match &entry.construct {
-            Construct::Adapter { module, into } => {
-                let construct = quote::format_ident!("__construct");
-                checks.push(params_check(
-                    module,
-                    &construct,
-                    &constructor.params,
-                    fqcn,
-                    "__construct",
-                ));
-                let into = into.apply(quote::quote! { value });
-                quote::quote! {
-                    let value = #module::__construct(call)?;
-                    ::core::result::Result::Ok(#into)
+    let construct = match &decl.constructor {
+        Some(constructor) if constructor.forwarded => {
+            match input.statuses.of(&chain, "__construct") {
+                Some(Status::Unimplemented) => {
+                    quote::quote! { ::core::result::Result::Err(call.unconstructible()) }
+                }
+                Some(Status::Refused(reason)) => {
+                    quote::quote! { ::core::result::Result::Err(call.unavailable(#reason)) }
+                }
+                None => {
+                    let Some(entry) = input
+                        .constructors
+                        .iter()
+                        .find(|entry| entry.fqcn.value() == *fqcn)
+                    else {
+                        return Err(syn::Error::new(
+                            span,
+                            format!(
+                                "{fqcn} forwards its constructor, which no entry of `constructors` answers; answer it, or list it in `unimplemented` or `refused`"
+                            ),
+                        ));
+                    };
+                    let built = match &entry.construct {
+                        Construct::Adapter { module, into } => {
+                            let construct = quote::format_ident!("__construct");
+                            checks.push(params_check(
+                                module,
+                                &construct,
+                                &constructor.params,
+                                fqcn,
+                                "__construct",
+                            ));
+                            let into = into.apply(quote::quote! { value });
+                            quote::quote! {{
+                                let value = #module::__construct(call)?;
+                                #into
+                            }}
+                        }
+                        Construct::Custom { function } => quote::quote! { #function(call)? },
+                    };
+                    quote::quote! {{
+                        let entity: #handle = #built;
+                        crate::php_worker::rpc::entity::constructed(call.class(), entity)
+                    }}
                 }
             }
-            Construct::Custom { function } => quote::quote! { #function(call) },
-        };
-        members.push(quote::quote! {
-            fn __construct(
-                call: &mut crate::php_worker::rpc::entity::Call<'_>,
-            ) -> ::core::result::Result<#handle, ::shirabe_php_rpc::PhpThrow> {
-                #body
-            }
-        });
-    }
+        }
+        _ => quote::quote! { crate::php_worker::rpc::entity::protocol_violation(call) },
+    };
+    let call_static = static_router(input, class, &chain, checks, kinds)?;
 
     let forwarding = &class.forwarding;
-    let handle_type = parent
-        .is_none()
-        .then(|| quote::quote! { type Handle = #handle; });
+    let dispatch = quote::format_ident!("__php_dispatch_{}", index);
+    let bindings = quote::format_ident!("__PHP_BINDINGS_{}", index);
+    let name = syn::LitByteStr::new(fqcn.as_bytes(), span);
 
     Ok(quote::quote! {
-        impl #forwarding::Forwarding for #forwarding::PhpClass {
-            #handle_type
+        fn #dispatch(
+            this: &#handle,
+            call: &mut crate::php_worker::rpc::entity::Call<'_>,
+        ) -> ::core::result::Result<::shirabe_php_rpc::RpcValue, ::shirabe_php_rpc::PhpThrow> {
+            match &**call.method() {
+                #(#arms)*
+                _ => crate::php_worker::rpc::entity::protocol_violation(call),
+            }
+        }
 
-            #(#members)*
+        static #bindings: crate::php_worker::rpc::entity::Bindings<#handle> =
+            crate::php_worker::rpc::entity::Bindings {
+                name: #name,
+                dispatch: #dispatch,
+            };
+
+        impl crate::php_worker::rpc::entity::ForwardedClass for #forwarding::PhpClass {
+            fn construct(
+                call: &mut crate::php_worker::rpc::entity::Call<'_>,
+            ) -> ::core::result::Result<u64, ::shirabe_php_rpc::PhpThrow> {
+                #construct
+            }
+
+            #call_static
         }
     })
 }
@@ -720,17 +907,21 @@ fn params_check(
 struct StaticsInput {
     class: syn::LitStr,
     types: Vec<Entry>,
+    statuses: Statuses,
 }
 
 impl syn::parse::Parse for StaticsInput {
     fn parse(input: syn::parse::ParseStream<'_>) -> syn::Result<Self> {
         let mut class = None;
         let mut types = None;
+        let mut statuses = Statuses::default();
         while !input.is_empty() {
             let key: syn::Ident = input.parse()?;
             input.parse::<syn::Token![:]>()?;
             match key.to_string().as_str() {
                 "class" => class = Some(input.parse()?),
+                "unimplemented" => statuses.parse_unimplemented(input)?,
+                "refused" => statuses.parse_refused(input)?,
                 "types" => {
                     let content;
                     syn::braced!(content in input);
@@ -741,7 +932,12 @@ impl syn::parse::Parse for StaticsInput {
                             .collect(),
                     );
                 }
-                _ => return Err(syn::Error::new(key.span(), "expected `class` or `types`")),
+                _ => {
+                    return Err(syn::Error::new(
+                        key.span(),
+                        "expected `class`, `types`, `unimplemented` or `refused`",
+                    ));
+                }
             }
             if !input.is_empty() {
                 input.parse::<syn::Token![,]>()?;
@@ -754,6 +950,7 @@ impl syn::parse::Parse for StaticsInput {
         Ok(StaticsInput {
             class: class.ok_or_else(|| missing("class"))?,
             types: types.ok_or_else(|| missing("types"))?,
+            statuses,
         })
     }
 }
@@ -774,13 +971,19 @@ fn expand_statics_input(input: StaticsInput) -> syn::Result<proc_macro2::TokenSt
         let segment = decls::ident(segment, span)?;
         forwarding = quote::quote! { #forwarding::#segment };
     }
-    let mut members = Vec::new();
+    let chain = [fqcn.as_str()];
+    let mut arms = Vec::new();
     let mut checks = Vec::new();
+    let mut forwarded = Vec::new();
     for method in &loaded.decl.methods {
-        if !method.is_static
-            || !method.forwarded()
-            || method.status.as_deref() != Some("implemented")
-        {
+        if !method.is_static || !method.forwarded() {
+            continue;
+        }
+        forwarded.push(method.name.as_str());
+        let literal = syn::LitByteStr::new(method.name.as_bytes(), span);
+        if let Some(status) = input.statuses.of(&chain, &method.name) {
+            let answer = status_answer(&status);
+            arms.push(quote::quote! { #literal => #answer, });
             continue;
         }
         let name = decls::ident(&method.rust, span)?;
@@ -799,7 +1002,7 @@ fn expand_statics_input(input: StaticsInput) -> syn::Result<proc_macro2::TokenSt
             return Err(syn::Error::new(
                 span,
                 format!(
-                    "{fqcn}::{} is declared by {}, whose static methods no entry of `types` answers",
+                    "{fqcn}::{} is declared by {}, whose static methods no entry of `types` answers; route it, or list it in `unimplemented` or `refused`",
                     method.name, method.declared_in,
                 ),
             ));
@@ -811,22 +1014,30 @@ fn expand_statics_input(input: StaticsInput) -> syn::Result<proc_macro2::TokenSt
             &fqcn,
             &method.name,
         ));
-        members.push(quote::quote! {
-            fn #name(
-                call: &mut crate::php_worker::rpc::entity::Call<'_>,
-            ) -> ::core::result::Result<::shirabe_php_rpc::RpcValue, ::shirabe_php_rpc::PhpThrow> {
-                #module::#name(call)
-            }
-        });
+        arms.push(quote::quote! { #literal => #module::#name(call), });
     }
+    input.statuses.check_used(&[(chain.to_vec(), forwarded)])?;
     let tracking = loaded.tracking;
 
     Ok(quote::quote! {
         const _: () = {
             #tracking
 
-            impl #forwarding::Forwarding for #forwarding::PhpClass {
-                #(#members)*
+            impl crate::php_worker::rpc::entity::ForwardedClass for #forwarding::PhpClass {
+                fn construct(
+                    call: &mut crate::php_worker::rpc::entity::Call<'_>,
+                ) -> ::core::result::Result<u64, ::shirabe_php_rpc::PhpThrow> {
+                    crate::php_worker::rpc::entity::protocol_violation(call)
+                }
+
+                fn call_static(
+                    call: &mut crate::php_worker::rpc::entity::Call<'_>,
+                ) -> ::core::result::Result<::shirabe_php_rpc::RpcValue, ::shirabe_php_rpc::PhpThrow> {
+                    match &**call.method() {
+                        #(#arms)*
+                        _ => crate::php_worker::rpc::entity::protocol_violation(call),
+                    }
+                }
             }
 
             #(#checks)*

@@ -8,6 +8,17 @@ php_entity! {
     handle: std::rc::Rc<std::cell::RefCell<dyn RepositoryManagerInterface>>,
     expected: "a RepositoryManager",
     class: r"Composer\Repository\RepositoryManager",
+    unimplemented: [
+        "__construct",
+        "addRepository",
+        "createRepository",
+        "findPackage",
+        "findPackages",
+        "getRepositories",
+        "prependRepository",
+        "setLocalRepository",
+        "setRepositoryClass",
+    ],
     types: {
         r"Composer\Repository\RepositoryManager": instance
             __php_binding_repository_manager_interface for dyn RepositoryManagerInterface {
