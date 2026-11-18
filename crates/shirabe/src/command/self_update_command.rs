@@ -69,8 +69,8 @@ impl Command for SelfUpdateCommand {
     }
 
     /// The self-update mechanism does not apply to Shirabe: the update flow
-    /// differs fundamentally from the PHP phar-based one, and no prebuilt
-    /// binaries are published to update from. The command is therefore
+    /// differs fundamentally from the PHP phar-based one, and Shirabe is still
+    /// in early development and not yet stable. The command is therefore
     /// disabled.
     async fn execute(
         &self,

@@ -18,8 +18,8 @@ as it starts the PHP process.
 
 ## Commands
 
-The `self-update` command is intentionally disabled because prebuilt binaries
-have not been published yet.
+The `self-update` command is intentionally disabled because Shirabe is still in early development
+and not yet stable.
 
 
 ## Default home, cache and data directories
