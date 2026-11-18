@@ -35,7 +35,7 @@ impl forwarding::autoload::autoload_generator::Forwarding
     type Handle = std::rc::Rc<std::cell::RefCell<dyn AutoloadGeneratorInterface>>;
 
     fn set_dev_mode(generator: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
-        generator.borrow().set_dev_mode(call.arg_or(0, true)?);
+        generator.borrow().set_dev_mode(call.arg::<bool>(0)?);
         Ok(RpcValue::Null)
     }
 
@@ -60,12 +60,12 @@ impl forwarding::autoload::autoload_generator::Forwarding
         generator: &Self::Handle,
         call: &mut Call<'_>,
     ) -> Result<RpcValue, PhpThrow> {
-        generator.borrow().set_run_scripts(call.arg_or(0, true)?);
+        generator.borrow().set_run_scripts(call.arg::<bool>(0)?);
         Ok(RpcValue::Null)
     }
 
     fn set_dry_run(generator: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
-        generator.borrow().set_dry_run(call.arg_or(0, true)?);
+        generator.borrow().set_dry_run(call.arg::<bool>(0)?);
         Ok(RpcValue::Null)
     }
 
@@ -91,11 +91,11 @@ impl forwarding::autoload::autoload_generator::Forwarding
         let installation_manager =
             call.entity::<std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>>(3)?;
         let target_dir = call.arg::<BString>(4)?;
-        let scan_psr_packages = call.arg_or(5, false)?;
+        let scan_psr_packages = call.arg::<bool>(5)?;
         let suffix = call.arg::<Option<BString>>(6)?;
         let locker =
             call.optional_entity::<std::rc::Rc<std::cell::RefCell<dyn LockerInterface>>>(7)?;
-        let strict_ambiguous = call.arg_or(8, false)?;
+        let strict_ambiguous = call.arg::<bool>(8)?;
         let class_map = generator
             .borrow()
             .dump(
@@ -136,7 +136,7 @@ impl forwarding::autoload::autoload_generator::Forwarding
     ) -> Result<RpcValue, PhpThrow> {
         let package_map = package_map_arg(call, 0)?;
         let root_package = root_package(call, 1)?;
-        let filtered_dev_packages = call.arg_or(2, PhpMixed::Bool(false))?;
+        let filtered_dev_packages = call.arg::<PhpMixed>(2)?;
         Ok(generator
             .borrow()
             .parse_autoloads(package_map, root_package, filtered_dev_packages)

@@ -106,7 +106,7 @@ impl forwarding::util::process_executor::Forwarding
     }
 
     fn split_lines(process: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
-        let output = call.arg_or(0, BString::default())?;
+        let output = call.arg::<Option<BString>>(0)?.unwrap_or_default();
         Ok(RpcValue::List(
             process
                 .borrow()

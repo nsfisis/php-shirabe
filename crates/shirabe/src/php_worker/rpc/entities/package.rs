@@ -11,7 +11,7 @@ use crate::repository::{PlatformRepository, RepositoryInterfaceHandle};
 use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_rpc::{FromRpcValue, PhpThrow, RpcValue, ToRpcValue};
-use shirabe_php_shim::{PhpMixed, bformat};
+use shirabe_php_shim::{PhpMixed, PhpTruthy as _, bformat};
 
 impl Entity for PackageInterfaceHandle {
     const EXPECTED: &'static [u8] = b"a package";
@@ -100,7 +100,7 @@ const ALIAS: &str =
     "only an alias package crosses as Composer\\Package\\AliasPackage or a subclass";
 
 fn links(call: &Call<'_>) -> Result<IndexMap<BString, Link>, PhpThrow> {
-    call.arg_or(0, IndexMap::new())
+    call.arg(0)
 }
 
 // TODO(plugin): the remaining PackageInterface surface is widened on demand.
@@ -136,7 +136,7 @@ impl forwarding::package::base_package::Forwarding for forwarding::package::base
             .as_rc()
             .borrow()
             .as_package_interface()
-            .get_names(call.arg_or(0, true)?)
+            .get_names(call.arg::<PhpMixed>(0)?.is_truthy())
             .to_rpc_value())
     }
 
@@ -409,8 +409,8 @@ impl forwarding::package::base_package::Forwarding for forwarding::package::base
         package: &PackageInterfaceHandle,
         call: &mut Call<'_>,
     ) -> Result<RpcValue, PhpThrow> {
-        let truncate = call.arg_or(0, true)?;
-        let display_mode = call.arg_or(1, DisplayMode::SourceRefIfDev)?;
+        let truncate = call.arg::<bool>(0)?;
+        let display_mode = call.arg::<DisplayMode>(1)?;
         Ok(package
             .as_rc()
             .borrow()
@@ -690,7 +690,7 @@ impl forwarding::package::base_package::Forwarding for forwarding::package::base
         package: &PackageInterfaceHandle,
         call: &mut Call<'_>,
     ) -> Result<RpcValue, PhpThrow> {
-        let options = call.arg_or(0, IndexMap::<BString, PhpMixed>::new())?;
+        let options = call.arg::<IndexMap<BString, PhpMixed>>(0)?;
         package
             .as_rc()
             .borrow_mut()

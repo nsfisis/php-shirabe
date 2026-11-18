@@ -43,7 +43,7 @@ impl forwarding::package::locker::Forwarding for forwarding::package::locker::Ph
     ) -> Result<RpcValue, PhpThrow> {
         let repository = locker
             .borrow_mut()
-            .get_locked_repository(call.arg_or(0, false)?)
+            .get_locked_repository(call.arg::<bool>(0)?)
             .map_err(call.failed())?;
         entity_value(&RepositoryInterfaceHandle::from(repository))
     }
@@ -65,7 +65,7 @@ impl forwarding::package::locker::Forwarding for forwarding::package::locker::Ph
     ) -> Result<RpcValue, PhpThrow> {
         Ok(locker
             .borrow_mut()
-            .get_platform_requirements(call.arg_or(0, false)?)
+            .get_platform_requirements(call.arg::<bool>(0)?)
             .map_err(call.failed())?
             .to_rpc_value())
     }
@@ -157,7 +157,7 @@ impl forwarding::package::locker::Forwarding for forwarding::package::locker::Ph
                 call.arg::<bool>(7)?,
                 call.arg::<bool>(8)?,
                 call.arg::<IndexMap<BString, PhpMixed>>(9)?,
-                call.arg_or::<bool>(10, true)?,
+                call.arg::<bool>(10)?,
             )
             .map_err(call.failed())?;
         Ok(written.to_rpc_value())

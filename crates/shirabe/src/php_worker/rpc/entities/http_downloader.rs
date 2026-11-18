@@ -39,7 +39,7 @@ fn add_job(
     options_position: usize,
 ) -> Result<RpcValue, PhpThrow> {
     let url = call.arg::<BString>(0)?;
-    let options = call.arg_or(options_position, StreamContextOptions::new())?;
+    let options = call.arg::<StreamContextOptions>(options_position)?;
     let failed = call.failed();
     let started = std::rc::Rc::new(std::cell::Cell::new(false));
     // PHP raises the empty-url check and the async gate out of `add()`/`addCopy()` itself,
@@ -87,8 +87,8 @@ impl forwarding::util::http_downloader::Forwarding for forwarding::util::http_do
         let downloader = HttpDownloader::new(
             call.entity::<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>(0)?,
             call.entity::<std::rc::Rc<std::cell::RefCell<Config>>>(1)?,
-            call.arg_or(2, StreamContextOptions::new())?,
-            call.arg_or(3, false)?,
+            call.arg::<StreamContextOptions>(2)?,
+            call.arg::<bool>(3)?,
         )
         .map_err(call.failed())?;
         Ok(std::rc::Rc::new(std::cell::RefCell::new(downloader)))
@@ -106,7 +106,7 @@ impl forwarding::util::http_downloader::Forwarding for forwarding::util::http_do
 
     fn get(downloader: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         let url = call.arg::<BString>(0)?;
-        let options = call.arg_or(1, StreamContextOptions::new())?;
+        let options = call.arg::<StreamContextOptions>(1)?;
         let response = downloader
             .borrow()
             .get(&url, options)
@@ -117,7 +117,7 @@ impl forwarding::util::http_downloader::Forwarding for forwarding::util::http_do
     fn copy(downloader: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         let url = call.arg::<BString>(0)?;
         let to = call.arg::<BString>(1)?;
-        let options = call.arg_or(2, StreamContextOptions::new())?;
+        let options = call.arg::<StreamContextOptions>(2)?;
         let response = downloader
             .borrow()
             .copy(&url, path_from_bytes(&to), options)

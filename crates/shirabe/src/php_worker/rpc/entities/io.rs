@@ -1,11 +1,10 @@
 //! The methods a `Composer\IO\IOInterface` entity answers over RPC.
 
-use crate::io::{BufferIO, ConsoleIO, IOInterface, NORMAL, NullIO};
+use crate::io::{BufferIO, ConsoleIO, IOInterface, NullIO};
 use crate::php_worker::rpc::entity::{Bindings, Call, Entity};
 use crate::php_worker::rpc::forwarding;
 use bstr::{BString, ByteSlice as _};
 use shirabe_php_rpc::{PhpThrow, RpcValue, ToRpcValue};
-use shirabe_symfony_console::output::VERBOSITY_NORMAL;
 
 impl Entity for std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
     const EXPECTED: &'static [u8] = b"an IOInterface";
@@ -40,7 +39,7 @@ fn write_args(call: &Call<'_>) -> Result<(Vec<BString>, bool, i64), PhpThrow> {
         Some(RpcValue::String(_)) => vec![call.arg::<BString>(0)?],
         _ => call.arg::<Vec<BString>>(0)?,
     };
-    Ok((messages, call.arg_or(1, true)?, call.arg_or(2, NORMAL)?))
+    Ok((messages, call.arg::<bool>(1)?, call.arg::<i64>(2)?))
 }
 
 // TODO(plugin): the remaining IOInterface surface (ask*, authentications, ...) is widened on
@@ -129,12 +128,8 @@ impl forwarding::io::buffer_io::Forwarding for forwarding::io::buffer_io::PhpCla
                 "Shirabe does not support passing an output formatter to Composer\\IO\\BufferIO inside the plugin process yet",
             ));
         }
-        let io = BufferIO::new(
-            call.arg_or(0, BString::default())?,
-            call.arg_or(1, VERBOSITY_NORMAL)?,
-            None,
-        )
-        .map_err(call.failed())?;
+        let io = BufferIO::new(call.arg::<BString>(0)?, call.arg::<i64>(1)?, None)
+            .map_err(call.failed())?;
         Ok(std::rc::Rc::new(std::cell::RefCell::new(io)))
     }
 }

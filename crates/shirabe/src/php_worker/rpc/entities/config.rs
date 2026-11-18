@@ -29,7 +29,7 @@ impl forwarding::config::Forwarding for forwarding::config::PhpClass {
     fn get(config: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         let value = config
             .borrow()
-            .get_with_flags(&call.arg::<BString>(0)?, call.arg_or(1, 0)?)
+            .get_with_flags(&call.arg::<BString>(0)?, call.arg::<i64>(1)?)
             .map_err(call.failed())?;
         Ok(value.to_rpc_value())
     }
@@ -37,7 +37,7 @@ impl forwarding::config::Forwarding for forwarding::config::PhpClass {
     fn all(config: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         let all = config
             .borrow()
-            .all(call.arg_or(0, 0)?)
+            .all(call.arg::<i64>(0)?)
             .map_err(call.failed())?;
         Ok(all.to_rpc_value())
     }
@@ -67,7 +67,7 @@ impl forwarding::config::Forwarding for forwarding::config::PhpClass {
 
     fn merge(config: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         let values = call.arg::<IndexMap<BString, PhpMixed>>(0)?;
-        let source = call.arg_or::<BString>(1, Config::SOURCE_UNKNOWN.to_owned())?;
+        let source = call.arg::<BString>(1)?;
         config.borrow_mut().merge(&values, &source);
         Ok(RpcValue::Null)
     }

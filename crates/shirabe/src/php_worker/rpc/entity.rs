@@ -129,21 +129,10 @@ impl<'a> Call<'a> {
     }
 
     /// Decodes the argument at `position`. A missing argument decodes the same way PHP's `null`
-    /// does; a parameter's own default belongs to `arg_or`.
+    /// does.
     pub fn arg<T: FromRpcValue>(&self, position: usize) -> Result<T, PhpThrow> {
         T::from_rpc_value(self.args.get(position).unwrap_or(&codec::NULL))
             .map_err(|error| self.arg_throw(position, error))
-    }
-
-    /// Decodes the argument at `position` for a parameter whose PHP declaration carries a
-    /// default: an omitted argument, and the `null` PHP passes in its place, take `default`.
-    pub fn arg_or<T: FromRpcValue>(&self, position: usize, default: T) -> Result<T, PhpThrow> {
-        match self.args.get(position) {
-            None | Some(RpcValue::Null) => Ok(default),
-            Some(value) => {
-                T::from_rpc_value(value).map_err(|error| self.arg_throw(position, error))
-            }
-        }
     }
 
     pub fn entity<H: Entity>(&self, position: usize) -> Result<H, PhpThrow> {
