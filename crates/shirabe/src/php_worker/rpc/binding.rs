@@ -12,16 +12,19 @@ use crate::package::{
     AliasPackageHandle, DisplayMode, Link, Mirror, PackageHandle, PackageInterfaceHandle,
     RootPackageInterfaceHandle,
 };
+use crate::php_worker::call::PhpCall;
 use crate::php_worker::job;
 use crate::php_worker::job::JobOwner;
+use crate::php_worker::rpc::dispatch::error_throw;
 use crate::php_worker::rpc::entity::{Call, Entity, EntityArg, entity_value};
+use crate::php_worker::throwable::throw_into_error;
 use crate::plugin::FileDownloadContext;
 use crate::repository::{
     InstalledRepositoryInterfaceHandle, LockArrayRepositoryHandle, RepositoryInterfaceHandle,
 };
 use crate::util::StreamContextOptions;
 use crate::util::http::Response;
-use bstr::BString;
+use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_rpc::codec::DecodeError;
 use shirabe_php_rpc::{FromRpcValue, PhpThrow, RpcValue, ToRpcValue, codec};
@@ -448,5 +451,38 @@ impl IntoRpcAnswer for &FileDownloadContext {
                 "the repository context of a file download event is not available over RPC yet",
             )),
         }
+    }
+}
+
+/// An argument of a call a proxy makes into the worker, encoded the way an answer to the worker
+/// is.
+pub(crate) fn proxy_arg<T: IntoRpcAnswer>(arg: T) -> anyhow::Result<RpcValue> {
+    arg.into_rpc_answer(&|error| error_throw(BStr::new("encoding an argument failed"), &error))
+        .map_err(throw_into_error)
+}
+
+/// The answer of a call a proxy made into the worker, decoded the way an argument from the worker
+/// is.
+pub(crate) fn proxy_answer<T: FromRpcArg>(
+    call: PhpCall<'_>,
+    value: &RpcValue,
+) -> anyhow::Result<T> {
+    T::from_rpc_arg(value).map_err(|error| call.unsupported_shape(error))
+}
+
+/// What the `?PromiseInterface` a proxied method answers with settles to: the value the promise
+/// resolves with, or null when the method answers with no promise.
+pub(crate) async fn promise_value(call: PhpCall<'_>, value: RpcValue) -> anyhow::Result<RpcValue> {
+    match value {
+        RpcValue::Null => Ok(RpcValue::Null),
+        RpcValue::PromiseHandle(id) => job::await_php_promise(id).await,
+        other => Err(call.unsupported_shape(codec::unexpected("a promise or null", &other))),
+    }
+}
+
+/// An installed repository an argument names crosses as a repository entity.
+impl IntoRpcAnswer for &InstalledRepositoryInterfaceHandle {
+    fn into_rpc_answer(self, _: &dyn Fn(anyhow::Error) -> PhpThrow) -> Result<RpcValue, PhpThrow> {
+        entity_value(&self.as_repository_handle())
     }
 }

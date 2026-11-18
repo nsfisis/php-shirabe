@@ -6,10 +6,15 @@ use crate::io::IOInterface;
 use crate::php_worker::proxy::PhpPluginProxy;
 use crate::plugin::Capable;
 use bstr::{BStr, BString};
+use shirabe_php_binding_macros::php_binding;
 use shirabe_php_shim::php_str;
 
 pub const PLUGIN_API_VERSION: &BStr = php_str(b"2.9.0");
 
+#[php_binding(
+    r"Composer\Plugin\PluginInterface",
+    proxy = PhpPluginProxy
+)]
 pub trait PluginInterface: std::fmt::Debug {
     // The PHP methods return void but may throw; the owned `ComposerHandle` follows the shared
     // handle policy — plugins typically store `$composer` beyond the call.
@@ -33,20 +38,24 @@ pub trait PluginInterface: std::fmt::Debug {
 
     /// PHP: `get_class($plugin)`. Rust has no runtime class name, so each implementor carries
     /// the name PHP would report.
+    #[php(rust_only)]
     fn get_class_name(&self) -> BString;
 
     // PHP-side `instanceof EventSubscriberInterface` / `instanceof Capable` checks map to
     // these downcast accessors.
+    #[php(rust_only)]
     fn as_event_subscriber(&self) -> Option<&dyn EventSubscriberInterface> {
         None
     }
 
+    #[php(rust_only)]
     fn as_capable(&self) -> Option<&dyn Capable> {
         None
     }
 
     /// For testing only: recovers the PHP-backed proxy so tests can read plugin properties the
     /// way PHPUnit asserts `$plugins[0]->version`.
+    #[php(rust_only)]
     fn __as_php_plugin_proxy(&self) -> Option<&PhpPluginProxy> {
         None
     }

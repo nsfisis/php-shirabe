@@ -2,14 +2,22 @@
 
 use crate::installer::{BinaryPresenceInterface, PluginInstaller};
 use crate::package::PackageInterfaceHandle;
+use crate::php_worker::proxy::{PhpInstallerProxy, installer_is_installed, installer_supports};
 use crate::repository::InstalledRepositoryInterfaceHandle;
 use bstr::BStr;
+use shirabe_php_binding_macros::php_binding;
 use shirabe_php_shim::PhpMixed;
 
+#[php_binding(
+    r"Composer\Installer\InstallerInterface",
+    proxy = PhpInstallerProxy
+)]
 #[async_trait::async_trait(?Send)]
 pub trait InstallerInterface: std::fmt::Debug {
+    #[php(custom = installer_supports)]
     fn supports(&self, package_type: &bstr::BStr) -> anyhow::Result<bool>;
 
+    #[php(custom = installer_is_installed)]
     fn is_installed(
         &self,
         repo: &InstalledRepositoryInterfaceHandle,

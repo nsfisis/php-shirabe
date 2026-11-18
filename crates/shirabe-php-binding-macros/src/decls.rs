@@ -22,6 +22,10 @@ pub struct Method {
     #[serde(rename = "static")]
     pub is_static: bool,
     pub params: Vec<Param>,
+    #[serde(default)]
+    pub return_type: Option<String>,
+    #[serde(default)]
+    pub doc_return_type: Option<String>,
     pub func_num_args: bool,
     /// Whether a call reaches the Rust side; absent for an interface, whose members reach it
     /// through the classes implementing it.

@@ -40,6 +40,15 @@ mod entity;
 /// * `#[php(custom = path)]` on a method: the adapter is the hand-written function at `path`.
 /// * `#[php(decode = T)]` on a parameter: the argument is decoded as `T`.
 ///
+/// On a trait, `proxy = Path` generates instead the impl of the trait for the adapter `Path` of an
+/// entity living in the worker (which implements `PhpProxy`): each method calls the PHP method of
+/// the same name on the entity and decodes its answer, waiting for the promise an `async fn`'s PHP
+/// method answers with. A method only the Rust side has keeps its default body, or delegates to
+/// the adapter's inherent method of the same name with `#[php(rust_only)]`. `#[php(custom = path)]`
+/// delegates a method to the hand-written function `path(proxy, args...)`; a method whose PHP
+/// counterpart may answer with null or an untyped value a non-`Option` Rust type cannot hold has
+/// to.
+///
 /// The child module also holds `__php_params`: for each adapter, the PHP parameter types it
 /// decodes the arguments against, which `php_entity!` compares with what the stubs declare.
 #[proc_macro_attribute]

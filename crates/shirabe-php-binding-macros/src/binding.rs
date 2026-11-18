@@ -15,11 +15,13 @@ struct Members {
 struct Args {
     fqcn: syn::LitStr,
     members: Members,
+    proxy: Option<syn::Path>,
 }
 
 impl syn::parse::Parse for Args {
     fn parse(input: syn::parse::ParseStream<'_>) -> syn::Result<Self> {
         let fqcn: syn::LitStr = input.parse()?;
+        let mut proxy = None;
         let mut members = Members {
             instance: true,
             statics: true,
@@ -63,11 +65,18 @@ impl syn::parse::Parse for Args {
                         }
                     }
                 }
-                _ => return Err(syn::Error::new(key.span(), "expected `members`")),
+                "proxy" => proxy = Some(input.parse()?),
+                _ => {
+                    return Err(syn::Error::new(key.span(), "expected `members` or `proxy`"));
+                }
             }
         }
 
-        Ok(Args { fqcn, members })
+        Ok(Args {
+            fqcn,
+            members,
+            proxy,
+        })
     }
 }
 
@@ -77,6 +86,7 @@ struct MethodAttrs {
     name: Option<syn::LitStr>,
     custom: Option<syn::Path>,
     skip: bool,
+    rust_only: bool,
 }
 
 /// Removes the `#[php(...)]` annotations of a method and its parameters, and reads them.
@@ -93,8 +103,10 @@ fn take_attrs(
                 method.custom = Some(meta.value()?.parse()?);
             } else if meta.path.is_ident("skip") {
                 method.skip = true;
+            } else if meta.path.is_ident("rust_only") {
+                method.rust_only = true;
             } else {
-                return Err(meta.error("expected `name`, `custom` or `skip`"));
+                return Err(meta.error("expected `name`, `custom`, `skip` or `rust_only`"));
             }
             Ok(())
         })?;
@@ -135,6 +147,8 @@ struct RustMethod {
     attrs: MethodAttrs,
     decodes: Vec<Option<syn::Type>>,
     matched: bool,
+    /// Whether a trait method has a default body.
+    has_default: bool,
 }
 
 pub fn expand(
@@ -161,6 +175,7 @@ fn expand_item(
     let args: Args = syn::parse2(attr)?;
     let mut methods = Vec::new();
     let mut self_ty = None;
+    let mut proxy_trait = None;
     let (target, call_base, module_name) = match item {
         syn::Item::Trait(item) => {
             if !item.generics.params.is_empty() {
@@ -177,9 +192,23 @@ fn expand_item(
                         attrs,
                         decodes,
                         matched: false,
+                        has_default: function.default.is_some(),
                     });
                 }
             }
+            proxy_trait = Some((
+                item.ident.clone(),
+                item.attrs
+                    .iter()
+                    .filter(|attr| {
+                        attr.path()
+                            .segments
+                            .last()
+                            .is_some_and(|segment| segment.ident == "async_trait")
+                    })
+                    .cloned()
+                    .collect::<Vec<_>>(),
+            ));
             let ident = &item.ident;
             (
                 quote::quote! { dyn #ident + 'static },
@@ -202,6 +231,7 @@ fn expand_item(
                         attrs,
                         decodes,
                         matched: false,
+                        has_default: false,
                     });
                 }
             }
@@ -246,7 +276,11 @@ fn expand_item(
         } else {
             args.members.instance
         };
-        if !answers || method.declared_in != fqcn || method.answered_in_worker() {
+        if !answers
+            || method.declared_in != fqcn
+            || method.answered_in_worker()
+            || args.proxy.is_some()
+        {
             continue;
         }
         let Some(rust) = find(&mut methods, &method.name, &method.rust) else {
@@ -343,6 +377,21 @@ fn expand_item(
         }
     }
 
+    let proxy_impl = match (&args.proxy, &proxy_trait) {
+        (None, _) => None,
+        (Some(proxy), Some((trait_ident, async_attrs))) => Some(proxy_impl(
+            &fqcn,
+            &loaded.decl,
+            &methods,
+            proxy,
+            trait_ident,
+            async_attrs,
+        )?),
+        (Some(proxy), None) => {
+            return Err(syn::Error::new_spanned(proxy, "`proxy` goes on a trait"));
+        }
+    };
+
     let module = quote::format_ident!("__php_binding_{}", module_name);
     let tracking = loaded.tracking;
 
@@ -355,6 +404,8 @@ fn expand_item(
             #tracking
 
             #(#adapters)*
+
+            #proxy_impl
 
             /// The PHP parameter types each adapter decodes its arguments against, or `None`
             /// for a hand-written one.
@@ -371,6 +422,185 @@ fn expand_item(
             }
         }
     })
+}
+
+/// The impl of a trait standing for a PHP interface for the adapter of an entity living in the
+/// worker: each method calls the PHP method on the entity and decodes its answer, a promise's
+/// settlement for an `async fn`. A method only the Rust side has delegates to the adapter's
+/// inherent method of the same name (`#[php(rust_only)]`) or keeps the trait's default body.
+fn proxy_impl(
+    fqcn: &str,
+    decl: &decls::Decl,
+    methods: &[RustMethod],
+    proxy: &syn::Path,
+    trait_ident: &syn::Ident,
+    async_attrs: &[syn::Attribute],
+) -> syn::Result<proc_macro2::TokenStream> {
+    let mut items = Vec::new();
+    for rust in methods {
+        let sig = &rust.sig;
+        let span = sig.span();
+        let fn_ident = &sig.ident;
+        let mut names = Vec::new();
+        for input in &sig.inputs {
+            match input {
+                syn::FnArg::Receiver(_) => {}
+                syn::FnArg::Typed(pat_type) => match &*pat_type.pat {
+                    syn::Pat::Ident(ident) => names.push(ident.ident.clone()),
+                    other => {
+                        return Err(syn::Error::new_spanned(
+                            other,
+                            "a proxied method names each of its parameters",
+                        ));
+                    }
+                },
+            }
+        }
+        if rust.attrs.rust_only {
+            items.push(quote::quote! {
+                #sig {
+                    #proxy::#fn_ident(self, #(#names),*)
+                }
+            });
+            continue;
+        }
+        if let Some(custom) = &rust.attrs.custom {
+            items.push(quote::quote! {
+                #sig {
+                    #custom(self, #(#names),*)
+                }
+            });
+            continue;
+        }
+        let php = match &rust.attrs.name {
+            Some(name) => decl
+                .methods
+                .iter()
+                .find(|method| method.name == name.value()),
+            None => decl
+                .methods
+                .iter()
+                .find(|method| *fn_ident == method.rust.trim_start_matches("r#")),
+        };
+        let Some(php) = php else {
+            if rust.has_default {
+                continue;
+            }
+            return Err(syn::Error::new(
+                span,
+                format!(
+                    "{fqcn} declares no method `{fn_ident}`; mark a method only the Rust side has #[php(rust_only)]"
+                ),
+            ));
+        };
+        let member = format!("{fqcn}::{}", php.name);
+        if names.len() != php.params.len() {
+            return Err(syn::Error::new(
+                span,
+                format!(
+                    "{member} takes {} parameters in PHP, {} here",
+                    php.params.len(),
+                    names.len()
+                ),
+            ));
+        }
+        let syn::ReturnType::Type(_, output) = &sig.output else {
+            return Err(syn::Error::new(
+                span,
+                format!(
+                    "{member}: a proxied method answers with an `anyhow::Result`, since the call can fail"
+                ),
+            ));
+        };
+        let answer = result_ok_type(output).ok_or_else(|| {
+            syn::Error::new_spanned(
+                output,
+                format!("{member}: a proxied method answers with an `anyhow::Result`, since the call can fail"),
+            )
+        })?;
+        // A promise is often only documented: `@return PromiseInterface|null`.
+        let returns_promise = php
+            .return_type
+            .iter()
+            .chain(&php.doc_return_type)
+            .any(|ty| ty.contains("PromiseInterface"));
+        if sig.asyncness.is_some() != returns_promise {
+            return Err(syn::Error::new(
+                span,
+                format!(
+                    "{member}: an `async fn` stands for a PHP method answering with a promise, and only that"
+                ),
+            ));
+        }
+        let ignores_answer = matches!(answer, syn::Type::Tuple(tuple) if tuple.elems.is_empty());
+        if !returns_promise && !ignores_answer {
+            let php_admits_null = php
+                .return_type
+                .as_deref()
+                .is_none_or(|ty| ty.starts_with('?') || ty.contains("null") || ty == "mixed");
+            if php_admits_null && !admits_null(answer) {
+                return Err(syn::Error::new_spanned(
+                    answer,
+                    format!(
+                        "{member} may answer with null or an untyped value in PHP, which this type does not hold; answer it with #[php(custom = ...)]"
+                    ),
+                ));
+            }
+        }
+        let php_name = &php.name;
+        let settle = returns_promise.then(|| {
+            quote::quote! {
+                let __value = crate::php_worker::rpc::binding::promise_value(__call, __value).await?;
+            }
+        });
+        // A method the Rust side answers with `()` leaves PHP's answer alone, as a caller of a
+        // `void` method does.
+        let decode = if ignores_answer {
+            quote::quote! {
+                let _ = __value;
+                ::core::result::Result::Ok(())
+            }
+        } else {
+            quote::quote! { crate::php_worker::rpc::binding::proxy_answer(__call, &__value) }
+        };
+        items.push(quote::quote! {
+            #sig {
+                let __call = crate::php_worker::call::PhpCall::Method(
+                    crate::php_worker::proxy::PhpProxy::php_handle(self),
+                    ::bstr::BStr::new(#php_name),
+                );
+                let __args = vec![#(crate::php_worker::rpc::binding::proxy_arg(#names)?),*];
+                let __value: ::shirabe_php_rpc::RpcValue = __call.run(__args)?;
+                #settle
+                #decode
+            }
+        });
+    }
+
+    Ok(quote::quote! {
+        #(#async_attrs)*
+        impl #trait_ident for #proxy {
+            #(#items)*
+        }
+    })
+}
+
+/// `T` of a `Result<T>` return type.
+fn result_ok_type(ty: &syn::Type) -> Option<&syn::Type> {
+    let syn::Type::Path(path) = ty else {
+        return None;
+    };
+    let last = path.path.segments.last()?;
+    if last.ident != "Result" {
+        return None;
+    }
+    let syn::PathArguments::AngleBracketed(args) = &last.arguments else {
+        return None;
+    };
+    match args.args.first()? {
+        syn::GenericArgument::Type(ty) => Some(ty),
+        _ => None,
+    }
 }
 
 /// The Rust method answering a PHP member: the one naming it with `#[php(name = ...)]`, or else
