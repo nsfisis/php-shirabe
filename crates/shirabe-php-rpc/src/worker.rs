@@ -1,7 +1,7 @@
 use crate::frame::{self, Frame};
 use crate::value;
 use bstr::{BStr, BString};
-use shirabe_php_shim::{ToPhpString, bformat, os_str_from_bytes, path_from_bytes, php_str};
+use shirabe_php_shim::{ToPhpString, bformat, exit, os_str_from_bytes, path_from_bytes, php_str};
 use shirabe_symfony_process::PhpExecutableFinder;
 
 const GLUE_SCRIPT: &[u8] = include_bytes!("../php/worker.php");
@@ -27,11 +27,11 @@ const GUARD_FILES: &[(&BStr, &[u8])] = include!(concat!(env!("OUT_DIR"), "/guard
 struct Worker {
     stream: std::os::unix::net::UnixStream,
     // Also queried for its exit status when a socket read/write fails, to tell a dead worker
-    // apart from a framing bug. Kept alive for the process lifetime along with the temp dir
-    // holding the socket and glue script; neither is dropped because the worker lives in a
-    // never-dropped static.
+    // apart from a framing bug.
     child: std::process::Child,
-    _tempdir: tempfile::TempDir,
+    // Holds the glue script and class files the worker loads; removed once the worker has ended.
+    // The worker lives in a never-dropped static, so it is not removed otherwise.
+    tempdir: Option<tempfile::TempDir>,
 }
 
 impl Worker {
@@ -54,44 +54,38 @@ impl Worker {
         }
     }
 
-    /// Ends this process the way the worker ended, if it has: the worker stands in for the PHP
-    /// process Composer runs in, so a plugin's `exit()`, a fatal error or a signal that ends the
-    /// worker ends Shirabe with the same exit code or signal, as it ends Composer. Returns when the
-    /// worker is still running.
-    ///
-    /// TODO(php-runtime): Composer's own shutdown functions, such as the memory-limit hint its
-    /// Application registers, run in the process that ended and so are not run here.
-    fn exit_if_worker_is_dead(&mut self) {
+    /// The status the worker ended with, waiting a moment for it to be reaped, or `None` while it
+    /// is still running.
+    fn exit_status(&mut self) -> Option<std::process::ExitStatus> {
         // The socket closes as the worker ends, a moment before it can be reaped.
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(1);
-        let status = loop {
+        loop {
             match self.child.try_wait() {
-                Ok(Some(status)) => break status,
+                Ok(Some(status)) => return Some(status),
                 Ok(None) if std::time::Instant::now() < deadline => {
                     std::thread::sleep(std::time::Duration::from_millis(10));
                 }
-                _ => return,
+                _ => return None,
             }
-        };
-        use std::io::Write as _;
-        let _ = std::io::stdout().flush();
-        let _ = std::io::stderr().flush();
-        if let Some(code) = status.code() {
-            std::process::exit(code);
         }
-        if let Some(signal) = std::os::unix::process::ExitStatusExt::signal(&status)
-            && let Ok(signal) = nix::sys::signal::Signal::try_from(signal)
-        {
-            let default = nix::sys::signal::SigAction::new(
-                nix::sys::signal::SigHandler::SigDfl,
-                nix::sys::signal::SaFlags::empty(),
-                nix::sys::signal::SigSet::empty(),
-            );
-            // SAFETY: SIG_DFL installs no handler code, and nothing runs after the raise below
-            // that could rely on the disposition this replaces.
-            let _ = unsafe { nix::sys::signal::sigaction(signal, &default) };
-            let _ = nix::sys::signal::raise(signal);
-            std::process::exit(128 + signal as i32);
+    }
+
+    /// Runs `f` on the worker's socket. A failure of the worker having ended comes back as its exit
+    /// status, with the temp dir removed, as nothing reads it any more; any other failure comes
+    /// back as the I/O error with the worker's state attached.
+    fn on_stream<T>(
+        &mut self,
+        f: impl FnOnce(&mut std::os::unix::net::UnixStream) -> std::io::Result<T>,
+    ) -> anyhow::Result<Result<T, std::process::ExitStatus>> {
+        match f(&mut self.stream) {
+            Ok(value) => Ok(Ok(value)),
+            Err(e) => match self.exit_status() {
+                Some(status) => {
+                    self.tempdir = None;
+                    Ok(Err(status))
+                }
+                None => Err(anyhow::Error::new(e).context(self.worker_state())),
+            },
         }
     }
 }
@@ -157,27 +151,38 @@ fn with_worker<T>(f: impl FnOnce(&mut Worker) -> T) -> anyhow::Result<T> {
 /// locked across a whole call. A `ReleaseHandle` for every PHP entity handle dropped since the
 /// previous write goes out first.
 pub(crate) fn send_frame(frame: &Frame) -> anyhow::Result<()> {
-    with_worker(|worker| {
-        let mut write = |frame: &Frame| {
-            frame::write_frame(&mut worker.stream, frame).map_err(|e| {
-                worker.exit_if_worker_is_dead();
-                anyhow::Error::new(e).context(worker.worker_state())
-            })
-        };
+    with_worker_stream(|stream| {
         for entity_id in value::take_released_php_entity_ids() {
-            write(&Frame::ReleaseHandle { entity_id })?;
+            frame::write_frame(stream, &Frame::ReleaseHandle { entity_id })?;
         }
-        write(frame)
-    })?
+        frame::write_frame(stream, frame)
+    })
 }
 
 pub(crate) fn recv_frame() -> anyhow::Result<Frame> {
-    with_worker(|worker| {
-        frame::read_frame(&mut worker.stream).map_err(|e| {
-            worker.exit_if_worker_is_dead();
-            anyhow::Error::new(e).context(worker.worker_state())
-        })
-    })?
+    with_worker_stream(frame::read_frame)
+}
+
+/// Runs `f` on the worker's socket. If it fails because the worker has ended, ends this process the
+/// same way: the worker stands in for the PHP process Composer runs in, so a plugin's `exit()`, a
+/// fatal error or a signal that ends the worker ends Shirabe with the same exit code or signal, as
+/// it ends Composer. The end unwinds like PHP's `exit` (see [`exit`]), so the stack is
+/// dropped on the way out; a failure met while the stack is already unwinding is returned as an
+/// error instead, since unwinding again would abort.
+///
+/// TODO(php-runtime): Composer's own shutdown functions, such as the memory-limit hint its
+/// Application registers, run in the process that ended and so are not run here.
+fn with_worker_stream<T>(
+    f: impl FnOnce(&mut std::os::unix::net::UnixStream) -> std::io::Result<T>,
+) -> anyhow::Result<T> {
+    let status = match with_worker(|worker| worker.on_stream(f))?? {
+        Ok(value) => return Ok(value),
+        Err(status) => status,
+    };
+    if std::thread::panicking() {
+        anyhow::bail!("PHP worker process already exited: {status}");
+    }
+    exit(status)
 }
 
 /// The descriptor the worker's end of the RPC socket is installed on in the child. `pre_exec`
@@ -251,7 +256,7 @@ fn spawn_worker(config: &WorkerConfig) -> anyhow::Result<Worker> {
     Ok(Worker {
         stream,
         child,
-        _tempdir: tempdir,
+        tempdir: Some(tempdir),
     })
 }
 
@@ -311,6 +316,7 @@ fn install_worker_socket_fd(child_end: &std::os::fd::OwnedFd) -> std::io::Result
 mod tests {
     use super::*;
     use crate::value::RpcValue;
+    use shirabe_php_shim::Exit;
 
     #[test]
     fn request_error_reports_dead_worker_exit_status() {
@@ -334,5 +340,33 @@ mod tests {
             state.contains("PHP worker process already exited"),
             "unexpected worker state: {state}"
         );
+    }
+
+    #[test]
+    fn a_dead_worker_comes_back_as_its_exit_status() {
+        let mut worker =
+            spawn_worker(&WorkerConfig::default()).expect("failed to spawn PHP worker");
+        worker.child.kill().expect("failed to kill PHP worker");
+
+        let status = worker
+            .on_stream(|stream| {
+                // Writing may still succeed into the socket buffer; the read is what must fail.
+                let _ = frame::write_frame(
+                    stream,
+                    &Frame::CallFunction {
+                        corr_id: 1,
+                        function_name: "defined".into(),
+                        args: vec![RpcValue::string("PHP_VERSION")],
+                    },
+                );
+                frame::read_frame(stream)
+            })
+            .expect("a dead worker is not an I/O error")
+            .expect_err("reading from a dead worker should fail");
+        assert!(matches!(
+            Exit::from(status),
+            Exit::Signal(signal) if signal == nix::sys::signal::Signal::SIGKILL as i32
+        ));
+        assert!(worker.tempdir.is_none());
     }
 }
