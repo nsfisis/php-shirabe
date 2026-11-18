@@ -6,6 +6,7 @@ use crate::signal::SignalSubscription;
 use crate::util::{GitHub, Platform};
 use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
+use shirabe_php_binding_macros::php_binding;
 use shirabe_php_shim::{
     Catch as _, LogicException, PHP_EOL, PhpMixed, PregMatches, RuntimeException, array_intersect,
     array_map, bformat, display_to_bytes, escapeshellarg, explode, implode, in_array_strict,
@@ -109,6 +110,7 @@ pub struct MockHandler {
 /// [`ProcessExecutor::FORWARD_OUTPUT`] constant rather than constructing this directly.
 pub struct ProcessForwardOutput;
 
+#[php_binding(r"Composer\Util\ProcessExecutor")]
 impl ProcessExecutor {
     pub const FORWARD_OUTPUT: ProcessForwardOutput = ProcessForwardOutput;
 
@@ -169,6 +171,7 @@ impl ProcessExecutor {
         &[php_str(b"remote"), php_str(b"set-url")],
     ];
 
+    #[php(name = "__construct")]
     pub fn new(io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>) -> Self {
         let this = Self {
             capture_output: std::cell::Cell::new(false),
@@ -184,6 +187,7 @@ impl ProcessExecutor {
     }
 
     /// runs a process on the commandline
+    #[php(skip)]
     pub fn execute<'o, C, O>(
         &self,
         command: C,
@@ -199,6 +203,7 @@ impl ProcessExecutor {
     }
 
     /// runs a process on the commandline in TTY mode
+    #[php(skip)]
     pub fn execute_tty<C>(&self, command: C, cwd: Option<&std::path::Path>) -> anyhow::Result<i64>
     where
         C: IntoExecCommand,
@@ -569,6 +574,7 @@ impl ProcessExecutor {
     /// The mock branch updates `error_output`/`capture_output` before returning, mirroring
     /// `ProcessExecutorMock::executeAsync` — which resolves through the same `doExecute` the sync
     /// path uses, so it updates the executor's cached error output too (cf. `mock_do_execute`).
+    #[php(skip)]
     pub fn execute_async<C>(
         &self,
         command: C,
@@ -723,6 +729,7 @@ impl ProcessExecutor {
         self.allow_async.set(true);
     }
 
+    #[php(skip)]
     pub fn split_lines(&self, output: impl AsRef<[u8]>) -> Vec<BString> {
         let output = trim(output);
 
@@ -742,7 +749,7 @@ impl ProcessExecutor {
         *TIMEOUT.lock().unwrap()
     }
 
-    pub fn set_timeout<T: ToTimeoutSeconds>(timeout: T) {
+    pub fn set_timeout<T: ToTimeoutSeconds>(#[php(decode = i64)] timeout: T) {
         *TIMEOUT.lock().unwrap() = timeout.to_timeout_seconds();
     }
 
@@ -866,6 +873,7 @@ impl ProcessExecutor {
         argument
     }
 
+    #[php(skip)]
     pub fn requires_git_dir_env(&self, command: &CommandLine) -> bool {
         let cmd: Vec<BString> = match command {
             CommandLine::Shell(command) => explode(" ", command),

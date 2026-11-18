@@ -21,6 +21,7 @@ use indexmap::IndexMap;
 use crate::advisory::Auditor;
 use crate::downloader::TransportException;
 use crate::util::{Platform, ProcessExecutor, StoreAuth};
+use shirabe_php_binding_macros::php_binding;
 
 /// The value of the `discard-changes` setting.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -112,6 +113,7 @@ pub struct Config {
     source_of_config_value: std::cell::RefCell<IndexMap<BString, BString>>,
 }
 
+#[php_binding(r"Composer\Config", members = instance)]
 impl Config {
     pub const SOURCE_DEFAULT: &'static BStr = php_str(b"default");
     pub const SOURCE_COMMAND: &'static BStr = php_str(b"command");
@@ -297,10 +299,12 @@ impl Config {
         self.base_dir = base_dir;
     }
 
+    #[php(skip)]
     pub fn set_config_source(&mut self, source: Box<dyn ConfigSourceInterface>) {
         self.config_source = Some(source);
     }
 
+    #[php(skip)]
     pub fn get_config_source(&self) -> &dyn ConfigSourceInterface {
         self.config_source.as_ref().unwrap().as_ref()
     }
@@ -309,10 +313,12 @@ impl Config {
         self.config_source.as_mut().unwrap().as_mut()
     }
 
+    #[php(skip)]
     pub fn set_auth_config_source(&mut self, source: Box<dyn ConfigSourceInterface>) {
         self.auth_config_source = Some(source);
     }
 
+    #[php(skip)]
     pub fn get_auth_config_source(&self) -> &dyn ConfigSourceInterface {
         self.auth_config_source.as_ref().unwrap().as_ref()
     }
@@ -321,10 +327,12 @@ impl Config {
         self.auth_config_source.as_mut().unwrap().as_mut()
     }
 
+    #[php(skip)]
     pub fn set_local_auth_config_source(&mut self, source: Box<dyn ConfigSourceInterface>) {
         self.local_auth_config_source = Some(source);
     }
 
+    #[php(skip)]
     pub fn get_local_auth_config_source(&self) -> Option<&dyn ConfigSourceInterface> {
         self.local_auth_config_source.as_deref()
     }
@@ -338,7 +346,11 @@ impl Config {
     }
 
     /// Merges new config values with the existing ones (overriding)
-    pub fn merge(&mut self, config: &IndexMap<BString, PhpMixed>, source: impl AsRef<[u8]>) {
+    pub fn merge(
+        &mut self,
+        config: &IndexMap<BString, PhpMixed>,
+        #[php(decode = BString)] source: impl AsRef<[u8]>,
+    ) {
         let source = source.as_ref();
         // override defaults with given config
         let config_section = config.get(B("config")).cloned().unwrap_or(PhpMixed::Null);
@@ -597,7 +609,12 @@ impl Config {
         self.get_with_flags(key, 0)
     }
 
-    pub fn get_with_flags(&self, key: impl AsRef<[u8]>, flags: i64) -> anyhow::Result<PhpMixed> {
+    #[php(name = "get")]
+    pub fn get_with_flags(
+        &self,
+        #[php(decode = BString)] key: impl AsRef<[u8]>,
+        flags: i64,
+    ) -> anyhow::Result<PhpMixed> {
         let key = key.as_ref();
         match key {
             // strings/paths with env var and {$refs} support
@@ -1302,7 +1319,10 @@ impl Config {
         Ok(all)
     }
 
-    pub fn get_source_of_value(&self, key: impl AsRef<[u8]>) -> anyhow::Result<BString> {
+    pub fn get_source_of_value(
+        &self,
+        #[php(decode = BString)] key: impl AsRef<[u8]>,
+    ) -> anyhow::Result<BString> {
         let key = key.as_ref();
         self.get(key)?;
 
@@ -1351,7 +1371,7 @@ impl Config {
     }
 
     /// Checks whether a setting exists
-    pub fn has(&self, key: impl AsRef<[u8]>) -> bool {
+    pub fn has(&self, #[php(decode = BString)] key: impl AsRef<[u8]>) -> bool {
         let key = key.as_ref();
         array_key_exists(B(key), &self.config)
     }

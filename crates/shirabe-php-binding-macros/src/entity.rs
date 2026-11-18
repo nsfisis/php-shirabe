@@ -40,6 +40,7 @@ enum Source {
         target: syn::Type,
         via: Option<Access>,
         mutable: Option<Access>,
+        deref: Option<Access>,
     },
     /// The adapters of an item answering static methods.
     Static { module: syn::Path },
@@ -69,13 +70,20 @@ impl syn::parse::Parse for Entry {
                 syn::braced!(content in input);
                 let mut via = None;
                 let mut mutable = None;
+                let mut deref = None;
                 while !content.is_empty() {
                     let key: syn::Ident = syn::ext::IdentExt::parse_any(&content)?;
                     content.parse::<syn::Token![:]>()?;
                     match key.to_string().as_str() {
                         "via" => via = Some(content.parse()?),
                         "mut" => mutable = Some(content.parse()?),
-                        _ => return Err(syn::Error::new(key.span(), "expected `via` or `mut`")),
+                        "deref" => deref = Some(content.parse()?),
+                        _ => {
+                            return Err(syn::Error::new(
+                                key.span(),
+                                "expected `via`, `mut` or `deref`",
+                            ));
+                        }
                     }
                     if !content.is_empty() {
                         content.parse::<syn::Token![,]>()?;
@@ -86,6 +94,7 @@ impl syn::parse::Parse for Entry {
                     target: with_static_bound(target),
                     via,
                     mutable,
+                    deref,
                 }
             }
             "static" => Source::Static { module },
@@ -340,6 +349,7 @@ fn expand_input(input: Input) -> syn::Result<proc_macro2::TokenStream> {
             target,
             via,
             mutable,
+            deref,
             ..
         } = &entry.source
         else {
@@ -354,6 +364,16 @@ fn expand_input(input: Input) -> syn::Result<proc_macro2::TokenStream> {
             routes.push(quote::quote! {
                 impl<'h> crate::php_worker::rpc::binding::Receiver<#target> for #route<'h> {
                     type Guard<'a> = ::std::cell::Ref<'a, #target> where Self: 'a;
+
+                    fn get(&self) -> Self::Guard<'_> #body
+                }
+            });
+        }
+        if let Some(deref) = deref {
+            let body = deref.apply(quote::quote! { self.0 });
+            routes.push(quote::quote! {
+                impl<'h> crate::php_worker::rpc::binding::Receiver<#target> for #route<'h> {
+                    type Guard<'a> = &'a #target where Self: 'a;
 
                     fn get(&self) -> Self::Guard<'_> #body
                 }
@@ -479,7 +499,7 @@ fn forwarding_impl(
                 .decl
                 .methods
                 .iter()
-                .filter(|method| method.forwarded && !method.is_static)
+                .filter(|method| method.forwarded() && !method.is_static)
                 .map(|method| method.name.as_str())
                 .collect()
         })
@@ -487,7 +507,7 @@ fn forwarding_impl(
 
     let mut members = Vec::new();
     for method in &decl.methods {
-        if !method.forwarded
+        if !method.forwarded()
             || method.status.as_deref() != Some("implemented")
             || (!method.is_static && inherited.contains(&method.name.as_str()))
         {

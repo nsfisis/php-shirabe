@@ -3,6 +3,7 @@
 use crate::dependency_resolver::operation::SolverOperation;
 use crate::package::{AliasPackageHandle, DisplayMode};
 use bstr::{BStr, BString};
+use shirabe_php_binding_macros::php_binding;
 use shirabe_php_shim::{PhpDisplay, bformat, php_str};
 
 #[derive(Debug, Clone)]
@@ -10,7 +11,9 @@ pub struct MarkAliasInstalledOperation {
     package: AliasPackageHandle,
 }
 
+#[php_binding(r"Composer\DependencyResolver\Operation\MarkAliasInstalledOperation", members = (instance, constructor))]
 impl MarkAliasInstalledOperation {
+    #[php(name = "__construct")]
     pub fn new(package: AliasPackageHandle) -> Self {
         Self { package }
     }

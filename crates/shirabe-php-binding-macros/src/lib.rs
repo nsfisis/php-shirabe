@@ -78,8 +78,9 @@ pub fn php_binding(
 ///   property forwarders.
 /// * Each entry of `types` names what answers the instance or static methods a PHP type
 ///   declares, or only the ones it lists after `only [...]`. An `instance` entry gives the type
-///   the adapters call (`for`) and how a handle reaches it, for `&self` methods (`via`) and for
-///   `&mut self` methods (`mut`); a `static` entry the adapters of static methods; a `custom`
+///   the adapters call (`for`) and how a handle reaches it, for `&self` methods through a
+///   `RefCell` borrow (`via`) or a plain reference (`deref`) and for `&mut self` methods (`mut`);
+///   a `static` entry the adapters of static methods; a `custom`
 ///   entry a module of hand-written functions taking the handle.
 /// * Each entry of `constructors` gives, for a class whose constructor the Rust side answers,
 ///   the adapter of the inherent impl and how the value it builds becomes a handle

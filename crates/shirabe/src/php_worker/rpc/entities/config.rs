@@ -1,74 +1,19 @@
 //! The methods a `Composer\Config` entity answers over RPC.
 
-use crate::config::Config;
-use crate::php_worker::rpc::entity::{Bindings, Call, Entity};
-use crate::php_worker::rpc::forwarding;
-use bstr::BString;
-use indexmap::IndexMap;
-use shirabe_php_rpc::{PhpThrow, RpcValue, ToRpcValue};
-use shirabe_php_shim::PhpMixed;
-
-impl Entity for std::rc::Rc<std::cell::RefCell<Config>> {
-    const EXPECTED: &'static [u8] = b"a Config";
-
-    fn address(&self) -> *const () {
-        std::rc::Rc::as_ptr(self) as *const ()
-    }
-
-    fn class(&self) -> Result<&'static Bindings<Self>, PhpThrow> {
-        Ok(&forwarding::config::BINDINGS)
-    }
-}
+use crate::config::{__php_binding_config, Config};
+use shirabe_php_binding_macros::php_entity;
 
 // TODO(plugin): the config-source surface (getConfigSource / setAuthConfigSource / ...) needs
 // proxy stubs for ConfigSourceInterface implementations, and prohibitUrlByConfig needs the IO
 // argument decoded back into the Rust-side instance.
-impl forwarding::config::Forwarding for forwarding::config::PhpClass {
-    type Handle = std::rc::Rc<std::cell::RefCell<Config>>;
-
-    fn get(config: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
-        let value = config
-            .borrow()
-            .get_with_flags(&call.arg::<BString>(0)?, call.arg::<i64>(1)?)
-            .map_err(call.failed())?;
-        Ok(value.to_rpc_value())
-    }
-
-    fn all(config: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
-        let all = config
-            .borrow()
-            .all(call.arg::<i64>(0)?)
-            .map_err(call.failed())?;
-        Ok(all.to_rpc_value())
-    }
-
-    fn raw(config: &Self::Handle, _: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
-        Ok(config.borrow().raw().to_rpc_value())
-    }
-
-    fn has(config: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
-        Ok(config.borrow().has(&call.arg::<BString>(0)?).to_rpc_value())
-    }
-
-    fn get_repositories(config: &Self::Handle, _: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
-        Ok(config.borrow().get_repositories().to_rpc_value())
-    }
-
-    fn get_source_of_value(
-        config: &Self::Handle,
-        call: &mut Call<'_>,
-    ) -> Result<RpcValue, PhpThrow> {
-        let source = config
-            .borrow()
-            .get_source_of_value(&call.arg::<BString>(0)?)
-            .map_err(call.failed())?;
-        Ok(source.to_rpc_value())
-    }
-
-    fn merge(config: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
-        let values = call.arg::<IndexMap<BString, PhpMixed>>(0)?;
-        let source = call.arg::<BString>(1)?;
-        config.borrow_mut().merge(&values, &source);
-        Ok(RpcValue::Null)
-    }
+php_entity! {
+    handle: std::rc::Rc<std::cell::RefCell<Config>>,
+    expected: "a Config",
+    class: r"Composer\Config",
+    types: {
+        r"Composer\Config": instance __php_binding_config for Config {
+            via: |config| config.borrow(),
+            mut: |config| config.borrow_mut(),
+        },
+    },
 }

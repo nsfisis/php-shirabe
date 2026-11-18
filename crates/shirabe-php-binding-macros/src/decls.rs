@@ -23,10 +23,23 @@ pub struct Method {
     pub is_static: bool,
     pub params: Vec<Param>,
     pub func_num_args: bool,
-    #[serde(default)]
-    pub forwarded: bool,
+    /// Whether a call reaches the Rust side; absent for an interface, whose members reach it
+    /// through the classes implementing it.
+    #[serde(rename = "forwarded")]
+    pub forwarded_flag: Option<bool>,
     #[serde(default)]
     pub status: Option<String>,
+}
+
+impl Method {
+    pub fn forwarded(&self) -> bool {
+        self.forwarded_flag == Some(true)
+    }
+
+    /// Whether the worker answers every call itself, so no adapter is needed.
+    pub fn answered_in_worker(&self) -> bool {
+        self.forwarded_flag == Some(false)
+    }
 }
 
 #[derive(Debug, serde::Deserialize)]

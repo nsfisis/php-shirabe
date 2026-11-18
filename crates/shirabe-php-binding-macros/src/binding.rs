@@ -245,7 +245,7 @@ fn expand_item(
         } else {
             args.members.instance
         };
-        if !answers || method.declared_in != fqcn {
+        if !answers || method.declared_in != fqcn || method.answered_in_worker() {
             continue;
         }
         let Some(rust) = find(&mut methods, &method.name, &method.rust) else {

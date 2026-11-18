@@ -7,10 +7,13 @@
 //! the answer names may borrow other entities, or the receiver itself.
 
 use crate::package::{
-    DisplayMode, Link, Mirror, PackageHandle, PackageInterfaceHandle, RootPackageInterfaceHandle,
+    AliasPackageHandle, DisplayMode, Link, Mirror, PackageHandle, PackageInterfaceHandle,
+    RootPackageInterfaceHandle,
 };
 use crate::php_worker::rpc::entity::{Call, Entity, EntityArg, entity_value};
 use crate::repository::{LockArrayRepositoryHandle, RepositoryInterfaceHandle};
+use crate::util::StreamContextOptions;
+use crate::util::http::Response;
 use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_rpc::codec::DecodeError;
@@ -77,6 +80,7 @@ from_rpc_value_args!(
     Mirror,
     DisplayMode,
     chrono::DateTime<chrono::Utc>,
+    StreamContextOptions,
 );
 
 impl<T: FromRpcArg> FromRpcArg for Option<T> {
@@ -117,6 +121,14 @@ impl FromRpcArg for RootPackageInterfaceHandle {
     }
 }
 
+impl FromRpcArg for AliasPackageHandle {
+    fn from_rpc_arg(value: &RpcValue) -> Result<Self, DecodeError> {
+        PackageInterfaceHandle::from_rpc_arg(value)?
+            .as_alias()
+            .ok_or_else(|| codec::unexpected("an AliasPackage", value))
+    }
+}
+
 /// A Rust return type encoded as the answer of a forwarded call.
 pub trait IntoRpcAnswer {
     fn into_rpc_answer(self, call: &Call<'_>) -> Result<RpcValue, PhpThrow>;
@@ -150,6 +162,8 @@ to_rpc_value_answers!(
     RpcValue,
     Link,
     Mirror,
+    StreamContextOptions,
+    Response,
 );
 
 impl IntoRpcAnswer for () {
@@ -182,6 +196,19 @@ impl<T: IntoRpcAnswer> IntoRpcAnswer for Vec<T> {
     }
 }
 
+impl IntoRpcAnswer for &StreamContextOptions {
+    fn into_rpc_answer(self, _: &Call<'_>) -> Result<RpcValue, PhpThrow> {
+        Ok(self.clone().to_rpc_value())
+    }
+}
+
+/// A list the Rust side lends crosses as a copy.
+impl<T: IntoRpcAnswer + Clone> IntoRpcAnswer for &Vec<T> {
+    fn into_rpc_answer(self, call: &Call<'_>) -> Result<RpcValue, PhpThrow> {
+        self.clone().into_rpc_answer(call)
+    }
+}
+
 /// An `array<string, T>` as PHP shapes it: an empty map crosses as a list, since an empty PHP
 /// array is indistinguishable from an empty list.
 impl<T: IntoRpcAnswer> IntoRpcAnswer for IndexMap<BString, T> {
@@ -198,6 +225,13 @@ impl<T: IntoRpcAnswer> IntoRpcAnswer for IndexMap<BString, T> {
 
 /// A real package crosses as a package entity.
 impl IntoRpcAnswer for PackageHandle {
+    fn into_rpc_answer(self, _: &Call<'_>) -> Result<RpcValue, PhpThrow> {
+        entity_value(&PackageInterfaceHandle::from(self))
+    }
+}
+
+/// An alias package crosses as a package entity.
+impl IntoRpcAnswer for AliasPackageHandle {
     fn into_rpc_answer(self, _: &Call<'_>) -> Result<RpcValue, PhpThrow> {
         entity_value(&PackageInterfaceHandle::from(self))
     }
