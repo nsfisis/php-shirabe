@@ -9,6 +9,7 @@
 use crate::io::IOInterface;
 use crate::php_worker::call::PhpCall;
 use crate::php_worker::rpc::entity::entity_value;
+use crate::php_worker::throwable::throw_into_error;
 use bstr::BStr;
 use shirabe_php_rpc::RpcValue;
 
@@ -78,7 +79,7 @@ pub(crate) fn push_io(
     io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
 ) -> anyhow::Result<()> {
     let io = match io {
-        Some(io) => entity_value(&io)?,
+        Some(io) => entity_value(&io).map_err(throw_into_error)?,
         None => RpcValue::Null,
     };
     PhpCall::StaticMethod(

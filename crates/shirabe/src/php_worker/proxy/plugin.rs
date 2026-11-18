@@ -5,10 +5,12 @@ use crate::event_dispatcher::{EventSubscriberInterface, SubscribedEventEntry};
 use crate::io::IOInterface;
 use crate::php_worker::call::PhpCall;
 use crate::php_worker::rpc::entity::entity_value;
+use crate::php_worker::throwable::throw_into_error;
 use crate::plugin::{Capable, PluginInterface};
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
-use shirabe_php_rpc::{FromRpcValue, PhpEntityHandle, PhpThrow, RpcValue, codec};
+use shirabe_php_rpc::codec::DecodeError;
+use shirabe_php_rpc::{FromRpcValue, PhpEntityHandle, RpcValue, codec};
 use shirabe_php_shim::PhpMixed;
 
 /// `PluginInterface` adapter for a plugin entity living in the PHP child process: every
@@ -29,7 +31,10 @@ impl PhpPluginProxy {
         composer: &ComposerHandle,
         io: &std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     ) -> anyhow::Result<()> {
-        let args = vec![entity_value(composer)?, entity_value(io)?];
+        let args = vec![
+            entity_value(composer).map_err(throw_into_error)?,
+            entity_value(io).map_err(throw_into_error)?,
+        ];
         PhpCall::Method(&self.handle, method).run::<RpcValue>(args)?;
         Ok(())
     }
@@ -126,11 +131,11 @@ impl Capable for PhpPluginProxy {
             RpcValue::Null => IndexMap::new(),
             array @ (RpcValue::Array(_) | RpcValue::List(_)) => {
                 IndexMap::<BString, PhpMixed>::from_rpc_value(&array)
-                    .map_err(|throw| call.unsupported_shape(throw))?
+                    .map_err(|error| call.unsupported_shape(error))?
             }
             scalar => IndexMap::from([(
                 "0".into(),
-                PhpMixed::from_rpc_value(&scalar).map_err(|throw| call.unsupported_shape(throw))?,
+                PhpMixed::from_rpc_value(&scalar).map_err(|error| call.unsupported_shape(error))?,
             )]),
         };
         Ok(entries)
@@ -141,8 +146,8 @@ impl Capable for PhpPluginProxy {
 /// distinguishes: `'method'`, `['method', priority]`, and `[['method', priority], ...]`. A shape
 /// outside these is an explicit error, never a silently dropped listener.
 impl FromRpcValue for SubscribedEventEntry {
-    fn from_rpc_value(value: &RpcValue) -> Result<Self, PhpThrow> {
-        let listener = |items: &[RpcValue]| -> Result<(BString, Option<i64>), PhpThrow> {
+    fn from_rpc_value(value: &RpcValue) -> Result<Self, DecodeError> {
+        let listener = |items: &[RpcValue]| -> Result<(BString, Option<i64>), DecodeError> {
             Ok((
                 BString::from_rpc_value(items.first().unwrap_or(&codec::NULL))?,
                 Option::<i64>::from_rpc_value(items.get(1).unwrap_or(&codec::NULL))?,

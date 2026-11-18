@@ -15,7 +15,7 @@ pub use builtins::{
     memory_get_usage, phpversion, query, rar, stream_resolve_include_path,
 };
 pub use codec::{FromRpcValue, ToRpcValue};
-pub use throw::PhpThrow;
+pub use throw::{PhpThrow, set_throw_reviver};
 pub use transport::{
     RefuseCallbacks, RustMethodDispatcher, alloc_entity_id, call_function, call_internal_function,
     call_php_method, call_static_method, new_object, set_release_rust_entity_hook,

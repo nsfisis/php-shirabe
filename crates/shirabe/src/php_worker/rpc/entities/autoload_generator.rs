@@ -13,6 +13,7 @@ use crate::php_worker::runtime::autoloading;
 use crate::repository::RepositoryInterfaceHandle;
 use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
+use shirabe_php_rpc::codec::DecodeError;
 use shirabe_php_rpc::{FromRpcValue, PhpThrow, RpcValue, ToRpcValue, codec};
 use shirabe_php_shim::{E_USER_DEPRECATED, PhpMixed, trigger_error};
 
@@ -189,7 +190,7 @@ fn package_map_arg(
                 &RpcValue::List(pair),
             )),
         })
-        .collect::<Result<_, PhpThrow>>()
+        .collect::<Result<_, DecodeError>>()
         .map_err(|throw| call.arg_throw(position, throw))
 }
 

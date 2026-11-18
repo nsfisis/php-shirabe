@@ -33,6 +33,7 @@ use crate::php_worker::console::{
 use crate::php_worker::proxy::PhpCommandProxy;
 use crate::php_worker::rpc::dispatch::find_file_in_registered_loaders;
 use crate::php_worker::rpc::entity::entity_value;
+use crate::php_worker::throwable::throw_into_error;
 use crate::php_worker::xdebug::is_xdebug_active;
 use crate::php_worker::{error_handler, runtime};
 use crate::util::{ErrorHandler, Filesystem, HttpDownloader, Platform};
@@ -540,8 +541,14 @@ impl Application {
                 .expect("Factory::create and Factory::create_global build a full Composer");
             let pm = composer.borrow().get_plugin_manager();
             let mut ctor_args: IndexMap<BString, shirabe_php_rpc::RpcValue> = IndexMap::new();
-            ctor_args.insert(BString::from("composer"), entity_value(&composer)?);
-            ctor_args.insert(BString::from("io"), entity_value(&self.io)?);
+            ctor_args.insert(
+                BString::from("composer"),
+                entity_value(&composer).map_err(throw_into_error)?,
+            );
+            ctor_args.insert(
+                BString::from("io"),
+                entity_value(&self.io).map_err(throw_into_error)?,
+            );
             let capabilities = pm.borrow().get_plugin_capabilities(
                 BStr::new("Composer\\Plugin\\Capability\\CommandProvider"),
                 ctor_args,

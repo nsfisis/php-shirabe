@@ -2,9 +2,10 @@
 //! through: the arguments and the answer of a call in either direction, and the fields of a
 //! composite payload.
 //!
-//! `FromRpcValue` fails with the `PhpThrow` a PHP caller gets for a value of the wrong shape. A
-//! caller for which a malformed value is a Shirabe bug rather than a plugin one (a frame, a
-//! payload only Shirabe's own worker code writes) turns that failure into a panic instead.
+//! `FromRpcValue` fails with a `DecodeError`, which reaches a PHP caller that handed in a value of
+//! the wrong type as a `TypeError`. A caller for which a malformed value is a Shirabe bug rather
+//! than a plugin one (a frame, a payload only Shirabe's own worker code writes) turns that failure
+//! into a panic instead.
 
 use crate::value::RpcValue;
 use crate::{PhpEntityHandle, PhpObject, PhpThrow, RustEntityHandle};
@@ -24,12 +25,34 @@ pub trait ToRpcValue {
 /// Decodes the PHP value a Rust value stands for. A value that is absent where PHP would read
 /// null (an omitted argument, say) is decoded from `RpcValue::Null`.
 pub trait FromRpcValue: Sized {
-    fn from_rpc_value(value: &RpcValue) -> Result<Self, PhpThrow>;
+    fn from_rpc_value(value: &RpcValue) -> Result<Self, DecodeError>;
+}
+
+/// A value that does not have the type the receiving side declares.
+#[derive(Debug, Clone)]
+pub struct DecodeError {
+    pub message: BString,
+}
+
+impl DecodeError {
+    pub fn new(message: impl Into<BString>) -> DecodeError {
+        DecodeError {
+            message: message.into(),
+        }
+    }
+}
+
+/// A PHP caller that hands in a value of the wrong type gets a `TypeError`, as under
+/// `declare(strict_types=1)`.
+impl From<DecodeError> for PhpThrow {
+    fn from(error: DecodeError) -> PhpThrow {
+        PhpThrow::new("TypeError", error.message, 0)
+    }
 }
 
 /// The failure of a value that does not have the shape `expected` names.
-pub fn unexpected(expected: impl AsRef<[u8]>, value: &RpcValue) -> PhpThrow {
-    PhpThrow::runtime(bformat!(
+pub fn unexpected(expected: impl AsRef<[u8]>, value: &RpcValue) -> DecodeError {
+    DecodeError::new(bformat!(
         "expected {}, got {}",
         expected.as_ref(),
         display_to_bytes(format_args!("{value:?}"))
@@ -39,11 +62,11 @@ pub fn unexpected(expected: impl AsRef<[u8]>, value: &RpcValue) -> PhpThrow {
 /// Decodes a value only Shirabe's own code on the other side writes, for which a failure is a
 /// protocol violation.
 pub fn protocol_value<T: FromRpcValue>(value: &RpcValue, what: impl AsRef<[u8]>) -> T {
-    T::from_rpc_value(value).unwrap_or_else(|throw| {
+    T::from_rpc_value(value).unwrap_or_else(|error| {
         panic!(
             "PHP RPC: protocol violation — {}: {}",
             what.as_ref().as_bstr().display_lossy(),
-            throw.message.display_lossy()
+            error.message.display_lossy()
         )
     })
 }
@@ -55,7 +78,7 @@ impl ToRpcValue for RpcValue {
 }
 
 impl FromRpcValue for RpcValue {
-    fn from_rpc_value(value: &RpcValue) -> Result<Self, PhpThrow> {
+    fn from_rpc_value(value: &RpcValue) -> Result<Self, DecodeError> {
         Ok(value.clone())
     }
 }
@@ -67,7 +90,7 @@ impl ToRpcValue for bool {
 }
 
 impl FromRpcValue for bool {
-    fn from_rpc_value(value: &RpcValue) -> Result<Self, PhpThrow> {
+    fn from_rpc_value(value: &RpcValue) -> Result<Self, DecodeError> {
         match value {
             RpcValue::Bool(value) => Ok(*value),
             other => Err(unexpected("a bool", other)),
@@ -82,7 +105,7 @@ impl ToRpcValue for i64 {
 }
 
 impl FromRpcValue for i64 {
-    fn from_rpc_value(value: &RpcValue) -> Result<Self, PhpThrow> {
+    fn from_rpc_value(value: &RpcValue) -> Result<Self, DecodeError> {
         match value {
             RpcValue::Int(value) => Ok(*value),
             other => Err(unexpected("an int", other)),
@@ -97,7 +120,7 @@ impl ToRpcValue for f64 {
 }
 
 impl FromRpcValue for f64 {
-    fn from_rpc_value(value: &RpcValue) -> Result<Self, PhpThrow> {
+    fn from_rpc_value(value: &RpcValue) -> Result<Self, DecodeError> {
         match value {
             RpcValue::Float(value) => Ok(*value),
             other => Err(unexpected("a float", other)),
@@ -118,7 +141,7 @@ impl ToRpcValue for &BStr {
 }
 
 impl FromRpcValue for BString {
-    fn from_rpc_value(value: &RpcValue) -> Result<Self, PhpThrow> {
+    fn from_rpc_value(value: &RpcValue) -> Result<Self, DecodeError> {
         match value {
             RpcValue::String(bytes) => Ok(bytes.clone()),
             other => Err(unexpected("a string", other)),
@@ -139,7 +162,7 @@ impl ToRpcValue for &std::path::Path {
 }
 
 impl FromRpcValue for std::path::PathBuf {
-    fn from_rpc_value(value: &RpcValue) -> Result<Self, PhpThrow> {
+    fn from_rpc_value(value: &RpcValue) -> Result<Self, DecodeError> {
         match value {
             RpcValue::String(bytes) => Ok(path_from_bytes(bytes).to_path_buf()),
             other => Err(unexpected("a path", other)),
@@ -154,7 +177,7 @@ impl ToRpcValue for PhpEntityHandle {
 }
 
 impl FromRpcValue for PhpEntityHandle {
-    fn from_rpc_value(value: &RpcValue) -> Result<Self, PhpThrow> {
+    fn from_rpc_value(value: &RpcValue) -> Result<Self, DecodeError> {
         match value {
             RpcValue::PhpEntityHandle(handle) => Ok(handle.clone()),
             other => Err(unexpected("a PHP object", other)),
@@ -192,7 +215,7 @@ impl ToRpcValue for PhpMixed {
 
 /// Plain data only: an object record or a handle has no `PhpMixed` counterpart.
 impl FromRpcValue for PhpMixed {
-    fn from_rpc_value(value: &RpcValue) -> Result<Self, PhpThrow> {
+    fn from_rpc_value(value: &RpcValue) -> Result<Self, DecodeError> {
         Ok(match value {
             RpcValue::Null => PhpMixed::Null,
             RpcValue::Bool(b) => PhpMixed::Bool(*b),
@@ -208,7 +231,7 @@ impl FromRpcValue for PhpMixed {
             RpcValue::Array(map) => PhpMixed::Array(
                 map.iter()
                     .map(|(key, value)| Ok((key.clone(), PhpMixed::from_rpc_value(value)?)))
-                    .collect::<Result<_, PhpThrow>>()?,
+                    .collect::<Result<_, DecodeError>>()?,
             ),
             other @ (RpcValue::PhpObject(_)
             | RpcValue::RustEntityHandle(_)
@@ -228,7 +251,7 @@ impl<T: ToRpcValue> ToRpcValue for Option<T> {
 }
 
 impl<T: FromRpcValue> FromRpcValue for Option<T> {
-    fn from_rpc_value(value: &RpcValue) -> Result<Self, PhpThrow> {
+    fn from_rpc_value(value: &RpcValue) -> Result<Self, DecodeError> {
         match value {
             RpcValue::Null => Ok(None),
             value => Ok(Some(T::from_rpc_value(value)?)),
@@ -244,7 +267,7 @@ impl<T: ToRpcValue> ToRpcValue for Vec<T> {
 
 /// A PHP array as a list, accepting the keyed shape PHP allows anywhere a list is documented.
 impl<T: FromRpcValue> FromRpcValue for Vec<T> {
-    fn from_rpc_value(value: &RpcValue) -> Result<Self, PhpThrow> {
+    fn from_rpc_value(value: &RpcValue) -> Result<Self, DecodeError> {
         match value {
             RpcValue::List(items) => items.iter().map(T::from_rpc_value).collect(),
             RpcValue::Array(map) => map.values().map(T::from_rpc_value).collect(),
@@ -272,7 +295,7 @@ impl<K: Into<BString>, T: ToRpcValue> ToRpcValue for IndexMap<K, T> {
 /// A PHP array as a map. An empty PHP array is indistinguishable from an empty list, so it
 /// decodes here as an empty map; a non-empty list decodes under its int keys.
 impl<T: FromRpcValue> FromRpcValue for IndexMap<BString, T> {
-    fn from_rpc_value(value: &RpcValue) -> Result<Self, PhpThrow> {
+    fn from_rpc_value(value: &RpcValue) -> Result<Self, DecodeError> {
         match value {
             RpcValue::Array(map) => map
                 .iter()
@@ -324,7 +347,7 @@ macro_rules! rpc_value_record {
         }
 
         impl $crate::FromRpcValue for $name {
-            fn from_rpc_value(value: &$crate::RpcValue) -> Result<Self, $crate::PhpThrow> {
+            fn from_rpc_value(value: &$crate::RpcValue) -> Result<Self, $crate::codec::DecodeError> {
                 let record = $crate::codec::record_entries(value, stringify!($name).as_bytes())?;
                 Ok($name {
                     $(
@@ -354,7 +377,7 @@ pub fn record_to_rpc_value(fields: Vec<(&'static [u8], RpcValue)>) -> RpcValue {
 pub fn record_entries<'a>(
     value: &'a RpcValue,
     record: &[u8],
-) -> Result<&'a IndexMap<BString, RpcValue>, PhpThrow> {
+) -> Result<&'a IndexMap<BString, RpcValue>, DecodeError> {
     match value {
         RpcValue::Array(entries) => Ok(entries),
         other => Err(unexpected(bformat!("a {record} record"), other)),
@@ -366,16 +389,15 @@ pub fn record_field<T: FromRpcValue>(
     entries: &IndexMap<BString, RpcValue>,
     record: &[u8],
     field: &[u8],
-) -> Result<T, PhpThrow> {
+) -> Result<T, DecodeError> {
     let value = entries
         .get(field)
-        .ok_or_else(|| PhpThrow::runtime(bformat!("the {record} record has no `{field}` entry")))?;
-    T::from_rpc_value(value).map_err(|throw| PhpThrow {
-        message: bformat!(
+        .ok_or_else(|| DecodeError::new(bformat!("the {record} record has no `{field}` entry")))?;
+    T::from_rpc_value(value).map_err(|error| {
+        DecodeError::new(bformat!(
             "the `{field}` entry of the {record} record: {}",
-            throw.message
-        ),
-        ..throw
+            error.message
+        ))
     })
 }
 
@@ -410,12 +432,12 @@ impl ToRpcValue for chrono::DateTime<chrono::Utc> {
 }
 
 impl FromRpcValue for chrono::DateTime<chrono::Utc> {
-    fn from_rpc_value(value: &RpcValue) -> Result<Self, PhpThrow> {
+    fn from_rpc_value(value: &RpcValue) -> Result<Self, DecodeError> {
         let RpcValue::PhpObject(object) = value else {
             return Err(unexpected("a date", value));
         };
         if object.class != DATE_TIME_IMMUTABLE_CLASS && object.class != DATE_TIME_CLASS {
-            return Err(PhpThrow::runtime(bformat!(
+            return Err(DecodeError::new(bformat!(
                 "the class `{}` cannot cross the plugin boundary as a date",
                 object.class
             )));
@@ -424,20 +446,20 @@ impl FromRpcValue for chrono::DateTime<chrono::Utc> {
         if object.public("timezone_type") != Some(&RpcValue::Int(TIMEZONE_TYPE_IDENTIFIER))
             || zone.as_ref().is_none_or(|zone| zone != TIMEZONE_UTC)
         {
-            return Err(PhpThrow::runtime(bformat!(
+            return Err(DecodeError::new(bformat!(
                 "a date crosses the plugin boundary rebased on {TIMEZONE_UTC}, got the zone {}",
                 display_to_bytes(format_args!("{zone:?}"))
             )));
         }
         let rendered = BString::from_rpc_value(object.public("date").unwrap_or(&NULL))?;
         let rendered = utf8_text(&rendered).ok_or_else(|| {
-            PhpThrow::runtime(bformat!(
+            DecodeError::new(bformat!(
                 "the date {} from the plugin is not text",
                 display_to_bytes(format_args!("{rendered:?}"))
             ))
         })?;
         let parsed = chrono::NaiveDateTime::parse_from_str(rendered, DATE_FORMAT).map_err(|e| {
-            PhpThrow::runtime(bformat!(
+            DecodeError::new(bformat!(
                 "the date `{rendered}` from the plugin is not in the expected format: {}",
                 display_to_bytes(e)
             ))

@@ -12,7 +12,7 @@ use crate::php_worker::throwable::exception_into_throw;
 use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_rpc::{PhpThrow, RpcValue, RustMethodDispatcher, ToRpcValue};
-use shirabe_php_shim::{AnyThrowable, ToPhpString, bformat, error_chain_message};
+use shirabe_php_shim::{AnyThrowable, bformat, error_chain_message};
 
 /// Looks a class up in every Rust-side `ClassLoader` on the autoload stack, in stack order — the
 /// Rust mirror of what the PHP `spl_autoload_register` stack would do in-process.
@@ -73,10 +73,9 @@ fn call_runtime_service(method_name: &BStr, args: &[RpcValue]) -> Result<RpcValu
     if method_name == "__shirabe_run_rust_command" {
         let name = arg::<BString>(method_name, args, 0)?;
         let input_line = arg::<BString>(method_name, args, 1)?;
-        return match run_worker_reverse_command(name.as_ref(), input_line.as_ref()) {
-            Ok(code) => Ok(code.to_rpc_value()),
-            Err(e) => Err(PhpThrow::runtime(error_chain_message(&e).to_php_string())),
-        };
+        return run_worker_reverse_command(name.as_ref(), input_line.as_ref())
+            .map(ToRpcValue::to_rpc_value)
+            .map_err(|error| error_throw(bformat!("running the command {name} failed"), &error));
     }
     if method_name == "__shirabe_find_file" {
         let class = arg::<BString>(method_name, args, 0)?;
@@ -173,6 +172,22 @@ mod tests {
         assert_eq!(
             BStr::new(b"unknown runtime service `function\xff`"),
             throw.message.as_bstr()
+        );
+    }
+
+    #[test]
+    fn an_argument_of_the_wrong_type_is_a_type_error() {
+        let throw = RpcDispatcher
+            .call_function(
+                BStr::new("__shirabe_run_rust_command"),
+                vec![RpcValue::Int(1), RpcValue::string("")],
+            )
+            .unwrap_err();
+        assert_eq!("TypeError", throw.exception_class);
+        assert!(
+            throw
+                .message
+                .starts_with(b"__shirabe_run_rust_command argument 0: ")
         );
     }
 

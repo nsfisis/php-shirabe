@@ -10,6 +10,7 @@ use crate::repository::{
     LockArrayRepository, RepositoryInterfaceHandle, WritableRepositoryInterface,
 };
 use bstr::{BString, ByteSlice as _};
+use shirabe_php_rpc::codec::DecodeError;
 use shirabe_php_rpc::{PhpThrow, RpcValue, ToRpcValue};
 use shirabe_php_shim::bformat;
 
@@ -121,7 +122,7 @@ impl forwarding::repository::array_repository::Forwarding
         let constraint = find_package_constraint(call, 1)?.ok_or_else(|| {
             call.arg_throw(
                 1,
-                PhpThrow::runtime("expected a constraint string or object, got null"),
+                DecodeError::new("expected a constraint string or object, got null"),
             )
         })?;
         let package = repository

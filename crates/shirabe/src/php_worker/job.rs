@@ -8,13 +8,14 @@
 pub(crate) mod rpc;
 
 use crate::php_worker::call::PhpCall;
+use crate::php_worker::rpc::dispatch::error_throw;
 use crate::php_worker::throwable::throw_into_error;
 use crate::util::sync_executor::block_on;
 use crate::util::{HttpDownloader, ProcessExecutor};
 use bstr::BStr;
 use indexmap::IndexMap;
 use shirabe_php_rpc::{PhpThrow, RpcValue};
-use shirabe_php_shim::{bformat, error_chain_message};
+use shirabe_php_shim::bformat;
 
 /// The service a job is counted against: the one whose `countActiveJobs()` reports it and whose
 /// tick drives it.
@@ -228,10 +229,10 @@ fn push_settle(id: u64, outcome: Result<RpcValue, PhpThrow>) -> Result<(), PhpTh
     match PhpCall::Function(BStr::new(function)).try_run::<RpcValue>(args) {
         Ok(Ok(_)) => Ok(()),
         Ok(Err(throw)) => Err(throw),
-        Err(error) => Err(PhpThrow::runtime(bformat!(
-            "settling promise {id} in the plugin process failed: {}",
-            error_chain_message(&error)
-        ))),
+        Err(error) => Err(error_throw(
+            bformat!("settling promise {id} in the plugin process failed"),
+            &error,
+        )),
     }
 }
 

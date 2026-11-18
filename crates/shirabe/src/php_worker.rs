@@ -20,8 +20,10 @@ pub mod runtime;
 pub(crate) mod throwable;
 pub mod xdebug;
 
-/// Registers what the worker is spawned with (see [`xdebug::worker_config`]). Called once at
-/// startup, before anything can spawn the worker.
+/// Registers what the worker is spawned with (see [`xdebug::worker_config`]) and how an exception
+/// it throws is rebuilt (see [`throwable::throw_into_error`]). Called once at startup, before
+/// anything can spawn the worker.
 pub fn install() {
     shirabe_php_rpc::set_worker_config_provider(xdebug::worker_config);
+    shirabe_php_rpc::set_throw_reviver(throwable::throw_into_error);
 }

@@ -8,6 +8,7 @@
 use crate::php_worker::rpc::dispatch::RpcDispatcher;
 use crate::php_worker::throwable::throw_into_error;
 use bstr::BStr;
+use shirabe_php_rpc::codec::DecodeError;
 use shirabe_php_rpc::{FromRpcValue, PhpEntityHandle, PhpThrow, RpcValue};
 use shirabe_php_shim::{RuntimeException, bformat};
 
@@ -49,14 +50,14 @@ impl PhpCall<'_> {
         }?;
         Ok(match outcome {
             Ok(value) => {
-                Ok(R::from_rpc_value(&value).map_err(|throw| self.unsupported_shape(throw))?)
+                Ok(R::from_rpc_value(&value).map_err(|error| self.unsupported_shape(error))?)
             }
             Err(throw) => Err(throw),
         })
     }
 
     /// The error of an answer that did not decode, naming the call.
-    pub fn unsupported_shape(self, throw: PhpThrow) -> anyhow::Error {
+    pub fn unsupported_shape(self, error: DecodeError) -> anyhow::Error {
         let callee = match self {
             PhpCall::Function(name) => bformat!("{name}()"),
             PhpCall::Method(handle, method) => bformat!("{}::{method}()", handle.class()),
@@ -65,7 +66,7 @@ impl PhpCall<'_> {
         };
         RuntimeException::new(bformat!(
             "{callee} returned an unsupported shape over RPC: {}",
-            throw.message
+            error.message
         ))
         .into()
     }

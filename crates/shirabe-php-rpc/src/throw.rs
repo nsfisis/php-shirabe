@@ -3,6 +3,17 @@ use crate::value::RpcValue;
 use bstr::BString;
 use indexmap::IndexMap;
 
+/// Rebuilds the ported exception a [`PhpThrow`] describes.
+static THROW_REVIVER: std::sync::OnceLock<fn(PhpThrow) -> anyhow::Error> =
+    std::sync::OnceLock::new();
+
+/// Registers the function that rebuilds the ported exception a [`PhpThrow`] from the worker
+/// describes. The exception types live in the crates that port them, which this crate does not
+/// depend on. A second registration is ignored.
+pub fn set_throw_reviver(revive: fn(PhpThrow) -> anyhow::Error) {
+    let _ = THROW_REVIVER.set(revive);
+}
+
 /// A PHP exception that crossed the RPC boundary (the recoverable failure lane, as opposed to
 /// the fatal `anyhow::Error` lane used for a dead worker or a broken channel).
 #[derive(Debug, Clone)]
@@ -44,6 +55,15 @@ impl PhpThrow {
 
     pub fn runtime(message: impl Into<BString>) -> PhpThrow {
         PhpThrow::new("RuntimeException", message, 0)
+    }
+
+    /// The error the exception stands for on the Rust side: the ported exception the function
+    /// [`set_throw_reviver`] registered rebuilds from it.
+    pub fn into_error(self) -> anyhow::Error {
+        let revive = THROW_REVIVER
+            .get()
+            .expect("an exception crossed from the PHP worker before a reviver was registered");
+        revive(self)
     }
 
     /// The exception as it crosses the boundary wherever it does — as the payload of a `Throw`
@@ -101,5 +121,3 @@ impl std::fmt::Display for PhpThrow {
         )
     }
 }
-
-impl std::error::Error for PhpThrow {}

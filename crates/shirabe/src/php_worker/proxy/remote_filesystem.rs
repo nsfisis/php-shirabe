@@ -11,10 +11,12 @@ use crate::io::IOInterface;
 use crate::php_worker::call::PhpCall;
 use crate::php_worker::rpc::entity::entity_value;
 use crate::php_worker::runtime;
+use crate::php_worker::throwable::throw_into_error;
 use crate::util::StreamContextOptions;
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
-use shirabe_php_rpc::{FromRpcValue, PhpEntityHandle, PhpThrow, RpcValue, ToRpcValue, codec};
+use shirabe_php_rpc::codec::DecodeError;
+use shirabe_php_rpc::{FromRpcValue, PhpEntityHandle, RpcValue, ToRpcValue, codec};
 use shirabe_php_shim::{
     PhpMixed, path_from_bytes, path_to_bytes, php_regex, php_str, preg_match, utf8_text,
 };
@@ -145,8 +147,8 @@ impl RemoteFilesystem {
             Ok(path_from_bytes(&cache_dir).to_path_buf())
         })?;
         let handle: PhpEntityHandle = PhpCall::New(CLASS).run(vec![
-            entity_value(&self.io)?,
-            entity_value(&self.config)?,
+            entity_value(&self.io).map_err(throw_into_error)?,
+            entity_value(&self.config).map_err(throw_into_error)?,
             self.options.clone().to_rpc_value(),
             RpcValue::Bool(self.disable_tls),
         ])?;
@@ -262,7 +264,7 @@ impl RemoteFilesystem {
 
 /// `string|bool` as `get()` answers it: the content, or whether a copy succeeded.
 impl FromRpcValue for GetResult {
-    fn from_rpc_value(value: &RpcValue) -> Result<Self, PhpThrow> {
+    fn from_rpc_value(value: &RpcValue) -> Result<Self, DecodeError> {
         match value {
             RpcValue::Bool(true) => Ok(GetResult::True),
             RpcValue::Bool(false) => Ok(GetResult::False),

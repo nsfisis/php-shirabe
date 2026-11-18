@@ -6,10 +6,10 @@
 //! the available decoders (the `unrar` crate and its bindings) build on the UnRAR library, whose
 //! license is not an open source one. A native decoder could still replace the worker here.
 
-use crate::PhpEntityHandle;
 use crate::builtins::or_false;
 use crate::codec::{ToRpcValue, protocol_value};
 use crate::transport::{RefuseCallbacks, call_php_method, call_static_method};
+use crate::{PhpEntityHandle, PhpThrow};
 use bstr::BStr;
 use shirabe_php_shim::php_str;
 
@@ -28,13 +28,15 @@ impl RarArchive {
             "open",
             vec![file.as_ref().to_rpc_value()],
             &mut RefuseCallbacks,
-        )??;
+        )?
+        .map_err(PhpThrow::into_error)?;
         Ok(or_false(&value, "RarArchive::open()").map(|entity| RarArchive { entity }))
     }
 
     /// PHP `$archive->getEntries()`, with PHP's `false` mapped to `None`.
     pub fn get_entries(&self) -> anyhow::Result<Option<Vec<RarEntry>>> {
-        let value = call_php_method(&self.entity, "getEntries", vec![], &mut RefuseCallbacks)??;
+        let value = call_php_method(&self.entity, "getEntries", vec![], &mut RefuseCallbacks)?
+            .map_err(PhpThrow::into_error)?;
         Ok(
             or_false::<Vec<PhpEntityHandle>>(&value, "RarArchive::getEntries()").map(|entities| {
                 entities
@@ -47,7 +49,8 @@ impl RarArchive {
 
     /// PHP `$archive->close()`.
     pub fn close(&self) -> anyhow::Result<bool> {
-        let value = call_php_method(&self.entity, "close", vec![], &mut RefuseCallbacks)??;
+        let value = call_php_method(&self.entity, "close", vec![], &mut RefuseCallbacks)?
+            .map_err(PhpThrow::into_error)?;
         Ok(protocol_value(&value, "RarArchive::close()"))
     }
 }
@@ -65,7 +68,8 @@ impl RarEntry {
             "extract",
             vec![dir.as_ref().to_rpc_value()],
             &mut RefuseCallbacks,
-        )??;
+        )?
+        .map_err(PhpThrow::into_error)?;
         Ok(protocol_value(&value, "RarEntry::extract()"))
     }
 }

@@ -120,7 +120,7 @@ pub(crate) fn anonymous_class_display_name(class: &BStr) -> anyhow::Result<BStri
         RpcValue::Bool(false) => None,
         value => Some(
             BString::from_rpc_value(&value)
-                .map_err(|throw| get_parent_class.unsupported_shape(throw))?,
+                .map_err(|error| get_parent_class.unsupported_shape(error))?,
         ),
     };
     let name = match parent {

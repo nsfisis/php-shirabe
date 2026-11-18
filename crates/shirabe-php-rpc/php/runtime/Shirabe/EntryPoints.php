@@ -150,7 +150,7 @@ final class EntryPoints
             // Tries to open the embedded runtime bundle and maps the phar to $alias.
             // Returns whether the extraction succeeds or not.
             '__shirabe_open_runtime_bundle' => static function ($args) {
-                [$executable, $alias, $sentinel, $bundleId] = $args;
+                [$executable, $alias, $sentinel, $bundleId] = $args[0];
                 if (!extension_loaded('phar') || !in_array('phar', stream_get_wrappers(), true)) {
                     return false;
                 }

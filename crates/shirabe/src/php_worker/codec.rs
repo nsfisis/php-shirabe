@@ -23,7 +23,8 @@ use crate::util::http::Response;
 use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_class_map_generator::class_map::ClassMap;
-use shirabe_php_rpc::{FromRpcValue, PhpObject, PhpThrow, RpcValue, ToRpcValue, codec};
+use shirabe_php_rpc::codec::DecodeError;
+use shirabe_php_rpc::{FromRpcValue, PhpObject, RpcValue, ToRpcValue, codec};
 use shirabe_php_shim::{PhpMixed, bformat, display_to_bytes, error_message, php_str};
 use shirabe_semver::constraint::{
     AnyConstraint, MatchAllConstraint, MatchNoneConstraint, MultiConstraint, SimpleConstraint,
@@ -48,11 +49,9 @@ fn as_object(value: &RpcValue) -> Option<&PhpObject> {
 fn property<T: FromRpcValue>(
     context: impl AsRef<[u8]>,
     value: Option<&RpcValue>,
-) -> Result<T, PhpThrow> {
-    T::from_rpc_value(value.unwrap_or(&codec::NULL)).map_err(|throw| PhpThrow {
-        message: bformat!("{}: {}", context.as_ref(), throw.message),
-        ..throw
-    })
+) -> Result<T, DecodeError> {
+    T::from_rpc_value(value.unwrap_or(&codec::NULL))
+        .map_err(|error| DecodeError::new(bformat!("{}: {}", context.as_ref(), error.message)))
 }
 
 // Whether the pretty string was ever set is observable (`getPrettyString()` falls back to the
@@ -132,7 +131,7 @@ pub(crate) fn encode_semver_constraint_match_none_constraint(
     RpcValue::PhpObject(object)
 }
 
-fn constraint_pretty_string(object: &PhpObject) -> Result<Option<BString>, PhpThrow> {
+fn constraint_pretty_string(object: &PhpObject) -> Result<Option<BString>, DecodeError> {
     property(
         "a semver constraint pretty string",
         object.protected("prettyString"),
@@ -142,10 +141,10 @@ fn constraint_pretty_string(object: &PhpObject) -> Result<Option<BString>, PhpTh
 /// `Composer\Semver\Constraint\Constraint`.
 pub(crate) fn decode_semver_constraint_constraint(
     object: &PhpObject,
-) -> Result<SimpleConstraint, PhpThrow> {
+) -> Result<SimpleConstraint, DecodeError> {
     let code: i64 = property("a semver constraint operator", object.protected("operator"))?;
     let operator = SimpleConstraint::from_operator_constant(code).ok_or_else(|| {
-        PhpThrow::runtime(bformat!(
+        DecodeError::new(bformat!(
             "a semver constraint has an unknown operator: {code}"
         ))
     })?;
@@ -159,7 +158,7 @@ pub(crate) fn decode_semver_constraint_constraint(
 /// `Composer\Semver\Constraint\MultiConstraint`.
 pub(crate) fn decode_semver_constraint_multi_constraint(
     object: &PhpObject,
-) -> Result<MultiConstraint, PhpThrow> {
+) -> Result<MultiConstraint, DecodeError> {
     let pretty_string = constraint_pretty_string(object)?;
     let constraints = match object.protected("constraints") {
         Some(RpcValue::List(items)) => items
@@ -172,14 +171,14 @@ pub(crate) fn decode_semver_constraint_multi_constraint(
             .map(constraint_from_rpc_value)
             .collect::<Result<Vec<_>, _>>()?,
         other => {
-            return Err(PhpThrow::runtime(bformat!(
+            return Err(DecodeError::new(bformat!(
                 "a MultiConstraint expects a list of constraints, got {}",
                 display_to_bytes(format_args!("{other:?}"))
             )));
         }
     };
     if constraints.len() < 2 {
-        return Err(PhpThrow::runtime(
+        return Err(DecodeError::new(
             "a MultiConstraint needs at least two constraints",
         ));
     }
@@ -197,20 +196,20 @@ pub(crate) fn decode_semver_constraint_multi_constraint(
 /// `Composer\Semver\Constraint\MatchAllConstraint`.
 pub(crate) fn decode_semver_constraint_match_all_constraint(
     object: &PhpObject,
-) -> Result<MatchAllConstraint, PhpThrow> {
+) -> Result<MatchAllConstraint, DecodeError> {
     Ok(MatchAllConstraint::new(constraint_pretty_string(object)?))
 }
 
 /// `Composer\Semver\Constraint\MatchNoneConstraint`.
 pub(crate) fn decode_semver_constraint_match_none_constraint(
     object: &PhpObject,
-) -> Result<MatchNoneConstraint, PhpThrow> {
+) -> Result<MatchNoneConstraint, DecodeError> {
     Ok(MatchNoneConstraint::new(constraint_pretty_string(object)?))
 }
 
-pub(crate) fn constraint_from_rpc_value(value: &RpcValue) -> Result<AnyConstraint, PhpThrow> {
+pub(crate) fn constraint_from_rpc_value(value: &RpcValue) -> Result<AnyConstraint, DecodeError> {
     let object = as_object(value).ok_or_else(|| {
-        PhpThrow::runtime(bformat!(
+        DecodeError::new(bformat!(
             "expected a semver constraint from the plugin, got {}",
             display_to_bytes(format_args!("{value:?}"))
         ))
@@ -234,7 +233,7 @@ pub(crate) fn constraint_from_rpc_value(value: &RpcValue) -> Result<AnyConstrain
         // TODO(plugin): a plugin-defined ConstraintInterface implementation has no Rust
         // counterpart; the four composer/semver classes are the whole vocabulary here.
         other => {
-            return Err(PhpThrow::runtime(bformat!(
+            return Err(DecodeError::new(bformat!(
                 "the semver constraint class `{other}` cannot cross the plugin boundary"
             )));
         }
@@ -282,7 +281,7 @@ pub(crate) fn encode_util_http_response(response: Response) -> RpcValue {
 }
 
 /// `Composer\Util\Http\Response`.
-pub(crate) fn decode_util_http_response(object: &PhpObject) -> Result<Response, PhpThrow> {
+pub(crate) fn decode_util_http_response(object: &PhpObject) -> Result<Response, DecodeError> {
     let request: IndexMap<BString, RpcValue> = property(
         "a Response request",
         object.private(RESPONSE_CLASS, "request"),
@@ -348,7 +347,7 @@ pub(crate) fn encode_class_map_generator_class_map(class_map: &ClassMap) -> RpcV
 /// `Composer\ClassMapGenerator\ClassMap`.
 pub(crate) fn decode_class_map_generator_class_map(
     object: &PhpObject,
-) -> Result<ClassMap, PhpThrow> {
+) -> Result<ClassMap, DecodeError> {
     let mut class_map = ClassMap::new();
     let map: IndexMap<BString, BString> = property("a ClassMap map", object.public("map"))?;
     for (class_name, path) in map {
@@ -371,7 +370,7 @@ pub(crate) fn decode_class_map_generator_class_map(
         for violation in violations {
             let field = |key: &[u8]| {
                 violation.get(key).cloned().ok_or_else(|| {
-                    PhpThrow::runtime(bformat!(
+                    DecodeError::new(bformat!(
                         "a ClassMap psr violation lacks `{}`",
                         BStr::new(key)
                     ))
@@ -384,9 +383,9 @@ pub(crate) fn decode_class_map_generator_class_map(
 }
 
 impl FromRpcValue for Link {
-    fn from_rpc_value(value: &RpcValue) -> Result<Self, PhpThrow> {
+    fn from_rpc_value(value: &RpcValue) -> Result<Self, DecodeError> {
         let object = as_object(value).ok_or_else(|| {
-            PhpThrow::runtime(bformat!(
+            DecodeError::new(bformat!(
                 "expected a Link from the plugin, got {}",
                 display_to_bytes(format_args!("{value:?}"))
             ))
@@ -394,7 +393,7 @@ impl FromRpcValue for Link {
         if object.class != LINK_CLASS {
             // TODO(plugin): Link subclasses have no Rust counterpart; the port models links as a
             // single value type.
-            return Err(PhpThrow::runtime(bformat!(
+            return Err(DecodeError::new(bformat!(
                 "the class `{}` cannot cross the plugin boundary as a Link",
                 object.class
             )));
@@ -404,11 +403,11 @@ impl FromRpcValue for Link {
 }
 
 /// `Composer\Package\Link`.
-pub(crate) fn decode_package_link(object: &PhpObject) -> Result<Link, PhpThrow> {
+pub(crate) fn decode_package_link(object: &PhpObject) -> Result<Link, DecodeError> {
     let constraint = constraint_from_rpc_value(
         object
             .protected("constraint")
-            .ok_or_else(|| PhpThrow::runtime("a Link expects a constraint"))?,
+            .ok_or_else(|| DecodeError::new("a Link expects a constraint"))?,
     )?;
     Ok(Link::from_parts(
         property("a Link source", object.protected("source"))?,
@@ -456,7 +455,7 @@ pub(crate) fn encode_date_time_immutable(instant: chrono::DateTime<chrono::Utc>)
 /// `DateTimeImmutable`.
 pub(crate) fn decode_date_time_immutable(
     object: &PhpObject,
-) -> Result<chrono::DateTime<chrono::Utc>, PhpThrow> {
+) -> Result<chrono::DateTime<chrono::Utc>, DecodeError> {
     chrono::DateTime::<chrono::Utc>::from_rpc_value(&RpcValue::PhpObject(object.clone()))
 }
 
@@ -473,13 +472,13 @@ pub(crate) fn encode_date_time(instant: chrono::DateTime<chrono::Utc>) -> RpcVal
 /// `DateTime`.
 pub(crate) fn decode_date_time(
     object: &PhpObject,
-) -> Result<chrono::DateTime<chrono::Utc>, PhpThrow> {
+) -> Result<chrono::DateTime<chrono::Utc>, DecodeError> {
     chrono::DateTime::<chrono::Utc>::from_rpc_value(&RpcValue::PhpObject(object.clone()))
 }
 
 /// `array{url: string, preferred: bool}` as PHP shapes it.
 impl FromRpcValue for Mirror {
-    fn from_rpc_value(value: &RpcValue) -> Result<Self, PhpThrow> {
+    fn from_rpc_value(value: &RpcValue) -> Result<Self, DecodeError> {
         let row = IndexMap::<BString, RpcValue>::from_rpc_value(value)?;
         let field = |key: &[u8]| row.get(key).unwrap_or(&codec::NULL);
         Ok(Mirror {
@@ -499,7 +498,7 @@ impl ToRpcValue for Mirror {
 }
 
 impl FromRpcValue for DisplayMode {
-    fn from_rpc_value(value: &RpcValue) -> Result<Self, PhpThrow> {
+    fn from_rpc_value(value: &RpcValue) -> Result<Self, DecodeError> {
         match value {
             RpcValue::Int(0) => Ok(DisplayMode::SourceRefIfDev),
             RpcValue::Int(1) => Ok(DisplayMode::SourceRef),
@@ -516,9 +515,9 @@ impl ToRpcValue for StreamContextOptions {
 }
 
 impl FromRpcValue for StreamContextOptions {
-    fn from_rpc_value(value: &RpcValue) -> Result<Self, PhpThrow> {
+    fn from_rpc_value(value: &RpcValue) -> Result<Self, DecodeError> {
         Self::from_array(IndexMap::<BString, PhpMixed>::from_rpc_value(value)?)
-            .map_err(|error| PhpThrow::new("TypeError", error_message(&error), 0))
+            .map_err(|error| DecodeError::new(error_message(&error)))
     }
 }
 

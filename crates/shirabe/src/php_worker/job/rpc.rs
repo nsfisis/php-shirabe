@@ -5,10 +5,10 @@ use crate::php_worker::call::PhpCall;
 use crate::php_worker::job;
 use crate::php_worker::job::JobOwner;
 use crate::php_worker::rpc::args::arg;
+use crate::php_worker::rpc::dispatch::error_throw;
 use crate::util::sync_executor::block_on;
 use bstr::{BStr, ByteSlice as _};
 use shirabe_php_rpc::{PhpThrow, RpcValue};
-use shirabe_php_shim::{bformat, error_chain_message};
 
 /// Polls a job future that was just built, the one time a job is advanced outside a tick.
 /// Composer starts a process inside `executeAsync()` itself when the job budget has room, and
@@ -57,10 +57,10 @@ pub(crate) fn resolved_promise(value: RpcValue) -> Result<RpcValue, PhpThrow> {
     match PhpCall::Function(BStr::new("__shirabe_resolved_promise")).try_run(vec![value]) {
         Ok(Ok(promise)) => Ok(promise),
         Ok(Err(throw)) => Err(throw),
-        Err(error) => Err(PhpThrow::runtime(bformat!(
-            "creating a resolved promise in the plugin process failed: {}",
-            error_chain_message(&error)
-        ))),
+        Err(error) => Err(error_throw(
+            b"creating a resolved promise in the plugin process failed",
+            &error,
+        )),
     }
 }
 
@@ -73,9 +73,9 @@ pub(crate) fn rejected_promise(throw: PhpThrow) -> Result<RpcValue, PhpThrow> {
     {
         Ok(Ok(promise)) => Ok(promise),
         Ok(Err(throw)) => Err(throw),
-        Err(error) => Err(PhpThrow::runtime(bformat!(
-            "creating a rejected promise in the plugin process failed: {}",
-            error_chain_message(&error)
-        ))),
+        Err(error) => Err(error_throw(
+            b"creating a rejected promise in the plugin process failed",
+            &error,
+        )),
     }
 }

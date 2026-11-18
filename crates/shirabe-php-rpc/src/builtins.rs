@@ -3,6 +3,7 @@
 pub mod rar;
 
 use crate::codec::{FromRpcValue, ToRpcValue, protocol_value};
+use crate::throw::PhpThrow;
 use crate::transport::call_internal_function;
 use crate::value::RpcValue;
 use bstr::{BStr, BString, ByteSlice as _};
@@ -71,7 +72,8 @@ pub fn query<T: FromRpcValue>(
     request: impl ToRpcValue,
 ) -> anyhow::Result<T> {
     let name = name.as_ref().as_bstr();
-    let value = call_internal_function(name, vec![request.to_rpc_value()])??;
+    let value = call_internal_function(name, vec![request.to_rpc_value()])?
+        .map_err(PhpThrow::into_error)?;
     Ok(protocol_value(&value, bformat!("the answer of {name}")))
 }
 

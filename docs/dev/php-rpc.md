@@ -211,8 +211,8 @@ as a `Throw` frame.
 
 A value of the wrong type is an exception, not a fatal error. When an argument or an answer does
 not have the type the receiving side expects, it is not coerced, much as under
-`declare(strict_types=1)`: the receiving side throws instead. The exception is a
-`RuntimeException`, not a `TypeError`.
+`declare(strict_types=1)`: the receiving side throws a `TypeError` instead. A value of the wrong
+type that only Shirabe's own code writes is a bug in Shirabe, not an exception.
 
 An exception is sent by value, not as a handle: the sending side writes a throwable record of it
 (its class, message, code, properties, location and superclasses), and the receiving side rebuilds

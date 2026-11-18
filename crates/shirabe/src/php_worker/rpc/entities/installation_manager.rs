@@ -3,12 +3,13 @@
 use crate::installer::InstallationManagerInterface;
 use crate::package::PackageInterfaceHandle;
 use crate::php_worker::proxy::{forget_php_installer_proxy, php_installer_proxy};
+use crate::php_worker::rpc::dispatch::error_throw;
 use crate::php_worker::rpc::entity::{Bindings, Call, Entity};
 use crate::php_worker::rpc::forwarding;
 use crate::php_worker::runtime;
 use bstr::BStr;
 use shirabe_php_rpc::{PhpEntityHandle, PhpThrow, RpcValue, ToRpcValue};
-use shirabe_php_shim::{bformat, error_chain_message};
+use shirabe_php_shim::bformat;
 
 impl Entity for std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>> {
     const EXPECTED: &'static [u8] = b"an InstallationManager";
@@ -31,11 +32,10 @@ fn installer_arg(call: &Call<'_>) -> Result<PhpEntityHandle, PhpThrow> {
         BStr::new("Composer\\Installer\\InstallerInterface"),
     )
     .map_err(|error| {
-        PhpThrow::runtime(bformat!(
-            "{} could not type-check its argument: {}",
-            call.method(),
-            error_chain_message(&error)
-        ))
+        error_throw(
+            bformat!("{} could not type-check its argument", call.method()),
+            &error,
+        )
     })?;
     if !is_installer {
         return Err(PhpThrow::runtime(bformat!(

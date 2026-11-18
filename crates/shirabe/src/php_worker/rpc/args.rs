@@ -1,6 +1,7 @@
 //! Argument decoding for the entity methods.
 
 use bstr::BStr;
+use shirabe_php_rpc::codec::DecodeError;
 use shirabe_php_rpc::{FromRpcValue, PhpThrow, RpcValue, codec};
 use shirabe_php_shim::bformat;
 
@@ -12,7 +13,7 @@ pub(crate) fn arg<T: FromRpcValue>(
     position: usize,
 ) -> Result<T, PhpThrow> {
     T::from_rpc_value(args.get(position).unwrap_or(&codec::NULL))
-        .map_err(|throw| arg_throw(method, position, throw))
+        .map_err(|error| arg_throw(method, position, error))
 }
 
 /// Decodes the argument at `position` for a parameter whose PHP declaration carries a default:
@@ -25,16 +26,13 @@ pub(crate) fn arg_or<T: FromRpcValue>(
 ) -> Result<T, PhpThrow> {
     match args.get(position) {
         None | Some(RpcValue::Null) => Ok(default),
-        Some(value) => T::from_rpc_value(value).map_err(|throw| arg_throw(method, position, throw)),
+        Some(value) => T::from_rpc_value(value).map_err(|error| arg_throw(method, position, error)),
     }
 }
 
-/// Names the argument a decoding failure is about.
-pub(crate) fn arg_throw(method: &BStr, position: usize, throw: PhpThrow) -> PhpThrow {
-    PhpThrow {
-        message: bformat!("{method} argument {position}: {}", throw.message),
-        ..throw
-    }
+/// The `TypeError` of an argument that did not decode, naming the argument.
+pub(crate) fn arg_throw(method: &BStr, position: usize, error: DecodeError) -> PhpThrow {
+    DecodeError::new(bformat!("{method} argument {position}: {}", error.message)).into()
 }
 
 #[cfg(test)]

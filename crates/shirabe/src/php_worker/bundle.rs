@@ -3,7 +3,7 @@
 //! See `docs/dev/composer-runtime-bundle.md`.
 
 use bstr::{BStr, BString};
-use shirabe_php_rpc::{RpcValue, call_internal_function};
+use shirabe_php_rpc::{RpcValue, query};
 use shirabe_php_shim::{
     AnyThrowable, Phar, RuntimeException, bformat, display_to_bytes, getenv, os_str_from_bytes,
     path_from_bytes, path_to_bytes, php_str,
@@ -74,24 +74,15 @@ fn override_directory() -> anyhow::Result<Option<std::path::PathBuf>> {
 /// wrapper.
 fn worker_opens_bundle() -> anyhow::Result<bool> {
     let executable = std::env::current_exe()?;
-    let opened = call_internal_function(
+    query(
         "__shirabe_open_runtime_bundle",
-        vec![
+        RpcValue::List(vec![
             RpcValue::string(path_to_bytes(&executable)),
             RpcValue::string(ALIAS),
             RpcValue::string(SENTINEL_PATH),
             RpcValue::string(BUNDLE_ID),
-        ],
-    )?
-    .map_err(|throw| {
-        RuntimeException::new(bformat!("{}: {}", throw.exception_class, throw.message))
-    })?;
-    match opened {
-        RpcValue::Bool(opened) => Ok(opened),
-        other => Err(anyhow::anyhow!(
-            "opening the Composer PHP runtime bundle did not answer with a bool: {other:?}"
-        )),
-    }
+        ]),
+    )
 }
 
 /// One of the runtime's files, at a path a reader in this process can open: the one in the
@@ -163,6 +154,7 @@ fn extract_into(root: &std::path::Path) -> anyhow::Result<std::path::PathBuf> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use shirabe_php_rpc::call_internal_function;
 
     fn sentinel_of(directory: &std::path::Path) -> BString {
         std::fs::read(directory.join(path_from_bytes(SENTINEL_PATH)))

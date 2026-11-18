@@ -12,6 +12,7 @@ use crate::php_worker::rpc::dispatch::error_throw;
 use crate::php_worker::rpc::table;
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
+use shirabe_php_rpc::codec::DecodeError;
 use shirabe_php_rpc::{FromRpcValue, PhpThrow, RpcValue, RustEntityHandle, codec};
 use shirabe_php_shim::bformat;
 
@@ -131,7 +132,7 @@ impl<'a> Call<'a> {
     /// does; a parameter's own default belongs to `arg_or`.
     pub fn arg<T: FromRpcValue>(&self, position: usize) -> Result<T, PhpThrow> {
         T::from_rpc_value(self.args.get(position).unwrap_or(&codec::NULL))
-            .map_err(|throw| self.arg_throw(position, throw))
+            .map_err(|error| self.arg_throw(position, error))
     }
 
     /// Decodes the argument at `position` for a parameter whose PHP declaration carries a
@@ -140,7 +141,7 @@ impl<'a> Call<'a> {
         match self.args.get(position) {
             None | Some(RpcValue::Null) => Ok(default),
             Some(value) => {
-                T::from_rpc_value(value).map_err(|throw| self.arg_throw(position, throw))
+                T::from_rpc_value(value).map_err(|error| self.arg_throw(position, error))
             }
         }
     }
@@ -159,17 +160,15 @@ impl<'a> Call<'a> {
         self.out_params.insert(position, value);
     }
 
-    /// Names the argument a decoding failure is about.
-    pub fn arg_throw(&self, position: usize, throw: PhpThrow) -> PhpThrow {
-        PhpThrow {
-            message: bformat!(
-                "{}::{} argument {position}: {}",
-                self.class,
-                self.method,
-                throw.message
-            ),
-            ..throw
-        }
+    /// The `TypeError` of an argument that did not decode, naming the argument.
+    pub fn arg_throw(&self, position: usize, error: DecodeError) -> PhpThrow {
+        DecodeError::new(bformat!(
+            "{}::{} argument {position}: {}",
+            self.class,
+            self.method,
+            error.message
+        ))
+        .into()
     }
 
     /// The `Throw` a failed Rust-side call of this member crosses the boundary as.
@@ -245,14 +244,14 @@ pub fn entity_value<H: Entity>(entity: &H) -> Result<RpcValue, PhpThrow> {
 pub struct EntityArg<H>(pub H);
 
 impl<H: Entity> FromRpcValue for EntityArg<H> {
-    fn from_rpc_value(value: &RpcValue) -> Result<Self, PhpThrow> {
+    fn from_rpc_value(value: &RpcValue) -> Result<Self, DecodeError> {
         let RpcValue::RustEntityHandle(handle) = value else {
             return Err(codec::unexpected(H::EXPECTED, value));
         };
         table::lookup::<H>(handle.entity_id)
             .map(EntityArg)
             .ok_or_else(|| {
-                PhpThrow::runtime(bformat!(
+                DecodeError::new(bformat!(
                     "expected {}, got Rust entity id {}",
                     BStr::new(H::EXPECTED),
                     handle.entity_id

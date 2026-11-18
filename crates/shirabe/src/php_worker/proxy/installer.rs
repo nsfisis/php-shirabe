@@ -5,6 +5,7 @@ use crate::package::PackageInterfaceHandle;
 use crate::php_worker::call::PhpCall;
 use crate::php_worker::job;
 use crate::php_worker::rpc::entity::entity_value;
+use crate::php_worker::throwable::throw_into_error;
 use crate::repository::InstalledRepositoryInterfaceHandle;
 use bstr::BStr;
 use indexmap::IndexMap;
@@ -40,7 +41,7 @@ impl PhpInstallerProxy {
     }
 
     fn repo_arg(repo: &InstalledRepositoryInterfaceHandle) -> anyhow::Result<RpcValue> {
-        Ok(entity_value(&repo.as_repository_handle())?)
+        entity_value(&repo.as_repository_handle()).map_err(throw_into_error)
     }
 
     /// The `?PromiseInterface` half of the installer contract. The Rust callers await the
@@ -60,7 +61,7 @@ impl PhpInstallerProxy {
             }
         };
         let result = job::await_php_promise(id).await?;
-        Option::<PhpMixed>::from_rpc_value(&result).map_err(|throw| call.unsupported_shape(throw))
+        Option::<PhpMixed>::from_rpc_value(&result).map_err(|error| call.unsupported_shape(error))
     }
 }
 

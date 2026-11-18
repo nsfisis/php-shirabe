@@ -6,6 +6,7 @@ use crate::php_worker::rpc::entity::{Bindings, Call, Entity, EntityArg, Property
 use crate::repository::RepositoryInterfaceHandle;
 use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
+use shirabe_php_rpc::codec::DecodeError;
 use shirabe_php_rpc::{FromRpcValue, PhpThrow, RpcValue, codec};
 use shirabe_php_shim::bformat;
 
@@ -197,13 +198,13 @@ pub(crate) fn call(
 }
 
 impl FromRpcValue for PackageInterfaceHandle {
-    fn from_rpc_value(value: &RpcValue) -> Result<Self, PhpThrow> {
+    fn from_rpc_value(value: &RpcValue) -> Result<Self, DecodeError> {
         EntityArg::from_rpc_value(value).map(|package| package.0)
     }
 }
 
 impl FromRpcValue for RepositoryInterfaceHandle {
-    fn from_rpc_value(value: &RpcValue) -> Result<Self, PhpThrow> {
+    fn from_rpc_value(value: &RpcValue) -> Result<Self, DecodeError> {
         EntityArg::from_rpc_value(value).map(|repository| repository.0)
     }
 }
