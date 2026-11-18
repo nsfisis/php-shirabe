@@ -41,6 +41,7 @@ enum Source {
         via: Option<Access>,
         mutable: Option<Access>,
         deref: Option<Access>,
+        job: Option<syn::Path>,
     },
     /// The adapters of an item answering static methods.
     Static { module: syn::Path },
@@ -71,6 +72,7 @@ impl syn::parse::Parse for Entry {
                 let mut via = None;
                 let mut mutable = None;
                 let mut deref = None;
+                let mut job = None;
                 while !content.is_empty() {
                     let key: syn::Ident = syn::ext::IdentExt::parse_any(&content)?;
                     content.parse::<syn::Token![:]>()?;
@@ -78,10 +80,11 @@ impl syn::parse::Parse for Entry {
                         "via" => via = Some(content.parse()?),
                         "mut" => mutable = Some(content.parse()?),
                         "deref" => deref = Some(content.parse()?),
+                        "job" => job = Some(content.parse()?),
                         _ => {
                             return Err(syn::Error::new(
                                 key.span(),
-                                "expected `via`, `mut` or `deref`",
+                                "expected `via`, `mut`, `deref` or `job`",
                             ));
                         }
                     }
@@ -95,6 +98,7 @@ impl syn::parse::Parse for Entry {
                     via,
                     mutable,
                     deref,
+                    job,
                 }
             }
             "static" => Source::Static { module },
@@ -350,6 +354,7 @@ fn expand_input(input: Input) -> syn::Result<proc_macro2::TokenStream> {
             via,
             mutable,
             deref,
+            job,
             ..
         } = &entry.source
         else {
@@ -357,12 +362,28 @@ fn expand_input(input: Input) -> syn::Result<proc_macro2::TokenStream> {
         };
         let route = quote::format_ident!("__PhpRoute{}", index);
         routes.push(quote::quote! {
-            struct #route<'h>(&'h #handle);
+            #[derive(Clone)]
+            struct #route(#handle);
         });
-        if let Some(via) = via {
-            let body = via.apply(quote::quote! { self.0 });
+        if let Some(job) = job {
             routes.push(quote::quote! {
-                impl<'h> crate::php_worker::rpc::binding::Receiver<#target> for #route<'h> {
+                impl crate::php_worker::rpc::binding::JobReceiver for #route {
+                    fn job(
+                        &self,
+                        call: &crate::php_worker::rpc::entity::Call<'_>,
+                    ) -> ::core::result::Result<
+                        crate::php_worker::rpc::binding::JobContext,
+                        ::shirabe_php_rpc::PhpThrow,
+                    > {
+                        #job(&self.0, call)
+                    }
+                }
+            });
+        }
+        if let Some(via) = via {
+            let body = via.apply(quote::quote! { &self.0 });
+            routes.push(quote::quote! {
+                impl crate::php_worker::rpc::binding::Receiver<#target> for #route {
                     type Guard<'a> = ::std::cell::Ref<'a, #target> where Self: 'a;
 
                     fn get(&self) -> Self::Guard<'_> #body
@@ -370,9 +391,9 @@ fn expand_input(input: Input) -> syn::Result<proc_macro2::TokenStream> {
             });
         }
         if let Some(deref) = deref {
-            let body = deref.apply(quote::quote! { self.0 });
+            let body = deref.apply(quote::quote! { &self.0 });
             routes.push(quote::quote! {
-                impl<'h> crate::php_worker::rpc::binding::Receiver<#target> for #route<'h> {
+                impl crate::php_worker::rpc::binding::Receiver<#target> for #route {
                     type Guard<'a> = &'a #target where Self: 'a;
 
                     fn get(&self) -> Self::Guard<'_> #body
@@ -380,9 +401,9 @@ fn expand_input(input: Input) -> syn::Result<proc_macro2::TokenStream> {
             });
         }
         if let Some(mutable) = mutable {
-            let body = mutable.apply(quote::quote! { self.0 });
+            let body = mutable.apply(quote::quote! { &self.0 });
             routes.push(quote::quote! {
-                impl<'h> crate::php_worker::rpc::binding::ReceiverMut<#target> for #route<'h> {
+                impl crate::php_worker::rpc::binding::ReceiverMut<#target> for #route {
                     type Guard<'a> = ::std::cell::RefMut<'a, #target> where Self: 'a;
 
                     fn get_mut(&self) -> Self::Guard<'_> #body
@@ -393,9 +414,22 @@ fn expand_input(input: Input) -> syn::Result<proc_macro2::TokenStream> {
 
     let mut impls = Vec::new();
     let mut checks = Vec::new();
+    let mut kinds = Vec::new();
     for class in &classes {
-        impls.push(forwarding_impl(&input, &classes, class, &mut checks)?);
+        impls.push(forwarding_impl(
+            &input,
+            &classes,
+            class,
+            &mut checks,
+            &mut kinds,
+        )?);
     }
+    checks.push(quote::quote! {
+        const _: () = assert!(
+            !crate::php_worker::rpc::binding::mixes_async_and_mut(&[#(#kinds),*]),
+            "this handle forwards an async fn and a `&mut self` method; answer one of them with a hand-written function",
+        );
+    });
 
     let address = match &input.address {
         Some(address) => address.apply(quote::quote! { self }),
@@ -414,7 +448,8 @@ fn expand_input(input: Input) -> syn::Result<proc_macro2::TokenStream> {
                 quote::quote! { #literal => ::core::result::Result::Ok(&#forwarding::BINDINGS), }
             });
             quote::quote! {
-                let class: &'static [u8] = #chosen;
+                let class: ::core::result::Result<&'static [u8], ::shirabe_php_rpc::PhpThrow> = #chosen;
+                let class = class?;
                 match class {
                     #(#arms)*
                     other => panic!(
@@ -483,6 +518,7 @@ fn forwarding_impl(
     classes: &[ClassDecl],
     class: &ClassDecl,
     checks: &mut Vec<proc_macro2::TokenStream>,
+    kinds: &mut Vec<proc_macro2::TokenStream>,
 ) -> syn::Result<proc_macro2::TokenStream> {
     let handle = &input.handle;
     let decl = &class.loaded.decl;
@@ -555,9 +591,10 @@ fn forwarding_impl(
                     fqcn,
                     &method.name,
                 ));
+                kinds.push(quote::quote! { #module::__php_kinds::#name });
                 quote::quote! {
                     fn #name(this: &#handle, #call) -> #answer {
-                        #module::#name(&#route(this), call)
+                        #module::#name(&#route(::core::clone::Clone::clone(this)), call)
                     }
                 }
             }

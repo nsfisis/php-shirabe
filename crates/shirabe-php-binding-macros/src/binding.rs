@@ -239,6 +239,7 @@ fn expand_item(
     let loaded = decls::load(&fqcn, span)?;
     let mut adapters = Vec::new();
     let mut checked = Vec::new();
+    let mut kinds = Vec::new();
     for method in &loaded.decl.methods {
         let answers = if method.is_static {
             args.members.statics
@@ -258,6 +259,9 @@ fn expand_item(
         if let Some(custom) = &rust.attrs.custom {
             adapters.push(quote::quote! { pub(crate) use #custom as #adapter_name; });
             checked.push(quote::quote! { pub(crate) const #adapter_name: ::core::option::Option<&[&[u8]]> = ::core::option::Option::None; });
+            kinds.push(
+                quote::quote! { pub(crate) const #adapter_name: (bool, bool) = (false, false); },
+            );
             continue;
         }
         if method.func_num_args {
@@ -281,6 +285,13 @@ fn expand_item(
         )?);
         let signatures = decls::signatures(&method.params);
         checked.push(quote::quote! { pub(crate) const #adapter_name: ::core::option::Option<&[&[u8]]> = ::core::option::Option::Some(#signatures); });
+        let is_async = rust.sig.asyncness.is_some();
+        let is_mut = rust.sig.inputs.iter().any(|input| {
+            matches!(input, syn::FnArg::Receiver(r) if matches!(r.kind, syn::ReceiverKind::Reference(_, _, Some(_))))
+        });
+        kinds.push(
+            quote::quote! { pub(crate) const #adapter_name: (bool, bool) = (#is_async, #is_mut); },
+        );
     }
     if let Some(index) = methods.iter().position(|method| {
         method
@@ -351,6 +362,13 @@ fn expand_item(
             pub(crate) mod __php_params {
                 #(#checked)*
             }
+
+            /// For each adapter, whether the Rust method is an `async fn` and whether it takes
+            /// `&mut self`, which `php_entity!` checks one handle does not mix.
+            #[allow(non_upper_case_globals)]
+            pub(crate) mod __php_kinds {
+                #(#kinds)*
+            }
         }
     })
 }
@@ -407,12 +425,7 @@ fn adapter(
     let sig = &rust.sig;
     let span = sig.span();
     let member = format!("{fqcn}::{php_name}");
-    if sig.asyncness.is_some() {
-        return Err(syn::Error::new(
-            span,
-            format!("{member}: #[php_binding] does not generate async adapters yet"),
-        ));
-    }
+    let is_async = sig.asyncness.is_some();
     let mut receiver = None;
     let mut typed = Vec::new();
     for input in &sig.inputs {
@@ -457,6 +470,47 @@ fn adapter(
         syn::ReturnType::Type(_, ty) => has_reference(ty),
     };
     let answer = quote::quote! { crate::php_worker::rpc::binding::IntoRpcAnswer::into_rpc_answer };
+    if is_async {
+        if receiver_mut != Some(false) {
+            return Err(syn::Error::new(
+                span,
+                format!(
+                    "{member}: an async adapter holds its borrow of the receiver across `.await`, so it takes `&self`"
+                ),
+            ));
+        }
+        if lends {
+            return Err(syn::Error::new(
+                span,
+                format!("{member}: an async adapter cannot answer with a borrowed value"),
+            ));
+        }
+        return Ok(quote::quote! {
+            pub(crate) fn #adapter_name(
+                this: &(impl crate::php_worker::rpc::binding::Receiver<#target>
+                      + crate::php_worker::rpc::binding::JobReceiver
+                      + ::core::clone::Clone
+                      + 'static),
+                call: &mut crate::php_worker::rpc::entity::Call<'_>,
+            ) -> ::core::result::Result<::shirabe_php_rpc::RpcValue, ::shirabe_php_rpc::PhpThrow> {
+                #(#decodes)*
+                let __job = crate::php_worker::rpc::binding::JobReceiver::job(this, call)?;
+                let __failed = call.failed();
+                let __this = ::core::clone::Clone::clone(this);
+                ::core::result::Result::Ok(crate::php_worker::rpc::binding::register_job(
+                    __job,
+                    move |__started| ::std::boxed::Box::pin(async move {
+                        __started.set(true);
+                        let __answer = {
+                            let __guard = crate::php_worker::rpc::binding::Receiver::get(&__this);
+                            #call_base::#fn_ident(&*__guard, #(#passes),*).await
+                        };
+                        #answer(__answer, &__failed)
+                    }),
+                ))
+            }
+        });
+    }
     let (this, invoke) = match receiver_mut {
         None => (
             quote::quote! {},
@@ -472,11 +526,14 @@ fn adapter(
         ),
     };
     let body = if lends {
-        quote::quote! { #answer(#invoke, call) }
+        quote::quote! {
+            let __failed = call.failed();
+            #answer(#invoke, &__failed)
+        }
     } else {
         quote::quote! {
             let __answer = #invoke;
-            #answer(__answer, call)
+            #answer(__answer, &call.failed())
         }
     };
 

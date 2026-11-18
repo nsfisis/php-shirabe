@@ -7,6 +7,7 @@ use crate::package::PackageInterfaceHandle;
 use crate::util::Filesystem;
 use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
+use shirabe_php_binding_macros::php_binding;
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, LogicException, PhpMixed, RuntimeException, ToPhpString,
     array_keys, array_reverse, array_shift, bformat, dirname, implode, in_array_strict,
@@ -454,10 +455,12 @@ impl DownloadManager {
 // Composer's Composer::setDownloadManager() accepts any DownloadManager subclass, so plugins may
 // swap in a replacement. The interface captures the methods reached through Composer's accessor and
 // through the `Rc<RefCell<dyn DownloadManagerInterface>>` references fed from it.
+#[php_binding(r"Composer\Downloader\DownloadManager")]
 #[async_trait::async_trait(?Send)]
 pub trait DownloadManagerInterface: std::fmt::Debug {
     fn set_prefer_source(&self, prefer_source: bool);
     fn set_prefer_dist(&self, prefer_dist: bool);
+    #[php(skip)]
     fn get_downloader_for_package(
         &self,
         package: PackageInterfaceHandle,

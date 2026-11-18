@@ -6,6 +6,7 @@ use crate::event_dispatcher::{Event, EventFlags, delegate_event_interface_to_inn
 use crate::io::IOInterface;
 use crate::repository::InstalledRepositoryInterfaceHandle;
 use bstr::BString;
+use shirabe_php_binding_macros::php_binding;
 
 /// The operations are shared rather than owned so that the same operation crosses the plugin
 /// boundary as one object for both the pre- and the post-event, as it does in PHP.
@@ -20,6 +21,7 @@ pub struct PackageEvent {
     operation: std::rc::Rc<AnyOperation>,
 }
 
+#[php_binding(r"Composer\Installer\PackageEvent", members = instance)]
 impl PackageEvent {
     pub fn new(
         event_name: impl Into<BString>,
@@ -70,4 +72,4 @@ impl PackageEvent {
     }
 }
 
-delegate_event_interface_to_inner!(PackageEvent, inner);
+delegate_event_interface_to_inner!(PackageEvent, inner, "Composer\\Installer\\PackageEvent");

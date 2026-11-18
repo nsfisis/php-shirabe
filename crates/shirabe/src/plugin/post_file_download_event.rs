@@ -4,6 +4,7 @@ use crate::event_dispatcher::{Event, EventFlags, delegate_event_interface_to_inn
 use crate::package::PackageInterfaceHandle;
 use crate::plugin::FileDownloadContext;
 use bstr::{BStr, BString, ByteSlice as _};
+use shirabe_php_binding_macros::php_binding;
 use shirabe_php_shim::{E_USER_DEPRECATED, trigger_error};
 
 #[derive(Debug)]
@@ -16,6 +17,7 @@ pub struct PostFileDownloadEvent {
     r#type: BString,
 }
 
+#[php_binding(r"Composer\Plugin\PostFileDownloadEvent", members = instance)]
 impl PostFileDownloadEvent {
     pub fn new(
         name: impl Into<BString>,
@@ -72,4 +74,8 @@ impl PostFileDownloadEvent {
     }
 }
 
-delegate_event_interface_to_inner!(PostFileDownloadEvent, inner);
+delegate_event_interface_to_inner!(
+    PostFileDownloadEvent,
+    inner,
+    "Composer\\Plugin\\PostFileDownloadEvent"
+);

@@ -6,12 +6,12 @@ use shirabe_php_binding_macros::php_entity;
 php_entity! {
     handle: std::rc::Rc<AnyTransaction>,
     expected: "a Transaction",
-    class: |transaction| match &**transaction {
+    class: |transaction| Ok(match &**transaction {
         AnyTransaction::Transaction(_) => br"Composer\DependencyResolver\Transaction",
         AnyTransaction::LocalRepoTransaction(_) => {
             br"Composer\DependencyResolver\LocalRepoTransaction"
         }
-    },
+    }),
     classes: [
         r"Composer\DependencyResolver\Transaction",
         r"Composer\DependencyResolver\LocalRepoTransaction",

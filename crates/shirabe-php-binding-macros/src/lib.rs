@@ -70,8 +70,9 @@ pub fn php_binding(
 /// }
 /// ```
 ///
-/// * `class` is the class the entities cross as, or a closure choosing it from the handle as a
-///   byte string; `classes` then lists every class it chooses from, with their forwarding
+/// * `class` is the class the entities cross as, or a closure choosing it from the handle, as a
+///   byte string in a `Result` whose error is the answer for an entity no class stands for;
+///   `classes` then lists every class it chooses from, with their forwarding
 ///   ancestors.
 /// * `address` computes the entity's identity from the handle, the `Rc` itself by default;
 ///   `clone` and `property` name the hand-written functions answering `__clone` and the

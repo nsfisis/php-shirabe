@@ -1,74 +1,72 @@
 //! The methods a `Composer\IO\IOInterface` entity answers over RPC.
 
-use crate::io::{BufferIO, ConsoleIO, IOInterface, NullIO};
-use crate::php_worker::rpc::entity::{Bindings, Call, Entity};
-use crate::php_worker::rpc::forwarding;
+use crate::io::{
+    __php_binding_buffer_io, __php_binding_io_interface_immutable, BufferIO, IOInterface,
+    IOInterfaceImmutable,
+};
+use crate::php_worker::rpc::entity::Call;
 use bstr::{BString, ByteSlice as _};
-use shirabe_php_rpc::{PhpThrow, RpcValue, ToRpcValue};
-
-impl Entity for std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
-    const EXPECTED: &'static [u8] = b"an IOInterface";
-
-    fn address(&self) -> *const () {
-        std::rc::Rc::as_ptr(self) as *const ()
-    }
-
-    fn class(&self) -> Result<&'static Bindings<Self>, PhpThrow> {
-        let borrowed = self.borrow();
-        let any = borrowed.as_any();
-        if any.is::<BufferIO>() {
-            Ok(&forwarding::io::buffer_io::BINDINGS)
-        } else if any.is::<ConsoleIO>() {
-            Ok(&forwarding::io::console_io::BINDINGS)
-        } else if any.is::<NullIO>() {
-            Ok(&forwarding::io::null_io::BINDINGS)
-        } else {
-            // TODO(plugin): only IO implementations with a generated proxy stub can cross the
-            // boundary; the rest are an explicit error until stubs of their own are generated.
-            Err(PhpThrow::runtime(
-                "no proxy stub class is available for this IO implementation",
-            ))
-        }
-    }
-}
-
-/// Decodes `($messages, bool $newline, int $verbosity)`: `$messages` is a string or a list of
-/// strings in PHP.
-fn write_args(call: &Call<'_>) -> Result<(Vec<BString>, bool, i64), PhpThrow> {
-    let messages = match call.args().first() {
-        Some(RpcValue::String(_)) => vec![call.arg::<BString>(0)?],
-        _ => call.arg::<Vec<BString>>(0)?,
-    };
-    Ok((messages, call.arg::<bool>(1)?, call.arg::<i64>(2)?))
-}
+use shirabe_php_binding_macros::php_entity;
+use shirabe_php_rpc::{PhpThrow, RpcValue};
 
 // TODO(plugin): the remaining IOInterface surface (ask*, authentications, ...) is widened on
 // demand. The ask* methods take `InputValue` defaults and validators, which cannot hold an int or
 // float default, a non-string choice, or a validator returning any other PHP value.
-impl forwarding::io::base_io::Forwarding for forwarding::io::base_io::PhpClass {
-    type Handle = std::rc::Rc<std::cell::RefCell<dyn IOInterface>>;
+php_entity! {
+    handle: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    expected: "an IOInterface",
+    class: |io| io.borrow().php_class().map(|class| class.as_bytes()).ok_or_else(|| {
+        // TODO(plugin): only IO implementations with a generated proxy stub can cross the
+        // boundary; the rest are an explicit error until stubs of their own are generated.
+        PhpThrow::runtime("no proxy stub class is available for this IO implementation")
+    }),
+    classes: [
+        r"Composer\IO\BaseIO",
+        r"Composer\IO\ConsoleIO",
+        r"Composer\IO\NullIO",
+        r"Composer\IO\BufferIO",
+    ],
+    types: {
+        r"Composer\IO\IOInterface": custom messages only [write, writeError],
+        r"Composer\IO\IOInterface": instance __php_binding_io_interface_immutable
+            for dyn IOInterfaceImmutable {
+            via: |io| std::cell::Ref::map(io.borrow(), |io| {
+                io as &(dyn IOInterfaceImmutable + 'static)
+            }),
+        },
+        r"Composer\IO\BufferIO": instance __php_binding_buffer_io for BufferIO {
+            via: |io| std::cell::Ref::map(io.borrow(), |io| {
+                io.as_any()
+                    .downcast_ref::<BufferIO>()
+                    .expect("only a BufferIO crosses as Composer\\IO\\BufferIO")
+            }),
+        },
+    },
+    constructors: {
+        r"Composer\IO\BufferIO": custom construct_buffer_io,
+    },
+}
 
-    fn is_interactive(io: &Self::Handle, _: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
-        Ok(io.borrow().is_interactive().to_rpc_value())
+/// `write()` and `writeError()`, whose `$messages` is a string or a list of strings in PHP.
+mod messages {
+    use crate::io::IOInterface;
+    use crate::php_worker::rpc::entity::Call;
+    use bstr::{BString, ByteSlice as _};
+    use shirabe_php_rpc::{PhpThrow, RpcValue};
+
+    /// Decodes `($messages, bool $newline, int $verbosity)`.
+    fn write_args(call: &Call<'_>) -> Result<(Vec<BString>, bool, i64), PhpThrow> {
+        let messages = match call.args().first() {
+            Some(RpcValue::String(_)) => vec![call.arg::<BString>(0)?],
+            _ => call.arg::<Vec<BString>>(0)?,
+        };
+        Ok((messages, call.arg::<bool>(1)?, call.arg::<i64>(2)?))
     }
 
-    fn is_verbose(io: &Self::Handle, _: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
-        Ok(io.borrow().is_verbose().to_rpc_value())
-    }
-
-    fn is_very_verbose(io: &Self::Handle, _: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
-        Ok(io.borrow().is_very_verbose().to_rpc_value())
-    }
-
-    fn is_debug(io: &Self::Handle, _: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
-        Ok(io.borrow().is_debug().to_rpc_value())
-    }
-
-    fn is_decorated(io: &Self::Handle, _: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
-        Ok(io.borrow().is_decorated().to_rpc_value())
-    }
-
-    fn write(io: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
+    pub(super) fn write(
+        io: &std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        call: &mut Call<'_>,
+    ) -> Result<RpcValue, PhpThrow> {
         let (messages, newline, verbosity) = write_args(call)?;
         let io = io.borrow();
         for message in &messages {
@@ -77,7 +75,10 @@ impl forwarding::io::base_io::Forwarding for forwarding::io::base_io::PhpClass {
         Ok(RpcValue::Null)
     }
 
-    fn write_error(io: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
+    pub(super) fn write_error(
+        io: &std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        call: &mut Call<'_>,
+    ) -> Result<RpcValue, PhpThrow> {
         let (messages, newline, verbosity) = write_args(call)?;
         let io = io.borrow();
         for message in &messages {
@@ -87,49 +88,19 @@ impl forwarding::io::base_io::Forwarding for forwarding::io::base_io::PhpClass {
     }
 }
 
-impl forwarding::io::console_io::Forwarding for forwarding::io::console_io::PhpClass {}
-
-impl forwarding::io::null_io::Forwarding for forwarding::io::null_io::PhpClass {}
-
-fn buffer_io(io: &dyn IOInterface) -> &BufferIO {
-    io.as_any()
-        .downcast_ref::<BufferIO>()
-        .expect("only a BufferIO crosses as Composer\\IO\\BufferIO")
-}
-
-impl forwarding::io::buffer_io::Forwarding for forwarding::io::buffer_io::PhpClass {
-    fn get_output(
-        io: &std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        _: &mut Call<'_>,
-    ) -> Result<RpcValue, PhpThrow> {
-        Ok(RpcValue::string(buffer_io(&*io.borrow()).get_output()))
+// A BufferIO writes into a memory stream of its own and reads from its own string input, so a
+// plugin-built one is a complete instance rather than a second view on the graph's IO.
+fn construct_buffer_io(
+    call: &mut Call<'_>,
+) -> Result<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>, PhpThrow> {
+    // TODO(plugin): an OutputFormatterInterface is a Symfony object the plugin builds in its
+    // own process, and no proxy carries one to the Rust side.
+    if !matches!(call.args().get(2), None | Some(RpcValue::Null)) {
+        return Err(PhpThrow::runtime(
+            "Shirabe does not support passing an output formatter to Composer\\IO\\BufferIO inside the plugin process yet",
+        ));
     }
-
-    fn set_user_inputs(
-        io: &std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        call: &mut Call<'_>,
-    ) -> Result<RpcValue, PhpThrow> {
-        let inputs = call.arg::<Vec<BString>>(0)?;
-        buffer_io(&*io.borrow())
-            .set_user_inputs(inputs)
-            .map_err(call.failed())?;
-        Ok(RpcValue::Null)
-    }
-
-    // A BufferIO writes into a memory stream of its own and reads from its own string input, so a
-    // plugin-built one is a complete instance rather than a second view on the graph's IO.
-    fn __construct(
-        call: &mut Call<'_>,
-    ) -> Result<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>, PhpThrow> {
-        // TODO(plugin): an OutputFormatterInterface is a Symfony object the plugin builds in its
-        // own process, and no proxy carries one to the Rust side.
-        if !matches!(call.args().get(2), None | Some(RpcValue::Null)) {
-            return Err(PhpThrow::runtime(
-                "Shirabe does not support passing an output formatter to Composer\\IO\\BufferIO inside the plugin process yet",
-            ));
-        }
-        let io = BufferIO::new(call.arg::<BString>(0)?, call.arg::<i64>(1)?, None)
-            .map_err(call.failed())?;
-        Ok(std::rc::Rc::new(std::cell::RefCell::new(io)))
-    }
+    let io =
+        BufferIO::new(call.arg::<BString>(0)?, call.arg::<i64>(1)?, None).map_err(call.failed())?;
+    Ok(std::rc::Rc::new(std::cell::RefCell::new(io)))
 }

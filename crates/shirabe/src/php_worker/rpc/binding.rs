@@ -6,12 +6,19 @@
 //! converts the answer after the borrow ends: decoding an argument and registering an entity
 //! the answer names may borrow other entities, or the receiver itself.
 
+use crate::composer::ComposerWeakHandle;
+use crate::event_dispatcher::EventFlags;
 use crate::package::{
     AliasPackageHandle, DisplayMode, Link, Mirror, PackageHandle, PackageInterfaceHandle,
     RootPackageInterfaceHandle,
 };
+use crate::php_worker::job;
+use crate::php_worker::job::JobOwner;
 use crate::php_worker::rpc::entity::{Call, Entity, EntityArg, entity_value};
-use crate::repository::{LockArrayRepositoryHandle, RepositoryInterfaceHandle};
+use crate::plugin::FileDownloadContext;
+use crate::repository::{
+    InstalledRepositoryInterfaceHandle, LockArrayRepositoryHandle, RepositoryInterfaceHandle,
+};
 use crate::util::StreamContextOptions;
 use crate::util::http::Response;
 use bstr::BString;
@@ -129,13 +136,17 @@ impl FromRpcArg for AliasPackageHandle {
     }
 }
 
-/// A Rust return type encoded as the answer of a forwarded call.
+/// A Rust return type encoded as the answer of a forwarded call. `failed` turns an error the
+/// Rust side reports into the `Throw` the call crosses back as (`Call::failed`).
 pub trait IntoRpcAnswer {
-    fn into_rpc_answer(self, call: &Call<'_>) -> Result<RpcValue, PhpThrow>;
+    fn into_rpc_answer(
+        self,
+        failed: &dyn Fn(anyhow::Error) -> PhpThrow,
+    ) -> Result<RpcValue, PhpThrow>;
 }
 
 impl<H: Entity> IntoRpcAnswer for H {
-    fn into_rpc_answer(self, _: &Call<'_>) -> Result<RpcValue, PhpThrow> {
+    fn into_rpc_answer(self, _: &dyn Fn(anyhow::Error) -> PhpThrow) -> Result<RpcValue, PhpThrow> {
         entity_value(&self)
     }
 }
@@ -144,7 +155,7 @@ macro_rules! to_rpc_value_answers {
     ($($ty:ty),* $(,)?) => {
         $(
             impl IntoRpcAnswer for $ty {
-                fn into_rpc_answer(self, _: &Call<'_>) -> Result<RpcValue, PhpThrow> {
+                fn into_rpc_answer(self, _: &dyn Fn(anyhow::Error) -> PhpThrow) -> Result<RpcValue, PhpThrow> {
                     Ok(self.to_rpc_value())
                 }
             }
@@ -167,57 +178,72 @@ to_rpc_value_answers!(
 );
 
 impl IntoRpcAnswer for () {
-    fn into_rpc_answer(self, _: &Call<'_>) -> Result<RpcValue, PhpThrow> {
+    fn into_rpc_answer(self, _: &dyn Fn(anyhow::Error) -> PhpThrow) -> Result<RpcValue, PhpThrow> {
         Ok(RpcValue::Null)
     }
 }
 
 impl<T: IntoRpcAnswer> IntoRpcAnswer for anyhow::Result<T> {
-    fn into_rpc_answer(self, call: &Call<'_>) -> Result<RpcValue, PhpThrow> {
-        self.map_err(call.failed())?.into_rpc_answer(call)
+    fn into_rpc_answer(
+        self,
+        failed: &dyn Fn(anyhow::Error) -> PhpThrow,
+    ) -> Result<RpcValue, PhpThrow> {
+        self.map_err(failed)?.into_rpc_answer(failed)
     }
 }
 
 impl<T: IntoRpcAnswer> IntoRpcAnswer for Option<T> {
-    fn into_rpc_answer(self, call: &Call<'_>) -> Result<RpcValue, PhpThrow> {
+    fn into_rpc_answer(
+        self,
+        failed: &dyn Fn(anyhow::Error) -> PhpThrow,
+    ) -> Result<RpcValue, PhpThrow> {
         match self {
-            Some(value) => value.into_rpc_answer(call),
+            Some(value) => value.into_rpc_answer(failed),
             None => Ok(RpcValue::Null),
         }
     }
 }
 
 impl<T: IntoRpcAnswer> IntoRpcAnswer for Vec<T> {
-    fn into_rpc_answer(self, call: &Call<'_>) -> Result<RpcValue, PhpThrow> {
+    fn into_rpc_answer(
+        self,
+        failed: &dyn Fn(anyhow::Error) -> PhpThrow,
+    ) -> Result<RpcValue, PhpThrow> {
         self.into_iter()
-            .map(|item| item.into_rpc_answer(call))
+            .map(|item| item.into_rpc_answer(failed))
             .collect::<Result<_, _>>()
             .map(RpcValue::List)
     }
 }
 
 impl IntoRpcAnswer for &StreamContextOptions {
-    fn into_rpc_answer(self, _: &Call<'_>) -> Result<RpcValue, PhpThrow> {
+    fn into_rpc_answer(self, _: &dyn Fn(anyhow::Error) -> PhpThrow) -> Result<RpcValue, PhpThrow> {
         Ok(self.clone().to_rpc_value())
     }
 }
 
 /// A list the Rust side lends crosses as a copy.
 impl<T: IntoRpcAnswer + Clone> IntoRpcAnswer for &Vec<T> {
-    fn into_rpc_answer(self, call: &Call<'_>) -> Result<RpcValue, PhpThrow> {
-        self.clone().into_rpc_answer(call)
+    fn into_rpc_answer(
+        self,
+        failed: &dyn Fn(anyhow::Error) -> PhpThrow,
+    ) -> Result<RpcValue, PhpThrow> {
+        self.clone().into_rpc_answer(failed)
     }
 }
 
 /// An `array<string, T>` as PHP shapes it: an empty map crosses as a list, since an empty PHP
 /// array is indistinguishable from an empty list.
 impl<T: IntoRpcAnswer> IntoRpcAnswer for IndexMap<BString, T> {
-    fn into_rpc_answer(self, call: &Call<'_>) -> Result<RpcValue, PhpThrow> {
+    fn into_rpc_answer(
+        self,
+        failed: &dyn Fn(anyhow::Error) -> PhpThrow,
+    ) -> Result<RpcValue, PhpThrow> {
         if self.is_empty() {
             return Ok(RpcValue::List(Vec::new()));
         }
         self.into_iter()
-            .map(|(key, value)| Ok((key, value.into_rpc_answer(call)?)))
+            .map(|(key, value)| Ok((key, value.into_rpc_answer(failed)?)))
             .collect::<Result<_, _>>()
             .map(RpcValue::Array)
     }
@@ -225,41 +251,44 @@ impl<T: IntoRpcAnswer> IntoRpcAnswer for IndexMap<BString, T> {
 
 /// A real package crosses as a package entity.
 impl IntoRpcAnswer for PackageHandle {
-    fn into_rpc_answer(self, _: &Call<'_>) -> Result<RpcValue, PhpThrow> {
+    fn into_rpc_answer(self, _: &dyn Fn(anyhow::Error) -> PhpThrow) -> Result<RpcValue, PhpThrow> {
         entity_value(&PackageInterfaceHandle::from(self))
     }
 }
 
 /// An alias package crosses as a package entity.
 impl IntoRpcAnswer for AliasPackageHandle {
-    fn into_rpc_answer(self, _: &Call<'_>) -> Result<RpcValue, PhpThrow> {
+    fn into_rpc_answer(self, _: &dyn Fn(anyhow::Error) -> PhpThrow) -> Result<RpcValue, PhpThrow> {
         entity_value(&PackageInterfaceHandle::from(self))
     }
 }
 
 /// A `LockArrayRepository` crosses as a repository entity.
 impl IntoRpcAnswer for LockArrayRepositoryHandle {
-    fn into_rpc_answer(self, _: &Call<'_>) -> Result<RpcValue, PhpThrow> {
+    fn into_rpc_answer(self, _: &dyn Fn(anyhow::Error) -> PhpThrow) -> Result<RpcValue, PhpThrow> {
         entity_value(&RepositoryInterfaceHandle::from(self))
     }
 }
 
 impl IntoRpcAnswer for &bstr::BStr {
-    fn into_rpc_answer(self, _: &Call<'_>) -> Result<RpcValue, PhpThrow> {
+    fn into_rpc_answer(self, _: &dyn Fn(anyhow::Error) -> PhpThrow) -> Result<RpcValue, PhpThrow> {
         Ok(self.to_rpc_value())
     }
 }
 
 impl IntoRpcAnswer for chrono::DateTime<chrono::Utc> {
-    fn into_rpc_answer(self, _: &Call<'_>) -> Result<RpcValue, PhpThrow> {
+    fn into_rpc_answer(self, _: &dyn Fn(anyhow::Error) -> PhpThrow) -> Result<RpcValue, PhpThrow> {
         Ok(self.to_rpc_value())
     }
 }
 
 /// A map the Rust side shares between readers crosses as a copy.
 impl<T: IntoRpcAnswer + Clone> IntoRpcAnswer for std::rc::Rc<IndexMap<BString, T>> {
-    fn into_rpc_answer(self, call: &Call<'_>) -> Result<RpcValue, PhpThrow> {
-        std::rc::Rc::unwrap_or_clone(self).into_rpc_answer(call)
+    fn into_rpc_answer(
+        self,
+        failed: &dyn Fn(anyhow::Error) -> PhpThrow,
+    ) -> Result<RpcValue, PhpThrow> {
+        std::rc::Rc::unwrap_or_clone(self).into_rpc_answer(failed)
     }
 }
 
@@ -295,4 +324,122 @@ const fn bytes_eq(a: &[u8], b: &[u8]) -> bool {
         index += 1;
     }
     true
+}
+
+/// What a job a forwarded call starts is registered with, besides its future: see
+/// `job::register`.
+pub(crate) struct JobContext {
+    pub(crate) owner: JobOwner,
+    pub(crate) owner_entity: std::rc::Rc<dyn std::any::Any>,
+    pub(crate) canceled: PhpThrow,
+}
+
+impl std::fmt::Debug for JobContext {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("JobContext")
+            .field("owner", &self.owner)
+            .finish_non_exhaustive()
+    }
+}
+
+/// A route whose `async fn` methods answer with a promise: the job each call starts.
+pub(crate) trait JobReceiver {
+    fn job(&self, call: &Call<'_>) -> Result<JobContext, PhpThrow>;
+}
+
+/// Registers the future an `async fn` adapter built as a job, and answers with its promise.
+pub(crate) fn register_job(
+    job: JobContext,
+    future: impl FnOnce(
+        std::rc::Rc<std::cell::Cell<bool>>,
+    ) -> std::pin::Pin<
+        Box<dyn std::future::Future<Output = Result<RpcValue, PhpThrow>>>,
+    >,
+) -> RpcValue {
+    let started = std::rc::Rc::new(std::cell::Cell::new(false));
+    job::register(
+        job.owner,
+        job.owner_entity,
+        started.clone(),
+        job.canceled,
+        future(started),
+    )
+}
+
+/// Whether one handle forwards both an `async fn` and a `&mut self` method: the former holds its
+/// borrow of the receiver across `.await`, where the RPC session can re-enter the latter.
+pub const fn mixes_async_and_mut(kinds: &[(bool, bool)]) -> bool {
+    let mut has_async = false;
+    let mut has_mut = false;
+    let mut index = 0;
+    while index < kinds.len() {
+        has_async |= kinds[index].0;
+        has_mut |= kinds[index].1;
+        index += 1;
+    }
+    has_async && has_mut
+}
+
+/// A shared entity the Rust side lends crosses as itself.
+impl<T: ?Sized> IntoRpcAnswer for &std::rc::Rc<T>
+where
+    std::rc::Rc<T>: Entity,
+{
+    fn into_rpc_answer(self, _: &dyn Fn(anyhow::Error) -> PhpThrow) -> Result<RpcValue, PhpThrow> {
+        entity_value(self)
+    }
+}
+
+impl IntoRpcAnswer for &std::path::Path {
+    fn into_rpc_answer(self, _: &dyn Fn(anyhow::Error) -> PhpThrow) -> Result<RpcValue, PhpThrow> {
+        Ok(self.to_rpc_value())
+    }
+}
+
+/// A map the Rust side lends crosses as a copy.
+impl<T: IntoRpcAnswer + Clone> IntoRpcAnswer for &IndexMap<BString, T> {
+    fn into_rpc_answer(
+        self,
+        failed: &dyn Fn(anyhow::Error) -> PhpThrow,
+    ) -> Result<RpcValue, PhpThrow> {
+        self.clone().into_rpc_answer(failed)
+    }
+}
+
+/// An event's flags cross as the array PHP keeps them in.
+impl IntoRpcAnswer for &EventFlags {
+    fn into_rpc_answer(self, _: &dyn Fn(anyhow::Error) -> PhpThrow) -> Result<RpcValue, PhpThrow> {
+        Ok(PhpMixed::Array(self.to_php_array()).to_rpc_value())
+    }
+}
+
+/// The `$composer` of a script, package or installer event.
+impl IntoRpcAnswer for &ComposerWeakHandle {
+    fn into_rpc_answer(self, _: &dyn Fn(anyhow::Error) -> PhpThrow) -> Result<RpcValue, PhpThrow> {
+        let composer = self
+            .upgrade()
+            .ok_or_else(|| PhpThrow::runtime("the Composer instance of this event is gone"))?;
+        entity_value(&composer)
+    }
+}
+
+/// An installed repository crosses as a repository entity.
+impl IntoRpcAnswer for InstalledRepositoryInterfaceHandle {
+    fn into_rpc_answer(self, _: &dyn Fn(anyhow::Error) -> PhpThrow) -> Result<RpcValue, PhpThrow> {
+        entity_value(&self.as_repository_handle())
+    }
+}
+
+/// The `$context` of a file download event as the PHP value the event stub returns.
+impl IntoRpcAnswer for &FileDownloadContext {
+    fn into_rpc_answer(self, _: &dyn Fn(anyhow::Error) -> PhpThrow) -> Result<RpcValue, PhpThrow> {
+        match self {
+            FileDownloadContext::Package(package) => entity_value(package),
+            // TODO(plugin): the array a repository passes names the repository itself, which
+            // cannot cross the boundary yet.
+            FileDownloadContext::Repository => Err(PhpThrow::runtime(
+                "the repository context of a file download event is not available over RPC yet",
+            )),
+        }
+    }
 }

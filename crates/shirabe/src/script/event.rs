@@ -6,6 +6,7 @@ use crate::event_dispatcher::{
 };
 use crate::io::IOInterface;
 use bstr::BString;
+use shirabe_php_binding_macros::php_binding;
 
 #[derive(Debug)]
 pub struct Event {
@@ -22,6 +23,7 @@ pub enum OriginatingEvent {
     Script(Box<Event>),
 }
 
+#[php_binding(r"Composer\Script\Event", members = instance)]
 impl Event {
     pub fn new(
         name: impl Into<BString>,
@@ -52,10 +54,12 @@ impl Event {
         self.dev_mode
     }
 
+    #[php(skip)]
     pub fn get_originating_event(&self) -> Option<&OriginatingEvent> {
         self.originating_event.as_ref()
     }
 
+    #[php(skip)]
     pub fn set_originating_event(&mut self, event: OriginatingEvent) -> &mut Self {
         self.originating_event = Some(Self::calculate_originating_event(event));
         self
@@ -74,7 +78,7 @@ impl Event {
     }
 }
 
-delegate_event_interface_to_inner!(Event, inner);
+delegate_event_interface_to_inner!(Event, inner, "Composer\\Script\\Event");
 
 impl EventInterface for OriginatingEvent {
     fn as_any(&self) -> &dyn std::any::Any {
@@ -83,6 +87,11 @@ impl EventInterface for OriginatingEvent {
 
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
         self
+    }
+
+    // A Rust-side wrapper of the event a script event was dispatched for, with no proxy stub.
+    fn php_class(&self) -> Option<&'static bstr::BStr> {
+        None
     }
 
     fn get_name(&self) -> &bstr::BStr {

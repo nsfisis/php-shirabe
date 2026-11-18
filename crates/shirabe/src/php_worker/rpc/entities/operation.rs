@@ -14,7 +14,7 @@ use shirabe_php_binding_macros::php_entity;
 php_entity! {
     handle: std::rc::Rc<AnyOperation>,
     expected: "an operation",
-    class: |operation| match &**operation {
+    class: |operation| Ok(match &**operation {
         AnyOperation::Install(_) => br"Composer\DependencyResolver\Operation\InstallOperation",
         AnyOperation::Update(_) => br"Composer\DependencyResolver\Operation\UpdateOperation",
         AnyOperation::Uninstall(_) => {
@@ -26,7 +26,7 @@ php_entity! {
         AnyOperation::MarkAliasUninstalled(_) => {
             br"Composer\DependencyResolver\Operation\MarkAliasUninstalledOperation"
         }
-    },
+    }),
     classes: [
         r"Composer\DependencyResolver\Operation\SolverOperation",
         r"Composer\DependencyResolver\Operation\InstallOperation",

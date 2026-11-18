@@ -6,6 +6,7 @@ use crate::package::BasePackageHandle;
 use crate::repository::RepositoryInterfaceHandle;
 use bstr::BString;
 use indexmap::IndexMap;
+use shirabe_php_binding_macros::php_binding;
 
 #[derive(Debug)]
 pub struct PrePoolCreateEvent {
@@ -22,6 +23,7 @@ pub struct PrePoolCreateEvent {
     unacceptable_fixed_packages: Vec<BasePackageHandle>,
 }
 
+#[php_binding(r"Composer\Plugin\PrePoolCreateEvent", members = instance)]
 impl PrePoolCreateEvent {
     pub fn get_name(&self) -> &bstr::BStr {
         self.inner.get_name()
@@ -56,6 +58,7 @@ impl PrePoolCreateEvent {
         &self.repositories
     }
 
+    #[php(skip)]
     pub fn get_request(&self) -> &Request {
         &self.request
     }
@@ -106,4 +109,8 @@ impl PrePoolCreateEvent {
     }
 }
 
-delegate_event_interface_to_inner!(PrePoolCreateEvent, inner);
+delegate_event_interface_to_inner!(
+    PrePoolCreateEvent,
+    inner,
+    "Composer\\Plugin\\PrePoolCreateEvent"
+);

@@ -27,14 +27,14 @@ php_entity! {
     handle: PackageInterfaceHandle,
     expected: "a package",
     address: |package| std::rc::Rc::as_ptr(package.as_rc()) as *const (),
-    class: |package| match &*package.as_rc().borrow() {
+    class: |package| Ok(match &*package.as_rc().borrow() {
         AnyPackage::Package(_) => br"Composer\Package\Package",
         AnyPackage::CompletePackage(_) => br"Composer\Package\CompletePackage",
         AnyPackage::RootPackage(_) => br"Composer\Package\RootPackage",
         AnyPackage::AliasPackage(_) => br"Composer\Package\AliasPackage",
         AnyPackage::CompleteAliasPackage(_) => br"Composer\Package\CompleteAliasPackage",
         AnyPackage::RootAliasPackage(_) => br"Composer\Package\RootAliasPackage",
-    },
+    }),
     classes: [
         r"Composer\Package\BasePackage",
         r"Composer\Package\Package",

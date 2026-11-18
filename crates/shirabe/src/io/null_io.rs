@@ -2,7 +2,7 @@
 
 use crate::config::Config;
 use crate::io::{BaseIO, IOInterface, IOInterfaceImmutable, IOInterfaceMutable};
-use bstr::BString;
+use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe_symfony_console::input::InputValue;
 
@@ -163,6 +163,10 @@ impl IOInterfaceMutable for NullIO {
 impl IOInterface for NullIO {
     fn as_any(&self) -> &dyn std::any::Any {
         self
+    }
+
+    fn php_class(&self) -> Option<&'static BStr> {
+        Some(BStr::new("Composer\\IO\\NullIO"))
     }
 
     fn as_base_io_mut(&mut self) -> Option<&mut dyn BaseIO> {

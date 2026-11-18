@@ -508,6 +508,10 @@ impl IOInterface for ConsoleIO {
         self
     }
 
+    fn php_class(&self) -> Option<&'static BStr> {
+        Some(BStr::new("Composer\\IO\\ConsoleIO"))
+    }
+
     fn as_base_io_mut(&mut self) -> Option<&mut dyn BaseIO> {
         Some(self)
     }
