@@ -339,7 +339,7 @@ impl FilesystemRepository {
             // make sure the in memory state is up to date with on disk
             // The upstream in-process reload/selfDir/installedIsLocalDir tail is pushed to the
             // PHP worker, where the real observers (plugins) live.
-            installed_versions::reload(versions, &repo_dir)?;
+            installed_versions::push_installed(versions, &repo_dir)?;
         }
 
         Ok(())

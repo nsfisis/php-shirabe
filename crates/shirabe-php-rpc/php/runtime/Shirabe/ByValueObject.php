@@ -9,31 +9,14 @@
 // CLASSES is the whole vocabulary that may cross this way: it is both the set of classes handed
 // to `serialize()` in place of a handle, and, together with the handle classes,
 // the `allowed_classes` list every frame payload is unserialized under
-// (`Shirabe\RpcRuntime::unserializePayload`), so a payload can never name another class.
+// (`Shirabe\RpcRuntime::unserializePayload`), so a payload can never name another class. It is
+// generated from the classifier report (Shirabe\ByValueClasses).
 
 namespace Shirabe;
 
-use Composer\ClassMapGenerator\ClassMap;
-use Composer\Package\Link;
-use Composer\Semver\Constraint\Constraint;
-use Composer\Semver\Constraint\MatchAllConstraint;
-use Composer\Semver\Constraint\MatchNoneConstraint;
-use Composer\Semver\Constraint\MultiConstraint;
-use Composer\Util\Http\Response;
-
 final class ByValueObject
 {
-    public const CLASSES = [
-        Link::class,
-        Constraint::class,
-        MultiConstraint::class,
-        MatchAllConstraint::class,
-        MatchNoneConstraint::class,
-        Response::class,
-        ClassMap::class,
-        \DateTimeImmutable::class,
-        \DateTime::class,
-    ];
+    public const CLASSES = ByValueClasses::CLASSES;
 
     /**
      * The object to serialize into a frame payload in place of $value, or null when the Rust side

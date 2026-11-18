@@ -2,236 +2,85 @@
 
 ## Purpose
 
-Shirabe's plugin mechanism runs Composer plugins as real PHP code in a child
-process, connected to the Rust core by a bidirectional RPC channel. The
-entity of each object is fixed to one side: the Composer object graph lives
-in Rust and is proxied into the child process as thin same-FQCN stub
-classes, while code that shares no state with the graph is loaded into the
-child as the real PHP implementation. This document defines, for *every*
-class in composer/composer and its vendor dependencies, which treatment it
-receives — and defines the decision as a deterministic procedure, so that
-new or rewritten classes in future Composer releases are classified the same
-way without a human re-deriving the design.
+Shirabe's plugin mechanism runs Composer plugins as real PHP code in a child process (the
+worker), connected to the Rust core by a bidirectional RPC channel. For every class of
+composer/composer and its vendor dependencies, something has to decide what the worker puts at
+that FQCN — a generated proxy stub, a hand-written class, the real source, or a guard that raises
+an explicit error — and what the Rust side has to answer for it.
 
-The classification decides three practical things per class:
+The classifier (`scripts/plugin-class-classifier/`) makes that decision for every class, from two
+sources of truth only:
 
-* what the stub generator must emit for the PHP child process (proxy stub,
-  snapshot class, real source passthrough, or nothing),
-* what the Rust side must reproduce with full fidelity (method set, argument
-  order, class hierarchy, subclassing behavior) versus where internal
-  refactoring is free,
-* which classes need a reverse adapter so that plugin-provided objects can be
-  called back from Rust.
+* the Composer sources (`composer/src/Composer` and the vendor packages), and
+* a few input files under `scripts/plugin-class-classifier/inputs/`.
 
-A small, versioned exception list is permitted. Everything not on it must be
-decided by the rules below, from the PHP sources alone.
+It writes the outcome to `scripts/plugin-class-classifier/report.json`, and everything else is
+generated from that report: the proxy stubs and guards the worker loads, the list of classes that
+cross by value, and the Rust tables of forwarded members, codecs and pushed static state (see
+[plugin-stub-generation.md](./plugin-stub-generation.md)). Neither the classifier nor the
+generator reads the implementation to decide a treatment — not the files under `php/runtime/`,
+not the Rust impls, not any hand-written list. Whether the implementation agrees with the report
+is checked instead, and on the Rust side the check is the compiler: the generated code names
+every hand-written function the report requires.
 
-## Classification output
+The procedure is deterministic, so a class a future Composer release adds or rewrites is
+classified without a human re-deriving the design.
 
-### Categories
+## Values and treatments
 
-Every class or interface that can appear at the plugin boundary is assigned
-exactly one category.
+Each class gets two properties.
 
-| Category | Entity lives | PHP child process sees | Rust obligation |
-|---|---|---|---|
-| `rust-proxy` | Rust | generated proxy stub (methods RPC to Rust) | full-fidelity reproduction; every public/protected method needs an RPC handler |
-| `rust-snapshot` | Rust | the real class, revived from the object record a frame carries (no handle, getters answer locally) | full-fidelity reproduction; both halves of the value codec |
-| `contract` | n/a (interface / abstract type) | generated declaration preserving the `extends`/`implements` hierarchy | depends on direction attributes |
-| `two-world` | both, independent siblings | the real PHP implementation (same FQCN, re-defined or vendor-loaded) | independent Rust implementation; only the seam objects (composer / io / dispatcher) are shared |
-| `php-native` | PHP | the real, unmodified PHP source | none — Rust may or may not have its own port for internal use, and that port is free to diverge in shape |
-| `unsupported` | n/a | nothing; any reference raises an explicit error | none, until explicitly promoted |
+### Value
 
-A Rust-owned class the child has no artifact for — every `unsupported` one, and
-every `rust-proxy`/`rust-snapshot` one whose stub is not written yet — is
-shadowed there by a generated *guard* class instead of the real Composer source:
-same FQCN, hierarchy and constants, every constructor and method an explicit
-error. See [docs/dev/plugin-stub-generation.md](./plugin-stub-generation.md).
+The value says where the instances of a class live, assuming Shirabe were 100% compatible with
+Composer. Whether the Rust side implements the class yet, and whether the class is an explicit
+error today, never changes its value.
 
-#### rust-proxy
+| Value | Where an instance lives | Default treatment |
+|---|---|---|
+| `rust-handle` | the Rust side; the worker holds a handle | `stub` |
+| `rust-value` | nowhere in particular: the value is copied to both sides | `by-value` |
+| `worker` | the worker | `real` |
+| `refused` | — | `guard` |
 
-The living services: `Composer`, `Config`, `RepositoryManager`,
-`InstallationManager`, `EventDispatcher`, `Locker`, `PluginManager`,
-`DownloadManager`, `ArchiveManager`, `HttpDownloader`, the
-`IOInterface` implementations, and the Event objects passed to listeners.
-State sharing is their essence; every method call round-trips to the Rust
-entity. Not all of them have a stub; those without one are guarded.
-`Composer\EventDispatcher\Event` and `Composer\Plugin\PreCommandRunEvent`
-are dual-mode: an instance revived from a Rust entity handle forwards over RPC,
-while one constructed in the worker runs natively (see "Dual
-instantiation").
+* Only classes and enums have a value; interfaces and traits have none (`null` in the report).
+  An abstract class has a value like any other class.
+* The value does not say whether the class works with the Rust side. A `worker` class may be held
+  by the Rust side through a PHP entity handle (`RemoteFilesystem`), or have its static state
+  pushed from the Rust side (`InstalledVersions`, `ErrorHandler`). The first is a matter of the
+  handlers of the members involved (see "What the classification does not decide"); the second
+  is covered by "Shared state".
+* Vendor packages are handled as a whole: symfony/console is two-world, every other package is
+  `worker`. The vendor and builtin classes that cross by value (the composer/semver constraints,
+  `ClassMap`, `DateTime`, `DateTimeImmutable`) get `rust-value` from `overrides.json`, since the
+  rules never look at single vendor classes.
+* `refused` records a decision to give up compatibility for a class. Only `overrides.json` can
+  give it, and no class has it today.
 
-#### rust-snapshot
+### Treatment
 
-Immutable value objects, e.g. `Link` and the security-advisory family. A
-value has no entity to point at, so it gets no handle and no stub: a frame
-carries the object record `serialize()` writes for it, `unserialize()`
-revives a genuine instance of the real class without running a constructor,
-and getters answer locally with zero round-trips. Identity is not preserved
-— two calls of the same getter yield two objects in the child (see
-[docs/dev/php-rpc.md](./php-rpc.md)). Only the classes on the codec's closed
-list are sent this way today (`Link` and the `composer/semver` constraints it
-holds, and `Composer\Util\Http\Response`); the rest of the category has no
-artifact yet and is guarded.
+The treatment says what the worker puts at the FQCN.
 
-`Response` is on the list by `overrides.list` entry rather than by the
-value-object rule, which rejects it because `collect()` assigns to `$this`.
-The entity it would otherwise need does not exist: a response is built for
-one request and the graph never retains it, and `collect()` frees the copy
-each side holds, which is what that method is for. Two of its members do
-not work from the child even so: `decodeJson()` reaches
-`Composer\Json\JsonFile`, which a guard shadows, and Composer answers a
-curl request with the `CurlResponse` subclass where this port flattens the
-value into a `Response` before it leaves `HttpDownloader`.
+| Treatment | What the worker defines |
+|---|---|
+| `stub` | a generated proxy stub |
+| `runtime` | a hand-written class under `crates/shirabe-php-rpc/php/runtime/` |
+| `by-value` | the real class, listed in `Shirabe\ByValueClasses` and carried as an object record |
+| `real` | the real class |
+| `guard` | a generated guard |
 
-#### contract
-
-Interfaces and abstract classes themselves; concrete classes get one of the
-other categories. A contract's *direction* decides the artifacts: a
-`provided` contract (instances flow Rust→PHP) needs the PHP declaration so
-`instanceof` works; a `consumed` contract (plugins implement it and Composer
-calls it back: `PluginInterface`, `EventSubscriberInterface`,
-`InstallerInterface`, `Capability` and its descendants) additionally needs a
-Rust-side reverse adapter that wraps a PHP object handle and implements the
-corresponding Rust trait. Contracts can be both (`InstallerInterface` is
-registered by plugins *and* returned by
-`InstallationManager::getInstaller()`).
-
-The Rust traits behind consumed contracts whose only implementor is the
-adapter for a PHP plugin are fallible: `EventSubscriberInterface::
-get_subscribed_events`, `Capable::get_capabilities` and
-`CommandProvider::get_commands` return `anyhow::Result`, so an exception the
-plugin throws propagates instead of degrading to an empty subscription list
-or capability map. `get_subscribed_events` takes `&self` although the PHP
-method is static, because the plugin's class is known only at run time.
-`PluginManager::getPluginCapability` builds the capability in the worker
-and wraps it in the adapter for its interface.
-
-For abstract *classes* with concrete state and bodies (`BaseIO`,
-`BasePackage`) a declaration-only stub is not enough: real plugins subclass
-them relying on the inherited behavior, so the stub must carry the concrete
-members (proxy-dispatched or operating on snapshot state) — the per-method
-rows in the report cover exactly these members. Concrete base classes plugins
-subclass whose instances only the plugin constructs, such as
-`LibraryInstaller`, are instead exempted from guarding
-(`scripts/plugin-stub-generator/guard-exemptions.list`): the worker runs the
-real implementation over the proxy stubs of the services it holds, and the
-Rust side reaches the instance through the `InstallerInterface` adapter.
-
-#### two-world
-
-An exception-list category (it cannot be inferred from the sources):
-`Composer\Console\*`, `Composer\Command\*`, the whole symfony/console
-package, and `Composer\Util\Loop` / `Composer\Util\SyncHelper`. Each side runs its own full implementation; instances do not cross
-the boundary.
-
-#### php-native
-
-The pure type definitions of the plugin API (`composer-plugin-api`), the
-stateless utility classes (`Platform\Version`, `ClassMapGenerator`, …),
-exception classes, constants-only classes, the state-decoupled vendor packages
-(composer/pcre, composer/semver, seld/jsonlint, justinrainbow/json-schema,
-…) — and *reachable* classes that are stateless and pure (`VersionParser`,
-`Auditor`, `Platform\Runtime`): with no instance state to share, the real
-code answers identically on both sides, and a snapshot would have nothing
-to copy.
-
-#### unsupported
-
-Not a design failure; it applies the principle of never trading accuracy
-away silently to classes nobody has needed yet. Plugins touching them get an
-explicit error, and the class can be promoted later.
-
-### Attributes
-
-Categories alone are not enough for the stub generator. The classifier also
-emits per-class and per-method attributes.
-
-#### direction
-
-`provided` / `consumed` / both: whether instances flow Rust→PHP (return
-positions, event getters, callback arguments) or PHP→Rust (parameter
-positions of methods on shared objects, plugin-implemented contracts).
-Drives which side needs stubs and which needs adapters.
-
-#### plugin-constructible
-
-A non-abstract class with a public constructor that is also reachable from
-the graph (e.g. `JsonFile`, obtainable via `Locker::getJsonFile()` *and*
-freely `new`ed by plugins). These need a constructor story on the stub (the
-stub constructor sends a `NewObject` to the Rust side, which allocates the
-entity and answers with its handle); the classifier surfaces them because they are individually
-design-sensitive.
-
-#### mutable-static
-
-The class writes to `static` properties. Sub-classified by the disposition
-list (see exception lists): `memo-cache` (pure memoization, each side may
-compute its own: `Git::$version`, `Hg`, `Svn`, …), `seed-once`
-(copied from the Rust side once at child startup; nothing is filed this way
-today), `needs-sync` (genuinely shared process state: `Platform`'s env table,
-`ProcessExecutor::$timeout`), or `needs-review` (default for newly appearing
-ones — the run fails loudly until a human files it).
-
-A `needs-sync` static is not actually synced by copying it: the child holds no
-copy at all, because the stub forwards the accessors that read and write it
-(as a `CallStaticMethod`, see [docs/dev/plugin-stub-generation.md](./plugin-stub-generation.md)) where a
-stub exists (`ProcessExecutor`); a `needs-sync` class without a stub is
-guarded. The disposition records that the state is shared, not the
-mechanism.
-
-#### throwable
-
-Subclasses of `\Throwable`. These always need a real PHP class definition in
-the child (so `catch`/`instanceof` work) regardless of category, and a mapping to and
-from the fields of the `Throw` message.
-
-#### pure/mutator (per method)
-
-Feeds the stateless-pure and value-object tests of the decision procedure
-(steps 6 and 7 below). A method is a
-mutator iff it assigns to `$this->…` (directly, via compound assignment,
-`unset`, increment), passes a `$this`-rooted expression into a by-reference
-parameter position (builtin signatures resolved from
-jetbrains/phpstorm-stubs; `&` read syntactically for user-land signatures),
-or transitively calls a mutator on the same object. Statically unresolvable
-calls (dynamic method names, `call_user_func` and other
-callback-forwarding builtins receiving `$this`) are conservatively
-mutators.
-
-#### by-ref parameters
-
-Positions of `&$param` in public methods (the positions the protocol's
-out-params are keyed by).
-
-#### callable parameters
-
-Positions whose native type is `callable` or `\Closure`
-(`IOInterface::askAndValidate`, promise callbacks). These are the places
-the callback-handle machinery must cover; the stub generator gets an
-explicit signal instead of discovering them at runtime.
-
-#### public static properties
-
-On proxied/snapshotted classes (`FileDownloader::$downloadMetadata`,
-`Config::$defaultConfig`). PHP has no `__getStatic`, so a stub cannot
-intercept static property access — each one needs an explicit decision
-(materialize as a constant initializer when immutable, push-sync or
-explicit-error when mutable).
+The treatment starts as the default of the value, `forced.json` overrides it, and the guard
+propagation (below) applies last. Interfaces and traits are always `real`. A two-world class is
+`real` or `runtime`; only some of its members run in the worker.
 
 ## The decision procedure
 
-The classifier runs the following pipeline. Every step is deterministic; the
-only free inputs are the versioned exception lists.
-
 ### Inputs
 
-The parsed sources of `composer/src/Composer`, plus the vendor packages
-named in composer/composer's `require`. Vendor packages are first classified
-as a whole (see the vendor rule under "Unreachable types"); only
-symfony/console and react/promise need class-level treatment.
-`Composer\PHPStan\*` is excluded entirely: dev-only tooling, never shipped
-at runtime.
+The parsed sources of `composer/src/Composer`, plus the vendor packages named in
+composer/composer's `require`, applied at package granularity
+(`src/VendorPackages.php`). `Composer\PHPStan\*` is excluded: dev-only tooling, never shipped at
+runtime.
 
 ### Seed set
 
@@ -244,413 +93,514 @@ The boundary starts where Composer hands objects to plugin code:
 Nothing else is seeded by hand: `Composer` itself enters through
 `PluginInterface::activate(Composer, IOInterface)`, `BaseCommand` through
 `CommandProvider::getCommands()`, `InstallerInterface` through
-`InstallationManager::addInstaller()` once `InstallationManager` is reached,
-and so on.
+`InstallationManager::addInstaller()` once `InstallationManager` is reached, and so on.
 
 ### Reachability closure
 
 For every type `T` in the set, add:
 
-* class-typed native parameter and return types of `T`'s public and protected
-  methods (including inherited ones),
-* element types from `@param` / `@return` / `@var` docblocks where the native
-  type is `array`, `iterable`, `mixed`, `object`, or absent (Composer's
-  PHPStan-checked docblocks make this reliable),
-* types of `T`'s public and protected properties (a plugin subclassing
-  `LibraryInstaller` sees `$this->downloadManager`),
+* class-typed native parameter and return types of `T`'s public and protected methods (including
+  inherited ones),
+* element types from `@param` / `@return` / `@var` docblocks where the native type is `array`,
+  `iterable`, `mixed`, `object`, or absent (Composer's PHPStan-checked docblocks make this
+  reliable),
+* types of `T`'s public and protected properties (a plugin subclassing `LibraryInstaller` sees
+  `$this->downloadManager`),
 * `@throws` types,
 * `T`'s ancestors (parent classes and interfaces),
-* when `T` is an interface or abstract class: every concrete subtype declared
-  in the inputs (any of them can be the runtime instance behind the
-  abstraction).
+* when `T` is an interface or abstract class: every concrete subtype declared in the inputs (any of
+  them can be the runtime instance behind the abstraction).
 
-Iterate to a fixed point. Private members and method bodies do not extend the
-closure — the boundary is the declared API surface, not the implementation.
-Two-world classes do not extend it either: the child process carries their
-real implementation wholesale, so a `Command` subclass's protected fields are
-local to the PHP side, not graph seams.
+Iterate to a fixed point. Private members and method bodies do not extend the closure — the
+boundary is the declared API surface, not the implementation. Two-world classes do not extend it
+either: the worker carries their real implementation wholesale, so a `Command` subclass's protected
+fields are local to the PHP side, not graph seams.
 
 ### Direction marking
 
-During the closure, propagate direction: on a `provided` type, plugins call
-the methods — parameter types become `consumed`, return/throws types become
-`provided`. The inverse expansion (parameters `provided`, returns
-`consumed`) models Composer calling the plugin's implementation, and
-therefore applies **only to plugin-implementable types** (interfaces and
-abstract classes) marked `consumed`. A concrete class also gains a
-`consumed` mark when it appears in a parameter position (a plugin can
-construct one and pass it in), but its method bodies are still Composer's
-own, so it always expands provided-style. Without this restriction nearly
-every direction degenerates to `both` through self-feedback.
+During the closure, propagate direction: on a `provided` type, plugins call the methods —
+parameter types become `consumed`, return/throws types become `provided`. The inverse expansion
+(parameters `provided`, returns `consumed`) models Composer calling the plugin's implementation,
+and therefore applies only to plugin-implementable types (interfaces and abstract classes) marked
+`consumed`. A concrete class also gains a `consumed` mark when it appears in a parameter position
+(a plugin can construct one and pass it in), but its method bodies are still Composer's own, so it
+always expands provided-style. Without this restriction nearly every direction degenerates to
+`both` through self-feedback.
 
-### Categories for reachable types
+### Values of reachable classes
 
 Assigned in order:
 
-1. On the two-world exception list → `two-world`.
-2. Subclass of `\Throwable` → `php-native` with the `throwable` attribute
-   (exception classes are flat data; the child gets real definitions, a
-   frame carries them by value).
-3. Interface or abstract class → `contract` (+ direction attributes). This
-   outranks the constants-only rule below: a marker interface such as
-   `Capability` still needs direction attributes.
-4. Constants-only class (no methods, no properties, no hierarchy:
-   `ScriptEvents`, `PluginEvents`, …) → `php-native`; the definition is
-   pure data.
-5. Belongs to a vendor package classified `php-native` as a whole → the
-   type is `php-native` (its appearance in signatures does not force a proxy;
-   instances are plain values or PHP-local objects). react/promise is the
-   exception: `PromiseInterface` is a `contract` bridged to Rust promises.
-6. Stateless pure class → `php-native`: no instance property anywhere in
-   the hierarchy, every public/protected instance method `pure` per the
-   purity analysis, and the method bodies are locally satisfiable (they
-   construct nothing that will be a proxied service). With no state to
-   share there is nothing to proxy or snapshot; the real code, run against
-   injected proxies, behaves identically on both sides. This catches
-   `VersionParser`, `Auditor`, `Platform\Runtime`, `NoopInstaller`.
-7. Value-object test → `rust-snapshot`: same purity and body-locality
-   conditions, plus (a) at least one instance property (something to
-   copy), and (b) no property — including inherited ones — and no
-   constructor parameter typed as a blocking type (a reachable type that is
-   not itself a candidate, a throwable, or a php-native vendor type). The
-   candidate sets grow as one fixed point, and after the unreachable pass
-   below, candidates whose bodies reference `unsupported` classes are
-   demoted and everything reruns until stable. This is a strict *immutable
-   value object* detector: it finds `Link` and the advisory family — but
-   not `Package`/`CompletePackage`, which carry setters and a
-   `RepositoryInterface` back-reference (see "Known deviations").
-8. Everything else → `rust-proxy`.
+1. Listed in `two-world.json` → `worker`.
+2. Subclass of `\Throwable` → `worker`, with the `throwable` attribute. Exceptions are thrown and
+   caught where they are raised, and cross as a throwable record.
+3. Constants-only class (no methods, no properties, no hierarchy: `ScriptEvents`, `PluginEvents`,
+   …) → `worker`; the definition is pure data.
+4. Stateless pure class → `worker`: no instance property anywhere in the hierarchy, every
+   public/protected instance method `pure` per the purity analysis, and the method bodies are
+   locally satisfiable (they construct nothing that is a reachable class with shared state). With no
+   state to share, the real code, run against the stubs it is given, answers identically on both
+   sides. This catches `VersionParser`, `Auditor`, `Platform\Runtime`, `NoopInstaller`.
+5. Value object → `rust-value`: the same purity and body-locality conditions, plus at least one
+   instance property (something to copy), and no property — including inherited ones — and no
+   constructor parameter typed as a blocking type (a reachable type that is not itself a candidate
+   or a throwable, or a vendor type whose package holds living objects: react/promise,
+   symfony/console). The candidate sets of steps 4 and 5 grow as one fixed point. This is a strict
+   immutable-value detector: it finds `Link` and the advisory family, but not
+   `Package`/`CompletePackage`, which carry setters and a `RepositoryInterface` back-reference.
+6. Everything else → `rust-handle`.
 
-### Unreachable types
+Abstract classes go through the same steps; those with state end up `rust-handle` (`BaseIO`,
+`BasePackage`, `SolverOperation`, `Rule`, `ArchiveDownloader`, `VcsDownloader`, `VcsDriver`).
+Step 6 is a fall-through, so the reachable solver internals and VCS drivers are `rust-handle` too.
+With full compatibility as the goal, plugins can touch instances of them, so that is the right
+value; which of them gets a stub first is a priority the classification does not decide.
 
-Classes never touched by the closure are not part of the shared graph, but
-plugins may still reference them (`Composer\Platform\Version`,
-`Composer\Script\ScriptEvents`, any vendor helper). The rule is a leaf-first fixed
-point over *hard* body references — `new X`, `X::method()`, writes to
-`X::$prop` — while `instanceof`, `catch`, and `X::class` are satisfied by a
-mere declaration and never demote.
+### Values of unreachable classes
 
-What a hard reference may legally target from real PHP running in the child
-process:
+A class the closure never reaches is `worker`. No instance the Rust side owns ever reaches plugin
+code through the API, so whatever instance exists is one the worker made. If such a class's real
+code constructs a `rust-handle` class whose stub constructor builds a Rust-side entity, the result
+is the entity the Rust side would hold, not a second, unconnected instance. A class whose real code
+cannot run in the worker because of what it reaches is guarded by the guard propagation, which
+works from the treatments rather than the values.
 
-* `X::method()` works when X has any executable presence there: a php-native
-  class, real vendor code, real console code (two-world), or a class filed
-  as `rust-proxy` (a proxy stub forwards static methods over RPC; a class
-  without a stub is guarded, so the call is an explicit error rather than a
-  fork). Only `unsupported` peers and unknown types demote.
-* `new X` additionally requires local constructibility: php-native,
-  two-world, vendor, and builtin classes are real code; `rust-snapshot`
-  values may be built locally (they are values — they become Rust-backed
-  when they cross the boundary). So may a `rust-proxy` class on
-  `constructible.list`: its stub constructor has the Rust side allocate an
-  entity of its own. Constructing any other `rust-proxy` service is the
-  unresolved dual-instantiation case and demotes, explicitly and visibly.
-* a `needs-sync` static disposition (and an unfiled one) also demotes.
+### Overrides
 
-A class every hard reference of which passes is `php-native`; otherwise it
-is `unsupported` — the class embeds orchestration over shared state (e.g.
-`Composer\Installer`, `Factory`, the solver), and silently running the real
-PHP implementation against proxies would fork the state the Rust side
-believes it owns. Explicit error until a human decides. Demotions cascade,
-and every demotion records its concrete reason in the report. Classes with
-an `overrides.list` entry take their category from the override and do not
-participate in the fixed point.
+`overrides.json` changes the value of a class for reasons the rules cannot see. It holds:
 
-Vendor packages are classified wholesale by the same criterion applied
-package-level: a package is `php-native` if no class in it references
-composer/composer types or shared static state (true for composer/pcre,
-composer/semver, seld/jsonlint, justinrainbow/json-schema,
-composer/ca-bundle, composer/spdx-licenses, composer/metadata-minifier,
-composer/class-map-generator, composer/xdebug-handler, seld/signal-handler,
-psr/log, symfony/filesystem, symfony/finder, symfony/process,
-seld/phar-utils, the polyfills); symfony/console is `two-world`;
-react/promise ships as real code while `PromiseInterface` is bridged.
+* `Composer\Autoload\ClassLoader` → `worker`: the worker bootstraps through the real
+  `vendor/composer/ClassLoader.php` before any other definition could load.
+* `Composer\Util\Http\Response` → `rust-value`: the value-object rule rejects it because
+  `collect()` assigns to `$this`, but the object graph never retains a response, and freeing the
+  copy each side holds is what `collect()` is for.
+* the vendor and builtin classes that cross by value: the four composer/semver constraint classes,
+  `ClassMap`, `DateTime` and `DateTimeImmutable`.
 
-### Exception lists
+The report keeps the value the rules would give an overridden class as `ruleValue` (vendor and
+builtin classes have none). An override that gives the value the rules already give is a
+violation.
 
-Three, all versioned next to the tool, all expected to stay short:
+### Default treatment, forced treatments and the guard propagation
 
-* `two-world.list` — `Composer\Console\*`, `Composer\Command\*`,
-  symfony/console, `Composer\Util\Loop` and `Composer\Util\SyncHelper`.
-* `static-state.list` — disposition per mutable-static class
-  (`memo-cache` / `seed-once` / `needs-sync`); anything not listed fails
-  the run.
-* `overrides.list` — per-class category corrections. Every entry must carry
-  a reason. Current content: `Platform` → `rust-proxy` (its env table is
-  shared state; no stub exists, so the child resolves the class to a guard
-  and every env access from plugin code is an explicit error), the
-  bootstrap classes (see "Known deviations"), two phantom-reachability
-  corrections (`HhvmDetector`, `VersionGuesser`),
-  `Composer\Util\Http\Response` → `rust-snapshot` (see rust-snapshot above),
-  and the transport classes the Rust-side `HttpDownloader` does not own →
-  `php-native`: `CurlDownloader` and `CurlResponse` (its http(s) requests go
-  to a native downloader instead) and `RemoteFilesystem` (it hands the
-  requests it cannot serve itself to an instance of the real class in the
-  child).
+The treatment of a class is the default of its value, unless `forced.json` gives one (see "Input
+files"). Then the guard propagation runs as a fixed point. A class whose value is `worker`, whose
+treatment is the default `real`, and that is neither forced nor two-world, becomes `guard` when
+its code has one of these hard references:
 
-Next to them, `constructible.list` is not an exception but a mirror of the
-Rust side: the `rust-proxy` classes whose forwarded constructor the Rust side
-answers (the `constructor supported` rows of
-`crates/shirabe/src/php_worker/rpc/surface.tsv`), which "Unreachable types"
-above lets other classes construct. An entry that is not classified
-`rust-proxy` fails the run, and the `plugin_constructible_list` rule of
-`scripts/linters/lint` fails unless the list names exactly those classes.
+* `new X`, where `X` is a stub whose constructor is `unimplemented` or `refused`,
+* `new X`, where `X` is a guard,
+* a static reference to a class this rule guarded.
 
-### Failure mode
+The real code of such a class would only get halfway before failing; failing at the entry is
+better. The fifteen classes guarded this way today are the orchestrators (`Factory`, `Installer`,
+the solver and its builders, `RepositoryFactory`) and the classes that construct them (`Git`,
+`GitHub`, `AuthHelper`, …). The report names the reference that guarded each of them.
 
-When the rules cannot decide (a new mutable-static class, a docblock the
-type extractor cannot parse in a position that matters, a class whose
-category changed between Composer versions), the classifier fails the run
-and names the class. It never silently defaults — the
-default-to-`unsupported` rule for unreachable classes is itself an explicit,
-reviewable outcome in the report, not a silent guess.
+### Forwarded members
 
-## Known deviations and open questions
+For every class whose treatment is `stub` or `runtime` and whose value is `rust-handle`, the
+classifier lists the members its worker-side definition forwards to the Rust side, per declaring
+class:
 
-This section records the points where the mechanical rules alone do not
-settle how a class is served. For the decided ones it records what the
-implementation does; the others need an explicit maintainer decision, and
-the tool keeps them visible instead of resolving them silently.
+* the instance methods: for a class whose parent forwards nothing, the methods of its interfaces
+  and its own public methods (`__toString` included, other magic methods excluded); for any other
+  class, those of them its parent's surface lacks. An abstract class lists the methods it
+  declares, even though only its concrete subclasses are ever instantiated.
+* the constructor (`__construct`) of every concrete stub whose `new` reaches the Rust side: a stub
+  whose parent forwards nothing declares one, and so does a stub declaring a public constructor of
+  its own; any other stub inherits its parent's. A runtime class builds its own instance, and
+  forwards no constructor.
+* the public static methods of a stub that cannot run as copies of the real code in the worker:
+  the ones that read or write a static property, or that name a guarded class, directly or through
+  the non-public static helpers they call.
 
-### ProcessExecutor and HttpDownloader are reachable
+For a guard, the static methods `forced.json` lists under `statics`.
 
-No getter of `Composer` itself returns a `ProcessExecutor`, but
-`Composer::getLoop()` → `Loop::getProcessExecutor(): ?ProcessExecutor` /
-`Loop::getHttpDownloader(): HttpDownloader` make both reachable. The
-graph-owned `ProcessExecutor` instance must therefore be proxied (its job
-queue is driven by the Rust loop), which is the dual-instantiation situation
-the `plugin-constructible` attribute exists to surface.
+Each member carries a status: `implemented` (the Rust side answers it), `unimplemented` or
+`refused` (from `forced.json`), or `forward` for a guard's static. The stub generator checks that
+each stub forwards exactly these members, and the Rust forwarding modules are generated from them.
 
-`ProcessExecutor` is one class in one category for both routes: it is a
-`rust-proxy` stub, and a plugin-`new`ed instance allocates a Rust-side entity
-of its own rather than a second, unconnected executor. That is what keeps
-`$timeout` — process-wide state Composer seeds from `process-timeout` and
-`RunScriptCommand` rewrites mid-run — readable and writable from both sides
-through one value, and it is what lets the executor stay a constructor
-argument of the classes that take one (`new Filesystem($process)` is what
-plugins actually write). Children are spawned in the Rust process either way,
-which is also correct for stdio: the worker inherits the Rust process's
-standard streams, so both sides see the same terminal.
+## Input files
 
-The async surface — `executeAsync()`, `wait()`, `enableAsync()`,
-`countActiveJobs()` — is served on the same terms, for a graph-owned executor
-and a plugin-`new`ed one alike: `enableAsync()`, `wait()` and
-`countActiveJobs()` are all public (`@internal` is a docblock note), so a
-plugin can reach the async path on an instance of its own. `executeAsync()`
-resolves its promise with a `Symfony\Component\Process\Process`, whose state
-is the `proc_open()` resource and OS pipes of whichever process called
-`start()`. A Rust-side spawn has no such object to hand back, so the promise
-resolves with a `Shirabe\RustProcessStub`, a subclass limited to the surface
-that inspects a terminated process. See
-[plugin-async.md](./plugin-async.md).
+All inputs are JSON objects under `scripts/plugin-class-classifier/inputs/`. An entry that needs a
+justification carries it in a `reason` field. Every file fails the run when an entry names a
+class, member or property the Composer sources do not have, and when an entry gives what the rules
+already give.
 
-`HttpDownloader` is a proxy stub on the same terms and for the same reasons:
-its options, its TLS defaults and the authentication it collects into the
-run's IO are state the two sides have to share, and a plugin-`new`ed one
-allocates a Rust-side entity rather than a second downloader the graph knows
-nothing about. `get()` and `copy()` answer with a
-`Composer\Util\Http\Response` the child holds as a value (see below). The
-async surface registers each request as a job and answers with a promise that
-is still pending; `wait()` and `countActiveJobs()` drive the jobs and settle
-their promises.
+| File | Content | Kind |
+|---|---|---|
+| `two-world.json` | the namespaces and classes each side implements on its own | evidence |
+| `static-state.json` | the disposition of each static property a class writes | evidence |
+| `overrides.json` | values the rules cannot see | value |
+| `forced.json` | where the current treatment departs from the value | current state |
 
-`Loop` is `two-world`: the worker runs a port of the class over the two proxied
-services, and the Rust side keeps a Loop of its own for the execution itself.
-`Composer::getLoop()` — the route Composer's own docblocks point plugin authors
-at — answers with the worker-side one, built over the graph's own downloader
-and executor. `React\Promise\all()`, the rethrow of a rejection and the
-`ProgressBar` a caller passes all run in the worker, on real objects.
-`SyncHelper` is `two-world` with it, being pure orchestration over
-`Loop::wait()`.
+### two-world.json
 
-### AutoloadGenerator
+`Composer\Console\*`, `Composer\Command\*`, symfony/console, `Composer\Util\Loop` and
+`Composer\Util\SyncHelper`, each keyed by namespace prefix or FQCN with a reason. Each side runs
+its own implementation of them. The list cannot be inferred from the sources; it also stops the
+reachability closure.
 
-`Composer::getAutoloadGenerator()` hands out the generator Composer's own
-dumps run on, so it is a `rust-proxy` stub: a setter a plugin calls is seen by
-the next dump the Rust side performs. Its return values are sent without an
-entity of their own. `buildPackageMap()` answers with package handles,
-`parseAutoloads()` with plain arrays, and `dump()` with a
-`Composer\ClassMapGenerator\ClassMap` revived as a value (`php-native`, and
-the Rust side keeps none). `createLoader()` answers with a real
-`Composer\Autoload\ClassLoader` built in the worker. That class is
-`php-native` because the worker bootstraps itself with it (see "Bootstrap
-classes cannot be stub-shadowed"). The fresh instance is filled with the state
-of the Rust-side loader and is left unregistered, as upstream leaves it.
+### static-state.json
 
-Two parts of the surface are explicit errors. The constructor is one,
-because the Rust generator takes the concrete `EventDispatcher` and the R
-table holds the dispatcher only through its interface.
-`setPlatformRequirementFilter()` is the other, because no filter crosses the
-boundary: the factory's filters are guarded, and a plugin-implemented one has
-no reverse adapter.
+`{"<FQCN>": {"<property>": "<disposition>"}}`, for every static property a class writes from its
+method bodies. See "Shared state". A property written without an entry fails the run.
 
-### Locker
+### overrides.json
 
-`Composer::getLocker()` hands out the locker the running command reads and
-writes the lock file through, so it is a `rust-proxy` stub: the lock data a
-plugin reads is the cache the Rust side holds, and an in-memory
-`setLockData(..., false)` is seen by the Rust side's next read. The lock
-contents are sent as plain arrays, the platform requirements as by-value
-`Link` objects keyed by package name, and `getLockedRepository()` as a
-`LockArrayRepository` stub over a fresh Rust-side repository, as upstream
-builds a fresh one per call.
+`{"<FQCN>": {"value": "<value>", "reason": "..."}}`. See "Overrides".
 
-`getJsonFile()` and `updateHash()` are explicit errors, since `JsonFile` has
-no stub. So are the constructors: a plugin-built `Locker` would be a second
-view on the lock file the Rust side never reads back, and
-`LockArrayRepository` has no construction story yet.
+### forced.json
 
-### Dual instantiation
+Everything in which the worker, or the Rust side, currently departs from what the value calls
+for. Each entry is keyed by FQCN:
 
-`Locker::getJsonFile(): JsonFile` makes `JsonFile` reachable, so it is
-`rust-proxy` + `plugin-constructible` — and plugins `new JsonFile(...)`
-constantly, as they do `ArrayLoader`. The question is not cosmetic: a
-`rust-proxy` class a plugin constructs demotes the constructing class unless
-the Rust side can build it, and the demotions cascade. `ConfigValidator`,
-for one, is `unsupported` for constructing a `JsonFile`, and so is every
-class that constructs a `ConfigValidator` in turn.
+```jsonc
+{
+  "Composer\\Json\\JsonFile": { "treatment": "guard" },
+  "Composer\\Installer\\LibraryInstaller": { "treatment": "real", "reason": "..." },
+  "Composer\\Console\\Application": {
+    "treatment": "runtime",
+    "reason": "...",
+    "properties": { "composer": "handoff", "hasPluginCommands": "rust-local", "logo": "static-config" }
+  },
+  "Composer\\Factory": {
+    "statics": { "getComposerFile": { "status": "forward", "reason": "..." } }
+  },
+  "Composer\\Composer": {
+    "members": { "__construct": { "status": "unimplemented" } }
+  },
+  "Composer\\Package\\Locker": {
+    "members": { "getJsonFile": { "status": "refused", "reason": "..." } }
+  },
+  "Composer\\Downloader\\FileDownloader": {
+    "staticProperties": { "downloadMetadata": "unsynced" }
+  }
+}
+```
 
-The construction half exists as a mechanism rather than a question: a
-stub constructor sends a `NewObject`, the Rust side allocates
-the entity and answers with its handle, and the plugin-`new`ed object is
-then the same entity the graph sees. It is filled in per class, driven by
-the explicit errors real plugins hit; `constructible.list` names the
-classes built this way, and every other proxied class answers with an
-explicit error naming it.
-`Composer\EventDispatcher\Event` and `Composer\Plugin\PreCommandRunEvent`
-are the exception: their worker-side definitions are hand-written dual-mode
-classes, so `new` builds a native in-process instance (what
-`BaseCommand::initialize()` does), while an instance revived from a Rust
-handle forwards over RPC.
+* `treatment` overrides the treatment.
+    * `guard`: a `rust-handle` or `rust-value` class with no stub or codec yet. It takes no reason,
+      since the reason is always that one.
+    * `real`: a class whose value is not `worker` but whose real code stays in the worker, or a
+      `worker` class kept out of the guard propagation. A reason is required.
+    * `runtime`: a class with a hand-written definition under `php/runtime/`, because no generated
+      one can do the job (the dual-mode `Event` and `PreCommandRunEvent`) or because the upstream
+      body cannot run in the worker (`Application`, `Loop`). A reason is required.
+    * A treatment equal to the one the class would have anyway fails the run.
+* `members` lists, for a stub or runtime class, the forwarded members (constructor, methods, static
+  methods) whose answer departs from the default "forward, and the Rust side answers it". Keys sit
+  on the class that declares the forwarder, as in "Forwarded members".
+    * `unimplemented`: the Rust side has no handler; a call is the "not available yet" error.
+    * `refused`: an explicit error by design. The `reason` is required and is part of the error
+      message.
+* `statics` lists the static methods of a guard that forward to the Rust side instead of failing,
+  each with the reason it is safe to serve.
+* `properties` classifies, for a runtime class, every property the upstream class declares:
+  `handoff` (copied into the worker-side instance), `rust-local` (Rust-side state the worker
+  never needs) or `static-config` (static rendering data). A declared property without an entry,
+  or an entry for a property upstream no longer declares, fails the run.
+* `staticProperties` marks the shared static properties nothing keeps in sync (`unsynced`).
 
-The demotion rule reads the buildable proxied classes from
-`constructible.list` (see "Exception lists"), and constructing one does not
-demote. Only the unreachable fixed point consults the list: the
-body-locality condition of the stateless-pure and value-object tests still
-rejects every constructed `rust-proxy` class.
+### forced.json has to become empty
 
-`JsonFile` and `ArrayLoader` are undecided, so the classes that construct
-them stay `unsupported` — but a guard shadows each of them in the child, so
-touching one is an explicit error instead of real code running against a
-second instance.
+An entry means the implementation lags behind, or the value of the class is not settled yet. That
+is the only place either is recorded: there is no list of open questions elsewhere. A class whose
+value is undecided keeps the value the rules give it, and `forced.json` records its current
+treatment; revising the value later only means rewriting the entry so the treatment stays.
 
-### Package and CompletePackage
+Changing the classifier never changes what the worker does — the treatment of a class, and
+whether each member forwards or fails. When a rule or a value changes and the treatment would
+follow, a `forced.json` entry cancels the difference. Changing what plugins can do is a separate
+change that adds or removes `forced.json` entries.
 
-They classify as `rust-proxy` mechanically, and the mechanical result
-stands: the whole package family, including the `RootPackage`/
-`AliasPackage` variants, is pure `rust-proxy` with no `overrides.list`
-entry. The family is genuinely mutable — it carries 60+ setters, and
-Composer itself mutates packages in flight (`DownloadManager::download`,
-`GitDownloader::doUpdate`, `PoolBuilder`, `LockTransaction`) — so a
-snapshot treatment would need write-back plus invalidation on top of the
-copy. Snapshotting, like getter prefetching, is a performance optimization
-to be weighed only against measured RPC overhead; the category is
-invisible to plugins (the child sees the same FQCN either way), so
-switching later is free.
+## Shared state
 
-### Bootstrap classes cannot be stub-shadowed
+Apart from where instances live, the two processes share state. Ideally all of it is synced both
+ways.
 
-The child process necessarily `require`s the project's real
-`vendor/composer/ClassLoader.php` (and `installed.php` /
-`InstalledVersions`) to autoload plugin code, before any stub could load. A
-same-FQCN stub cannot coexist; both are overridden to `php-native`.
-`InstalledVersions::$installed` is nonetheless genuinely shared state —
-Rust rewrites `installed.php` on every dump — and the Rust side pushes the
-reload: right after writing the file it calls
-`__shirabe_installed_versions_reload` in the worker, which mirrors the tail
-of `FilesystemRepository::write` (the unconditional
-`InstalledVersions::reload($versions)` plus the reflection-based
-`selfDir`/`installedIsLocalDir` restore).
+### Static properties
 
-Plugin classes are autoloaded from the Rust side. The loaders
-`PluginManager::registerPackage` builds live in the Rust process, and the
-worker's autoloader asks them for a file through the `__shirabe_find_file`
-runtime service; the files-autoload entries and the
-`_composer_tmp` class-rename path run in the worker. `ClassLoader::register`
-keeps a Rust-side autoload stack that mirrors PHP's: every registered loader
-stays on it in registration order (or in front, when prepended), and every
-lookup the worker makes walks it, whether a plugin call or a script call is in
-flight, so the loader `EventDispatcher` builds for scripts sits on the same
-stack after the plugin loaders.
+The disposition of each static property a class writes says whether the state is shared:
 
-### ConsoleIO leaks PHP-side objects
+* `memo-cache`: pure memoization; each side computes its own copy (`Git::$version`,
+  `ProcessExecutor::$executables`, `Platform::$isDocker`, …).
+* `seed-once`: copied from the Rust side once when the worker starts (nothing has it today).
+* `needs-sync`: genuinely shared state (`ProcessExecutor::$timeout`,
+  `InstalledVersions::$installed`, `ErrorHandler::$io`,
+  `FileDownloader::$downloadMetadata` / `$responseHeaders`).
+* `needs-review` is what the report shows for a property with no entry, and fails the run.
 
-`ConsoleIO` (rust-proxy) returns real symfony/console instances through the
-seam: `getTable(): Table` / `getProgressBar(): ProgressBar`, and its
-constructor takes `InputInterface`/`OutputInterface`/`HelperSet` — none of
-which can be sent as values. The stub needs a bespoke story (e.g. a
-local Table bound to a proxying `OutputInterface`); until one is designed,
-both members raise explicit errors, as does the constructor — the Rust side
-has no construction story for this class.
+How a `needs-sync` property is kept in sync follows from the treatment of its class:
+
+* `stub`: the stub forwards the static accessors that read and write it, so the worker holds no
+  copy (`ProcessExecutor::$timeout`). PHP cannot intercept a public static property, so a public
+  one has no mechanism.
+* `real` or `runtime`: the state lives in the worker and the Rust side pushes it there (`push`):
+  `InstalledVersions::$installed` after each install dump, `ErrorHandler::$io` through
+  `register()`. The function that pushes each property is named by the generated
+  `php_worker::pushed_statics`, so a missing one is a compile error; whether it is called at the
+  right moments is not checked.
+* `guard`: no mechanism. The guard copies public static properties from the real source, so a
+  plugin reads the initial value.
+
+A property with no mechanism has to be recorded as `unsynced` in `forced.json`:
+`FileDownloader::$downloadMetadata` and `$responseHeaders`, which a plugin reads as empty arrays.
+
+### Process environment
+
+The environment is not class state, so it is recorded here rather than in the backlog.
+
+* Rust → worker: `shirabe-php-rpc`'s `env.rs` replays the Rust side's writes before the outermost
+  RPC call. When Rust code called from PHP writes the environment and calls PHP again in a nested
+  call, the write is not replayed.
+* Worker → Rust: nothing syncs it (see [env-vars-porting.md](./env-vars-porting.md)). A plugin's
+  `putenv()` or `$_SERVER` write, and `Platform::putEnv` in the worker's real code (only
+  `Svn::cleanEnv` today), do not reach the child processes the Rust side starts.
+
+## Rust obligations
+
+Every obligation follows from the report and is checked by compiling the generated code:
+
+* `stub` and `runtime`: a handler for every forwarded member that is neither `unimplemented` nor
+  `refused` (the `Forwarding` traits of `php_worker::rpc::forwarding`).
+* `by-value`: an encode and a decode function in `php_worker::codec` (named by
+  `php_worker::by_value`).
+* a pushed static property: the function that pushes it (named by `php_worker::pushed_statics`).
+* `real`: none as a rule. A worker class the Rust side holds through a PHP entity handle
+  (`RemoteFilesystem`) is called through its public PHP methods, which the generated code does not
+  cover.
+
+## Backlog
+
+The report's `backlog` lists the gaps between the current treatment and full compatibility; the
+classifier prints the count of each item as a warning, without failing. It is computed from the
+inputs alone.
+
+The backlog judges references more strictly than the guard propagation: a static reference to any
+guarded class counts as one the worker cannot follow, since a guard fails its static methods too
+(except the ones it forwards).
+
+1. Guarded `rust-handle` and `rust-value` classes: each needs a stub or a codec. `reachable`,
+   `direction` and `plugin-constructible` are listed to help set priorities.
+2. Hard references the upstream code in the worker cannot follow, per member: in every `real`
+   class (two-world classes only when reachable, i.e. `BaseCommand`), a `new`, static reference or
+   `extends` of a guarded class, or a `new` of a stub whose constructor is `unimplemented` or
+   `refused`.
+3. The `worker` classes the guard propagation guarded, with the references that did it.
+4. The `unimplemented` and `refused` forwarded members, per class, with constructors marked when
+   the class is plugin-constructible. Constructors that are errors by design (`Locker`'s) are here
+   as well: under full compatibility each of them is a gap.
+5. Concrete `rust-handle` classes whose treatment is `real`: an instance the Rust side owns cannot
+   cross.
+6. `unsynced` static properties.
+
+## What the classification does not decide
+
+Much of what happens at the boundary is not a property of a class, and the classification does not
+record it. It is the content of the handlers of the members involved:
+
+* the API slot (a method and an argument or return position): `Locker::getJsonFile()` alone is an
+  error; `AutoloadGenerator::createLoader()` alone builds its answer in the worker; an object
+  passed to `InstallationManager::addInstaller(InstallerInterface)` becomes a reverse adapter.
+* the concrete type on the Rust side: a handle is revived as the class the Rust side writes into
+  it (`Shirabe\RustProcessStub`, `Shirabe\RustPluginStub`), and a stubbed class the Rust side does
+  not bind (`ArrayRepository`) never crosses.
+* where an instance came from: an `Event` or `PreCommandRunEvent` the Rust side hands over
+  forwards, while one the worker constructs runs natively; the stub subclasses of `Event`
+  (`Script\Event`, …) are not dual-mode.
+* the runtime class: a plugin's subclass of a stub reaches the "cannot construct" error through
+  `NewObject`, and a subclass of `Link` falls out of the exact-class check of the by-value codec and
+  fails in the Rust decoder.
+* how promises, callables, resources and exceptions cross ([php-rpc.md](./php-rpc.md),
+  [plugin-async.md](./plugin-async.md)).
+
+The worker runtime's own classes under `php/runtime/Shirabe/` (`RustPluginStub`,
+`RustCapablePluginStub`, `RustProcessStub`, …) stand for Rust-side objects no Composer class
+describes; they are outside the classification, and the stub generator reads what they forward
+from their PHP.
+
+### Notes on single classes
+
+**ProcessExecutor and HttpDownloader.** No getter of `Composer` returns a `ProcessExecutor`, but
+`Composer::getLoop()` → `Loop::getProcessExecutor()` / `Loop::getHttpDownloader()` make both
+reachable. Both are stubs, and a plugin-`new`ed instance allocates a Rust-side entity of its own
+rather than a second, unconnected executor or downloader. That keeps `ProcessExecutor::$timeout` —
+process-wide state Composer seeds from `process-timeout` and `RunScriptCommand` rewrites mid-run —
+one value for both sides, and lets the executor stay a constructor argument of the classes that
+take one (`new Filesystem($process)`). Children are spawned in the Rust process either way, which
+is also right for stdio: the worker inherits the Rust process's standard streams.
+`executeAsync()` resolves its promise with a `Symfony\Component\Process\Process`, whose state is
+the `proc_open()` resource of whichever process called `start()`; a Rust-side spawn has no such
+object, so the promise resolves with a `Shirabe\RustProcessStub`, a subclass limited to the
+surface that inspects a terminated process. `HttpDownloader::get()` and `copy()` answer with a
+`Response` held as a value; its async surface registers each request as a job and answers with a
+pending promise. `Loop` is two-world: the worker runs a port of the class over the two stubs, and
+`Composer::getLoop()` answers with it (see [plugin-async.md](./plugin-async.md)).
+
+**AutoloadGenerator.** `Composer::getAutoloadGenerator()` hands out the generator Composer's own
+dumps run on, so a setter a plugin calls is seen by the next dump on the Rust side.
+`buildPackageMap()` answers with package handles, `parseAutoloads()` with plain arrays, and
+`dump()` with a `ClassMap` carried as a value. `createLoader()` answers with a real `ClassLoader`
+built in the worker and filled with the state of the Rust-side loader, left unregistered as
+upstream leaves it. The constructor is unimplemented: the Rust generator takes the concrete
+`EventDispatcher`, and the entity table holds the dispatcher only through its interface.
+`setPlatformRequirementFilter()` is refused: the factory's filters are guarded, and a
+plugin-implemented filter has no reverse adapter.
+
+**Locker.** `Composer::getLocker()` hands out the locker the running command reads and writes the
+lock file through: the lock data a plugin reads is the Rust side's cache, and an in-memory
+`setLockData(..., false)` is seen by the Rust side's next read. `getLockedRepository()` answers
+with a `LockArrayRepository` stub over a fresh Rust-side repository, as upstream builds a fresh one
+per call. `getJsonFile()` and `updateHash()` are refused, since `JsonFile` has no stub, and the
+constructor is unimplemented: a plugin-built `Locker` would be a second view on the lock file.
+
+**Response.** Two members do not work from the worker even as a value: `decodeJson()` reaches the
+guarded `JsonFile`, and Composer answers a curl request with the `CurlResponse` subclass where this
+port flattens the answer into a `Response` before it leaves `HttpDownloader`.
+
+**Package and CompletePackage.** The whole package family is `rust-handle`. It is genuinely
+mutable — 60+ setters, and Composer mutates packages in flight (`DownloadManager::download`,
+`GitDownloader::doUpdate`, `PoolBuilder`, `LockTransaction`) — so a by-value treatment would need
+write-back and invalidation on top of the copy.
+
+**Bootstrap classes.** The worker `require`s the project's real `vendor/composer/ClassLoader.php`
+(and `installed.php` / `InstalledVersions`) to autoload plugin code before any stub could load, so
+`ClassLoader` is a `worker` override and `InstalledVersions` is `worker` by the rules. Plugin
+classes are autoloaded from the Rust side: the loaders `PluginManager::registerPackage` builds
+live in the Rust process, and the worker's autoloader asks them for a file through the
+`__shirabe_find_file` runtime service. `ClassLoader::register` keeps a Rust-side autoload stack
+that mirrors PHP's, so the loader `EventDispatcher` builds for scripts sits on the same stack after
+the plugin loaders.
+
+**ConsoleIO.** It returns real symfony/console objects (`getTable()`, `getProgressBar()`), and its
+constructor takes `InputInterface`/`OutputInterface`/`HelperSet`, none of which can be carried as a
+value. Those members and the constructor are unimplemented until a design exists.
+
+### Undecided values
+
+These are represented by keeping the value the rules give and recording the current treatment in
+`forced.json`; none of them is settled by the classification.
+
+* **Base classes plugins extend while the Rust side holds instances too** (`FileDownloader`,
+  `ArchiveDownloader`, `LibraryInstaller`, `BaseIO`, `Package`, …). Their value is `rust-handle`.
+  Full compatibility may call for a dual-mode definition like `Event`'s: an instance from the Rust
+  side forwards, one the worker constructs runs the real code. Today their treatments split three
+  ways, each broken on one side:
+    * `guard` (`FileDownloader`, forced): extending `ArchiveDownloader` fails in the parent
+      constructor.
+    * `real` (`LibraryInstaller`, `ArchiveDownloader`, forced): an instance the Rust side owns
+      cannot cross.
+    * `stub` (`BaseIO`, `Package`, by default): a plugin's subclass fails at `NewObject`, which is
+      decided by the runtime class and not recorded here.
+* **Unreachable orchestrators** (`Installer`, `Factory`, the solver). Their value is `worker`
+  (`rust-handle` for the reachable solver internals); forwarding their static entry points to the
+  Rust side as `rust-handle` classes may be the better design. They are guarded today, by the guard
+  propagation for `Factory` and `Installer` and by `forced.json` for the solver internals. Revising
+  the value means adding an override and a `forced.json` `guard` entry, so the treatment stays.
+* **The runtime classes**: whether full compatibility still needs a hand-written definition is
+  open for as long as their `forced.json` entries remain.
+
+## Attributes
+
+The report also carries, for every class:
+
+* `direction` — `provided` / `consumed` / `both`: whether instances flow Rust→PHP (return
+  positions, event getters, callback arguments) or PHP→Rust (parameters of methods on shared
+  objects, plugin-implemented contracts).
+* `plugin-constructible` — a non-abstract class with a public constructor.
+* `mutable-static` — the disposition of each static property the class writes.
+* `throwable` — a subclass of `\Throwable`; it always needs a real definition in the worker so that
+  `catch` and `instanceof` work.
+* `public-static-properties` — PHP has no `__getStatic`, so a stub cannot intercept static property
+  access.
+* per method, `purity`: a method is a mutator iff it assigns to `$this->…` (directly, via compound
+  assignment, `unset`, increment), passes a `$this`-rooted expression into a by-reference
+  parameter position (builtin signatures resolved from jetbrains/phpstorm-stubs), or transitively
+  calls a mutator on the same object; statically unresolvable calls are conservatively mutators.
+* per method, `byRefParams` (the positions the protocol's out-params are keyed by) and
+  `callableParams` (the positions the callback-handle machinery must cover).
+* `hardRefs`, per member: `new X`, static calls `X::m` and static property writes `X::$p` from the
+  method bodies, and the `extends` of the class.
 
 ## The classifier tool
 
-### Dependencies and layout
+### Layout
 
-`scripts/plugin-class-classifier/` implements the pipeline in PHP. Two
-Composer dependencies: nikic/PHP-Parser (parsing) and
-jetbrains/phpstorm-stubs (builtin function signatures — by-ref parameter
-positions are read from the stubs instead of a hand-maintained table).
-`vendor/` and `report.json` are git-ignored; `composer.lock` is committed.
-The exception lists live in `lists/`.
+`scripts/plugin-class-classifier/` implements the procedure in PHP, with nikic/PHP-Parser for
+parsing and jetbrains/phpstorm-stubs for builtin function signatures. `vendor/` is git-ignored;
+`composer.lock`, the inputs and `report.json` are committed.
 
 ### Running
 
     scripts/plugin-class-classifier/classify
+    scripts/plugin-class-classifier/classify --check
 
-reads `composer/src/Composer` and writes `report.json` (machine-readable,
-stable ordering) plus a human-readable Markdown summary to stdout. Per-class
-rows carry category, direction, attributes (including public static
-properties on stub categories), demotion reasons, and — for stub-relevant
-categories — the per-method purity verdicts, by-ref parameter positions,
-and callable parameter positions the stub generator needs. The wholesale
-vendor package table and the vendor types actually reached by the closure
-are listed separately. The run exits non-zero when a rule cannot decide (an
-unfiled mutable-static class, a reachable type that resolves to nothing
-known); the report is still written so the violation can be reviewed and
-filed.
+The first form reads `composer/src/Composer` and the inputs and writes `report.json` (stable
+ordering), prints a summary to stdout and the backlog counts to stderr, and exits non-zero on a
+violation (an input error, an unfiled static property, a reachable type that resolves to nothing
+known); the report is still written so the violation can be reviewed. `--check` instead fails
+unless the committed report equals the one the inputs give; the `plugin_classification` rule of
+`scripts/linters/lint` runs it.
 
-`report.json` is generated output and not tracked in git. The intended
-workflow on a Composer upgrade: run the classifier before updating the
-`composer/` checkout, keep that report aside, re-run after the update, and
-diff the two files — review only the changed rows. A brand-new class lands
-in a category (or in the violation list) without any human re-derivation.
+On a Composer upgrade, regenerate the report and review its diff: a class whose value changed
+needs either the new value accepted (and its treatment with it, which changes what plugins can do)
+or a `forced.json` entry that keeps the treatment.
+
+### Report
+
+Each row of `classes`:
+
+```jsonc
+{
+  "fqcn": "...",
+  "kind": "class|interface|trait|enum",
+  "abstract": false,
+  "reachable": true,
+  "direction": "provided|consumed|both|null",
+  "value": "rust-handle|rust-value|worker|refused|null",
+  "ruleValue": "...",            // overridden classes only
+  "treatment": "stub|runtime|by-value|real|guard",
+  "treatmentSource": "default|forced|propagated",
+  "reasons": ["..."],
+  "hardRefs": [{ "member": "...", "kind": "new|static|extends", "target": "..." }],
+  "attributes": { ... },
+  "methods": [{ "name", "visibility", "static", "purity", "byRefParams", "callableParams" }],
+  "forwarded": [{ "member": "...", "kind": "constructor|method|static", "status": "...", "reason": "..." }],
+  "staticProperties": [{ "name": "...", "disposition": "...", "sync": "forward|push|unsynced|null" }]
+}
+```
+
+`forwarded` is present for the stub and runtime classes that forward members and for the guards
+with forwarded statics. Next to `classes`, the report lists the counts per value and treatment
+(`categories`), the vendor packages and the vendor types the closure reached, the reachable
+builtins, the `backlog` and the `violations`.
 
 ### Querying a single class
 
     scripts/plugin-class-classifier/query <target>...
 
-answers "how is this class treated?" for one or more targets, from
-`report.json` (generated on the fly when missing; staleness is not
-checked). A target may be a PHP source file, a Rust source file, or a class
-name — fully qualified or just the short name, case-insensitive:
+answers "how is this class treated?" from `report.json`. A target may be a PHP source file, a Rust
+source file, or a class name — fully qualified or just the short name, case-insensitive:
 
     query composer/src/Composer/Util/Git.php
     query crates/shirabe/src/io/io_interface.rs
     query Locker
 
-Vendor class names resolve at package granularity. The output shows category
-(including an overridden category's computed value), direction,
-reachability, reasons, attributes, and the mutator methods.
-
 ### Analysis limits
 
 All conservative:
 
-* dynamic calls (`$this->$m()`, `call_user_func` and other
-  callback-forwarding builtins with `$this`-rooted arguments) force
-  `mutator`;
-* a call to a method the class hierarchy does not declare (an
-  interface-only method such as `$this->getVersion()` from
-  `BasePackage::getUniqueName`) forces `mutator` even when every concrete
-  implementation is a pure read — this can only keep a class out of the
-  `php-native` and `rust-snapshot` tests, and can be refined by resolving such
-  callees over all concrete subtypes; a call to a declared abstract method
-  is treated as pure;
-* `parent::m()` purity resolves against the own hierarchy rather than the
-  declaring parent;
-* vendor by-ref signatures are tabled only for composer/pcre
-  (jetbrains/phpstorm-stubs covers PHP itself, not Composer's vendor
-  packages; other vendor APIs composer calls expose no by-ref parameters);
-* docblock type extraction tokenizes rather than fully parsing phpdoc
-  (constants, `@template` names, and phpstan aliases are filtered out).
+* dynamic calls (`$this->$m()`, `call_user_func` and other callback-forwarding builtins with
+  `$this`-rooted arguments) force `mutator`;
+* a call to a method the class hierarchy does not declare (an interface-only method such as
+  `$this->getVersion()` from `BasePackage::getUniqueName`) forces `mutator` even when every
+  concrete implementation is a pure read; a call to a declared abstract method is treated as pure;
+* `parent::m()` purity resolves against the own hierarchy rather than the declaring parent;
+* vendor by-ref signatures are tabled only for composer/pcre;
+* docblock type extraction tokenizes rather than fully parsing phpdoc (constants, `@template`
+  names, and phpstan aliases are filtered out);
+* the forwarded instance methods are computed from the interfaces the classifier parses, which
+  excludes vendor interfaces; the stub generator, which reads every interface, checks that the two
+  agree.

@@ -30,7 +30,6 @@ setup: fetch-fixtures
     if [[ ! -f scripts/plugin-stub-generator/vendor/autoload.php ]]; then
         composer install --working-dir=scripts/plugin-stub-generator
     fi
-    scripts/plugin-class-classifier/classify > /dev/null
 
 fetch-fixtures:
     #!/usr/bin/env bash

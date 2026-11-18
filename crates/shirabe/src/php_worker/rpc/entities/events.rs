@@ -247,23 +247,7 @@ impl forwarding::installer::installer_event::Forwarding
     }
 }
 
-// TODO(plugin): symfony/console lives on both sides independently, and nothing hands the
-// Rust-side console input and output to the plugin process yet.
 impl forwarding::plugin::command_event::Forwarding for forwarding::plugin::command_event::PhpClass {
-    fn get_input(
-        _: &std::rc::Rc<std::cell::RefCell<dyn EventInterface>>,
-        call: &mut Call<'_>,
-    ) -> Result<RpcValue, PhpThrow> {
-        Err(call.unavailable("the console input cannot cross the boundary"))
-    }
-
-    fn get_output(
-        _: &std::rc::Rc<std::cell::RefCell<dyn EventInterface>>,
-        call: &mut Call<'_>,
-    ) -> Result<RpcValue, PhpThrow> {
-        Err(call.unavailable("the console output cannot cross the boundary"))
-    }
-
     fn get_command_name(
         event: &std::rc::Rc<std::cell::RefCell<dyn EventInterface>>,
         _: &mut Call<'_>,
@@ -277,15 +261,6 @@ impl forwarding::plugin::command_event::Forwarding for forwarding::plugin::comma
 impl forwarding::plugin::pre_command_run_event::Forwarding
     for forwarding::plugin::pre_command_run_event::PhpClass
 {
-    // TODO(plugin): symfony/console lives on both sides independently, and nothing hands the
-    // Rust-side console input to the plugin process yet.
-    fn get_input(
-        _: &std::rc::Rc<std::cell::RefCell<dyn EventInterface>>,
-        call: &mut Call<'_>,
-    ) -> Result<RpcValue, PhpThrow> {
-        Err(call.unavailable("the console input cannot cross the boundary"))
-    }
-
     fn get_command(
         event: &std::rc::Rc<std::cell::RefCell<dyn EventInterface>>,
         _: &mut Call<'_>,
@@ -468,15 +443,6 @@ impl forwarding::plugin::pre_pool_create_event::Forwarding
                 .map(entity_value)
                 .collect::<Result<_, _>>()?,
         ))
-    }
-
-    // TODO(plugin): Request has no proxy stub, so the request a listener would inspect or change
-    // cannot cross the boundary yet.
-    fn get_request(
-        _: &std::rc::Rc<std::cell::RefCell<dyn EventInterface>>,
-        call: &mut Call<'_>,
-    ) -> Result<RpcValue, PhpThrow> {
-        Err(call.unavailable("the Request cannot cross the boundary"))
     }
 
     fn get_acceptable_stabilities(

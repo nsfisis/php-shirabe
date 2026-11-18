@@ -11,11 +11,13 @@ namespace Shirabe\PluginStubGenerator;
  * is `shirabe::rust_plugin_stub`).
  *
  * Each module holds `PhpClass`, a marker type standing for the class; `Forwarding`, a trait with
- * one method per member the class itself declares and forwards, whose default answers that the
- * member is not available; `dispatch`, which routes a method name to the `Forwarding` of the class
- * declaring it, the class itself or an ancestor; and `BINDINGS`, the class and its `dispatch` as
- * one value. The trait of a class whose parent forwards nothing also names the handle type of the
- * entities crossing as it or as a descendant (`type Handle`); every descendant takes that type.
+ * one method per member the class itself declares and the Rust side answers, with no default, so
+ * that the hand-written impl has to answer each of them and nothing else; `dispatch`, which routes
+ * a method name to the `Forwarding` of the class declaring it, the class itself or an ancestor, and
+ * answers the members the Rust side does not serve (unimplemented ones and refused ones, with their
+ * reason) with an error; and `BINDINGS`, the class and its `dispatch` as one value. The trait of a
+ * class whose parent forwards nothing also names the handle type of the entities crossing as it or
+ * as a descendant (`type Handle`); every descendant takes that type.
  */
 final class ForwardingModules
 {
@@ -27,23 +29,24 @@ final class ForwardingModules
         'typeof', 'unsized', 'virtual', 'yield',
     ];
 
-    /** @var \Closure(string): string */
-    private readonly \Closure $root;
-
     /**
-     * @param array<string, array{guard: bool, parent: ?string, abstract: bool, methods: list<string>, statics: list<string>, constructs: ?bool}> $classes
-     * @param list<string> $generated the forwarding classes to emit a module for
-     * @param list<string> $guards the guard classes forwarding static methods
-     * @param callable(string): string $root the class a forwarding class descends from whose
-     *                                       parent forwards nothing
+     * @param array<string, array{
+     *     guard: bool,
+     *     parent: ?string,
+     *     abstract: bool,
+     *     methods: list<array{name: string, status: string, reason?: string}>,
+     *     statics: list<array{name: string, status: string, reason?: string}>,
+     *     constructor: ?array{status: string, reason?: string},
+     * }> $classes the forwarding classes; `parent` is set only when the parent forwards too, and
+     *             `status` is `implemented`, `unimplemented` or `refused`
      */
-    public function __construct(
-        private readonly array $classes,
-        private readonly array $generated,
-        private readonly array $guards,
-        callable $root,
-    ) {
-        $this->root = \Closure::fromCallable($root);
+    public function __construct(private readonly array $classes)
+    {
+        foreach ($classes as $fqcn => $class) {
+            if (!$class['guard'] && $this->instanceSurface($fqcn) === []) {
+                throw new GenerationError(["$fqcn forwards no instance method"]);
+            }
+        }
     }
 
     /** A PHP member or class name as a Rust identifier: snake case, raw if it is a keyword. */
@@ -69,48 +72,12 @@ final class ForwardingModules
         return array_map(static fn (string $segment): string => self::rustName($segment), $segments);
     }
 
-    /**
-     * Matches the hand-written impls with the generated traits.
-     *
-     * @param array<string, list<array{path: string, fns: list<string>}>> $impls module path => impls
-     * @return array<string, list<string>> FQCN => the members its impl answers, as Rust names
-     */
-    public function overrides(array $impls): array
-    {
-        $errors = [];
-        $overrides = [];
-        foreach ([...$this->generated, ...$this->guards] as $fqcn) {
-            $module = implode('::', self::modulePath($fqcn));
-            $found = $impls[$module] ?? [];
-            if (count($found) !== 1) {
-                $errors[] = "expected exactly one `impl forwarding::$module::Forwarding for forwarding::$module::PhpClass`, found "
-                    . (count($found) === 0 ? 'none' : implode(', ', array_column($found, 'path')));
-                continue;
-            }
-            $overrides[$fqcn] = array_map(
-                static fn (string $fn): string => str_starts_with($fn, 'r#') ? substr($fn, 2) : $fn,
-                $found[0]['fns'],
-            );
-        }
-        if ($errors !== []) {
-            throw new GenerationError($errors);
-        }
-
-        return array_map(
-            static fn (array $fns): array => array_map(
-                static fn (string $fn): string => in_array($fn, self::KEYWORDS, true) ? 'r#' . $fn : $fn,
-                $fns,
-            ),
-            $overrides,
-        );
-    }
-
     public function render(): string
     {
         $tree = [];
-        $generated = [...$this->generated, ...$this->guards];
-        sort($generated, SORT_STRING);
-        foreach ($generated as $fqcn) {
+        $fqcns = array_keys($this->classes);
+        sort($fqcns, SORT_STRING);
+        foreach ($fqcns as $fqcn) {
             $node = &$tree;
             foreach (self::modulePath($fqcn) as $segment) {
                 $node['children'][$segment] ??= [];
@@ -123,9 +90,9 @@ final class ForwardingModules
             unset($node);
         }
 
-        $code = "//! Generated by scripts/plugin-stub-generator/surface-manifest; do not edit by hand.\n"
-            . "//! One module per worker-side class that forwards members to the Rust side. A class no\n"
-            . "//! entity crosses as still has its `BINDINGS`, which nothing refers to.\n"
+        $code = "//! Generated by scripts/plugin-stub-generator/generate-stubs from the classifier report; do not\n"
+            . "//! edit by hand. One module per worker-side class that forwards members to the Rust side. A\n"
+            . "//! class no entity crosses as still has its `BINDINGS`, which nothing refers to.\n"
             . "#![allow(dead_code)]\n\n"
             . "use crate::php_worker::rpc::entity::{Call, protocol_violation};\nuse crate::php_worker::rpc::forwarding;\n"
             . "use bstr::{BStr, ByteSlice as _};\n"
@@ -156,17 +123,20 @@ final class ForwardingModules
     private function construct(): string
     {
         $arms = '';
-        $generated = $this->generated;
-        sort($generated, SORT_STRING);
-        foreach ($generated as $fqcn) {
-            if (!$this->classes[$fqcn]['abstract'] && $this->constructs($fqcn)) {
-                $arms .= self::byteString($fqcn) . ' => ' . self::pathOf($fqcn) . "::construct(call),\n";
+        foreach ($this->sorted() as $fqcn) {
+            $constructor = $this->classes[$fqcn]['constructor'];
+            if ($constructor === null || $constructor['status'] === 'unimplemented') {
+                continue;
             }
+            $arms .= self::byteString($fqcn) . ' => ' . match ($constructor['status']) {
+                'implemented' => self::pathOf($fqcn) . "::construct(call),\n",
+                'refused' => 'Err(call.unavailable(' . self::stringLiteral($constructor['reason']) . ")),\n",
+            };
         }
 
         return "/// A `NewObject` from the worker: builds the entity, registers it and answers its Rust entity id.\n"
             . "/// A stub's constructor sends `static::class`, so a plugin's subclass of a proxied class\n"
-            . "/// reaches the last arm.\n"
+            . "/// reaches the last arm, as does a class whose constructor the Rust side does not serve yet.\n"
             . "pub(crate) fn construct(class: &BStr, call: &mut Call<'_>) -> Result<u64, PhpThrow> {\n"
             . "match class.as_bytes() {\n{$arms}_ => Err(call.unconstructible()),\n}\n}\n";
     }
@@ -175,9 +145,7 @@ final class ForwardingModules
     private function callStatic(): string
     {
         $arms = '';
-        $classes = [...$this->generated, ...$this->guards];
-        sort($classes, SORT_STRING);
-        foreach ($classes as $fqcn) {
+        foreach ($this->sorted() as $fqcn) {
             if ($this->classes[$fqcn]['statics'] !== []) {
                 $arms .= self::byteString($fqcn) . ' => ' . self::pathOf($fqcn) . "::call_static(call),\n";
             }
@@ -193,9 +161,9 @@ final class ForwardingModules
     {
         $names = [];
         $items = [];
-        foreach ($this->classes[$fqcn]['statics'] as $method) {
-            $name = $this->claim($names, $fqcn, $method);
-            $items[] = "fn $name(call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {\nErr(call.unsupported())\n}\n";
+        foreach ($this->classes[$fqcn]['statics'] as $static) {
+            $name = $this->claim($names, $fqcn, $static['name']);
+            $items[] = "fn $name(call: &mut Call<'_>) -> Result<RpcValue, PhpThrow>;\n";
         }
 
         return "use crate::php_worker::rpc::entity::{Call, protocol_violation};\nuse bstr::ByteSlice as _;\nuse shirabe_php_rpc::{PhpThrow, RpcValue};\n\n"
@@ -210,17 +178,17 @@ final class ForwardingModules
             return $this->guardItems($fqcn);
         }
         $class = $this->classes[$fqcn];
-        $root = ($this->root)($fqcn);
+        $root = $this->root($fqcn);
         $isRoot = $root === $fqcn;
         $handle = $isRoot ? '<PhpClass as Forwarding>::Handle' : self::traitOf($root) . '::Handle';
         $traitHandle = $isRoot ? 'Self::Handle' : $handle;
         $literal = self::byteString($fqcn);
+        $constructs = ($class['constructor']['status'] ?? null) === 'implemented';
 
         $entity = ['Bindings', 'Call', 'protocol_violation'];
         if ($isRoot) {
             $entity[] = 'Entity';
         }
-        $constructs = !$class['abstract'] && $this->constructs($fqcn);
         if ($constructs) {
             $entity[] = 'constructed';
         }
@@ -239,36 +207,44 @@ final class ForwardingModules
             $items[] = "/// The handle type of the entities crossing as this class or a subclass.\ntype Handle: Entity;\n";
         }
         foreach ($class['methods'] as $method) {
-            $name = $this->claim($names, $fqcn, $method);
-            $items[] = "fn $name(this: &$traitHandle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {\n"
-                . "let _ = this;\nErr(call.unsupported())\n}\n";
+            $name = $this->claim($names, $fqcn, $method['name']);
+            if ($method['status'] === 'implemented') {
+                $items[] = "fn $name(this: &$traitHandle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow>;\n";
+            }
         }
-        if (!$class['abstract'] && $this->constructs($fqcn)) {
+        if ($constructs) {
             $name = $this->claim($names, $fqcn, '__construct');
-            $items[] = "fn $name(call: &mut Call<'_>) -> Result<$traitHandle, PhpThrow> {\nErr(call.unconstructible())\n}\n";
+            $items[] = "fn $name(call: &mut Call<'_>) -> Result<$traitHandle, PhpThrow>;\n";
         }
-        foreach ($class['statics'] as $method) {
-            $name = $this->claim($names, $fqcn, $method);
-            $items[] = "fn $name(call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {\nErr(call.unsupported())\n}\n";
+        foreach ($class['statics'] as $static) {
+            $name = $this->claim($names, $fqcn, $static['name']);
+            if ($static['status'] === 'implemented') {
+                $items[] = "fn $name(call: &mut Call<'_>) -> Result<RpcValue, PhpThrow>;\n";
+            }
         }
         $code .= "pub(crate) trait Forwarding {\n" . implode("\n", $items) . "}\n\n";
 
         $arms = '';
+        $usesThis = false;
         $seen = [];
-        for ($current = $fqcn; $current !== null && isset($this->classes[$current]) && !$this->classes[$current]['guard']; $current = $this->classes[$current]['parent']) {
+        for ($current = $fqcn; $current !== null; $current = $this->classes[$current]['parent']) {
             $trait = $current === $fqcn ? '<PhpClass as Forwarding>' : self::traitOf($current);
             foreach ($this->classes[$current]['methods'] as $method) {
-                if (isset($seen[$method])) {
+                if (isset($seen[$method['name']])) {
                     continue;
                 }
-                $seen[$method] = true;
-                $arms .= self::byteString($method) . " => $trait::" . self::rustName($method) . "(this, call),\n";
-            }
-            if ($current === $root) {
-                break;
+                $seen[$method['name']] = true;
+                $arms .= self::byteString($method['name']) . ' => ';
+                if ($method['status'] === 'implemented') {
+                    $usesThis = true;
+                    $arms .= "$trait::" . self::rustName($method['name']) . "(this, call),\n";
+                } else {
+                    $arms .= self::refusal($method) . ",\n";
+                }
             }
         }
-        $code .= "pub(crate) fn dispatch(this: &$handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {\n"
+        $param = $usesThis ? 'this' : '_';
+        $code .= "pub(crate) fn dispatch($param: &$handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {\n"
             . "match call.method().as_bytes() {\n{$arms}_ => protocol_violation(call),\n}\n}\n\n";
         $code .= "pub(crate) static BINDINGS: Bindings<$handle> = Bindings {\nname: $literal,\ndispatch,\n};\n";
         if ($constructs) {
@@ -285,12 +261,55 @@ final class ForwardingModules
     private function staticRouter(string $fqcn): string
     {
         $arms = '';
-        foreach ($this->classes[$fqcn]['statics'] as $method) {
-            $arms .= self::byteString($method) . ' => <PhpClass as Forwarding>::' . self::rustName($method) . "(call),\n";
+        foreach ($this->classes[$fqcn]['statics'] as $static) {
+            $arms .= self::byteString($static['name']) . ' => ' . ($static['status'] === 'implemented'
+                ? '<PhpClass as Forwarding>::' . self::rustName($static['name']) . '(call)'
+                : self::refusal($static)) . ",\n";
         }
 
         return "pub(crate) fn call_static(call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {\n"
             . "match call.method().as_bytes() {\n{$arms}_ => protocol_violation(call),\n}\n}\n";
+    }
+
+    /** @param array{status: string, reason?: string} $member */
+    private static function refusal(array $member): string
+    {
+        return match ($member['status']) {
+            'unimplemented' => 'Err(call.unsupported())',
+            'refused' => 'Err(call.unavailable(' . self::stringLiteral($member['reason']) . '))',
+        };
+    }
+
+    /** The forwarding class `$fqcn` descends from whose parent forwards nothing. */
+    private function root(string $fqcn): string
+    {
+        while (($parent = $this->classes[$fqcn]['parent']) !== null) {
+            $fqcn = $parent;
+        }
+
+        return $fqcn;
+    }
+
+    /** @return list<string> */
+    private function instanceSurface(string $fqcn): array
+    {
+        $methods = [];
+        for ($class = $fqcn; $class !== null; $class = $this->classes[$class]['parent']) {
+            foreach ($this->classes[$class]['methods'] as $method) {
+                $methods[$method['name']] = true;
+            }
+        }
+
+        return array_keys($methods);
+    }
+
+    /** @return list<string> */
+    private function sorted(): array
+    {
+        $fqcns = array_keys($this->classes);
+        sort($fqcns, SORT_STRING);
+
+        return $fqcns;
     }
 
     /** @param array<string, true> $names */
@@ -303,17 +322,6 @@ final class ForwardingModules
         $names[$name] = true;
 
         return $name;
-    }
-
-    private function constructs(string $fqcn): bool
-    {
-        for ($class = $fqcn; $class !== null && isset($this->classes[$class]); $class = $this->classes[$class]['parent']) {
-            if ($this->classes[$class]['constructs'] !== null) {
-                return $this->classes[$class]['constructs'];
-            }
-        }
-
-        return false;
     }
 
     private static function pathOf(string $fqcn): string
@@ -331,6 +339,11 @@ final class ForwardingModules
     private static function byteString(string $value): string
     {
         return 'b"' . addcslashes($value, "\\\"") . '"';
+    }
+
+    private static function stringLiteral(string $value): string
+    {
+        return '"' . addcslashes($value, "\\\"") . '"';
     }
 
     /**

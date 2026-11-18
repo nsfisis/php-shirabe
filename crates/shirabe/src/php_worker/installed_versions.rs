@@ -38,11 +38,11 @@ pub(crate) fn load_pending() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Reloads the worker's `InstalledVersions` with `versions`, the data just written to
-/// `{repo_dir}/installed.php`. Skipped when no worker is running: with no child there is nothing
-/// that could observe the state. The worker side skips it only when the class is not even
+/// Pushes `InstalledVersions::$installed` into the worker: reloads its `InstalledVersions` with
+/// `versions`, the data just written to `{repo_dir}/installed.php`. Skipped when no worker is
+/// running: with no child there is nothing that could observe the state. The worker side skips it only when the class is not even
 /// autoloadable there (no Composer PHP runtime = no observer code either).
-pub(crate) fn reload(
+pub(crate) fn push_installed(
     versions: IndexMap<BString, PhpMixed>,
     repo_dir: &std::path::Path,
 ) -> anyhow::Result<()> {

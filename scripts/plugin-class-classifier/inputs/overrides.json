@@ -1,0 +1,38 @@
+{
+    "Composer\\Autoload\\ClassLoader": {
+        "value": "worker",
+        "reason": "the worker bootstraps through the real vendor/composer/ClassLoader.php before any other definition could load, so the real class always runs there; the registered loaders are per-process state"
+    },
+    "Composer\\Util\\Http\\Response": {
+        "value": "rust-value",
+        "reason": "built for one request and never retained by the object graph, so there is no entity to point at; the value-object rule rejects it only because collect() assigns to $this, and freeing the copy each side holds is what that method is for"
+    },
+    "Composer\\ClassMapGenerator\\ClassMap": {
+        "value": "rust-value",
+        "reason": "AutoloadGenerator::dump() returns it to the plugin as a whole value"
+    },
+    "Composer\\Semver\\Constraint\\Constraint": {
+        "value": "rust-value",
+        "reason": "constraints cross inside links and as arguments; the Rust side holds them as values of its own constraint type"
+    },
+    "Composer\\Semver\\Constraint\\MatchAllConstraint": {
+        "value": "rust-value",
+        "reason": "constraints cross inside links and as arguments; the Rust side holds them as values of its own constraint type"
+    },
+    "Composer\\Semver\\Constraint\\MatchNoneConstraint": {
+        "value": "rust-value",
+        "reason": "constraints cross inside links and as arguments; the Rust side holds them as values of its own constraint type"
+    },
+    "Composer\\Semver\\Constraint\\MultiConstraint": {
+        "value": "rust-value",
+        "reason": "constraints cross inside links and as arguments; the Rust side holds them as values of its own constraint type"
+    },
+    "DateTime": {
+        "value": "rust-value",
+        "reason": "dates cross as instants the Rust side holds as values"
+    },
+    "DateTimeImmutable": {
+        "value": "rust-value",
+        "reason": "dates cross as instants the Rust side holds as values"
+    }
+}

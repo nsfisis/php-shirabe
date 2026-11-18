@@ -12,6 +12,9 @@ final class ClassInfo
     /** @var list<PropertyInfo> */
     public array $properties = [];
 
+    /** @var array<string, true> lowercase names of the methods merged in from used traits */
+    public array $traitMethods = [];
+
     /** @var list<string> FQCNs of used traits */
     public array $traitUses = [];
 
@@ -42,6 +45,18 @@ final class ClassInfo
     public array $benignBodyRefs = [];
 
     public bool $writesOwnStaticProps = false;
+
+    /** @var list<string> own static properties written from method bodies; `*` for a dynamic name */
+    public array $staticWrites = [];
+
+    /**
+     * References that need executable code behind the target, per member:
+     * `new X` (target `X`) and `X::m()` / writes to `X::$p` (target
+     * `X::m` / `X::$p`).
+     *
+     * @var list<array{member: string, kind: 'new'|'static', target: string}>
+     */
+    public array $hardRefs = [];
 
     public function __construct(
         public readonly string $fqcn,

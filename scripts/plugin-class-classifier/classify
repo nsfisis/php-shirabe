@@ -6,20 +6,23 @@ declare(strict_types=1);
 require __DIR__ . '/vendor/autoload.php';
 
 use Shirabe\PluginClassifier\Classifier;
-use Shirabe\PluginClassifier\Lists;
+use Shirabe\PluginClassifier\Inputs;
 use Shirabe\PluginClassifier\Report;
 
 $repoRoot = dirname(__DIR__, 2);
 $composerSrc = $repoRoot . '/composer/src/Composer';
 $out = __DIR__ . '/report.json';
+$check = false;
 
 foreach (array_slice($argv, 1) as $arg) {
     if (str_starts_with($arg, '--composer-src=')) {
         $composerSrc = substr($arg, strlen('--composer-src='));
     } elseif (str_starts_with($arg, '--out=')) {
         $out = substr($arg, strlen('--out='));
+    } elseif ($arg === '--check') {
+        $check = true;
     } else {
-        fwrite(STDERR, "usage: classify [--composer-src=DIR] [--out=FILE]\n");
+        fwrite(STDERR, "usage: classify [--composer-src=DIR] [--out=FILE] [--check]\n");
         exit(2);
     }
 }
@@ -29,12 +32,35 @@ if (!is_dir($composerSrc)) {
     exit(2);
 }
 
-$classifier = new Classifier($composerSrc, Lists::load(__DIR__ . '/lists'));
+try {
+    $inputs = Inputs::load(__DIR__ . '/inputs');
+} catch (RuntimeException $e) {
+    fwrite(STDERR, 'error: ' . $e->getMessage() . "\n");
+    exit(1);
+}
+$classifier = new Classifier($composerSrc, $inputs);
 $classifier->run();
 
 $report = new Report($classifier);
-$report->writeJson($out);
+$json = $report->render();
+
+if ($check) {
+    foreach ($classifier->violations as $violation) {
+        fwrite(STDERR, "error: $violation\n");
+    }
+    if (@file_get_contents($out) !== $json) {
+        fwrite(STDERR, "error: stale report (regenerate with scripts/plugin-class-classifier/classify): $out\n");
+        exit(1);
+    }
+    exit($classifier->violations === [] ? 0 : 1);
+}
+
+if (file_put_contents($out, $json) === false) {
+    fwrite(STDERR, "cannot write $out\n");
+    exit(1);
+}
 $report->printSummary();
+$report->printBacklog();
 
 fwrite(STDERR, "report written to $out\n");
 exit($classifier->violations === [] ? 0 : 1);

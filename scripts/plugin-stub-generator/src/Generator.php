@@ -96,36 +96,31 @@ final class Generator
     /** @var array<string, true> */
     private array $runtimeSet = [];
 
-    /** @var array<string, true> */
-    private array $guardExemptSet = [];
+    /** @var array<string, bool> stub FQCN => whether `new` on it builds a Rust-side entity */
+    private array $constructs = [];
 
     private NodeFinder $nodeFinder;
 
+    /** @var list<string> the stub classes, every class after its ancestors */
+    private array $targets;
+
     /**
-     * @param list<string> $targets
-     * @param list<string> $runtimeProvided FQCNs of the hand-written dual-mode classes under
-     *                                      php/runtime/; they may serve as stub base classes
-     *                                      but must never be generation targets themselves
-     * @param list<string> $guardExempt     FQCNs the Rust side owns that the child still resolves
-     *                                      to the real Composer class (guard-exemptions.list)
+     * @var list<string> FQCNs of the hand-written classes under php/runtime/; they may serve as
+     *                   stub base classes but are never generation targets themselves
      */
-    public function __construct(
-        string $composerRoot,
-        private readonly Report $report,
-        private readonly array $targets,
-        private readonly array $runtimeProvided = [],
-        array $guardExempt = [],
-    ) {
+    private array $runtimeProvided;
+
+    public function __construct(string $composerRoot, private readonly Report $report)
+    {
         $this->project = new Project($composerRoot);
         $this->printer = new NamePrinter();
         $this->nodeFinder = new NodeFinder();
-        foreach ($guardExempt as $fqcn) {
-            $this->guardExemptSet[$fqcn] = true;
-        }
-        foreach ($targets as $fqcn) {
+        $this->targets = $report->withTreatmentParentsFirst('stub');
+        $this->runtimeProvided = $report->withTreatment('runtime');
+        foreach ($this->targets as $fqcn) {
             $this->targetSet[$fqcn] = true;
         }
-        foreach ($runtimeProvided as $fqcn) {
+        foreach ($this->runtimeProvided as $fqcn) {
             $this->runtimeSet[$fqcn] = true;
         }
     }
@@ -133,12 +128,6 @@ final class Generator
     /** @return array<string, string> relative stub path => file content */
     public function generate(): array
     {
-        foreach ($this->runtimeProvided as $fqcn) {
-            if (isset($this->targetSet[$fqcn])) {
-                $this->errors[] = "$fqcn is both a stub target and provided by php/runtime/;"
-                    . ' the runtime definition would be shadowed by the generated stub';
-            }
-        }
         $files = [];
         foreach ($this->targets as $fqcn) {
             $files[str_replace('\\', '/', $fqcn) . '.php'] = $this->emitClass($fqcn);
@@ -201,12 +190,6 @@ final class Generator
             $this->errors[] = "$fqcn is not a class";
             return '';
         }
-        $category = $this->report->category($fqcn);
-        if (!in_array($category, ['rust-proxy', 'contract'], true)) {
-            $this->errors[] = "$fqcn is classified as " . ($category ?? 'nothing')
-                . '; only rust-proxy and contract classes can become proxy stubs';
-        }
-
         $parentFqcn = $class->extends === null ? null : SourceFile::resolvedName($class->extends);
         $isRoot = $parentFqcn === null;
         if ($parentFqcn !== null && !isset($this->targetSet[$parentFqcn])) {
@@ -216,10 +199,6 @@ final class Generator
                 $this->errors[] = "$fqcn extends $parentFqcn, which is not a stub target";
                 $isRoot = true;
             }
-        }
-        if (!$isRoot && !isset($this->surfaces[$parentFqcn])) {
-            $this->errors[] = "$fqcn must come after its base class $parentFqcn in targets.list";
-            $isRoot = true;
         }
 
         // Instance properties are entity state, so the stub declares none of them.
@@ -324,6 +303,11 @@ final class Generator
             }
         }
 
+        // A stub declaring no constructor inherits its parent's: a stub's forwards to the Rust
+        // side, a runtime class's builds a worker-side instance.
+        $this->constructs[$fqcn] = $isRoot || $constructor !== null || ($this->constructs[$parentFqcn] ?? false);
+        $this->checkForwarded($fqcn, array_keys($emitted), $this->constructs[$fqcn], array_keys($forwardedStatics));
+
         $methodTexts = [];
         foreach ($emitted as $name => $method) {
             $methodTexts[] = $this->renderProxyMethod($fqcn, $name, $method, $file);
@@ -368,6 +352,36 @@ final class Generator
             $text .= $uses . "\n\n";
         }
         return $text . $decl . "\n{\n" . ($body === '' ? '' : $body . "\n") . "}\n";
+    }
+
+    /**
+     * The stub forwards exactly what the classifier report says it does, so that the Rust
+     * forwarding modules generated from the report answer every call the stub sends.
+     *
+     * @param list<string> $methods the instance methods the stub declares
+     * @param list<string> $statics the static methods the stub forwards
+     */
+    private function checkForwarded(string $fqcn, array $methods, bool $constructsEntity, array $statics): void
+    {
+        $expected = ['method' => [], 'constructor' => [], 'static' => []];
+        foreach ($this->report->forwarded($fqcn) as $member) {
+            $expected[$member['kind']][] = $member['member'];
+        }
+        $constructs = $constructsEntity && !$this->report->isAbstract($fqcn);
+        $actual = [
+            'method' => $methods,
+            'constructor' => $constructs ? ['__construct'] : [],
+            'static' => $statics,
+        ];
+        foreach ($expected as $kind => $members) {
+            sort($members);
+            $have = $actual[$kind];
+            sort($have);
+            if ($members !== $have) {
+                $this->errors[] = "$fqcn: the stub forwards the {$kind}s [" . implode(', ', $have)
+                    . '], the classifier report [' . implode(', ', $members) . ']';
+            }
+        }
     }
 
     /**
@@ -512,16 +526,12 @@ final class Generator
     }
 
     /**
-     * Whether the worker resolves this class to a guard rather than to executable code: the Rust
-     * side owns it and neither a stub, a runtime definition nor a guard exemption stands in for
-     * it, so materialized code reaching it would raise an explicit error at run time.
+     * Whether the worker resolves this class to a guard rather than to executable code, so that
+     * materialized code reaching it would raise an explicit error at run time.
      */
     private function isGuardedInChild(string $fqcn): bool
     {
-        if (isset($this->targetSet[$fqcn]) || isset($this->runtimeSet[$fqcn]) || isset($this->guardExemptSet[$fqcn])) {
-            return false;
-        }
-        return in_array($this->report->category($fqcn), ['rust-proxy', 'rust-snapshot', 'unsupported'], true);
+        return $this->report->treatment($fqcn) === 'guard';
     }
 
     /** Interfaces implemented by the class, each interface preceding the ones it extends. */
@@ -560,7 +570,7 @@ final class Generator
      * two-world class the Rust side never hands out as an entity, so `getLoop()` answers with the
      * worker-side sibling built over the proxied services (docs/dev/plugin-async.md).
      */
-    private const LOCAL_BODIES = [
+    public const LOCAL_BODIES = [
         'Composer\\PartialComposer::getLoop' => '        return \\Shirabe\\RpcRuntime::loopFor($this, $this->__entityId);',
     ];
 

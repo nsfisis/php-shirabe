@@ -181,14 +181,4 @@ impl forwarding::package::locker::Forwarding for forwarding::package::locker::Ph
             .map(RpcValue::string)
             .map_err(call.failed())
     }
-
-    // TODO(plugin): `JsonFile` has no proxy stub, so the lock file cannot be handed out.
-    fn get_json_file(_: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
-        Err(call.unavailable("JsonFile cannot cross the boundary"))
-    }
-
-    // TODO(plugin): `JsonFile` has no proxy stub, so no plugin holds a JsonFile it could pass.
-    fn update_hash(_: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
-        Err(call.unavailable("JsonFile cannot cross the boundary"))
-    }
 }

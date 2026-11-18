@@ -5,18 +5,41 @@ declare(strict_types=1);
 
 require __DIR__ . '/vendor/autoload.php';
 
+use PhpParser\ParserFactory;
+use Shirabe\PluginStubGenerator\ForwardingModel;
+use Shirabe\PluginStubGenerator\ForwardingModules;
 use Shirabe\PluginStubGenerator\GenerationError;
 use Shirabe\PluginStubGenerator\Generator;
 use Shirabe\PluginStubGenerator\GuardGenerator;
 use Shirabe\PluginStubGenerator\NamePrinter;
 use Shirabe\PluginStubGenerator\Project;
 use Shirabe\PluginStubGenerator\Report;
+use Shirabe\PluginStubGenerator\SourceFile;
+
+function rustfmt(string $code): string
+{
+    $process = proc_open(['rustfmt', '--edition', '2024'], [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
+    fwrite($pipes[0], $code);
+    fclose($pipes[0]);
+    $formatted = stream_get_contents($pipes[1]);
+    $errors = stream_get_contents($pipes[2]);
+    fclose($pipes[1]);
+    fclose($pipes[2]);
+    if (proc_close($process) !== 0) {
+        fwrite(STDERR, "error: rustfmt failed on generated code:\n$errors");
+        exit(1);
+    }
+    return $formatted;
+}
 
 $repoRoot = dirname(__DIR__, 2);
 $composerRoot = $repoRoot . '/composer';
 $reportPath = $repoRoot . '/scripts/plugin-class-classifier/report.json';
 $stubsDir = $repoRoot . '/crates/shirabe-php-rpc/php/stubs';
 $guardsDir = $repoRoot . '/crates/shirabe-php-rpc/php/guards';
+$forwardingPath = $repoRoot . '/crates/shirabe/src/php_worker/rpc/forwarding.rs';
+$byValuePath = $repoRoot . '/crates/shirabe/src/php_worker/by_value.rs';
+$pushedStaticsPath = $repoRoot . '/crates/shirabe/src/php_worker/pushed_statics.rs';
 $check = false;
 
 foreach (array_slice($argv, 1) as $arg) {
@@ -37,78 +60,73 @@ foreach (array_slice($argv, 1) as $arg) {
     }
 }
 
-/** @return list<string> */
-$readList = static function (string $path): array {
-    $entries = [];
-    foreach (file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
-        $line = trim($line);
-        if ($line !== '' && !str_starts_with($line, '#')) {
-            $entries[] = $line;
-        }
-    }
-    return $entries;
-};
-
-$targets = $readList(__DIR__ . '/targets.list');
-$exemptions = $readList(__DIR__ . '/guard-exemptions.list');
-
-// Hand-written dual-mode classes (php/runtime/) resolve through the same worker autoloader as
-// the generated stubs; the generator must know them so they can serve as stub base classes and
-// so a targets.list entry can never shadow one.
-$runtimeDir = $repoRoot . '/crates/shirabe-php-rpc/php/runtime';
-$runtimeProvided = [];
-if (is_dir($runtimeDir)) {
-    $iterator = new RecursiveIteratorIterator(
-        new RecursiveDirectoryIterator($runtimeDir, FilesystemIterator::SKIP_DOTS)
-    );
-    foreach ($iterator as $entry) {
-        if ($entry->isFile() && str_ends_with($entry->getFilename(), '.php')) {
-            $relative = substr($entry->getPathname(), strlen($runtimeDir) + 1);
-            $runtimeProvided[] = str_replace('/', '\\', substr($relative, 0, -strlen('.php')));
-        }
-    }
-}
-sort($runtimeProvided);
-
 $problems = [];
 $report = Report::load($reportPath);
 $project = new Project($composerRoot);
 
-// Every class the Rust side owns and neither a stub nor a runtime class shadows gets a guard, so
-// that the worker cannot fall through to the real implementation and run a second instance.
-// Exempt entries stay real because the worker has a mechanism that makes a native instance
-// correct; each one is justified where it is listed.
-$exempt = array_flip($exemptions);
+// The hand-written classes under php/runtime/Composer/ are exactly the classes whose treatment is
+// runtime. They resolve through the same worker autoloader as the generated stubs, and a stub may
+// extend one of them.
+$runtimeDir = $repoRoot . '/crates/shirabe-php-rpc/php/runtime';
+$runtimeFiles = [];
+if (is_dir("$runtimeDir/Composer")) {
+    $iterator = new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator("$runtimeDir/Composer", FilesystemIterator::SKIP_DOTS)
+    );
+    foreach ($iterator as $entry) {
+        if ($entry->isFile() && str_ends_with($entry->getFilename(), '.php')) {
+            $relative = substr($entry->getPathname(), strlen($runtimeDir) + 1);
+            $runtimeFiles[str_replace('/', '\\', substr($relative, 0, -strlen('.php')))] = $entry->getPathname();
+        }
+    }
+}
+$runtimeClasses = $report->withTreatment('runtime');
+foreach ($runtimeClasses as $fqcn) {
+    if (!isset($runtimeFiles[$fqcn])) {
+        $problems[] = "$fqcn has the runtime treatment but no file under $runtimeDir";
+        continue;
+    }
+    // The Rust side answers what the report says the class forwards, so the hand-written class
+    // has to define every one of those members.
+    $declared = [];
+    foreach ((new SourceFile($runtimeFiles[$fqcn], $fqcn, (new ParserFactory())->createForNewestSupportedVersion()))->classLike->getMethods() as $method) {
+        $declared[$method->name->toString()] = true;
+    }
+    foreach ($report->forwarded($fqcn) as $member) {
+        if (!isset($declared[$member['member']])) {
+            $problems[] = "$fqcn forwards {$member['member']}, which {$runtimeFiles[$fqcn]} does not define";
+        }
+    }
+}
+foreach (array_keys($runtimeFiles) as $fqcn) {
+    if (!in_array($fqcn, $runtimeClasses, true)) {
+        $problems[] = "$runtimeDir defines $fqcn, whose treatment is " . ($report->treatment($fqcn) ?? 'unknown') . ', not runtime';
+    }
+}
+
 $guardTargets = [];
-foreach ($report->inCategories(['rust-proxy', 'rust-snapshot', 'unsupported']) as $fqcn) {
-    if (in_array($fqcn, $targets, true) || in_array($fqcn, $runtimeProvided, true)) {
-        continue;
-    }
-    if (isset($exempt[$fqcn])) {
-        unset($exempt[$fqcn]);
-        continue;
-    }
+foreach ($report->withTreatment('guard') as $fqcn) {
     if ($report->kind($fqcn) !== 'class') {
-        $problems[] = "$fqcn is a {$report->kind($fqcn)} in a Rust-owned category; a guard can only"
-            . ' shadow a class';
+        $problems[] = "$fqcn is a {$report->kind($fqcn)} with the guard treatment; a guard can only shadow a class";
         continue;
     }
     $guardTargets[] = $fqcn;
 }
-foreach (array_keys($exempt) as $fqcn) {
-    $problems[] = "stale guard exemption in guard-exemptions.list: $fqcn needs no guard";
-}
 
 try {
-    $generator = new Generator($composerRoot, $report, $targets, $runtimeProvided, $exemptions);
+    $generator = new Generator($composerRoot, $report);
     $files = $generator->generate();
     $guardGenerator = new GuardGenerator(
         $project,
         new NamePrinter(),
         $guardTargets,
-        array_merge($targets, $runtimeProvided),
+        array_merge($report->withTreatment('stub'), $runtimeClasses),
+        $report,
     );
     $guardFiles = $guardGenerator->generate();
+    $forwarding = (new ForwardingModules(
+        ForwardingModel::build($report, "$runtimeDir/Shirabe", array_keys(Generator::LOCAL_BODIES)),
+    ))->render();
 } catch (GenerationError $e) {
     foreach ($e->errors as $error) {
         fwrite(STDERR, "error: $error\n");
@@ -116,40 +134,20 @@ try {
     exit(1);
 }
 
-// Handoff classification of Composer\Console\Application's declared properties. The worker-side
-// runtime definition (php/runtime/Composer/Console/Application.php) hands off exactly the state
-// a plugin-visible application exposes; a property the upstream class declares and this table
-// does not know means the handoff decision has not been made, and generation fails so a
-// Composer version bump surfaces it explicitly instead of silently dropping state.
-$applicationPropertyTable = [
-    'composer' => 'handoff',                // carried by __shirabe_console_application_boot
-    'io' => 'handoff',                      // the IO seam proxy
-    'initialWorkingDirectory' => 'handoff', // copied once at boot
-    'disablePluginsByDefault' => 'handoff', // copied once at boot
-    'disableScriptsByDefault' => 'handoff', // copied once at boot
-    'hasPluginCommands' => 'rust-local',    // Rust-side runtime state, never shared
-    'logo' => 'static-config',              // static rendering data, the worker never needs it
-];
-$applicationFile = $project->sourceFor('Composer\\Console\\Application');
-$declaredProperties = [];
-foreach ($applicationFile->classLike->getProperties() as $property) {
-    foreach ($property->props as $prop) {
-        $declaredProperties[$prop->name->toString()] = true;
-    }
-}
-foreach ($declaredProperties as $name => $_) {
-    if (!isset($applicationPropertyTable[$name])) {
-        $problems[] = "Composer\\Console\\Application::\$$name is not classified in the handoff property table in generate-stubs";
-    }
-}
-foreach ($applicationPropertyTable as $name => $_) {
-    if (!isset($declaredProperties[$name])) {
-        $problems[] = "the handoff property table in generate-stubs classifies Composer\\Console\\Application::\$$name, which the class no longer declares";
-    }
-}
+// The vocabulary of the by-value object codec (php/runtime/Shirabe/ByValueObject.php): the
+// classes whose treatment is by-value.
+$byValue = $report->withTreatment('by-value');
+sort($byValue, SORT_STRING);
+$files['Shirabe/ByValueClasses.php'] = "<?php\n\n"
+    . "// Generated by scripts/plugin-stub-generator; do not edit by hand.\n"
+    . "// The classes that cross the boundary by value: the classes whose treatment is by-value in the\n"
+    . "// classifier report. Shirabe\\ByValueObject is the codec that reads it.\n\n"
+    . "namespace Shirabe;\n\nfinal class ByValueClasses\n{\n    public const CLASSES = [\n"
+    . implode('', array_map(static fn (string $fqcn): string => "        \\$fqcn::class,\n", $byValue))
+    . "    ];\n}\n";
 
 $generatedSets = [
-    [$stubsDir, $files, 'targets.list'],
+    [$stubsDir, $files, 'the classifier report'],
     [$guardsDir, $guardFiles, 'the classifier report'],
 ];
 foreach ($generatedSets as [$dir, $generated, $source]) {
@@ -189,6 +187,56 @@ foreach ([[$stubsDir, $files, 'stubs'], [$guardsDir, $guardFiles, 'guards']] as 
         file_put_contents($path, $content);
     }
     fwrite(STDERR, count($generated) . " $what written to $dir\n");
+}
+
+// The Rust half of the by-value codec: every by-value class names the hand-written functions
+// that encode and decode it, so that a missing one is a compile error.
+$byValueCode = "//! Generated by scripts/plugin-stub-generator/generate-stubs from the classifier report; do not\n"
+    . "//! edit by hand. The classes that cross the boundary by value, each with the functions of\n"
+    . "//! `php_worker::codec` that write its value as the object record PHP's `serialize()` writes\n"
+    . "//! for it and read it back.\n\n";
+$codecFunctions = [];
+$byValueItems = '';
+foreach ($byValue as $fqcn) {
+    $suffix = implode('_', ForwardingModules::modulePath($fqcn));
+    array_push($codecFunctions, "decode_$suffix", "encode_$suffix");
+    $byValueItems .= "\n/// `$fqcn`.\nconst _: () = {\n    let _ = encode_$suffix;\n    let _ = decode_$suffix;\n};\n";
+}
+sort($codecFunctions, SORT_STRING);
+$byValueCode .= 'use crate::php_worker::codec::{' . implode(', ', $codecFunctions) . "};\n" . $byValueItems;
+
+// The shared static properties whose state lives in the worker: the Rust side pushes each of them
+// there with a hand-written function, named after the class and the property.
+$pushedStaticsCode = "//! Generated by scripts/plugin-stub-generator/generate-stubs from the classifier report; do not\n"
+    . "//! edit by hand. The static properties the worker and the Rust side share whose state lives in\n"
+    . "//! the worker, each with the function that pushes the Rust side's state there.\n\n";
+$pushFunctions = [];
+$pushItems = '';
+foreach ($report->classes() as $fqcn) {
+    foreach ($report->staticProperties($fqcn) as $property) {
+        if ($property['sync'] !== 'push') {
+            continue;
+        }
+        $module = ForwardingModules::rustName(substr($fqcn, strrpos($fqcn, '\\') + 1));
+        $function = 'push_' . ForwardingModules::rustName($property['name']);
+        $pushFunctions[$module][] = $function;
+        $pushItems .= "\n/// `$fqcn::\${$property['name']}`.\nconst _: () = {\n    let _ = $module::$function;\n};\n";
+    }
+}
+ksort($pushFunctions, SORT_STRING);
+$pushedStaticsCode .= 'use crate::php_worker::{' . implode(', ', array_keys($pushFunctions)) . "};\n" . $pushItems;
+$pushedStaticsCode = rustfmt($pushedStaticsCode);
+$byValueCode = rustfmt($byValueCode);
+
+foreach ([$forwardingPath => $forwarding, $byValuePath => $byValueCode, $pushedStaticsPath => $pushedStaticsCode] as $path => $content) {
+    if ($check) {
+        if (@file_get_contents($path) !== $content) {
+            $problems[] = "stale file (regenerate): $path";
+        }
+    } else {
+        file_put_contents($path, $content);
+        fwrite(STDERR, "written to $path\n");
+    }
 }
 
 foreach ($problems as $problem) {

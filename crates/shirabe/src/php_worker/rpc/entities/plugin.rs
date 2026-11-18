@@ -32,6 +32,18 @@ impl forwarding::shirabe::rust_plugin_stub::Forwarding
     for forwarding::shirabe::rust_plugin_stub::PhpClass
 {
     type Handle = std::rc::Rc<std::cell::RefCell<dyn PluginInterface>>;
+
+    fn activate(_: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
+        Err(call.unsupported())
+    }
+
+    fn deactivate(_: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
+        Err(call.unsupported())
+    }
+
+    fn uninstall(_: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
+        Err(call.unsupported())
+    }
 }
 
 impl forwarding::shirabe::rust_capable_plugin_stub::Forwarding

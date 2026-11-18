@@ -6,7 +6,7 @@ use crate::filter::platform_requirement_filter::PlatformRequirementFilterFactory
 use crate::installer::InstallationManagerInterface;
 use crate::package::{LockerInterface, PackageInterfaceHandle, RootPackageInterfaceHandle};
 use crate::php_worker::call::PhpCall;
-use crate::php_worker::codec::class_map_to_rpc_value;
+use crate::php_worker::codec::encode_class_map_generator_class_map;
 use crate::php_worker::rpc::entity::{Bindings, Call, Entity};
 use crate::php_worker::rpc::forwarding;
 use crate::php_worker::runtime::autoloading;
@@ -83,16 +83,6 @@ impl forwarding::autoload::autoload_generator::Forwarding
         Ok(RpcValue::Null)
     }
 
-    // TODO(plugin): no PlatformRequirementFilterInterface implementation crosses the boundary:
-    // the factory's filters are guarded in the worker, and a plugin-implemented filter has no
-    // Rust-side adapter.
-    fn set_platform_requirement_filter(
-        _: &Self::Handle,
-        call: &mut Call<'_>,
-    ) -> Result<RpcValue, PhpThrow> {
-        Err(call.unavailable("no platform requirement filter can cross the boundary"))
-    }
-
     fn dump(generator: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
         let config = call.entity::<std::rc::Rc<std::cell::RefCell<Config>>>(0)?;
         let local_repo = call.arg::<RepositoryInterfaceHandle>(1)?;
@@ -119,7 +109,7 @@ impl forwarding::autoload::autoload_generator::Forwarding
                 strict_ambiguous,
             )
             .map_err(call.failed())?;
-        Ok(class_map_to_rpc_value(&class_map))
+        Ok(encode_class_map_generator_class_map(&class_map))
     }
 
     fn build_package_map(

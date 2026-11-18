@@ -289,6 +289,20 @@ final class SourceParser
         if ($analyzer->writesOwnStaticProps) {
             $info->writesOwnStaticProps = true;
         }
+        foreach ($analyzer->ownStaticWrites as $property) {
+            $info->staticWrites[] = $property;
+        }
+        foreach ($analyzer->hardRefs as $ref) {
+            $class = ltrim($ref['class'], '\\');
+            $info->hardRefs[] = [
+                'member' => $method->name,
+                'kind' => $ref['kind'],
+                'target' => $ref['kind'] === 'new' ? $class : "$class::{$ref['member']}",
+            ];
+        }
+        $method->touchesStaticProps = $analyzer->touchesStaticProps;
+        $method->classRefs = array_values(array_unique(array_map(static fn (string $ref) => ltrim($ref, '\\'), $analyzer->classRefs)));
+        $method->ownStaticCalls = array_values(array_unique($analyzer->ownStaticCalls));
 
         $info->methods[strtolower($method->name)] = $method;
     }
@@ -407,6 +421,7 @@ final class SourceParser
                 foreach ($trait->methods as $lname => $method) {
                     if (!isset($info->methods[$lname])) {
                         $info->methods[$lname] = $method;
+                        $info->traitMethods[$lname] = true;
                     }
                 }
                 foreach ($trait->properties as $prop) {
@@ -423,6 +438,12 @@ final class SourceParser
                 }
                 if ($trait->writesOwnStaticProps) {
                     $info->writesOwnStaticProps = true;
+                }
+                foreach ($trait->staticWrites as $property) {
+                    $info->staticWrites[] = $property;
+                }
+                foreach ($trait->hardRefs as $ref) {
+                    $info->hardRefs[] = $ref;
                 }
             }
         }

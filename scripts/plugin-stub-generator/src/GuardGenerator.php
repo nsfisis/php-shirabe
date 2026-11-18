@@ -19,15 +19,6 @@ use PhpParser\Node\Stmt\ClassMethod;
  */
 final class GuardGenerator
 {
-    /**
-     * Static methods of guarded classes that forward to the Rust side through
-     * `RpcRuntime::callRustStatic` instead of failing, each with the reason it is safe to serve: the
-     * call reads no entity, so there is no second instance for it to fork.
-     */
-    private const FORWARDED_STATICS = [
-        'Composer\\Factory::getComposerFile' => 'it only reads the COMPOSER environment variable, whose value the Rust side owns.',
-    ];
-
     /** @var list<string> */
     private array $errors = [];
 
@@ -41,6 +32,15 @@ final class GuardGenerator
     private array $inheritedFinals = [];
 
     /**
+     * Static methods of guarded classes that forward to the Rust side through
+     * `RpcRuntime::callRustStatic` instead of failing, each with the reason the classifier report
+     * gives for it.
+     *
+     * @var array<string, string> `FQCN::method` => reason
+     */
+    private array $forwardedStatics = [];
+
+    /**
      * @param list<string> $targets  FQCNs to emit a guard for
      * @param list<string> $provided FQCNs the worker resolves to a proxy stub or a hand-written
      *                               runtime class; a guard never reproduces their members, since
@@ -51,9 +51,15 @@ final class GuardGenerator
         private readonly NamePrinter $printer,
         private readonly array $targets,
         array $provided,
+        Report $report,
     ) {
         foreach ($targets as $fqcn) {
             $this->guardSet[$fqcn] = true;
+            foreach ($report->forwarded($fqcn) as $member) {
+                if ($member['status'] === 'forward') {
+                    $this->forwardedStatics[$fqcn . '::' . $member['member']] = $member['reason'];
+                }
+            }
         }
         foreach ($provided as $fqcn) {
             $this->providedSet[$fqcn] = true;
@@ -63,11 +69,6 @@ final class GuardGenerator
     /** @return array<string, string> relative guard path => file content */
     public function generate(): array
     {
-        foreach (array_keys(self::FORWARDED_STATICS) as $member) {
-            if (!in_array(explode('::', $member)[0], $this->targets, true)) {
-                $this->errors[] = "FORWARDED_STATICS names $member, which is not a guard target";
-            }
-        }
         $files = [];
         foreach ($this->targets as $fqcn) {
             $files[str_replace('\\', '/', $fqcn) . '.php'] = $this->emitClass($fqcn);
@@ -138,7 +139,7 @@ final class GuardGenerator
         foreach ($this->inheritedFinals as $member) {
             $header .= "\n// $member() is final, so it keeps running the real implementation here.";
         }
-        foreach (array_keys(self::FORWARDED_STATICS) as $member) {
+        foreach (array_keys($this->forwardedStatics) as $member) {
             if (str_starts_with($member, "$fqcn::")) {
                 $header .= "\n// $member() is the exception: it forwards to the Rust side.";
             }
@@ -228,7 +229,7 @@ final class GuardGenerator
             return "    $signature;";
         }
         $member = "$fqcn::$name";
-        if ($method->isStatic() && isset(self::FORWARDED_STATICS[$member])) {
+        if ($method->isStatic() && isset($this->forwardedStatics[$member])) {
             foreach ($method->params as $param) {
                 if ($param->byRef) {
                     $this->errors[] = "$member: a forwarded static may not take by-ref parameters";
@@ -237,7 +238,7 @@ final class GuardGenerator
             $args = implode(', ', array_map(static fn ($param): string => '$' . $param->var->name, $method->params));
             $call = "\\Shirabe\\RpcRuntime::callRustStatic(self::class, '$name', [$args])";
             $isVoid = $returnType === 'void';
-            return "    // Forwarded rather than guarded: " . self::FORWARDED_STATICS[$member] . "\n"
+            return "    // Forwarded rather than guarded: " . $this->forwardedStatics[$member] . "\n"
                 . "    $signature\n    {\n"
                 . "        " . ($isVoid ? '' : 'return ') . "$call;\n    }";
         }
