@@ -124,20 +124,38 @@ function resolveTarget(string $target, array $classes): array
 function printRow(array $row): void
 {
     echo $row['fqcn'], "\n";
-    echo '  category:  ', $row['category'];
-    if (isset($row['computedCategory'])) {
-        echo ' (computed: ', $row['computedCategory'], ', overridden)';
+    echo '  value:     ', $row['value'] ?? '-';
+    if (isset($row['ruleValue'])) {
+        echo ' (rules: ', $row['ruleValue'], ', overridden)';
     }
     echo "\n";
+    echo '  treatment: ', $row['treatment'], ' (', $row['treatmentSource'], ")\n";
     echo '  direction: ', $row['direction'] ?? '-', "\n";
     echo '  reachable: ', $row['reachable'] ? 'yes' : 'no', "\n";
     foreach ($row['reasons'] as $reason) {
         echo '  reason:    ', $reason, "\n";
     }
     foreach ($row['attributes'] as $key => $value) {
-        echo '  ', $key, ': ', is_array($value) ? implode(', ', $value) : var_export($value, true), "\n";
+        if (is_array($value)) {
+            $value = array_is_list($value)
+                ? implode(', ', $value)
+                : implode(', ', array_map(static fn ($k, $v) => "$k: $v", array_keys($value), $value));
+        } else {
+            $value = var_export($value, true);
+        }
+        echo '  ', $key, ': ', $value, "\n";
     }
-    if (isset($row['methods'])) {
+    foreach ($row['forwarded'] ?? [] as $member) {
+        if ($member['status'] !== 'implemented') {
+            echo '  ', $member['kind'], ' ', $member['member'], ': ', $member['status'],
+                isset($member['reason']) ? ' (' . $member['reason'] . ')' : '', "\n";
+        }
+    }
+    foreach ($row['staticProperties'] ?? [] as $property) {
+        echo '  static $', $property['name'], ': ', $property['disposition'],
+            $property['sync'] !== null ? ', sync ' . $property['sync'] : '', "\n";
+    }
+    if ($row['methods'] !== []) {
         $mutators = array_values(array_filter($row['methods'], static fn (array $m) => $m['purity'] === 'mutator'));
         echo '  methods:   ', count($row['methods']), ' public/protected, ', count($mutators), " mutator\n";
         foreach ($mutators as $m) {
@@ -169,14 +187,14 @@ foreach (array_slice($argv, 1) as $i => $target) {
     if (isset($vendorTypes[$name])) {
         $row = $vendorTypes[$name];
         echo $row['fqcn'], "\n";
-        echo '  category:  ', $row['category'], ' (vendor package ', $row['package'], ")\n";
+        echo '  value:     ', $row['value'], ' (vendor package ', $row['package'], ")\n";
         echo '  direction: ', $row['direction'], "\n";
         continue;
     }
     $vendor = VendorPackages::lookup($name);
     if ($vendor !== null) {
         echo $name, "\n";
-        echo '  category:  ', $vendor['category'], ' (vendor package ', $vendor['package'], ", wholesale)\n";
+        echo '  value:     ', $vendor['value'], ' (vendor package ', $vendor['package'], ", wholesale)\n";
         continue;
     }
 

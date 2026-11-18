@@ -1,0 +1,62 @@
+{
+    "Composer\\Autoload\\ClassLoader": {
+        "includeFile": "memo-cache",
+        "registeredLoaders": "memo-cache"
+    },
+    "Composer\\Cache": {
+        "cacheCollected": "memo-cache"
+    },
+    "Composer\\Downloader\\FileDownloader": {
+        "downloadMetadata": "needs-sync",
+        "responseHeaders": "needs-sync"
+    },
+    "Composer\\Downloader\\ZipDownloader": {
+        "hasZipArchive": "memo-cache",
+        "isWindows": "memo-cache",
+        "unzipCommands": "memo-cache"
+    },
+    "Composer\\InstalledVersions": {
+        "canGetVendors": "memo-cache",
+        "installed": "needs-sync",
+        "installedByVendor": "memo-cache",
+        "installedIsLocalDir": "memo-cache",
+        "selfDir": "memo-cache"
+    },
+    "Composer\\Package\\Version\\VersionParser": {
+        "constraints": "memo-cache"
+    },
+    "Composer\\Platform\\HhvmDetector": {
+        "hhvmVersion": "memo-cache"
+    },
+    "Composer\\Repository\\PlatformRepository": {
+        "lastSeenPlatformPhp": "memo-cache"
+    },
+    "Composer\\Util\\ErrorHandler": {
+        "hasShownDeprecationNotice": "memo-cache",
+        "io": "needs-sync"
+    },
+    "Composer\\Util\\Git": {
+        "version": "memo-cache"
+    },
+    "Composer\\Util\\Hg": {
+        "version": "memo-cache"
+    },
+    "Composer\\Util\\Http\\ProxyManager": {
+        "instance": "memo-cache"
+    },
+    "Composer\\Util\\Platform": {
+        "isDocker": "memo-cache",
+        "isVirtualBoxGuest": "memo-cache",
+        "isWindowsSubsystemForLinux": "memo-cache"
+    },
+    "Composer\\Util\\ProcessExecutor": {
+        "executables": "memo-cache",
+        "timeout": "needs-sync"
+    },
+    "Composer\\Util\\Silencer": {
+        "stack": "memo-cache"
+    },
+    "Composer\\Util\\Svn": {
+        "version": "memo-cache"
+    }
+}

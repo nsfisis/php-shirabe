@@ -5,32 +5,37 @@ declare(strict_types=1);
 namespace Shirabe\PluginClassifier;
 
 /**
- * Package-level classification of composer/composer's runtime vendor
- * dependencies, applied by namespace prefix. See the "Mechanical rules"
- * step 6 in docs/dev/plugin-class-classification.md for the criterion.
+ * composer/composer's runtime vendor dependencies, applied by namespace
+ * prefix. A vendor package is handled as a whole: symfony/console is
+ * two-world, every other one runs as real code in the worker (`worker`).
+ * The vendor classes that cross by value are named in overrides.json.
+ *
+ * `valueSafe` says whether a value object may hold the package's types in
+ * its state: false for the packages whose types are living objects
+ * (promises, console objects) rather than values.
  */
 final class VendorPackages
 {
-    /** @var array<string, array{package: string, category: string}> prefix => info */
+    /** @var array<string, array{package: string, value: string, valueSafe: bool}> prefix => info */
     public const PREFIXES = [
-        'Composer\\Semver\\' => ['package' => 'composer/semver', 'category' => 'php-native'],
-        'Composer\\Pcre\\' => ['package' => 'composer/pcre', 'category' => 'php-native'],
-        'Composer\\CaBundle\\' => ['package' => 'composer/ca-bundle', 'category' => 'php-native'],
-        'Composer\\ClassMapGenerator\\' => ['package' => 'composer/class-map-generator', 'category' => 'php-native'],
-        'Composer\\MetadataMinifier\\' => ['package' => 'composer/metadata-minifier', 'category' => 'php-native'],
-        'Composer\\Spdx\\' => ['package' => 'composer/spdx-licenses', 'category' => 'php-native'],
-        'Composer\\XdebugHandler\\' => ['package' => 'composer/xdebug-handler', 'category' => 'php-native'],
-        'JsonSchema\\' => ['package' => 'justinrainbow/json-schema', 'category' => 'php-native'],
-        'Seld\\JsonLint\\' => ['package' => 'seld/jsonlint', 'category' => 'php-native'],
-        'Seld\\PharUtils\\' => ['package' => 'seld/phar-utils', 'category' => 'php-native'],
-        'Seld\\Signal\\' => ['package' => 'seld/signal-handler', 'category' => 'php-native'],
-        'Psr\\Log\\' => ['package' => 'psr/log', 'category' => 'php-native'],
-        'React\\Promise\\' => ['package' => 'react/promise', 'category' => 'contract'],
-        'Symfony\\Component\\Console\\' => ['package' => 'symfony/console', 'category' => 'two-world'],
-        'Symfony\\Component\\Process\\' => ['package' => 'symfony/process', 'category' => 'php-native'],
-        'Symfony\\Component\\Filesystem\\' => ['package' => 'symfony/filesystem', 'category' => 'php-native'],
-        'Symfony\\Component\\Finder\\' => ['package' => 'symfony/finder', 'category' => 'php-native'],
-        'Symfony\\Polyfill\\' => ['package' => 'symfony/polyfill', 'category' => 'php-native'],
+        'Composer\\Semver\\' => ['package' => 'composer/semver', 'value' => 'worker', 'valueSafe' => true],
+        'Composer\\Pcre\\' => ['package' => 'composer/pcre', 'value' => 'worker', 'valueSafe' => true],
+        'Composer\\CaBundle\\' => ['package' => 'composer/ca-bundle', 'value' => 'worker', 'valueSafe' => true],
+        'Composer\\ClassMapGenerator\\' => ['package' => 'composer/class-map-generator', 'value' => 'worker', 'valueSafe' => true],
+        'Composer\\MetadataMinifier\\' => ['package' => 'composer/metadata-minifier', 'value' => 'worker', 'valueSafe' => true],
+        'Composer\\Spdx\\' => ['package' => 'composer/spdx-licenses', 'value' => 'worker', 'valueSafe' => true],
+        'Composer\\XdebugHandler\\' => ['package' => 'composer/xdebug-handler', 'value' => 'worker', 'valueSafe' => true],
+        'JsonSchema\\' => ['package' => 'justinrainbow/json-schema', 'value' => 'worker', 'valueSafe' => true],
+        'Seld\\JsonLint\\' => ['package' => 'seld/jsonlint', 'value' => 'worker', 'valueSafe' => true],
+        'Seld\\PharUtils\\' => ['package' => 'seld/phar-utils', 'value' => 'worker', 'valueSafe' => true],
+        'Seld\\Signal\\' => ['package' => 'seld/signal-handler', 'value' => 'worker', 'valueSafe' => true],
+        'Psr\\Log\\' => ['package' => 'psr/log', 'value' => 'worker', 'valueSafe' => true],
+        'React\\Promise\\' => ['package' => 'react/promise', 'value' => 'worker', 'valueSafe' => false],
+        'Symfony\\Component\\Console\\' => ['package' => 'symfony/console', 'value' => 'two-world', 'valueSafe' => false],
+        'Symfony\\Component\\Process\\' => ['package' => 'symfony/process', 'value' => 'worker', 'valueSafe' => true],
+        'Symfony\\Component\\Filesystem\\' => ['package' => 'symfony/filesystem', 'value' => 'worker', 'valueSafe' => true],
+        'Symfony\\Component\\Finder\\' => ['package' => 'symfony/finder', 'value' => 'worker', 'valueSafe' => true],
+        'Symfony\\Polyfill\\' => ['package' => 'symfony/polyfill', 'value' => 'worker', 'valueSafe' => true],
     ];
 
     /**
@@ -55,7 +60,7 @@ final class VendorPackages
         'Composer\\Pcre\\Regex' => [],
     ];
 
-    /** @return array{package: string, category: string}|null */
+    /** @return array{package: string, value: string, valueSafe: bool}|null */
     public static function lookup(string $fqcn): ?array
     {
         foreach (self::PREFIXES as $prefix => $info) {

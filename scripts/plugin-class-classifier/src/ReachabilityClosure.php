@@ -33,7 +33,7 @@ final class ReachabilityClosure
 
     public function __construct(
         private readonly SourceParser $sources,
-        private readonly Lists $lists,
+        private readonly Inputs $lists,
     ) {
         $this->buildDescendants();
     }

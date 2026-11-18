@@ -1,0 +1,17 @@
+{
+    "Composer\\Command": {
+        "reason": "the console commands: the Rust side runs its own, and plugin commands run in the worker under a genuine console application"
+    },
+    "Composer\\Console": {
+        "reason": "the console application: each side runs its own, the worker one hosting plugin commands"
+    },
+    "Composer\\Util\\Loop": {
+        "reason": "each side drives its own event loop over the jobs it started"
+    },
+    "Composer\\Util\\SyncHelper": {
+        "reason": "a helper over Loop, which each side drives on its own"
+    },
+    "Symfony\\Component\\Console": {
+        "reason": "the console component: each side has its own input, output and application objects"
+    }
+}

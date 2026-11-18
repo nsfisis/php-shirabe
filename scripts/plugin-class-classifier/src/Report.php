@@ -6,11 +6,20 @@ namespace Shirabe\PluginClassifier;
 
 final class Report
 {
+    private const BACKLOG_ITEMS = [
+        1 => 'guarded classes the Rust side owns: a stub or a codec is missing',
+        2 => 'references the upstream code in the worker cannot follow',
+        3 => 'worker classes the guard propagation guards',
+        4 => 'forwarded members the Rust side does not answer',
+        5 => 'real classes whose Rust-side instances cannot cross',
+        6 => 'shared static properties no mechanism keeps in sync',
+    ];
+
     public function __construct(private readonly Classifier $classifier)
     {
     }
 
-    public function writeJson(string $path): void
+    public function render(): string
     {
         $vendor = [];
         foreach ($this->classifier->closure->vendorReachable as $fqcn => $bits) {
@@ -18,7 +27,7 @@ final class Report
             $vendor[] = [
                 'fqcn' => $fqcn,
                 'package' => $info['package'],
-                'category' => $info['category'],
+                'value' => $this->classifier->foreignValue($fqcn) ?? $info['value'],
                 'direction' => $bits === 3 ? 'both' : ($bits === 1 ? 'provided' : 'consumed'),
             ];
         }
@@ -28,55 +37,43 @@ final class Report
         sort($builtins);
 
         $vendorPackages = [];
-        foreach (VendorPackages::PREFIXES as $prefix => $info) {
-            $vendorPackages[$info['package']] = $info['category'];
+        foreach (VendorPackages::PREFIXES as $info) {
+            $vendorPackages[$info['package']] = $info['value'];
         }
         ksort($vendorPackages);
 
         $data = [
-            'categories' => $this->countByCategory(),
+            'categories' => $this->counts(),
             'classes' => array_values($this->classifier->rows),
             'vendorPackages' => $vendorPackages,
             'vendorTypes' => $vendor,
             'reachableBuiltins' => $builtins,
+            'backlog' => $this->classifier->backlog,
             'violations' => $this->classifier->violations,
         ];
 
-        $json = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-        if (file_put_contents($path, $json . "\n") === false) {
-            throw new \RuntimeException("cannot write $path");
-        }
+        return json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR) . "\n";
     }
 
     public function printSummary(): void
     {
-        $counts = $this->countByCategory();
+        $counts = $this->counts();
         echo "# Plugin boundary classification\n\n";
-        echo "| category | classes |\n|---|---|\n";
-        foreach ($counts as $category => $count) {
-            echo "| $category | $count |\n";
+        echo "| value | classes |\n|---|---|\n";
+        foreach ($counts['value'] as $value => $count) {
+            echo "| $value | $count |\n";
         }
-
-        echo "\n## Reachable surface\n\n";
-        foreach (['rust-proxy', 'rust-snapshot', 'contract'] as $category) {
-            $names = [];
-            foreach ($this->classifier->rows as $row) {
-                if ($row['category'] === $category && $row['reachable']) {
-                    $names[] = $row['fqcn'] . ($row['direction'] === 'both' ? ' (both)' : '');
-                }
-            }
-            echo '### ' . $category . ' (' . count($names) . ")\n\n";
-            foreach ($names as $name) {
-                echo "- $name\n";
-            }
-            echo "\n";
+        echo "\n| treatment | classes |\n|---|---|\n";
+        foreach ($counts['treatment'] as $treatment => $count) {
+            echo "| $treatment | $count |\n";
         }
+        echo "\n";
 
-        $overridden = array_filter($this->classifier->rows, static fn (array $r) => isset($r['computedCategory']));
+        $overridden = array_filter($this->classifier->rows, static fn (array $r) => isset($r['ruleValue']));
         if ($overridden !== []) {
             echo "## Overridden\n\n";
             foreach ($overridden as $row) {
-                echo "- {$row['fqcn']}: {$row['computedCategory']} -> {$row['category']}\n";
+                echo "- {$row['fqcn']}: {$row['ruleValue']} -> {$row['value']}\n";
             }
             echo "\n";
         }
@@ -90,14 +87,33 @@ final class Report
         }
     }
 
-    /** @return array<string, int> */
-    private function countByCategory(): array
+    /** Prints the backlog as warnings: each entry is a gap between the current treatment and full compatibility. */
+    public function printBacklog(): void
     {
-        $counts = array_fill_keys(Classifier::CATEGORIES, 0);
+        $byItem = [];
+        foreach ($this->classifier->backlog as $entry) {
+            $byItem[$entry['item']][] = $entry;
+        }
+        foreach (self::BACKLOG_ITEMS as $item => $title) {
+            $entries = $byItem[$item] ?? [];
+            if ($entries !== []) {
+                fwrite(STDERR, "warning: backlog $item ($title): " . count($entries) . " entries\n");
+            }
+        }
+    }
+
+    /** @return array{value: array<string, int>, treatment: array<string, int>} */
+    private function counts(): array
+    {
+        $values = array_fill_keys(Classifier::VALUES, 0);
+        $treatments = array_fill_keys(Classifier::TREATMENTS, 0);
         foreach ($this->classifier->rows as $row) {
-            $counts[$row['category']]++;
+            if ($row['value'] !== null) {
+                $values[$row['value']]++;
+            }
+            $treatments[$row['treatment']]++;
         }
 
-        return $counts;
+        return ['value' => $values, 'treatment' => $treatments];
     }
 }
