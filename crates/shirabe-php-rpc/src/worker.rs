@@ -319,6 +319,37 @@ mod tests {
     use shirabe_php_shim::Exit;
 
     #[test]
+    fn an_idle_worker_outlasts_the_socket_timeout() {
+        let config = WorkerConfig {
+            ini_settings: vec![("default_socket_timeout".into(), "1".into())],
+            ..WorkerConfig::default()
+        };
+        let mut worker = spawn_worker(&config).expect("failed to spawn PHP worker");
+        std::thread::sleep(std::time::Duration::from_secs(3));
+
+        let reply = worker
+            .on_stream(|stream| {
+                frame::write_frame(
+                    stream,
+                    &Frame::CallFunction {
+                        corr_id: 1,
+                        function_name: "strtoupper".into(),
+                        args: vec![RpcValue::string("idle")],
+                    },
+                )?;
+                frame::read_frame(stream)
+            })
+            .expect("a live worker is not an I/O error")
+            .expect("the worker is still running");
+        assert!(
+            matches!(&reply, Frame::Return { value, .. } if *value == RpcValue::string("IDLE")),
+            "unexpected reply: {reply:?}"
+        );
+        worker.child.kill().expect("failed to kill PHP worker");
+        worker.child.wait().expect("failed to reap PHP worker");
+    }
+
+    #[test]
     fn request_error_reports_dead_worker_exit_status() {
         let mut worker =
             spawn_worker(&WorkerConfig::default()).expect("failed to spawn PHP worker");
