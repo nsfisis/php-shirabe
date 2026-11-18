@@ -570,7 +570,7 @@ final class Generator
      * two-world class the Rust side never hands out as an entity, so `getLoop()` answers with the
      * worker-side sibling built over the proxied services (docs/dev/plugin-async.md).
      */
-    private const LOCAL_BODIES = [
+    public const LOCAL_BODIES = [
         'Composer\\PartialComposer::getLoop' => '        return \\Shirabe\\RpcRuntime::loopFor($this, $this->__entityId);',
     ];
 

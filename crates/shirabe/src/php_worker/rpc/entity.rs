@@ -3,8 +3,10 @@
 //!
 //! An entity crosses the boundary as one of the worker-side classes that forward members to the
 //! Rust side (a proxy stub, a runtime class). `forwarding` holds, for each of those classes, the
-//! members it forwards as a trait and the `match` routing a call to them; both are generated
-//! from the PHP side. What the Rust side answers is written by hand, as the impl of that trait.
+//! members the Rust side answers as a trait and the `match` routing a call to them; both are
+//! generated from the classifier report, which also records the members the Rust side does not
+//! answer, and the `match` answers those with an error. What the Rust side answers is written by
+//! hand, as the impl of that trait.
 
 use crate::php_worker::rpc::dispatch::error_throw;
 use crate::php_worker::rpc::table;

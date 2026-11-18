@@ -6,6 +6,8 @@ declare(strict_types=1);
 require __DIR__ . '/vendor/autoload.php';
 
 use PhpParser\ParserFactory;
+use Shirabe\PluginStubGenerator\ForwardingModel;
+use Shirabe\PluginStubGenerator\ForwardingModules;
 use Shirabe\PluginStubGenerator\GenerationError;
 use Shirabe\PluginStubGenerator\Generator;
 use Shirabe\PluginStubGenerator\GuardGenerator;
@@ -19,6 +21,7 @@ $composerRoot = $repoRoot . '/composer';
 $reportPath = $repoRoot . '/scripts/plugin-class-classifier/report.json';
 $stubsDir = $repoRoot . '/crates/shirabe-php-rpc/php/stubs';
 $guardsDir = $repoRoot . '/crates/shirabe-php-rpc/php/guards';
+$forwardingPath = $repoRoot . '/crates/shirabe/src/php_worker/rpc/forwarding.rs';
 $check = false;
 
 foreach (array_slice($argv, 1) as $arg) {
@@ -103,6 +106,9 @@ try {
         $report,
     );
     $guardFiles = $guardGenerator->generate();
+    $forwarding = (new ForwardingModules(
+        ForwardingModel::build($report, "$runtimeDir/Shirabe", array_keys(Generator::LOCAL_BODIES)),
+    ))->render();
 } catch (GenerationError $e) {
     foreach ($e->errors as $error) {
         fwrite(STDERR, "error: $error\n");
@@ -163,6 +169,15 @@ foreach ([[$stubsDir, $files, 'stubs'], [$guardsDir, $guardFiles, 'guards']] as 
         file_put_contents($path, $content);
     }
     fwrite(STDERR, count($generated) . " $what written to $dir\n");
+}
+
+if ($check) {
+    if (@file_get_contents($forwardingPath) !== $forwarding) {
+        $problems[] = "stale file (regenerate): $forwardingPath";
+    }
+} else {
+    file_put_contents($forwardingPath, $forwarding);
+    fwrite(STDERR, "forwarding modules written to $forwardingPath\n");
 }
 
 foreach ($problems as $problem) {
