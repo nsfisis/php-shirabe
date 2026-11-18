@@ -83,8 +83,11 @@ pub fn php_binding(
 ///   `classes` then lists every class it chooses from, with their forwarding
 ///   ancestors.
 /// * `address` computes the entity's identity from the handle, the `Rc` itself by default;
-///   `clone`, `property` and `worker_method` name the hand-written functions answering
-///   `__clone`, the property forwarders and the methods only the worker runtime calls.
+///   `clone` and `worker_method` name the hand-written functions answering `__clone` and the
+///   methods only the worker runtime calls.
+/// * `properties: { "name": path }` names the hand-written functions answering the property
+///   forwarders (`__get`, `__set`, `__isset`, `__unset`) for an instance property the classes
+///   declare; any other property is the "not available over RPC yet" error.
 /// * Each entry of `types` names what answers the instance or static methods a PHP type
 ///   declares, or only the ones it lists after `only [...]`. An `instance` entry gives the type
 ///   the adapters call (`for`) and how a handle reaches it, for `&self` methods through a

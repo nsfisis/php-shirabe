@@ -11,6 +11,16 @@ pub struct Decl {
     pub methods: Vec<Method>,
     #[serde(default)]
     pub constructor: Option<Constructor>,
+    #[serde(default)]
+    pub properties: Vec<Property>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Property {
+    pub name: String,
+    #[serde(rename = "static")]
+    pub is_static: bool,
 }
 
 #[derive(Debug, serde::Deserialize)]

@@ -38,13 +38,7 @@ pub trait Entity: Clone + 'static {
 
     /// `__get` / `__set` / `__isset` / `__unset`.
     fn property(&self, access: PropertyAccess<'_>) -> Result<RpcValue, PhpThrow> {
-        // TODO(plugin): the instance properties the proxied classes expose are widened on
-        // demand. Each one has to decide how the state the real class keeps in that property is
-        // served from the Rust-side entity.
-        Err(PhpThrow::runtime(bformat!(
-            "the property `{}` is not available over RPC yet",
-            access.name()
-        )))
+        unavailable_property(&access)
     }
 
     /// A method only the worker runtime itself calls on this entity (`__shirabe_loop_services` on the
@@ -53,6 +47,17 @@ pub trait Entity: Clone + 'static {
         let _ = call;
         None
     }
+}
+
+/// The answer of a property forwarder for a property the entity declaration does not serve.
+pub fn unavailable_property(access: &PropertyAccess<'_>) -> Result<RpcValue, PhpThrow> {
+    // TODO(plugin): the instance properties the proxied classes expose are widened on demand.
+    // Each one has to decide how the state the real class keeps in that property is served from
+    // the Rust-side entity.
+    Err(PhpThrow::runtime(bformat!(
+        "the property `{}` is not available over RPC yet",
+        access.name()
+    )))
 }
 
 /// One of the property forwarders every stub carries.

@@ -301,7 +301,7 @@ struct Input {
     class: Class,
     classes: Vec<syn::LitStr>,
     clone: Option<syn::Path>,
-    property: Option<syn::Path>,
+    properties: Vec<(syn::LitStr, syn::Path)>,
     worker_method: Option<syn::Path>,
     types: Vec<Entry>,
     constructors: Vec<ConstructEntry>,
@@ -316,7 +316,7 @@ impl syn::parse::Parse for Input {
         let mut class = None;
         let mut classes = None;
         let mut clone = None;
-        let mut property = None;
+        let mut properties = Vec::new();
         let mut worker_method = None;
         let mut types = None;
         let mut constructors = Vec::new();
@@ -352,7 +352,18 @@ impl syn::parse::Parse for Input {
                     );
                 }
                 "clone" => clone = Some(input.parse()?),
-                "property" => property = Some(input.parse()?),
+                "properties" => {
+                    let content;
+                    syn::braced!(content in input);
+                    while !content.is_empty() {
+                        let name: syn::LitStr = content.parse()?;
+                        content.parse::<syn::Token![:]>()?;
+                        properties.push((name, content.parse()?));
+                        if !content.is_empty() {
+                            content.parse::<syn::Token![,]>()?;
+                        }
+                    }
+                }
                 "worker_method" => worker_method = Some(input.parse()?),
                 "unimplemented" => statuses.parse_unimplemented(input)?,
                 "refused" => statuses.parse_refused(input)?,
@@ -380,7 +391,7 @@ impl syn::parse::Parse for Input {
                 _ => {
                     return Err(syn::Error::new(
                         key.span(),
-                        "expected `handle`, `expected`, `address`, `class`, `classes`, `clone`, `property`, `worker_method`, `types`, `constructors`, `unimplemented` or `refused`",
+                        "expected `handle`, `expected`, `address`, `class`, `classes`, `clone`, `properties`, `worker_method`, `types`, `constructors`, `unimplemented` or `refused`",
                     ));
                 }
             }
@@ -411,7 +422,7 @@ impl syn::parse::Parse for Input {
             class,
             classes,
             clone,
-            property,
+            properties,
             worker_method,
             types: types.ok_or_else(|| missing("types"))?,
             constructors,
@@ -576,13 +587,39 @@ fn expand_input(input: Input) -> syn::Result<proc_macro2::TokenStream> {
             }
         }
     });
-    let property = input.property.as_ref().map(|function| {
+    for (name, _) in &input.properties {
+        let declared = classes.iter().any(|class| {
+            class
+                .loaded
+                .decl
+                .properties
+                .iter()
+                .any(|property| !property.is_static && property.name == name.value())
+        });
+        if !declared {
+            return Err(syn::Error::new(
+                name.span(),
+                format!(
+                    "these classes declare no instance property `{}`",
+                    name.value()
+                ),
+            ));
+        }
+    }
+    let property = (!input.properties.is_empty()).then(|| {
+        let arms = input.properties.iter().map(|(name, function)| {
+            let literal = syn::LitByteStr::new(name.value().as_bytes(), name.span());
+            quote::quote! { #literal => #function(self, access), }
+        });
         quote::quote! {
             fn property(
                 &self,
                 access: crate::php_worker::rpc::entity::PropertyAccess<'_>,
             ) -> ::core::result::Result<::shirabe_php_rpc::RpcValue, ::shirabe_php_rpc::PhpThrow> {
-                #function(self, access)
+                match &**access.name() {
+                    #(#arms)*
+                    _ => crate::php_worker::rpc::entity::unavailable_property(&access),
+                }
             }
         }
     });

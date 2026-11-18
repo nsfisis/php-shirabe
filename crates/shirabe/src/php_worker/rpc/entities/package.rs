@@ -45,7 +45,7 @@ php_entity! {
         r"Composer\Package\RootAliasPackage",
     ],
     clone: clone_package,
-    property: package_property,
+    properties: { "id": package_id },
     unimplemented: [
         r"Composer\Package\RootPackage::__construct",
     ],
@@ -116,17 +116,10 @@ fn clone_package(package: &PackageInterfaceHandle) -> Result<PackageInterfaceHan
 }
 
 // `BasePackage::$id` is the one instance property the packages expose so far.
-fn package_property(
+fn package_id(
     package: &PackageInterfaceHandle,
     access: PropertyAccess<'_>,
 ) -> Result<RpcValue, PhpThrow> {
-    if access.name() != "id" {
-        // TODO(plugin): the remaining package properties are widened on demand.
-        return Err(PhpThrow::runtime(bformat!(
-            "the property `{}` is not available over RPC yet",
-            access.name()
-        )));
-    }
     match access {
         PropertyAccess::Get { .. } => Ok(package
             .as_rc()
