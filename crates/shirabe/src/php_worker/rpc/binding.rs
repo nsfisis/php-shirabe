@@ -256,6 +256,13 @@ impl IntoRpcAnswer for PackageHandle {
     }
 }
 
+/// The root package crosses as a package entity.
+impl IntoRpcAnswer for &RootPackageInterfaceHandle {
+    fn into_rpc_answer(self, _: &dyn Fn(anyhow::Error) -> PhpThrow) -> Result<RpcValue, PhpThrow> {
+        entity_value(&PackageInterfaceHandle::from(self.clone()))
+    }
+}
+
 /// An alias package crosses as a package entity.
 impl IntoRpcAnswer for AliasPackageHandle {
     fn into_rpc_answer(self, _: &dyn Fn(anyhow::Error) -> PhpThrow) -> Result<RpcValue, PhpThrow> {

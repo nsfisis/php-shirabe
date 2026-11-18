@@ -202,6 +202,7 @@ struct Input {
     classes: Vec<syn::LitStr>,
     clone: Option<syn::Path>,
     property: Option<syn::Path>,
+    worker_method: Option<syn::Path>,
     types: Vec<Entry>,
     constructors: Vec<ConstructEntry>,
 }
@@ -215,6 +216,7 @@ impl syn::parse::Parse for Input {
         let mut classes = None;
         let mut clone = None;
         let mut property = None;
+        let mut worker_method = None;
         let mut types = None;
         let mut constructors = Vec::new();
         while !input.is_empty() {
@@ -249,6 +251,7 @@ impl syn::parse::Parse for Input {
                 }
                 "clone" => clone = Some(input.parse()?),
                 "property" => property = Some(input.parse()?),
+                "worker_method" => worker_method = Some(input.parse()?),
                 "types" => {
                     let content;
                     syn::braced!(content in input);
@@ -273,7 +276,7 @@ impl syn::parse::Parse for Input {
                 _ => {
                     return Err(syn::Error::new(
                         key.span(),
-                        "expected `handle`, `expected`, `address`, `class`, `classes`, `clone`, `property`, `types` or `constructors`",
+                        "expected `handle`, `expected`, `address`, `class`, `classes`, `clone`, `property`, `worker_method`, `types` or `constructors`",
                     ));
                 }
             }
@@ -305,6 +308,7 @@ impl syn::parse::Parse for Input {
             classes,
             clone,
             property,
+            worker_method,
             types: types.ok_or_else(|| missing("types"))?,
             constructors,
         })
@@ -477,6 +481,18 @@ fn expand_input(input: Input) -> syn::Result<proc_macro2::TokenStream> {
             }
         }
     });
+    let worker_method = input.worker_method.as_ref().map(|function| {
+        quote::quote! {
+            fn worker_method(
+                &self,
+                call: &mut crate::php_worker::rpc::entity::Call<'_>,
+            ) -> ::core::option::Option<
+                ::core::result::Result<::shirabe_php_rpc::RpcValue, ::shirabe_php_rpc::PhpThrow>,
+            > {
+                #function(self, call)
+            }
+        }
+    });
     let tracking = classes.iter().map(|class| &class.loaded.tracking);
 
     Ok(quote::quote! {
@@ -500,6 +516,8 @@ fn expand_input(input: Input) -> syn::Result<proc_macro2::TokenStream> {
                 #clone
 
                 #property
+
+                #worker_method
             }
 
             #(#routes)*
@@ -696,4 +714,122 @@ fn params_check(
             #message,
         );
     }
+}
+
+/// The input of `php_statics!`: a class with no entity, whose static methods are forwarded.
+struct StaticsInput {
+    class: syn::LitStr,
+    types: Vec<Entry>,
+}
+
+impl syn::parse::Parse for StaticsInput {
+    fn parse(input: syn::parse::ParseStream<'_>) -> syn::Result<Self> {
+        let mut class = None;
+        let mut types = None;
+        while !input.is_empty() {
+            let key: syn::Ident = input.parse()?;
+            input.parse::<syn::Token![:]>()?;
+            match key.to_string().as_str() {
+                "class" => class = Some(input.parse()?),
+                "types" => {
+                    let content;
+                    syn::braced!(content in input);
+                    types = Some(
+                        content
+                            .parse_terminated(<Entry as syn::parse::Parse>::parse, syn::Token![,])?
+                            .into_iter()
+                            .collect(),
+                    );
+                }
+                _ => return Err(syn::Error::new(key.span(), "expected `class` or `types`")),
+            }
+            if !input.is_empty() {
+                input.parse::<syn::Token![,]>()?;
+            }
+        }
+        let missing = |what: &str| {
+            syn::Error::new(proc_macro2::Span::call_site(), format!("missing `{what}`"))
+        };
+
+        Ok(StaticsInput {
+            class: class.ok_or_else(|| missing("class"))?,
+            types: types.ok_or_else(|| missing("types"))?,
+        })
+    }
+}
+
+pub fn expand_statics(input: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
+    match syn::parse2(input).and_then(expand_statics_input) {
+        Ok(tokens) => tokens,
+        Err(error) => error.to_compile_error(),
+    }
+}
+
+fn expand_statics_input(input: StaticsInput) -> syn::Result<proc_macro2::TokenStream> {
+    let fqcn = input.class.value();
+    let span = input.class.span();
+    let loaded = decls::load(&fqcn, span)?;
+    let mut forwarding = quote::quote! { crate::php_worker::rpc::forwarding };
+    for segment in &loaded.decl.rust_module {
+        let segment = decls::ident(segment, span)?;
+        forwarding = quote::quote! { #forwarding::#segment };
+    }
+    let mut members = Vec::new();
+    let mut checks = Vec::new();
+    for method in &loaded.decl.methods {
+        if !method.is_static
+            || !method.forwarded()
+            || method.status.as_deref() != Some("implemented")
+        {
+            continue;
+        }
+        let name = decls::ident(&method.rust, span)?;
+        let Some(module) = input.types.iter().find_map(|entry| match &entry.source {
+            Source::Static { module }
+                if entry.fqcn.value() == method.declared_in
+                    && entry
+                        .only
+                        .as_ref()
+                        .is_none_or(|only| only.contains(&method.name)) =>
+            {
+                Some(module)
+            }
+            _ => None,
+        }) else {
+            return Err(syn::Error::new(
+                span,
+                format!(
+                    "{fqcn}::{} is declared by {}, whose static methods no entry of `types` answers",
+                    method.name, method.declared_in,
+                ),
+            ));
+        };
+        checks.push(params_check(
+            module,
+            &name,
+            &method.params,
+            &fqcn,
+            &method.name,
+        ));
+        members.push(quote::quote! {
+            fn #name(
+                call: &mut crate::php_worker::rpc::entity::Call<'_>,
+            ) -> ::core::result::Result<::shirabe_php_rpc::RpcValue, ::shirabe_php_rpc::PhpThrow> {
+                #module::#name(call)
+            }
+        });
+    }
+    let tracking = loaded.tracking;
+
+    Ok(quote::quote! {
+        const _: () = {
+            #tracking
+
+            impl #forwarding::Forwarding for #forwarding::PhpClass {
+                #(#members)*
+            }
+
+            #(#checks)*
+        };
+    })
 }

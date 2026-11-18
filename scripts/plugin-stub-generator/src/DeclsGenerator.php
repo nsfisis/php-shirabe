@@ -21,9 +21,10 @@ use PhpParser\NodeFinder;
  * bindings answer for or stand in for, describing its PHP surface for the Rust side's binding
  * macros to read at compile time.
  *
- * The types described are the interfaces of the classifier report and the classes that forward
- * members to the Rust side, together with every Composer supertype of them. A Composer type is one
- * whose source lives under `composer/src/`; PHP's builtin types and vendor types are never
+ * The types described are the interfaces of the classifier report, the classes that forward
+ * members to the Rust side (the worker runtime's own ones under php/runtime/Shirabe/ included),
+ * together with every Composer supertype of them. A Composer type is one whose source lives under
+ * `composer/src/`, or one of those worker runtime classes; PHP's builtin types and vendor types are never
  * described, and their members count only where a Composer type declares them too.
  *
  * Each file holds the type's surface as seen from it: the public methods (static ones included)
@@ -49,10 +50,19 @@ final class DeclsGenerator
     /** @var array<string, ?SourceFile> fqcn => source, or null for a non-Composer type */
     private array $composerSources = [];
 
+    /**
+     * @param array<string, string>       $runtimeSources   the worker runtime's own classes
+     *                                                      forwarding members (`Shirabe\RustPluginStub`
+     *                                                      and the like): fqcn => source path
+     * @param array<string, list<string>> $runtimeForwarded what each of them forwards, all of it
+     *                                                      answered by the Rust side
+     */
     public function __construct(
         private readonly Project $project,
         private readonly string $composerRoot,
         private readonly Report $report,
+        private readonly array $runtimeSources = [],
+        private readonly array $runtimeForwarded = [],
     ) {
         $this->finder = new NodeFinder();
     }
@@ -60,7 +70,7 @@ final class DeclsGenerator
     /** @return array<string, string> path relative to php-decls/ => file content */
     public function generate(): array
     {
-        $seeds = [];
+        $seeds = array_keys($this->runtimeSources);
         foreach ($this->report->classes() as $fqcn) {
             if ($this->report->kind($fqcn) === 'interface' || $this->forwardedMembers($fqcn) !== []) {
                 if ($this->composerSource($fqcn) !== null) {
@@ -125,6 +135,25 @@ final class DeclsGenerator
         $methods = [];
         foreach ($this->methodNames($fqcn) as $name) {
             $methods[] = $this->describeMethod($fqcn, $name, $forwarding);
+        }
+        // A worker runtime class also forwards members only the runtime itself calls, which are
+        // not part of the PHP surface.
+        foreach ($this->runtimeForwarded[$fqcn] ?? [] as $name) {
+            if (!in_array($name, array_column($methods, 'name'), true)) {
+                $methods[] = [
+                    'name' => $name,
+                    'rust' => ForwardingModules::rustName($name),
+                    'declaredIn' => $fqcn,
+                    'static' => false,
+                    'params' => [],
+                    'returnType' => null,
+                    'docReturnType' => null,
+                    'funcNumArgs' => false,
+                    'workerOnly' => true,
+                    'forwarded' => true,
+                    'status' => 'implemented',
+                ];
+            }
         }
         $decl['methods'] = $methods;
         if ($isClass) {
@@ -570,7 +599,7 @@ final class DeclsGenerator
             }
         }
         foreach ($types as $type) {
-            foreach ($this->report->forwarded($type) as $member) {
+            foreach ($this->forwardedMembers($type) as $member) {
                 if ($member['kind'] === $kind && $member['member'] === $name) {
                     $row = [
                         'forwarded' => true,
@@ -623,6 +652,13 @@ final class DeclsGenerator
     /** @return list<array{member: string, kind: string, status: string, reason?: string}> */
     private function forwardedMembers(string $fqcn): array
     {
+        if (isset($this->runtimeForwarded[$fqcn])) {
+            return array_map(
+                static fn (string $method): array => ['member' => $method, 'kind' => 'method', 'status' => 'forward'],
+                $this->runtimeForwarded[$fqcn],
+            );
+        }
+
         return $this->report->forwarded($fqcn);
     }
 
@@ -727,10 +763,18 @@ final class DeclsGenerator
         if (array_key_exists($fqcn, $this->composerSources)) {
             return $this->composerSources[$fqcn];
         }
+        if (isset($this->runtimeSources[$fqcn])) {
+            return $this->composerSources[$fqcn] = new SourceFile(
+                $this->runtimeSources[$fqcn],
+                $fqcn,
+                (new \PhpParser\ParserFactory())->createForNewestSupportedVersion(),
+            );
+        }
         $builtin = (class_exists($fqcn, false) || interface_exists($fqcn, false))
             && (new \ReflectionClass($fqcn))->isInternal();
         $source = null;
-        if (!$builtin) {
+        // The worker runtime's other classes (`Shirabe\RustStub` and the like) forward nothing.
+        if (!$builtin && !str_starts_with($fqcn, 'Shirabe\\')) {
             $file = $this->project->sourceFor($fqcn);
             if (str_starts_with($file->path, $this->composerRoot . '/src/')) {
                 $source = $file;

@@ -175,8 +175,9 @@ every one of those members.
 
 `crates/shirabe/php-decls/<namespace path>/<class>.json` (`Composer/Package/Locker.json` for
 `Composer\Package\Locker`) describes one Composer class or interface: every interface of the
-report and every class forwarding members, together with their Composer supertypes. A Composer
-type is one whose source lives under `composer/src/`. PHP's builtin types and vendor types are not
+report and every class forwarding members, the worker runtime's own ones included, together with
+their Composer supertypes. A Composer type is one whose source lives under `composer/src/`, or one
+of those worker runtime classes. PHP's builtin types and vendor types are not
 described and not traversed: a member only they declare is not part of the surface, and a member
 they declare along with a Composer type counts as the Composer type's.
 
@@ -200,6 +201,9 @@ Each file holds:
   except that one of a method calling `func_num_args()` sends what the caller passed;
 * for a class, `constructor` (`declaredIn` is null for PHP's implicit one) and `properties`, the
   public and protected properties, promoted ones included;
+* for a worker runtime class (`Shirabe\RustPluginStub` and the like, under
+  `php/runtime/Shirabe/`), also the members it forwards that only the runtime calls
+  (`workerOnly`, `__shirabe_facts` of `Shirabe\RustProcessStub`), without parameters;
 * for a class forwarding members, `forwarded` on each method and on the constructor: whether a
   call reaches the Rust side. It is false for a static method materialized in the worker and for
   a method answered there (`Generator::LOCAL_BODIES`). A forwarded member also has the `status`

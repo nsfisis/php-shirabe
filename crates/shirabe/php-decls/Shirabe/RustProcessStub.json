@@ -1,0 +1,841 @@
+{
+    "fqcn": "Shirabe\\RustProcessStub",
+    "rustModule": [
+        "shirabe",
+        "rust_process_stub"
+    ],
+    "kind": "class",
+    "abstract": false,
+    "parent": null,
+    "interfaces": [],
+    "treatment": null,
+    "methods": [
+        {
+            "name": "addErrorOutput",
+            "rust": "add_error_output",
+            "declaredIn": "Shirabe\\RustProcessStub",
+            "static": false,
+            "params": [
+                {
+                    "name": "line",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": null
+                }
+            ],
+            "returnType": null,
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": false
+        },
+        {
+            "name": "addOutput",
+            "rust": "add_output",
+            "declaredIn": "Shirabe\\RustProcessStub",
+            "static": false,
+            "params": [
+                {
+                    "name": "line",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": null
+                }
+            ],
+            "returnType": null,
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": false
+        },
+        {
+            "name": "checkTimeout",
+            "rust": "check_timeout",
+            "declaredIn": "Shirabe\\RustProcessStub",
+            "static": false,
+            "params": [],
+            "returnType": null,
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": false
+        },
+        {
+            "name": "clearErrorOutput",
+            "rust": "clear_error_output",
+            "declaredIn": "Shirabe\\RustProcessStub",
+            "static": false,
+            "params": [],
+            "returnType": null,
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": false
+        },
+        {
+            "name": "clearOutput",
+            "rust": "clear_output",
+            "declaredIn": "Shirabe\\RustProcessStub",
+            "static": false,
+            "params": [],
+            "returnType": null,
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": false
+        },
+        {
+            "name": "disableOutput",
+            "rust": "disable_output",
+            "declaredIn": "Shirabe\\RustProcessStub",
+            "static": false,
+            "params": [],
+            "returnType": null,
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": false
+        },
+        {
+            "name": "enableOutput",
+            "rust": "enable_output",
+            "declaredIn": "Shirabe\\RustProcessStub",
+            "static": false,
+            "params": [],
+            "returnType": null,
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": false
+        },
+        {
+            "name": "getCommandLine",
+            "rust": "get_command_line",
+            "declaredIn": "Shirabe\\RustProcessStub",
+            "static": false,
+            "params": [],
+            "returnType": null,
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": false
+        },
+        {
+            "name": "getEnv",
+            "rust": "get_env",
+            "declaredIn": "Shirabe\\RustProcessStub",
+            "static": false,
+            "params": [],
+            "returnType": null,
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": false
+        },
+        {
+            "name": "getErrorOutput",
+            "rust": "get_error_output",
+            "declaredIn": "Shirabe\\RustProcessStub",
+            "static": false,
+            "params": [],
+            "returnType": null,
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": false
+        },
+        {
+            "name": "getExitCode",
+            "rust": "get_exit_code",
+            "declaredIn": "Shirabe\\RustProcessStub",
+            "static": false,
+            "params": [],
+            "returnType": null,
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": false
+        },
+        {
+            "name": "getExitCodeText",
+            "rust": "get_exit_code_text",
+            "declaredIn": "Shirabe\\RustProcessStub",
+            "static": false,
+            "params": [],
+            "returnType": null,
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": false
+        },
+        {
+            "name": "getIdleTimeout",
+            "rust": "get_idle_timeout",
+            "declaredIn": "Shirabe\\RustProcessStub",
+            "static": false,
+            "params": [],
+            "returnType": null,
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": false
+        },
+        {
+            "name": "getIncrementalErrorOutput",
+            "rust": "get_incremental_error_output",
+            "declaredIn": "Shirabe\\RustProcessStub",
+            "static": false,
+            "params": [],
+            "returnType": null,
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": false
+        },
+        {
+            "name": "getIncrementalOutput",
+            "rust": "get_incremental_output",
+            "declaredIn": "Shirabe\\RustProcessStub",
+            "static": false,
+            "params": [],
+            "returnType": null,
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": false
+        },
+        {
+            "name": "getInput",
+            "rust": "get_input",
+            "declaredIn": "Shirabe\\RustProcessStub",
+            "static": false,
+            "params": [],
+            "returnType": null,
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": false
+        },
+        {
+            "name": "getIterator",
+            "rust": "get_iterator",
+            "declaredIn": "Shirabe\\RustProcessStub",
+            "static": false,
+            "params": [
+                {
+                    "name": "flags",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "int",
+                    "docType": null
+                }
+            ],
+            "returnType": null,
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": false
+        },
+        {
+            "name": "getLastOutputTime",
+            "rust": "get_last_output_time",
+            "declaredIn": "Shirabe\\RustProcessStub",
+            "static": false,
+            "params": [],
+            "returnType": "?float",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": false
+        },
+        {
+            "name": "getOutput",
+            "rust": "get_output",
+            "declaredIn": "Shirabe\\RustProcessStub",
+            "static": false,
+            "params": [],
+            "returnType": null,
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": false
+        },
+        {
+            "name": "getPid",
+            "rust": "get_pid",
+            "declaredIn": "Shirabe\\RustProcessStub",
+            "static": false,
+            "params": [],
+            "returnType": null,
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": false
+        },
+        {
+            "name": "getStartTime",
+            "rust": "get_start_time",
+            "declaredIn": "Shirabe\\RustProcessStub",
+            "static": false,
+            "params": [],
+            "returnType": "float",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": false
+        },
+        {
+            "name": "getStatus",
+            "rust": "get_status",
+            "declaredIn": "Shirabe\\RustProcessStub",
+            "static": false,
+            "params": [],
+            "returnType": null,
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": false
+        },
+        {
+            "name": "getStopSignal",
+            "rust": "get_stop_signal",
+            "declaredIn": "Shirabe\\RustProcessStub",
+            "static": false,
+            "params": [],
+            "returnType": null,
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": false
+        },
+        {
+            "name": "getTermSignal",
+            "rust": "get_term_signal",
+            "declaredIn": "Shirabe\\RustProcessStub",
+            "static": false,
+            "params": [],
+            "returnType": null,
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": false
+        },
+        {
+            "name": "getTimeout",
+            "rust": "get_timeout",
+            "declaredIn": "Shirabe\\RustProcessStub",
+            "static": false,
+            "params": [],
+            "returnType": null,
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": false
+        },
+        {
+            "name": "getWorkingDirectory",
+            "rust": "get_working_directory",
+            "declaredIn": "Shirabe\\RustProcessStub",
+            "static": false,
+            "params": [],
+            "returnType": null,
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": false
+        },
+        {
+            "name": "hasBeenSignaled",
+            "rust": "has_been_signaled",
+            "declaredIn": "Shirabe\\RustProcessStub",
+            "static": false,
+            "params": [],
+            "returnType": null,
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": false
+        },
+        {
+            "name": "hasBeenStopped",
+            "rust": "has_been_stopped",
+            "declaredIn": "Shirabe\\RustProcessStub",
+            "static": false,
+            "params": [],
+            "returnType": null,
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": false
+        },
+        {
+            "name": "isOutputDisabled",
+            "rust": "is_output_disabled",
+            "declaredIn": "Shirabe\\RustProcessStub",
+            "static": false,
+            "params": [],
+            "returnType": null,
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": false
+        },
+        {
+            "name": "isPty",
+            "rust": "is_pty",
+            "declaredIn": "Shirabe\\RustProcessStub",
+            "static": false,
+            "params": [],
+            "returnType": null,
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": false
+        },
+        {
+            "name": "isRunning",
+            "rust": "is_running",
+            "declaredIn": "Shirabe\\RustProcessStub",
+            "static": false,
+            "params": [],
+            "returnType": null,
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": false
+        },
+        {
+            "name": "isStarted",
+            "rust": "is_started",
+            "declaredIn": "Shirabe\\RustProcessStub",
+            "static": false,
+            "params": [],
+            "returnType": null,
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": false
+        },
+        {
+            "name": "isSuccessful",
+            "rust": "is_successful",
+            "declaredIn": "Shirabe\\RustProcessStub",
+            "static": false,
+            "params": [],
+            "returnType": null,
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": false
+        },
+        {
+            "name": "isTerminated",
+            "rust": "is_terminated",
+            "declaredIn": "Shirabe\\RustProcessStub",
+            "static": false,
+            "params": [],
+            "returnType": null,
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": false
+        },
+        {
+            "name": "isTty",
+            "rust": "is_tty",
+            "declaredIn": "Shirabe\\RustProcessStub",
+            "static": false,
+            "params": [],
+            "returnType": null,
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": false
+        },
+        {
+            "name": "mustRun",
+            "rust": "must_run",
+            "declaredIn": "Shirabe\\RustProcessStub",
+            "static": false,
+            "params": [
+                {
+                    "name": "callback",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": "?callable",
+                    "docType": null
+                },
+                {
+                    "name": "env",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "array",
+                    "docType": null
+                }
+            ],
+            "returnType": "self",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": false
+        },
+        {
+            "name": "restart",
+            "rust": "restart",
+            "declaredIn": "Shirabe\\RustProcessStub",
+            "static": false,
+            "params": [
+                {
+                    "name": "callback",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": "?callable",
+                    "docType": null
+                },
+                {
+                    "name": "env",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "array",
+                    "docType": null
+                }
+            ],
+            "returnType": "self",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": false
+        },
+        {
+            "name": "run",
+            "rust": "run",
+            "declaredIn": "Shirabe\\RustProcessStub",
+            "static": false,
+            "params": [
+                {
+                    "name": "callback",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": "?callable",
+                    "docType": null
+                },
+                {
+                    "name": "env",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "array",
+                    "docType": null
+                }
+            ],
+            "returnType": "int",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": false
+        },
+        {
+            "name": "setEnv",
+            "rust": "set_env",
+            "declaredIn": "Shirabe\\RustProcessStub",
+            "static": false,
+            "params": [
+                {
+                    "name": "env",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "array",
+                    "docType": null
+                }
+            ],
+            "returnType": null,
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": false
+        },
+        {
+            "name": "setIdleTimeout",
+            "rust": "set_idle_timeout",
+            "declaredIn": "Shirabe\\RustProcessStub",
+            "static": false,
+            "params": [
+                {
+                    "name": "timeout",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": "?float",
+                    "docType": null
+                }
+            ],
+            "returnType": null,
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": false
+        },
+        {
+            "name": "setInput",
+            "rust": "set_input",
+            "declaredIn": "Shirabe\\RustProcessStub",
+            "static": false,
+            "params": [
+                {
+                    "name": "input",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": null,
+                    "docType": null
+                }
+            ],
+            "returnType": null,
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": false
+        },
+        {
+            "name": "setOptions",
+            "rust": "set_options",
+            "declaredIn": "Shirabe\\RustProcessStub",
+            "static": false,
+            "params": [
+                {
+                    "name": "options",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "array",
+                    "docType": null
+                }
+            ],
+            "returnType": null,
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": false
+        },
+        {
+            "name": "setPty",
+            "rust": "set_pty",
+            "declaredIn": "Shirabe\\RustProcessStub",
+            "static": false,
+            "params": [
+                {
+                    "name": "bool",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "bool",
+                    "docType": null
+                }
+            ],
+            "returnType": null,
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": false
+        },
+        {
+            "name": "setTimeout",
+            "rust": "set_timeout",
+            "declaredIn": "Shirabe\\RustProcessStub",
+            "static": false,
+            "params": [
+                {
+                    "name": "timeout",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": "?float",
+                    "docType": null
+                }
+            ],
+            "returnType": null,
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": false
+        },
+        {
+            "name": "setTty",
+            "rust": "set_tty",
+            "declaredIn": "Shirabe\\RustProcessStub",
+            "static": false,
+            "params": [
+                {
+                    "name": "tty",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "bool",
+                    "docType": null
+                }
+            ],
+            "returnType": null,
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": false
+        },
+        {
+            "name": "setWorkingDirectory",
+            "rust": "set_working_directory",
+            "declaredIn": "Shirabe\\RustProcessStub",
+            "static": false,
+            "params": [
+                {
+                    "name": "cwd",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": null
+                }
+            ],
+            "returnType": null,
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": false
+        },
+        {
+            "name": "signal",
+            "rust": "signal",
+            "declaredIn": "Shirabe\\RustProcessStub",
+            "static": false,
+            "params": [
+                {
+                    "name": "signal",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "int",
+                    "docType": null
+                }
+            ],
+            "returnType": null,
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": false
+        },
+        {
+            "name": "start",
+            "rust": "start",
+            "declaredIn": "Shirabe\\RustProcessStub",
+            "static": false,
+            "params": [
+                {
+                    "name": "callback",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": "?callable",
+                    "docType": null
+                },
+                {
+                    "name": "env",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "array",
+                    "docType": null
+                }
+            ],
+            "returnType": null,
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": false
+        },
+        {
+            "name": "stop",
+            "rust": "stop",
+            "declaredIn": "Shirabe\\RustProcessStub",
+            "static": false,
+            "params": [
+                {
+                    "name": "timeout",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "float",
+                    "docType": null
+                },
+                {
+                    "name": "signal",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": "?int",
+                    "docType": null
+                }
+            ],
+            "returnType": null,
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": false
+        },
+        {
+            "name": "wait",
+            "rust": "wait",
+            "declaredIn": "Shirabe\\RustProcessStub",
+            "static": false,
+            "params": [
+                {
+                    "name": "callback",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": "?callable",
+                    "docType": null
+                }
+            ],
+            "returnType": null,
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": false
+        },
+        {
+            "name": "waitUntil",
+            "rust": "wait_until",
+            "declaredIn": "Shirabe\\RustProcessStub",
+            "static": false,
+            "params": [
+                {
+                    "name": "callback",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "callable",
+                    "docType": null
+                }
+            ],
+            "returnType": "bool",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": false
+        },
+        {
+            "name": "__shirabe_facts",
+            "rust": "__shirabe_facts",
+            "declaredIn": "Shirabe\\RustProcessStub",
+            "static": false,
+            "params": [],
+            "returnType": null,
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "workerOnly": true,
+            "forwarded": true,
+            "status": "implemented"
+        }
+    ],
+    "constructor": {
+        "declaredIn": null,
+        "public": true,
+        "params": [],
+        "funcNumArgs": false,
+        "forwarded": false
+    },
+    "properties": [
+        {
+            "name": "__entityId",
+            "declaredIn": "Shirabe\\RustProcessStub",
+            "visibility": "protected",
+            "static": false,
+            "readonly": false,
+            "type": null,
+            "docType": "int"
+        }
+    ]
+}

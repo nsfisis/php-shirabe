@@ -1,95 +1,51 @@
 //! The methods a `Composer\Composer` entity answers over RPC.
 
-use crate::composer::ComposerHandle;
-use crate::php_worker::rpc::entities::package::package_value;
-use crate::php_worker::rpc::entity::{Bindings, Call, Entity, entity_value};
-use crate::php_worker::rpc::forwarding;
+use crate::composer::{
+    __php_binding_composer, __php_binding_partial_composer, Composer, ComposerHandle,
+    PartialComposer,
+};
+use crate::php_worker::rpc::entity::{Call, entity_value};
+use shirabe_php_binding_macros::php_entity;
 use shirabe_php_rpc::{PhpThrow, RpcValue};
-
-impl Entity for ComposerHandle {
-    const EXPECTED: &'static [u8] = b"a Composer";
-
-    fn address(&self) -> *const () {
-        std::rc::Rc::as_ptr(self.as_rc()) as *const ()
-    }
-
-    fn class(&self) -> Result<&'static Bindings<Self>, PhpThrow> {
-        Ok(&forwarding::composer::BINDINGS)
-    }
-
-    // `getLoop()` itself never reaches the Rust side: the Loop is a two-world class, and the stub
-    // builds the worker-side one over the two services the Rust-side Loop drives.
-    fn worker_method(&self, call: &mut Call<'_>) -> Option<Result<RpcValue, PhpThrow>> {
-        if call.method() != "__shirabe_loop_services" {
-            return None;
-        }
-        let r#loop = self.borrow().get_loop();
-        let downloader = r#loop.borrow().get_http_downloader().clone();
-        let process = r#loop.borrow().get_process_executor().cloned();
-        Some((|| {
-            Ok(RpcValue::List(vec![
-                entity_value(&downloader)?,
-                match process {
-                    Some(process) => entity_value(&process)?,
-                    None => RpcValue::Null,
-                },
-            ]))
-        })())
-    }
-}
 
 // TODO(plugin): the setters, `isGlobal`/`setGlobal` and the remaining getters of the object
 // graph become reachable over RPC on demand.
-impl forwarding::partial_composer::Forwarding for forwarding::partial_composer::PhpClass {
-    type Handle = ComposerHandle;
-
-    fn get_package(composer: &Self::Handle, _: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
-        let package = composer.borrow().get_package().as_rc().clone();
-        package_value(&package)
-    }
-
-    fn get_config(composer: &Self::Handle, _: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
-        entity_value(&composer.borrow().get_config())
-    }
-
-    fn get_repository_manager(
-        composer: &Self::Handle,
-        _: &mut Call<'_>,
-    ) -> Result<RpcValue, PhpThrow> {
-        entity_value(&composer.borrow().get_repository_manager())
-    }
-
-    fn get_installation_manager(
-        composer: &Self::Handle,
-        _: &mut Call<'_>,
-    ) -> Result<RpcValue, PhpThrow> {
-        entity_value(&composer.borrow().get_installation_manager())
-    }
-
-    fn get_event_dispatcher(
-        composer: &Self::Handle,
-        _: &mut Call<'_>,
-    ) -> Result<RpcValue, PhpThrow> {
-        entity_value(&composer.borrow().get_event_dispatcher())
-    }
+php_entity! {
+    handle: ComposerHandle,
+    expected: "a Composer",
+    address: |composer| std::rc::Rc::as_ptr(composer.as_rc()) as *const (),
+    class: |_| Ok(br"Composer\Composer"),
+    classes: [r"Composer\PartialComposer", r"Composer\Composer"],
+    worker_method: loop_services,
+    types: {
+        r"Composer\PartialComposer": instance __php_binding_partial_composer for PartialComposer {
+            via: |composer| std::cell::Ref::map(composer.borrow(), Composer::as_partial),
+        },
+        r"Composer\Composer": instance __php_binding_composer for Composer {
+            via: |composer| composer.borrow(),
+        },
+    },
 }
 
-impl forwarding::composer::Forwarding for forwarding::composer::PhpClass {
-    fn get_locker(composer: &ComposerHandle, _: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
-        entity_value(&composer.borrow().get_locker())
+// `getLoop()` itself never reaches the Rust side: the Loop is a two-world class, and the stub
+// builds the worker-side one over the two services the Rust-side Loop drives.
+fn loop_services(
+    composer: &ComposerHandle,
+    call: &mut Call<'_>,
+) -> Option<Result<RpcValue, PhpThrow>> {
+    if call.method() != "__shirabe_loop_services" {
+        return None;
     }
-
-    fn get_download_manager(
-        composer: &ComposerHandle,
-        _: &mut Call<'_>,
-    ) -> Result<RpcValue, PhpThrow> {
-        entity_value(&composer.borrow().get_download_manager())
-    }
-
-    fn get_autoload_generator(
-        composer: &ComposerHandle,
-        _: &mut Call<'_>,
-    ) -> Result<RpcValue, PhpThrow> {
-        entity_value(&composer.borrow().get_autoload_generator())
-    }
+    let r#loop = composer.borrow().get_loop();
+    let downloader = r#loop.borrow().get_http_downloader().clone();
+    let process = r#loop.borrow().get_process_executor().cloned();
+    Some((|| {
+        Ok(RpcValue::List(vec![
+            entity_value(&downloader)?,
+            match process {
+                Some(process) => entity_value(&process)?,
+                None => RpcValue::Null,
+            },
+        ]))
+    })())
 }

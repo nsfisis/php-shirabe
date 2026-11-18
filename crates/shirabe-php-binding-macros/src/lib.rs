@@ -75,8 +75,8 @@ pub fn php_binding(
 ///   `classes` then lists every class it chooses from, with their forwarding
 ///   ancestors.
 /// * `address` computes the entity's identity from the handle, the `Rc` itself by default;
-///   `clone` and `property` name the hand-written functions answering `__clone` and the
-///   property forwarders.
+///   `clone`, `property` and `worker_method` name the hand-written functions answering
+///   `__clone`, the property forwarders and the methods only the worker runtime calls.
 /// * Each entry of `types` names what answers the instance or static methods a PHP type
 ///   declares, or only the ones it lists after `only [...]`. An `instance` entry gives the type
 ///   the adapters call (`for`) and how a handle reaches it, for `&self` methods through a
@@ -92,4 +92,20 @@ pub fn php_binding(
 #[proc_macro]
 pub fn php_entity(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     entity::expand(input.into()).into()
+}
+
+/// Generates the `Forwarding` impl of a class no entity crosses as, a guard whose static methods
+/// are forwarded, routing each of them to the adapter of the type declaring it.
+///
+/// ```ignore
+/// php_statics! {
+///     class: r"Composer\Factory",
+///     types: {
+///         r"Composer\Factory": static crate::factory::__php_binding_factory,
+///     },
+/// }
+/// ```
+#[proc_macro]
+pub fn php_statics(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    entity::expand_statics(input.into()).into()
 }

@@ -34,6 +34,7 @@ use crate::util::r#loop::Loop;
 use crate::util::{Filesystem, HttpDownloader, Platform, ProcessExecutor, StreamContextOptions};
 use bstr::{B, BStr, BString};
 use indexmap::IndexMap;
+use shirabe_php_binding_macros::php_binding;
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, PATHINFO_EXTENSION, PHP_EOL, PHP_OS, PHP_SERVER,
     PhpMixed, RuntimeException, ToPhpString, UnexpectedValueException, bformat, boolval, dirname,
@@ -75,6 +76,7 @@ pub struct Factory {
     mock: bool,
 }
 
+#[php_binding(r"Composer\Factory", members = static)]
 impl Factory {
     fn get_home_dir() -> anyhow::Result<BString> {
         let home = Platform::get_env("COMPOSER_HOME");

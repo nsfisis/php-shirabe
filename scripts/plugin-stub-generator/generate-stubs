@@ -126,10 +126,19 @@ try {
         $report,
     );
     $guardFiles = $guardGenerator->generate();
-    $declFiles = (new DeclsGenerator($project, $composerRoot, $report))->generate();
-    $forwarding = (new ForwardingModules(
-        ForwardingModel::build($report, "$runtimeDir/Shirabe", array_keys(Generator::LOCAL_BODIES)),
-    ))->render();
+    $forwardingModel = ForwardingModel::build($report, "$runtimeDir/Shirabe", array_keys(Generator::LOCAL_BODIES));
+    // The worker runtime's own classes forwarding members, which the report knows nothing of.
+    $runtimeSources = [];
+    $runtimeForwarded = [];
+    foreach ($forwardingModel as $fqcn => $class) {
+        if (!str_starts_with($fqcn, 'Shirabe\\')) {
+            continue;
+        }
+        $runtimeSources[$fqcn] = "$runtimeDir/" . str_replace('\\', '/', $fqcn) . '.php';
+        $runtimeForwarded[$fqcn] = array_map(static fn (array $method): string => $method['name'], $class['methods']);
+    }
+    $declFiles = (new DeclsGenerator($project, $composerRoot, $report, $runtimeSources, $runtimeForwarded))->generate();
+    $forwarding = (new ForwardingModules($forwardingModel))->render();
 } catch (GenerationError $e) {
     foreach ($e->errors as $error) {
         fwrite(STDERR, "error: $error\n");

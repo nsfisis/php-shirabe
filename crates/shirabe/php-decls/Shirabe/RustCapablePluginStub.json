@@ -1,0 +1,139 @@
+{
+    "fqcn": "Shirabe\\RustCapablePluginStub",
+    "rustModule": [
+        "shirabe",
+        "rust_capable_plugin_stub"
+    ],
+    "kind": "class",
+    "abstract": false,
+    "parent": "Shirabe\\RustPluginStub",
+    "interfaces": [
+        "Composer\\Plugin\\Capable"
+    ],
+    "treatment": null,
+    "methods": [
+        {
+            "name": "activate",
+            "rust": "activate",
+            "declaredIn": "Composer\\Plugin\\PluginInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "composer",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Composer",
+                    "docType": null
+                },
+                {
+                    "name": "io",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\IO\\IOInterface",
+                    "docType": null
+                }
+            ],
+            "returnType": null,
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "deactivate",
+            "rust": "deactivate",
+            "declaredIn": "Composer\\Plugin\\PluginInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "composer",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Composer",
+                    "docType": null
+                },
+                {
+                    "name": "io",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\IO\\IOInterface",
+                    "docType": null
+                }
+            ],
+            "returnType": null,
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "getCapabilities",
+            "rust": "get_capabilities",
+            "declaredIn": "Composer\\Plugin\\Capable",
+            "static": false,
+            "params": [],
+            "returnType": null,
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        },
+        {
+            "name": "uninstall",
+            "rust": "uninstall",
+            "declaredIn": "Composer\\Plugin\\PluginInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "composer",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Composer",
+                    "docType": null
+                },
+                {
+                    "name": "io",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\IO\\IOInterface",
+                    "docType": null
+                }
+            ],
+            "returnType": null,
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true,
+            "status": "implemented"
+        }
+    ],
+    "constructor": {
+        "declaredIn": null,
+        "public": true,
+        "params": [],
+        "funcNumArgs": false,
+        "forwarded": false
+    },
+    "properties": [
+        {
+            "name": "__entityId",
+            "declaredIn": "Shirabe\\RustPluginStub",
+            "visibility": "protected",
+            "static": false,
+            "readonly": false,
+            "type": null,
+            "docType": "int"
+        }
+    ]
+}

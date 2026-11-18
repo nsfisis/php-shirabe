@@ -11,6 +11,7 @@ use crate::repository::{
 use crate::util::{HttpDownloader, ProcessExecutor};
 use bstr::{B, BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
+use shirabe_php_binding_macros::php_binding;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, RuntimeException, ToPhpString, bformat, json_encode,
 };
@@ -227,6 +228,7 @@ impl RepositoryManager {
 // Composer's PartialComposer::setRepositoryManager() accepts any RepositoryManager subclass, so
 // plugins may swap in a replacement. The interface captures the methods reached through Composer's
 // accessor and through the `&mut RepositoryManager` parameters fed from it.
+#[php_binding(r"Composer\Repository\RepositoryManager")]
 pub trait RepositoryManagerInterface: std::fmt::Debug {
     fn get_local_repository(&self) -> RepositoryInterfaceHandle;
     fn get_repositories(&self) -> &Vec<RepositoryInterfaceHandle>;
