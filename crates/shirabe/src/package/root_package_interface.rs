@@ -3,8 +3,10 @@
 use crate::package::{CompletePackageInterface, Link, PackageInterface};
 use bstr::BString;
 use indexmap::IndexMap;
+use shirabe_php_binding_macros::php_binding;
 use shirabe_php_shim::PhpMixed;
 
+#[php_binding(r"Composer\Package\RootPackageInterface")]
 pub trait RootPackageInterface: CompletePackageInterface {
     fn get_aliases(&self) -> Vec<IndexMap<BString, BString>>;
 

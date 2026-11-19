@@ -34,7 +34,7 @@ final class ForwardingModel
     /**
      * @param list<string> $local `FQCN::method` entries a stub answers in the worker instead of
      *                            forwarding
-     * @return array<string, array{guard: bool, parent: ?string, abstract: bool, methods: list<array{name: string, status: string, reason?: string}>, statics: list<array{name: string, status: string, reason?: string}>, constructor: ?array{status: string, reason?: string}}>
+     * @return array<string, array{guard: bool, parent: ?string, abstract: bool, methods: list<array{name: string}>, statics: list<array{name: string}>, constructor: ?array{}}>
      */
     public static function build(Report $report, string $runtimeShirabeDir, array $local): array
     {
@@ -50,10 +50,7 @@ final class ForwardingModel
                 'constructor' => null,
             ];
             foreach ($report->forwarded($fqcn) as $member) {
-                $row = ['name' => $member['member'], 'status' => $member['status'] === 'forward' ? 'implemented' : $member['status']];
-                if (isset($member['reason']) && $member['status'] === 'refused') {
-                    $row['reason'] = $member['reason'];
-                }
+                $row = ['name' => $member['member']];
                 if ($member['kind'] === 'method') {
                     if (in_array("$fqcn::{$member['member']}", $local, true)) {
                         continue;
@@ -141,7 +138,7 @@ final class ForwardingModel
                             throw new GenerationError(["$where calls callRust on a handle other than its own"]);
                         }
                         if (!in_array($member->value, self::GENERIC_METHODS, true)) {
-                            $methods[$member->value] = ['name' => $member->value, 'status' => 'implemented'];
+                            $methods[$member->value] = ['name' => $member->value];
                         }
                     }
                 }

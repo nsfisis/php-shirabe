@@ -2,9 +2,9 @@
 
 use crate::event_dispatcher::{Event, EventDispatcherInterface};
 use crate::php_worker::call::PhpCall;
-use crate::php_worker::rpc::entity::{Bindings, Call, Entity};
-use crate::php_worker::rpc::forwarding;
+use crate::php_worker::rpc::entity::Call;
 use bstr::{BStr, BString};
+use shirabe_php_binding_macros::php_entity;
 use shirabe_php_rpc::{PhpThrow, RpcValue};
 use shirabe_php_shim::bformat;
 
@@ -36,38 +36,46 @@ pub(crate) fn call_php_callable(
     PhpCall::Function(BStr::new("call_user_func")).run(call_args)
 }
 
-impl Entity for std::rc::Rc<std::cell::RefCell<dyn EventDispatcherInterface>> {
-    const EXPECTED: &'static [u8] = b"an EventDispatcher";
-
-    fn address(&self) -> *const () {
-        std::rc::Rc::as_ptr(self) as *const ()
-    }
-
-    fn class(&self) -> Result<&'static Bindings<Self>, PhpThrow> {
-        Ok(&forwarding::event_dispatcher::event_dispatcher::BINDINGS)
-    }
+php_entity! {
+    handle: std::rc::Rc<std::cell::RefCell<dyn EventDispatcherInterface>>,
+    type_error: "an EventDispatcher",
+    classes: {
+        r"Composer\EventDispatcher\EventDispatcher": { constructor: unimplemented },
+    },
+    methods: {
+        r"Composer\EventDispatcher\EventDispatcher": {
+            handwritten: { module: self },
+            unimplemented: [
+                addListener,
+                addSubscriber,
+                dispatchInstallerEvent,
+                dispatchPackageEvent,
+                dispatchScript,
+                hasEventListeners,
+                removeListener,
+                setRunScripts,
+            ],
+        },
+    },
 }
 
-impl forwarding::event_dispatcher::event_dispatcher::Forwarding
-    for forwarding::event_dispatcher::event_dispatcher::PhpClass
-{
-    type Handle = std::rc::Rc<std::cell::RefCell<dyn EventDispatcherInterface>>;
-
-    fn dispatch(dispatcher: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
-        let name = call.arg::<BString>(0)?;
-        let probe = Event::from_name(name.clone());
-        if dispatcher.borrow_mut().has_event_listeners(&probe) {
-            // TODO(plugin): dispatching a worker-constructed event through the Rust-side
-            // dispatcher needs the event object (and the console input it carries) proxied back
-            // into this process, so only the no-listener case is answered here.
-            return Err(PhpThrow::runtime(bformat!(
-                "dispatching `{name}` from the plugin process is not supported yet while listeners are registered for it"
-            )));
-        }
-        // TODO(plugin): answering 0 here skips what `do_dispatch` does before it reaches the
-        // listener loop, and upstream does both regardless of the listener count: the
-        // `COMPOSER_DEBUG_EVENTS` trace line, and `push_event`'s circular-call detection (a
-        // nested dispatch of the same event name throws there even with no listeners).
-        Ok(RpcValue::Int(0))
+fn dispatch(
+    dispatcher: &std::rc::Rc<std::cell::RefCell<dyn EventDispatcherInterface>>,
+    call: &mut Call<'_>,
+) -> Result<RpcValue, PhpThrow> {
+    let name = call.arg::<BString>(0)?;
+    let probe = Event::from_name(name.clone());
+    if dispatcher.borrow_mut().has_event_listeners(&probe) {
+        // TODO(plugin): dispatching a worker-constructed event through the Rust-side
+        // dispatcher needs the event object (and the console input it carries) proxied back
+        // into this process, so only the no-listener case is answered here.
+        return Err(PhpThrow::runtime(bformat!(
+            "dispatching `{name}` from the plugin process is not supported yet while listeners are registered for it"
+        )));
     }
+    // TODO(plugin): answering 0 here skips what `do_dispatch` does before it reaches the
+    // listener loop, and upstream does both regardless of the listener count: the
+    // `COMPOSER_DEBUG_EVENTS` trace line, and `push_event`'s circular-call detection (a
+    // nested dispatch of the same event name throws there even with no listeners).
+    Ok(RpcValue::Int(0))
 }

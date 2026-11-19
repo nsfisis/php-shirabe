@@ -1,0 +1,99 @@
+{
+    "fqcn": "Composer\\DependencyResolver\\Operation\\MarkAliasUninstalledOperation",
+    "rustModule": [
+        "dependency_resolver",
+        "operation",
+        "mark_alias_uninstalled_operation"
+    ],
+    "kind": "class",
+    "abstract": false,
+    "parent": "Composer\\DependencyResolver\\Operation\\SolverOperation",
+    "interfaces": [
+        "Composer\\DependencyResolver\\Operation\\OperationInterface"
+    ],
+    "treatment": "stub",
+    "methods": [
+        {
+            "name": "__toString",
+            "rust": "__to_string",
+            "declaredIn": "Composer\\DependencyResolver\\Operation\\OperationInterface",
+            "static": false,
+            "params": [],
+            "returnType": null,
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "getOperationType",
+            "rust": "get_operation_type",
+            "declaredIn": "Composer\\DependencyResolver\\Operation\\OperationInterface",
+            "static": false,
+            "params": [],
+            "returnType": "string",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "getPackage",
+            "rust": "get_package",
+            "declaredIn": "Composer\\DependencyResolver\\Operation\\MarkAliasUninstalledOperation",
+            "static": false,
+            "params": [],
+            "returnType": "\\Composer\\Package\\AliasPackage",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "show",
+            "rust": "show",
+            "declaredIn": "Composer\\DependencyResolver\\Operation\\OperationInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "lock",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": null,
+                    "docType": null
+                }
+            ],
+            "returnType": "string",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        }
+    ],
+    "constructor": {
+        "declaredIn": "Composer\\DependencyResolver\\Operation\\MarkAliasUninstalledOperation",
+        "public": true,
+        "params": [
+            {
+                "name": "package",
+                "position": 0,
+                "byRef": false,
+                "variadic": false,
+                "nullable": false,
+                "type": "\\Composer\\Package\\AliasPackage",
+                "docType": null
+            }
+        ],
+        "funcNumArgs": false,
+        "forwarded": true
+    },
+    "properties": [
+        {
+            "name": "package",
+            "declaredIn": "Composer\\DependencyResolver\\Operation\\MarkAliasUninstalledOperation",
+            "visibility": "protected",
+            "static": false,
+            "readonly": false,
+            "type": null,
+            "docType": "AliasPackage"
+        }
+    ]
+}

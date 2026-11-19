@@ -4,6 +4,7 @@ use crate::dependency_resolver::operation::SolverOperation;
 use crate::package::version::VersionParser;
 use crate::package::{DisplayMode, PackageInterfaceHandle};
 use bstr::{BStr, BString};
+use shirabe_php_binding_macros::php_binding;
 use shirabe_php_shim::{PhpDisplay, bformat, php_str};
 
 #[derive(Debug, Clone)]
@@ -12,7 +13,9 @@ pub struct UpdateOperation {
     target_package: PackageInterfaceHandle,
 }
 
+#[php_binding(r"Composer\DependencyResolver\Operation\UpdateOperation", members = (instance, constructor))]
 impl UpdateOperation {
+    #[php(name = "__construct")]
     pub fn new(initial: PackageInterfaceHandle, target: PackageInterfaceHandle) -> Self {
         Self {
             initial_package: initial,

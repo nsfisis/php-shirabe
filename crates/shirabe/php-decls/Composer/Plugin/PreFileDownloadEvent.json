@@ -1,0 +1,280 @@
+{
+    "fqcn": "Composer\\Plugin\\PreFileDownloadEvent",
+    "rustModule": [
+        "plugin",
+        "pre_file_download_event"
+    ],
+    "kind": "class",
+    "abstract": false,
+    "parent": "Composer\\EventDispatcher\\Event",
+    "interfaces": [],
+    "treatment": "stub",
+    "methods": [
+        {
+            "name": "getArguments",
+            "rust": "get_arguments",
+            "declaredIn": "Composer\\EventDispatcher\\Event",
+            "static": false,
+            "params": [],
+            "returnType": "array",
+            "docReturnType": "string[]",
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "getContext",
+            "rust": "get_context",
+            "declaredIn": "Composer\\Plugin\\PreFileDownloadEvent",
+            "static": false,
+            "params": [],
+            "returnType": null,
+            "docReturnType": "mixed",
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "getCustomCacheKey",
+            "rust": "get_custom_cache_key",
+            "declaredIn": "Composer\\Plugin\\PreFileDownloadEvent",
+            "static": false,
+            "params": [],
+            "returnType": "?string",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "getFlags",
+            "rust": "get_flags",
+            "declaredIn": "Composer\\EventDispatcher\\Event",
+            "static": false,
+            "params": [],
+            "returnType": "array",
+            "docReturnType": "mixed[]",
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "getHttpDownloader",
+            "rust": "get_http_downloader",
+            "declaredIn": "Composer\\Plugin\\PreFileDownloadEvent",
+            "static": false,
+            "params": [],
+            "returnType": "\\Composer\\Util\\HttpDownloader",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "getName",
+            "rust": "get_name",
+            "declaredIn": "Composer\\EventDispatcher\\Event",
+            "static": false,
+            "params": [],
+            "returnType": "string",
+            "docReturnType": "string",
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "getProcessedUrl",
+            "rust": "get_processed_url",
+            "declaredIn": "Composer\\Plugin\\PreFileDownloadEvent",
+            "static": false,
+            "params": [],
+            "returnType": "string",
+            "docReturnType": "non-empty-string",
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "getTransportOptions",
+            "rust": "get_transport_options",
+            "declaredIn": "Composer\\Plugin\\PreFileDownloadEvent",
+            "static": false,
+            "params": [],
+            "returnType": "array",
+            "docReturnType": "mixed[]",
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "getType",
+            "rust": "get_type",
+            "declaredIn": "Composer\\Plugin\\PreFileDownloadEvent",
+            "static": false,
+            "params": [],
+            "returnType": "string",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "isPropagationStopped",
+            "rust": "is_propagation_stopped",
+            "declaredIn": "Composer\\EventDispatcher\\Event",
+            "static": false,
+            "params": [],
+            "returnType": "bool",
+            "docReturnType": "bool",
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "setCustomCacheKey",
+            "rust": "set_custom_cache_key",
+            "declaredIn": "Composer\\Plugin\\PreFileDownloadEvent",
+            "static": false,
+            "params": [
+                {
+                    "name": "customCacheKey",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": "?string",
+                    "docType": "string|null"
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "setProcessedUrl",
+            "rust": "set_processed_url",
+            "declaredIn": "Composer\\Plugin\\PreFileDownloadEvent",
+            "static": false,
+            "params": [
+                {
+                    "name": "processedUrl",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": "non-empty-string"
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "setTransportOptions",
+            "rust": "set_transport_options",
+            "declaredIn": "Composer\\Plugin\\PreFileDownloadEvent",
+            "static": false,
+            "params": [
+                {
+                    "name": "options",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "array",
+                    "docType": "mixed[]"
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "stopPropagation",
+            "rust": "stop_propagation",
+            "declaredIn": "Composer\\EventDispatcher\\Event",
+            "static": false,
+            "params": [],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        }
+    ],
+    "constructor": {
+        "declaredIn": "Composer\\Plugin\\PreFileDownloadEvent",
+        "public": true,
+        "params": [
+            {
+                "name": "name",
+                "position": 0,
+                "byRef": false,
+                "variadic": false,
+                "nullable": false,
+                "type": "string",
+                "docType": "string"
+            },
+            {
+                "name": "httpDownloader",
+                "position": 1,
+                "byRef": false,
+                "variadic": false,
+                "nullable": false,
+                "type": "\\Composer\\Util\\HttpDownloader",
+                "docType": null
+            },
+            {
+                "name": "processedUrl",
+                "position": 2,
+                "byRef": false,
+                "variadic": false,
+                "nullable": false,
+                "type": "string",
+                "docType": "non-empty-string"
+            },
+            {
+                "name": "type",
+                "position": 3,
+                "byRef": false,
+                "variadic": false,
+                "nullable": false,
+                "type": "string",
+                "docType": null
+            },
+            {
+                "name": "context",
+                "position": 4,
+                "byRef": false,
+                "variadic": false,
+                "nullable": true,
+                "type": null,
+                "docType": "mixed"
+            }
+        ],
+        "funcNumArgs": false,
+        "forwarded": true
+    },
+    "properties": [
+        {
+            "name": "args",
+            "declaredIn": "Composer\\EventDispatcher\\Event",
+            "visibility": "protected",
+            "static": false,
+            "readonly": false,
+            "type": null,
+            "docType": "string[]"
+        },
+        {
+            "name": "flags",
+            "declaredIn": "Composer\\EventDispatcher\\Event",
+            "visibility": "protected",
+            "static": false,
+            "readonly": false,
+            "type": null,
+            "docType": "mixed[]"
+        },
+        {
+            "name": "name",
+            "declaredIn": "Composer\\EventDispatcher\\Event",
+            "visibility": "protected",
+            "static": false,
+            "readonly": false,
+            "type": null,
+            "docType": "string"
+        }
+    ]
+}

@@ -20,6 +20,7 @@ use bstr::{B, BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_class_map_generator::class_map::ClassMap;
 use shirabe_class_map_generator::class_map_generator::ClassMapGenerator;
+use shirabe_php_binding_macros::php_binding;
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, PHP_SERVER, PhpMixed, PregMatches, RuntimeException,
     ToPhpString, array_keys, array_map, array_merge_map, array_merge_recursive, array_shift,
@@ -1911,16 +1912,19 @@ if (PHP_INT_SIZE !== 8) {
 // Composer's Composer::setAutoloadGenerator() accepts any AutoloadGenerator subclass, so plugins
 // may swap in a replacement. The interface captures the methods reached through Composer's accessor
 // and through the `Rc<RefCell<dyn AutoloadGeneratorInterface>>` references fed from it.
+#[php_binding(r"Composer\Autoload\AutoloadGenerator")]
 pub trait AutoloadGeneratorInterface: std::fmt::Debug {
     fn set_dev_mode(&self, dev_mode: bool);
     fn set_class_map_authoritative(&self, class_map_authoritative: bool);
     fn set_apcu(&self, apcu: bool, apcu_prefix: Option<BString>);
     fn set_run_scripts(&self, run_scripts: bool);
     fn set_dry_run(&self, dry_run: bool);
+    #[php(skip)]
     fn set_platform_requirement_filter(
         &self,
         platform_requirement_filter: std::rc::Rc<dyn PlatformRequirementFilterInterface>,
     );
+    #[php(skip)]
     #[allow(clippy::too_many_arguments, reason = "to keep PHP signature")]
     fn dump(
         &self,
@@ -1934,18 +1938,21 @@ pub trait AutoloadGeneratorInterface: std::fmt::Debug {
         locker: Option<std::rc::Rc<std::cell::RefCell<dyn LockerInterface>>>,
         strict_ambiguous: bool,
     ) -> anyhow::Result<ClassMap>;
+    #[php(skip)]
     fn build_package_map(
         &self,
         installation_manager: std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>,
         root_package: RootPackageInterfaceHandle,
         packages: Vec<PackageInterfaceHandle>,
     ) -> anyhow::Result<Vec<(PackageInterfaceHandle, Option<std::path::PathBuf>)>>;
+    #[php(skip)]
     fn parse_autoloads(
         &self,
         package_map: Vec<(PackageInterfaceHandle, Option<std::path::PathBuf>)>,
         root_package: RootPackageInterfaceHandle,
         filtered_dev_packages: PhpMixed,
     ) -> IndexMap<BString, PhpMixed>;
+    #[php(skip)]
     fn create_loader(
         &self,
         autoloads: &IndexMap<BString, PhpMixed>,

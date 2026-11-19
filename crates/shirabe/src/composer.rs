@@ -12,6 +12,7 @@ use crate::plugin::PluginManager;
 use crate::repository::RepositoryManagerInterface;
 use crate::util::r#loop::Loop;
 use bstr::{BStr, BString};
+use shirabe_php_binding_macros::php_binding;
 use shirabe_php_shim::{bformat, php_regex, php_str, preg_is_match};
 
 /// The Composer version this port tracks. Kept as-is so `Composer::VERSION`, the `composer`
@@ -71,6 +72,7 @@ pub struct PartialComposer {
     event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<dyn EventDispatcherInterface>>>,
 }
 
+#[php_binding(r"Composer\PartialComposer", members = instance)]
 impl PartialComposer {
     pub fn set_package(&mut self, package: RootPackageInterfaceHandle) {
         self.package = Some(package);
@@ -88,10 +90,12 @@ impl PartialComposer {
         self.config.as_ref().unwrap().clone()
     }
 
+    #[php(skip)]
     pub fn set_loop(&mut self, r#loop: std::rc::Rc<std::cell::RefCell<Loop>>) {
         self.r#loop = Some(r#loop);
     }
 
+    #[php(skip)]
     pub fn get_loop(&self) -> std::rc::Rc<std::cell::RefCell<Loop>> {
         self.r#loop.as_ref().unwrap().clone()
     }
@@ -162,6 +166,7 @@ impl Default for Composer {
     }
 }
 
+#[php_binding(r"Composer\Composer", members = instance)]
 impl Composer {
     pub fn new() -> Self {
         Self {
@@ -195,6 +200,7 @@ impl Composer {
         self.download_manager.as_ref().unwrap().clone()
     }
 
+    #[php(skip)]
     pub fn set_archive_manager(
         &mut self,
         manager: std::rc::Rc<std::cell::RefCell<dyn ArchiveManagerInterface>>,
@@ -202,6 +208,7 @@ impl Composer {
         self.archive_manager = Some(manager);
     }
 
+    #[php(skip)]
     pub fn get_archive_manager(
         &self,
     ) -> std::rc::Rc<std::cell::RefCell<dyn ArchiveManagerInterface>> {
@@ -209,11 +216,13 @@ impl Composer {
     }
 
     // TODO(plugin): set_plugin_manager is part of the plugin API
+    #[php(skip)]
     pub fn set_plugin_manager(&mut self, manager: std::rc::Rc<std::cell::RefCell<PluginManager>>) {
         self.plugin_manager = Some(manager);
     }
 
     // TODO(plugin): get_plugin_manager is part of the plugin API
+    #[php(skip)]
     pub fn get_plugin_manager(&self) -> std::rc::Rc<std::cell::RefCell<PluginManager>> {
         self.plugin_manager.as_ref().unwrap().clone()
     }
@@ -255,10 +264,12 @@ impl Composer {
         self.partial.get_config()
     }
 
+    #[php(skip)]
     pub fn set_loop(&mut self, r#loop: std::rc::Rc<std::cell::RefCell<Loop>>) {
         self.partial.set_loop(r#loop);
     }
 
+    #[php(skip)]
     pub fn get_loop(&self) -> std::rc::Rc<std::cell::RefCell<Loop>> {
         self.partial.get_loop()
     }

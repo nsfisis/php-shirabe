@@ -2,11 +2,12 @@
 //! answered in.
 //!
 //! An entity crosses the boundary as one of the worker-side classes that forward members to the
-//! Rust side (a proxy stub, a runtime class). `forwarding` holds, for each of those classes, the
-//! members the Rust side answers as a trait and the `match` routing a call to them; both are
-//! generated from the classifier report, which also records the members the Rust side does not
-//! answer, and the `match` answers those with an error. What the Rust side answers is written by
-//! hand, as the impl of that trait.
+//! Rust side (a proxy stub, a runtime class). `forwarding` holds a marker type for each of those
+//! classes and routes the worker's constructor and static calls to them; the entity declarations
+//! in `entities` (`php_entity!`) generate, for each class, the `ForwardedClass` impl of its marker
+//! type and the dispatch of its methods, which answers a member the Rust side does not serve with
+//! an error. They route the other members to the adapters `#[php_binding]` generates next to the
+//! Rust trait or type standing for the class (see `binding`), or to hand-written functions.
 
 use crate::php_worker::rpc::dispatch::error_throw;
 use crate::php_worker::rpc::table;
@@ -37,13 +38,7 @@ pub trait Entity: Clone + 'static {
 
     /// `__get` / `__set` / `__isset` / `__unset`.
     fn property(&self, access: PropertyAccess<'_>) -> Result<RpcValue, PhpThrow> {
-        // TODO(plugin): the instance properties the proxied classes expose are widened on
-        // demand. Each one has to decide how the state the real class keeps in that property is
-        // served from the Rust-side entity.
-        Err(PhpThrow::runtime(bformat!(
-            "the property `{}` is not available over RPC yet",
-            access.name()
-        )))
+        unavailable_property(&access)
     }
 
     /// A method only the worker runtime itself calls on this entity (`__shirabe_loop_services` on the
@@ -52,6 +47,17 @@ pub trait Entity: Clone + 'static {
         let _ = call;
         None
     }
+}
+
+/// The answer of a property forwarder for a property the entity declaration does not serve.
+pub fn unavailable_property(access: &PropertyAccess<'_>) -> Result<RpcValue, PhpThrow> {
+    // TODO(plugin): the instance properties the proxied classes expose are widened on demand.
+    // Each one has to decide how the state the real class keeps in that property is served from
+    // the Rust-side entity.
+    Err(PhpThrow::runtime(bformat!(
+        "the property `{}` is not available over RPC yet",
+        access.name()
+    )))
 }
 
 /// One of the property forwarders every stub carries.
@@ -87,6 +93,16 @@ impl<H> std::fmt::Debug for Bindings<H> {
             .field("name", &BStr::new(self.name))
             .finish_non_exhaustive()
     }
+}
+
+/// The constructor and the static methods of a forwarding class, which `forwarding`'s routing
+/// tables reach through the class's marker type.
+pub(crate) trait ForwardedClass {
+    /// A `NewObject`: builds the entity, registers it and answers its Rust entity id.
+    fn construct(call: &mut Call<'_>) -> Result<u64, PhpThrow>;
+
+    /// A `CallStaticMethod`.
+    fn call_static(call: &mut Call<'_>) -> Result<RpcValue, PhpThrow>;
 }
 
 /// One forwarded call: a method, a static method or a constructor of a forwarding class.

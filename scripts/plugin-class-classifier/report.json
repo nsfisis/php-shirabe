@@ -685,64 +685,51 @@
             "forwarded": [
                 {
                     "member": "__construct",
-                    "kind": "constructor",
-                    "status": "unimplemented"
+                    "kind": "constructor"
                 },
                 {
                     "member": "buildPackageMap",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "createLoader",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "dump",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "parseAutoloads",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setApcu",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setClassMapAuthoritative",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setDevMode",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setDryRun",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setIgnorePlatformRequirements",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setPlatformRequirementFilter",
-                    "kind": "method",
-                    "status": "refused",
-                    "reason": "no platform requirement filter can cross the boundary"
+                    "kind": "method"
                 },
                 {
                     "member": "setRunScripts",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 }
             ]
         },
@@ -7175,58 +7162,47 @@
             "forwarded": [
                 {
                     "member": "__construct",
-                    "kind": "constructor",
-                    "status": "unimplemented"
+                    "kind": "constructor"
                 },
                 {
                     "member": "getArchiveManager",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getAutoloadGenerator",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getDownloadManager",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getLocker",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getPluginManager",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setArchiveManager",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setAutoloadGenerator",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setDownloadManager",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setLocker",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setPluginManager",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 }
             ]
         },
@@ -7442,83 +7418,67 @@
             "forwarded": [
                 {
                     "member": "__construct",
-                    "kind": "constructor",
-                    "status": "unimplemented"
+                    "kind": "constructor"
                 },
                 {
                     "member": "all",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "get",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getAuthConfigSource",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getConfigSource",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getLocalAuthConfigSource",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getRepositories",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getSourceOfValue",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "has",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "merge",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "prohibitUrlByConfig",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "raw",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setAuthConfigSource",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setBaseDir",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setConfigSource",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setLocalAuthConfigSource",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 }
             ]
         },
@@ -8894,8 +8854,7 @@
             "forwarded": [
                 {
                     "member": "__construct",
-                    "kind": "constructor",
-                    "status": "unimplemented"
+                    "kind": "constructor"
                 }
             ]
         },
@@ -9131,13 +9090,11 @@
             "forwarded": [
                 {
                     "member": "__construct",
-                    "kind": "constructor",
-                    "status": "implemented"
+                    "kind": "constructor"
                 },
                 {
                     "member": "getPackage",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 }
             ]
         },
@@ -9192,13 +9149,11 @@
             "forwarded": [
                 {
                     "member": "__construct",
-                    "kind": "constructor",
-                    "status": "implemented"
+                    "kind": "constructor"
                 },
                 {
                     "member": "getPackage",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 }
             ]
         },
@@ -9253,13 +9208,11 @@
             "forwarded": [
                 {
                     "member": "__construct",
-                    "kind": "constructor",
-                    "status": "implemented"
+                    "kind": "constructor"
                 },
                 {
                     "member": "getPackage",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 }
             ]
         },
@@ -9341,18 +9294,15 @@
             "forwarded": [
                 {
                     "member": "__toString",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getOperationType",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "show",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 }
             ]
         },
@@ -9415,13 +9365,11 @@
             "forwarded": [
                 {
                     "member": "__construct",
-                    "kind": "constructor",
-                    "status": "implemented"
+                    "kind": "constructor"
                 },
                 {
                     "member": "getPackage",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 }
             ]
         },
@@ -9497,18 +9445,15 @@
             "forwarded": [
                 {
                     "member": "__construct",
-                    "kind": "constructor",
-                    "status": "implemented"
+                    "kind": "constructor"
                 },
                 {
                     "member": "getInitialPackage",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getTargetPackage",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 }
             ]
         },
@@ -9767,7 +9712,6 @@
             "treatmentSource": "propagated",
             "reasons": [
                 "not plugin-reachable: no instance the Rust side owns ever reaches plugin code",
-                "propagated: buildPool() constructs Composer\\Plugin\\PrePoolCreateEvent",
                 "propagated: buildPool() constructs Composer\\DependencyResolver\\Pool"
             ],
             "hardRefs": [
@@ -11538,13 +11482,11 @@
             "forwarded": [
                 {
                     "member": "__construct",
-                    "kind": "constructor",
-                    "status": "unimplemented"
+                    "kind": "constructor"
                 },
                 {
                     "member": "getOperations",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 }
             ]
         },
@@ -11831,73 +11773,59 @@
             "forwarded": [
                 {
                     "member": "__construct",
-                    "kind": "constructor",
-                    "status": "unimplemented"
+                    "kind": "constructor"
                 },
                 {
                     "member": "cleanup",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "download",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getDownloader",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getDownloaderForPackage",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getDownloaderType",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "install",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "prepare",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "remove",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setDownloader",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setPreferDist",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setPreferSource",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setPreferences",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "update",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 }
             ]
         },
@@ -14158,28 +14086,23 @@
             "forwarded": [
                 {
                     "member": "getArguments",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getFlags",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getName",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "isPropagationStopped",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "stopPropagation",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 }
             ]
         },
@@ -14558,53 +14481,43 @@
             "forwarded": [
                 {
                     "member": "__construct",
-                    "kind": "constructor",
-                    "status": "unimplemented"
+                    "kind": "constructor"
                 },
                 {
                     "member": "addListener",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "addSubscriber",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "dispatch",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "dispatchInstallerEvent",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "dispatchPackageEvent",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "dispatchScript",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "hasEventListeners",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "removeListener",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setRunScripts",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 }
             ]
         },
@@ -14719,20 +14632,12 @@
             "treatmentSource": "propagated",
             "reasons": [
                 "not plugin-reachable: no instance the Rust side owns ever reaches plugin code",
-                "propagated: createConfig() constructs Composer\\Config",
                 "propagated: createConfig() constructs Composer\\Json\\JsonFile",
                 "propagated: createConfig() constructs Composer\\Config\\JsonConfigSource",
                 "propagated: createComposer() constructs Composer\\Json\\JsonFile",
                 "propagated: createComposer() constructs Composer\\Config\\JsonConfigSource",
-                "propagated: createComposer() constructs Composer\\Composer",
-                "propagated: createComposer() constructs Composer\\PartialComposer",
-                "propagated: createComposer() constructs Composer\\EventDispatcher\\EventDispatcher",
-                "propagated: createComposer() constructs Composer\\Autoload\\AutoloadGenerator",
-                "propagated: createComposer() constructs Composer\\Package\\Locker",
-                "propagated: addLocalRepository() constructs Composer\\Repository\\InstalledFilesystemRepository",
                 "propagated: addLocalRepository() constructs Composer\\Json\\JsonFile",
                 "propagated: createDownloadManager() constructs Composer\\Cache",
-                "propagated: createDownloadManager() constructs Composer\\Downloader\\DownloadManager",
                 "propagated: createDownloadManager() constructs Composer\\Downloader\\GitDownloader",
                 "propagated: createDownloadManager() constructs Composer\\Downloader\\SvnDownloader",
                 "propagated: createDownloadManager() constructs Composer\\Downloader\\FossilDownloader",
@@ -14749,7 +14654,6 @@
                 "propagated: createArchiveManager() constructs Composer\\Package\\Archiver\\ArchiveManager",
                 "propagated: createArchiveManager() constructs Composer\\Package\\Archiver\\ZipArchiver",
                 "propagated: createPluginManager() constructs Composer\\Plugin\\PluginManager",
-                "propagated: createInstallationManager() constructs Composer\\Installer\\InstallationManager",
                 "propagated: createDefaultInstallers() constructs Composer\\Installer\\PluginInstaller",
                 "propagated: createDefaultInstallers() constructs Composer\\Installer\\MetapackageInstaller",
                 "propagated: loadRootPackage() constructs Composer\\Package\\Loader\\RootPackageLoader"
@@ -15333,7 +15237,6 @@
                 {
                     "member": "getComposerFile",
                     "kind": "static",
-                    "status": "forward",
                     "reason": "it only reads the COMPOSER environment variable, whose value the Rust side owns."
                 }
             ]
@@ -15811,158 +15714,127 @@
             "forwarded": [
                 {
                     "member": "alert",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "ask",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "askAndHideAnswer",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "askAndValidate",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "askConfirmation",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "critical",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "debug",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "emergency",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "error",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getAuthentication",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getAuthentications",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "hasAuthentication",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "info",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "isDebug",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "isDecorated",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "isInteractive",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "isVerbose",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "isVeryVerbose",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "loadConfiguration",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "log",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "notice",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "overwrite",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "overwriteError",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "resetAuthentications",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "select",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setAuthentication",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "warning",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "write",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "writeError",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "writeErrorRaw",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "writeRaw",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 }
             ]
         },
@@ -16057,18 +15929,15 @@
             "forwarded": [
                 {
                     "member": "__construct",
-                    "kind": "constructor",
-                    "status": "implemented"
+                    "kind": "constructor"
                 },
                 {
                     "member": "getOutput",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setUserInputs",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 }
             ]
         },
@@ -16307,23 +16176,19 @@
             "forwarded": [
                 {
                     "member": "__construct",
-                    "kind": "constructor",
-                    "status": "unimplemented"
+                    "kind": "constructor"
                 },
                 {
                     "member": "enableDebugging",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getProgressBar",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getTable",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 }
             ]
         },
@@ -16653,8 +16518,7 @@
             "forwarded": [
                 {
                     "member": "__construct",
-                    "kind": "constructor",
-                    "status": "unimplemented"
+                    "kind": "constructor"
                 }
             ]
         },
@@ -16861,17 +16725,14 @@
                 "propagated: run() constructs Composer\\Repository\\RootPackageRepository",
                 "propagated: run() constructs Composer\\Repository\\RepositorySet",
                 "propagated: doUpdate() constructs Composer\\DependencyResolver\\Solver",
-                "propagated: extractDevPackages() constructs Composer\\Repository\\ArrayRepository",
                 "propagated: extractDevPackages() constructs Composer\\Package\\Loader\\ArrayLoader",
                 "propagated: extractDevPackages() constructs Composer\\DependencyResolver\\Solver",
                 "propagated: doInstall() constructs Composer\\DependencyResolver\\Solver",
-                "propagated: doInstall() constructs Composer\\DependencyResolver\\LocalRepoTransaction",
                 "propagated: createPlatformRepo() constructs Composer\\Repository\\PlatformRepository",
                 "propagated: createRepositorySet() constructs Composer\\Repository\\RepositorySet",
                 "propagated: createRepositorySet() constructs Composer\\Repository\\RootPackageRepository",
                 "propagated: createPolicy() constructs Composer\\DependencyResolver\\DefaultPolicy",
                 "propagated: createRequest() constructs Composer\\DependencyResolver\\Request",
-                "propagated: mockLocalRepositories() constructs Composer\\Repository\\InstalledArrayRepository",
                 "propagated: createPoolOptimizer() constructs Composer\\DependencyResolver\\PoolOptimizer",
                 "propagated: createSecurityAuditPoolFilter() constructs Composer\\DependencyResolver\\SecurityAdvisoryPoolFilter"
             ],
@@ -17804,93 +17665,75 @@
             "forwarded": [
                 {
                     "member": "__construct",
-                    "kind": "constructor",
-                    "status": "unimplemented"
+                    "kind": "constructor"
                 },
                 {
                     "member": "addInstaller",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "disablePlugins",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "download",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "ensureBinariesPresence",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "execute",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getInstallPath",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getInstaller",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "install",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "isPackageInstalled",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "markAliasInstalled",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "markAliasUninstalled",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "notifyInstalls",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "removeInstaller",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "reset",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setOutputProgress",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "uninstall",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "update",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 }
             ]
         },
@@ -17969,33 +17812,27 @@
             "forwarded": [
                 {
                     "member": "__construct",
-                    "kind": "constructor",
-                    "status": "unimplemented"
+                    "kind": "constructor"
                 },
                 {
                     "member": "getComposer",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getIO",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getTransaction",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "isDevMode",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "isExecutingOperations",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 }
             ]
         },
@@ -18624,38 +18461,31 @@
             "forwarded": [
                 {
                     "member": "__construct",
-                    "kind": "constructor",
-                    "status": "unimplemented"
+                    "kind": "constructor"
                 },
                 {
                     "member": "getComposer",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getIO",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getLocalRepo",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getOperation",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getOperations",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "isDevMode",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 }
             ]
         },
@@ -20181,28 +20011,23 @@
             "forwarded": [
                 {
                     "member": "__construct",
-                    "kind": "constructor",
-                    "status": "implemented"
+                    "kind": "constructor"
                 },
                 {
                     "member": "getAliasOf",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "hasSelfVersionRequires",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "isRootPackageAlias",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setRootPackageAlias",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 }
             ]
         },
@@ -20927,288 +20752,231 @@
             "forwarded": [
                 {
                     "member": "__toString",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "equals",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getAutoload",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getBinaries",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getConflicts",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getDevAutoload",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getDevRequires",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getDistMirrors",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getDistReference",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getDistSha1Checksum",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getDistType",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getDistUrl",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getDistUrls",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getExtra",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getFullPrettyVersion",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getId",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getIncludePaths",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getInstallationSource",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getName",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getNames",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getNotificationUrl",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getPhpExt",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getPrettyName",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getPrettyString",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getPrettyVersion",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getProvides",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getReleaseDate",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getReplaces",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getRepository",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getRequires",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getSourceMirrors",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getSourceReference",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getSourceType",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getSourceUrl",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getSourceUrls",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getStability",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getStabilityPriority",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getSuggests",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getTargetDir",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getTransportOptions",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getType",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getUniqueName",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getVersion",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "isDefaultBranch",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "isDev",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "isPlatform",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setDistMirrors",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setDistReference",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setDistType",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setDistUrl",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setId",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setInstallationSource",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setRepository",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setSourceDistReferences",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setSourceMirrors",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setSourceReference",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setTransportOptions",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 }
             ]
         },
@@ -21520,133 +21288,107 @@
             "forwarded": [
                 {
                     "member": "__construct",
-                    "kind": "constructor",
-                    "status": "implemented"
+                    "kind": "constructor"
                 },
                 {
                     "member": "getArchiveExcludes",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getArchiveName",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getAuthors",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getDescription",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getFunding",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getHomepage",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getKeywords",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getLicense",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getReplacementPackage",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getRepositories",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getScripts",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getSupport",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "isAbandoned",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setAbandoned",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setArchiveExcludes",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setArchiveName",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setAuthors",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setDescription",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setFunding",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setHomepage",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setKeywords",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setLicense",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setRepositories",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setScripts",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setSupport",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 }
             ]
         },
@@ -21877,133 +21619,107 @@
             "forwarded": [
                 {
                     "member": "__construct",
-                    "kind": "constructor",
-                    "status": "implemented"
+                    "kind": "constructor"
                 },
                 {
                     "member": "getArchiveExcludes",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getArchiveName",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getAuthors",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getDescription",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getFunding",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getHomepage",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getKeywords",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getLicense",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getReplacementPackage",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getRepositories",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getScripts",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getSupport",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "isAbandoned",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setAbandoned",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setArchiveExcludes",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setArchiveName",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setAuthors",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setDescription",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setFunding",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setHomepage",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setKeywords",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setLicense",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setRepositories",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setScripts",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setSupport",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 }
             ]
         },
@@ -23193,100 +22909,79 @@
             "forwarded": [
                 {
                     "member": "__construct",
-                    "kind": "constructor",
-                    "status": "unimplemented"
+                    "kind": "constructor"
                 },
                 {
                     "member": "getAliases",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getContentHash",
-                    "kind": "static",
-                    "status": "implemented"
+                    "kind": "static"
                 },
                 {
                     "member": "getDevPackageNames",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getJsonFile",
-                    "kind": "method",
-                    "status": "refused",
-                    "reason": "JsonFile cannot cross the boundary"
+                    "kind": "method"
                 },
                 {
                     "member": "getLockData",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getLockedRepository",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getMinimumStability",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getMissingRequirementInfo",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getPlatformOverrides",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getPlatformRequirements",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getPluginApi",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getPreferLowest",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getPreferStable",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getStabilityFlags",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "isFresh",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "isLocked",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setLockData",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "updateHash",
-                    "kind": "method",
-                    "status": "refused",
-                    "reason": "JsonFile cannot cross the boundary"
+                    "kind": "method"
                 }
             ]
         },
@@ -23885,113 +23580,91 @@
             "forwarded": [
                 {
                     "member": "__construct",
-                    "kind": "constructor",
-                    "status": "implemented"
+                    "kind": "constructor"
                 },
                 {
                     "member": "replaceVersion",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setAutoload",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setBinaries",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setConflicts",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setDevAutoload",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setDevRequires",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setDistSha1Checksum",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setExtra",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setIncludePaths",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setIsDefaultBranch",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setNotificationUrl",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setPhpExt",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setProvides",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setReleaseDate",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setReplaces",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setRequires",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setSourceType",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setSourceUrl",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setSuggests",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setTargetDir",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setType",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 }
             ]
         },
@@ -24663,113 +24336,91 @@
             "forwarded": [
                 {
                     "member": "__construct",
-                    "kind": "constructor",
-                    "status": "implemented"
+                    "kind": "constructor"
                 },
                 {
                     "member": "getAliases",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getConfig",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getMinimumStability",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getPreferStable",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getReferences",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getStabilityFlags",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setAliases",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setAutoload",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setConfig",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setConflicts",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setDevAutoload",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setDevRequires",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setExtra",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setMinimumStability",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setPreferStable",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setProvides",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setReferences",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setReplaces",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setRequires",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setStabilityFlags",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setSuggests",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 }
             ]
         },
@@ -24896,68 +24547,55 @@
             "forwarded": [
                 {
                     "member": "__construct",
-                    "kind": "constructor",
-                    "status": "unimplemented"
+                    "kind": "constructor"
                 },
                 {
                     "member": "getAliases",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getConfig",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getMinimumStability",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getPreferStable",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getReferences",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getStabilityFlags",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setAliases",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setConfig",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setMinimumStability",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setPreferStable",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setReferences",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setStabilityFlags",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 }
             ]
         },
@@ -25694,78 +25332,63 @@
             "forwarded": [
                 {
                     "member": "__construct",
-                    "kind": "constructor",
-                    "status": "unimplemented"
+                    "kind": "constructor"
                 },
                 {
                     "member": "getConfig",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getEventDispatcher",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getInstallationManager",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getLoop",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getPackage",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getRepositoryManager",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "isGlobal",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setConfig",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setEventDispatcher",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setGlobal",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setInstallationManager",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setLoop",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setPackage",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setRepositoryManager",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 }
             ]
         },
@@ -26163,25 +25786,19 @@
             "forwarded": [
                 {
                     "member": "__construct",
-                    "kind": "constructor",
-                    "status": "unimplemented"
+                    "kind": "constructor"
                 },
                 {
                     "member": "getCommandName",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getInput",
-                    "kind": "method",
-                    "status": "refused",
-                    "reason": "the console input cannot cross the boundary"
+                    "kind": "method"
                 },
                 {
                     "member": "getOutput",
-                    "kind": "method",
-                    "status": "refused",
-                    "reason": "the console output cannot cross the boundary"
+                    "kind": "method"
                 }
             ]
         },
@@ -26618,38 +26235,31 @@
             "forwarded": [
                 {
                     "member": "__construct",
-                    "kind": "constructor",
-                    "status": "unimplemented"
+                    "kind": "constructor"
                 },
                 {
                     "member": "getChecksum",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getContext",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getFileName",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getPackage",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getType",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getUrl",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 }
             ]
         },
@@ -26705,14 +26315,11 @@
             "forwarded": [
                 {
                     "member": "getCommand",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getInput",
-                    "kind": "method",
-                    "status": "refused",
-                    "reason": "the console input cannot cross the boundary"
+                    "kind": "method"
                 }
             ]
         },
@@ -26823,53 +26430,43 @@
             "forwarded": [
                 {
                     "member": "__construct",
-                    "kind": "constructor",
-                    "status": "unimplemented"
+                    "kind": "constructor"
                 },
                 {
                     "member": "getContext",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getCustomCacheKey",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getHttpDownloader",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getProcessedUrl",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getTransportOptions",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getType",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setCustomCacheKey",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setProcessedUrl",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setTransportOptions",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 }
             ]
         },
@@ -26988,59 +26585,47 @@
             "forwarded": [
                 {
                     "member": "__construct",
-                    "kind": "constructor",
-                    "status": "unimplemented"
+                    "kind": "constructor"
                 },
                 {
                     "member": "getAcceptableStabilities",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getPackages",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getRepositories",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getRequest",
-                    "kind": "method",
-                    "status": "refused",
-                    "reason": "the Request cannot cross the boundary"
+                    "kind": "method"
                 },
                 {
                     "member": "getRootAliases",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getRootReferences",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getStabilityFlags",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getUnacceptableFixedPackages",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setPackages",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setUnacceptableFixedPackages",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 }
             ]
         },
@@ -27314,63 +26899,51 @@
             "forwarded": [
                 {
                     "member": "__construct",
-                    "kind": "constructor",
-                    "status": "unimplemented"
+                    "kind": "constructor"
                 },
                 {
                     "member": "addPackage",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "count",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "findPackage",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "findPackages",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getPackages",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getProviders",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getRepoName",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "hasPackage",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "loadPackages",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "removePackage",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "search",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 }
             ]
         },
@@ -28331,8 +27904,7 @@
             "forwarded": [
                 {
                     "member": "__construct",
-                    "kind": "constructor",
-                    "status": "unimplemented"
+                    "kind": "constructor"
                 }
             ]
         },
@@ -28519,13 +28091,11 @@
             "forwarded": [
                 {
                     "member": "__construct",
-                    "kind": "constructor",
-                    "status": "unimplemented"
+                    "kind": "constructor"
                 },
                 {
                     "member": "isFresh",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 }
             ]
         },
@@ -28572,13 +28142,11 @@
             "forwarded": [
                 {
                     "member": "__construct",
-                    "kind": "constructor",
-                    "status": "unimplemented"
+                    "kind": "constructor"
                 },
                 {
                     "member": "isFresh",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 }
             ]
         },
@@ -28776,8 +28344,7 @@
             "forwarded": [
                 {
                     "member": "__construct",
-                    "kind": "constructor",
-                    "status": "unimplemented"
+                    "kind": "constructor"
                 }
             ]
         },
@@ -29318,9 +28885,7 @@
                 "propagated: defaultRepos() calls Composer\\Factory::createConfig",
                 "propagated: defaultRepos() calls Composer\\Factory::createHttpDownloader",
                 "propagated: manager() calls Composer\\Factory::createHttpDownloader",
-                "propagated: manager() constructs Composer\\Repository\\RepositoryManager",
-                "propagated: defaultReposWithDefaultManager() calls Composer\\Factory::createConfig",
-                "propagated: createRepos() constructs Composer\\Repository\\FilesystemRepository"
+                "propagated: defaultReposWithDefaultManager() calls Composer\\Factory::createConfig"
             ],
             "hardRefs": [
                 {
@@ -29664,53 +29229,43 @@
             "forwarded": [
                 {
                     "member": "__construct",
-                    "kind": "constructor",
-                    "status": "unimplemented"
+                    "kind": "constructor"
                 },
                 {
                     "member": "addRepository",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "createRepository",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "findPackage",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "findPackages",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getLocalRepository",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getRepositories",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "prependRepository",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setLocalRepository",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setRepositoryClass",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 }
             ]
         },
@@ -32621,38 +32176,31 @@
             "forwarded": [
                 {
                     "member": "__construct",
-                    "kind": "constructor",
-                    "status": "unimplemented"
+                    "kind": "constructor"
                 },
                 {
                     "member": "getCanonicalPackages",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getDevMode",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getDevPackageNames",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "reload",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setDevPackageNames",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "write",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 }
             ]
         },
@@ -32804,33 +32352,27 @@
             "forwarded": [
                 {
                     "member": "__construct",
-                    "kind": "constructor",
-                    "status": "unimplemented"
+                    "kind": "constructor"
                 },
                 {
                     "member": "getComposer",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getIO",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getOriginatingEvent",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 },
                 {
                     "member": "isDevMode",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setOriginatingEvent",
-                    "kind": "method",
-                    "status": "unimplemented"
+                    "kind": "method"
                 }
             ]
         },
@@ -33890,128 +33432,103 @@
             "forwarded": [
                 {
                     "member": "__construct",
-                    "kind": "constructor",
-                    "status": "implemented"
+                    "kind": "constructor"
                 },
                 {
                     "member": "copy",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "copyThenRemove",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "emptyDirectory",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "ensureDirectoryExists",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "filePutContentsIfModified",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "findShortestPath",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "findShortestPathCode",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "isAbsolutePath",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "isDirEmpty",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "isJunction",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "isSymlinkedDirectory",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "junction",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "normalizePath",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "relativeSymlink",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "remove",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "removeDirectory",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "removeDirectoryAsync",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "removeDirectoryPhp",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "removeJunction",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "rename",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "rmdir",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "safeCopy",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "size",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "unlink",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 }
             ]
         },
@@ -34955,53 +34472,43 @@
             "forwarded": [
                 {
                     "member": "__construct",
-                    "kind": "constructor",
-                    "status": "implemented"
+                    "kind": "constructor"
                 },
                 {
                     "member": "add",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "addCopy",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "copy",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "countActiveJobs",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "enableAsync",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "get",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getOptions",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setOptions",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "wait",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 }
             ]
         },
@@ -36722,73 +36229,59 @@
             "forwarded": [
                 {
                     "member": "__construct",
-                    "kind": "constructor",
-                    "status": "implemented"
+                    "kind": "constructor"
                 },
                 {
                     "member": "countActiveJobs",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "enableAsync",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "execute",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "executeAsync",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "executeTty",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getErrorOutput",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "getTimeout",
-                    "kind": "static",
-                    "status": "implemented"
+                    "kind": "static"
                 },
                 {
                     "member": "requiresGitDirEnv",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "resetMaxJobs",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setMaxJobs",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "setTimeout",
-                    "kind": "static",
-                    "status": "implemented"
+                    "kind": "static"
                 },
                 {
                     "member": "splitLines",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 },
                 {
                     "member": "wait",
-                    "kind": "method",
-                    "status": "implemented"
+                    "kind": "method"
                 }
             ],
             "staticProperties": [
@@ -38340,14 +37833,6 @@
         {
             "item": 2,
             "fqcn": "Composer\\Command\\BaseCommand",
-            "member": "getIO",
-            "kind": "new",
-            "target": "Composer\\IO\\NullIO",
-            "problem": "the constructor of the Composer\\IO\\NullIO stub is unimplemented"
-        },
-        {
-            "item": 2,
-            "fqcn": "Composer\\Command\\BaseCommand",
             "member": "initialize",
             "kind": "static",
             "target": "Composer\\Factory::createGlobal",
@@ -38670,14 +38155,6 @@
             "fqcn": "Composer\\Package\\Version\\VersionGuesser",
             "member": "guessHgVersion",
             "kind": "new",
-            "target": "Composer\\IO\\NullIO",
-            "problem": "the constructor of the Composer\\IO\\NullIO stub is unimplemented"
-        },
-        {
-            "item": 2,
-            "fqcn": "Composer\\Package\\Version\\VersionGuesser",
-            "member": "guessHgVersion",
-            "kind": "new",
             "target": "Composer\\Repository\\Vcs\\HgDriver",
             "problem": "Composer\\Repository\\Vcs\\HgDriver is guarded"
         },
@@ -38752,11 +38229,6 @@
             "item": 3,
             "fqcn": "Composer\\DependencyResolver\\PoolBuilder",
             "origins": [
-                {
-                    "member": "buildPool",
-                    "kind": "new",
-                    "target": "Composer\\Plugin\\PrePoolCreateEvent"
-                },
                 {
                     "member": "buildPool",
                     "kind": "new",
@@ -38843,11 +38315,6 @@
                 {
                     "member": "createConfig",
                     "kind": "new",
-                    "target": "Composer\\Config"
-                },
-                {
-                    "member": "createConfig",
-                    "kind": "new",
                     "target": "Composer\\Json\\JsonFile"
                 },
                 {
@@ -38864,36 +38331,6 @@
                     "member": "createComposer",
                     "kind": "new",
                     "target": "Composer\\Config\\JsonConfigSource"
-                },
-                {
-                    "member": "createComposer",
-                    "kind": "new",
-                    "target": "Composer\\Composer"
-                },
-                {
-                    "member": "createComposer",
-                    "kind": "new",
-                    "target": "Composer\\PartialComposer"
-                },
-                {
-                    "member": "createComposer",
-                    "kind": "new",
-                    "target": "Composer\\EventDispatcher\\EventDispatcher"
-                },
-                {
-                    "member": "createComposer",
-                    "kind": "new",
-                    "target": "Composer\\Autoload\\AutoloadGenerator"
-                },
-                {
-                    "member": "createComposer",
-                    "kind": "new",
-                    "target": "Composer\\Package\\Locker"
-                },
-                {
-                    "member": "addLocalRepository",
-                    "kind": "new",
-                    "target": "Composer\\Repository\\InstalledFilesystemRepository"
                 },
                 {
                     "member": "addLocalRepository",
@@ -38904,11 +38341,6 @@
                     "member": "createDownloadManager",
                     "kind": "new",
                     "target": "Composer\\Cache"
-                },
-                {
-                    "member": "createDownloadManager",
-                    "kind": "new",
-                    "target": "Composer\\Downloader\\DownloadManager"
                 },
                 {
                     "member": "createDownloadManager",
@@ -38991,11 +38423,6 @@
                     "target": "Composer\\Plugin\\PluginManager"
                 },
                 {
-                    "member": "createInstallationManager",
-                    "kind": "new",
-                    "target": "Composer\\Installer\\InstallationManager"
-                },
-                {
                     "member": "createDefaultInstallers",
                     "kind": "new",
                     "target": "Composer\\Installer\\PluginInstaller"
@@ -39039,11 +38466,6 @@
                 {
                     "member": "extractDevPackages",
                     "kind": "new",
-                    "target": "Composer\\Repository\\ArrayRepository"
-                },
-                {
-                    "member": "extractDevPackages",
-                    "kind": "new",
                     "target": "Composer\\Package\\Loader\\ArrayLoader"
                 },
                 {
@@ -39055,11 +38477,6 @@
                     "member": "doInstall",
                     "kind": "new",
                     "target": "Composer\\DependencyResolver\\Solver"
-                },
-                {
-                    "member": "doInstall",
-                    "kind": "new",
-                    "target": "Composer\\DependencyResolver\\LocalRepoTransaction"
                 },
                 {
                     "member": "createPlatformRepo",
@@ -39085,11 +38502,6 @@
                     "member": "createRequest",
                     "kind": "new",
                     "target": "Composer\\DependencyResolver\\Request"
-                },
-                {
-                    "member": "mockLocalRepositories",
-                    "kind": "new",
-                    "target": "Composer\\Repository\\InstalledArrayRepository"
                 },
                 {
                     "member": "createPoolOptimizer",
@@ -39155,19 +38567,9 @@
                     "target": "Composer\\Factory::createHttpDownloader"
                 },
                 {
-                    "member": "manager",
-                    "kind": "new",
-                    "target": "Composer\\Repository\\RepositoryManager"
-                },
-                {
                     "member": "defaultReposWithDefaultManager",
                     "kind": "static",
                     "target": "Composer\\Factory::createConfig"
-                },
-                {
-                    "member": "createRepos",
-                    "kind": "new",
-                    "target": "Composer\\Repository\\FilesystemRepository"
                 }
             ]
         },
@@ -39259,921 +38661,31 @@
         },
         {
             "item": 4,
-            "fqcn": "Composer\\Autoload\\AutoloadGenerator",
-            "count": 2,
-            "members": [
-                {
-                    "member": "__construct",
-                    "kind": "constructor",
-                    "status": "unimplemented",
-                    "plugin-constructible": true
-                },
-                {
-                    "member": "setPlatformRequirementFilter",
-                    "kind": "method",
-                    "status": "refused"
-                }
-            ]
-        },
-        {
-            "item": 4,
-            "fqcn": "Composer\\Composer",
-            "count": 8,
-            "members": [
-                {
-                    "member": "__construct",
-                    "kind": "constructor",
-                    "status": "unimplemented",
-                    "plugin-constructible": true
-                },
-                {
-                    "member": "getArchiveManager",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "getPluginManager",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "setArchiveManager",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "setAutoloadGenerator",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "setDownloadManager",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "setLocker",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "setPluginManager",
-                    "kind": "method",
-                    "status": "unimplemented"
-                }
-            ]
-        },
-        {
-            "item": 4,
-            "fqcn": "Composer\\Config",
-            "count": 9,
-            "members": [
-                {
-                    "member": "__construct",
-                    "kind": "constructor",
-                    "status": "unimplemented",
-                    "plugin-constructible": true
-                },
-                {
-                    "member": "getAuthConfigSource",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "getConfigSource",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "getLocalAuthConfigSource",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "prohibitUrlByConfig",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "setAuthConfigSource",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "setBaseDir",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "setConfigSource",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "setLocalAuthConfigSource",
-                    "kind": "method",
-                    "status": "unimplemented"
-                }
-            ]
-        },
-        {
-            "item": 4,
-            "fqcn": "Composer\\DependencyResolver\\LocalRepoTransaction",
-            "count": 1,
-            "members": [
-                {
-                    "member": "__construct",
-                    "kind": "constructor",
-                    "status": "unimplemented",
-                    "plugin-constructible": true
-                }
-            ]
-        },
-        {
-            "item": 4,
-            "fqcn": "Composer\\DependencyResolver\\Transaction",
-            "count": 1,
-            "members": [
-                {
-                    "member": "__construct",
-                    "kind": "constructor",
-                    "status": "unimplemented",
-                    "plugin-constructible": true
-                }
-            ]
-        },
-        {
-            "item": 4,
-            "fqcn": "Composer\\Downloader\\DownloadManager",
-            "count": 6,
-            "members": [
-                {
-                    "member": "__construct",
-                    "kind": "constructor",
-                    "status": "unimplemented",
-                    "plugin-constructible": true
-                },
-                {
-                    "member": "getDownloader",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "getDownloaderForPackage",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "getDownloaderType",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "setDownloader",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "setPreferences",
-                    "kind": "method",
-                    "status": "unimplemented"
-                }
-            ]
-        },
-        {
-            "item": 4,
-            "fqcn": "Composer\\EventDispatcher\\EventDispatcher",
-            "count": 9,
-            "members": [
-                {
-                    "member": "__construct",
-                    "kind": "constructor",
-                    "status": "unimplemented",
-                    "plugin-constructible": true
-                },
-                {
-                    "member": "addListener",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "addSubscriber",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "dispatchInstallerEvent",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "dispatchPackageEvent",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "dispatchScript",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "hasEventListeners",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "removeListener",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "setRunScripts",
-                    "kind": "method",
-                    "status": "unimplemented"
-                }
-            ]
-        },
-        {
-            "item": 4,
-            "fqcn": "Composer\\IO\\BaseIO",
-            "count": 24,
-            "members": [
-                {
-                    "member": "alert",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "ask",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "askAndHideAnswer",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "askAndValidate",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "askConfirmation",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "critical",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "debug",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "emergency",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "error",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "getAuthentication",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "getAuthentications",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "hasAuthentication",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "info",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "loadConfiguration",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "log",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "notice",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "overwrite",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "overwriteError",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "resetAuthentications",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "select",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "setAuthentication",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "warning",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "writeErrorRaw",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "writeRaw",
-                    "kind": "method",
-                    "status": "unimplemented"
-                }
-            ]
-        },
-        {
-            "item": 4,
-            "fqcn": "Composer\\IO\\ConsoleIO",
-            "count": 4,
-            "members": [
-                {
-                    "member": "__construct",
-                    "kind": "constructor",
-                    "status": "unimplemented",
-                    "plugin-constructible": true
-                },
-                {
-                    "member": "enableDebugging",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "getProgressBar",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "getTable",
-                    "kind": "method",
-                    "status": "unimplemented"
-                }
-            ]
-        },
-        {
-            "item": 4,
-            "fqcn": "Composer\\IO\\NullIO",
-            "count": 1,
-            "members": [
-                {
-                    "member": "__construct",
-                    "kind": "constructor",
-                    "status": "unimplemented",
-                    "plugin-constructible": true
-                }
-            ]
-        },
-        {
-            "item": 4,
-            "fqcn": "Composer\\Installer\\InstallationManager",
-            "count": 15,
-            "members": [
-                {
-                    "member": "__construct",
-                    "kind": "constructor",
-                    "status": "unimplemented",
-                    "plugin-constructible": true
-                },
-                {
-                    "member": "disablePlugins",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "download",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "ensureBinariesPresence",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "execute",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "getInstaller",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "install",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "isPackageInstalled",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "markAliasInstalled",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "markAliasUninstalled",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "notifyInstalls",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "reset",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "setOutputProgress",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "uninstall",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "update",
-                    "kind": "method",
-                    "status": "unimplemented"
-                }
-            ]
-        },
-        {
-            "item": 4,
-            "fqcn": "Composer\\Installer\\InstallerEvent",
-            "count": 1,
-            "members": [
-                {
-                    "member": "__construct",
-                    "kind": "constructor",
-                    "status": "unimplemented",
-                    "plugin-constructible": true
-                }
-            ]
-        },
-        {
-            "item": 4,
-            "fqcn": "Composer\\Installer\\PackageEvent",
-            "count": 1,
-            "members": [
-                {
-                    "member": "__construct",
-                    "kind": "constructor",
-                    "status": "unimplemented",
-                    "plugin-constructible": true
-                }
-            ]
-        },
-        {
-            "item": 4,
-            "fqcn": "Composer\\Package\\Locker",
-            "count": 3,
-            "members": [
-                {
-                    "member": "__construct",
-                    "kind": "constructor",
-                    "status": "unimplemented",
-                    "plugin-constructible": true
-                },
-                {
-                    "member": "getJsonFile",
-                    "kind": "method",
-                    "status": "refused"
-                },
-                {
-                    "member": "updateHash",
-                    "kind": "method",
-                    "status": "refused"
-                }
-            ]
-        },
-        {
-            "item": 4,
-            "fqcn": "Composer\\Package\\RootPackage",
-            "count": 1,
-            "members": [
-                {
-                    "member": "__construct",
-                    "kind": "constructor",
-                    "status": "unimplemented",
-                    "plugin-constructible": true
-                }
-            ]
-        },
-        {
-            "item": 4,
-            "fqcn": "Composer\\PartialComposer",
-            "count": 9,
-            "members": [
-                {
-                    "member": "__construct",
-                    "kind": "constructor",
-                    "status": "unimplemented",
-                    "plugin-constructible": true
-                },
-                {
-                    "member": "isGlobal",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "setConfig",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "setEventDispatcher",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "setGlobal",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "setInstallationManager",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "setLoop",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "setPackage",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "setRepositoryManager",
-                    "kind": "method",
-                    "status": "unimplemented"
-                }
-            ]
-        },
-        {
-            "item": 4,
-            "fqcn": "Composer\\Plugin\\CommandEvent",
-            "count": 3,
-            "members": [
-                {
-                    "member": "__construct",
-                    "kind": "constructor",
-                    "status": "unimplemented",
-                    "plugin-constructible": true
-                },
-                {
-                    "member": "getInput",
-                    "kind": "method",
-                    "status": "refused"
-                },
-                {
-                    "member": "getOutput",
-                    "kind": "method",
-                    "status": "refused"
-                }
-            ]
-        },
-        {
-            "item": 4,
-            "fqcn": "Composer\\Plugin\\PostFileDownloadEvent",
-            "count": 1,
-            "members": [
-                {
-                    "member": "__construct",
-                    "kind": "constructor",
-                    "status": "unimplemented",
-                    "plugin-constructible": true
-                }
-            ]
-        },
-        {
-            "item": 4,
-            "fqcn": "Composer\\Plugin\\PreCommandRunEvent",
-            "count": 1,
-            "members": [
-                {
-                    "member": "getInput",
-                    "kind": "method",
-                    "status": "refused"
-                }
-            ]
-        },
-        {
-            "item": 4,
-            "fqcn": "Composer\\Plugin\\PreFileDownloadEvent",
-            "count": 1,
-            "members": [
-                {
-                    "member": "__construct",
-                    "kind": "constructor",
-                    "status": "unimplemented",
-                    "plugin-constructible": true
-                }
-            ]
-        },
-        {
-            "item": 4,
-            "fqcn": "Composer\\Plugin\\PrePoolCreateEvent",
-            "count": 2,
-            "members": [
-                {
-                    "member": "__construct",
-                    "kind": "constructor",
-                    "status": "unimplemented",
-                    "plugin-constructible": true
-                },
-                {
-                    "member": "getRequest",
-                    "kind": "method",
-                    "status": "refused"
-                }
-            ]
-        },
-        {
-            "item": 4,
-            "fqcn": "Composer\\Repository\\ArrayRepository",
-            "count": 6,
-            "members": [
-                {
-                    "member": "__construct",
-                    "kind": "constructor",
-                    "status": "unimplemented",
-                    "plugin-constructible": true
-                },
-                {
-                    "member": "count",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "getProviders",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "getRepoName",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "loadPackages",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "search",
-                    "kind": "method",
-                    "status": "unimplemented"
-                }
-            ]
-        },
-        {
-            "item": 4,
-            "fqcn": "Composer\\Repository\\FilesystemRepository",
-            "count": 1,
-            "members": [
-                {
-                    "member": "__construct",
-                    "kind": "constructor",
-                    "status": "unimplemented",
-                    "plugin-constructible": true
-                }
-            ]
-        },
-        {
-            "item": 4,
-            "fqcn": "Composer\\Repository\\InstalledArrayRepository",
-            "count": 2,
-            "members": [
-                {
-                    "member": "__construct",
-                    "kind": "constructor",
-                    "status": "unimplemented",
-                    "plugin-constructible": true
-                },
-                {
-                    "member": "isFresh",
-                    "kind": "method",
-                    "status": "unimplemented"
-                }
-            ]
-        },
-        {
-            "item": 4,
-            "fqcn": "Composer\\Repository\\InstalledFilesystemRepository",
-            "count": 2,
-            "members": [
-                {
-                    "member": "__construct",
-                    "kind": "constructor",
-                    "status": "unimplemented",
-                    "plugin-constructible": true
-                },
-                {
-                    "member": "isFresh",
-                    "kind": "method",
-                    "status": "unimplemented"
-                }
-            ]
-        },
-        {
-            "item": 4,
-            "fqcn": "Composer\\Repository\\LockArrayRepository",
-            "count": 1,
-            "members": [
-                {
-                    "member": "__construct",
-                    "kind": "constructor",
-                    "status": "unimplemented",
-                    "plugin-constructible": true
-                }
-            ]
-        },
-        {
-            "item": 4,
-            "fqcn": "Composer\\Repository\\RepositoryManager",
-            "count": 9,
-            "members": [
-                {
-                    "member": "__construct",
-                    "kind": "constructor",
-                    "status": "unimplemented",
-                    "plugin-constructible": true
-                },
-                {
-                    "member": "addRepository",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "createRepository",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "findPackage",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "findPackages",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "getRepositories",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "prependRepository",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "setLocalRepository",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "setRepositoryClass",
-                    "kind": "method",
-                    "status": "unimplemented"
-                }
-            ]
-        },
-        {
-            "item": 4,
-            "fqcn": "Composer\\Repository\\WritableArrayRepository",
-            "count": 5,
-            "members": [
-                {
-                    "member": "__construct",
-                    "kind": "constructor",
-                    "status": "unimplemented",
-                    "plugin-constructible": true
-                },
-                {
-                    "member": "getDevMode",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "reload",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "setDevPackageNames",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "write",
-                    "kind": "method",
-                    "status": "unimplemented"
-                }
-            ]
-        },
-        {
-            "item": 4,
-            "fqcn": "Composer\\Script\\Event",
-            "count": 3,
-            "members": [
-                {
-                    "member": "__construct",
-                    "kind": "constructor",
-                    "status": "unimplemented",
-                    "plugin-constructible": true
-                },
-                {
-                    "member": "getOriginatingEvent",
-                    "kind": "method",
-                    "status": "unimplemented"
-                },
-                {
-                    "member": "setOriginatingEvent",
-                    "kind": "method",
-                    "status": "unimplemented"
-                }
-            ]
-        },
-        {
-            "item": 5,
             "fqcn": "Composer\\Installer\\BinaryInstaller"
         },
         {
-            "item": 5,
+            "item": 4,
             "fqcn": "Composer\\Installer\\LibraryInstaller"
         },
         {
-            "item": 5,
+            "item": 4,
             "fqcn": "Composer\\Package\\Version\\VersionGuesser"
         },
         {
-            "item": 5,
+            "item": 4,
             "fqcn": "Composer\\Platform\\HhvmDetector"
         },
         {
-            "item": 5,
+            "item": 4,
             "fqcn": "Composer\\Util\\Http\\CurlResponse"
         },
         {
-            "item": 6,
+            "item": 5,
             "fqcn": "Composer\\Downloader\\FileDownloader",
             "property": "downloadMetadata"
         },
         {
-            "item": 6,
+            "item": 5,
             "fqcn": "Composer\\Downloader\\FileDownloader",
             "property": "responseHeaders"
         }

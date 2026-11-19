@@ -1,0 +1,282 @@
+{
+    "fqcn": "Composer\\Repository\\RepositoryManager",
+    "rustModule": [
+        "repository",
+        "repository_manager"
+    ],
+    "kind": "class",
+    "abstract": false,
+    "parent": null,
+    "interfaces": [],
+    "treatment": "stub",
+    "methods": [
+        {
+            "name": "addRepository",
+            "rust": "add_repository",
+            "declaredIn": "Composer\\Repository\\RepositoryManager",
+            "static": false,
+            "params": [
+                {
+                    "name": "repository",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Repository\\RepositoryInterface",
+                    "docType": "RepositoryInterface"
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "createRepository",
+            "rust": "create_repository",
+            "declaredIn": "Composer\\Repository\\RepositoryManager",
+            "static": false,
+            "params": [
+                {
+                    "name": "type",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": "string"
+                },
+                {
+                    "name": "config",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "array",
+                    "docType": "array<string, mixed>"
+                },
+                {
+                    "name": "name",
+                    "position": 2,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": "?string",
+                    "docType": "string"
+                }
+            ],
+            "returnType": "\\Composer\\Repository\\RepositoryInterface",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "findPackage",
+            "rust": "find_package",
+            "declaredIn": "Composer\\Repository\\RepositoryManager",
+            "static": false,
+            "params": [
+                {
+                    "name": "name",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": "string"
+                },
+                {
+                    "name": "constraint",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": null,
+                    "docType": "string|\\Composer\\Semver\\Constraint\\ConstraintInterface"
+                }
+            ],
+            "returnType": "?\\Composer\\Package\\PackageInterface",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "findPackages",
+            "rust": "find_packages",
+            "declaredIn": "Composer\\Repository\\RepositoryManager",
+            "static": false,
+            "params": [
+                {
+                    "name": "name",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": "string"
+                },
+                {
+                    "name": "constraint",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": null,
+                    "docType": "string|\\Composer\\Semver\\Constraint\\ConstraintInterface"
+                }
+            ],
+            "returnType": "array",
+            "docReturnType": "PackageInterface[]",
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "getLocalRepository",
+            "rust": "get_local_repository",
+            "declaredIn": "Composer\\Repository\\RepositoryManager",
+            "static": false,
+            "params": [],
+            "returnType": "\\Composer\\Repository\\InstalledRepositoryInterface",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "getRepositories",
+            "rust": "get_repositories",
+            "declaredIn": "Composer\\Repository\\RepositoryManager",
+            "static": false,
+            "params": [],
+            "returnType": "array",
+            "docReturnType": "RepositoryInterface[]",
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "prependRepository",
+            "rust": "prepend_repository",
+            "declaredIn": "Composer\\Repository\\RepositoryManager",
+            "static": false,
+            "params": [
+                {
+                    "name": "repository",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Repository\\RepositoryInterface",
+                    "docType": "RepositoryInterface"
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "setLocalRepository",
+            "rust": "set_local_repository",
+            "declaredIn": "Composer\\Repository\\RepositoryManager",
+            "static": false,
+            "params": [
+                {
+                    "name": "repository",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Repository\\InstalledRepositoryInterface",
+                    "docType": "InstalledRepositoryInterface"
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "setRepositoryClass",
+            "rust": "set_repository_class",
+            "declaredIn": "Composer\\Repository\\RepositoryManager",
+            "static": false,
+            "params": [
+                {
+                    "name": "type",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": "string"
+                },
+                {
+                    "name": "class",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": null,
+                    "docType": "class-string<RepositoryInterface>"
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        }
+    ],
+    "constructor": {
+        "declaredIn": "Composer\\Repository\\RepositoryManager",
+        "public": true,
+        "params": [
+            {
+                "name": "io",
+                "position": 0,
+                "byRef": false,
+                "variadic": false,
+                "nullable": false,
+                "type": "\\Composer\\IO\\IOInterface",
+                "docType": null
+            },
+            {
+                "name": "config",
+                "position": 1,
+                "byRef": false,
+                "variadic": false,
+                "nullable": false,
+                "type": "\\Composer\\Config",
+                "docType": null
+            },
+            {
+                "name": "httpDownloader",
+                "position": 2,
+                "byRef": false,
+                "variadic": false,
+                "nullable": false,
+                "type": "\\Composer\\Util\\HttpDownloader",
+                "docType": null
+            },
+            {
+                "name": "eventDispatcher",
+                "position": 3,
+                "byRef": false,
+                "variadic": false,
+                "nullable": true,
+                "type": "?\\Composer\\EventDispatcher\\EventDispatcher",
+                "docType": null
+            },
+            {
+                "name": "process",
+                "position": 4,
+                "byRef": false,
+                "variadic": false,
+                "nullable": true,
+                "type": "?\\Composer\\Util\\ProcessExecutor",
+                "docType": null
+            }
+        ],
+        "funcNumArgs": false,
+        "forwarded": true
+    },
+    "properties": []
+}

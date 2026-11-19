@@ -1,12 +1,9 @@
 //! `PluginInterface` adapter for a plugin entity living in the PHP child process.
 
-use crate::composer::ComposerHandle;
 use crate::event_dispatcher::{EventSubscriberInterface, SubscribedEventEntry};
-use crate::io::IOInterface;
 use crate::php_worker::call::PhpCall;
-use crate::php_worker::rpc::entity::entity_value;
-use crate::php_worker::throwable::throw_into_error;
-use crate::plugin::{Capable, PluginInterface};
+use crate::php_worker::proxy::PhpProxy;
+use crate::plugin::Capable;
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_rpc::codec::DecodeError;
@@ -14,7 +11,8 @@ use shirabe_php_rpc::{FromRpcValue, PhpEntityHandle, RpcValue, codec};
 use shirabe_php_shim::PhpMixed;
 
 /// `PluginInterface` adapter for a plugin entity living in the PHP child process: every
-/// lifecycle call is forwarded as a `CallMethod` RPC.
+/// lifecycle call is forwarded as a `CallMethod` RPC, by the `PluginInterface`,
+/// `EventSubscriberInterface` and `Capable` impls `#[php_binding]` generates.
 #[derive(Debug)]
 pub struct PhpPluginProxy {
     pub(crate) handle: PhpEntityHandle,
@@ -25,20 +23,6 @@ impl PhpPluginProxy {
         Self { handle }
     }
 
-    fn forward_lifecycle_call(
-        &self,
-        method: &BStr,
-        composer: &ComposerHandle,
-        io: &std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-    ) -> anyhow::Result<()> {
-        let args = vec![
-            entity_value(composer).map_err(throw_into_error)?,
-            entity_value(io).map_err(throw_into_error)?,
-        ];
-        PhpCall::Method(&self.handle, method).run::<RpcValue>(args)?;
-        Ok(())
-    }
-
     /// For testing only: reads a public property of the plugin entity in the child, mirroring
     /// PHPUnit assertions like `$plugins[0]->version`.
     pub fn __get_property(&self, name: &BStr) -> anyhow::Result<PhpMixed> {
@@ -47,38 +31,14 @@ impl PhpPluginProxy {
             RpcValue::string(name),
         ])
     }
-}
 
-impl PluginInterface for PhpPluginProxy {
-    fn activate(
-        &mut self,
-        composer: ComposerHandle,
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-    ) -> anyhow::Result<()> {
-        self.forward_lifecycle_call(BStr::new("activate"), &composer, &io)
-    }
-
-    fn deactivate(
-        &mut self,
-        composer: ComposerHandle,
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-    ) -> anyhow::Result<()> {
-        self.forward_lifecycle_call(BStr::new("deactivate"), &composer, &io)
-    }
-
-    fn uninstall(
-        &mut self,
-        composer: ComposerHandle,
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-    ) -> anyhow::Result<()> {
-        self.forward_lifecycle_call(BStr::new("uninstall"), &composer, &io)
-    }
-
-    fn get_class_name(&self) -> BString {
+    // What the generated `PluginInterface`, `EventSubscriberInterface` and `Capable` impls
+    // delegate the methods only the Rust side has to.
+    pub(crate) fn get_class_name(&self) -> BString {
         self.handle.class().to_owned()
     }
 
-    fn as_event_subscriber(&self) -> Option<&dyn EventSubscriberInterface> {
+    pub(crate) fn as_event_subscriber(&self) -> Option<&dyn EventSubscriberInterface> {
         if self
             .handle
             .implements()
@@ -91,7 +51,7 @@ impl PluginInterface for PhpPluginProxy {
         }
     }
 
-    fn as_capable(&self) -> Option<&dyn Capable> {
+    pub(crate) fn as_capable(&self) -> Option<&dyn Capable> {
         if self
             .handle
             .implements()
@@ -104,42 +64,49 @@ impl PluginInterface for PhpPluginProxy {
         }
     }
 
-    fn __as_php_plugin_proxy(&self) -> Option<&PhpPluginProxy> {
+    pub(crate) fn __as_php_plugin_proxy(&self) -> Option<&PhpPluginProxy> {
         Some(self)
     }
-}
 
-impl EventSubscriberInterface for PhpPluginProxy {
-    fn get_subscribed_events(&self) -> anyhow::Result<IndexMap<BString, SubscribedEventEntry>> {
-        // PHP: `$subscriber->getSubscribedEvents()` (an instance call of the static method).
-        PhpCall::Method(&self.handle, BStr::new("getSubscribedEvents")).run(Vec::new())
-    }
-
-    fn subscriber_handle(&self) -> PhpEntityHandle {
+    pub(crate) fn subscriber_handle(&self) -> PhpEntityHandle {
         self.handle.clone()
     }
 }
 
-impl Capable for PhpPluginProxy {
-    fn get_capabilities(&self) -> anyhow::Result<IndexMap<BString, PhpMixed>> {
-        let call = PhpCall::Method(&self.handle, BStr::new("getCapabilities"));
-        let value: RpcValue = call.run(Vec::new())?;
-        // PHP: `(array) $plugin->getCapabilities()` — the interface declares no return type,
-        // so a non-array return is cast. A handle in the map (a plugin putting an object among
-        // its capability values) has no PhpMixed image and fails the conversion explicitly.
-        let entries = match value {
-            RpcValue::Null => IndexMap::new(),
-            array @ (RpcValue::Array(_) | RpcValue::List(_)) => {
-                IndexMap::<BString, PhpMixed>::from_rpc_value(&array)
-                    .map_err(|error| call.unsupported_shape(error))?
-            }
-            scalar => IndexMap::from([(
-                "0".into(),
-                PhpMixed::from_rpc_value(&scalar).map_err(|error| call.unsupported_shape(error))?,
-            )]),
-        };
-        Ok(entries)
+impl PhpProxy for PhpPluginProxy {
+    fn php_handle(&self) -> &PhpEntityHandle {
+        &self.handle
     }
+}
+
+/// `getSubscribedEvents()`, which declares no return type: only the three shapes `addSubscriber`
+/// reads decode.
+pub(crate) fn subscribed_events(
+    proxy: &PhpPluginProxy,
+) -> anyhow::Result<IndexMap<BString, SubscribedEventEntry>> {
+    // PHP: `$subscriber->getSubscribedEvents()` (an instance call of the static method).
+    PhpCall::Method(&proxy.handle, BStr::new("getSubscribedEvents")).run(Vec::new())
+}
+
+/// `getCapabilities()`, which declares no return type.
+pub(crate) fn capabilities(proxy: &PhpPluginProxy) -> anyhow::Result<IndexMap<BString, PhpMixed>> {
+    let call = PhpCall::Method(&proxy.handle, BStr::new("getCapabilities"));
+    let value: RpcValue = call.run(Vec::new())?;
+    // PHP: `(array) $plugin->getCapabilities()` — the interface declares no return type,
+    // so a non-array return is cast. A handle in the map (a plugin putting an object among
+    // its capability values) has no PhpMixed image and fails the conversion explicitly.
+    let entries = match value {
+        RpcValue::Null => IndexMap::new(),
+        array @ (RpcValue::Array(_) | RpcValue::List(_)) => {
+            IndexMap::<BString, PhpMixed>::from_rpc_value(&array)
+                .map_err(|error| call.unsupported_shape(error))?
+        }
+        scalar => IndexMap::from([(
+            "0".into(),
+            PhpMixed::from_rpc_value(&scalar).map_err(|error| call.unsupported_shape(error))?,
+        )]),
+    };
+    Ok(entries)
 }
 
 /// One entry of a `getSubscribedEvents()` answer, in the three shapes `addSubscriber`

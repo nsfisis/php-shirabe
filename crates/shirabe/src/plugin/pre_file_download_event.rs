@@ -4,6 +4,7 @@ use crate::event_dispatcher::{Event, EventFlags, delegate_event_interface_to_inn
 use crate::package::PackageInterfaceHandle;
 use crate::util::{HttpDownloader, StreamContextOptions};
 use bstr::{BStr, BString, ByteSlice as _};
+use shirabe_php_binding_macros::php_binding;
 
 /// The `$context` a file download event carries: the package a dist download is for, or the
 /// array a repository passes along with a metadata download.
@@ -28,6 +29,7 @@ pub struct PreFileDownloadEvent {
     transport_options: StreamContextOptions,
 }
 
+#[php_binding(r"Composer\Plugin\PreFileDownloadEvent", members = instance)]
 impl PreFileDownloadEvent {
     pub fn new(
         name: impl Into<BString>,
@@ -88,4 +90,8 @@ impl PreFileDownloadEvent {
     }
 }
 
-delegate_event_interface_to_inner!(PreFileDownloadEvent, inner);
+delegate_event_interface_to_inner!(
+    PreFileDownloadEvent,
+    inner,
+    "Composer\\Plugin\\PreFileDownloadEvent"
+);

@@ -1,0 +1,432 @@
+{
+    "fqcn": "Composer\\Repository\\InstalledArrayRepository",
+    "rustModule": [
+        "repository",
+        "installed_array_repository"
+    ],
+    "kind": "class",
+    "abstract": false,
+    "parent": "Composer\\Repository\\WritableArrayRepository",
+    "interfaces": [
+        "Composer\\Repository\\InstalledRepositoryInterface"
+    ],
+    "treatment": "stub",
+    "methods": [
+        {
+            "name": "addPackage",
+            "rust": "add_package",
+            "declaredIn": "Composer\\Repository\\WritableRepositoryInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "package",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Package\\PackageInterface",
+                    "docType": null
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "void",
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "count",
+            "rust": "count",
+            "declaredIn": "Composer\\Repository\\ArrayRepository",
+            "static": false,
+            "params": [],
+            "returnType": "int",
+            "docReturnType": "0|positive-int",
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "findPackage",
+            "rust": "find_package",
+            "declaredIn": "Composer\\Repository\\RepositoryInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "name",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": null
+                },
+                {
+                    "name": "constraint",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": null,
+                    "docType": null
+                }
+            ],
+            "returnType": null,
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "findPackages",
+            "rust": "find_packages",
+            "declaredIn": "Composer\\Repository\\RepositoryInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "name",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": null
+                },
+                {
+                    "name": "constraint",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": null,
+                    "docType": null
+                }
+            ],
+            "returnType": null,
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "getCanonicalPackages",
+            "rust": "get_canonical_packages",
+            "declaredIn": "Composer\\Repository\\WritableRepositoryInterface",
+            "static": false,
+            "params": [],
+            "returnType": null,
+            "docReturnType": "PackageInterface[]",
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "getDevMode",
+            "rust": "get_dev_mode",
+            "declaredIn": "Composer\\Repository\\InstalledRepositoryInterface",
+            "static": false,
+            "params": [],
+            "returnType": null,
+            "docReturnType": "bool|null",
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "getDevPackageNames",
+            "rust": "get_dev_package_names",
+            "declaredIn": "Composer\\Repository\\WritableRepositoryInterface",
+            "static": false,
+            "params": [],
+            "returnType": null,
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "getPackages",
+            "rust": "get_packages",
+            "declaredIn": "Composer\\Repository\\RepositoryInterface",
+            "static": false,
+            "params": [],
+            "returnType": null,
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "getProviders",
+            "rust": "get_providers",
+            "declaredIn": "Composer\\Repository\\RepositoryInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "packageName",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": null
+                }
+            ],
+            "returnType": null,
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "getRepoName",
+            "rust": "get_repo_name",
+            "declaredIn": "Composer\\Repository\\RepositoryInterface",
+            "static": false,
+            "params": [],
+            "returnType": "string",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "hasPackage",
+            "rust": "has_package",
+            "declaredIn": "Composer\\Repository\\RepositoryInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "package",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Package\\PackageInterface",
+                    "docType": null
+                }
+            ],
+            "returnType": null,
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "isFresh",
+            "rust": "is_fresh",
+            "declaredIn": "Composer\\Repository\\InstalledRepositoryInterface",
+            "static": false,
+            "params": [],
+            "returnType": "bool",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "loadPackages",
+            "rust": "load_packages",
+            "declaredIn": "Composer\\Repository\\RepositoryInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "packageNameMap",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "array",
+                    "docType": null
+                },
+                {
+                    "name": "acceptableStabilities",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "array",
+                    "docType": null
+                },
+                {
+                    "name": "stabilityFlags",
+                    "position": 2,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "array",
+                    "docType": null
+                },
+                {
+                    "name": "alreadyLoaded",
+                    "position": 3,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "array",
+                    "docType": null
+                }
+            ],
+            "returnType": null,
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "reload",
+            "rust": "reload",
+            "declaredIn": "Composer\\Repository\\WritableRepositoryInterface",
+            "static": false,
+            "params": [],
+            "returnType": null,
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "removePackage",
+            "rust": "remove_package",
+            "declaredIn": "Composer\\Repository\\WritableRepositoryInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "package",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Package\\PackageInterface",
+                    "docType": "PackageInterface"
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "void",
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "search",
+            "rust": "search",
+            "declaredIn": "Composer\\Repository\\RepositoryInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "query",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": null
+                },
+                {
+                    "name": "mode",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "int",
+                    "docType": null
+                },
+                {
+                    "name": "type",
+                    "position": 2,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": "?string",
+                    "docType": null
+                }
+            ],
+            "returnType": null,
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "setDevPackageNames",
+            "rust": "set_dev_package_names",
+            "declaredIn": "Composer\\Repository\\WritableRepositoryInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "devPackageNames",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "array",
+                    "docType": null
+                }
+            ],
+            "returnType": null,
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "write",
+            "rust": "write",
+            "declaredIn": "Composer\\Repository\\WritableRepositoryInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "devMode",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "bool",
+                    "docType": null
+                },
+                {
+                    "name": "installationManager",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Installer\\InstallationManager",
+                    "docType": null
+                }
+            ],
+            "returnType": null,
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        }
+    ],
+    "constructor": {
+        "declaredIn": "Composer\\Repository\\ArrayRepository",
+        "public": true,
+        "params": [
+            {
+                "name": "packages",
+                "position": 0,
+                "byRef": false,
+                "variadic": false,
+                "nullable": false,
+                "type": "array",
+                "docType": "array<PackageInterface>"
+            }
+        ],
+        "funcNumArgs": false,
+        "forwarded": true
+    },
+    "properties": [
+        {
+            "name": "devPackageNames",
+            "declaredIn": "Composer\\Repository\\WritableArrayRepository",
+            "visibility": "protected",
+            "static": false,
+            "readonly": false,
+            "type": null,
+            "docType": "string[]"
+        },
+        {
+            "name": "packageMap",
+            "declaredIn": "Composer\\Repository\\ArrayRepository",
+            "visibility": "protected",
+            "static": false,
+            "readonly": false,
+            "type": null,
+            "docType": "?array<BasePackage>"
+        },
+        {
+            "name": "packages",
+            "declaredIn": "Composer\\Repository\\ArrayRepository",
+            "visibility": "protected",
+            "static": false,
+            "readonly": false,
+            "type": null,
+            "docType": "?array<BasePackage>"
+        }
+    ]
+}

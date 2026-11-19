@@ -1,157 +1,141 @@
 //! The methods a `Composer\Autoload\AutoloadGenerator` entity answers over RPC.
 
-use crate::autoload::{AutoloadGeneratorInterface, ClassLoader};
+use crate::autoload::{
+    __php_binding_autoload_generator_interface, AutoloadGeneratorInterface, ClassLoader,
+};
 use crate::config::Config;
 use crate::filter::platform_requirement_filter::PlatformRequirementFilterFactory;
 use crate::installer::InstallationManagerInterface;
 use crate::package::{LockerInterface, PackageInterfaceHandle, RootPackageInterfaceHandle};
 use crate::php_worker::call::PhpCall;
 use crate::php_worker::codec::encode_class_map_generator_class_map;
-use crate::php_worker::rpc::entity::{Bindings, Call, Entity};
-use crate::php_worker::rpc::forwarding;
+use crate::php_worker::rpc::entity::Call;
 use crate::php_worker::runtime::autoloading;
 use crate::repository::RepositoryInterfaceHandle;
 use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
+use shirabe_php_binding_macros::php_entity;
 use shirabe_php_rpc::codec::DecodeError;
 use shirabe_php_rpc::{FromRpcValue, PhpThrow, RpcValue, ToRpcValue, codec};
 use shirabe_php_shim::{E_USER_DEPRECATED, PhpMixed, trigger_error};
 
-impl Entity for std::rc::Rc<std::cell::RefCell<dyn AutoloadGeneratorInterface>> {
-    const EXPECTED: &'static [u8] = b"an AutoloadGenerator";
-
-    fn address(&self) -> *const () {
-        std::rc::Rc::as_ptr(self) as *const ()
-    }
-
-    fn class(&self) -> Result<&'static Bindings<Self>, PhpThrow> {
-        Ok(&forwarding::autoload::autoload_generator::BINDINGS)
-    }
+php_entity! {
+    handle: std::rc::Rc<std::cell::RefCell<dyn AutoloadGeneratorInterface>>,
+    type_error: "an AutoloadGenerator",
+    classes: {
+        r"Composer\Autoload\AutoloadGenerator": { constructor: unimplemented },
+    },
+    methods: {
+        r"Composer\Autoload\AutoloadGenerator": {
+            handwritten: {
+                module: self,
+                members: [
+                    setIgnorePlatformRequirements,
+                    dump,
+                    buildPackageMap,
+                    parseAutoloads,
+                    createLoader,
+                ],
+            },
+            instance: {
+                adapters: __php_binding_autoload_generator_interface,
+                target: dyn AutoloadGeneratorInterface,
+                borrow: |generator| generator.borrow(),
+            },
+            refused: {
+                setPlatformRequirementFilter: "no platform requirement filter can cross the boundary",
+            },
+        },
+    },
 }
 
-impl forwarding::autoload::autoload_generator::Forwarding
-    for forwarding::autoload::autoload_generator::PhpClass
-{
-    type Handle = std::rc::Rc<std::cell::RefCell<dyn AutoloadGeneratorInterface>>;
+fn set_ignore_platform_requirements(
+    generator: &std::rc::Rc<std::cell::RefCell<dyn AutoloadGeneratorInterface>>,
+    call: &mut Call<'_>,
+) -> Result<RpcValue, PhpThrow> {
+    trigger_error(
+        "AutoloadGenerator::setIgnorePlatformRequirements is deprecated since Composer 2.2, use setPlatformRequirementFilter instead.",
+        E_USER_DEPRECATED,
+    );
 
-    fn set_dev_mode(generator: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
-        generator.borrow().set_dev_mode(call.arg::<bool>(0)?);
-        Ok(RpcValue::Null)
-    }
+    let filter = PlatformRequirementFilterFactory::from_bool_or_list(call.arg::<PhpMixed>(0)?)
+        .map_err(call.failed())?;
+    generator.borrow().set_platform_requirement_filter(filter);
+    Ok(RpcValue::Null)
+}
 
-    fn set_class_map_authoritative(
-        generator: &Self::Handle,
-        call: &mut Call<'_>,
-    ) -> Result<RpcValue, PhpThrow> {
-        generator
-            .borrow()
-            .set_class_map_authoritative(call.arg::<bool>(0)?);
-        Ok(RpcValue::Null)
-    }
+fn dump(
+    generator: &std::rc::Rc<std::cell::RefCell<dyn AutoloadGeneratorInterface>>,
+    call: &mut Call<'_>,
+) -> Result<RpcValue, PhpThrow> {
+    let config = call.entity::<std::rc::Rc<std::cell::RefCell<Config>>>(0)?;
+    let local_repo = call.arg::<RepositoryInterfaceHandle>(1)?;
+    let root_package = root_package(call, 2)?;
+    let installation_manager =
+        call.entity::<std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>>(3)?;
+    let target_dir = call.arg::<BString>(4)?;
+    let scan_psr_packages = call.arg::<bool>(5)?;
+    let suffix = call.arg::<Option<BString>>(6)?;
+    let locker = call.optional_entity::<std::rc::Rc<std::cell::RefCell<dyn LockerInterface>>>(7)?;
+    let strict_ambiguous = call.arg::<bool>(8)?;
+    let class_map = generator
+        .borrow()
+        .dump(
+            &config.borrow(),
+            local_repo,
+            root_package,
+            installation_manager,
+            target_dir.as_bstr(),
+            scan_psr_packages,
+            suffix,
+            locker,
+            strict_ambiguous,
+        )
+        .map_err(call.failed())?;
+    Ok(encode_class_map_generator_class_map(&class_map))
+}
 
-    fn set_apcu(generator: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
-        generator
-            .borrow()
-            .set_apcu(call.arg::<bool>(0)?, call.arg::<Option<BString>>(1)?);
-        Ok(RpcValue::Null)
-    }
+fn build_package_map(
+    generator: &std::rc::Rc<std::cell::RefCell<dyn AutoloadGeneratorInterface>>,
+    call: &mut Call<'_>,
+) -> Result<RpcValue, PhpThrow> {
+    let installation_manager =
+        call.entity::<std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>>(0)?;
+    // TODO(type-model): PHP takes any PackageInterface as the root package here, while the
+    // Rust signature narrows it to a RootPackageInterface.
+    let root_package = root_package(call, 1)?;
+    let packages = call.arg::<Vec<PackageInterfaceHandle>>(2)?;
+    let package_map = generator
+        .borrow()
+        .build_package_map(installation_manager, root_package, packages)
+        .map_err(call.failed())?;
+    Ok(package_map_value(package_map))
+}
 
-    fn set_run_scripts(
-        generator: &Self::Handle,
-        call: &mut Call<'_>,
-    ) -> Result<RpcValue, PhpThrow> {
-        generator.borrow().set_run_scripts(call.arg::<bool>(0)?);
-        Ok(RpcValue::Null)
-    }
+fn parse_autoloads(
+    generator: &std::rc::Rc<std::cell::RefCell<dyn AutoloadGeneratorInterface>>,
+    call: &mut Call<'_>,
+) -> Result<RpcValue, PhpThrow> {
+    let package_map = package_map_arg(call, 0)?;
+    let root_package = root_package(call, 1)?;
+    let filtered_dev_packages = call.arg::<PhpMixed>(2)?;
+    Ok(generator
+        .borrow()
+        .parse_autoloads(package_map, root_package, filtered_dev_packages)
+        .to_rpc_value())
+}
 
-    fn set_dry_run(generator: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
-        generator.borrow().set_dry_run(call.arg::<bool>(0)?);
-        Ok(RpcValue::Null)
-    }
-
-    fn set_ignore_platform_requirements(
-        generator: &Self::Handle,
-        call: &mut Call<'_>,
-    ) -> Result<RpcValue, PhpThrow> {
-        trigger_error(
-            "AutoloadGenerator::setIgnorePlatformRequirements is deprecated since Composer 2.2, use setPlatformRequirementFilter instead.",
-            E_USER_DEPRECATED,
-        );
-
-        let filter = PlatformRequirementFilterFactory::from_bool_or_list(call.arg::<PhpMixed>(0)?)
-            .map_err(call.failed())?;
-        generator.borrow().set_platform_requirement_filter(filter);
-        Ok(RpcValue::Null)
-    }
-
-    fn dump(generator: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
-        let config = call.entity::<std::rc::Rc<std::cell::RefCell<Config>>>(0)?;
-        let local_repo = call.arg::<RepositoryInterfaceHandle>(1)?;
-        let root_package = root_package(call, 2)?;
-        let installation_manager =
-            call.entity::<std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>>(3)?;
-        let target_dir = call.arg::<BString>(4)?;
-        let scan_psr_packages = call.arg::<bool>(5)?;
-        let suffix = call.arg::<Option<BString>>(6)?;
-        let locker =
-            call.optional_entity::<std::rc::Rc<std::cell::RefCell<dyn LockerInterface>>>(7)?;
-        let strict_ambiguous = call.arg::<bool>(8)?;
-        let class_map = generator
-            .borrow()
-            .dump(
-                &config.borrow(),
-                local_repo,
-                root_package,
-                installation_manager,
-                target_dir.as_bstr(),
-                scan_psr_packages,
-                suffix,
-                locker,
-                strict_ambiguous,
-            )
-            .map_err(call.failed())?;
-        Ok(encode_class_map_generator_class_map(&class_map))
-    }
-
-    fn build_package_map(
-        generator: &Self::Handle,
-        call: &mut Call<'_>,
-    ) -> Result<RpcValue, PhpThrow> {
-        let installation_manager =
-            call.entity::<std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>>(0)?;
-        // TODO(type-model): PHP takes any PackageInterface as the root package here, while the
-        // Rust signature narrows it to a RootPackageInterface.
-        let root_package = root_package(call, 1)?;
-        let packages = call.arg::<Vec<PackageInterfaceHandle>>(2)?;
-        let package_map = generator
-            .borrow()
-            .build_package_map(installation_manager, root_package, packages)
-            .map_err(call.failed())?;
-        Ok(package_map_value(package_map))
-    }
-
-    fn parse_autoloads(
-        generator: &Self::Handle,
-        call: &mut Call<'_>,
-    ) -> Result<RpcValue, PhpThrow> {
-        let package_map = package_map_arg(call, 0)?;
-        let root_package = root_package(call, 1)?;
-        let filtered_dev_packages = call.arg::<PhpMixed>(2)?;
-        Ok(generator
-            .borrow()
-            .parse_autoloads(package_map, root_package, filtered_dev_packages)
-            .to_rpc_value())
-    }
-
-    fn create_loader(generator: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
-        let autoloads = call.arg::<IndexMap<BString, PhpMixed>>(0)?;
-        let vendor_dir = call.arg::<Option<BString>>(1)?;
-        let loader = generator
-            .borrow()
-            .create_loader(&autoloads, vendor_dir.clone())
-            .map_err(call.failed())?;
-        class_loader_to_php(&loader.borrow(), vendor_dir).map_err(call.failed())
-    }
+fn create_loader(
+    generator: &std::rc::Rc<std::cell::RefCell<dyn AutoloadGeneratorInterface>>,
+    call: &mut Call<'_>,
+) -> Result<RpcValue, PhpThrow> {
+    let autoloads = call.arg::<IndexMap<BString, PhpMixed>>(0)?;
+    let vendor_dir = call.arg::<Option<BString>>(1)?;
+    let loader = generator
+        .borrow()
+        .create_loader(&autoloads, vendor_dir.clone())
+        .map_err(call.failed())?;
+    class_loader_to_php(&loader.borrow(), vendor_dir).map_err(call.failed())
 }
 
 /// Resolves a package argument the PHP signature types as a root package.

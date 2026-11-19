@@ -46,6 +46,8 @@ $runner = new Runner($rootDir, [
         // Build scripts read Cargo's own variables, and run before the shim exists.
         'crates/shirabe-php-rpc/build.rs',
         'crates/shirabe/build.rs',
+        // Reads the calling crate's directory, which Cargo gives the macro at compile time.
+        'crates/shirabe-php-binding-macros/src/decls.rs',
     ]],
     [new NoExceptionDowncast(), [
         // Defines the box and the walk the rule points at.
@@ -64,7 +66,11 @@ $runner = new Runner($rootDir, [
     ]],
     [new NoModRs(), []],
     [new NoPhpDocTag(), []],
-    [new NoQualifiedCratePath(), []],
+    [new NoQualifiedCratePath(), [
+        // Generate code that expands in the caller's scope, as a `macro_rules!` body does.
+        'crates/shirabe-php-binding-macros/src/binding.rs',
+        'crates/shirabe-php-binding-macros/src/entity.rs',
+    ]],
     [new NoQualifiedPhpShimPath(), [
         // Generates code that expands in the caller's scope, as a `macro_rules!` body does.
         'crates/shirabe-php-shim-macros/src/lib.rs',
@@ -80,7 +86,11 @@ $runner = new Runner($rootDir, [
     ]],
     [new NoRedundantModulePath(), []],
     [new NoStdCollectionsMaps(), []],
-    [new NoSuperPath(), []],
+    [new NoSuperPath(), [
+        // Generates the child module holding a trait's or an impl's adapters, which sees the
+        // scope of the item it stands next to.
+        'crates/shirabe-php-binding-macros/src/binding.rs',
+    ]],
     [new NoUseAsAlias(), []],
     [new OneUsePerModule(), []],
     [new PhpSrcDerivationBoundary(), []],

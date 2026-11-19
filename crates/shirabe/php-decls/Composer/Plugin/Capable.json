@@ -1,0 +1,22 @@
+{
+    "fqcn": "Composer\\Plugin\\Capable",
+    "rustModule": [
+        "plugin",
+        "capable"
+    ],
+    "kind": "interface",
+    "interfaces": [],
+    "treatment": "real",
+    "methods": [
+        {
+            "name": "getCapabilities",
+            "rust": "get_capabilities",
+            "declaredIn": "Composer\\Plugin\\Capable",
+            "static": false,
+            "params": [],
+            "returnType": null,
+            "docReturnType": "string[]",
+            "funcNumArgs": false
+        }
+    ]
+}

@@ -1,0 +1,167 @@
+{
+    "fqcn": "Composer\\DependencyResolver\\Operation\\UpdateOperation",
+    "rustModule": [
+        "dependency_resolver",
+        "operation",
+        "update_operation"
+    ],
+    "kind": "class",
+    "abstract": false,
+    "parent": "Composer\\DependencyResolver\\Operation\\SolverOperation",
+    "interfaces": [
+        "Composer\\DependencyResolver\\Operation\\OperationInterface"
+    ],
+    "treatment": "stub",
+    "methods": [
+        {
+            "name": "__toString",
+            "rust": "__to_string",
+            "declaredIn": "Composer\\DependencyResolver\\Operation\\OperationInterface",
+            "static": false,
+            "params": [],
+            "returnType": null,
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "format",
+            "rust": "format",
+            "declaredIn": "Composer\\DependencyResolver\\Operation\\UpdateOperation",
+            "static": true,
+            "params": [
+                {
+                    "name": "initialPackage",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Package\\PackageInterface",
+                    "docType": null
+                },
+                {
+                    "name": "targetPackage",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Package\\PackageInterface",
+                    "docType": null
+                },
+                {
+                    "name": "lock",
+                    "position": 2,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "bool",
+                    "docType": null
+                }
+            ],
+            "returnType": "string",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": false
+        },
+        {
+            "name": "getInitialPackage",
+            "rust": "get_initial_package",
+            "declaredIn": "Composer\\DependencyResolver\\Operation\\UpdateOperation",
+            "static": false,
+            "params": [],
+            "returnType": "\\Composer\\Package\\PackageInterface",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "getOperationType",
+            "rust": "get_operation_type",
+            "declaredIn": "Composer\\DependencyResolver\\Operation\\OperationInterface",
+            "static": false,
+            "params": [],
+            "returnType": "string",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "getTargetPackage",
+            "rust": "get_target_package",
+            "declaredIn": "Composer\\DependencyResolver\\Operation\\UpdateOperation",
+            "static": false,
+            "params": [],
+            "returnType": "\\Composer\\Package\\PackageInterface",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "show",
+            "rust": "show",
+            "declaredIn": "Composer\\DependencyResolver\\Operation\\OperationInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "lock",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": null,
+                    "docType": null
+                }
+            ],
+            "returnType": "string",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        }
+    ],
+    "constructor": {
+        "declaredIn": "Composer\\DependencyResolver\\Operation\\UpdateOperation",
+        "public": true,
+        "params": [
+            {
+                "name": "initial",
+                "position": 0,
+                "byRef": false,
+                "variadic": false,
+                "nullable": false,
+                "type": "\\Composer\\Package\\PackageInterface",
+                "docType": "PackageInterface"
+            },
+            {
+                "name": "target",
+                "position": 1,
+                "byRef": false,
+                "variadic": false,
+                "nullable": false,
+                "type": "\\Composer\\Package\\PackageInterface",
+                "docType": "PackageInterface"
+            }
+        ],
+        "funcNumArgs": false,
+        "forwarded": true
+    },
+    "properties": [
+        {
+            "name": "initialPackage",
+            "declaredIn": "Composer\\DependencyResolver\\Operation\\UpdateOperation",
+            "visibility": "protected",
+            "static": false,
+            "readonly": false,
+            "type": null,
+            "docType": "PackageInterface"
+        },
+        {
+            "name": "targetPackage",
+            "declaredIn": "Composer\\DependencyResolver\\Operation\\UpdateOperation",
+            "visibility": "protected",
+            "static": false,
+            "readonly": false,
+            "type": null,
+            "docType": "PackageInterface"
+        }
+    ]
+}

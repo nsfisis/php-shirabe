@@ -11,6 +11,7 @@ use crate::dependency_resolver::operation::{
 };
 use crate::package::PackageInterfaceHandle;
 use bstr::{BStr, BString};
+use shirabe_php_binding_macros::php_binding;
 use shirabe_php_shim::PhpDisplay;
 
 /// Any solver operation.
@@ -23,6 +24,7 @@ pub enum AnyOperation {
     MarkAliasUninstalled(MarkAliasUninstalledOperation),
 }
 
+#[php_binding(r"Composer\DependencyResolver\Operation\OperationInterface")]
 impl AnyOperation {
     pub fn get_operation_type(&self) -> &'static BStr {
         match self {

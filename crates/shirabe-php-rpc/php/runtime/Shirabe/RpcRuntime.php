@@ -62,6 +62,11 @@ final class RpcRuntime
         while (strlen($buf) < $len) {
             $chunk = fread(self::$socket, $len - strlen($buf));
             if ($chunk === false || $chunk === '') {
+                // A socket stream gives up a read after default_socket_timeout, which is not the
+                // end of the channel: the parent may leave the worker idle for any length of time.
+                if (stream_get_meta_data(self::$socket)['timed_out']) {
+                    continue;
+                }
                 return null;
             }
             $buf .= $chunk;

@@ -1,26 +1,51 @@
 //! The methods a `Composer\Installer\InstallationManager` entity answers over RPC.
 
-use crate::installer::InstallationManagerInterface;
-use crate::package::PackageInterfaceHandle;
+use crate::installer::{
+    __php_binding_installation_manager_interface, InstallationManagerInterface,
+};
 use crate::php_worker::proxy::{forget_php_installer_proxy, php_installer_proxy};
 use crate::php_worker::rpc::dispatch::error_throw;
-use crate::php_worker::rpc::entity::{Bindings, Call, Entity};
-use crate::php_worker::rpc::forwarding;
+use crate::php_worker::rpc::entity::Call;
 use crate::php_worker::runtime;
 use bstr::BStr;
-use shirabe_php_rpc::{PhpEntityHandle, PhpThrow, RpcValue, ToRpcValue};
+use shirabe_php_binding_macros::php_entity;
+use shirabe_php_rpc::{PhpEntityHandle, PhpThrow, RpcValue};
 use shirabe_php_shim::bformat;
 
-impl Entity for std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>> {
-    const EXPECTED: &'static [u8] = b"an InstallationManager";
-
-    fn address(&self) -> *const () {
-        std::rc::Rc::as_ptr(self) as *const ()
-    }
-
-    fn class(&self) -> Result<&'static Bindings<Self>, PhpThrow> {
-        Ok(&forwarding::installer::installation_manager::BINDINGS)
-    }
+// TODO(plugin): the remaining InstallationManager surface is widened on demand.
+php_entity! {
+    handle: std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>,
+    type_error: "an InstallationManager",
+    classes: {
+        r"Composer\Installer\InstallationManager": { constructor: unimplemented },
+    },
+    methods: {
+        r"Composer\Installer\InstallationManager": {
+            handwritten: { module: self, members: [addInstaller, removeInstaller] },
+            instance: {
+                adapters: __php_binding_installation_manager_interface,
+                target: dyn InstallationManagerInterface,
+                borrow: |im| im.borrow(),
+                borrow_mut: |im| im.borrow_mut(),
+            },
+            unimplemented: [
+                disablePlugins,
+                download,
+                ensureBinariesPresence,
+                execute,
+                getInstaller,
+                install,
+                isPackageInstalled,
+                markAliasInstalled,
+                markAliasUninstalled,
+                notifyInstalls,
+                reset,
+                setOutputProgress,
+                uninstall,
+                update,
+            ],
+        },
+    },
 }
 
 /// The installer argument of `addInstaller()` / `removeInstaller()`, type-checked the way the PHP
@@ -47,32 +72,22 @@ fn installer_arg(call: &Call<'_>) -> Result<PhpEntityHandle, PhpThrow> {
     Ok(handle)
 }
 
-// TODO(plugin): the remaining InstallationManager surface is widened on demand.
-impl forwarding::installer::installation_manager::Forwarding
-    for forwarding::installer::installation_manager::PhpClass
-{
-    type Handle = std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>;
+fn add_installer(
+    im: &std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>,
+    call: &mut Call<'_>,
+) -> Result<RpcValue, PhpThrow> {
+    let handle = installer_arg(call)?;
+    im.borrow().add_installer(php_installer_proxy(handle));
+    Ok(RpcValue::Null)
+}
 
-    fn get_install_path(im: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
-        let package = call.arg::<PackageInterfaceHandle>(0)?;
-        Ok(im
-            .borrow()
-            .get_install_path(package)
-            .map_err(call.failed())?
-            .to_rpc_value())
-    }
-
-    fn add_installer(im: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
-        let handle = installer_arg(call)?;
-        im.borrow().add_installer(php_installer_proxy(handle));
-        Ok(RpcValue::Null)
-    }
-
-    fn remove_installer(im: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
-        let handle = installer_arg(call)?;
-        let installer = php_installer_proxy(handle.clone());
-        im.borrow().remove_installer(&*installer);
-        forget_php_installer_proxy(&handle);
-        Ok(RpcValue::Null)
-    }
+fn remove_installer(
+    im: &std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>,
+    call: &mut Call<'_>,
+) -> Result<RpcValue, PhpThrow> {
+    let handle = installer_arg(call)?;
+    let installer = php_installer_proxy(handle.clone());
+    im.borrow().remove_installer(&*installer);
+    forget_php_installer_proxy(&handle);
+    Ok(RpcValue::Null)
 }

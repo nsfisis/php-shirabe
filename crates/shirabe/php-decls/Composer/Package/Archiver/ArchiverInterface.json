@@ -1,0 +1,98 @@
+{
+    "fqcn": "Composer\\Package\\Archiver\\ArchiverInterface",
+    "rustModule": [
+        "package",
+        "archiver",
+        "archiver_interface"
+    ],
+    "kind": "interface",
+    "interfaces": [],
+    "treatment": "real",
+    "methods": [
+        {
+            "name": "archive",
+            "rust": "archive",
+            "declaredIn": "Composer\\Package\\Archiver\\ArchiverInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "sources",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": "string"
+                },
+                {
+                    "name": "target",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": "string"
+                },
+                {
+                    "name": "format",
+                    "position": 2,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": "string"
+                },
+                {
+                    "name": "excludes",
+                    "position": 3,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "array",
+                    "docType": "string[]"
+                },
+                {
+                    "name": "ignoreFilters",
+                    "position": 4,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "bool",
+                    "docType": "bool"
+                }
+            ],
+            "returnType": "string",
+            "docReturnType": "string",
+            "funcNumArgs": false
+        },
+        {
+            "name": "supports",
+            "rust": "supports",
+            "declaredIn": "Composer\\Package\\Archiver\\ArchiverInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "format",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": "string"
+                },
+                {
+                    "name": "sourceType",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": "?string",
+                    "docType": "?string"
+                }
+            ],
+            "returnType": "bool",
+            "docReturnType": "bool",
+            "funcNumArgs": false
+        }
+    ]
+}

@@ -69,7 +69,7 @@ final class Classifier
     /** @var array<string, array{kind: string, abstract: bool, origin: string}> vendor or builtin FQCN => declaration */
     private array $foreignClasses = [];
 
-    /** @var array<string, list<array{member: string, kind: string, status: string, reason?: string}>> */
+    /** @var array<string, list<array{member: string, kind: string, reason?: string}>> */
     private array $forwarded = [];
 
     /** @var array<string, array<string, list<int|string>>> stub/runtime FQCN => instance surface */
@@ -116,7 +116,6 @@ final class Classifier
         $this->checkRedundantForcedReal();
 
         $this->computeForwarded();
-        $this->checkForcedMemberKeys();
 
         foreach ($this->sources->classes as $fqcn => $info) {
             $this->rows[$fqcn] = $this->row($fqcn, $info);
@@ -354,8 +353,7 @@ final class Classifier
                     }
                     if ($ref['kind'] === 'new') {
                         $target = $ref['target'];
-                        if (($treatments[$target] ?? null) === 'guard'
-                            || (($treatments[$target] ?? null) === 'stub' && $this->constructorRefused($target))) {
+                        if (($treatments[$target] ?? null) === 'guard') {
                             $origins[] = $ref;
                         }
                     } else {
@@ -378,14 +376,6 @@ final class Classifier
         return [$treatments, $sources, $by];
     }
 
-    /** Whether the stub's constructor answers with an error rather than building an entity. */
-    private function constructorRefused(string $fqcn): bool
-    {
-        $status = $this->inputs->forced[$fqcn]['members']['__construct']['status'] ?? null;
-
-        return $status === 'unimplemented' || $status === 'refused';
-    }
-
     private function checkForcedMembers(): void
     {
         foreach ($this->inputs->forced as $fqcn => $entry) {
@@ -393,9 +383,6 @@ final class Classifier
                 continue;
             }
             $treatment = $this->treatments[$fqcn];
-            if (isset($entry['members']) && !in_array($treatment, ['stub', 'runtime'], true)) {
-                $this->violations[] = "forced.json: $fqcn: members belong to a stub or runtime class, not a $treatment one";
-            }
             if (isset($entry['statics']) && $treatment !== 'guard') {
                 $this->violations[] = "forced.json: $fqcn: statics belong to a guard class, not a $treatment one";
             }
@@ -425,14 +412,14 @@ final class Classifier
                         $this->violations[] = "forced.json: $fqcn::$name is not a public static method";
                         continue;
                     }
-                    $rows[] = ['member' => $method->name, 'kind' => 'static', 'status' => 'forward', 'reason' => $static['reason']];
+                    $rows[] = ['member' => $method->name, 'kind' => 'static', 'reason' => $static['reason']];
                 }
                 $this->forwarded[$fqcn] = $rows;
             }
         }
     }
 
-    /** @return list<array{member: string, kind: string, status: string, reason?: string}> */
+    /** @return list<array{member: string, kind: string, reason?: string}> */
     private function forwardedBy(string $fqcn): array
     {
         $info = $this->sources->classes[$fqcn];
@@ -453,16 +440,10 @@ final class Classifier
         return $rows;
     }
 
-    /** @return array{member: string, kind: string, status: string, reason?: string} */
+    /** @return array{member: string, kind: string} */
     private function forwardedRow(string $fqcn, string $member, string $kind): array
     {
-        $override = $this->inputs->forced[$fqcn]['members'][$member] ?? null;
-        $row = ['member' => $member, 'kind' => $kind, 'status' => $override['status'] ?? 'implemented'];
-        if (isset($override['reason'])) {
-            $row['reason'] = $override['reason'];
-        }
-
-        return $row;
+        return ['member' => $member, 'kind' => $kind];
     }
 
     /**
@@ -639,23 +620,6 @@ final class Classifier
         return $forwarded;
     }
 
-    private function checkForcedMemberKeys(): void
-    {
-        foreach ($this->inputs->forced as $fqcn => $entry) {
-            if (!isset($entry['members'])) {
-                continue;
-            }
-            $known = [];
-            foreach ($this->forwarded[$fqcn] ?? [] as $row) {
-                $known[$row['member']] = true;
-            }
-            foreach (array_keys($entry['members']) as $member) {
-                if (!isset($known[$member])) {
-                    $this->violations[] = "forced.json: $fqcn does not forward $member";
-                }
-            }
-        }
-    }
 
     /** @return array<string, mixed> */
     private function row(string $fqcn, ClassInfo $info): array
@@ -922,33 +886,16 @@ final class Classifier
             }
         }
 
-        foreach ($this->forwarded as $fqcn => $rows) {
-            $members = [];
-            foreach ($rows as $member) {
-                if (!in_array($member['status'], ['unimplemented', 'refused'], true)) {
-                    continue;
-                }
-                $entry = ['member' => $member['member'], 'kind' => $member['kind'], 'status' => $member['status']];
-                if ($member['kind'] === 'constructor') {
-                    $entry['plugin-constructible'] = $this->rows[$fqcn]['attributes']['plugin-constructible'] ?? false;
-                }
-                $members[] = $entry;
-            }
-            if ($members !== []) {
-                $this->backlog[] = ['item' => 4, 'fqcn' => $fqcn, 'count' => count($members), 'members' => $members];
-            }
-        }
-
         foreach ($this->rows as $fqcn => $row) {
             if ($row['treatment'] === 'real' && $row['value'] === 'rust-handle' && !$row['abstract']) {
-                $this->backlog[] = ['item' => 5, 'fqcn' => $fqcn];
+                $this->backlog[] = ['item' => 4, 'fqcn' => $fqcn];
             }
         }
 
         foreach ($this->rows as $fqcn => $row) {
             foreach ($row['staticProperties'] ?? [] as $property) {
                 if ($property['sync'] === 'unsynced') {
-                    $this->backlog[] = ['item' => 6, 'fqcn' => $fqcn, 'property' => $property['name']];
+                    $this->backlog[] = ['item' => 5, 'fqcn' => $fqcn, 'property' => $property['name']];
                 }
             }
         }
@@ -967,7 +914,7 @@ final class Classifier
                 return null;
             }
             foreach ($this->forwarded[$class] ?? [] as $row) {
-                if ($row['member'] === $member && $row['status'] === 'forward') {
+                if ($row['member'] === $member) {
                     return null;
                 }
             }
@@ -978,9 +925,6 @@ final class Classifier
         $treatment = $this->treatments[$class] ?? null;
         if ($treatment === 'guard') {
             return "$class is guarded";
-        }
-        if ($ref['kind'] === 'new' && $treatment === 'stub' && $this->constructorRefused($class)) {
-            return "the constructor of the $class stub is " . $this->inputs->forced[$class]['members']['__construct']['status'];
         }
 
         return null;

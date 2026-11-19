@@ -2,6 +2,7 @@
 
 use crate::event_dispatcher::{Event, EventFlags, delegate_event_interface_to_inner};
 use bstr::BString;
+use shirabe_php_binding_macros::php_binding;
 use shirabe_symfony_console::input::InputInterface;
 use shirabe_symfony_console::output::OutputInterface;
 
@@ -13,6 +14,7 @@ pub struct CommandEvent {
     output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
 }
 
+#[php_binding(r"Composer\Plugin\CommandEvent", members = instance)]
 impl CommandEvent {
     pub fn new(
         name: impl Into<BString>,
@@ -47,10 +49,12 @@ impl CommandEvent {
         }
     }
 
+    #[php(skip)]
     pub fn get_input(&self) -> std::rc::Rc<std::cell::RefCell<dyn InputInterface>> {
         self.input.clone()
     }
 
+    #[php(skip)]
     pub fn get_output(&self) -> std::rc::Rc<std::cell::RefCell<dyn OutputInterface>> {
         self.output.clone()
     }
@@ -64,4 +68,4 @@ impl CommandEvent {
     }
 }
 
-delegate_event_interface_to_inner!(CommandEvent, inner);
+delegate_event_interface_to_inner!(CommandEvent, inner, "Composer\\Plugin\\CommandEvent");

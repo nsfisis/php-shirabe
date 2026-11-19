@@ -2,8 +2,9 @@
 
 use crate::config::Config;
 use crate::io::{BaseIO, ConsoleIO, IOInterface, IOInterfaceImmutable, IOInterfaceMutable};
-use bstr::BString;
+use bstr::{BStr, BString};
 use indexmap::IndexMap;
+use shirabe_php_binding_macros::php_binding;
 use shirabe_php_shim::{
     PHP_EOL, PhpResource, PregMatches, RuntimeException, SEEK_SET, bformat, fopen, fseek, fwrite,
     php_regex, preg_replace_callback, rewind, rtrim, stream_get_contents, strip_tags,
@@ -18,6 +19,7 @@ pub struct BufferIO {
     pub(crate) inner: ConsoleIO,
 }
 
+#[php_binding(r"Composer\IO\BufferIO", members = instance)]
 impl BufferIO {
     pub fn new(
         input: impl AsRef<[u8]>,
@@ -100,7 +102,10 @@ impl BufferIO {
         output
     }
 
-    pub fn set_user_inputs(&self, inputs: Vec<impl AsRef<[u8]>>) -> anyhow::Result<()> {
+    pub fn set_user_inputs(
+        &self,
+        #[php(decode = Vec<BString>)] inputs: Vec<impl AsRef<[u8]>>,
+    ) -> anyhow::Result<()> {
         let stream = self.create_stream(inputs)?;
 
         let mut input = self.inner.input.borrow_mut();
@@ -270,6 +275,10 @@ impl IOInterfaceMutable for BufferIO {
 impl IOInterface for BufferIO {
     fn as_any(&self) -> &dyn std::any::Any {
         self
+    }
+
+    fn php_class(&self) -> Option<&'static BStr> {
+        Some(BStr::new("Composer\\IO\\BufferIO"))
     }
 
     fn as_base_io_mut(&mut self) -> Option<&mut dyn BaseIO> {

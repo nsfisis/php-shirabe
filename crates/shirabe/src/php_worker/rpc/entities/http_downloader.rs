@@ -4,31 +4,46 @@
 //! the authentication a run collects, the TLS defaults and the parallel-request budget
 //! single-sourced across the boundary.
 
-use crate::config::Config;
-use crate::io::IOInterface;
 use crate::php_worker::job;
 use crate::php_worker::job::JobOwner;
 use crate::php_worker::job::rpc::{
     HTTP_DOWNLOADER_TICK_CAP, dispatch_tick_method, rejected_promise, resolved_promise,
 };
 use crate::php_worker::rpc::dispatch::error_throw;
-use crate::php_worker::rpc::entity::{Bindings, Call, Entity};
-use crate::php_worker::rpc::forwarding;
-use crate::util::{HttpDownloader, HttpDownloaderJob, StreamContextOptions};
+use crate::php_worker::rpc::entity::Call;
+use crate::util::{
+    __php_binding_http_downloader, HttpDownloader, HttpDownloaderJob, StreamContextOptions,
+};
 use bstr::{BStr, BString, ByteSlice as _};
+use shirabe_php_binding_macros::php_entity;
 use shirabe_php_rpc::{PhpThrow, RpcValue, ToRpcValue};
 use shirabe_php_shim::{bformat, path_from_bytes};
 
-impl Entity for std::rc::Rc<std::cell::RefCell<HttpDownloader>> {
-    const EXPECTED: &'static [u8] = b"an HttpDownloader";
-
-    fn address(&self) -> *const () {
-        std::rc::Rc::as_ptr(self) as *const ()
-    }
-
-    fn class(&self) -> Result<&'static Bindings<Self>, PhpThrow> {
-        Ok(&forwarding::util::http_downloader::BINDINGS)
-    }
+// A downloader carries its own options, TLS defaults and request backends; what it shares with
+// the graph is the IO it collects authentication into and the config it reads, both of which it
+// receives as the proxies the plugin already holds.
+php_entity! {
+    handle: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
+    type_error: "an HttpDownloader",
+    classes: {
+        r"Composer\Util\HttpDownloader": {
+            constructor: {
+                adapters: __php_binding_http_downloader,
+                into: |downloader| std::rc::Rc::new(std::cell::RefCell::new(downloader)),
+            },
+        },
+    },
+    methods: {
+        r"Composer\Util\HttpDownloader": {
+            handwritten: { module: self, members: [add, addCopy, wait, countActiveJobs] },
+            instance: {
+                adapters: __php_binding_http_downloader,
+                target: HttpDownloader,
+                borrow: |downloader| downloader.borrow(),
+                borrow_mut: |downloader| downloader.borrow_mut(),
+            },
+        },
+    },
 }
 
 /// `add()` and `addCopy()`: `to` is the target of the copy, and the options follow it.
@@ -77,86 +92,41 @@ fn add_job(
     }
 }
 
-impl forwarding::util::http_downloader::Forwarding for forwarding::util::http_downloader::PhpClass {
-    type Handle = std::rc::Rc<std::cell::RefCell<HttpDownloader>>;
+fn add(
+    downloader: &std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
+    call: &mut Call<'_>,
+) -> Result<RpcValue, PhpThrow> {
+    add_job(downloader, call, None, 1)
+}
 
-    // A downloader carries its own options, TLS defaults and request backends; what it shares
-    // with the graph is the IO it collects authentication into and the config it reads, both of
-    // which it receives as the proxies the plugin already holds.
-    fn __construct(call: &mut Call<'_>) -> Result<Self::Handle, PhpThrow> {
-        let downloader = HttpDownloader::new(
-            call.entity::<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>(0)?,
-            call.entity::<std::rc::Rc<std::cell::RefCell<Config>>>(1)?,
-            call.arg::<StreamContextOptions>(2)?,
-            call.arg::<bool>(3)?,
-        )
-        .map_err(call.failed())?;
-        Ok(std::rc::Rc::new(std::cell::RefCell::new(downloader)))
-    }
+fn add_copy(
+    downloader: &std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
+    call: &mut Call<'_>,
+) -> Result<RpcValue, PhpThrow> {
+    let to = call.arg::<BString>(1)?;
+    add_job(downloader, call, Some(to), 2)
+}
 
-    fn get_options(downloader: &Self::Handle, _: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
-        Ok(downloader.borrow().get_options().clone().to_rpc_value())
-    }
+fn wait(
+    downloader: &std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
+    call: &mut Call<'_>,
+) -> Result<RpcValue, PhpThrow> {
+    dispatch_tick_method(
+        JobOwner::http_downloader(downloader),
+        HTTP_DOWNLOADER_TICK_CAP,
+        call.method(),
+        call.args(),
+    )
+}
 
-    fn set_options(downloader: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
-        let options = call.arg::<StreamContextOptions>(0)?;
-        downloader.borrow_mut().set_options(options);
-        Ok(RpcValue::Null)
-    }
-
-    fn get(downloader: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
-        let url = call.arg::<BString>(0)?;
-        let options = call.arg::<StreamContextOptions>(1)?;
-        let response = downloader
-            .borrow()
-            .get(&url, options)
-            .map_err(call.failed())?;
-        Ok(response.to_rpc_value())
-    }
-
-    fn copy(downloader: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
-        let url = call.arg::<BString>(0)?;
-        let to = call.arg::<BString>(1)?;
-        let options = call.arg::<StreamContextOptions>(2)?;
-        let response = downloader
-            .borrow()
-            .copy(&url, path_from_bytes(&to), options)
-            .map_err(call.failed())?;
-        Ok(response.to_rpc_value())
-    }
-
-    fn add(downloader: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
-        add_job(downloader, call, None, 1)
-    }
-
-    fn add_copy(downloader: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
-        let to = call.arg::<BString>(1)?;
-        add_job(downloader, call, Some(to), 2)
-    }
-
-    fn enable_async(downloader: &Self::Handle, _: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
-        downloader.borrow_mut().enable_async();
-        Ok(RpcValue::Null)
-    }
-
-    fn wait(downloader: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
-        dispatch_tick_method(
-            JobOwner::http_downloader(downloader),
-            HTTP_DOWNLOADER_TICK_CAP,
-            call.method(),
-            call.args(),
-        )
-    }
-
-    fn count_active_jobs(
-        downloader: &Self::Handle,
-        call: &mut Call<'_>,
-    ) -> Result<RpcValue, PhpThrow> {
-        dispatch_tick_method(
-            JobOwner::http_downloader(downloader),
-            HTTP_DOWNLOADER_TICK_CAP,
-            call.method(),
-            call.args(),
-        )
-    }
+fn count_active_jobs(
+    downloader: &std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
+    call: &mut Call<'_>,
+) -> Result<RpcValue, PhpThrow> {
+    dispatch_tick_method(
+        JobOwner::http_downloader(downloader),
+        HTTP_DOWNLOADER_TICK_CAP,
+        call.method(),
+        call.args(),
+    )
 }

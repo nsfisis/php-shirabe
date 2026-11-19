@@ -17,6 +17,7 @@ use crate::util::r#loop::Loop;
 use crate::util::{HttpOptions, Platform, StreamContextOptions};
 use bstr::{B, BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
+use shirabe_php_binding_macros::php_binding;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, array_splice, array_unshift, bformat, boolval,
     http_build_query, json_encode, path_from_bytes, str_replace, strip_tags, strpos, strtolower,
@@ -1038,6 +1039,7 @@ impl InstallationManager {
 // Composer's PartialComposer::setInstallationManager() accepts any InstallationManager subclass, so
 // plugins may swap in a replacement. The interface captures the methods reached through Composer's
 // accessor and through the `&mut dyn InstallationManagerInterface` references fed from it.
+#[php_binding(r"Composer\Installer\InstallationManager")]
 #[async_trait::async_trait(?Send)]
 pub trait InstallationManagerInterface: std::fmt::Debug {
     /// For testing only: lets a test recover the concrete manager (e.g. the recording mock) from a
@@ -1046,15 +1048,19 @@ pub trait InstallationManagerInterface: std::fmt::Debug {
         unimplemented!("as_any is only implemented for the concrete InstallationManager")
     }
 
+    #[php(skip)]
     fn add_installer(&self, installer: std::rc::Rc<dyn InstallerInterface>);
+    #[php(skip)]
     fn remove_installer(&self, installer: &dyn InstallerInterface);
     fn disable_plugins(&mut self);
+    #[php(skip)]
     fn is_package_installed(
         &mut self,
         repo: &InstalledRepositoryInterfaceHandle,
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<bool>;
     fn ensure_binaries_presence(&mut self, package: PackageInterfaceHandle) -> anyhow::Result<()>;
+    #[php(skip)]
     async fn execute(
         &self,
         repo: &InstalledRepositoryInterfaceHandle,
@@ -1068,6 +1074,7 @@ pub trait InstallationManagerInterface: std::fmt::Debug {
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<std::path::PathBuf>>;
     fn set_output_progress(&mut self, output_progress: bool);
+    #[php(skip)]
     async fn notify_installs(&mut self, io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>);
 }
 

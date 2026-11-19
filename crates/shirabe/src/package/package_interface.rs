@@ -4,6 +4,7 @@ use crate::package::{AliasPackage, CompletePackageInterface, Link, Mirror, RootP
 use crate::repository::RepositoryInterfaceHandle;
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
+use shirabe_php_binding_macros::php_binding;
 use shirabe_php_shim::{PhpDisplay, PhpMixed};
 
 /// Selects how `get_full_pretty_version` renders the reference.
@@ -21,6 +22,7 @@ pub enum DisplayMode {
 /// Defines the essential information a package has that is used during solving/installation
 ///
 /// PackageInterface & derivatives are considered internal, you may use them in type hints but extending/implementing them is not recommended and not supported. Things may change without notice.
+#[php_binding(r"Composer\Package\PackageInterface")]
 pub trait PackageInterface: std::fmt::Debug + PhpDisplay {
     /// Returns the package's name without version info, thus not a unique identifier
     fn get_name(&self) -> &BStr;

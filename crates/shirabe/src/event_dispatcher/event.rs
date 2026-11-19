@@ -2,6 +2,7 @@
 
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
+use shirabe_php_binding_macros::php_binding;
 use shirabe_php_shim::PhpMixed;
 
 #[derive(Debug)]
@@ -86,11 +87,15 @@ impl EventFlags {
     }
 }
 
+#[php_binding(r"Composer\EventDispatcher\Event")]
 pub trait EventInterface: std::fmt::Debug {
     /// For downcasting to the concrete event type (PHP `instanceof`), mirroring
     /// `IOInterface::as_any`.
     fn as_any(&self) -> &dyn std::any::Any;
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any;
+    /// The PHP class this event crosses the plugin boundary as, or `None` for an event with no
+    /// proxy stub.
+    fn php_class(&self) -> Option<&'static BStr>;
     fn get_name(&self) -> &BStr;
     fn get_arguments(&self) -> &Vec<BString>;
     fn get_flags(&self) -> &EventFlags;
@@ -105,6 +110,10 @@ impl EventInterface for Event {
 
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
         self
+    }
+
+    fn php_class(&self) -> Option<&'static BStr> {
+        Some(BStr::new("Composer\\EventDispatcher\\Event"))
     }
 
     fn get_name(&self) -> &BStr {
@@ -129,7 +138,7 @@ impl EventInterface for Event {
 }
 
 macro_rules! delegate_event_interface_to_inner {
-    ($Type:ty, $field:ident) => {
+    ($Type:ty, $field:ident, $php_class:literal) => {
         impl crate::event_dispatcher::EventInterface for $Type {
             fn as_any(&self) -> &dyn std::any::Any {
                 self
@@ -137,6 +146,10 @@ macro_rules! delegate_event_interface_to_inner {
 
             fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
                 self
+            }
+
+            fn php_class(&self) -> Option<&'static bstr::BStr> {
+                Some(bstr::BStr::new($php_class))
             }
 
             fn get_name(&self) -> &bstr::BStr {

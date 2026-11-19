@@ -4,6 +4,7 @@ use crate::config::Config;
 use crate::io::BaseIO;
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
+use shirabe_php_binding_macros::php_binding;
 use shirabe_symfony_console::input::InputValue;
 
 pub const QUIET: i64 = 1;
@@ -17,6 +18,7 @@ pub const DEBUG: i64 = 16;
 // `LoggerInterface` entity on the Rust side: the LoggerInterface methods that
 // Composer actually invokes through an IO are folded directly into this trait
 // (each is annotated as originating from LoggerInterface).
+#[php_binding(r"Composer\IO\IOInterface")]
 pub trait IOInterfaceImmutable: std::fmt::Debug {
     fn is_interactive(&self) -> bool;
 
@@ -240,6 +242,12 @@ pub trait IOInterfaceMutable {
 // `dyn IOInterface`; its vtable carries both the immutable and mutable methods.
 pub trait IOInterface: IOInterfaceImmutable + IOInterfaceMutable {
     fn as_any(&self) -> &dyn std::any::Any;
+
+    /// The PHP class this IO crosses the plugin boundary as, or `None` for an implementation
+    /// with no proxy stub.
+    fn php_class(&self) -> Option<&'static BStr> {
+        None
+    }
 
     fn as_base_io_mut(&mut self) -> Option<&mut dyn BaseIO> {
         None

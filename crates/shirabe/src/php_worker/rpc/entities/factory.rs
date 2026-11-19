@@ -1,15 +1,13 @@
 //! The static methods of `Composer\Factory` answered over RPC.
 
-use crate::factory::Factory;
-use crate::php_worker::rpc::entity::Call;
-use crate::php_worker::rpc::forwarding;
-use shirabe_php_rpc::{PhpThrow, RpcValue};
-use shirabe_php_shim::path_to_bytes;
+use crate::factory::__php_binding_factory;
+use shirabe_php_binding_macros::php_statics;
 
-impl forwarding::factory::Forwarding for forwarding::factory::PhpClass {
-    fn get_composer_file(call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
-        Factory::get_composer_file()
-            .map(|file| RpcValue::string(path_to_bytes(&file)))
-            .map_err(call.failed())
-    }
+php_statics! {
+    class: r"Composer\Factory",
+    methods: {
+        r"Composer\Factory": {
+            static: { adapters: __php_binding_factory },
+        },
+    },
 }

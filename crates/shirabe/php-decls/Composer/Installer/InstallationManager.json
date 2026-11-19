@@ -1,0 +1,477 @@
+{
+    "fqcn": "Composer\\Installer\\InstallationManager",
+    "rustModule": [
+        "installer",
+        "installation_manager"
+    ],
+    "kind": "class",
+    "abstract": false,
+    "parent": null,
+    "interfaces": [],
+    "treatment": "stub",
+    "methods": [
+        {
+            "name": "addInstaller",
+            "rust": "add_installer",
+            "declaredIn": "Composer\\Installer\\InstallationManager",
+            "static": false,
+            "params": [
+                {
+                    "name": "installer",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Installer\\InstallerInterface",
+                    "docType": "InstallerInterface"
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "disablePlugins",
+            "rust": "disable_plugins",
+            "declaredIn": "Composer\\Installer\\InstallationManager",
+            "static": false,
+            "params": [],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "download",
+            "rust": "download",
+            "declaredIn": "Composer\\Installer\\InstallationManager",
+            "static": false,
+            "params": [
+                {
+                    "name": "package",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Package\\PackageInterface",
+                    "docType": null
+                }
+            ],
+            "returnType": "?\\React\\Promise\\PromiseInterface",
+            "docReturnType": "PromiseInterface<void|null>|null",
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "ensureBinariesPresence",
+            "rust": "ensure_binaries_presence",
+            "declaredIn": "Composer\\Installer\\InstallationManager",
+            "static": false,
+            "params": [
+                {
+                    "name": "package",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Package\\PackageInterface",
+                    "docType": "PackageInterface"
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "execute",
+            "rust": "execute",
+            "declaredIn": "Composer\\Installer\\InstallationManager",
+            "static": false,
+            "params": [
+                {
+                    "name": "repo",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Repository\\InstalledRepositoryInterface",
+                    "docType": "InstalledRepositoryInterface"
+                },
+                {
+                    "name": "operations",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "array",
+                    "docType": "OperationInterface[]"
+                },
+                {
+                    "name": "devMode",
+                    "position": 2,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "bool",
+                    "docType": "bool"
+                },
+                {
+                    "name": "runScripts",
+                    "position": 3,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "bool",
+                    "docType": "bool"
+                },
+                {
+                    "name": "downloadOnly",
+                    "position": 4,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "bool",
+                    "docType": "bool"
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "getInstallPath",
+            "rust": "get_install_path",
+            "declaredIn": "Composer\\Installer\\InstallationManager",
+            "static": false,
+            "params": [
+                {
+                    "name": "package",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Package\\PackageInterface",
+                    "docType": null
+                }
+            ],
+            "returnType": "?string",
+            "docReturnType": "string|null",
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "getInstaller",
+            "rust": "get_installer",
+            "declaredIn": "Composer\\Installer\\InstallationManager",
+            "static": false,
+            "params": [
+                {
+                    "name": "type",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": "string"
+                }
+            ],
+            "returnType": "\\Composer\\Installer\\InstallerInterface",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "install",
+            "rust": "install",
+            "declaredIn": "Composer\\Installer\\InstallationManager",
+            "static": false,
+            "params": [
+                {
+                    "name": "repo",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Repository\\InstalledRepositoryInterface",
+                    "docType": "InstalledRepositoryInterface"
+                },
+                {
+                    "name": "operation",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\DependencyResolver\\Operation\\InstallOperation",
+                    "docType": "InstallOperation"
+                }
+            ],
+            "returnType": "?\\React\\Promise\\PromiseInterface",
+            "docReturnType": "PromiseInterface<void|null>|null",
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "isPackageInstalled",
+            "rust": "is_package_installed",
+            "declaredIn": "Composer\\Installer\\InstallationManager",
+            "static": false,
+            "params": [
+                {
+                    "name": "repo",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Repository\\InstalledRepositoryInterface",
+                    "docType": "InstalledRepositoryInterface"
+                },
+                {
+                    "name": "package",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Package\\PackageInterface",
+                    "docType": "PackageInterface"
+                }
+            ],
+            "returnType": "bool",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "markAliasInstalled",
+            "rust": "mark_alias_installed",
+            "declaredIn": "Composer\\Installer\\InstallationManager",
+            "static": false,
+            "params": [
+                {
+                    "name": "repo",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Repository\\InstalledRepositoryInterface",
+                    "docType": "InstalledRepositoryInterface"
+                },
+                {
+                    "name": "operation",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\DependencyResolver\\Operation\\MarkAliasInstalledOperation",
+                    "docType": "MarkAliasInstalledOperation"
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "markAliasUninstalled",
+            "rust": "mark_alias_uninstalled",
+            "declaredIn": "Composer\\Installer\\InstallationManager",
+            "static": false,
+            "params": [
+                {
+                    "name": "repo",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Repository\\InstalledRepositoryInterface",
+                    "docType": "InstalledRepositoryInterface"
+                },
+                {
+                    "name": "operation",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\DependencyResolver\\Operation\\MarkAliasUninstalledOperation",
+                    "docType": "MarkAliasUninstalledOperation"
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "notifyInstalls",
+            "rust": "notify_installs",
+            "declaredIn": "Composer\\Installer\\InstallationManager",
+            "static": false,
+            "params": [
+                {
+                    "name": "io",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\IO\\IOInterface",
+                    "docType": null
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "removeInstaller",
+            "rust": "remove_installer",
+            "declaredIn": "Composer\\Installer\\InstallationManager",
+            "static": false,
+            "params": [
+                {
+                    "name": "installer",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Installer\\InstallerInterface",
+                    "docType": "InstallerInterface"
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "reset",
+            "rust": "reset",
+            "declaredIn": "Composer\\Installer\\InstallationManager",
+            "static": false,
+            "params": [],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "setOutputProgress",
+            "rust": "set_output_progress",
+            "declaredIn": "Composer\\Installer\\InstallationManager",
+            "static": false,
+            "params": [
+                {
+                    "name": "outputProgress",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "bool",
+                    "docType": null
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "uninstall",
+            "rust": "uninstall",
+            "declaredIn": "Composer\\Installer\\InstallationManager",
+            "static": false,
+            "params": [
+                {
+                    "name": "repo",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Repository\\InstalledRepositoryInterface",
+                    "docType": "InstalledRepositoryInterface"
+                },
+                {
+                    "name": "operation",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\DependencyResolver\\Operation\\UninstallOperation",
+                    "docType": "UninstallOperation"
+                }
+            ],
+            "returnType": "?\\React\\Promise\\PromiseInterface",
+            "docReturnType": "PromiseInterface<void|null>|null",
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "update",
+            "rust": "update",
+            "declaredIn": "Composer\\Installer\\InstallationManager",
+            "static": false,
+            "params": [
+                {
+                    "name": "repo",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Repository\\InstalledRepositoryInterface",
+                    "docType": "InstalledRepositoryInterface"
+                },
+                {
+                    "name": "operation",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\DependencyResolver\\Operation\\UpdateOperation",
+                    "docType": "UpdateOperation"
+                }
+            ],
+            "returnType": "?\\React\\Promise\\PromiseInterface",
+            "docReturnType": "PromiseInterface<void|null>|null",
+            "funcNumArgs": false,
+            "forwarded": true
+        }
+    ],
+    "constructor": {
+        "declaredIn": "Composer\\Installer\\InstallationManager",
+        "public": true,
+        "params": [
+            {
+                "name": "loop",
+                "position": 0,
+                "byRef": false,
+                "variadic": false,
+                "nullable": false,
+                "type": "\\Composer\\Util\\Loop",
+                "docType": null
+            },
+            {
+                "name": "io",
+                "position": 1,
+                "byRef": false,
+                "variadic": false,
+                "nullable": false,
+                "type": "\\Composer\\IO\\IOInterface",
+                "docType": null
+            },
+            {
+                "name": "eventDispatcher",
+                "position": 2,
+                "byRef": false,
+                "variadic": false,
+                "nullable": true,
+                "type": "?\\Composer\\EventDispatcher\\EventDispatcher",
+                "docType": null
+            }
+        ],
+        "funcNumArgs": false,
+        "forwarded": true
+    },
+    "properties": []
+}

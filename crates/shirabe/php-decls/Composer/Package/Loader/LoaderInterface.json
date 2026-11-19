@@ -1,0 +1,42 @@
+{
+    "fqcn": "Composer\\Package\\Loader\\LoaderInterface",
+    "rustModule": [
+        "package",
+        "loader",
+        "loader_interface"
+    ],
+    "kind": "interface",
+    "interfaces": [],
+    "treatment": "real",
+    "methods": [
+        {
+            "name": "load",
+            "rust": "load",
+            "declaredIn": "Composer\\Package\\Loader\\LoaderInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "config",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "array",
+                    "docType": "mixed[]"
+                },
+                {
+                    "name": "class",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": "class-string<CompletePackage|RootPackage>"
+                }
+            ],
+            "returnType": "\\Composer\\Package\\BasePackage",
+            "docReturnType": "CompletePackage|CompleteAliasPackage|RootPackage|RootAliasPackage",
+            "funcNumArgs": false
+        }
+    ]
+}

@@ -6,6 +6,7 @@ use crate::package::{
 use crate::repository::RepositoryInterfaceHandle;
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
+use shirabe_php_binding_macros::php_binding;
 use shirabe_php_shim::{PhpDisplay, PhpMixed};
 
 #[derive(Debug, Clone)]
@@ -25,7 +26,9 @@ pub struct CompletePackage {
     archive_excludes: Vec<BString>,
 }
 
+#[php_binding(r"Composer\Package\CompletePackage", members = constructor)]
 impl CompletePackage {
+    #[php(name = "__construct")]
     pub fn new(name: BString, version: BString, pretty_version: BString) -> Self {
         Self {
             inner: Package::new(name, version, pretty_version),

@@ -9,6 +9,7 @@ use crate::package::{AliasPackageHandle, Link, PackageInterfaceHandle};
 use crate::repository::PlatformRepository;
 use bstr::{B, BString};
 use indexmap::{IndexMap, IndexSet};
+use shirabe_php_binding_macros::php_binding;
 use shirabe_php_shim::{
     PhpMixed, ToPhpString, array_filter, array_intersect, array_keys, array_pop, array_unshift,
     bformat, strcmp, uasort, uasort_map,
@@ -390,6 +391,7 @@ pub enum AnyTransaction {
     LocalRepoTransaction(LocalRepoTransaction),
 }
 
+#[php_binding(r"Composer\DependencyResolver\Transaction", members = instance)]
 impl AnyTransaction {
     pub fn get_operations(&self) -> &Vec<std::rc::Rc<AnyOperation>> {
         match self {

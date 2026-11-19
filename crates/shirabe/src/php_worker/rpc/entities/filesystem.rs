@@ -1,79 +1,52 @@
 //! The methods a `Composer\Util\Filesystem` entity answers over RPC.
 
-use crate::php_worker::job;
-use crate::php_worker::job::JobOwner;
-use crate::php_worker::job::rpc::{poll_once, resolved_promise};
-use crate::php_worker::rpc::dispatch::error_throw;
-use crate::php_worker::rpc::entity::{Bindings, Call, Entity};
-use crate::php_worker::rpc::forwarding;
-use crate::util::{Filesystem, ProcessExecutor};
-use bstr::BString;
-use shirabe_php_rpc::{PhpThrow, RpcValue, ToRpcValue};
-use shirabe_php_shim::path_from_bytes;
+use crate::util::{__php_binding_filesystem, Filesystem};
+use shirabe_php_binding_macros::php_entity;
 
-impl Entity for std::rc::Rc<std::cell::RefCell<Filesystem>> {
-    const EXPECTED: &'static [u8] = b"a Filesystem";
-
-    fn address(&self) -> *const () {
-        std::rc::Rc::as_ptr(self) as *const ()
-    }
-
-    fn class(&self) -> Result<&'static Bindings<Self>, PhpThrow> {
-        Ok(&forwarding::util::filesystem::BINDINGS)
-    }
+// A Filesystem shares no state with the object graph beyond the process executor it runs
+// subprocesses through, so a plugin-built one is a complete instance rather than a second view on
+// a Rust-side service.
+php_entity! {
+    handle: std::rc::Rc<std::cell::RefCell<Filesystem>>,
+    type_error: "a Filesystem",
+    classes: {
+        r"Composer\Util\Filesystem": {
+            constructor: {
+                adapters: __php_binding_filesystem,
+                into: |fs| std::rc::Rc::new(std::cell::RefCell::new(fs)),
+            },
+        },
+    },
+    methods: {
+        r"Composer\Util\Filesystem": {
+            handwritten: { module: promise, members: [removeDirectoryAsync] },
+            instance: {
+                adapters: __php_binding_filesystem,
+                target: Filesystem,
+                borrow: |fs| fs.borrow(),
+                borrow_mut: |fs| fs.borrow_mut(),
+            },
+        },
+    },
 }
 
-fn path(call: &Call<'_>, position: usize) -> Result<std::path::PathBuf, PhpThrow> {
-    call.arg::<BString>(position)
-        .map(|path| std::path::PathBuf::from(path_from_bytes(&path)))
-}
+/// The members answering with a promise.
+mod promise {
+    use crate::php_worker::job;
+    use crate::php_worker::job::JobOwner;
+    use crate::php_worker::job::rpc::{poll_once, resolved_promise};
+    use crate::php_worker::rpc::dispatch::error_throw;
+    use crate::php_worker::rpc::entity::Call;
+    use crate::util::Filesystem;
+    use bstr::BString;
+    use shirabe_php_rpc::{PhpThrow, RpcValue, ToRpcValue};
+    use shirabe_php_shim::path_from_bytes;
 
-impl forwarding::util::filesystem::Forwarding for forwarding::util::filesystem::PhpClass {
-    type Handle = std::rc::Rc<std::cell::RefCell<Filesystem>>;
-
-    // A Filesystem shares no state with the object graph beyond the process executor it runs
-    // subprocesses through, so a plugin-built one is a complete instance rather than a second
-    // view on a Rust-side service.
-    fn __construct(call: &mut Call<'_>) -> Result<Self::Handle, PhpThrow> {
-        let executor =
-            call.optional_entity::<std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>(0)?;
-        Ok(std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(
-            executor,
-        ))))
-    }
-
-    fn remove(fs: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
-        Ok(fs
-            .borrow_mut()
-            .remove(path(call, 0)?)
-            .map_err(call.failed())?
-            .to_rpc_value())
-    }
-
-    fn is_dir_empty(fs: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
-        Ok(fs.borrow().is_dir_empty(&path(call, 0)?).to_rpc_value())
-    }
-
-    fn empty_directory(fs: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
-        fs.borrow_mut()
-            .empty_directory(&path(call, 0)?, call.arg::<bool>(1)?)
-            .map_err(call.failed())?;
-        Ok(RpcValue::Null)
-    }
-
-    fn remove_directory(fs: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
-        Ok(fs
-            .borrow_mut()
-            .remove_directory(path(call, 0)?)
-            .map_err(call.failed())?
-            .to_rpc_value())
-    }
-
-    fn remove_directory_async(
-        fs: &Self::Handle,
+    pub(super) fn remove_directory_async(
+        fs: &std::rc::Rc<std::cell::RefCell<Filesystem>>,
         call: &mut Call<'_>,
     ) -> Result<RpcValue, PhpThrow> {
-        let directory = path(call, 0)?;
+        let directory = std::path::PathBuf::from(path_from_bytes(&call.arg::<BString>(0)?));
         let executor = fs.borrow_mut().get_process_handle();
         let fs = fs.clone();
         let mut future: std::pin::Pin<Box<dyn std::future::Future<Output = anyhow::Result<bool>>>> =
@@ -97,162 +70,5 @@ impl forwarding::util::filesystem::Forwarding for forwarding::util::filesystem::
                 }),
             )),
         }
-    }
-
-    fn remove_directory_php(fs: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
-        Ok(fs
-            .borrow_mut()
-            .remove_directory_php(&path(call, 0)?)
-            .map_err(call.failed())?
-            .to_rpc_value())
-    }
-
-    fn ensure_directory_exists(
-        fs: &Self::Handle,
-        call: &mut Call<'_>,
-    ) -> Result<RpcValue, PhpThrow> {
-        fs.borrow_mut()
-            .ensure_directory_exists(&path(call, 0)?)
-            .map_err(call.failed())?;
-        Ok(RpcValue::Null)
-    }
-
-    fn unlink(fs: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
-        Ok(fs
-            .borrow()
-            .unlink(path(call, 0)?)
-            .map_err(call.failed())?
-            .to_rpc_value())
-    }
-
-    fn rmdir(fs: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
-        Ok(fs
-            .borrow()
-            .rmdir(path(call, 0)?)
-            .map_err(call.failed())?
-            .to_rpc_value())
-    }
-
-    fn copy_then_remove(fs: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
-        fs.borrow_mut()
-            .copy_then_remove(&path(call, 0)?, &path(call, 1)?)
-            .map_err(call.failed())?;
-        Ok(RpcValue::Null)
-    }
-
-    fn copy(fs: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
-        Ok(fs
-            .borrow_mut()
-            .copy(&path(call, 0)?, &path(call, 1)?)
-            .map_err(call.failed())?
-            .to_rpc_value())
-    }
-
-    fn rename(fs: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
-        fs.borrow_mut()
-            .rename(path(call, 0)?, path(call, 1)?)
-            .map_err(call.failed())?;
-        Ok(RpcValue::Null)
-    }
-
-    fn find_shortest_path(fs: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
-        Ok(fs
-            .borrow()
-            .find_shortest_path(
-                &path(call, 0)?,
-                &path(call, 1)?,
-                call.arg::<bool>(2)?,
-                call.arg::<bool>(3)?,
-            )
-            .map_err(call.failed())?
-            .to_rpc_value())
-    }
-
-    fn find_shortest_path_code(
-        fs: &Self::Handle,
-        call: &mut Call<'_>,
-    ) -> Result<RpcValue, PhpThrow> {
-        Ok(fs
-            .borrow()
-            .find_shortest_path_code(
-                &path(call, 0)?,
-                &path(call, 1)?,
-                call.arg::<bool>(2)?,
-                call.arg::<bool>(3)?,
-                call.arg::<bool>(4)?,
-            )
-            .map_err(call.failed())?
-            .to_rpc_value())
-    }
-
-    fn is_absolute_path(fs: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
-        Ok(fs.borrow().is_absolute_path(&path(call, 0)?).to_rpc_value())
-    }
-
-    fn size(fs: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
-        Ok(fs
-            .borrow()
-            .size(path(call, 0)?)
-            .map_err(call.failed())?
-            .to_rpc_value())
-    }
-
-    fn normalize_path(fs: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
-        Ok(fs.borrow().normalize_path(&path(call, 0)?).to_rpc_value())
-    }
-
-    fn relative_symlink(fs: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
-        Ok(fs
-            .borrow()
-            .relative_symlink(&path(call, 0)?, &path(call, 1)?)
-            .map_err(call.failed())?
-            .to_rpc_value())
-    }
-
-    fn is_symlinked_directory(
-        fs: &Self::Handle,
-        call: &mut Call<'_>,
-    ) -> Result<RpcValue, PhpThrow> {
-        Ok(fs
-            .borrow()
-            .is_symlinked_directory(&path(call, 0)?)
-            .to_rpc_value())
-    }
-
-    fn junction(fs: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
-        fs.borrow_mut()
-            .junction(&path(call, 0)?, &path(call, 1)?)
-            .map_err(call.failed())?;
-        Ok(RpcValue::Null)
-    }
-
-    fn is_junction(fs: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
-        Ok(fs.borrow().is_junction(&path(call, 0)?).to_rpc_value())
-    }
-
-    fn remove_junction(fs: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
-        Ok(fs
-            .borrow_mut()
-            .remove_junction(&path(call, 0)?)
-            .map_err(call.failed())?
-            .to_rpc_value())
-    }
-
-    fn file_put_contents_if_modified(
-        fs: &Self::Handle,
-        call: &mut Call<'_>,
-    ) -> Result<RpcValue, PhpThrow> {
-        Ok(fs
-            .borrow()
-            .file_put_contents_if_modified(&path(call, 0)?, call.arg::<BString>(1)?)
-            .map_err(call.failed())?
-            .to_rpc_value())
-    }
-
-    fn safe_copy(fs: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
-        fs.borrow()
-            .safe_copy(&path(call, 0)?, &path(call, 1)?)
-            .map_err(call.failed())?;
-        Ok(RpcValue::Null)
     }
 }

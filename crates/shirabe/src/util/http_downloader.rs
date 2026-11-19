@@ -14,6 +14,7 @@ use crate::util::{
 };
 use bstr::{B, BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
+use shirabe_php_binding_macros::php_binding;
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, LogicException, PHP_EOL, PhpJson, PhpMixed, bformat,
     boolval, empty, extension_loaded, implode, intval, is_numeric, path_to_bytes,
@@ -93,7 +94,9 @@ impl Default for HttpDownloaderMockHandler {
     }
 }
 
+#[php_binding(r"Composer\Util\HttpDownloader", members = (instance, constructor))]
 impl HttpDownloader {
+    #[php(name = "__construct")]
     pub fn new(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
@@ -152,13 +155,14 @@ impl HttpDownloader {
     /// Download a file synchronously
     pub fn get(
         &self,
-        url: impl AsRef<[u8]>,
+        #[php(decode = BString)] url: impl AsRef<[u8]>,
         options: StreamContextOptions,
     ) -> anyhow::Result<Response> {
         sync_executor::block_on(self.execute(url.as_ref().as_bstr(), options, None, true))
     }
 
     /// Create an async download operation
+    #[php(skip)]
     pub async fn add(
         &self,
         url: impl AsRef<[u8]>,
@@ -171,8 +175,8 @@ impl HttpDownloader {
     /// Copy a file synchronously
     pub fn copy(
         &self,
-        url: impl AsRef<[u8]>,
-        to: impl AsRef<std::path::Path>,
+        #[php(decode = BString)] url: impl AsRef<[u8]>,
+        #[php(decode = std::path::PathBuf)] to: impl AsRef<std::path::Path>,
         options: StreamContextOptions,
     ) -> anyhow::Result<Response> {
         sync_executor::block_on(self.execute(
@@ -184,6 +188,7 @@ impl HttpDownloader {
     }
 
     /// Create an async copy operation
+    #[php(skip)]
     pub async fn add_copy(
         &self,
         url: impl AsRef<[u8]>,

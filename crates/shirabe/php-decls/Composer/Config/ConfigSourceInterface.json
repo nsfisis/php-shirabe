@@ -1,0 +1,321 @@
+{
+    "fqcn": "Composer\\Config\\ConfigSourceInterface",
+    "rustModule": [
+        "config",
+        "config_source_interface"
+    ],
+    "kind": "interface",
+    "interfaces": [],
+    "treatment": "real",
+    "methods": [
+        {
+            "name": "addConfigSetting",
+            "rust": "add_config_setting",
+            "declaredIn": "Composer\\Config\\ConfigSourceInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "name",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": "string"
+                },
+                {
+                    "name": "value",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": null,
+                    "docType": "mixed"
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false
+        },
+        {
+            "name": "addLink",
+            "rust": "add_link",
+            "declaredIn": "Composer\\Config\\ConfigSourceInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "type",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": "string"
+                },
+                {
+                    "name": "name",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": "string"
+                },
+                {
+                    "name": "value",
+                    "position": 2,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": "string"
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false
+        },
+        {
+            "name": "addProperty",
+            "rust": "add_property",
+            "declaredIn": "Composer\\Config\\ConfigSourceInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "name",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": "string"
+                },
+                {
+                    "name": "value",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": null,
+                    "docType": "string|string[]"
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false
+        },
+        {
+            "name": "addRepository",
+            "rust": "add_repository",
+            "declaredIn": "Composer\\Config\\ConfigSourceInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "name",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": "string"
+                },
+                {
+                    "name": "config",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": null,
+                    "docType": "mixed[]|false"
+                },
+                {
+                    "name": "append",
+                    "position": 2,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "bool",
+                    "docType": "bool"
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false
+        },
+        {
+            "name": "getName",
+            "rust": "get_name",
+            "declaredIn": "Composer\\Config\\ConfigSourceInterface",
+            "static": false,
+            "params": [],
+            "returnType": "string",
+            "docReturnType": null,
+            "funcNumArgs": false
+        },
+        {
+            "name": "insertRepository",
+            "rust": "insert_repository",
+            "declaredIn": "Composer\\Config\\ConfigSourceInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "name",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": "string"
+                },
+                {
+                    "name": "config",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": null,
+                    "docType": "mixed[]|false"
+                },
+                {
+                    "name": "referenceName",
+                    "position": 2,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": "string"
+                },
+                {
+                    "name": "offset",
+                    "position": 3,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "int",
+                    "docType": "int"
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false
+        },
+        {
+            "name": "removeConfigSetting",
+            "rust": "remove_config_setting",
+            "declaredIn": "Composer\\Config\\ConfigSourceInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "name",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": null
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false
+        },
+        {
+            "name": "removeLink",
+            "rust": "remove_link",
+            "declaredIn": "Composer\\Config\\ConfigSourceInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "type",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": "string"
+                },
+                {
+                    "name": "name",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": "string"
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false
+        },
+        {
+            "name": "removeProperty",
+            "rust": "remove_property",
+            "declaredIn": "Composer\\Config\\ConfigSourceInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "name",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": null
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false
+        },
+        {
+            "name": "removeRepository",
+            "rust": "remove_repository",
+            "declaredIn": "Composer\\Config\\ConfigSourceInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "name",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": null
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false
+        },
+        {
+            "name": "setRepositoryUrl",
+            "rust": "set_repository_url",
+            "declaredIn": "Composer\\Config\\ConfigSourceInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "name",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": null
+                },
+                {
+                    "name": "url",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": null
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false
+        }
+    ]
+}

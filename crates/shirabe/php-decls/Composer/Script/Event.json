@@ -1,0 +1,225 @@
+{
+    "fqcn": "Composer\\Script\\Event",
+    "rustModule": [
+        "script",
+        "event"
+    ],
+    "kind": "class",
+    "abstract": false,
+    "parent": "Composer\\EventDispatcher\\Event",
+    "interfaces": [],
+    "treatment": "stub",
+    "methods": [
+        {
+            "name": "getArguments",
+            "rust": "get_arguments",
+            "declaredIn": "Composer\\EventDispatcher\\Event",
+            "static": false,
+            "params": [],
+            "returnType": "array",
+            "docReturnType": "string[]",
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "getComposer",
+            "rust": "get_composer",
+            "declaredIn": "Composer\\Script\\Event",
+            "static": false,
+            "params": [],
+            "returnType": "\\Composer\\Composer",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "getFlags",
+            "rust": "get_flags",
+            "declaredIn": "Composer\\EventDispatcher\\Event",
+            "static": false,
+            "params": [],
+            "returnType": "array",
+            "docReturnType": "mixed[]",
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "getIO",
+            "rust": "get_io",
+            "declaredIn": "Composer\\Script\\Event",
+            "static": false,
+            "params": [],
+            "returnType": "\\Composer\\IO\\IOInterface",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "getName",
+            "rust": "get_name",
+            "declaredIn": "Composer\\EventDispatcher\\Event",
+            "static": false,
+            "params": [],
+            "returnType": "string",
+            "docReturnType": "string",
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "getOriginatingEvent",
+            "rust": "get_originating_event",
+            "declaredIn": "Composer\\Script\\Event",
+            "static": false,
+            "params": [],
+            "returnType": "?\\Composer\\EventDispatcher\\Event",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "isDevMode",
+            "rust": "is_dev_mode",
+            "declaredIn": "Composer\\Script\\Event",
+            "static": false,
+            "params": [],
+            "returnType": "bool",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "isPropagationStopped",
+            "rust": "is_propagation_stopped",
+            "declaredIn": "Composer\\EventDispatcher\\Event",
+            "static": false,
+            "params": [],
+            "returnType": "bool",
+            "docReturnType": "bool",
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "setOriginatingEvent",
+            "rust": "set_originating_event",
+            "declaredIn": "Composer\\Script\\Event",
+            "static": false,
+            "params": [
+                {
+                    "name": "event",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\EventDispatcher\\Event",
+                    "docType": null
+                }
+            ],
+            "returnType": "self",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "stopPropagation",
+            "rust": "stop_propagation",
+            "declaredIn": "Composer\\EventDispatcher\\Event",
+            "static": false,
+            "params": [],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        }
+    ],
+    "constructor": {
+        "declaredIn": "Composer\\Script\\Event",
+        "public": true,
+        "params": [
+            {
+                "name": "name",
+                "position": 0,
+                "byRef": false,
+                "variadic": false,
+                "nullable": false,
+                "type": "string",
+                "docType": "string"
+            },
+            {
+                "name": "composer",
+                "position": 1,
+                "byRef": false,
+                "variadic": false,
+                "nullable": false,
+                "type": "\\Composer\\Composer",
+                "docType": "Composer"
+            },
+            {
+                "name": "io",
+                "position": 2,
+                "byRef": false,
+                "variadic": false,
+                "nullable": false,
+                "type": "\\Composer\\IO\\IOInterface",
+                "docType": "IOInterface"
+            },
+            {
+                "name": "devMode",
+                "position": 3,
+                "byRef": false,
+                "variadic": false,
+                "nullable": false,
+                "type": "bool",
+                "docType": "bool"
+            },
+            {
+                "name": "args",
+                "position": 4,
+                "byRef": false,
+                "variadic": false,
+                "nullable": false,
+                "type": "array",
+                "docType": "array<string|int|float|bool|null>"
+            },
+            {
+                "name": "flags",
+                "position": 5,
+                "byRef": false,
+                "variadic": false,
+                "nullable": false,
+                "type": "array",
+                "docType": "mixed[]"
+            }
+        ],
+        "funcNumArgs": false,
+        "forwarded": true
+    },
+    "properties": [
+        {
+            "name": "args",
+            "declaredIn": "Composer\\EventDispatcher\\Event",
+            "visibility": "protected",
+            "static": false,
+            "readonly": false,
+            "type": null,
+            "docType": "string[]"
+        },
+        {
+            "name": "flags",
+            "declaredIn": "Composer\\EventDispatcher\\Event",
+            "visibility": "protected",
+            "static": false,
+            "readonly": false,
+            "type": null,
+            "docType": "mixed[]"
+        },
+        {
+            "name": "name",
+            "declaredIn": "Composer\\EventDispatcher\\Event",
+            "visibility": "protected",
+            "static": false,
+            "readonly": false,
+            "type": null,
+            "docType": "string"
+        }
+    ]
+}

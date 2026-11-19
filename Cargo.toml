@@ -14,6 +14,7 @@ shirabe = { path = "crates/shirabe" }
 shirabe-ca-bundle = { path = "crates/shirabe-ca-bundle" }
 shirabe-class-map-generator = { path = "crates/shirabe-class-map-generator" }
 shirabe-metadata-minifier = { path = "crates/shirabe-metadata-minifier" }
+shirabe-php-binding-macros = { path = "crates/shirabe-php-binding-macros" }
 shirabe-php-rpc = { path = "crates/shirabe-php-rpc" }
 shirabe-php-shim = { path = "crates/shirabe-php-shim" }
 shirabe-php-shim-macros = { path = "crates/shirabe-php-shim-macros" }

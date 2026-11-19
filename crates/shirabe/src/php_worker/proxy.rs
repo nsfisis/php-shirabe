@@ -8,6 +8,12 @@ mod installer;
 mod plugin;
 pub mod remote_filesystem;
 
+/// An adapter for an entity living in the PHP child process, whose trait impl
+/// `#[php_binding(.., proxy = ..)]` generates: the entity the calls go to.
+pub(crate) trait PhpProxy {
+    fn php_handle(&self) -> &shirabe_php_rpc::PhpEntityHandle;
+}
+
 pub use capability::*;
 pub use command::*;
 pub use installer::*;

@@ -1,0 +1,89 @@
+{
+    "fqcn": "Composer\\DependencyResolver\\Transaction",
+    "rustModule": [
+        "dependency_resolver",
+        "transaction"
+    ],
+    "kind": "class",
+    "abstract": false,
+    "parent": null,
+    "interfaces": [],
+    "treatment": "stub",
+    "methods": [
+        {
+            "name": "getOperations",
+            "rust": "get_operations",
+            "declaredIn": "Composer\\DependencyResolver\\Transaction",
+            "static": false,
+            "params": [],
+            "returnType": "array",
+            "docReturnType": "OperationInterface[]",
+            "funcNumArgs": false,
+            "forwarded": true
+        }
+    ],
+    "constructor": {
+        "declaredIn": "Composer\\DependencyResolver\\Transaction",
+        "public": true,
+        "params": [
+            {
+                "name": "presentPackages",
+                "position": 0,
+                "byRef": false,
+                "variadic": false,
+                "nullable": false,
+                "type": "array",
+                "docType": "PackageInterface[]"
+            },
+            {
+                "name": "resultPackages",
+                "position": 1,
+                "byRef": false,
+                "variadic": false,
+                "nullable": false,
+                "type": "array",
+                "docType": "PackageInterface[]"
+            }
+        ],
+        "funcNumArgs": false,
+        "forwarded": true
+    },
+    "properties": [
+        {
+            "name": "operations",
+            "declaredIn": "Composer\\DependencyResolver\\Transaction",
+            "visibility": "protected",
+            "static": false,
+            "readonly": false,
+            "type": null,
+            "docType": "OperationInterface[]"
+        },
+        {
+            "name": "presentPackages",
+            "declaredIn": "Composer\\DependencyResolver\\Transaction",
+            "visibility": "protected",
+            "static": false,
+            "readonly": false,
+            "type": null,
+            "docType": "PackageInterface[]"
+        },
+        {
+            "name": "resultPackageMap",
+            "declaredIn": "Composer\\DependencyResolver\\Transaction",
+            "visibility": "protected",
+            "static": false,
+            "readonly": false,
+            "type": null,
+            "docType": "array<string, PackageInterface>"
+        },
+        {
+            "name": "resultPackagesByName",
+            "declaredIn": "Composer\\DependencyResolver\\Transaction",
+            "visibility": "protected",
+            "static": false,
+            "readonly": false,
+            "type": null,
+            "docType": "array<string, PackageInterface[]>"
+        }
+    ]
+}

@@ -2,54 +2,69 @@
 //! PHP-implemented plugin never crosses this way: its entity lives in the child's PHP entity table
 //! already.
 
-use crate::php_worker::rpc::entity::{Bindings, Call, Entity};
-use crate::php_worker::rpc::forwarding;
 use crate::plugin::PluginInterface;
-use shirabe_php_rpc::{PhpThrow, RpcValue, ToRpcValue};
+use shirabe_php_binding_macros::php_entity;
 
-impl Entity for std::rc::Rc<std::cell::RefCell<dyn PluginInterface>> {
-    const EXPECTED: &'static [u8] = b"a plugin";
-
-    fn address(&self) -> *const () {
-        std::rc::Rc::as_ptr(self) as *const ()
-    }
-
-    // TODO(plugin): a Rust-implemented plugin that is also an EventSubscriberInterface crosses as
-    // one of these two classes, so `instanceof EventSubscriberInterface` is false in the child;
-    // Composer's own subscriber dispatch runs on the Rust side and never asks.
-    fn class(&self) -> Result<&'static Bindings<Self>, PhpThrow> {
-        Ok(match self.borrow().as_capable() {
-            Some(_) => &forwarding::shirabe::rust_capable_plugin_stub::BINDINGS,
-            None => &forwarding::shirabe::rust_plugin_stub::BINDINGS,
-        })
-    }
+// TODO(plugin): a Rust-implemented plugin that is also an EventSubscriberInterface crosses as one
+// of these two classes, so `instanceof EventSubscriberInterface` is false in the child; Composer's
+// own subscriber dispatch runs on the Rust side and never asks.
+php_entity! {
+    handle: std::rc::Rc<std::cell::RefCell<dyn PluginInterface>>,
+    type_error: "a plugin",
+    class_of: |plugin| Ok(match plugin.borrow().as_capable() {
+        Some(_) => br"Shirabe\RustCapablePluginStub",
+        None => br"Shirabe\RustPluginStub",
+    }),
+    classes: {
+        r"Shirabe\RustPluginStub": {},
+        r"Shirabe\RustCapablePluginStub": {},
+    },
+    methods: {
+        r"Composer\Plugin\PluginInterface": {
+            handwritten: { module: lifecycle },
+        },
+        r"Composer\Plugin\Capable": {
+            handwritten: { module: capable },
+        },
+    },
 }
 
 // TODO(plugin): the lifecycle methods would have to turn the `$composer`/`$io` stubs the child
 // passes back into the Rust entities they stand for; nothing calls them, because Composer
 // activates a Rust-implemented plugin on the Rust side.
-impl forwarding::shirabe::rust_plugin_stub::Forwarding
-    for forwarding::shirabe::rust_plugin_stub::PhpClass
-{
-    type Handle = std::rc::Rc<std::cell::RefCell<dyn PluginInterface>>;
+mod lifecycle {
+    use crate::php_worker::rpc::entity::Call;
+    use crate::plugin::PluginInterface;
+    use shirabe_php_rpc::{PhpThrow, RpcValue};
 
-    fn activate(_: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
+    pub(super) fn activate(
+        _: &std::rc::Rc<std::cell::RefCell<dyn PluginInterface>>,
+        call: &mut Call<'_>,
+    ) -> Result<RpcValue, PhpThrow> {
         Err(call.unsupported())
     }
 
-    fn deactivate(_: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
+    pub(super) fn deactivate(
+        _: &std::rc::Rc<std::cell::RefCell<dyn PluginInterface>>,
+        call: &mut Call<'_>,
+    ) -> Result<RpcValue, PhpThrow> {
         Err(call.unsupported())
     }
 
-    fn uninstall(_: &Self::Handle, call: &mut Call<'_>) -> Result<RpcValue, PhpThrow> {
+    pub(super) fn uninstall(
+        _: &std::rc::Rc<std::cell::RefCell<dyn PluginInterface>>,
+        call: &mut Call<'_>,
+    ) -> Result<RpcValue, PhpThrow> {
         Err(call.unsupported())
     }
 }
 
-impl forwarding::shirabe::rust_capable_plugin_stub::Forwarding
-    for forwarding::shirabe::rust_capable_plugin_stub::PhpClass
-{
-    fn get_capabilities(
+mod capable {
+    use crate::php_worker::rpc::entity::Call;
+    use crate::plugin::PluginInterface;
+    use shirabe_php_rpc::{PhpThrow, RpcValue, ToRpcValue};
+
+    pub(super) fn get_capabilities(
         plugin: &std::rc::Rc<std::cell::RefCell<dyn PluginInterface>>,
         call: &mut Call<'_>,
     ) -> Result<RpcValue, PhpThrow> {

@@ -1,0 +1,406 @@
+{
+    "fqcn": "Composer\\Composer",
+    "rustModule": [
+        "composer"
+    ],
+    "kind": "class",
+    "abstract": false,
+    "parent": "Composer\\PartialComposer",
+    "interfaces": [],
+    "treatment": "stub",
+    "methods": [
+        {
+            "name": "getArchiveManager",
+            "rust": "get_archive_manager",
+            "declaredIn": "Composer\\Composer",
+            "static": false,
+            "params": [],
+            "returnType": "\\Composer\\Package\\Archiver\\ArchiveManager",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "getAutoloadGenerator",
+            "rust": "get_autoload_generator",
+            "declaredIn": "Composer\\Composer",
+            "static": false,
+            "params": [],
+            "returnType": "\\Composer\\Autoload\\AutoloadGenerator",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "getConfig",
+            "rust": "get_config",
+            "declaredIn": "Composer\\PartialComposer",
+            "static": false,
+            "params": [],
+            "returnType": "\\Composer\\Config",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "getDownloadManager",
+            "rust": "get_download_manager",
+            "declaredIn": "Composer\\Composer",
+            "static": false,
+            "params": [],
+            "returnType": "\\Composer\\Downloader\\DownloadManager",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "getEventDispatcher",
+            "rust": "get_event_dispatcher",
+            "declaredIn": "Composer\\PartialComposer",
+            "static": false,
+            "params": [],
+            "returnType": "\\Composer\\EventDispatcher\\EventDispatcher",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "getInstallationManager",
+            "rust": "get_installation_manager",
+            "declaredIn": "Composer\\PartialComposer",
+            "static": false,
+            "params": [],
+            "returnType": "\\Composer\\Installer\\InstallationManager",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "getLocker",
+            "rust": "get_locker",
+            "declaredIn": "Composer\\Composer",
+            "static": false,
+            "params": [],
+            "returnType": "\\Composer\\Package\\Locker",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "getLoop",
+            "rust": "get_loop",
+            "declaredIn": "Composer\\PartialComposer",
+            "static": false,
+            "params": [],
+            "returnType": "\\Composer\\Util\\Loop",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": false
+        },
+        {
+            "name": "getPackage",
+            "rust": "get_package",
+            "declaredIn": "Composer\\PartialComposer",
+            "static": false,
+            "params": [],
+            "returnType": "\\Composer\\Package\\RootPackageInterface",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "getPluginManager",
+            "rust": "get_plugin_manager",
+            "declaredIn": "Composer\\Composer",
+            "static": false,
+            "params": [],
+            "returnType": "\\Composer\\Plugin\\PluginManager",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "getRepositoryManager",
+            "rust": "get_repository_manager",
+            "declaredIn": "Composer\\PartialComposer",
+            "static": false,
+            "params": [],
+            "returnType": "\\Composer\\Repository\\RepositoryManager",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "getVersion",
+            "rust": "get_version",
+            "declaredIn": "Composer\\Composer",
+            "static": true,
+            "params": [],
+            "returnType": "string",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": false
+        },
+        {
+            "name": "isGlobal",
+            "rust": "is_global",
+            "declaredIn": "Composer\\PartialComposer",
+            "static": false,
+            "params": [],
+            "returnType": "bool",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "setArchiveManager",
+            "rust": "set_archive_manager",
+            "declaredIn": "Composer\\Composer",
+            "static": false,
+            "params": [
+                {
+                    "name": "manager",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Package\\Archiver\\ArchiveManager",
+                    "docType": null
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "setAutoloadGenerator",
+            "rust": "set_autoload_generator",
+            "declaredIn": "Composer\\Composer",
+            "static": false,
+            "params": [
+                {
+                    "name": "autoloadGenerator",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Autoload\\AutoloadGenerator",
+                    "docType": null
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "setConfig",
+            "rust": "set_config",
+            "declaredIn": "Composer\\PartialComposer",
+            "static": false,
+            "params": [
+                {
+                    "name": "config",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Config",
+                    "docType": null
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "setDownloadManager",
+            "rust": "set_download_manager",
+            "declaredIn": "Composer\\Composer",
+            "static": false,
+            "params": [
+                {
+                    "name": "manager",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Downloader\\DownloadManager",
+                    "docType": null
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "setEventDispatcher",
+            "rust": "set_event_dispatcher",
+            "declaredIn": "Composer\\PartialComposer",
+            "static": false,
+            "params": [
+                {
+                    "name": "eventDispatcher",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\EventDispatcher\\EventDispatcher",
+                    "docType": null
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "setGlobal",
+            "rust": "set_global",
+            "declaredIn": "Composer\\PartialComposer",
+            "static": false,
+            "params": [],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "setInstallationManager",
+            "rust": "set_installation_manager",
+            "declaredIn": "Composer\\PartialComposer",
+            "static": false,
+            "params": [
+                {
+                    "name": "manager",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Installer\\InstallationManager",
+                    "docType": null
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "setLocker",
+            "rust": "set_locker",
+            "declaredIn": "Composer\\Composer",
+            "static": false,
+            "params": [
+                {
+                    "name": "locker",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Package\\Locker",
+                    "docType": null
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "setLoop",
+            "rust": "set_loop",
+            "declaredIn": "Composer\\PartialComposer",
+            "static": false,
+            "params": [
+                {
+                    "name": "loop",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Util\\Loop",
+                    "docType": null
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "setPackage",
+            "rust": "set_package",
+            "declaredIn": "Composer\\PartialComposer",
+            "static": false,
+            "params": [
+                {
+                    "name": "package",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Package\\RootPackageInterface",
+                    "docType": null
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "setPluginManager",
+            "rust": "set_plugin_manager",
+            "declaredIn": "Composer\\Composer",
+            "static": false,
+            "params": [
+                {
+                    "name": "manager",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Plugin\\PluginManager",
+                    "docType": null
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "setRepositoryManager",
+            "rust": "set_repository_manager",
+            "declaredIn": "Composer\\PartialComposer",
+            "static": false,
+            "params": [
+                {
+                    "name": "manager",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Repository\\RepositoryManager",
+                    "docType": null
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        }
+    ],
+    "constructor": {
+        "declaredIn": null,
+        "public": true,
+        "params": [],
+        "funcNumArgs": false,
+        "forwarded": true
+    },
+    "properties": []
+}

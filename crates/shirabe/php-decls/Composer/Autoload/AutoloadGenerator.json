@@ -1,0 +1,398 @@
+{
+    "fqcn": "Composer\\Autoload\\AutoloadGenerator",
+    "rustModule": [
+        "autoload",
+        "autoload_generator"
+    ],
+    "kind": "class",
+    "abstract": false,
+    "parent": null,
+    "interfaces": [],
+    "treatment": "stub",
+    "methods": [
+        {
+            "name": "buildPackageMap",
+            "rust": "build_package_map",
+            "declaredIn": "Composer\\Autoload\\AutoloadGenerator",
+            "static": false,
+            "params": [
+                {
+                    "name": "installationManager",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Installer\\InstallationManager",
+                    "docType": null
+                },
+                {
+                    "name": "rootPackage",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Package\\PackageInterface",
+                    "docType": null
+                },
+                {
+                    "name": "packages",
+                    "position": 2,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "array",
+                    "docType": "PackageInterface[]"
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "non-empty-array<int, array{0: PackageInterface, 1: string|null}>",
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "createLoader",
+            "rust": "create_loader",
+            "declaredIn": "Composer\\Autoload\\AutoloadGenerator",
+            "static": false,
+            "params": [
+                {
+                    "name": "autoloads",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "array",
+                    "docType": "array<string, mixed[]>"
+                },
+                {
+                    "name": "vendorDir",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": "?string",
+                    "docType": null
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "ClassLoader",
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "dump",
+            "rust": "dump",
+            "declaredIn": "Composer\\Autoload\\AutoloadGenerator",
+            "static": false,
+            "params": [
+                {
+                    "name": "config",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Config",
+                    "docType": null
+                },
+                {
+                    "name": "localRepo",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Repository\\InstalledRepositoryInterface",
+                    "docType": null
+                },
+                {
+                    "name": "rootPackage",
+                    "position": 2,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Package\\RootPackageInterface",
+                    "docType": null
+                },
+                {
+                    "name": "installationManager",
+                    "position": 3,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Installer\\InstallationManager",
+                    "docType": null
+                },
+                {
+                    "name": "targetDir",
+                    "position": 4,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": null
+                },
+                {
+                    "name": "scanPsrPackages",
+                    "position": 5,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "bool",
+                    "docType": null
+                },
+                {
+                    "name": "suffix",
+                    "position": 6,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": "?string",
+                    "docType": null
+                },
+                {
+                    "name": "locker",
+                    "position": 7,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": "?\\Composer\\Package\\Locker",
+                    "docType": null
+                },
+                {
+                    "name": "strictAmbiguous",
+                    "position": 8,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "bool",
+                    "docType": null
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "ClassMap",
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "parseAutoloads",
+            "rust": "parse_autoloads",
+            "declaredIn": "Composer\\Autoload\\AutoloadGenerator",
+            "static": false,
+            "params": [
+                {
+                    "name": "packageMap",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "array",
+                    "docType": "non-empty-array<int, array{0: PackageInterface, 1: string|null}>"
+                },
+                {
+                    "name": "rootPackage",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Package\\PackageInterface",
+                    "docType": "RootPackageInterface"
+                },
+                {
+                    "name": "filteredDevPackages",
+                    "position": 2,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": null,
+                    "docType": "bool|string[]"
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "array{ 'psr-0': array<string, array<string>>, 'psr-4': array<string, array<string>>, 'classmap': array<int, string>, 'files': array<string, string>, 'exclude-from-classmap': array<int, string>, }",
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "setApcu",
+            "rust": "set_apcu",
+            "declaredIn": "Composer\\Autoload\\AutoloadGenerator",
+            "static": false,
+            "params": [
+                {
+                    "name": "apcu",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "bool",
+                    "docType": null
+                },
+                {
+                    "name": "apcuPrefix",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": "?string",
+                    "docType": null
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "void",
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "setClassMapAuthoritative",
+            "rust": "set_class_map_authoritative",
+            "declaredIn": "Composer\\Autoload\\AutoloadGenerator",
+            "static": false,
+            "params": [
+                {
+                    "name": "classMapAuthoritative",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "bool",
+                    "docType": null
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "void",
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "setDevMode",
+            "rust": "set_dev_mode",
+            "declaredIn": "Composer\\Autoload\\AutoloadGenerator",
+            "static": false,
+            "params": [
+                {
+                    "name": "devMode",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "bool",
+                    "docType": null
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "void",
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "setDryRun",
+            "rust": "set_dry_run",
+            "declaredIn": "Composer\\Autoload\\AutoloadGenerator",
+            "static": false,
+            "params": [
+                {
+                    "name": "dryRun",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "bool",
+                    "docType": null
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "setIgnorePlatformRequirements",
+            "rust": "set_ignore_platform_requirements",
+            "declaredIn": "Composer\\Autoload\\AutoloadGenerator",
+            "static": false,
+            "params": [
+                {
+                    "name": "ignorePlatformReqs",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": null,
+                    "docType": "bool|string[]"
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "void",
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "setPlatformRequirementFilter",
+            "rust": "set_platform_requirement_filter",
+            "declaredIn": "Composer\\Autoload\\AutoloadGenerator",
+            "static": false,
+            "params": [
+                {
+                    "name": "platformRequirementFilter",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Filter\\PlatformRequirementFilter\\PlatformRequirementFilterInterface",
+                    "docType": null
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "void",
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "setRunScripts",
+            "rust": "set_run_scripts",
+            "declaredIn": "Composer\\Autoload\\AutoloadGenerator",
+            "static": false,
+            "params": [
+                {
+                    "name": "runScripts",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "bool",
+                    "docType": null
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "void",
+            "funcNumArgs": false,
+            "forwarded": true
+        }
+    ],
+    "constructor": {
+        "declaredIn": "Composer\\Autoload\\AutoloadGenerator",
+        "public": true,
+        "params": [
+            {
+                "name": "eventDispatcher",
+                "position": 0,
+                "byRef": false,
+                "variadic": false,
+                "nullable": false,
+                "type": "\\Composer\\EventDispatcher\\EventDispatcher",
+                "docType": null
+            },
+            {
+                "name": "io",
+                "position": 1,
+                "byRef": false,
+                "variadic": false,
+                "nullable": true,
+                "type": "?\\Composer\\IO\\IOInterface",
+                "docType": null
+            }
+        ],
+        "funcNumArgs": false,
+        "forwarded": true
+    },
+    "properties": []
+}

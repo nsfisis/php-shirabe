@@ -1,0 +1,755 @@
+{
+    "fqcn": "Composer\\Util\\Filesystem",
+    "rustModule": [
+        "util",
+        "filesystem"
+    ],
+    "kind": "class",
+    "abstract": false,
+    "parent": null,
+    "interfaces": [],
+    "treatment": "stub",
+    "methods": [
+        {
+            "name": "copy",
+            "rust": "copy",
+            "declaredIn": "Composer\\Util\\Filesystem",
+            "static": false,
+            "params": [
+                {
+                    "name": "source",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": null
+                },
+                {
+                    "name": "target",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": null
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "bool",
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "copyThenRemove",
+            "rust": "copy_then_remove",
+            "declaredIn": "Composer\\Util\\Filesystem",
+            "static": false,
+            "params": [
+                {
+                    "name": "source",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": null
+                },
+                {
+                    "name": "target",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": null
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "void",
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "emptyDirectory",
+            "rust": "empty_directory",
+            "declaredIn": "Composer\\Util\\Filesystem",
+            "static": false,
+            "params": [
+                {
+                    "name": "dir",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": null
+                },
+                {
+                    "name": "ensureDirectoryExists",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "bool",
+                    "docType": null
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "void",
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "ensureDirectoryExists",
+            "rust": "ensure_directory_exists",
+            "declaredIn": "Composer\\Util\\Filesystem",
+            "static": false,
+            "params": [
+                {
+                    "name": "directory",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": null
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "void",
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "filePutContentsIfModified",
+            "rust": "file_put_contents_if_modified",
+            "declaredIn": "Composer\\Util\\Filesystem",
+            "static": false,
+            "params": [
+                {
+                    "name": "path",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": null
+                },
+                {
+                    "name": "content",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": null
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "int|false",
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "findShortestPath",
+            "rust": "find_shortest_path",
+            "declaredIn": "Composer\\Util\\Filesystem",
+            "static": false,
+            "params": [
+                {
+                    "name": "from",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": null
+                },
+                {
+                    "name": "to",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": null
+                },
+                {
+                    "name": "directories",
+                    "position": 2,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "bool",
+                    "docType": "bool"
+                },
+                {
+                    "name": "preferRelative",
+                    "position": 3,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "bool",
+                    "docType": "bool"
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "string",
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "findShortestPathCode",
+            "rust": "find_shortest_path_code",
+            "declaredIn": "Composer\\Util\\Filesystem",
+            "static": false,
+            "params": [
+                {
+                    "name": "from",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": null
+                },
+                {
+                    "name": "to",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": null
+                },
+                {
+                    "name": "directories",
+                    "position": 2,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "bool",
+                    "docType": "bool"
+                },
+                {
+                    "name": "staticCode",
+                    "position": 3,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "bool",
+                    "docType": null
+                },
+                {
+                    "name": "preferRelative",
+                    "position": 4,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "bool",
+                    "docType": "bool"
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "string",
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "getPlatformPath",
+            "rust": "get_platform_path",
+            "declaredIn": "Composer\\Util\\Filesystem",
+            "static": true,
+            "params": [
+                {
+                    "name": "path",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": null
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "string",
+            "funcNumArgs": false,
+            "forwarded": false
+        },
+        {
+            "name": "isAbsolutePath",
+            "rust": "is_absolute_path",
+            "declaredIn": "Composer\\Util\\Filesystem",
+            "static": false,
+            "params": [
+                {
+                    "name": "path",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": null
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "bool",
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "isDirEmpty",
+            "rust": "is_dir_empty",
+            "declaredIn": "Composer\\Util\\Filesystem",
+            "static": false,
+            "params": [
+                {
+                    "name": "dir",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": null
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "bool",
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "isJunction",
+            "rust": "is_junction",
+            "declaredIn": "Composer\\Util\\Filesystem",
+            "static": false,
+            "params": [
+                {
+                    "name": "junction",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": "string"
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "bool",
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "isLocalPath",
+            "rust": "is_local_path",
+            "declaredIn": "Composer\\Util\\Filesystem",
+            "static": true,
+            "params": [
+                {
+                    "name": "path",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": null
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "bool",
+            "funcNumArgs": false,
+            "forwarded": false
+        },
+        {
+            "name": "isReadable",
+            "rust": "is_readable",
+            "declaredIn": "Composer\\Util\\Filesystem",
+            "static": true,
+            "params": [
+                {
+                    "name": "path",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": null
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "bool",
+            "funcNumArgs": false,
+            "forwarded": false
+        },
+        {
+            "name": "isSymlinkedDirectory",
+            "rust": "is_symlinked_directory",
+            "declaredIn": "Composer\\Util\\Filesystem",
+            "static": false,
+            "params": [
+                {
+                    "name": "directory",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": null
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "bool",
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "junction",
+            "rust": "junction",
+            "declaredIn": "Composer\\Util\\Filesystem",
+            "static": false,
+            "params": [
+                {
+                    "name": "target",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": null
+                },
+                {
+                    "name": "junction",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": null
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "void",
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "normalizePath",
+            "rust": "normalize_path",
+            "declaredIn": "Composer\\Util\\Filesystem",
+            "static": false,
+            "params": [
+                {
+                    "name": "path",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": "string"
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "string",
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "relativeSymlink",
+            "rust": "relative_symlink",
+            "declaredIn": "Composer\\Util\\Filesystem",
+            "static": false,
+            "params": [
+                {
+                    "name": "target",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": "string"
+                },
+                {
+                    "name": "link",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": "string"
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "bool",
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "remove",
+            "rust": "remove",
+            "declaredIn": "Composer\\Util\\Filesystem",
+            "static": false,
+            "params": [
+                {
+                    "name": "file",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": null
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "bool",
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "removeDirectory",
+            "rust": "remove_directory",
+            "declaredIn": "Composer\\Util\\Filesystem",
+            "static": false,
+            "params": [
+                {
+                    "name": "directory",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": null
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "bool",
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "removeDirectoryAsync",
+            "rust": "remove_directory_async",
+            "declaredIn": "Composer\\Util\\Filesystem",
+            "static": false,
+            "params": [
+                {
+                    "name": "directory",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": null
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "PromiseInterface<bool>",
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "removeDirectoryPhp",
+            "rust": "remove_directory_php",
+            "declaredIn": "Composer\\Util\\Filesystem",
+            "static": false,
+            "params": [
+                {
+                    "name": "directory",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": null
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "bool",
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "removeJunction",
+            "rust": "remove_junction",
+            "declaredIn": "Composer\\Util\\Filesystem",
+            "static": false,
+            "params": [
+                {
+                    "name": "junction",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": null
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "bool",
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "rename",
+            "rust": "rename",
+            "declaredIn": "Composer\\Util\\Filesystem",
+            "static": false,
+            "params": [
+                {
+                    "name": "source",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": null
+                },
+                {
+                    "name": "target",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": null
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "void",
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "rmdir",
+            "rust": "rmdir",
+            "declaredIn": "Composer\\Util\\Filesystem",
+            "static": false,
+            "params": [
+                {
+                    "name": "path",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": null
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "bool",
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "safeCopy",
+            "rust": "safe_copy",
+            "declaredIn": "Composer\\Util\\Filesystem",
+            "static": false,
+            "params": [
+                {
+                    "name": "source",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": null
+                },
+                {
+                    "name": "target",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": null
+                }
+            ],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "size",
+            "rust": "size",
+            "declaredIn": "Composer\\Util\\Filesystem",
+            "static": false,
+            "params": [
+                {
+                    "name": "path",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": "string"
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "int",
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "trimTrailingSlash",
+            "rust": "trim_trailing_slash",
+            "declaredIn": "Composer\\Util\\Filesystem",
+            "static": true,
+            "params": [
+                {
+                    "name": "path",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": null
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "string",
+            "funcNumArgs": false,
+            "forwarded": false
+        },
+        {
+            "name": "unlink",
+            "rust": "unlink",
+            "declaredIn": "Composer\\Util\\Filesystem",
+            "static": false,
+            "params": [
+                {
+                    "name": "path",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": null
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "bool",
+            "funcNumArgs": false,
+            "forwarded": true
+        }
+    ],
+    "constructor": {
+        "declaredIn": "Composer\\Util\\Filesystem",
+        "public": true,
+        "params": [
+            {
+                "name": "executor",
+                "position": 0,
+                "byRef": false,
+                "variadic": false,
+                "nullable": true,
+                "type": "?\\Composer\\Util\\ProcessExecutor",
+                "docType": null
+            }
+        ],
+        "funcNumArgs": false,
+        "forwarded": true
+    },
+    "properties": []
+}

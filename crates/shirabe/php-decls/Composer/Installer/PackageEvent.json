@@ -1,0 +1,235 @@
+{
+    "fqcn": "Composer\\Installer\\PackageEvent",
+    "rustModule": [
+        "installer",
+        "package_event"
+    ],
+    "kind": "class",
+    "abstract": false,
+    "parent": "Composer\\EventDispatcher\\Event",
+    "interfaces": [],
+    "treatment": "stub",
+    "methods": [
+        {
+            "name": "getArguments",
+            "rust": "get_arguments",
+            "declaredIn": "Composer\\EventDispatcher\\Event",
+            "static": false,
+            "params": [],
+            "returnType": "array",
+            "docReturnType": "string[]",
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "getComposer",
+            "rust": "get_composer",
+            "declaredIn": "Composer\\Installer\\PackageEvent",
+            "static": false,
+            "params": [],
+            "returnType": "\\Composer\\Composer",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "getFlags",
+            "rust": "get_flags",
+            "declaredIn": "Composer\\EventDispatcher\\Event",
+            "static": false,
+            "params": [],
+            "returnType": "array",
+            "docReturnType": "mixed[]",
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "getIO",
+            "rust": "get_io",
+            "declaredIn": "Composer\\Installer\\PackageEvent",
+            "static": false,
+            "params": [],
+            "returnType": "\\Composer\\IO\\IOInterface",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "getLocalRepo",
+            "rust": "get_local_repo",
+            "declaredIn": "Composer\\Installer\\PackageEvent",
+            "static": false,
+            "params": [],
+            "returnType": "\\Composer\\Repository\\RepositoryInterface",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "getName",
+            "rust": "get_name",
+            "declaredIn": "Composer\\EventDispatcher\\Event",
+            "static": false,
+            "params": [],
+            "returnType": "string",
+            "docReturnType": "string",
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "getOperation",
+            "rust": "get_operation",
+            "declaredIn": "Composer\\Installer\\PackageEvent",
+            "static": false,
+            "params": [],
+            "returnType": "\\Composer\\DependencyResolver\\Operation\\OperationInterface",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "getOperations",
+            "rust": "get_operations",
+            "declaredIn": "Composer\\Installer\\PackageEvent",
+            "static": false,
+            "params": [],
+            "returnType": "array",
+            "docReturnType": "OperationInterface[]",
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "isDevMode",
+            "rust": "is_dev_mode",
+            "declaredIn": "Composer\\Installer\\PackageEvent",
+            "static": false,
+            "params": [],
+            "returnType": "bool",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "isPropagationStopped",
+            "rust": "is_propagation_stopped",
+            "declaredIn": "Composer\\EventDispatcher\\Event",
+            "static": false,
+            "params": [],
+            "returnType": "bool",
+            "docReturnType": "bool",
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "stopPropagation",
+            "rust": "stop_propagation",
+            "declaredIn": "Composer\\EventDispatcher\\Event",
+            "static": false,
+            "params": [],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        }
+    ],
+    "constructor": {
+        "declaredIn": "Composer\\Installer\\PackageEvent",
+        "public": true,
+        "params": [
+            {
+                "name": "eventName",
+                "position": 0,
+                "byRef": false,
+                "variadic": false,
+                "nullable": false,
+                "type": "string",
+                "docType": null
+            },
+            {
+                "name": "composer",
+                "position": 1,
+                "byRef": false,
+                "variadic": false,
+                "nullable": false,
+                "type": "\\Composer\\Composer",
+                "docType": null
+            },
+            {
+                "name": "io",
+                "position": 2,
+                "byRef": false,
+                "variadic": false,
+                "nullable": false,
+                "type": "\\Composer\\IO\\IOInterface",
+                "docType": null
+            },
+            {
+                "name": "devMode",
+                "position": 3,
+                "byRef": false,
+                "variadic": false,
+                "nullable": false,
+                "type": "bool",
+                "docType": null
+            },
+            {
+                "name": "localRepo",
+                "position": 4,
+                "byRef": false,
+                "variadic": false,
+                "nullable": false,
+                "type": "\\Composer\\Repository\\RepositoryInterface",
+                "docType": null
+            },
+            {
+                "name": "operations",
+                "position": 5,
+                "byRef": false,
+                "variadic": false,
+                "nullable": false,
+                "type": "array",
+                "docType": "OperationInterface[]"
+            },
+            {
+                "name": "operation",
+                "position": 6,
+                "byRef": false,
+                "variadic": false,
+                "nullable": false,
+                "type": "\\Composer\\DependencyResolver\\Operation\\OperationInterface",
+                "docType": null
+            }
+        ],
+        "funcNumArgs": false,
+        "forwarded": true
+    },
+    "properties": [
+        {
+            "name": "args",
+            "declaredIn": "Composer\\EventDispatcher\\Event",
+            "visibility": "protected",
+            "static": false,
+            "readonly": false,
+            "type": null,
+            "docType": "string[]"
+        },
+        {
+            "name": "flags",
+            "declaredIn": "Composer\\EventDispatcher\\Event",
+            "visibility": "protected",
+            "static": false,
+            "readonly": false,
+            "type": null,
+            "docType": "mixed[]"
+        },
+        {
+            "name": "name",
+            "declaredIn": "Composer\\EventDispatcher\\Event",
+            "visibility": "protected",
+            "static": false,
+            "readonly": false,
+            "type": null,
+            "docType": "string"
+        }
+    ]
+}

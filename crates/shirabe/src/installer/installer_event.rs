@@ -5,6 +5,7 @@ use crate::dependency_resolver::AnyTransaction;
 use crate::event_dispatcher::{Event, EventFlags, delegate_event_interface_to_inner};
 use crate::io::IOInterface;
 use bstr::BString;
+use shirabe_php_binding_macros::php_binding;
 
 #[derive(Debug)]
 pub struct InstallerEvent {
@@ -16,6 +17,7 @@ pub struct InstallerEvent {
     transaction: std::rc::Rc<AnyTransaction>,
 }
 
+#[php_binding(r"Composer\Installer\InstallerEvent", members = instance)]
 impl InstallerEvent {
     pub fn new(
         event_name: impl Into<BString>,
@@ -57,4 +59,4 @@ impl InstallerEvent {
     }
 }
 
-delegate_event_interface_to_inner!(InstallerEvent, inner);
+delegate_event_interface_to_inner!(InstallerEvent, inner, "Composer\\Installer\\InstallerEvent");

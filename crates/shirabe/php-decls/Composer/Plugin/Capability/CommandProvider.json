@@ -1,0 +1,25 @@
+{
+    "fqcn": "Composer\\Plugin\\Capability\\CommandProvider",
+    "rustModule": [
+        "plugin",
+        "capability",
+        "command_provider"
+    ],
+    "kind": "interface",
+    "interfaces": [
+        "Composer\\Plugin\\Capability\\Capability"
+    ],
+    "treatment": "real",
+    "methods": [
+        {
+            "name": "getCommands",
+            "rust": "get_commands",
+            "declaredIn": "Composer\\Plugin\\Capability\\CommandProvider",
+            "static": false,
+            "params": [],
+            "returnType": null,
+            "docReturnType": "\\Composer\\Command\\BaseCommand[]",
+            "funcNumArgs": false
+        }
+    ]
+}

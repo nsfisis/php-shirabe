@@ -1,0 +1,432 @@
+{
+    "fqcn": "Composer\\Factory",
+    "rustModule": [
+        "factory"
+    ],
+    "kind": "class",
+    "abstract": false,
+    "parent": null,
+    "interfaces": [],
+    "treatment": "guard",
+    "methods": [
+        {
+            "name": "create",
+            "rust": "create",
+            "declaredIn": "Composer\\Factory",
+            "static": true,
+            "params": [
+                {
+                    "name": "io",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\IO\\IOInterface",
+                    "docType": "IOInterface"
+                },
+                {
+                    "name": "config",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": null,
+                    "docType": "mixed"
+                },
+                {
+                    "name": "disablePlugins",
+                    "position": 2,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": null,
+                    "docType": "bool|'local'|'global'"
+                },
+                {
+                    "name": "disableScripts",
+                    "position": 3,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "bool",
+                    "docType": "bool"
+                }
+            ],
+            "returnType": "\\Composer\\Composer",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": false
+        },
+        {
+            "name": "createAdditionalStyles",
+            "rust": "create_additional_styles",
+            "declaredIn": "Composer\\Factory",
+            "static": true,
+            "params": [],
+            "returnType": "array",
+            "docReturnType": "array{highlight: OutputFormatterStyle, warning: OutputFormatterStyle}",
+            "funcNumArgs": false,
+            "forwarded": false
+        },
+        {
+            "name": "createArchiveManager",
+            "rust": "create_archive_manager",
+            "declaredIn": "Composer\\Factory",
+            "static": false,
+            "params": [
+                {
+                    "name": "config",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Config",
+                    "docType": "Config"
+                },
+                {
+                    "name": "dm",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Downloader\\DownloadManager",
+                    "docType": "Downloader\\DownloadManager"
+                },
+                {
+                    "name": "loop",
+                    "position": 2,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Util\\Loop",
+                    "docType": null
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "Archiver\\ArchiveManager",
+            "funcNumArgs": false,
+            "forwarded": false
+        },
+        {
+            "name": "createComposer",
+            "rust": "create_composer",
+            "declaredIn": "Composer\\Factory",
+            "static": false,
+            "params": [
+                {
+                    "name": "io",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\IO\\IOInterface",
+                    "docType": "IOInterface"
+                },
+                {
+                    "name": "localConfig",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": null,
+                    "docType": "array<string, mixed>|string|null"
+                },
+                {
+                    "name": "disablePlugins",
+                    "position": 2,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": null,
+                    "docType": "bool|'local'|'global'"
+                },
+                {
+                    "name": "cwd",
+                    "position": 3,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": "?string",
+                    "docType": null
+                },
+                {
+                    "name": "fullLoad",
+                    "position": 4,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "bool",
+                    "docType": "bool"
+                },
+                {
+                    "name": "disableScripts",
+                    "position": 5,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "bool",
+                    "docType": "bool"
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "($fullLoad is true ? Composer : PartialComposer)",
+            "funcNumArgs": false,
+            "forwarded": false
+        },
+        {
+            "name": "createConfig",
+            "rust": "create_config",
+            "declaredIn": "Composer\\Factory",
+            "static": true,
+            "params": [
+                {
+                    "name": "io",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": "?\\Composer\\IO\\IOInterface",
+                    "docType": null
+                },
+                {
+                    "name": "cwd",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": "?string",
+                    "docType": null
+                }
+            ],
+            "returnType": "\\Composer\\Config",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": false
+        },
+        {
+            "name": "createDownloadManager",
+            "rust": "create_download_manager",
+            "declaredIn": "Composer\\Factory",
+            "static": false,
+            "params": [
+                {
+                    "name": "io",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\IO\\IOInterface",
+                    "docType": null
+                },
+                {
+                    "name": "config",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Config",
+                    "docType": null
+                },
+                {
+                    "name": "httpDownloader",
+                    "position": 2,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Util\\HttpDownloader",
+                    "docType": null
+                },
+                {
+                    "name": "process",
+                    "position": 3,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Util\\ProcessExecutor",
+                    "docType": null
+                },
+                {
+                    "name": "eventDispatcher",
+                    "position": 4,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": "?\\Composer\\EventDispatcher\\EventDispatcher",
+                    "docType": null
+                }
+            ],
+            "returnType": "\\Composer\\Downloader\\DownloadManager",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": false
+        },
+        {
+            "name": "createGlobal",
+            "rust": "create_global",
+            "declaredIn": "Composer\\Factory",
+            "static": true,
+            "params": [
+                {
+                    "name": "io",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\IO\\IOInterface",
+                    "docType": null
+                },
+                {
+                    "name": "disablePlugins",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "bool",
+                    "docType": "bool"
+                },
+                {
+                    "name": "disableScripts",
+                    "position": 2,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "bool",
+                    "docType": "bool"
+                }
+            ],
+            "returnType": "?\\Composer\\Composer",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": false
+        },
+        {
+            "name": "createHttpDownloader",
+            "rust": "create_http_downloader",
+            "declaredIn": "Composer\\Factory",
+            "static": true,
+            "params": [
+                {
+                    "name": "io",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\IO\\IOInterface",
+                    "docType": "IOInterface"
+                },
+                {
+                    "name": "config",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Config",
+                    "docType": "Config"
+                },
+                {
+                    "name": "options",
+                    "position": 2,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "array",
+                    "docType": "mixed[]"
+                }
+            ],
+            "returnType": "\\Composer\\Util\\HttpDownloader",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": false
+        },
+        {
+            "name": "createInstallationManager",
+            "rust": "create_installation_manager",
+            "declaredIn": "Composer\\Factory",
+            "static": false,
+            "params": [
+                {
+                    "name": "loop",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Util\\Loop",
+                    "docType": null
+                },
+                {
+                    "name": "io",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\IO\\IOInterface",
+                    "docType": null
+                },
+                {
+                    "name": "eventDispatcher",
+                    "position": 2,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": "?\\Composer\\EventDispatcher\\EventDispatcher",
+                    "docType": null
+                }
+            ],
+            "returnType": "\\Composer\\Installer\\InstallationManager",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": false
+        },
+        {
+            "name": "createOutput",
+            "rust": "create_output",
+            "declaredIn": "Composer\\Factory",
+            "static": true,
+            "params": [],
+            "returnType": "\\Symfony\\Component\\Console\\Output\\ConsoleOutput",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": false
+        },
+        {
+            "name": "getComposerFile",
+            "rust": "get_composer_file",
+            "declaredIn": "Composer\\Factory",
+            "static": true,
+            "params": [],
+            "returnType": "string",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "getLockFile",
+            "rust": "get_lock_file",
+            "declaredIn": "Composer\\Factory",
+            "static": true,
+            "params": [
+                {
+                    "name": "composerFile",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": null
+                }
+            ],
+            "returnType": "string",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": false
+        }
+    ],
+    "constructor": {
+        "declaredIn": null,
+        "public": true,
+        "params": [],
+        "funcNumArgs": false,
+        "forwarded": false
+    },
+    "properties": []
+}

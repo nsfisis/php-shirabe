@@ -1,0 +1,155 @@
+{
+    "fqcn": "Composer\\Plugin\\PreCommandRunEvent",
+    "rustModule": [
+        "plugin",
+        "pre_command_run_event"
+    ],
+    "kind": "class",
+    "abstract": false,
+    "parent": "Composer\\EventDispatcher\\Event",
+    "interfaces": [],
+    "treatment": "runtime",
+    "methods": [
+        {
+            "name": "getArguments",
+            "rust": "get_arguments",
+            "declaredIn": "Composer\\EventDispatcher\\Event",
+            "static": false,
+            "params": [],
+            "returnType": "array",
+            "docReturnType": "string[]",
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "getCommand",
+            "rust": "get_command",
+            "declaredIn": "Composer\\Plugin\\PreCommandRunEvent",
+            "static": false,
+            "params": [],
+            "returnType": "string",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "getFlags",
+            "rust": "get_flags",
+            "declaredIn": "Composer\\EventDispatcher\\Event",
+            "static": false,
+            "params": [],
+            "returnType": "array",
+            "docReturnType": "mixed[]",
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "getInput",
+            "rust": "get_input",
+            "declaredIn": "Composer\\Plugin\\PreCommandRunEvent",
+            "static": false,
+            "params": [],
+            "returnType": "\\Symfony\\Component\\Console\\Input\\InputInterface",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "getName",
+            "rust": "get_name",
+            "declaredIn": "Composer\\EventDispatcher\\Event",
+            "static": false,
+            "params": [],
+            "returnType": "string",
+            "docReturnType": "string",
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "isPropagationStopped",
+            "rust": "is_propagation_stopped",
+            "declaredIn": "Composer\\EventDispatcher\\Event",
+            "static": false,
+            "params": [],
+            "returnType": "bool",
+            "docReturnType": "bool",
+            "funcNumArgs": false,
+            "forwarded": true
+        },
+        {
+            "name": "stopPropagation",
+            "rust": "stop_propagation",
+            "declaredIn": "Composer\\EventDispatcher\\Event",
+            "static": false,
+            "params": [],
+            "returnType": "void",
+            "docReturnType": null,
+            "funcNumArgs": false,
+            "forwarded": true
+        }
+    ],
+    "constructor": {
+        "declaredIn": "Composer\\Plugin\\PreCommandRunEvent",
+        "public": true,
+        "params": [
+            {
+                "name": "name",
+                "position": 0,
+                "byRef": false,
+                "variadic": false,
+                "nullable": false,
+                "type": "string",
+                "docType": "string"
+            },
+            {
+                "name": "input",
+                "position": 1,
+                "byRef": false,
+                "variadic": false,
+                "nullable": false,
+                "type": "\\Symfony\\Component\\Console\\Input\\InputInterface",
+                "docType": null
+            },
+            {
+                "name": "command",
+                "position": 2,
+                "byRef": false,
+                "variadic": false,
+                "nullable": false,
+                "type": "string",
+                "docType": "string"
+            }
+        ],
+        "funcNumArgs": false,
+        "forwarded": false
+    },
+    "properties": [
+        {
+            "name": "args",
+            "declaredIn": "Composer\\EventDispatcher\\Event",
+            "visibility": "protected",
+            "static": false,
+            "readonly": false,
+            "type": null,
+            "docType": "string[]"
+        },
+        {
+            "name": "flags",
+            "declaredIn": "Composer\\EventDispatcher\\Event",
+            "visibility": "protected",
+            "static": false,
+            "readonly": false,
+            "type": null,
+            "docType": "mixed[]"
+        },
+        {
+            "name": "name",
+            "declaredIn": "Composer\\EventDispatcher\\Event",
+            "visibility": "protected",
+            "static": false,
+            "readonly": false,
+            "type": null,
+            "docType": "string"
+        }
+    ]
+}

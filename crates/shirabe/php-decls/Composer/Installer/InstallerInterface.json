@@ -1,0 +1,282 @@
+{
+    "fqcn": "Composer\\Installer\\InstallerInterface",
+    "rustModule": [
+        "installer",
+        "installer_interface"
+    ],
+    "kind": "interface",
+    "interfaces": [],
+    "treatment": "real",
+    "methods": [
+        {
+            "name": "cleanup",
+            "rust": "cleanup",
+            "declaredIn": "Composer\\Installer\\InstallerInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "type",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": "string"
+                },
+                {
+                    "name": "package",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Package\\PackageInterface",
+                    "docType": "PackageInterface"
+                },
+                {
+                    "name": "prevPackage",
+                    "position": 2,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": "?\\Composer\\Package\\PackageInterface",
+                    "docType": "PackageInterface"
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "PromiseInterface<void|null>|null",
+            "funcNumArgs": false
+        },
+        {
+            "name": "download",
+            "rust": "download",
+            "declaredIn": "Composer\\Installer\\InstallerInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "package",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Package\\PackageInterface",
+                    "docType": "PackageInterface"
+                },
+                {
+                    "name": "prevPackage",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": "?\\Composer\\Package\\PackageInterface",
+                    "docType": "PackageInterface"
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "PromiseInterface<void|null>|null",
+            "funcNumArgs": false
+        },
+        {
+            "name": "getInstallPath",
+            "rust": "get_install_path",
+            "declaredIn": "Composer\\Installer\\InstallerInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "package",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Package\\PackageInterface",
+                    "docType": null
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "string|null",
+            "funcNumArgs": false
+        },
+        {
+            "name": "install",
+            "rust": "install",
+            "declaredIn": "Composer\\Installer\\InstallerInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "repo",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Repository\\InstalledRepositoryInterface",
+                    "docType": "InstalledRepositoryInterface"
+                },
+                {
+                    "name": "package",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Package\\PackageInterface",
+                    "docType": "PackageInterface"
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "PromiseInterface<void|null>|null",
+            "funcNumArgs": false
+        },
+        {
+            "name": "isInstalled",
+            "rust": "is_installed",
+            "declaredIn": "Composer\\Installer\\InstallerInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "repo",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Repository\\InstalledRepositoryInterface",
+                    "docType": "InstalledRepositoryInterface"
+                },
+                {
+                    "name": "package",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Package\\PackageInterface",
+                    "docType": "PackageInterface"
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "bool",
+            "funcNumArgs": false
+        },
+        {
+            "name": "prepare",
+            "rust": "prepare",
+            "declaredIn": "Composer\\Installer\\InstallerInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "type",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": "string"
+                },
+                {
+                    "name": "package",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Package\\PackageInterface",
+                    "docType": "PackageInterface"
+                },
+                {
+                    "name": "prevPackage",
+                    "position": 2,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": true,
+                    "type": "?\\Composer\\Package\\PackageInterface",
+                    "docType": "PackageInterface"
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "PromiseInterface<void|null>|null",
+            "funcNumArgs": false
+        },
+        {
+            "name": "supports",
+            "rust": "supports",
+            "declaredIn": "Composer\\Installer\\InstallerInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "packageType",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "string",
+                    "docType": null
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "bool",
+            "funcNumArgs": false
+        },
+        {
+            "name": "uninstall",
+            "rust": "uninstall",
+            "declaredIn": "Composer\\Installer\\InstallerInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "repo",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Repository\\InstalledRepositoryInterface",
+                    "docType": "InstalledRepositoryInterface"
+                },
+                {
+                    "name": "package",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Package\\PackageInterface",
+                    "docType": "PackageInterface"
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "PromiseInterface<void|null>|null",
+            "funcNumArgs": false
+        },
+        {
+            "name": "update",
+            "rust": "update",
+            "declaredIn": "Composer\\Installer\\InstallerInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "repo",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Repository\\InstalledRepositoryInterface",
+                    "docType": "InstalledRepositoryInterface"
+                },
+                {
+                    "name": "initial",
+                    "position": 1,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Package\\PackageInterface",
+                    "docType": "PackageInterface"
+                },
+                {
+                    "name": "target",
+                    "position": 2,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "\\Composer\\Package\\PackageInterface",
+                    "docType": "PackageInterface"
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "PromiseInterface<void|null>|null",
+            "funcNumArgs": false
+        }
+    ]
+}

@@ -19,7 +19,6 @@ final class Inputs
 {
     public const DISPOSITIONS = ['memo-cache', 'seed-once', 'needs-sync'];
 
-    public const MEMBER_STATUSES = ['unimplemented', 'refused'];
 
     public const PROPERTY_HANDLINGS = ['handoff', 'rust-local', 'static-config'];
 
@@ -36,7 +35,6 @@ final class Inputs
      * @var array<string, array{
      *     treatment?: string,
      *     reason?: string,
-     *     members?: array<string, array{status: string, reason?: string}>,
      *     statics?: array<string, array{status: string, reason: string}>,
      *     properties?: array<string, string>,
      *     staticProperties?: array<string, string>,
@@ -78,7 +76,7 @@ final class Inputs
                 'forced.json',
                 $fqcn,
                 $entry,
-                ['treatment', 'reason', 'members', 'statics', 'properties', 'staticProperties'],
+                ['treatment', 'reason', 'statics', 'properties', 'staticProperties'],
                 [],
             );
             if (isset($entry['treatment']) && !in_array($entry['treatment'], Classifier::TREATMENTS, true)) {
@@ -86,15 +84,6 @@ final class Inputs
             }
             if (isset($entry['reason']) && !isset($entry['treatment'])) {
                 throw new \RuntimeException("forced.json: $fqcn: a reason belongs to a treatment");
-            }
-            foreach ($entry['members'] ?? [] as $member => $override) {
-                self::expectKeys('forced.json', "$fqcn::$member", $override, ['status', 'reason'], ['status']);
-                if (!in_array($override['status'], self::MEMBER_STATUSES, true)) {
-                    throw new \RuntimeException("forced.json: $fqcn::$member: unknown status " . json_encode($override['status']));
-                }
-                if (($override['status'] === 'refused') !== isset($override['reason'])) {
-                    throw new \RuntimeException("forced.json: $fqcn::$member: a refused member, and only a refused one, carries a reason");
-                }
             }
             foreach ($entry['statics'] ?? [] as $member => $override) {
                 self::expectKeys('forced.json', "$fqcn::$member", $override, ['status', 'reason'], ['status', 'reason']);

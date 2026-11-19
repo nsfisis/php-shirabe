@@ -1,0 +1,53 @@
+{
+    "fqcn": "Composer\\DependencyResolver\\Operation\\OperationInterface",
+    "rustModule": [
+        "dependency_resolver",
+        "operation",
+        "operation_interface"
+    ],
+    "kind": "interface",
+    "interfaces": [],
+    "treatment": "real",
+    "methods": [
+        {
+            "name": "__toString",
+            "rust": "__to_string",
+            "declaredIn": "Composer\\DependencyResolver\\Operation\\OperationInterface",
+            "static": false,
+            "params": [],
+            "returnType": null,
+            "docReturnType": "string",
+            "funcNumArgs": false
+        },
+        {
+            "name": "getOperationType",
+            "rust": "get_operation_type",
+            "declaredIn": "Composer\\DependencyResolver\\Operation\\OperationInterface",
+            "static": false,
+            "params": [],
+            "returnType": null,
+            "docReturnType": "string",
+            "funcNumArgs": false
+        },
+        {
+            "name": "show",
+            "rust": "show",
+            "declaredIn": "Composer\\DependencyResolver\\Operation\\OperationInterface",
+            "static": false,
+            "params": [
+                {
+                    "name": "lock",
+                    "position": 0,
+                    "byRef": false,
+                    "variadic": false,
+                    "nullable": false,
+                    "type": "bool",
+                    "docType": "bool"
+                }
+            ],
+            "returnType": null,
+            "docReturnType": "string",
+            "funcNumArgs": false
+        }
+    ]
+}
