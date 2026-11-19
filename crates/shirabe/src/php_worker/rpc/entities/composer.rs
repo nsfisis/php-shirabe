@@ -12,38 +12,48 @@ use shirabe_php_rpc::{PhpThrow, RpcValue};
 // graph become reachable over RPC on demand.
 php_entity! {
     handle: ComposerHandle,
-    expected: "a Composer",
-    address: |composer| std::rc::Rc::as_ptr(composer.as_rc()) as *const (),
-    class: |_| Ok(br"Composer\Composer"),
-    classes: [r"Composer\PartialComposer", r"Composer\Composer"],
-    worker_method: loop_services,
-    unimplemented: [
-        r"Composer\Composer::__construct",
-        r"Composer\Composer::getArchiveManager",
-        r"Composer\Composer::getPluginManager",
-        r"Composer\Composer::setArchiveManager",
-        r"Composer\Composer::setAutoloadGenerator",
-        r"Composer\Composer::setDownloadManager",
-        r"Composer\Composer::setLocker",
-        r"Composer\Composer::setPluginManager",
-        r"Composer\PartialComposer::__construct",
-        r"Composer\PartialComposer::isGlobal",
-        r"Composer\PartialComposer::setConfig",
-        r"Composer\PartialComposer::setEventDispatcher",
-        r"Composer\PartialComposer::setGlobal",
-        r"Composer\PartialComposer::setInstallationManager",
-        r"Composer\PartialComposer::setLoop",
-        r"Composer\PartialComposer::setPackage",
-        r"Composer\PartialComposer::setRepositoryManager",
-    ],
-    types: {
-        r"Composer\PartialComposer": instance __php_binding_partial_composer for PartialComposer {
-            via: |composer| std::cell::Ref::map(composer.borrow(), Composer::as_partial),
+    type_error: "a Composer",
+    identity: |composer| std::rc::Rc::as_ptr(composer.as_rc()) as *const (),
+    classes: {
+        r"Composer\PartialComposer": { ancestor: true, constructor: unimplemented },
+        r"Composer\Composer": { constructor: unimplemented },
+    },
+    methods: {
+        r"Composer\PartialComposer": {
+            instance: {
+                adapters: __php_binding_partial_composer,
+                target: PartialComposer,
+                borrow: |composer| std::cell::Ref::map(composer.borrow(), Composer::as_partial),
+            },
+            unimplemented: [
+                isGlobal,
+                setConfig,
+                setEventDispatcher,
+                setGlobal,
+                setInstallationManager,
+                setLoop,
+                setPackage,
+                setRepositoryManager,
+            ],
         },
-        r"Composer\Composer": instance __php_binding_composer for Composer {
-            via: |composer| composer.borrow(),
+        r"Composer\Composer": {
+            instance: {
+                adapters: __php_binding_composer,
+                target: Composer,
+                borrow: |composer| composer.borrow(),
+            },
+            unimplemented: [
+                getArchiveManager,
+                getPluginManager,
+                setArchiveManager,
+                setAutoloadGenerator,
+                setDownloadManager,
+                setLocker,
+                setPluginManager,
+            ],
         },
     },
+    handlers: { worker_method: loop_services },
 }
 
 // `getLoop()` itself never reaches the Rust side: the Loop is a two-world class, and the stub

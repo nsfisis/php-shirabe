@@ -33,27 +33,36 @@ fn cwd(call: &Call<'_>, position: usize) -> Result<Option<std::path::PathBuf>, P
 // former holding the latter, not a second view on the graph's executor.
 php_entity! {
     handle: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
-    expected: "a ProcessExecutor",
-    class: r"Composer\Util\ProcessExecutor",
-    types: {
-        r"Composer\Util\ProcessExecutor": custom self only [
-            execute,
-            executeTty,
-            executeAsync,
-            splitLines,
-            requiresGitDirEnv,
-            wait,
-            countActiveJobs,
-        ],
-        r"Composer\Util\ProcessExecutor": instance __php_binding_process_executor
-            for ProcessExecutor {
-            via: |process| process.borrow(),
+    type_error: "a ProcessExecutor",
+    classes: {
+        r"Composer\Util\ProcessExecutor": {
+            constructor: {
+                adapters: __php_binding_process_executor,
+                into: |process| std::rc::Rc::new(std::cell::RefCell::new(process)),
+            },
         },
-        r"Composer\Util\ProcessExecutor": static __php_binding_process_executor,
     },
-    constructors: {
-        r"Composer\Util\ProcessExecutor": __php_binding_process_executor
-            => |process| std::rc::Rc::new(std::cell::RefCell::new(process)),
+    methods: {
+        r"Composer\Util\ProcessExecutor": {
+            handwritten: {
+                module: self,
+                members: [
+                    execute,
+                    executeTty,
+                    executeAsync,
+                    splitLines,
+                    requiresGitDirEnv,
+                    wait,
+                    countActiveJobs,
+                ],
+            },
+            instance: {
+                adapters: __php_binding_process_executor,
+                target: ProcessExecutor,
+                borrow: |process| process.borrow(),
+            },
+            static: { adapters: __php_binding_process_executor },
+        },
     },
 }
 

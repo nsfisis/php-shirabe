@@ -17,9 +17,9 @@ use shirabe_php_shim::bformat;
 // TODO(plugin): the remaining RepositoryInterface surface is widened on demand.
 php_entity! {
     handle: RepositoryInterfaceHandle,
-    expected: "a repository",
-    address: |repository| repository.ptr_id() as *const (),
-    class: |repository| {
+    type_error: "a repository",
+    identity: |repository| repository.ptr_id() as *const (),
+    class_of: |repository| {
         if repository.is::<InstalledFilesystemRepository>() {
             Ok(br"Composer\Repository\InstalledFilesystemRepository")
         } else if repository.is::<InstalledArrayRepository>() {
@@ -33,37 +33,39 @@ php_entity! {
             ))
         }
     },
-    classes: [
-        r"Composer\Repository\ArrayRepository",
-        r"Composer\Repository\WritableArrayRepository",
-        r"Composer\Repository\FilesystemRepository",
-        r"Composer\Repository\InstalledArrayRepository",
-        r"Composer\Repository\InstalledFilesystemRepository",
-        r"Composer\Repository\LockArrayRepository",
-    ],
-    unimplemented: [
-        r"Composer\Repository\ArrayRepository::__construct",
-        r"Composer\Repository\ArrayRepository::count",
-        r"Composer\Repository\ArrayRepository::getProviders",
-        r"Composer\Repository\ArrayRepository::getRepoName",
-        r"Composer\Repository\ArrayRepository::loadPackages",
-        r"Composer\Repository\ArrayRepository::search",
-        r"Composer\Repository\FilesystemRepository::__construct",
-        r"Composer\Repository\InstalledArrayRepository::__construct",
-        r"Composer\Repository\InstalledArrayRepository::isFresh",
-        r"Composer\Repository\InstalledFilesystemRepository::__construct",
-        r"Composer\Repository\InstalledFilesystemRepository::isFresh",
-        r"Composer\Repository\LockArrayRepository::__construct",
-        r"Composer\Repository\WritableArrayRepository::__construct",
-        r"Composer\Repository\WritableArrayRepository::getDevMode",
-        r"Composer\Repository\WritableArrayRepository::reload",
-        r"Composer\Repository\WritableArrayRepository::setDevPackageNames",
-        r"Composer\Repository\WritableArrayRepository::write",
-    ],
-    types: {
-        r"Composer\Repository\RepositoryInterface": custom self,
-        r"Composer\Repository\ArrayRepository": custom self,
-        r"Composer\Repository\WritableRepositoryInterface": custom self,
+    classes: {
+        r"Composer\Repository\ArrayRepository": { ancestor: true, constructor: unimplemented },
+        r"Composer\Repository\WritableArrayRepository": {
+            ancestor: true,
+            constructor: unimplemented,
+        },
+        r"Composer\Repository\FilesystemRepository": {
+            ancestor: true,
+            constructor: unimplemented,
+        },
+        r"Composer\Repository\InstalledArrayRepository": { constructor: unimplemented },
+        r"Composer\Repository\InstalledFilesystemRepository": { constructor: unimplemented },
+        r"Composer\Repository\LockArrayRepository": { constructor: unimplemented },
+    },
+    methods: {
+        r"Composer\Repository\RepositoryInterface": {
+            handwritten: { module: self },
+            unimplemented: [getProviders, getRepoName, loadPackages, search],
+        },
+        r"Composer\Repository\ArrayRepository": {
+            handwritten: { module: self },
+            unimplemented: [count],
+        },
+        r"Composer\Repository\WritableRepositoryInterface": {
+            handwritten: { module: self },
+            unimplemented: [reload, setDevPackageNames, write],
+        },
+        r"Composer\Repository\WritableArrayRepository": {
+            unimplemented: [getDevMode],
+        },
+        r"Composer\Repository\InstalledRepositoryInterface": {
+            unimplemented: [getDevMode, isFresh],
+        },
     },
 }
 

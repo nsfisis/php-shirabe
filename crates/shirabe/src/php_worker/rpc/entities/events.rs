@@ -23,8 +23,8 @@ const CONCRETE: &str = "an event crosses as the class of its concrete type";
 // other way round.
 php_entity! {
     handle: std::rc::Rc<std::cell::RefCell<dyn EventInterface>>,
-    expected: "an event",
-    class: |event| {
+    type_error: "an event",
+    class_of: |event| {
         let event = event.borrow();
         event.php_class().map(|class| &**class).ok_or_else(|| {
             // TODO(plugin): an event class without a proxy stub cannot cross the boundary.
@@ -34,103 +34,132 @@ php_entity! {
             ))
         })
     },
-    classes: [
-        r"Composer\EventDispatcher\Event",
-        r"Composer\Script\Event",
-        r"Composer\Installer\PackageEvent",
-        r"Composer\Installer\InstallerEvent",
-        r"Composer\Plugin\CommandEvent",
-        r"Composer\Plugin\PreCommandRunEvent",
-        r"Composer\Plugin\PreFileDownloadEvent",
-        r"Composer\Plugin\PostFileDownloadEvent",
-        r"Composer\Plugin\PrePoolCreateEvent",
-    ],
-    unimplemented: [
-        r"Composer\Installer\InstallerEvent::__construct",
-        r"Composer\Installer\PackageEvent::__construct",
-        r"Composer\Plugin\CommandEvent::__construct",
-        r"Composer\Plugin\PostFileDownloadEvent::__construct",
-        r"Composer\Plugin\PreFileDownloadEvent::__construct",
-        r"Composer\Plugin\PrePoolCreateEvent::__construct",
-        r"Composer\Script\Event::__construct",
-        r"Composer\Script\Event::getOriginatingEvent",
-        r"Composer\Script\Event::setOriginatingEvent",
-    ],
-    refused: {
-        r"Composer\Plugin\CommandEvent::getInput": "the console input cannot cross the boundary",
-        r"Composer\Plugin\CommandEvent::getOutput": "the console output cannot cross the boundary",
-        r"Composer\Plugin\PreCommandRunEvent::getInput": "the console input cannot cross the boundary",
-        r"Composer\Plugin\PrePoolCreateEvent::getRequest": "the Request cannot cross the boundary",
+    classes: {
+        r"Composer\EventDispatcher\Event": {},
+        r"Composer\Script\Event": { constructor: unimplemented },
+        r"Composer\Installer\PackageEvent": { constructor: unimplemented },
+        r"Composer\Installer\InstallerEvent": { constructor: unimplemented },
+        r"Composer\Plugin\CommandEvent": { constructor: unimplemented },
+        r"Composer\Plugin\PreCommandRunEvent": {},
+        r"Composer\Plugin\PreFileDownloadEvent": { constructor: unimplemented },
+        r"Composer\Plugin\PostFileDownloadEvent": { constructor: unimplemented },
+        r"Composer\Plugin\PrePoolCreateEvent": { constructor: unimplemented },
     },
-    types: {
-        r"Composer\EventDispatcher\Event": instance __php_binding_event_interface
-            for dyn EventInterface {
-            via: |event| event.borrow(),
-            mut: |event| event.borrow_mut(),
+    methods: {
+        r"Composer\EventDispatcher\Event": {
+            instance: {
+                adapters: __php_binding_event_interface,
+                target: dyn EventInterface,
+                borrow: |event| event.borrow(),
+                borrow_mut: |event| event.borrow_mut(),
+            },
         },
-        r"Composer\Script\Event": instance __php_binding_event for ScriptEvent {
-            via: |event| std::cell::Ref::map(event.borrow(), |event| {
-                event.as_any().downcast_ref::<ScriptEvent>().expect(CONCRETE)
-            }),
-            mut: |event| std::cell::RefMut::map(event.borrow_mut(), |event| {
-                event.as_any_mut().downcast_mut::<ScriptEvent>().expect(CONCRETE)
-            }),
+        r"Composer\Script\Event": {
+            instance: {
+                adapters: __php_binding_event,
+                target: ScriptEvent,
+                borrow: |event| std::cell::Ref::map(event.borrow(), |event| {
+                    event.as_any().downcast_ref::<ScriptEvent>().expect(CONCRETE)
+                }),
+                borrow_mut: |event| std::cell::RefMut::map(event.borrow_mut(), |event| {
+                    event.as_any_mut().downcast_mut::<ScriptEvent>().expect(CONCRETE)
+                }),
+            },
+            unimplemented: [getOriginatingEvent, setOriginatingEvent],
         },
-        r"Composer\Installer\PackageEvent": instance __php_binding_package_event for PackageEvent {
-            via: |event| std::cell::Ref::map(event.borrow(), |event| {
-                event.as_any().downcast_ref::<PackageEvent>().expect(CONCRETE)
-            }),
-            mut: |event| std::cell::RefMut::map(event.borrow_mut(), |event| {
-                event.as_any_mut().downcast_mut::<PackageEvent>().expect(CONCRETE)
-            }),
+        r"Composer\Installer\PackageEvent": {
+            instance: {
+                adapters: __php_binding_package_event,
+                target: PackageEvent,
+                borrow: |event| std::cell::Ref::map(event.borrow(), |event| {
+                    event.as_any().downcast_ref::<PackageEvent>().expect(CONCRETE)
+                }),
+                borrow_mut: |event| std::cell::RefMut::map(event.borrow_mut(), |event| {
+                    event.as_any_mut().downcast_mut::<PackageEvent>().expect(CONCRETE)
+                }),
+            },
         },
-        r"Composer\Installer\InstallerEvent": instance __php_binding_installer_event for InstallerEvent {
-            via: |event| std::cell::Ref::map(event.borrow(), |event| {
-                event.as_any().downcast_ref::<InstallerEvent>().expect(CONCRETE)
-            }),
-            mut: |event| std::cell::RefMut::map(event.borrow_mut(), |event| {
-                event.as_any_mut().downcast_mut::<InstallerEvent>().expect(CONCRETE)
-            }),
+        r"Composer\Installer\InstallerEvent": {
+            instance: {
+                adapters: __php_binding_installer_event,
+                target: InstallerEvent,
+                borrow: |event| std::cell::Ref::map(event.borrow(), |event| {
+                    event.as_any().downcast_ref::<InstallerEvent>().expect(CONCRETE)
+                }),
+                borrow_mut: |event| std::cell::RefMut::map(event.borrow_mut(), |event| {
+                    event.as_any_mut().downcast_mut::<InstallerEvent>().expect(CONCRETE)
+                }),
+            },
         },
-        r"Composer\Plugin\CommandEvent": instance __php_binding_command_event for CommandEvent {
-            via: |event| std::cell::Ref::map(event.borrow(), |event| {
-                event.as_any().downcast_ref::<CommandEvent>().expect(CONCRETE)
-            }),
-            mut: |event| std::cell::RefMut::map(event.borrow_mut(), |event| {
-                event.as_any_mut().downcast_mut::<CommandEvent>().expect(CONCRETE)
-            }),
+        r"Composer\Plugin\CommandEvent": {
+            instance: {
+                adapters: __php_binding_command_event,
+                target: CommandEvent,
+                borrow: |event| std::cell::Ref::map(event.borrow(), |event| {
+                    event.as_any().downcast_ref::<CommandEvent>().expect(CONCRETE)
+                }),
+                borrow_mut: |event| std::cell::RefMut::map(event.borrow_mut(), |event| {
+                    event.as_any_mut().downcast_mut::<CommandEvent>().expect(CONCRETE)
+                }),
+            },
+            refused: {
+                getInput: "the console input cannot cross the boundary",
+                getOutput: "the console output cannot cross the boundary",
+            },
         },
-        r"Composer\Plugin\PreCommandRunEvent": instance __php_binding_pre_command_run_event for PreCommandRunEvent {
-            via: |event| std::cell::Ref::map(event.borrow(), |event| {
-                event.as_any().downcast_ref::<PreCommandRunEvent>().expect(CONCRETE)
-            }),
-            mut: |event| std::cell::RefMut::map(event.borrow_mut(), |event| {
-                event.as_any_mut().downcast_mut::<PreCommandRunEvent>().expect(CONCRETE)
-            }),
+        r"Composer\Plugin\PreCommandRunEvent": {
+            instance: {
+                adapters: __php_binding_pre_command_run_event,
+                target: PreCommandRunEvent,
+                borrow: |event| std::cell::Ref::map(event.borrow(), |event| {
+                    event.as_any().downcast_ref::<PreCommandRunEvent>().expect(CONCRETE)
+                }),
+                borrow_mut: |event| std::cell::RefMut::map(event.borrow_mut(), |event| {
+                    event.as_any_mut().downcast_mut::<PreCommandRunEvent>().expect(CONCRETE)
+                }),
+            },
+            refused: {
+                getInput: "the console input cannot cross the boundary",
+            },
         },
-        r"Composer\Plugin\PreFileDownloadEvent": instance __php_binding_pre_file_download_event for PreFileDownloadEvent {
-            via: |event| std::cell::Ref::map(event.borrow(), |event| {
-                event.as_any().downcast_ref::<PreFileDownloadEvent>().expect(CONCRETE)
-            }),
-            mut: |event| std::cell::RefMut::map(event.borrow_mut(), |event| {
-                event.as_any_mut().downcast_mut::<PreFileDownloadEvent>().expect(CONCRETE)
-            }),
+        r"Composer\Plugin\PreFileDownloadEvent": {
+            instance: {
+                adapters: __php_binding_pre_file_download_event,
+                target: PreFileDownloadEvent,
+                borrow: |event| std::cell::Ref::map(event.borrow(), |event| {
+                    event.as_any().downcast_ref::<PreFileDownloadEvent>().expect(CONCRETE)
+                }),
+                borrow_mut: |event| std::cell::RefMut::map(event.borrow_mut(), |event| {
+                    event.as_any_mut().downcast_mut::<PreFileDownloadEvent>().expect(CONCRETE)
+                }),
+            },
         },
-        r"Composer\Plugin\PostFileDownloadEvent": instance __php_binding_post_file_download_event for PostFileDownloadEvent {
-            via: |event| std::cell::Ref::map(event.borrow(), |event| {
-                event.as_any().downcast_ref::<PostFileDownloadEvent>().expect(CONCRETE)
-            }),
-            mut: |event| std::cell::RefMut::map(event.borrow_mut(), |event| {
-                event.as_any_mut().downcast_mut::<PostFileDownloadEvent>().expect(CONCRETE)
-            }),
+        r"Composer\Plugin\PostFileDownloadEvent": {
+            instance: {
+                adapters: __php_binding_post_file_download_event,
+                target: PostFileDownloadEvent,
+                borrow: |event| std::cell::Ref::map(event.borrow(), |event| {
+                    event.as_any().downcast_ref::<PostFileDownloadEvent>().expect(CONCRETE)
+                }),
+                borrow_mut: |event| std::cell::RefMut::map(event.borrow_mut(), |event| {
+                    event.as_any_mut().downcast_mut::<PostFileDownloadEvent>().expect(CONCRETE)
+                }),
+            },
         },
-        r"Composer\Plugin\PrePoolCreateEvent": instance __php_binding_pre_pool_create_event for PrePoolCreateEvent {
-            via: |event| std::cell::Ref::map(event.borrow(), |event| {
-                event.as_any().downcast_ref::<PrePoolCreateEvent>().expect(CONCRETE)
-            }),
-            mut: |event| std::cell::RefMut::map(event.borrow_mut(), |event| {
-                event.as_any_mut().downcast_mut::<PrePoolCreateEvent>().expect(CONCRETE)
-            }),
+        r"Composer\Plugin\PrePoolCreateEvent": {
+            instance: {
+                adapters: __php_binding_pre_pool_create_event,
+                target: PrePoolCreateEvent,
+                borrow: |event| std::cell::Ref::map(event.borrow(), |event| {
+                    event.as_any().downcast_ref::<PrePoolCreateEvent>().expect(CONCRETE)
+                }),
+                borrow_mut: |event| std::cell::RefMut::map(event.borrow_mut(), |event| {
+                    event.as_any_mut().downcast_mut::<PrePoolCreateEvent>().expect(CONCRETE)
+                }),
+            },
+            refused: {
+                getRequest: "the Request cannot cross the boundary",
+            },
         },
     },
 }

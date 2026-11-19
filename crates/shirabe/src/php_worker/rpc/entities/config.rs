@@ -8,23 +8,28 @@ use shirabe_php_binding_macros::php_entity;
 // argument decoded back into the Rust-side instance.
 php_entity! {
     handle: std::rc::Rc<std::cell::RefCell<Config>>,
-    expected: "a Config",
-    class: r"Composer\Config",
-    unimplemented: [
-        "__construct",
-        "getAuthConfigSource",
-        "getConfigSource",
-        "getLocalAuthConfigSource",
-        "prohibitUrlByConfig",
-        "setAuthConfigSource",
-        "setBaseDir",
-        "setConfigSource",
-        "setLocalAuthConfigSource",
-    ],
-    types: {
-        r"Composer\Config": instance __php_binding_config for Config {
-            via: |config| config.borrow(),
-            mut: |config| config.borrow_mut(),
+    type_error: "a Config",
+    classes: {
+        r"Composer\Config": { constructor: unimplemented },
+    },
+    methods: {
+        r"Composer\Config": {
+            instance: {
+                adapters: __php_binding_config,
+                target: Config,
+                borrow: |config| config.borrow(),
+                borrow_mut: |config| config.borrow_mut(),
+            },
+            unimplemented: [
+                getAuthConfigSource,
+                getConfigSource,
+                getLocalAuthConfigSource,
+                prohibitUrlByConfig,
+                setAuthConfigSource,
+                setBaseDir,
+                setConfigSource,
+                setLocalAuthConfigSource,
+            ],
         },
     },
 }

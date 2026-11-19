@@ -10,15 +10,22 @@ use shirabe_php_binding_macros::php_entity;
 // own subscriber dispatch runs on the Rust side and never asks.
 php_entity! {
     handle: std::rc::Rc<std::cell::RefCell<dyn PluginInterface>>,
-    expected: "a plugin",
-    class: |plugin| Ok(match plugin.borrow().as_capable() {
+    type_error: "a plugin",
+    class_of: |plugin| Ok(match plugin.borrow().as_capable() {
         Some(_) => br"Shirabe\RustCapablePluginStub",
         None => br"Shirabe\RustPluginStub",
     }),
-    classes: [r"Shirabe\RustPluginStub", r"Shirabe\RustCapablePluginStub"],
-    types: {
-        r"Composer\Plugin\PluginInterface": custom lifecycle,
-        r"Composer\Plugin\Capable": custom capable,
+    classes: {
+        r"Shirabe\RustPluginStub": {},
+        r"Shirabe\RustCapablePluginStub": {},
+    },
+    methods: {
+        r"Composer\Plugin\PluginInterface": {
+            handwritten: { module: lifecycle },
+        },
+        r"Composer\Plugin\Capable": {
+            handwritten: { module: capable },
+        },
     },
 }
 

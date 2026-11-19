@@ -24,19 +24,25 @@ use shirabe_php_shim::{bformat, path_from_bytes};
 // receives as the proxies the plugin already holds.
 php_entity! {
     handle: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
-    expected: "an HttpDownloader",
-    class: r"Composer\Util\HttpDownloader",
-    types: {
-        r"Composer\Util\HttpDownloader": custom self only [add, addCopy, wait, countActiveJobs],
-        r"Composer\Util\HttpDownloader": instance __php_binding_http_downloader
-            for HttpDownloader {
-            via: |downloader| downloader.borrow(),
-            mut: |downloader| downloader.borrow_mut(),
+    type_error: "an HttpDownloader",
+    classes: {
+        r"Composer\Util\HttpDownloader": {
+            constructor: {
+                adapters: __php_binding_http_downloader,
+                into: |downloader| std::rc::Rc::new(std::cell::RefCell::new(downloader)),
+            },
         },
     },
-    constructors: {
-        r"Composer\Util\HttpDownloader": __php_binding_http_downloader
-            => |downloader| std::rc::Rc::new(std::cell::RefCell::new(downloader)),
+    methods: {
+        r"Composer\Util\HttpDownloader": {
+            handwritten: { module: self, members: [add, addCopy, wait, countActiveJobs] },
+            instance: {
+                adapters: __php_binding_http_downloader,
+                target: HttpDownloader,
+                borrow: |downloader| downloader.borrow(),
+                borrow_mut: |downloader| downloader.borrow_mut(),
+            },
+        },
     },
 }
 

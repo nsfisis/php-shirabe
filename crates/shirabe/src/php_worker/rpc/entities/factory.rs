@@ -5,7 +5,9 @@ use shirabe_php_binding_macros::php_statics;
 
 php_statics! {
     class: r"Composer\Factory",
-    types: {
-        r"Composer\Factory": static __php_binding_factory,
+    methods: {
+        r"Composer\Factory": {
+            static: { adapters: __php_binding_factory },
+        },
     },
 }

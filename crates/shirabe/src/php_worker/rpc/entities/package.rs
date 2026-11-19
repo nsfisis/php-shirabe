@@ -25,9 +25,9 @@ const ALIAS: &str =
 
 php_entity! {
     handle: PackageInterfaceHandle,
-    expected: "a package",
-    address: |package| std::rc::Rc::as_ptr(package.as_rc()) as *const (),
-    class: |package| Ok(match &*package.as_rc().borrow() {
+    type_error: "a package",
+    identity: |package| std::rc::Rc::as_ptr(package.as_rc()) as *const (),
+    class_of: |package| Ok(match &*package.as_rc().borrow() {
         AnyPackage::Package(_) => br"Composer\Package\Package",
         AnyPackage::CompletePackage(_) => br"Composer\Package\CompletePackage",
         AnyPackage::RootPackage(_) => br"Composer\Package\RootPackage",
@@ -35,76 +35,103 @@ php_entity! {
         AnyPackage::CompleteAliasPackage(_) => br"Composer\Package\CompleteAliasPackage",
         AnyPackage::RootAliasPackage(_) => br"Composer\Package\RootAliasPackage",
     }),
-    classes: [
-        r"Composer\Package\BasePackage",
-        r"Composer\Package\Package",
-        r"Composer\Package\CompletePackage",
-        r"Composer\Package\RootPackage",
-        r"Composer\Package\AliasPackage",
-        r"Composer\Package\CompleteAliasPackage",
-        r"Composer\Package\RootAliasPackage",
-    ],
-    clone: clone_package,
-    properties: { "id": package_id },
-    unimplemented: [
-        r"Composer\Package\RootPackage::__construct",
-    ],
-    types: {
-        r"Composer\Package\PackageInterface": custom base_package only [getNames, __toString],
-        r"Composer\Package\PackageInterface": instance __php_binding_package_interface
-            for dyn PackageInterface {
-            via: |package| std::cell::Ref::map(
-                package.as_rc().borrow(),
-                AnyPackage::as_package_interface,
-            ),
-            mut: |package| std::cell::RefMut::map(
-                package.as_rc().borrow_mut(),
-                AnyPackage::as_package_interface_mut,
-            ),
+    classes: {
+        r"Composer\Package\BasePackage": { ancestor: true },
+        r"Composer\Package\Package": {
+            constructor: {
+                adapters: __php_binding_package,
+                into: |package| constructed(AnyPackage::Package(package)),
+            },
         },
-        r"Composer\Package\CompletePackageInterface": custom complete_package
-            only [setDescription, setHomepage, setArchiveName],
-        r"Composer\Package\CompletePackageInterface": instance
-            __php_binding_complete_package_interface for dyn CompletePackageInterface {
-            via: |package| std::cell::Ref::map(package.as_rc().borrow(), |package| {
-                package.as_complete_package_interface().expect(COMPLETE)
-            }),
-            mut: |package| std::cell::RefMut::map(package.as_rc().borrow_mut(), |package| {
-                package.as_complete_package_interface_mut().expect(COMPLETE)
-            }),
+        r"Composer\Package\CompletePackage": {
+            constructor: {
+                adapters: __php_binding_complete_package,
+                into: |package| constructed(AnyPackage::CompletePackage(package)),
+            },
         },
-        r"Composer\Package\RootPackageInterface": instance
-            __php_binding_root_package_interface for dyn RootPackageInterface {
-            via: |package| std::cell::Ref::map(package.as_rc().borrow(), |package| {
-                package.as_root_package_interface().expect(ROOT)
-            }),
-            mut: |package| std::cell::RefMut::map(package.as_rc().borrow_mut(), |package| {
-                package.as_root_package_interface_mut().expect(ROOT)
-            }),
+        r"Composer\Package\RootPackage": { constructor: unimplemented },
+        r"Composer\Package\AliasPackage": {
+            constructor: { handwritten: construct_alias_package },
         },
-        r"Composer\Package\BasePackage": custom base_package,
-        r"Composer\Package\Package": instance __php_binding_package for Package {
-            mut: |package| std::cell::RefMut::map(package.as_rc().borrow_mut(), |package| {
-                package.as_package_mut().expect(REAL)
-            }),
+        r"Composer\Package\CompleteAliasPackage": {
+            constructor: { handwritten: construct_complete_alias_package },
         },
-        r"Composer\Package\AliasPackage": instance __php_binding_alias_package for AliasPackage {
-            via: |package| std::cell::Ref::map(package.as_rc().borrow(), |package| {
-                package.as_alias_package().expect(ALIAS)
-            }),
-            mut: |package| std::cell::RefMut::map(package.as_rc().borrow_mut(), |package| {
-                package.as_alias_package_mut().expect(ALIAS)
-            }),
+        r"Composer\Package\RootAliasPackage": {
+            constructor: { handwritten: construct_root_alias_package },
         },
     },
-    constructors: {
-        r"Composer\Package\Package": __php_binding_package
-            => |package| constructed(AnyPackage::Package(package)),
-        r"Composer\Package\CompletePackage": __php_binding_complete_package
-            => |package| constructed(AnyPackage::CompletePackage(package)),
-        r"Composer\Package\AliasPackage": custom construct_alias_package,
-        r"Composer\Package\CompleteAliasPackage": custom construct_complete_alias_package,
-        r"Composer\Package\RootAliasPackage": custom construct_root_alias_package,
+    methods: {
+        r"Composer\Package\PackageInterface": {
+            handwritten: { module: base_package, members: [getNames, __toString] },
+            instance: {
+                adapters: __php_binding_package_interface,
+                target: dyn PackageInterface,
+                borrow: |package| std::cell::Ref::map(
+                    package.as_rc().borrow(),
+                    AnyPackage::as_package_interface,
+                ),
+                borrow_mut: |package| std::cell::RefMut::map(
+                    package.as_rc().borrow_mut(),
+                    AnyPackage::as_package_interface_mut,
+                ),
+            },
+        },
+        r"Composer\Package\CompletePackageInterface": {
+            handwritten: {
+                module: complete_package,
+                members: [setDescription, setHomepage, setArchiveName],
+            },
+            instance: {
+                adapters: __php_binding_complete_package_interface,
+                target: dyn CompletePackageInterface,
+                borrow: |package| std::cell::Ref::map(package.as_rc().borrow(), |package| {
+                    package.as_complete_package_interface().expect(COMPLETE)
+                }),
+                borrow_mut: |package| std::cell::RefMut::map(package.as_rc().borrow_mut(), |package| {
+                    package.as_complete_package_interface_mut().expect(COMPLETE)
+                }),
+            },
+        },
+        r"Composer\Package\RootPackageInterface": {
+            instance: {
+                adapters: __php_binding_root_package_interface,
+                target: dyn RootPackageInterface,
+                borrow: |package| std::cell::Ref::map(package.as_rc().borrow(), |package| {
+                    package.as_root_package_interface().expect(ROOT)
+                }),
+                borrow_mut: |package| std::cell::RefMut::map(package.as_rc().borrow_mut(), |package| {
+                    package.as_root_package_interface_mut().expect(ROOT)
+                }),
+            },
+        },
+        r"Composer\Package\BasePackage": {
+            handwritten: { module: base_package },
+        },
+        r"Composer\Package\Package": {
+            instance: {
+                adapters: __php_binding_package,
+                target: Package,
+                borrow_mut: |package| std::cell::RefMut::map(package.as_rc().borrow_mut(), |package| {
+                    package.as_package_mut().expect(REAL)
+                }),
+            },
+        },
+        r"Composer\Package\AliasPackage": {
+            instance: {
+                adapters: __php_binding_alias_package,
+                target: AliasPackage,
+                borrow: |package| std::cell::Ref::map(package.as_rc().borrow(), |package| {
+                    package.as_alias_package().expect(ALIAS)
+                }),
+                borrow_mut: |package| std::cell::RefMut::map(package.as_rc().borrow_mut(), |package| {
+                    package.as_alias_package_mut().expect(ALIAS)
+                }),
+            },
+        },
+    },
+    handlers: {
+        clone: clone_package,
+        properties: { id: package_id },
     },
 }
 

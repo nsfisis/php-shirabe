@@ -23,23 +23,27 @@ use shirabe_php_shim::bformat;
 // implementations before it can cross.
 php_entity! {
     handle: std::rc::Rc<std::cell::RefCell<dyn DownloadManagerInterface>>,
-    expected: "a DownloadManager",
-    class: r"Composer\Downloader\DownloadManager",
-    unimplemented: [
-        "__construct",
-        "getDownloader",
-        "getDownloaderForPackage",
-        "getDownloaderType",
-        "setDownloader",
-        "setPreferences",
-    ],
-    types: {
-        r"Composer\Downloader\DownloadManager": instance __php_binding_download_manager_interface
-            for dyn DownloadManagerInterface {
-            via: |dm| dm.borrow(),
-            job: job,
+    type_error: "a DownloadManager",
+    classes: {
+        r"Composer\Downloader\DownloadManager": { constructor: unimplemented },
+    },
+    methods: {
+        r"Composer\Downloader\DownloadManager": {
+            instance: {
+                adapters: __php_binding_download_manager_interface,
+                target: dyn DownloadManagerInterface,
+                borrow: |dm| dm.borrow(),
+            },
+            unimplemented: [
+                getDownloader,
+                getDownloaderForPackage,
+                getDownloaderType,
+                setDownloader,
+                setPreferences,
+            ],
         },
     },
+    handlers: { job: job },
 }
 
 /// The job a call starts. Under Composer the promise is a chain over the job the downloader

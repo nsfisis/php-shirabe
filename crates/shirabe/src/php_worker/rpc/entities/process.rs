@@ -31,10 +31,14 @@ shirabe_php_rpc::rpc_value_record! {
 // members are answered by hand.
 php_entity! {
     handle: std::rc::Rc<std::cell::RefCell<shirabe_symfony_process::Process>>,
-    expected: "a Process",
-    class: r"Shirabe\RustProcessStub",
-    types: {
-        r"Shirabe\RustProcessStub": custom self,
+    type_error: "a Process",
+    classes: {
+        r"Shirabe\RustProcessStub": {},
+    },
+    methods: {
+        r"Shirabe\RustProcessStub": {
+            handwritten: { module: self },
+        },
     },
 }
 

@@ -65,63 +65,80 @@ pub fn php_binding(
 /// ```ignore
 /// php_entity! {
 ///     handle: std::rc::Rc<std::cell::RefCell<dyn LockerInterface>>,
-///     expected: "a Locker",
-///     class: r"Composer\Package\Locker",
-///     types: {
-///         r"Composer\Package\Locker": instance crate::package::__php_binding_locker_interface
-///             for dyn LockerInterface {
-///             via: |handle| handle.borrow(),
-///             mut: |handle| handle.borrow_mut(),
+///     type_error: "a Locker",
+///     classes: {
+///         r"Composer\Package\Locker": { constructor: unimplemented },
+///     },
+///     methods: {
+///         r"Composer\Package\Locker": {
+///             instance: {
+///                 adapters: crate::package::__php_binding_locker_interface,
+///                 target: dyn LockerInterface,
+///                 borrow: |locker| locker.borrow(),
+///                 borrow_mut: |locker| locker.borrow_mut(),
+///             },
+///             static: { adapters: crate::package::__php_binding_locker },
+///             refused: { getJsonFile: "JsonFile cannot cross the boundary" },
 ///         },
-///         r"Composer\Package\Locker": static crate::package::__php_binding_locker,
 ///     },
 /// }
 /// ```
 ///
-/// * `class` is the class the entities cross as, or a closure choosing it from the handle, as a
-///   byte string in a `Result` whose error is the answer for an entity no class stands for;
-///   `classes` then lists every class it chooses from, with their forwarding
-///   ancestors.
-/// * `address` computes the entity's identity from the handle, the `Rc` itself by default;
-///   `clone` and `worker_method` name the hand-written functions answering `__clone` and the
-///   methods only the worker runtime calls.
-/// * `properties: { "name": path }` names the hand-written functions answering the property
-///   forwarders (`__get`, `__set`, `__isset`, `__unset`) for an instance property the classes
-///   declare; any other property is the "not available over RPC yet" error.
-/// * Each entry of `types` names what answers the instance or static methods a PHP type
-///   declares, or only the ones it lists after `only [...]`. An `instance` entry gives the type
-///   the adapters call (`for`) and how a handle reaches it, for `&self` methods through a
-///   `RefCell` borrow (`via`) or a plain reference (`deref`) and for `&mut self` methods (`mut`);
-///   a `static` entry the adapters of static methods; a `custom`
-///   entry a module of hand-written functions taking the handle.
-/// * Each entry of `constructors` gives, for a class whose constructor the Rust side answers,
-///   the adapter of the inherent impl and how the value it builds becomes a handle
-///   (`module => |value| ...`), or a hand-written function (`custom path`).
+/// Every part is `key: value`, each key given at most once. A string is a PHP class name or a
+/// message, an identifier a PHP member name, a path a Rust item, and a closure an expression on
+/// its one argument.
 ///
-/// * `unimplemented: [...]` and `refused: { "member": "reason" }` list the forwarded members the
-///   Rust side does not answer: the "not available over RPC yet" error, with the reason for a
-///   refused one. An entry names a member of every class (`"getFoo"`), or of a class and its
-///   subclasses (`r"Composer\Foo::getFoo"`; a constructor of that class alone).
+/// * `handle` is the handle type, and `type_error` names what an argument of another type was
+///   expected to be. `identity` computes the entity's identity from the handle, the `Rc` itself by
+///   default.
+/// * `classes` lists, by class, the classes the entities cross as and their forwarding ancestors
+///   (`ancestor: true`), which the entities never cross as. `constructor` answers a forwarded
+///   constructor, and only a forwarded one: `{ adapters: module, into: |value| ... }` calls the
+///   adapter of the inherent impl and makes a handle of the value it builds, `{ handwritten: path }`
+///   calls a hand-written function, and `unimplemented` and `refused("reason")` are the "not
+///   available over RPC yet" error, with the reason for a refused one.
+/// * `class_of`, required when the entities cross as several classes, chooses the class of an
+///   entity from the handle: a byte string in a `Result` whose error is the answer for an entity
+///   no class stands for.
+/// * `methods` lists, by the PHP type declaring them, what answers the forwarded methods:
+///     * `instance`: the adapters of a trait or inherent impl, the type they call (`target`), and
+///       how a handle reaches it: `borrow` (a `Ref`) or `deref` (a reference) for `&self` methods,
+///       `borrow_mut` (a `RefMut`) for `&mut self` methods;
+///     * `static`: the adapters of static methods;
+///     * `handwritten`: a module of hand-written functions taking the handle, for the instance
+///       methods it lists in `members`, or for every one;
+///     * `unimplemented: [...]` and `refused: { member: "reason" }`: the "not available over RPC
+///       yet" error, with the reason for a refused member.
+///
+///   A member listed in `unimplemented`, `refused` or `members` takes that answer whatever else the
+///   entry gives.
+/// * `handlers` names hand-written functions: `clone` answers `__clone`, `worker_method` the
+///   methods only the worker runtime calls, `job` the job an `async fn` method's call starts, and
+///   `properties: { name: path }` the property forwarders (`__get`, `__set`, `__isset`, `__unset`)
+///   of an instance property the classes declare; any other property is the "not available over
+///   RPC yet" error.
 ///
 /// For each class, the declaration generates the dispatch of the methods its stub forwards, its
 /// `Bindings`, and the `ForwardedClass` impl answering its constructor and static methods. A
-/// forwarded member neither routed nor listed, and an entry naming no forwarded member, fail the
-/// build, as does a generated route whose adapter decodes other parameter types than the stub of
-/// the class declares.
+/// forwarded member nothing answers, and anything given that no forwarded member reaches, fail
+/// the build, as does a generated route whose adapter decodes other parameter types than the stub
+/// of the class declares.
 #[proc_macro]
 pub fn php_entity(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     entity::expand(input.into()).into()
 }
 
 /// Generates the `ForwardedClass` impl of a class no entity crosses as, a guard whose static
-/// methods are forwarded, routing each of them to the adapter of the type declaring it. It takes
-/// `unimplemented` and `refused` as `php_entity!` does.
+/// methods are forwarded, routing each of them as `methods` of `php_entity!` does, with `static`,
+/// `unimplemented` and `refused` entries.
 ///
 /// ```ignore
 /// php_statics! {
 ///     class: r"Composer\Factory",
-///     types: {
-///         r"Composer\Factory": static crate::factory::__php_binding_factory,
+///     methods: {
+///         r"Composer\Factory": {
+///             static: { adapters: crate::factory::__php_binding_factory },
+///         },
 ///     },
 /// }
 /// ```

@@ -14,67 +14,73 @@ use shirabe_php_rpc::{PhpThrow, RpcValue};
 // float default, a non-string choice, or a validator returning any other PHP value.
 php_entity! {
     handle: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-    expected: "an IOInterface",
-    class: |io| io.borrow().php_class().map(|class| class.as_bytes()).ok_or_else(|| {
+    type_error: "an IOInterface",
+    class_of: |io| io.borrow().php_class().map(|class| class.as_bytes()).ok_or_else(|| {
         // TODO(plugin): only IO implementations with a generated proxy stub can cross the
         // boundary; the rest are an explicit error until stubs of their own are generated.
         PhpThrow::runtime("no proxy stub class is available for this IO implementation")
     }),
-    classes: [
-        r"Composer\IO\BaseIO",
-        r"Composer\IO\ConsoleIO",
-        r"Composer\IO\NullIO",
-        r"Composer\IO\BufferIO",
-    ],
-    unimplemented: [
-        r"Composer\IO\BaseIO::alert",
-        r"Composer\IO\BaseIO::ask",
-        r"Composer\IO\BaseIO::askAndHideAnswer",
-        r"Composer\IO\BaseIO::askAndValidate",
-        r"Composer\IO\BaseIO::askConfirmation",
-        r"Composer\IO\BaseIO::critical",
-        r"Composer\IO\BaseIO::debug",
-        r"Composer\IO\BaseIO::emergency",
-        r"Composer\IO\BaseIO::error",
-        r"Composer\IO\BaseIO::getAuthentication",
-        r"Composer\IO\BaseIO::getAuthentications",
-        r"Composer\IO\BaseIO::hasAuthentication",
-        r"Composer\IO\BaseIO::info",
-        r"Composer\IO\BaseIO::loadConfiguration",
-        r"Composer\IO\BaseIO::log",
-        r"Composer\IO\BaseIO::notice",
-        r"Composer\IO\BaseIO::overwrite",
-        r"Composer\IO\BaseIO::overwriteError",
-        r"Composer\IO\BaseIO::resetAuthentications",
-        r"Composer\IO\BaseIO::select",
-        r"Composer\IO\BaseIO::setAuthentication",
-        r"Composer\IO\BaseIO::warning",
-        r"Composer\IO\BaseIO::writeErrorRaw",
-        r"Composer\IO\BaseIO::writeRaw",
-        r"Composer\IO\ConsoleIO::__construct",
-        r"Composer\IO\ConsoleIO::enableDebugging",
-        r"Composer\IO\ConsoleIO::getProgressBar",
-        r"Composer\IO\ConsoleIO::getTable",
-        r"Composer\IO\NullIO::__construct",
-    ],
-    types: {
-        r"Composer\IO\IOInterface": custom messages only [write, writeError],
-        r"Composer\IO\IOInterface": instance __php_binding_io_interface_immutable
-            for dyn IOInterfaceImmutable {
-            via: |io| std::cell::Ref::map(io.borrow(), |io| {
-                io as &(dyn IOInterfaceImmutable + 'static)
-            }),
-        },
-        r"Composer\IO\BufferIO": instance __php_binding_buffer_io for BufferIO {
-            via: |io| std::cell::Ref::map(io.borrow(), |io| {
-                io.as_any()
-                    .downcast_ref::<BufferIO>()
-                    .expect("only a BufferIO crosses as Composer\\IO\\BufferIO")
-            }),
-        },
+    classes: {
+        r"Composer\IO\BaseIO": { ancestor: true },
+        r"Composer\IO\ConsoleIO": { constructor: unimplemented },
+        r"Composer\IO\NullIO": { constructor: unimplemented },
+        r"Composer\IO\BufferIO": { constructor: { handwritten: construct_buffer_io } },
     },
-    constructors: {
-        r"Composer\IO\BufferIO": custom construct_buffer_io,
+    methods: {
+        r"Composer\IO\IOInterface": {
+            handwritten: { module: messages, members: [write, writeError] },
+            instance: {
+                adapters: __php_binding_io_interface_immutable,
+                target: dyn IOInterfaceImmutable,
+                borrow: |io| std::cell::Ref::map(io.borrow(), |io| {
+                    io as &(dyn IOInterfaceImmutable + 'static)
+                }),
+            },
+            unimplemented: [
+                ask,
+                askAndHideAnswer,
+                askAndValidate,
+                askConfirmation,
+                getAuthentication,
+                getAuthentications,
+                hasAuthentication,
+                loadConfiguration,
+                overwrite,
+                overwriteError,
+                select,
+                setAuthentication,
+                writeErrorRaw,
+                writeRaw,
+            ],
+        },
+        r"Composer\IO\BaseIO": {
+            unimplemented: [
+                alert,
+                critical,
+                debug,
+                emergency,
+                error,
+                info,
+                log,
+                notice,
+                resetAuthentications,
+                warning,
+            ],
+        },
+        r"Composer\IO\ConsoleIO": {
+            unimplemented: [enableDebugging, getProgressBar, getTable],
+        },
+        r"Composer\IO\BufferIO": {
+            instance: {
+                adapters: __php_binding_buffer_io,
+                target: BufferIO,
+                borrow: |io| std::cell::Ref::map(io.borrow(), |io| {
+                    io.as_any()
+                        .downcast_ref::<BufferIO>()
+                        .expect("only a BufferIO crosses as Composer\\IO\\BufferIO")
+                }),
+            },
+        },
     },
 }
 

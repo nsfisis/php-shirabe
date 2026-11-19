@@ -21,25 +21,30 @@ use shirabe_php_shim::{E_USER_DEPRECATED, PhpMixed, trigger_error};
 
 php_entity! {
     handle: std::rc::Rc<std::cell::RefCell<dyn AutoloadGeneratorInterface>>,
-    expected: "an AutoloadGenerator",
-    class: r"Composer\Autoload\AutoloadGenerator",
-    unimplemented: [
-        "__construct",
-    ],
-    refused: {
-        "setPlatformRequirementFilter": "no platform requirement filter can cross the boundary",
+    type_error: "an AutoloadGenerator",
+    classes: {
+        r"Composer\Autoload\AutoloadGenerator": { constructor: unimplemented },
     },
-    types: {
-        r"Composer\Autoload\AutoloadGenerator": custom self only [
-            setIgnorePlatformRequirements,
-            dump,
-            buildPackageMap,
-            parseAutoloads,
-            createLoader,
-        ],
-        r"Composer\Autoload\AutoloadGenerator": instance
-            __php_binding_autoload_generator_interface for dyn AutoloadGeneratorInterface {
-            via: |generator| generator.borrow(),
+    methods: {
+        r"Composer\Autoload\AutoloadGenerator": {
+            handwritten: {
+                module: self,
+                members: [
+                    setIgnorePlatformRequirements,
+                    dump,
+                    buildPackageMap,
+                    parseAutoloads,
+                    createLoader,
+                ],
+            },
+            instance: {
+                adapters: __php_binding_autoload_generator_interface,
+                target: dyn AutoloadGeneratorInterface,
+                borrow: |generator| generator.borrow(),
+            },
+            refused: {
+                setPlatformRequirementFilter: "no platform requirement filter can cross the boundary",
+            },
         },
     },
 }

@@ -103,7 +103,8 @@ Stubs are emitted every base class first, following inheritance.
   access reaches the Rust side. They are emitted unconditionally because PHP's own answer for an
   undeclared property — null on a read, a dynamic property on a write, false on `isset()` — is
   silent. On the Rust side, the entity declaration names the function answering each
-  property it serves (`properties` in `php_entity!`); any other property is an explicit error.
+  property it serves (`properties` in the `handlers` of `php_entity!`); any other property is an
+  explicit error.
 * **`__toString`** is forwarded like any other method. **`__clone`** is part of the boilerplate on
   every stub, whether or not the real class declares one: PHP has already copied the stub by the
   time it runs, so the copy asks the Rust side for a clone of the entity and rebinds itself to the

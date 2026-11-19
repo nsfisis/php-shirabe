@@ -8,18 +8,25 @@ use shirabe_php_binding_macros::php_entity;
 // a Rust-side service.
 php_entity! {
     handle: std::rc::Rc<std::cell::RefCell<Filesystem>>,
-    expected: "a Filesystem",
-    class: r"Composer\Util\Filesystem",
-    types: {
-        r"Composer\Util\Filesystem": custom promise only [removeDirectoryAsync],
-        r"Composer\Util\Filesystem": instance __php_binding_filesystem for Filesystem {
-            via: |fs| fs.borrow(),
-            mut: |fs| fs.borrow_mut(),
+    type_error: "a Filesystem",
+    classes: {
+        r"Composer\Util\Filesystem": {
+            constructor: {
+                adapters: __php_binding_filesystem,
+                into: |fs| std::rc::Rc::new(std::cell::RefCell::new(fs)),
+            },
         },
     },
-    constructors: {
-        r"Composer\Util\Filesystem": __php_binding_filesystem
-            => |fs| std::rc::Rc::new(std::cell::RefCell::new(fs)),
+    methods: {
+        r"Composer\Util\Filesystem": {
+            handwritten: { module: promise, members: [removeDirectoryAsync] },
+            instance: {
+                adapters: __php_binding_filesystem,
+                target: Filesystem,
+                borrow: |fs| fs.borrow(),
+                borrow_mut: |fs| fs.borrow_mut(),
+            },
+        },
     },
 }
 

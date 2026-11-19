@@ -15,32 +15,35 @@ use shirabe_php_shim::bformat;
 // TODO(plugin): the remaining InstallationManager surface is widened on demand.
 php_entity! {
     handle: std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>,
-    expected: "an InstallationManager",
-    class: r"Composer\Installer\InstallationManager",
-    unimplemented: [
-        "__construct",
-        "disablePlugins",
-        "download",
-        "ensureBinariesPresence",
-        "execute",
-        "getInstaller",
-        "install",
-        "isPackageInstalled",
-        "markAliasInstalled",
-        "markAliasUninstalled",
-        "notifyInstalls",
-        "reset",
-        "setOutputProgress",
-        "uninstall",
-        "update",
-    ],
-    types: {
-        r"Composer\Installer\InstallationManager": custom self
-            only [addInstaller, removeInstaller],
-        r"Composer\Installer\InstallationManager": instance
-            __php_binding_installation_manager_interface for dyn InstallationManagerInterface {
-            via: |im| im.borrow(),
-            mut: |im| im.borrow_mut(),
+    type_error: "an InstallationManager",
+    classes: {
+        r"Composer\Installer\InstallationManager": { constructor: unimplemented },
+    },
+    methods: {
+        r"Composer\Installer\InstallationManager": {
+            handwritten: { module: self, members: [addInstaller, removeInstaller] },
+            instance: {
+                adapters: __php_binding_installation_manager_interface,
+                target: dyn InstallationManagerInterface,
+                borrow: |im| im.borrow(),
+                borrow_mut: |im| im.borrow_mut(),
+            },
+            unimplemented: [
+                disablePlugins,
+                download,
+                ensureBinariesPresence,
+                execute,
+                getInstaller,
+                install,
+                isPackageInstalled,
+                markAliasInstalled,
+                markAliasUninstalled,
+                notifyInstalls,
+                reset,
+                setOutputProgress,
+                uninstall,
+                update,
+            ],
         },
     },
 }

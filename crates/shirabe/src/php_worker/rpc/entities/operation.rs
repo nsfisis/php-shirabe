@@ -13,8 +13,8 @@ use shirabe_php_binding_macros::php_entity;
 // complete instance rather than a second view on a Rust-side service.
 php_entity! {
     handle: std::rc::Rc<AnyOperation>,
-    expected: "an operation",
-    class: |operation| Ok(match &**operation {
+    type_error: "an operation",
+    class_of: |operation| Ok(match &**operation {
         AnyOperation::Install(_) => br"Composer\DependencyResolver\Operation\InstallOperation",
         AnyOperation::Update(_) => br"Composer\DependencyResolver\Operation\UpdateOperation",
         AnyOperation::Uninstall(_) => {
@@ -27,71 +27,98 @@ php_entity! {
             br"Composer\DependencyResolver\Operation\MarkAliasUninstalledOperation"
         }
     }),
-    classes: [
-        r"Composer\DependencyResolver\Operation\SolverOperation",
-        r"Composer\DependencyResolver\Operation\InstallOperation",
-        r"Composer\DependencyResolver\Operation\UpdateOperation",
-        r"Composer\DependencyResolver\Operation\UninstallOperation",
-        r"Composer\DependencyResolver\Operation\MarkAliasInstalledOperation",
-        r"Composer\DependencyResolver\Operation\MarkAliasUninstalledOperation",
-    ],
-    types: {
-        r"Composer\DependencyResolver\Operation\OperationInterface": custom solver_operation
-            only [show, __toString],
-        r"Composer\DependencyResolver\Operation\OperationInterface": instance
-            __php_binding_any_operation for AnyOperation {
-            deref: |operation| &**operation,
-        },
-        r"Composer\DependencyResolver\Operation\InstallOperation": instance
-            __php_binding_install_operation for InstallOperation {
-            deref: |operation| match &**operation {
-                AnyOperation::Install(operation) => operation,
-                _ => unreachable!("only an InstallOperation crosses as one"),
+    classes: {
+        r"Composer\DependencyResolver\Operation\SolverOperation": { ancestor: true },
+        r"Composer\DependencyResolver\Operation\InstallOperation": {
+            constructor: {
+                adapters: __php_binding_install_operation,
+                into: |operation| std::rc::Rc::new(AnyOperation::Install(operation)),
             },
         },
-        r"Composer\DependencyResolver\Operation\UpdateOperation": instance
-            __php_binding_update_operation for UpdateOperation {
-            deref: |operation| match &**operation {
-                AnyOperation::Update(operation) => operation,
-                _ => unreachable!("only an UpdateOperation crosses as one"),
+        r"Composer\DependencyResolver\Operation\UpdateOperation": {
+            constructor: {
+                adapters: __php_binding_update_operation,
+                into: |operation| std::rc::Rc::new(AnyOperation::Update(operation)),
             },
         },
-        r"Composer\DependencyResolver\Operation\UninstallOperation": instance
-            __php_binding_uninstall_operation for UninstallOperation {
-            deref: |operation| match &**operation {
-                AnyOperation::Uninstall(operation) => operation,
-                _ => unreachable!("only an UninstallOperation crosses as one"),
+        r"Composer\DependencyResolver\Operation\UninstallOperation": {
+            constructor: {
+                adapters: __php_binding_uninstall_operation,
+                into: |operation| std::rc::Rc::new(AnyOperation::Uninstall(operation)),
             },
         },
-        r"Composer\DependencyResolver\Operation\MarkAliasInstalledOperation": instance
-            __php_binding_mark_alias_installed_operation for MarkAliasInstalledOperation {
-            deref: |operation| match &**operation {
-                AnyOperation::MarkAliasInstalled(operation) => operation,
-                _ => unreachable!("only a MarkAliasInstalledOperation crosses as one"),
+        r"Composer\DependencyResolver\Operation\MarkAliasInstalledOperation": {
+            constructor: {
+                adapters: __php_binding_mark_alias_installed_operation,
+                into: |operation| std::rc::Rc::new(AnyOperation::MarkAliasInstalled(operation)),
             },
         },
-        r"Composer\DependencyResolver\Operation\MarkAliasUninstalledOperation": instance
-            __php_binding_mark_alias_uninstalled_operation for MarkAliasUninstalledOperation {
-            deref: |operation| match &**operation {
-                AnyOperation::MarkAliasUninstalled(operation) => operation,
-                _ => unreachable!("only a MarkAliasUninstalledOperation crosses as one"),
+        r"Composer\DependencyResolver\Operation\MarkAliasUninstalledOperation": {
+            constructor: {
+                adapters: __php_binding_mark_alias_uninstalled_operation,
+                into: |operation| std::rc::Rc::new(AnyOperation::MarkAliasUninstalled(operation)),
             },
         },
     },
-    constructors: {
-        r"Composer\DependencyResolver\Operation\InstallOperation": __php_binding_install_operation
-            => |operation| std::rc::Rc::new(AnyOperation::Install(operation)),
-        r"Composer\DependencyResolver\Operation\UpdateOperation": __php_binding_update_operation
-            => |operation| std::rc::Rc::new(AnyOperation::Update(operation)),
-        r"Composer\DependencyResolver\Operation\UninstallOperation":
-            __php_binding_uninstall_operation
-            => |operation| std::rc::Rc::new(AnyOperation::Uninstall(operation)),
-        r"Composer\DependencyResolver\Operation\MarkAliasInstalledOperation":
-            __php_binding_mark_alias_installed_operation
-            => |operation| std::rc::Rc::new(AnyOperation::MarkAliasInstalled(operation)),
-        r"Composer\DependencyResolver\Operation\MarkAliasUninstalledOperation":
-            __php_binding_mark_alias_uninstalled_operation
-            => |operation| std::rc::Rc::new(AnyOperation::MarkAliasUninstalled(operation)),
+    methods: {
+        r"Composer\DependencyResolver\Operation\OperationInterface": {
+            handwritten: { module: solver_operation, members: [show, __toString] },
+            instance: {
+                adapters: __php_binding_any_operation,
+                target: AnyOperation,
+                deref: |operation| &**operation,
+            },
+        },
+        r"Composer\DependencyResolver\Operation\InstallOperation": {
+            instance: {
+                adapters: __php_binding_install_operation,
+                target: InstallOperation,
+                deref: |operation| match &**operation {
+                    AnyOperation::Install(operation) => operation,
+                    _ => unreachable!("only an InstallOperation crosses as one"),
+                },
+            },
+        },
+        r"Composer\DependencyResolver\Operation\UpdateOperation": {
+            instance: {
+                adapters: __php_binding_update_operation,
+                target: UpdateOperation,
+                deref: |operation| match &**operation {
+                    AnyOperation::Update(operation) => operation,
+                    _ => unreachable!("only an UpdateOperation crosses as one"),
+                },
+            },
+        },
+        r"Composer\DependencyResolver\Operation\UninstallOperation": {
+            instance: {
+                adapters: __php_binding_uninstall_operation,
+                target: UninstallOperation,
+                deref: |operation| match &**operation {
+                    AnyOperation::Uninstall(operation) => operation,
+                    _ => unreachable!("only an UninstallOperation crosses as one"),
+                },
+            },
+        },
+        r"Composer\DependencyResolver\Operation\MarkAliasInstalledOperation": {
+            instance: {
+                adapters: __php_binding_mark_alias_installed_operation,
+                target: MarkAliasInstalledOperation,
+                deref: |operation| match &**operation {
+                    AnyOperation::MarkAliasInstalled(operation) => operation,
+                    _ => unreachable!("only a MarkAliasInstalledOperation crosses as one"),
+                },
+            },
+        },
+        r"Composer\DependencyResolver\Operation\MarkAliasUninstalledOperation": {
+            instance: {
+                adapters: __php_binding_mark_alias_uninstalled_operation,
+                target: MarkAliasUninstalledOperation,
+                deref: |operation| match &**operation {
+                    AnyOperation::MarkAliasUninstalled(operation) => operation,
+                    _ => unreachable!("only a MarkAliasUninstalledOperation crosses as one"),
+                },
+            },
+        },
     },
 }
 
