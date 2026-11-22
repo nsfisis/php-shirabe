@@ -15,8 +15,8 @@ use bstr::{B, BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe::util::Filesystem;
 use shirabe_php_shim::{
-    PhpMixed, ToPhpString, bformat, intval, os_str_from_bytes, path_from_bytes, php_regex,
-    preg_match, preg_split_delim_capture, trim, utf8_text,
+    PhpMixed, ToPhpString, bformat, intval, os_str_from_bytes, path_from_bytes, path_to_bytes,
+    php_regex, preg_match, preg_split_delim_capture, trim, utf8_text,
 };
 
 /// ref: AllFunctionalTest's `$oldcwd` / `$testDir` instance state plus its `setUp`/`tearDown`.
@@ -185,8 +185,7 @@ fn expect_matches(expected: &[u8], output: &[u8]) {
     }
 }
 
-// ref: AllFunctionalTest::testIntegration (the @dataProvider getTestFiles datasets are wired up as
-// the individual #[test] functions below).
+// ref: AllFunctionalTest::testIntegration
 fn run_integration(test_filename: &BStr) {
     let guard = set_up();
 
@@ -266,36 +265,43 @@ fn test_build_phar() {
     todo!()
 }
 
-#[test]
-#[serial_test::serial]
-fn test_integration_create_project_command() {
-    run_integration(BStr::new("create-project-command.test"));
+// ref: AllFunctionalTest::getTestFiles
+fn get_test_files() -> Vec<BString> {
+    fn collect(root: &std::path::Path, dir: &std::path::Path, out: &mut Vec<BString>) {
+        for entry in std::fs::read_dir(dir).unwrap() {
+            let path = entry.unwrap().path();
+            if path.is_dir() {
+                collect(root, &path, out);
+            } else if path.extension() == Some(std::ffi::OsStr::new("test")) {
+                out.push(BString::from(path_to_bytes(
+                    path.strip_prefix(root).unwrap(),
+                )));
+            }
+        }
+    }
+    let dir = fixtures_dir();
+    let mut tests = Vec::new();
+    collect(&dir, &dir, &mut tests);
+    tests.sort();
+    tests
 }
 
 #[test]
 #[serial_test::serial]
-fn test_integration_create_project_shows_full_hash_for_dev_packages() {
-    run_integration(BStr::new(
-        "create-project-shows-full-hash-for-dev-packages.test",
-    ));
-}
-
-#[test]
-#[serial_test::serial]
-#[ignore = "the fixture's Hooks read Composer\\InstalledVersions, which is not autoloadable in the plugin worker (the fixture ships no vendor/ directory), so the pre-update hook aborts with `Class \"Composer\\InstalledVersions\" not found`"]
-fn test_integration_installed_versions() {
-    run_integration(BStr::new("installed-versions.test"));
-}
-
-#[test]
-#[serial_test::serial]
-#[ignore = "the plugin worker's Composer\\InstalledVersions is only reloaded on a repository write, never seeded from the project's installed.php at boot, so the fixture's plugins fail with `Package \"plugin/a\" is not installed`"]
-fn test_integration_installed_versions2() {
-    run_integration(BStr::new("installed-versions2.test"));
-}
-
-#[test]
-#[serial_test::serial]
-fn test_integration_plugin_autoloading_only_loads_dependencies() {
-    run_integration(BStr::new("plugin-autoloading-only-loads-dependencies.test"));
+fn test_integration() {
+    for test_file in get_test_files() {
+        if test_file == "installed-versions.test" {
+            // TODO(plugin): the fixture's Hooks read Composer\InstalledVersions, which is not
+            // autoloadable in the plugin worker (the fixture ships no vendor/ directory), so the
+            // pre-update hook aborts with `Class "Composer\InstalledVersions" not found`.
+            continue;
+        }
+        if test_file == "installed-versions2.test" {
+            // TODO(plugin): the plugin worker's Composer\InstalledVersions is only reloaded on a
+            // repository write, never seeded from the project's installed.php at boot, so the
+            // fixture's plugins fail with `Package "plugin/a" is not installed`.
+            continue;
+        }
+        run_integration(test_file.as_bstr());
+    }
 }
