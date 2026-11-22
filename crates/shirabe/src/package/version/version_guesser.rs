@@ -1,4 +1,5 @@
 //! ref: composer/src/Composer/Package/Version/VersionGuesser.php sha1:fa31581eef5544e44fb563b446e0e287dcbe5fd5
+//! ref: composer/tests/Composer/Test/Mock/VersionGuesserMock.php sha1:e62219ef0b07b17084594d73f1cb611e36b68b19
 
 use crate::config::Config;
 use crate::io::{IOInterface, NullIO};

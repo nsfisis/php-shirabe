@@ -1,4 +1,5 @@
 //! ref: composer/src/Composer/Repository/InstalledFilesystemRepository.php sha1:67c4cff619a86728e1eb35d1d1bac3b96c102163
+//! ref: composer/tests/Composer/Test/Mock/InstalledFilesystemRepositoryMock.php sha1:2c17f73393e99d874020172a3d29afe2e3269b46
 
 use crate::installer::InstallationManager;
 use crate::json::JsonFile;

@@ -1,4 +1,5 @@
 //! ref: composer/src/Composer/Factory.php sha1:7a476d1c754885b1552953a806535ddcff25cd94
+//! ref: composer/tests/Composer/Test/Mock/FactoryMock.php sha1:2672ff591abdd569b7eae115afd9cd3da29a4948
 
 use crate::autoload::AutoloadGenerator;
 use crate::cache::Cache;

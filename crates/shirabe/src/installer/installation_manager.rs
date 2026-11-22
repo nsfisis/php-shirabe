@@ -1,4 +1,5 @@
 //! ref: composer/src/Composer/Installer/InstallationManager.php sha1:a6a4d0d43896bdde576a4db13340fa5ea04c34aa
+//! ref: composer/tests/Composer/Test/Mock/InstallationManagerMock.php sha1:6dc5ee6d8f4799eac740e976cf4f8e10ac626c5c
 
 use crate::dependency_resolver::operation::{
     AnyOperation, InstallOperation, MarkAliasInstalledOperation, MarkAliasUninstalledOperation,
