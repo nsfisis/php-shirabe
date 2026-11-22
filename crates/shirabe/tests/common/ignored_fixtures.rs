@@ -4,6 +4,10 @@
 //! `foo-ignored-fixtures.json` next to it: an object mapping the fixture's path, relative to the
 //! repository root (e.g. `composer/tests/Composer/Test/Fixtures/installer/foo.test`), to the
 //! `TODO(<tag>): <reason>` it is skipped for.
+//!
+//! The test runs its fixtures with [`IgnoredFixtures::run`]. Like the data sets of a PHPUnit data
+//! provider, every fixture runs even after one fails, and the result of each is reported on its
+//! own line.
 #![allow(dead_code)]
 
 use bstr::{BStr, BString, ByteSlice as _};
@@ -58,5 +62,44 @@ impl IgnoredFixtures {
         let fixture = fixture.canonicalize().unwrap();
         let key = fixture.strip_prefix(&self.repository_root).unwrap();
         self.entries.contains_key(path_to_bytes(key).as_bstr())
+    }
+
+    /// Runs `run` on each case whose fixture, an absolute path, is not listed, and panics after all
+    /// of them ran if any of them panicked.
+    ///
+    /// Prints `fixture ok: <path>` or `fixture FAILED: <path>` for each fixture that runs, with the
+    /// path relative to the repository root.
+    /// After a failing fixture, the current directory is restored, so that the next fixture does
+    /// not run where the failed one left off.
+    pub fn run<T>(
+        &self,
+        cases: impl IntoIterator<Item = (std::path::PathBuf, T)>,
+        mut run: impl FnMut(T),
+    ) {
+        let mut failed = Vec::new();
+        for (fixture, case) in cases {
+            if self.is_ignored(&fixture) {
+                continue;
+            }
+            let fixture = fixture.canonicalize().unwrap();
+            let relative = BString::from(path_to_bytes(
+                fixture.strip_prefix(&self.repository_root).unwrap(),
+            ));
+            let cwd = std::env::current_dir().unwrap();
+            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| run(case)));
+            if result.is_ok() {
+                println!("fixture ok: {}", relative.display_lossy());
+            } else {
+                std::env::set_current_dir(cwd).unwrap();
+                println!("fixture FAILED: {}", relative.display_lossy());
+                failed.push(relative);
+            }
+        }
+        assert!(
+            failed.is_empty(),
+            "{} fixtures failed:\n{}",
+            failed.len(),
+            bstr::join("\n", &failed).as_bstr().display_lossy()
+        );
     }
 }

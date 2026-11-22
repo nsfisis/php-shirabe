@@ -293,10 +293,10 @@ fn get_test_files() -> Vec<BString> {
 #[serial_test::serial]
 fn test_integration() {
     let ignored_fixtures = IgnoredFixtures::load(BStr::new(file!()));
-    for test_file in get_test_files() {
-        if ignored_fixtures.is_ignored(&fixtures_dir().join(path_from_bytes(&test_file))) {
-            continue;
-        }
+    let cases = get_test_files()
+        .into_iter()
+        .map(|test_file| (fixtures_dir().join(path_from_bytes(&test_file)), test_file));
+    ignored_fixtures.run(cases, |test_file| {
         run_integration(test_file.as_bstr());
-    }
+    });
 }

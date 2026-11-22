@@ -1345,17 +1345,20 @@ fn php_mixed_map_to_json(map: &IndexMap<BString, PhpMixed>) -> serde_json::Value
 fn test_slow_integration() {
     let _tear_down = TearDown::new();
     let ignored_fixtures = IgnoredFixtures::load(BStr::new(file!()));
-    for case in load_integration_tests("installer-slow/") {
-        if ignored_fixtures
-            .is_ignored(&fixtures_dir("installer-slow/").join(path_from_bytes(&case.file)))
-        {
-            continue;
-        }
+    let cases = load_integration_tests("installer-slow/")
+        .into_iter()
+        .map(|case| {
+            (
+                fixtures_dir("installer-slow/").join(path_from_bytes(&case.file)),
+                case,
+            )
+        });
+    ignored_fixtures.run(cases, |case| {
         Platform::clear_env("COMPOSER_FUND").unwrap();
         Platform::put_env("COMPOSER_POOL_OPTIMIZER", "0").unwrap();
         let expect_output = case.expect_output.clone();
         do_test_integration(&case, expect_output.as_ref());
-    }
+    });
 }
 
 #[test]
@@ -1363,12 +1366,15 @@ fn test_slow_integration() {
 fn test_integration_with_pool_optimizer() {
     let _tear_down = TearDown::new();
     let ignored_fixtures = IgnoredFixtures::load(BStr::new(file!()));
-    for case in load_integration_tests("installer/") {
-        if ignored_fixtures
-            .is_ignored(&fixtures_dir("installer/").join(path_from_bytes(&case.file)))
-        {
-            continue;
-        }
+    let cases = load_integration_tests("installer/")
+        .into_iter()
+        .map(|case| {
+            (
+                fixtures_dir("installer/").join(path_from_bytes(&case.file)),
+                case,
+            )
+        });
+    ignored_fixtures.run(cases, |case| {
         Platform::clear_env("COMPOSER_FUND").unwrap();
         Platform::put_env("COMPOSER_POOL_OPTIMIZER", "1").unwrap();
         let expect_output = case
@@ -1377,7 +1383,7 @@ fn test_integration_with_pool_optimizer() {
             .filter(|s| !s.is_empty())
             .or_else(|| case.expect_output.clone());
         do_test_integration(&case, expect_output.as_ref());
-    }
+    });
 }
 
 #[test]
@@ -1385,15 +1391,18 @@ fn test_integration_with_pool_optimizer() {
 fn test_integration_with_raw_pool() {
     let _tear_down = TearDown::new();
     let ignored_fixtures = IgnoredFixtures::load(BStr::new(file!()));
-    for case in load_integration_tests("installer/") {
-        if ignored_fixtures
-            .is_ignored(&fixtures_dir("installer/").join(path_from_bytes(&case.file)))
-        {
-            continue;
-        }
+    let cases = load_integration_tests("installer/")
+        .into_iter()
+        .map(|case| {
+            (
+                fixtures_dir("installer/").join(path_from_bytes(&case.file)),
+                case,
+            )
+        });
+    ignored_fixtures.run(cases, |case| {
         Platform::clear_env("COMPOSER_FUND").unwrap();
         Platform::put_env("COMPOSER_POOL_OPTIMIZER", "0").unwrap();
         let expect_output = case.expect_output.clone();
         do_test_integration(&case, expect_output.as_ref());
-    }
+    });
 }

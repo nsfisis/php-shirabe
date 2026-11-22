@@ -251,11 +251,13 @@ fn run_test_pool_optimizer(
 #[test]
 fn test_pool_optimizer() {
     let ignored_fixtures = IgnoredFixtures::load(BStr::new(file!()));
-    let tests = provide_integration_tests();
-    for (name, (request_data, packages_before, expected_packages, message)) in tests {
-        if ignored_fixtures.is_ignored(&fixtures_dir().join(path_from_bytes(&name))) {
-            continue;
-        }
-        run_test_pool_optimizer(&request_data, packages_before, &expected_packages, &message);
-    }
+    let cases = provide_integration_tests()
+        .into_iter()
+        .map(|(name, data)| (fixtures_dir().join(path_from_bytes(&name)), data));
+    ignored_fixtures.run(
+        cases,
+        |(request_data, packages_before, expected_packages, message)| {
+            run_test_pool_optimizer(&request_data, packages_before, &expected_packages, &message);
+        },
+    );
 }

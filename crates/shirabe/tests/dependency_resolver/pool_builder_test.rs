@@ -620,11 +620,10 @@ fn test_pool_builder() {
     let fixtures_dir = std::fs::canonicalize(&fixtures_dir).unwrap();
 
     let ignored_fixtures = IgnoredFixtures::load(BStr::new(file!()));
-    let tests = get_integration_tests(&fixtures_dir);
-    for (_name, test) in tests {
-        if ignored_fixtures.is_ignored(&fixtures_dir.join(path_from_bytes(&test.file))) {
-            continue;
-        }
+    let cases = get_integration_tests(&fixtures_dir)
+        .into_iter()
+        .map(|(_name, test)| (fixtures_dir.join(path_from_bytes(&test.file)), test));
+    ignored_fixtures.run(cases, |test| {
         run_test_pool_builder(
             &fixtures_dir,
             test.file.as_bstr(),
@@ -636,5 +635,5 @@ fn test_pool_builder() {
             &test.package_repos,
             &test.fixed,
         );
-    }
+    });
 }
