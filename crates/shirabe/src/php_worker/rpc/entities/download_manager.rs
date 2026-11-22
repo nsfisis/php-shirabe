@@ -22,7 +22,7 @@ use shirabe_php_shim::bformat;
 // getDownloaderForPackage / getDownloaderType) needs proxy stubs for DownloaderInterface
 // implementations before it can cross.
 php_entity! {
-    handle: std::rc::Rc<std::cell::RefCell<dyn DownloadManagerInterface>>,
+    handle: std::rc::Rc<dyn DownloadManagerInterface>,
     type_error: "a DownloadManager",
     classes: {
         r"Composer\Downloader\DownloadManager": { constructor: unimplemented },
@@ -32,7 +32,7 @@ php_entity! {
             instance: {
                 adapters: __php_binding_download_manager_interface,
                 target: dyn DownloadManagerInterface,
-                borrow: |dm| dm.borrow(),
+                deref: |dm| &**dm,
             },
             unimplemented: [
                 getDownloader,
@@ -50,7 +50,7 @@ php_entity! {
 /// started on the graph's HttpDownloader, so that is the service whose `countActiveJobs()` keeps a
 /// wait going until this job is done.
 fn job(
-    dm: &std::rc::Rc<std::cell::RefCell<dyn DownloadManagerInterface>>,
+    dm: &std::rc::Rc<dyn DownloadManagerInterface>,
     call: &Call<'_>,
 ) -> Result<JobContext, PhpThrow> {
     let downloader = graph_http_downloader(dm)?;
@@ -73,7 +73,7 @@ fn job(
 /// The HttpDownloader of the object graph `dm` belongs to: the one the Loop of its Composer
 /// instance drives.
 fn graph_http_downloader(
-    dm: &std::rc::Rc<std::cell::RefCell<dyn DownloadManagerInterface>>,
+    dm: &std::rc::Rc<dyn DownloadManagerInterface>,
 ) -> Result<std::rc::Rc<std::cell::RefCell<HttpDownloader>>, PhpThrow> {
     for composer in table::entities::<ComposerHandle>() {
         let composer = composer.borrow();

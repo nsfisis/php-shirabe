@@ -21,7 +21,7 @@ use shirabe_php_shim::{
 pub struct LibraryInstaller {
     pub(crate) composer: PartialComposerWeakHandle,
     vendor_dir: std::cell::RefCell<std::path::PathBuf>,
-    download_manager: Option<std::rc::Rc<std::cell::RefCell<dyn DownloadManagerInterface>>>,
+    download_manager: Option<std::rc::Rc<dyn DownloadManagerInterface>>,
     pub(crate) io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     r#type: Option<BString>,
     filesystem: std::rc::Rc<std::cell::RefCell<Filesystem>>,
@@ -134,7 +134,6 @@ impl LibraryInstaller {
         let download_path = self.get_install_path(package.clone())?.unwrap();
 
         self.get_download_manager()
-            .borrow()
             .install(package, &download_path)
             .await
     }
@@ -165,7 +164,6 @@ impl LibraryInstaller {
         }
 
         self.get_download_manager()
-            .borrow()
             .update(initial, target, &target_download_path)
             .await
     }
@@ -177,7 +175,6 @@ impl LibraryInstaller {
         let download_path = self.get_package_base_path(package.clone())?;
 
         self.get_download_manager()
-            .borrow()
             .remove(package, &download_path)
             .await
     }
@@ -190,9 +187,7 @@ impl LibraryInstaller {
         *self.vendor_dir.borrow_mut() = realpath;
     }
 
-    fn get_download_manager(
-        &self,
-    ) -> &std::rc::Rc<std::cell::RefCell<dyn DownloadManagerInterface>> {
+    fn get_download_manager(&self) -> &std::rc::Rc<dyn DownloadManagerInterface> {
         // PHP: assert($this->downloadManager instanceof DownloadManager, new \LogicException(...))
         assert!(
             self.download_manager.is_some(),
@@ -253,7 +248,6 @@ impl InstallerInterface for LibraryInstaller {
         let download_path = self.get_install_path(package.clone())?.unwrap();
 
         self.get_download_manager()
-            .borrow()
             .download(package, &download_path, prev_package)
             .await
     }
@@ -268,7 +262,6 @@ impl InstallerInterface for LibraryInstaller {
         let download_path = self.get_install_path(package.clone())?.unwrap();
 
         self.get_download_manager()
-            .borrow()
             .prepare(r#type, package, &download_path, prev_package)
             .await
     }
@@ -283,7 +276,6 @@ impl InstallerInterface for LibraryInstaller {
         let download_path = self.get_install_path(package.clone())?.unwrap();
 
         self.get_download_manager()
-            .borrow()
             .cleanup(r#type, package, &download_path, prev_package)
             .await
     }

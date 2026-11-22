@@ -104,7 +104,7 @@ impl StatusCommand {
                 None => continue,
             };
             let target_dir = BString::from(path_to_bytes(&target_path));
-            let downloader_handle = match dm.borrow().get_downloader_for_package(package.clone())? {
+            let downloader_handle = match dm.get_downloader_for_package(package.clone())? {
                 Some(d) => d,
                 None => continue,
             };

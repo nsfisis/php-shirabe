@@ -78,7 +78,7 @@ pub struct Installer {
     package: RootPackageInterfaceHandle,
     // TODO can we get rid of the below and just use the package itself?
     fixed_root_package: RootPackageInterfaceHandle,
-    download_manager: std::rc::Rc<std::cell::RefCell<dyn DownloadManagerInterface>>,
+    download_manager: std::rc::Rc<dyn DownloadManagerInterface>,
     repository_manager: std::rc::Rc<dyn RepositoryManagerInterface>,
     locker: std::rc::Rc<dyn LockerInterface>,
     installation_manager: std::rc::Rc<dyn InstallationManagerInterface>,
@@ -134,7 +134,7 @@ impl Installer {
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<Config>,
         package: RootPackageInterfaceHandle,
-        download_manager: std::rc::Rc<std::cell::RefCell<dyn DownloadManagerInterface>>,
+        download_manager: std::rc::Rc<dyn DownloadManagerInterface>,
         repository_manager: std::rc::Rc<dyn RepositoryManagerInterface>,
         locker: std::rc::Rc<dyn LockerInterface>,
         installation_manager: std::rc::Rc<dyn InstallationManagerInterface>,
@@ -250,12 +250,8 @@ impl Installer {
             )?;
         }
 
-        self.download_manager
-            .borrow_mut()
-            .set_prefer_source(self.prefer_source);
-        self.download_manager
-            .borrow_mut()
-            .set_prefer_dist(self.prefer_dist);
+        self.download_manager.set_prefer_source(self.prefer_source);
+        self.download_manager.set_prefer_dist(self.prefer_dist);
 
         let local_repo = self.repository_manager.get_local_repository();
 

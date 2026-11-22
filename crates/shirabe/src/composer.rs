@@ -144,7 +144,7 @@ impl PartialComposer {
 pub struct Composer {
     partial: PartialComposer,
     locker: Option<std::rc::Rc<dyn LockerInterface>>,
-    download_manager: Option<std::rc::Rc<std::cell::RefCell<dyn DownloadManagerInterface>>>,
+    download_manager: Option<std::rc::Rc<dyn DownloadManagerInterface>>,
     // TODO(plugin): plugin_manager is part of the plugin API
     plugin_manager: Option<std::rc::Rc<std::cell::RefCell<PluginManager>>>,
     autoload_generator: Option<std::rc::Rc<std::cell::RefCell<dyn AutoloadGeneratorInterface>>>,
@@ -178,16 +178,11 @@ impl Composer {
         self.locker.as_ref().unwrap().clone()
     }
 
-    pub fn set_download_manager(
-        &mut self,
-        manager: std::rc::Rc<std::cell::RefCell<dyn DownloadManagerInterface>>,
-    ) {
+    pub fn set_download_manager(&mut self, manager: std::rc::Rc<dyn DownloadManagerInterface>) {
         self.download_manager = Some(manager);
     }
 
-    pub fn get_download_manager(
-        &self,
-    ) -> std::rc::Rc<std::cell::RefCell<dyn DownloadManagerInterface>> {
+    pub fn get_download_manager(&self) -> std::rc::Rc<dyn DownloadManagerInterface> {
         self.download_manager.as_ref().unwrap().clone()
     }
 

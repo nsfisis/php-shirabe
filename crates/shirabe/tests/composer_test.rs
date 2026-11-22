@@ -94,9 +94,8 @@ fn test_set_get_repository_manager() {
 #[test]
 fn test_set_get_download_manager() {
     let mut composer = Composer::new();
-    let manager: std::rc::Rc<std::cell::RefCell<dyn DownloadManagerInterface>> = std::rc::Rc::new(
-        std::cell::RefCell::new(DownloadManager::new(null_io(), false, None)),
-    );
+    let manager: std::rc::Rc<dyn DownloadManagerInterface> =
+        std::rc::Rc::new(DownloadManager::new(null_io(), false, None));
     composer.set_download_manager(manager.clone());
 
     assert!(std::rc::Rc::ptr_eq(

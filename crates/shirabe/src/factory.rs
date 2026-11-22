@@ -950,7 +950,7 @@ impl Factory {
         http_downloader: &std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
         process: &std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
         event_dispatcher: Option<&std::rc::Rc<EventDispatcher>>,
-    ) -> anyhow::Result<std::rc::Rc<std::cell::RefCell<DownloadManager>>> {
+    ) -> anyhow::Result<std::rc::Rc<DownloadManager>> {
         let cache_files_ttl = config.get_cache_files_ttl();
         let cache = if cache_files_ttl > 0 {
             let mut cache = Cache::new(
@@ -970,7 +970,7 @@ impl Factory {
             process.clone(),
         ))));
 
-        let mut dm = DownloadManager::new(io.clone(), false, Some(fs.clone()));
+        let dm = DownloadManager::new(io.clone(), false, Some(fs.clone()));
         let preferred = config.get_preferred_install()?;
         if preferred.loosely_equals("dist") {
             dm.set_prefer_dist(true);
@@ -1137,13 +1137,13 @@ impl Factory {
             )?)),
         );
 
-        Ok(std::rc::Rc::new(std::cell::RefCell::new(dm)))
+        Ok(std::rc::Rc::new(dm))
     }
 
     pub fn create_archive_manager(
         &self,
         _config: &Config,
-        dm: &std::rc::Rc<std::cell::RefCell<DownloadManager>>,
+        dm: &std::rc::Rc<DownloadManager>,
         r#loop: &std::rc::Rc<std::cell::RefCell<Loop>>,
     ) -> anyhow::Result<ArchiveManager> {
         let mut am = ArchiveManager::new(dm.clone(), r#loop.clone());

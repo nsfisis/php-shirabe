@@ -24,6 +24,7 @@ final class PhpObjectModel implements Linter
      */
     private const STRUCTS = [
         'crates/shirabe/src/config.rs' => ['Config'],
+        'crates/shirabe/src/downloader/download_manager.rs' => ['DownloadManager'],
         'crates/shirabe/src/event_dispatcher/event_dispatcher.rs' => ['EventDispatcher'],
         'crates/shirabe/src/installer/installation_manager.rs' => ['InstallationManager'],
         'crates/shirabe/src/package/locker.rs' => ['Locker'],
@@ -33,6 +34,8 @@ final class PhpObjectModel implements Linter
     /** The types and traits that are never wrapped in a `RefCell`. */
     private const HANDLE_TYPES = [
         'Config',
+        'DownloadManager',
+        'DownloadManagerInterface',
         'EventDispatcherInterface',
         'InstallationManager',
         'InstallationManagerInterface',

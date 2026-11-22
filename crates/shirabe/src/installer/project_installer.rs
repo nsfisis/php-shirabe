@@ -13,14 +13,14 @@ use shirabe_php_shim::{
 #[derive(Debug)]
 pub struct ProjectInstaller {
     install_path: std::path::PathBuf,
-    download_manager: std::rc::Rc<std::cell::RefCell<dyn DownloadManagerInterface>>,
+    download_manager: std::rc::Rc<dyn DownloadManagerInterface>,
     filesystem: std::rc::Rc<std::cell::RefCell<Filesystem>>,
 }
 
 impl ProjectInstaller {
     pub fn new(
         install_path: &std::path::Path,
-        dm: std::rc::Rc<std::cell::RefCell<dyn DownloadManagerInterface>>,
+        dm: std::rc::Rc<dyn DownloadManagerInterface>,
         fs: std::rc::Rc<std::cell::RefCell<Filesystem>>,
     ) -> Self {
         let install_path = std::path::PathBuf::from(path_from_bytes(&bformat!(
@@ -66,7 +66,6 @@ impl InstallerInterface for ProjectInstaller {
         }
 
         self.download_manager
-            .borrow()
             .download(package, install_path, prev_package)
             .await
     }
@@ -78,7 +77,6 @@ impl InstallerInterface for ProjectInstaller {
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         self.download_manager
-            .borrow()
             .prepare(r#type, package, &self.install_path, prev_package)
             .await
     }
@@ -90,7 +88,6 @@ impl InstallerInterface for ProjectInstaller {
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         self.download_manager
-            .borrow()
             .cleanup(r#type, package, &self.install_path, prev_package)
             .await
     }
@@ -101,7 +98,6 @@ impl InstallerInterface for ProjectInstaller {
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
         self.download_manager
-            .borrow()
             .install(package, &self.install_path)
             .await
     }

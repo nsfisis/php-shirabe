@@ -15,7 +15,7 @@ use shirabe_php_shim::{
 };
 
 pub struct ArchiveManager {
-    download_manager: std::rc::Rc<std::cell::RefCell<DownloadManager>>,
+    download_manager: std::rc::Rc<DownloadManager>,
     r#loop: std::rc::Rc<std::cell::RefCell<Loop>>,
     archivers: Vec<Box<dyn ArchiverInterface>>,
     overwrite_files: bool,
@@ -31,7 +31,7 @@ impl std::fmt::Debug for ArchiveManager {
 
 impl ArchiveManager {
     pub fn new(
-        download_manager: std::rc::Rc<std::cell::RefCell<DownloadManager>>,
+        download_manager: std::rc::Rc<DownloadManager>,
         r#loop: std::rc::Rc<std::cell::RefCell<Loop>>,
     ) -> Self {
         Self {
@@ -159,7 +159,6 @@ impl ArchiveManager {
                     &self.r#loop,
                     Some(Box::pin(async {
                         self.download_manager
-                            .borrow()
                             .download(package.clone().into(), &source_path, None)
                             .await
                             .map(|_| ())
@@ -170,7 +169,6 @@ impl ArchiveManager {
                     &self.r#loop,
                     Some(Box::pin(async {
                         self.download_manager
-                            .borrow()
                             .install(package.clone().into(), &source_path)
                             .await
                             .map(|_| ())

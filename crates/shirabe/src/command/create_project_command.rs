@@ -684,8 +684,8 @@ impl CreateProjectCommand {
         }
 
         let dm = composer.get_download_manager();
-        dm.borrow_mut().set_prefer_source(prefer_source);
-        dm.borrow_mut().set_prefer_dist(prefer_dist);
+        dm.set_prefer_source(prefer_source);
+        dm.set_prefer_dist(prefer_dist);
 
         let project_installer = ProjectInstaller::new(&directory, dm.clone(), fs);
         let installation_manager = composer.get_installation_manager();

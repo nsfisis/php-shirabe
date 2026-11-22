@@ -402,8 +402,8 @@ fn test_installer() {
             .with("notify-on-install", PhpMixed::Bool(true))
             .build_shared();
 
-        let download_manager: std::rc::Rc<std::cell::RefCell<dyn DownloadManagerInterface>> =
-            std::rc::Rc::new(std::cell::RefCell::new(StubDownloadManager));
+        let download_manager: std::rc::Rc<dyn DownloadManagerInterface> =
+            std::rc::Rc::new(StubDownloadManager);
 
         let http_downloader = std::rc::Rc::new(std::cell::RefCell::new(
             HttpDownloader::__new_mock(io.clone(), config.clone()),

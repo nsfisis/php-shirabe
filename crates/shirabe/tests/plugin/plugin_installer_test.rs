@@ -328,7 +328,7 @@ pub(crate) fn set_up() -> SetUp {
     {
         let mut c = composer.borrow_mut();
         c.set_config(std::rc::Rc::new(config));
-        c.set_download_manager(std::rc::Rc::new(std::cell::RefCell::new(dm)));
+        c.set_download_manager(std::rc::Rc::new(dm));
         c.set_repository_manager(std::rc::Rc::new(repository_manager));
         c.set_installation_manager(std::rc::Rc::new(installation_manager));
         c.set_autoload_generator(autoload_generator.clone());

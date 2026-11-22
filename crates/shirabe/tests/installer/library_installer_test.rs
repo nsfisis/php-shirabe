@@ -124,7 +124,7 @@ fn set_download_manager(setup: &SetUp, dm: MockDownloadManager) {
     setup
         .composer_full
         .borrow_mut()
-        .set_download_manager(std::rc::Rc::new(std::cell::RefCell::new(dm)));
+        .set_download_manager(std::rc::Rc::new(dm));
 }
 
 fn set_up() -> SetUp {
@@ -162,9 +162,7 @@ fn set_up() -> SetUp {
     // set_download_manager.
     composer
         .borrow_mut()
-        .set_download_manager(std::rc::Rc::new(std::cell::RefCell::new(
-            MockDownloadManager::new(),
-        )));
+        .set_download_manager(std::rc::Rc::new(MockDownloadManager::new()));
 
     let weak = PartialComposerHandle::from_rc(composer_rc).downgrade();
 
