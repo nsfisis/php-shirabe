@@ -21,6 +21,19 @@ final class FileFinder
         return self::walk("{$rootDir}/crates", static fn (string $path): bool => str_ends_with($path, '.rs'));
     }
 
+    // Returns absolute paths to the PHP files the worker runs (crates/*/php/runtime/**/*.php),
+    // sorted.
+    public static function phpRuntimeFiles(string $rootDir): array
+    {
+        $found = [];
+        foreach (glob("{$rootDir}/crates/*/php/runtime", GLOB_ONLYDIR) ?: [] as $dir) {
+            $found = [...$found, ...self::walk($dir, static fn (string $path): bool => str_ends_with($path, '.php'))];
+        }
+        sort($found);
+
+        return $found;
+    }
+
     // Returns absolute paths to mod.rs files under each crate's src/ tree
     // (crates/*/src/**/mod.rs), sorted.
     public static function modRsFiles(string $rootDir): array

@@ -20,14 +20,14 @@ final class UpstreamFileHash implements Linter
     {
         return "Found `ref: <file> sha1:<hash>` lines that do not match the sources under\n"
             . "composer/. On a hash mismatch, the file changed upstream: check that the Rust port\n"
-            . "follows it, then run `scripts/linters/upstream-file-hash update <rust-file>...`:";
+            . "or the PHP code follows it, then run `scripts/linters/upstream-file-hash update <file>...`:";
     }
 
     public function check(string $rootDir, array $excludes): array
     {
         $errors = [];
 
-        foreach (FileFinder::rustFiles($rootDir) as $path) {
+        foreach ([...FileFinder::rustFiles($rootDir), ...FileFinder::phpRuntimeFiles($rootDir)] as $path) {
             $relative = Paths::relativeTo($rootDir, $path);
             if (in_array($relative, $excludes, true)) {
                 continue;

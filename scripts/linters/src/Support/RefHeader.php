@@ -5,15 +5,17 @@ declare(strict_types=1);
 namespace Shirabe\Lint\Support;
 
 // A `ref:` line naming an upstream file, with the SHA-1 of that file's content. It is either the
-// `//! ref:` header of a Rust file that ports the upstream file, or a `// ref:` comment next to an
-// `include_str!` / `include_bytes!` that embeds it. The definition is documented in
+// `//! ref:` header of a Rust file that ports the upstream file, a `// ref:` comment next to an
+// `include_str!` / `include_bytes!` that embeds it, or a `// ref:` comment in the PHP code the
+// worker runs that ports or depends on it. The definition is documented in
 // docs/dev/porting-rules.md ("File and directory layout").
 final class RefHeader
 {
     // Any `ref:` line, so that one without a hash is reported instead of being skipped. A `// ref:`
     // comment counts only when it names a file under composer/: the tests also write `// ref:`
-    // followed by the upstream test method a helper stands for.
-    public const CANDIDATE_RE = '/^(?:\/\/! ref:|\s*\/\/ ref: composer\/)/';
+    // followed by the upstream test method a helper stands for. A doc comment naming a file under
+    // composer/ is matched only to be reported, as it is never checked otherwise.
+    public const CANDIDATE_RE = '/^(?:\/\/! ref:|\s*\/\/ ref: composer\/|\s*\/\/\/\s*ref:\s*composer\/)/';
 
     // `//! ref: composer/src/Composer/Json/JsonFile.php sha1:<40 hex>`, or the same with an
     // indented `//`. Groups: the leading comment marker, the file, the hash.

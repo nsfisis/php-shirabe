@@ -40,7 +40,7 @@ Do not merge multiple PHP files into a single Rust file, except in rare cases. W
 `ref:` line for every PHP file.
 
 The hash records the version of the upstream file that the port follows, so that a change upstream
-is detected when `composer/` is updated. `scripts/linters/upstream-file-hash update <rust-file>...`
+is detected when `composer/` is updated. `scripts/linters/upstream-file-hash update <file>...`
 writes the current hash into every `ref:` line of the files, adding it where it is missing. On a
 mismatch, compare the upstream change with the Rust port and update the port first.
 
@@ -52,6 +52,19 @@ Where Rust code embeds a file under `composer/` with `include_str!` or `include_
 pub const COMPOSER_SCHEMA_JSON: &'static [u8] =
     include_bytes!("../../../../composer/res/composer-schema.json");
 ```
+
+The same holds for the PHP code the worker runs (`crates/*/php/runtime/**/*.php`) where it ports
+or depends on an upstream file: write a `// ref:` comment for the file after the `<?php` line when
+the whole file follows it, or directly above the part that does:
+
+```php
+// ref: composer/src/Composer/Factory.php sha1:<40 hex digits>
+// The InstalledVersions part of Factory::createComposer, ...
+'__shirabe_safely_load_installed_versions' => static function ($args) {
+```
+
+Write a `ref:` line only in these forms. A doc comment (`/// ref: composer/...`) is reported as a
+malformed line, since it would otherwise go unchecked.
 
 ## Identifiers and class structure
 

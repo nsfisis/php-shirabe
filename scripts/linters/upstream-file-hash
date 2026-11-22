@@ -10,18 +10,19 @@ use Shirabe\Lint\Support\RefHeader;
 
 const USAGE = <<<'TXT'
 Usage:
-  upstream-file-hash update <rust-file>...
+  upstream-file-hash update <file>...
       Write the current hash of the upstream file into every `//! ref:` header and `// ref:`
-      comment, adding it where it is missing. Run it only after checking that the Rust port follows the upstream file.
+      comment of the Rust or PHP files, adding it where it is missing. Run it only after checking
+      that the port follows the upstream file.
 
 TXT;
 
 $rootDir = dirname(__DIR__, 2);
 
-function update(string $rootDir, string $rustPath): bool
+function update(string $rootDir, string $path): bool
 {
-    $lines = explode("\n", file_get_contents($rustPath));
-    $relative = Paths::relativeTo($rootDir, realpath($rustPath));
+    $lines = explode("\n", file_get_contents($path));
+    $relative = Paths::relativeTo($rootDir, realpath($path));
     $ok = true;
 
     foreach ($lines as $idx => $line) {
@@ -40,7 +41,7 @@ function update(string $rootDir, string $rustPath): bool
             $ok = false;
         }
     }
-    file_put_contents($rustPath, implode("\n", $lines));
+    file_put_contents($path, implode("\n", $lines));
 
     return $ok;
 }
@@ -50,8 +51,8 @@ $args = array_slice($argv, 2);
 
 if ($command === 'update' && $args !== []) {
     $ok = true;
-    foreach ($args as $rustPath) {
-        $ok = update($rootDir, $rustPath) && $ok;
+    foreach ($args as $path) {
+        $ok = update($rootDir, $path) && $ok;
     }
     exit($ok ? 0 : 1);
 }

@@ -33,7 +33,7 @@ final class UpstreamIncludeRef implements Linter
             . "`// ref: <file> sha1:<hash>` comment in the statement or item that embeds it, or a\n"
             . "`// ref:` comment that no such embedding follows. Write the comment above the\n"
             . "embedding with the path of the file, then run\n"
-            . "`scripts/linters/upstream-file-hash update <rust-file>...`:";
+            . "`scripts/linters/upstream-file-hash update <file>...`:";
     }
 
     public function check(string $rootDir, array $excludes): array
