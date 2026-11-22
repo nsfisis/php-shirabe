@@ -1,5 +1,6 @@
 //! ref: composer/tests/Composer/Test/DependencyResolver/PoolOptimizerTest.php sha1:03d43302268d6664f350b63398ce191085833df9
 
+use crate::ignored_fixtures::IgnoredFixtures;
 use bstr::{B, BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe::dependency_resolver::{DefaultPolicy, Pool, PoolOptimizer, Request};
@@ -9,7 +10,7 @@ use shirabe::package::loader::{ArrayLoader, LoaderInterface};
 use shirabe::package::version::VersionParser;
 use shirabe::repository::{LockArrayRepository, LockArrayRepositoryHandle};
 use shirabe_php_shim::{
-    PhpMixed, bformat, file_get_contents, path_to_bytes, php_regex, preg_is_match,
+    PhpMixed, bformat, file_get_contents, path_from_bytes, path_to_bytes, php_regex, preg_is_match,
     preg_split_delim_capture, str_replace,
 };
 
@@ -117,6 +118,12 @@ fn collect_test_files(dir: &std::path::Path, out: &mut Vec<std::path::PathBuf>) 
     }
 }
 
+fn fixtures_dir() -> std::path::PathBuf {
+    let fixtures_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../composer/tests/Composer/Test/DependencyResolver/Fixtures/pooloptimizer");
+    std::fs::canonicalize(&fixtures_dir).unwrap()
+}
+
 fn provide_integration_tests() -> IndexMap<
     BString,
     (
@@ -126,9 +133,7 @@ fn provide_integration_tests() -> IndexMap<
         BString,
     ),
 > {
-    let fixtures_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../composer/tests/Composer/Test/DependencyResolver/Fixtures/pooloptimizer");
-    let fixtures_dir = std::fs::canonicalize(&fixtures_dir).unwrap();
+    let fixtures_dir = fixtures_dir();
 
     let mut files: Vec<std::path::PathBuf> = Vec::new();
     collect_test_files(&fixtures_dir, &mut files);
@@ -245,8 +250,12 @@ fn run_test_pool_optimizer(
 
 #[test]
 fn test_pool_optimizer() {
+    let ignored_fixtures = IgnoredFixtures::load(BStr::new(file!()));
     let tests = provide_integration_tests();
-    for (_name, (request_data, packages_before, expected_packages, message)) in tests {
+    for (name, (request_data, packages_before, expected_packages, message)) in tests {
+        if ignored_fixtures.is_ignored(&fixtures_dir().join(path_from_bytes(&name))) {
+            continue;
+        }
         run_test_pool_optimizer(&request_data, packages_before, &expected_packages, &message);
     }
 }

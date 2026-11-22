@@ -7,11 +7,14 @@
 
 #[path = "common/bootstrap.rs"]
 mod bootstrap;
+#[path = "common/ignored_fixtures.rs"]
+mod ignored_fixtures;
 #[path = "common/test_case.rs"]
 mod test_case;
 
 use crate::test_case::get_unique_tmp_directory;
 use bstr::{B, BStr, BString, ByteSlice as _};
+use ignored_fixtures::IgnoredFixtures;
 use indexmap::IndexMap;
 use shirabe::util::Filesystem;
 use shirabe_php_shim::{
@@ -289,17 +292,9 @@ fn get_test_files() -> Vec<BString> {
 #[test]
 #[serial_test::serial]
 fn test_integration() {
+    let ignored_fixtures = IgnoredFixtures::load(BStr::new(file!()));
     for test_file in get_test_files() {
-        if test_file == "installed-versions.test" {
-            // TODO(plugin): the fixture's Hooks read Composer\InstalledVersions, which is not
-            // autoloadable in the plugin worker (the fixture ships no vendor/ directory), so the
-            // pre-update hook aborts with `Class "Composer\InstalledVersions" not found`.
-            continue;
-        }
-        if test_file == "installed-versions2.test" {
-            // TODO(plugin): the plugin worker's Composer\InstalledVersions is only reloaded on a
-            // repository write, never seeded from the project's installed.php at boot, so the
-            // fixture's plugins fail with `Package "plugin/a" is not installed`.
+        if ignored_fixtures.is_ignored(&fixtures_dir().join(path_from_bytes(&test_file))) {
             continue;
         }
         run_integration(test_file.as_bstr());

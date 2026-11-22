@@ -1,5 +1,7 @@
 #[path = "../common/bootstrap.rs"]
 mod bootstrap;
+#[path = "../common/ignored_fixtures.rs"]
+mod ignored_fixtures;
 #[path = "../common/test_case.rs"]
 mod test_case;
 

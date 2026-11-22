@@ -4,14 +4,17 @@
 mod bootstrap;
 #[path = "common/config_stub.rs"]
 mod config_stub;
+#[path = "common/ignored_fixtures.rs"]
+mod ignored_fixtures;
 #[path = "common/test_case.rs"]
 mod test_case;
 
 use bstr::{B, BStr, BString, ByteSlice as _};
 use config_stub::ConfigStubBuilder;
+use ignored_fixtures::IgnoredFixtures;
 use shirabe_php_shim::{
-    PHP_EOL, PhpJson, PhpMixed, ToPhpString, bformat, error_message, implode, path_to_bytes,
-    php_fopen_resource, php_regex, preg_is_match, preg_match, preg_replace,
+    PHP_EOL, PhpJson, PhpMixed, ToPhpString, bformat, error_message, implode, path_from_bytes,
+    path_to_bytes, php_fopen_resource, php_regex, preg_is_match, preg_match, preg_replace,
     preg_split_delim_capture, rewind, rtrim, str_replace, stream_get_contents, trim, utf8_text,
 };
 use shirabe_symfony_console::input::{
@@ -1341,18 +1344,11 @@ fn php_mixed_map_to_json(map: &IndexMap<BString, PhpMixed>) -> serde_json::Value
 #[serial_test::serial]
 fn test_slow_integration() {
     let _tear_down = TearDown::new();
+    let ignored_fixtures = IgnoredFixtures::load(BStr::new(file!()));
     for case in load_integration_tests("installer-slow/") {
-        if case.file == "github-issues-7665.test" {
-            // TODO(upstream): upstream Composer defect (composer/composer#12111), not a porting
-            // bug. Problem::getPrettyString breaks RULE_LEARNED sort ties with
-            // getSortableString() <=> getSortableString(), which compares numerically when both
-            // sides are numeric strings and by byte otherwise, so it is not transitive. Those
-            // sortable strings are SAT-solver literal ids assigned sequentially while rules are
-            // generated, so their values shift with the pool's total package count, including
-            // platform packages that Installer::createPlatformRepo() derives from the real
-            // ambient PHP runtime, which Composer's own test suite never mocks. This fixture's
-            // expected order is therefore brittle to whichever extensions happen to be loaded on
-            // the machine that generates or runs it. Nothing to fix on the Rust side.
+        if ignored_fixtures
+            .is_ignored(&fixtures_dir("installer-slow/").join(path_from_bytes(&case.file)))
+        {
             continue;
         }
         Platform::clear_env("COMPOSER_FUND").unwrap();
@@ -1366,7 +1362,13 @@ fn test_slow_integration() {
 #[serial_test::serial]
 fn test_integration_with_pool_optimizer() {
     let _tear_down = TearDown::new();
+    let ignored_fixtures = IgnoredFixtures::load(BStr::new(file!()));
     for case in load_integration_tests("installer/") {
+        if ignored_fixtures
+            .is_ignored(&fixtures_dir("installer/").join(path_from_bytes(&case.file)))
+        {
+            continue;
+        }
         Platform::clear_env("COMPOSER_FUND").unwrap();
         Platform::put_env("COMPOSER_POOL_OPTIMIZER", "1").unwrap();
         let expect_output = case
@@ -1382,7 +1384,13 @@ fn test_integration_with_pool_optimizer() {
 #[serial_test::serial]
 fn test_integration_with_raw_pool() {
     let _tear_down = TearDown::new();
+    let ignored_fixtures = IgnoredFixtures::load(BStr::new(file!()));
     for case in load_integration_tests("installer/") {
+        if ignored_fixtures
+            .is_ignored(&fixtures_dir("installer/").join(path_from_bytes(&case.file)))
+        {
+            continue;
+        }
         Platform::clear_env("COMPOSER_FUND").unwrap();
         Platform::put_env("COMPOSER_POOL_OPTIMIZER", "0").unwrap();
         let expect_output = case.expect_output.clone();

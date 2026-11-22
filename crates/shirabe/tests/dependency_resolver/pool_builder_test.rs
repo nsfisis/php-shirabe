@@ -1,5 +1,6 @@
 //! ref: composer/tests/Composer/Test/DependencyResolver/PoolBuilderTest.php sha1:7d7dab74920d7704bf7f062e0fee6186abbb9c61
 
+use crate::ignored_fixtures::IgnoredFixtures;
 use bstr::{B, BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe::config::Config;
@@ -16,8 +17,8 @@ use shirabe::repository::{
     RepositoryFactory, RepositoryInterfaceHandle, RepositorySet, RootAliasInput,
 };
 use shirabe_php_shim::{
-    PhpMixed, ToPhpString, bformat, display_to_bytes, file_get_contents, path_to_bytes, php_regex,
-    preg_is_match, preg_split_delim_capture, str_replace, utf8_text,
+    PhpMixed, ToPhpString, bformat, display_to_bytes, file_get_contents, path_from_bytes,
+    path_to_bytes, php_regex, preg_is_match, preg_split_delim_capture, str_replace, utf8_text,
 };
 
 /// Maps the PHP `$loadPackage` closure: pops the optional `id` from the data, loads the
@@ -618,8 +619,12 @@ fn test_pool_builder() {
         .join("../../composer/tests/Composer/Test/DependencyResolver/Fixtures/poolbuilder");
     let fixtures_dir = std::fs::canonicalize(&fixtures_dir).unwrap();
 
+    let ignored_fixtures = IgnoredFixtures::load(BStr::new(file!()));
     let tests = get_integration_tests(&fixtures_dir);
     for (_name, test) in tests {
+        if ignored_fixtures.is_ignored(&fixtures_dir.join(path_from_bytes(&test.file))) {
+            continue;
+        }
         run_test_pool_builder(
             &fixtures_dir,
             test.file.as_bstr(),
