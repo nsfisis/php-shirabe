@@ -542,7 +542,7 @@ impl Factory {
         let mut rm = None;
         let mut im = None;
         let composer = std::rc::Rc::new_cyclic(
-            |composer_weak: &std::rc::Weak<std::cell::RefCell<PartialOrFullComposer>>| {
+            |composer_weak: &std::rc::Weak<PartialOrFullComposer>| {
                 let mut build = || -> anyhow::Result<PartialOrFullComposer> {
                     let mut composer: PartialOrFullComposer = if full_load {
                         PartialOrFullComposer::new_full()
@@ -756,10 +756,10 @@ impl Factory {
                     Ok(composer)
                 };
                 match build() {
-                    Ok(composer) => std::cell::RefCell::new(composer),
+                    Ok(composer) => composer,
                     Err(e) => {
                         build_error = Some(e);
-                        std::cell::RefCell::new(PartialOrFullComposer::new_partial())
+                        PartialOrFullComposer::new_partial()
                     }
                 }
             },
@@ -773,13 +773,8 @@ impl Factory {
         // upgrade the Composer back-reference in their constructors, which only becomes upgradeable
         // once Rc::new_cyclic has returned.
         {
-            let im = composer.borrow().get_installation_manager();
-            let process = composer
-                .borrow()
-                .get_loop()
-                .borrow()
-                .get_process_executor()
-                .cloned();
+            let im = composer.get_installation_manager();
+            let process = composer.get_loop().borrow().get_process_executor().cloned();
             self.create_default_installers(
                 &im,
                 PartialComposerWeakHandle::from_weak(std::rc::Rc::downgrade(&composer)),
@@ -793,10 +788,7 @@ impl Factory {
         // PluginManager::new upgrades the Composer back-reference to read its config and locker, so
         // it must be built after Rc::new_cyclic returns; inside the closure the Rc is not yet
         // constructed and the weak handle cannot upgrade.
-        let (is_full, is_global) = {
-            let c = composer.borrow();
-            (c.is_full(), c.is_global())
-        };
+        let (is_full, is_global) = (composer.is_full(), composer.is_global());
         if is_full {
             let global_composer = if !is_global {
                 self.create_global_composer(
@@ -817,11 +809,7 @@ impl Factory {
                 disable_plugins,
             )?;
             let pm = std::rc::Rc::new(std::cell::RefCell::new(pm));
-            composer
-                .borrow_mut()
-                .as_full_mut()
-                .unwrap()
-                .set_plugin_manager(pm.clone());
+            composer.as_full().unwrap().set_plugin_manager(pm.clone());
 
             if is_global {
                 pm.borrow_mut().set_running_in_global_dir(true);
@@ -834,7 +822,7 @@ impl Factory {
             // the Composer through the dispatcher) is safe only after the Rc has been constructed.
             let init_event = Event::from_name(PluginEvents::INIT.to_php_string());
             let init_event_name = init_event.get_name().to_owned();
-            let dispatcher = composer.borrow().get_event_dispatcher();
+            let dispatcher = composer.get_event_dispatcher();
             dispatcher.dispatch(
                 Some(init_event_name.as_ref()),
                 Some(std::rc::Rc::new(std::cell::RefCell::new(init_event))),
@@ -1198,7 +1186,7 @@ impl Factory {
             let composer_rc = composer
                 .upgrade()
                 .expect("Composer must outlive create_default_installers");
-            let composer_ref = composer_rc.borrow_partial();
+            let composer_ref = &composer_rc;
             let config = composer_ref.get_config();
             let bin_dir = std::path::PathBuf::from(path_from_bytes(&rtrim_chars(
                 config.get_path("bin-dir")?,

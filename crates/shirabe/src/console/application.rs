@@ -220,7 +220,6 @@ impl Application {
         let disk_hint_msg: Option<BString> = (|| -> anyhow::Result<Option<BString>> {
             let composer = self.get_composer(false, Some(true), None)?;
             if let Some(composer) = composer {
-                let composer = composer.borrow_partial();
                 let config = composer.get_config();
 
                 let min_space_free: f64 = 100.0 * 1024.0 * 1024.0;
@@ -537,7 +536,7 @@ impl Application {
             let composer = composer
                 .as_full()
                 .expect("Factory::create and Factory::create_global build a full Composer");
-            let pm = composer.borrow().get_plugin_manager();
+            let pm = composer.get_plugin_manager();
             let mut ctor_args: IndexMap<BString, shirabe_php_rpc::RpcValue> = IndexMap::new();
             ctor_args.insert(
                 BString::from("composer"),

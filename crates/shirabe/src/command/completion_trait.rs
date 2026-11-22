@@ -53,7 +53,7 @@ pub trait CompletionTrait: BaseCommand {
 
             if include_root_package {
                 installed_repos.push(RepositoryInterfaceHandle::new(RootPackageRepository::new(
-                    RootPackageInterfaceHandle::dup(composer.get_package()),
+                    RootPackageInterfaceHandle::dup(&composer.get_package()),
                 )));
             }
 
@@ -134,7 +134,7 @@ pub trait CompletionTrait: BaseCommand {
 
             if include_root_package {
                 installed_repos.push(RepositoryInterfaceHandle::new(RootPackageRepository::new(
-                    RootPackageInterfaceHandle::dup(composer.get_package()),
+                    RootPackageInterfaceHandle::dup(&composer.get_package()),
                 )));
             }
 
@@ -172,7 +172,6 @@ pub trait CompletionTrait: BaseCommand {
             let composer = this.require_composer(None, None)?;
             let composer = composer_full(&composer);
             let repository_manager = composer.get_repository_manager();
-            let repository_manager = repository_manager;
             let mut repos = CompositeRepository::new(repository_manager.get_repositories().clone());
 
             let mut results: Vec<SearchResult> = vec![];

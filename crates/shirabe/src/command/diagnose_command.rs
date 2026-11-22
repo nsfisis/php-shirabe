@@ -1171,7 +1171,6 @@ impl Command for DiagnoseCommand {
         config_inner.insert("secure-http".into(), PhpMixed::Bool(false));
         let mut secure_http_wrap: IndexMap<BString, PhpMixed> = IndexMap::new();
         secure_http_wrap.insert("config".into(), PhpMixed::Array(config_inner));
-        let config = config;
         config.merge(&secure_http_wrap, Config::SOURCE_COMMAND);
         let _ = config.prohibit_url_by_config(
             "http://repo.packagist.org".into(),
@@ -1301,7 +1300,6 @@ impl Command for DiagnoseCommand {
             if c.get_locker().is_locked() {
                 io.write_no_newline("Checking composer.lock: ");
                 let locker = c.get_locker().clone();
-                let locker = locker;
                 let r = self.check_composer_lock_schema(&*locker)?;
                 self.output_result(r);
             }

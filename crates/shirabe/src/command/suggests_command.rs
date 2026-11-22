@@ -121,7 +121,7 @@ impl Command for SuggestsCommand {
 
         let mut installed_repos: Vec<RepositoryInterfaceHandle> =
             vec![RepositoryInterfaceHandle::new(RootPackageRepository::new(
-                RootPackageInterfaceHandle::dup(composer.get_package()),
+                RootPackageInterfaceHandle::dup(&composer.get_package()),
             ))];
 
         if composer.get_locker().is_locked() {

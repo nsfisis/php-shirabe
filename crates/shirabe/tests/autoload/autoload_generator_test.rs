@@ -192,9 +192,8 @@ fn set_up() -> SetUp {
 
     // EventDispatcher constructor is disabled in PHP and dispatch is never called when run-scripts
     // is off (the default), so a real dispatcher over an empty Composer is a faithful no-op stand-in.
-    let composer = ComposerHandle::from_rc_unchecked(std::rc::Rc::new(std::cell::RefCell::new(
-        PartialOrFullComposer::new_full(),
-    )));
+    let composer =
+        ComposerHandle::from_rc_unchecked(std::rc::Rc::new(PartialOrFullComposer::new_full()));
     let event_dispatcher = std::rc::Rc::new(EventDispatcher::new(
         composer.upcast().downgrade(),
         dispatcher_io.clone(),

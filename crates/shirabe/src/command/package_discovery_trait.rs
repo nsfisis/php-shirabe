@@ -185,8 +185,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
 
         // Collect existing packages
         let composer = self.try_composer(None, None);
-        let composer_ref = composer.as_ref().map(|c| c.borrow_partial());
-        let repository_manager = composer_ref.as_ref().map(|c| c.get_repository_manager());
+        let repository_manager = composer.as_ref().map(|c| c.get_repository_manager());
         let installed_repo = repository_manager
             .as_ref()
             .map(|rm| rm.get_local_repository());
@@ -199,7 +198,6 @@ pub trait PackageDiscoveryTrait: BaseCommand {
         // PHP: unset($composer, $installedRepo);
         drop(installed_repo);
         drop(repository_manager);
-        drop(composer_ref);
         drop(composer);
 
         let io = self.get_io();
@@ -668,9 +666,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
         let mut similar_packages: IndexMap<BString, i64> = IndexMap::new();
 
         let composer_for_installed = self.require_composer(None, None)?;
-        let composer_for_installed = composer_for_installed.borrow_partial();
         let repository_manager = composer_for_installed.get_repository_manager().clone();
-        let repository_manager = repository_manager;
         let installed_repo = repository_manager.get_local_repository();
 
         for result in &results {

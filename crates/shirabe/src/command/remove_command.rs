@@ -221,7 +221,6 @@ impl Command for RemoveCommand {
             let composer = composer_full(&composer);
             {
                 let locker = composer.get_locker().clone();
-                let locker = locker;
                 if !locker.is_locked() {
                     return Err(UnexpectedValueException::new(BString::from(
                         "A valid composer.lock file is required to run this command with --unused",

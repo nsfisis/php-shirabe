@@ -58,7 +58,7 @@ fn test_alias_packages_cross_the_plugin_boundary() {
         BString::from("1.1.0"),
     )
     .unwrap();
-    set_up.composer.borrow_mut().set_package(root_alias.into());
+    set_up.composer.set_package(root_alias.into());
 
     let installer = new_installer(&set_up);
     set_up.pm.borrow_mut().load_installed_plugins().unwrap();

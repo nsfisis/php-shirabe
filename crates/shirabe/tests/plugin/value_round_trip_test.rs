@@ -141,7 +141,7 @@ fn describe_links(links: &IndexMap<BString, Link>) -> Vec<BString> {
 fn test_links_and_release_date_round_trip_through_the_plugin() {
     let _worker = lock_php_worker();
     let set_up = set_up();
-    let package = set_up.composer.borrow().get_package().clone();
+    let package = set_up.composer.get_package().clone();
     package
         .set_requires(
             seeded_requires()
@@ -203,7 +203,7 @@ fn link_pretty_constraint_fixture_package() -> PackageInterfaceHandle {
 fn test_link_without_pretty_constraint_throws_on_both_sides() {
     let _worker = lock_php_worker();
     let set_up = set_up();
-    let package = set_up.composer.borrow().get_package().clone();
+    let package = set_up.composer.get_package().clone();
     let mut requires = IndexMap::new();
     requires.insert(
         BString::from("foo/set"),

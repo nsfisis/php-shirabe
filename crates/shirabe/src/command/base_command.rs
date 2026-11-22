@@ -823,7 +823,7 @@ pub fn base_command_initialize(
             command_name,
         );
         let pre_command_run_event_name = pre_command_run_event.get_name().to_owned();
-        let dispatcher = composer.borrow_partial().get_event_dispatcher();
+        let dispatcher = composer.get_event_dispatcher();
         dispatcher.dispatch(
             Some(pre_command_run_event_name.as_ref()),
             Some(std::rc::Rc::new(std::cell::RefCell::new(

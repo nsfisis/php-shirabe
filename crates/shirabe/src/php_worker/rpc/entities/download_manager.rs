@@ -76,7 +76,6 @@ fn graph_http_downloader(
     dm: &std::rc::Rc<dyn DownloadManagerInterface>,
 ) -> Result<std::rc::Rc<std::cell::RefCell<HttpDownloader>>, PhpThrow> {
     for composer in table::entities::<ComposerHandle>() {
-        let composer = composer.borrow();
         if std::rc::Rc::ptr_eq(&composer.get_download_manager(), dm) {
             return Ok(composer.get_loop().borrow().get_http_downloader().clone());
         }

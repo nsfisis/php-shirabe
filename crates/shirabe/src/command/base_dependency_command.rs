@@ -54,7 +54,7 @@ pub trait BaseDependencyCommand: BaseCommand {
             output.clone(),
         );
         let command_event_name = command_event.get_name().to_owned();
-        let event_dispatcher = composer.borrow_partial().get_event_dispatcher();
+        let event_dispatcher = composer.get_event_dispatcher();
         event_dispatcher.dispatch(
             Some(command_event_name.as_ref()),
             Some(std::rc::Rc::new(std::cell::RefCell::new(command_event))),
@@ -62,7 +62,7 @@ pub trait BaseDependencyCommand: BaseCommand {
         let composer = composer_full(&composer);
 
         let mut repos: Vec<RepositoryInterfaceHandle> = vec![RepositoryInterfaceHandle::new(
-            RootPackageRepository::new(RootPackageInterfaceHandle::dup(composer.get_package())),
+            RootPackageRepository::new(RootPackageInterfaceHandle::dup(&composer.get_package())),
         )];
 
         if input
@@ -72,7 +72,6 @@ pub trait BaseDependencyCommand: BaseCommand {
             .unwrap_or(false)
         {
             let locker = composer.get_locker().clone();
-            let locker = locker;
 
             if !locker.is_locked() {
                 return Err(UnexpectedValueException::new(BString::from(
@@ -95,7 +94,6 @@ pub trait BaseDependencyCommand: BaseCommand {
             )?));
         } else {
             let repository_manager = composer.get_repository_manager().clone();
-            let repository_manager = repository_manager;
             let local_repo = repository_manager.get_local_repository();
             let root_pkg = composer.get_package();
 

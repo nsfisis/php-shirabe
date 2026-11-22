@@ -70,7 +70,7 @@ impl Command for ClearCacheCommand {
         _output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
         let composer = self.try_composer(None, None);
-        let config_rc = composer.as_ref().map(|c| c.borrow_partial().get_config());
+        let config_rc = composer.as_ref().map(|c| c.get_config());
         let created_config = if config_rc.is_none() {
             Some(Factory::create_config(None, None)?)
         } else {

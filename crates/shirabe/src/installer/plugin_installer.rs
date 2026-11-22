@@ -65,7 +65,6 @@ impl PluginInstaller {
             .expect("Composer handle dropped")
             .as_full()
             .expect("PluginInstaller should be initialized with a fully loaded Composer instance.")
-            .borrow()
             .get_plugin_manager()
     }
 }

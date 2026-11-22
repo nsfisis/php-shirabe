@@ -49,29 +49,24 @@ impl Drop for TearDown {
 /// The RepositoryManager / AutoloadGenerator / InstallationManager are what the autoloader-rebuild
 /// path reaches for, which happens for PHP-script and array callables.
 fn create_composer_instance() -> ComposerHandle {
-    let composer = ComposerHandle::from_rc_unchecked(std::rc::Rc::new(std::cell::RefCell::new(
-        PartialOrFullComposer::new_full(),
-    )));
+    let composer =
+        ComposerHandle::from_rc_unchecked(std::rc::Rc::new(PartialOrFullComposer::new_full()));
     let config = std::rc::Rc::new(Config::new(true, None));
-    composer.borrow_mut().set_config(config);
+    composer.set_config(config);
     let package: RootPackageInterfaceHandle = RootPackageHandle::new(
         BString::from("foo"),
         BString::from("1.0.0.0"),
         BString::from("1.0.0"),
     )
     .into();
-    composer.borrow_mut().set_package(package);
+    composer.set_package(package);
 
     let mut repository_manager = MockRepositoryManager::new();
     repository_manager
         .expect_get_local_repository()
         .returning(|| RepositoryInterfaceHandle::new(InstalledArrayRepository::new().unwrap()));
-    composer
-        .borrow_mut()
-        .set_repository_manager(std::rc::Rc::new(repository_manager));
-    composer
-        .borrow_mut()
-        .set_installation_manager(std::rc::Rc::new(MockInstallationManager::new()));
+    composer.set_repository_manager(std::rc::Rc::new(repository_manager));
+    composer.set_installation_manager(std::rc::Rc::new(MockInstallationManager::new()));
     let generator = AutoloadGenerator::new(
         std::rc::Rc::new(EventDispatcher::new(
             composer.upcast().downgrade(),
@@ -80,9 +75,7 @@ fn create_composer_instance() -> ComposerHandle {
         )),
         None,
     );
-    composer
-        .borrow_mut()
-        .set_autoload_generator(std::rc::Rc::new(std::cell::RefCell::new(generator)));
+    composer.set_autoload_generator(std::rc::Rc::new(std::cell::RefCell::new(generator)));
 
     composer
 }
@@ -383,7 +376,7 @@ fn test_dispatcher_doesnt_return_skipped_scripts() {
         BString::from("scriptName"),
         vec![BString::from("scriptName")],
     );
-    composer.borrow().get_package().set_scripts(
+    composer.get_package().set_scripts(
         scripts
             .into_iter()
             .map(|(k, v)| (k, v.into_iter().collect::<Vec<_>>()))
@@ -610,9 +603,7 @@ fn test_dispatcher_pass_dev_mode_to_autoload_generator_for_script_events() {
                 None,
             ))))
         });
-        composer
-            .borrow_mut()
-            .set_autoload_generator(std::rc::Rc::new(std::cell::RefCell::new(generator)));
+        composer.set_autoload_generator(std::rc::Rc::new(std::cell::RefCell::new(generator)));
 
         let package: RootPackageInterfaceHandle = RootPackageHandle::new(
             BString::from("foo"),
@@ -631,18 +622,14 @@ fn test_dispatcher_pass_dev_mode_to_autoload_generator_for_script_events() {
                 .map(|(k, v)| (k, v.into_iter().collect::<Vec<_>>()))
                 .collect::<indexmap::IndexMap<_, _>>(),
         );
-        composer.borrow_mut().set_package(package);
+        composer.set_package(package);
 
         let mut repository_manager = MockRepositoryManager::new();
         repository_manager
             .expect_get_local_repository()
             .returning(|| RepositoryInterfaceHandle::new(InstalledArrayRepository::new().unwrap()));
-        composer
-            .borrow_mut()
-            .set_repository_manager(std::rc::Rc::new(repository_manager));
-        composer
-            .borrow_mut()
-            .set_installation_manager(std::rc::Rc::new(MockInstallationManager::new()));
+        composer.set_repository_manager(std::rc::Rc::new(repository_manager));
+        composer.set_installation_manager(std::rc::Rc::new(MockInstallationManager::new()));
 
         let (process, _process_guard) =
             get_process_executor_mock(vec![], false, MockHandler::default());

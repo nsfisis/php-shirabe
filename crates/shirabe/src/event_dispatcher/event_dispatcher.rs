@@ -673,7 +673,6 @@ impl EventDispatcher {
                             .composer
                             .upgrade()
                             .expect("Composer was dropped before EventDispatcher use")
-                            .borrow_partial()
                             .get_package()
                             .get_binaries();
                         if !possible_local_binaries.is_empty() {
@@ -1023,7 +1022,6 @@ impl EventDispatcher {
     /// Finds all listeners defined as scripts in the package
     fn get_script_listeners(&self, event: &dyn EventInterface) -> Vec<Callable> {
         let composer = self.composer();
-        let composer = composer.borrow_partial();
         let package = composer.get_package();
         let scripts = package.get_scripts();
 
@@ -1100,11 +1098,7 @@ impl EventDispatcher {
         }
 
         // add the bin dir to the PATH to make local binaries of deps usable in scripts
-        let bin_dir = self
-            .composer()
-            .borrow_partial()
-            .get_config()
-            .get_path("bin-dir")?;
+        let bin_dir = self.composer().get_config().get_path("bin-dir")?;
         let bin_dir = std::path::PathBuf::from(path_from_bytes(&bin_dir));
         if is_dir(&bin_dir) {
             let bin_dir = realpath(&bin_dir).unwrap_or(bin_dir);
@@ -1147,11 +1141,11 @@ impl EventDispatcher {
             std::rc::Rc::make_mut(previous).insert(callable_key, true);
         });
 
-        let package = composer.borrow().get_package().clone();
-        let repository_manager = composer.borrow().get_repository_manager();
+        let package = composer.get_package().clone();
+        let repository_manager = composer.get_repository_manager();
         let local_repository = repository_manager.get_local_repository();
         let packages = local_repository.get_canonical_packages()?;
-        let generator = composer.borrow().get_autoload_generator();
+        let generator = composer.get_autoload_generator();
         let mut hash_input = implode(
             ",",
             &packages
@@ -1190,7 +1184,7 @@ impl EventDispatcher {
 
         self.previous_hash.set(Some(hash));
 
-        let installation_manager = composer.borrow().get_installation_manager();
+        let installation_manager = composer.get_installation_manager();
         let package_map = generator.borrow().build_package_map(
             installation_manager.clone(),
             package.clone(),
@@ -1204,7 +1198,7 @@ impl EventDispatcher {
             ClassLoader::unregister(&loader);
         }
 
-        let vendor_dir = composer.borrow().get_config().get_path("vendor-dir")?;
+        let vendor_dir = composer.get_config().get_path("vendor-dir")?;
         let loader = generator.borrow().create_loader(&map, Some(vendor_dir))?;
         ClassLoader::register(&loader, false);
         self.loader.set(Some(loader));
@@ -1212,11 +1206,7 @@ impl EventDispatcher {
     }
 
     fn cache_dir(&self) -> anyhow::Result<std::path::PathBuf> {
-        let cache_dir = self
-            .composer()
-            .borrow_partial()
-            .get_config()
-            .get_path("cache-dir")?;
+        let cache_dir = self.composer().get_config().get_path("cache-dir")?;
         Ok(path_from_bytes(&cache_dir).to_path_buf())
     }
 

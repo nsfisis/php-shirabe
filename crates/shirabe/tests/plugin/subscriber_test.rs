@@ -32,7 +32,7 @@ fn install_subscriber_plugin(set_up: &SetUp) {
 }
 
 fn dispatch(set_up: &SetUp, event_name: &BStr) -> i64 {
-    let dispatcher = set_up.composer.borrow().get_event_dispatcher();
+    let dispatcher = set_up.composer.get_event_dispatcher();
     let result = dispatcher.dispatch(Some(event_name), None);
     result.unwrap()
 }

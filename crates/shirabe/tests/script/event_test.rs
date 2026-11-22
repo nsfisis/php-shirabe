@@ -9,18 +9,17 @@ use shirabe::package::{RootPackageHandle, RootPackageInterfaceHandle};
 use shirabe::script::{Event, OriginatingEvent};
 
 fn create_composer_instance() -> ComposerHandle {
-    let composer = ComposerHandle::from_rc_unchecked(std::rc::Rc::new(std::cell::RefCell::new(
-        PartialOrFullComposer::new_full(),
-    )));
+    let composer =
+        ComposerHandle::from_rc_unchecked(std::rc::Rc::new(PartialOrFullComposer::new_full()));
     let config = std::rc::Rc::new(Config::new(true, None));
-    composer.borrow_mut().set_config(config);
+    composer.set_config(config);
     let package: RootPackageInterfaceHandle = RootPackageHandle::new(
         BString::from("foo"),
         BString::from("1.0.0.0"),
         BString::from("1.0.0"),
     )
     .into();
-    composer.borrow_mut().set_package(package);
+    composer.set_package(package);
     composer
 }
 

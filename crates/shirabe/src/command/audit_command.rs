@@ -56,7 +56,6 @@ impl AuditCommand {
             .unwrap_or(false)
         {
             let locker = composer.get_locker().clone();
-            let locker = locker;
             if !locker.is_locked() {
                 return Err(UnexpectedValueException::new(BString::from("Valid composer.json and composer.lock files are required to run this command with --locked")).into());
             }

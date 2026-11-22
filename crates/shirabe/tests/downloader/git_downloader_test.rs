@@ -79,7 +79,6 @@ fn get_package(
 
 /// ref: GitDownloaderTest::setupConfig (seeds a temp `home` when none is set)
 fn setup_config(config: Config) -> Config {
-    let config = config;
     if !config.has("home") {
         let tmp_dir = tempfile::TempDir::new().unwrap().keep();
         let mut top: IndexMap<BString, PhpMixed> = IndexMap::new();

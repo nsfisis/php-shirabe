@@ -227,9 +227,8 @@ impl Command for DumpAutoloadCommand {
         let locker = composer.get_locker();
         let autoload_generator = composer.get_autoload_generator();
 
-        let config_ref = config;
         let class_map = autoload_generator.borrow().dump(
-            &config_ref,
+            &config,
             local_repo_handle,
             package,
             installation_manager,

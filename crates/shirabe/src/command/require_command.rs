@@ -810,7 +810,6 @@ impl Command for RequireCommand {
         let composer = self.require_composer(None, None)?;
         let composer = composer_full(&composer);
         let repository_manager = composer.get_repository_manager().clone();
-        let repository_manager = repository_manager;
         let repos = repository_manager.get_repositories();
 
         let platform_overrides_map = composer.get_config().get_map("platform")?;

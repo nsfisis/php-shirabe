@@ -220,7 +220,6 @@ impl ArchiveCommand {
         if let Some(composer) = self.try_composer(None, None) {
             let composer = composer_full(&composer);
             let repository_manager = composer.get_repository_manager().clone();
-            let repository_manager = repository_manager;
             let local_repo = repository_manager.get_local_repository();
             let mut repos: Vec<RepositoryInterfaceHandle> = vec![local_repo];
             repos.extend(repository_manager.get_repositories().iter().cloned());
@@ -342,11 +341,11 @@ impl Command for ArchiveCommand {
         let composer = self.try_composer(None, None);
 
         let config = if let Some(ref composer) = composer {
-            let config = composer.borrow_partial().get_config();
+            let config = composer.get_config();
             let command_event =
                 CommandEvent::new(PluginEvents::COMMAND, "archive", input.clone(), output);
             let command_event_name = command_event.get_name().to_owned();
-            let event_dispatcher = composer.borrow_partial().get_event_dispatcher();
+            let event_dispatcher = composer.get_event_dispatcher();
             event_dispatcher.dispatch(
                 Some(command_event_name.as_ref()),
                 Some(std::rc::Rc::new(std::cell::RefCell::new(command_event))),
@@ -416,15 +415,12 @@ impl Command for ArchiveCommand {
         if return_code == 0
             && let Some(ref composer) = composer
         {
-            composer
-                .borrow_partial()
-                .get_event_dispatcher()
-                .dispatch_script(
-                    ScriptEvents::POST_ARCHIVE_CMD,
-                    true,
-                    vec![],
-                    EventFlags::default(),
-                );
+            composer.get_event_dispatcher().dispatch_script(
+                ScriptEvents::POST_ARCHIVE_CMD,
+                true,
+                vec![],
+                EventFlags::default(),
+            );
         }
 
         Ok(return_code)

@@ -23,6 +23,7 @@ final class PhpObjectModel implements Linter
      * @var array<string, list<string>>
      */
     private const STRUCTS = [
+        'crates/shirabe/src/composer.rs' => ['PartialComposer', 'Composer'],
         'crates/shirabe/src/config.rs' => ['Config'],
         'crates/shirabe/src/downloader/download_manager.rs' => ['DownloadManager'],
         'crates/shirabe/src/event_dispatcher/event_dispatcher.rs' => ['EventDispatcher'],
@@ -33,6 +34,7 @@ final class PhpObjectModel implements Linter
 
     /** The types and traits that are never wrapped in a `RefCell`. */
     private const HANDLE_TYPES = [
+        'Composer',
         'Config',
         'DownloadManager',
         'DownloadManagerInterface',
@@ -41,6 +43,8 @@ final class PhpObjectModel implements Linter
         'InstallationManagerInterface',
         'Locker',
         'LockerInterface',
+        'PartialComposer',
+        'PartialOrFullComposer',
         'RepositoryManager',
         'RepositoryManagerInterface',
     ];

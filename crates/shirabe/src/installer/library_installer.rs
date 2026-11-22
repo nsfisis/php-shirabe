@@ -43,9 +43,9 @@ impl LibraryInstaller {
 
         let download_manager = composer_rc
             .as_full()
-            .map(|full| full.borrow().get_download_manager());
+            .map(|full| full.get_download_manager());
 
-        let composer_ref = composer_rc.borrow_partial();
+        let composer_ref = &composer_rc;
 
         let filesystem = filesystem
             .unwrap_or_else(|| std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(None))));

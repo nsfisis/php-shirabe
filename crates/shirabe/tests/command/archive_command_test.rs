@@ -139,9 +139,7 @@ fn root_package(name: &BStr, version: &BStr) -> RootPackageHandle {
 }
 
 fn full_composer(composer: Composer) -> PartialComposerHandle {
-    PartialComposerHandle::from_rc(std::rc::Rc::new(std::cell::RefCell::new(
-        PartialOrFullComposer::Full(composer),
-    )))
+    PartialComposerHandle::from_rc(std::rc::Rc::new(PartialOrFullComposer::Full(composer)))
 }
 
 #[test]
@@ -177,7 +175,7 @@ fn test_uses_config_from_composer_object() {
 
     let package = root_package(BStr::new("archive/test"), BStr::new("1.0.0"));
 
-    let mut composer = Composer::new();
+    let composer = Composer::new();
     composer.set_config(config);
     composer.set_archive_manager(std::rc::Rc::new(std::cell::RefCell::new(manager)));
     composer.set_event_dispatcher(std::rc::Rc::new(noop_event_dispatcher()));
@@ -281,7 +279,7 @@ fn test_uses_config_from_composer_object_with_package_name() {
         .times(1)
         .returning(Vec::new);
 
-    let mut composer = Composer::new();
+    let composer = Composer::new();
     composer.set_config(config);
     composer.set_archive_manager(std::rc::Rc::new(std::cell::RefCell::new(manager)));
     composer.set_event_dispatcher(std::rc::Rc::new(noop_event_dispatcher()));

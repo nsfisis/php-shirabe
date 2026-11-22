@@ -932,7 +932,7 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&BString>) 
         None,
     )
     .unwrap();
-    let repository_manager = composer.borrow().get_repository_manager();
+    let repository_manager = composer.get_repository_manager();
     repository_manager.set_local_repository(RepositoryInterfaceHandle::new(local_repo));
 
     // emulate a writable lock file: a real composer.lock over a temp path.
@@ -949,7 +949,7 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&BString>) 
     let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
         io.clone(),
     ))));
-    let locker_loop = composer.borrow().get_loop();
+    let locker_loop = composer.get_loop();
     let locker_im = std::rc::Rc::new(InstallationManager::__new_mock(
         locker_loop,
         io.clone(),
@@ -963,16 +963,12 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&BString>) 
         JsonFile::encode_with_options(&case.composer, shirabe::json::JsonEncodeOptions::none())
             .unwrap();
     let locker = Locker::new(io.clone(), lock_json, locker_im, &contents, process);
-    composer.borrow_mut().set_locker(std::rc::Rc::new(locker));
+    composer.set_locker(std::rc::Rc::new(locker));
 
-    composer
-        .borrow_mut()
-        .set_autoload_generator(std::rc::Rc::new(std::cell::RefCell::new(
-            StubAutoloadGenerator,
-        )));
-    composer
-        .borrow_mut()
-        .set_event_dispatcher(std::rc::Rc::new(StubEventDispatcher));
+    composer.set_autoload_generator(std::rc::Rc::new(std::cell::RefCell::new(
+        StubAutoloadGenerator,
+    )));
+    composer.set_event_dispatcher(std::rc::Rc::new(StubEventDispatcher));
 
     let installer = std::rc::Rc::new(std::cell::RefCell::new(Installer::create(
         io.clone(),
@@ -1040,7 +1036,7 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&BString>) 
                 )
                 .set_audit_config(
                     AuditConfig::from_config(
-                        &composer_cl.borrow().get_config(),
+                        &composer_cl.get_config(),
                         false,
                         Auditor::FORMAT_SUMMARY,
                     )
@@ -1140,7 +1136,7 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&BString>) 
                 )
                 .set_audit_config(
                     AuditConfig::from_config(
-                        &composer_cl.borrow().get_config(),
+                        &composer_cl.get_config(),
                         false,
                         Auditor::FORMAT_SUMMARY,
                     )
@@ -1293,8 +1289,8 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&BString>) 
     }
 
     // trace from the composer's recording InstallationManager.
-    let im_handle = composer.borrow().get_installation_manager();
-    let im_ref = im_handle;
+    let im_handle = composer.get_installation_manager();
+    let im_ref = &im_handle;
     let trace = im_ref
         .as_any()
         .downcast_ref::<InstallationManager>()

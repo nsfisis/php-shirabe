@@ -283,9 +283,7 @@ pub(crate) fn set_up() -> SetUp {
     ));
     let io_dyn: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io.clone();
 
-    let composer_rc = std::rc::Rc::new(std::cell::RefCell::new(PartialOrFullComposer::Full(
-        Composer::new(),
-    )));
+    let composer_rc = std::rc::Rc::new(PartialOrFullComposer::Full(Composer::new()));
     let composer = ComposerHandle::from_rc_unchecked(composer_rc.clone());
 
     // PHP hands the AutoloadGenerator a mocked EventDispatcher (disabled constructor); the Rust
@@ -326,7 +324,7 @@ pub(crate) fn set_up() -> SetUp {
     config.merge(&merged, Config::SOURCE_UNKNOWN);
 
     {
-        let mut c = composer.borrow_mut();
+        let c = &composer;
         c.set_config(std::rc::Rc::new(config));
         c.set_download_manager(std::rc::Rc::new(dm));
         c.set_repository_manager(std::rc::Rc::new(repository_manager));
@@ -338,8 +336,8 @@ pub(crate) fn set_up() -> SetUp {
         io_dyn.clone(),
         None,
     ));
-    composer.borrow_mut().set_event_dispatcher(real_dispatcher);
-    composer.borrow_mut().set_package(
+    composer.set_event_dispatcher(real_dispatcher);
+    composer.set_package(
         RootPackageHandle::new(
             BString::from("dummy/root"),
             BString::from("1.0.0.0"),
@@ -364,7 +362,7 @@ pub(crate) fn set_up() -> SetUp {
             "{}",
             process,
         ));
-        composer.borrow_mut().set_locker(locker);
+        composer.set_locker(locker);
     }
 
     let pm = std::rc::Rc::new(std::cell::RefCell::new(
@@ -376,7 +374,7 @@ pub(crate) fn set_up() -> SetUp {
         )
         .unwrap(),
     ));
-    composer.borrow_mut().set_plugin_manager(pm.clone());
+    composer.set_plugin_manager(pm.clone());
 
     SetUp {
         io,
@@ -455,7 +453,7 @@ fn test_install_plugin_with_root_package_having_files_autoload() {
         "files".into(),
         PhpMixed::List(vec![PhpMixed::string(path_to_bytes(&files_autoload))]),
     );
-    let root = set_up.composer.borrow().get_package().clone();
+    let root = set_up.composer.get_package().clone();
     root.set_autoload(autoload.clone());
     root.set_dev_autoload(autoload);
 
@@ -639,7 +637,7 @@ fn set_plugin_api_version_with_plugins(
     ));
     pm.borrow_mut()
         .__set_plugin_api_version(BStr::new(new_plugin_api_version));
-    set_up.composer.borrow_mut().set_plugin_manager(pm.clone());
+    set_up.composer.set_plugin_manager(pm.clone());
 
     let plug_api_internal_package: PackageInterfaceHandle = CompletePackageHandle::new(
         BString::from("composer-plugin-api"),
@@ -660,7 +658,6 @@ fn set_plugin_api_version_with_plugins(
     }
     set_up
         .composer
-        .borrow()
         .get_repository_manager()
         .set_local_repository(repository.as_repository_handle());
 

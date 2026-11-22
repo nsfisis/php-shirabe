@@ -13,7 +13,7 @@ use crate::repository::RepositoryManagerInterface;
 use crate::util::r#loop::Loop;
 use bstr::{BStr, BString};
 use shirabe_php_binding_macros::php_binding;
-use shirabe_php_shim::{bformat, php_regex, php_str, preg_is_match};
+use shirabe_php_shim::{PhpProp, bformat, php_regex, php_str, preg_is_match};
 
 /// The Composer version this port tracks. Kept as-is so `Composer::VERSION`, the `composer`
 /// platform package and the HTTP User-Agent keep reporting a value plugins and servers can
@@ -63,79 +63,76 @@ pub fn get_version() -> BString {
 /// Internal data type corresponding to \Composer\PartialComposer.
 #[derive(Debug, Default)]
 pub struct PartialComposer {
-    global: bool,
-    package: Option<RootPackageInterfaceHandle>,
-    r#loop: Option<std::rc::Rc<std::cell::RefCell<Loop>>>,
-    repository_manager: Option<std::rc::Rc<dyn RepositoryManagerInterface>>,
-    installation_manager: Option<std::rc::Rc<dyn InstallationManagerInterface>>,
-    config: Option<std::rc::Rc<Config>>,
-    event_dispatcher: Option<std::rc::Rc<dyn EventDispatcherInterface>>,
+    global: PhpProp<bool>,
+    package: PhpProp<Option<RootPackageInterfaceHandle>>,
+    r#loop: PhpProp<Option<std::rc::Rc<std::cell::RefCell<Loop>>>>,
+    repository_manager: PhpProp<Option<std::rc::Rc<dyn RepositoryManagerInterface>>>,
+    installation_manager: PhpProp<Option<std::rc::Rc<dyn InstallationManagerInterface>>>,
+    config: PhpProp<Option<std::rc::Rc<Config>>>,
+    event_dispatcher: PhpProp<Option<std::rc::Rc<dyn EventDispatcherInterface>>>,
 }
 
 #[php_binding(r"Composer\PartialComposer", members = instance)]
 impl PartialComposer {
-    pub fn set_package(&mut self, package: RootPackageInterfaceHandle) {
-        self.package = Some(package);
+    pub fn set_package(&self, package: RootPackageInterfaceHandle) {
+        self.package.set(Some(package));
     }
 
-    pub fn get_package(&self) -> &RootPackageInterfaceHandle {
-        self.package.as_ref().unwrap()
+    pub fn get_package(&self) -> RootPackageInterfaceHandle {
+        self.package.cloned().unwrap()
     }
 
-    pub fn set_config(&mut self, config: std::rc::Rc<Config>) {
-        self.config = Some(config);
+    pub fn set_config(&self, config: std::rc::Rc<Config>) {
+        self.config.set(Some(config));
     }
 
     pub fn get_config(&self) -> std::rc::Rc<Config> {
-        self.config.as_ref().unwrap().clone()
+        self.config.cloned().unwrap()
     }
 
     #[php(skip)]
-    pub fn set_loop(&mut self, r#loop: std::rc::Rc<std::cell::RefCell<Loop>>) {
-        self.r#loop = Some(r#loop);
+    pub fn set_loop(&self, r#loop: std::rc::Rc<std::cell::RefCell<Loop>>) {
+        self.r#loop.set(Some(r#loop));
     }
 
     #[php(skip)]
     pub fn get_loop(&self) -> std::rc::Rc<std::cell::RefCell<Loop>> {
-        self.r#loop.as_ref().unwrap().clone()
+        self.r#loop.cloned().unwrap()
     }
 
-    pub fn set_repository_manager(&mut self, manager: std::rc::Rc<dyn RepositoryManagerInterface>) {
-        self.repository_manager = Some(manager);
+    pub fn set_repository_manager(&self, manager: std::rc::Rc<dyn RepositoryManagerInterface>) {
+        self.repository_manager.set(Some(manager));
     }
 
     pub fn get_repository_manager(&self) -> std::rc::Rc<dyn RepositoryManagerInterface> {
-        self.repository_manager.as_ref().unwrap().clone()
+        self.repository_manager.cloned().unwrap()
     }
 
-    pub fn set_installation_manager(
-        &mut self,
-        manager: std::rc::Rc<dyn InstallationManagerInterface>,
-    ) {
-        self.installation_manager = Some(manager);
+    pub fn set_installation_manager(&self, manager: std::rc::Rc<dyn InstallationManagerInterface>) {
+        self.installation_manager.set(Some(manager));
     }
 
     pub fn get_installation_manager(&self) -> std::rc::Rc<dyn InstallationManagerInterface> {
-        self.installation_manager.as_ref().unwrap().clone()
+        self.installation_manager.cloned().unwrap()
     }
 
     pub fn set_event_dispatcher(
-        &mut self,
+        &self,
         event_dispatcher: std::rc::Rc<dyn EventDispatcherInterface>,
     ) {
-        self.event_dispatcher = Some(event_dispatcher);
+        self.event_dispatcher.set(Some(event_dispatcher));
     }
 
     pub fn get_event_dispatcher(&self) -> std::rc::Rc<dyn EventDispatcherInterface> {
-        self.event_dispatcher.as_ref().unwrap().clone()
+        self.event_dispatcher.cloned().unwrap()
     }
 
     pub fn is_global(&self) -> bool {
-        self.global
+        self.global.cloned()
     }
 
-    pub fn set_global(&mut self) {
-        self.global = true;
+    pub fn set_global(&self) {
+        self.global.set(true);
     }
 }
 
@@ -143,12 +140,13 @@ impl PartialComposer {
 #[derive(Debug)]
 pub struct Composer {
     partial: PartialComposer,
-    locker: Option<std::rc::Rc<dyn LockerInterface>>,
-    download_manager: Option<std::rc::Rc<dyn DownloadManagerInterface>>,
+    locker: PhpProp<Option<std::rc::Rc<dyn LockerInterface>>>,
+    download_manager: PhpProp<Option<std::rc::Rc<dyn DownloadManagerInterface>>>,
     // TODO(plugin): plugin_manager is part of the plugin API
-    plugin_manager: Option<std::rc::Rc<std::cell::RefCell<PluginManager>>>,
-    autoload_generator: Option<std::rc::Rc<std::cell::RefCell<dyn AutoloadGeneratorInterface>>>,
-    archive_manager: Option<std::rc::Rc<std::cell::RefCell<dyn ArchiveManagerInterface>>>,
+    plugin_manager: PhpProp<Option<std::rc::Rc<std::cell::RefCell<PluginManager>>>>,
+    autoload_generator:
+        PhpProp<Option<std::rc::Rc<std::cell::RefCell<dyn AutoloadGeneratorInterface>>>>,
+    archive_manager: PhpProp<Option<std::rc::Rc<std::cell::RefCell<dyn ArchiveManagerInterface>>>>,
 }
 
 impl Default for Composer {
@@ -162,87 +160,83 @@ impl Composer {
     pub fn new() -> Self {
         Self {
             partial: PartialComposer::default(),
-            locker: None,
-            download_manager: None,
-            plugin_manager: None,
-            autoload_generator: None,
-            archive_manager: None,
+            locker: PhpProp::new(None),
+            download_manager: PhpProp::new(None),
+            plugin_manager: PhpProp::new(None),
+            autoload_generator: PhpProp::new(None),
+            archive_manager: PhpProp::new(None),
         }
     }
 
-    pub fn set_locker(&mut self, locker: std::rc::Rc<dyn LockerInterface>) {
-        self.locker = Some(locker);
+    pub fn set_locker(&self, locker: std::rc::Rc<dyn LockerInterface>) {
+        self.locker.set(Some(locker));
     }
 
     pub fn get_locker(&self) -> std::rc::Rc<dyn LockerInterface> {
-        self.locker.as_ref().unwrap().clone()
+        self.locker.cloned().unwrap()
     }
 
-    pub fn set_download_manager(&mut self, manager: std::rc::Rc<dyn DownloadManagerInterface>) {
-        self.download_manager = Some(manager);
+    pub fn set_download_manager(&self, manager: std::rc::Rc<dyn DownloadManagerInterface>) {
+        self.download_manager.set(Some(manager));
     }
 
     pub fn get_download_manager(&self) -> std::rc::Rc<dyn DownloadManagerInterface> {
-        self.download_manager.as_ref().unwrap().clone()
+        self.download_manager.cloned().unwrap()
     }
 
     #[php(skip)]
     pub fn set_archive_manager(
-        &mut self,
+        &self,
         manager: std::rc::Rc<std::cell::RefCell<dyn ArchiveManagerInterface>>,
     ) {
-        self.archive_manager = Some(manager);
+        self.archive_manager.set(Some(manager));
     }
 
     #[php(skip)]
     pub fn get_archive_manager(
         &self,
     ) -> std::rc::Rc<std::cell::RefCell<dyn ArchiveManagerInterface>> {
-        self.archive_manager.as_ref().unwrap().clone()
+        self.archive_manager.cloned().unwrap()
     }
 
     // TODO(plugin): set_plugin_manager is part of the plugin API
     #[php(skip)]
-    pub fn set_plugin_manager(&mut self, manager: std::rc::Rc<std::cell::RefCell<PluginManager>>) {
-        self.plugin_manager = Some(manager);
+    pub fn set_plugin_manager(&self, manager: std::rc::Rc<std::cell::RefCell<PluginManager>>) {
+        self.plugin_manager.set(Some(manager));
     }
 
     // TODO(plugin): get_plugin_manager is part of the plugin API
     #[php(skip)]
     pub fn get_plugin_manager(&self) -> std::rc::Rc<std::cell::RefCell<PluginManager>> {
-        self.plugin_manager.as_ref().unwrap().clone()
+        self.plugin_manager.cloned().unwrap()
     }
 
     pub fn set_autoload_generator(
-        &mut self,
+        &self,
         autoload_generator: std::rc::Rc<std::cell::RefCell<dyn AutoloadGeneratorInterface>>,
     ) {
-        self.autoload_generator = Some(autoload_generator);
+        self.autoload_generator.set(Some(autoload_generator));
     }
 
     pub fn get_autoload_generator(
         &self,
     ) -> std::rc::Rc<std::cell::RefCell<dyn AutoloadGeneratorInterface>> {
-        self.autoload_generator.as_ref().unwrap().clone()
+        self.autoload_generator.cloned().unwrap()
     }
 
     pub fn as_partial(&self) -> &PartialComposer {
         &self.partial
     }
 
-    pub fn as_partial_mut(&mut self) -> &mut PartialComposer {
-        &mut self.partial
-    }
-
-    pub fn set_package(&mut self, package: RootPackageInterfaceHandle) {
+    pub fn set_package(&self, package: RootPackageInterfaceHandle) {
         self.partial.set_package(package);
     }
 
-    pub fn get_package(&self) -> &RootPackageInterfaceHandle {
+    pub fn get_package(&self) -> RootPackageInterfaceHandle {
         self.partial.get_package()
     }
 
-    pub fn set_config(&mut self, config: std::rc::Rc<Config>) {
+    pub fn set_config(&self, config: std::rc::Rc<Config>) {
         self.partial.set_config(config);
     }
 
@@ -251,7 +245,7 @@ impl Composer {
     }
 
     #[php(skip)]
-    pub fn set_loop(&mut self, r#loop: std::rc::Rc<std::cell::RefCell<Loop>>) {
+    pub fn set_loop(&self, r#loop: std::rc::Rc<std::cell::RefCell<Loop>>) {
         self.partial.set_loop(r#loop);
     }
 
@@ -260,7 +254,7 @@ impl Composer {
         self.partial.get_loop()
     }
 
-    pub fn set_repository_manager(&mut self, manager: std::rc::Rc<dyn RepositoryManagerInterface>) {
+    pub fn set_repository_manager(&self, manager: std::rc::Rc<dyn RepositoryManagerInterface>) {
         self.partial.set_repository_manager(manager);
     }
 
@@ -268,10 +262,7 @@ impl Composer {
         self.partial.get_repository_manager()
     }
 
-    pub fn set_installation_manager(
-        &mut self,
-        manager: std::rc::Rc<dyn InstallationManagerInterface>,
-    ) {
+    pub fn set_installation_manager(&self, manager: std::rc::Rc<dyn InstallationManagerInterface>) {
         self.partial.set_installation_manager(manager);
     }
 
@@ -279,7 +270,7 @@ impl Composer {
         self.partial.get_installation_manager()
     }
 
-    pub fn set_event_dispatcher(&mut self, dispatcher: std::rc::Rc<dyn EventDispatcherInterface>) {
+    pub fn set_event_dispatcher(&self, dispatcher: std::rc::Rc<dyn EventDispatcherInterface>) {
         self.partial.set_event_dispatcher(dispatcher);
     }
 
@@ -291,7 +282,7 @@ impl Composer {
         self.partial.is_global()
     }
 
-    pub fn set_global(&mut self) {
+    pub fn set_global(&self) {
         self.partial.set_global();
     }
 }
@@ -326,13 +317,6 @@ impl PartialOrFullComposer {
         }
     }
 
-    pub fn as_full_mut(&mut self) -> Option<&mut Composer> {
-        match self {
-            Self::Full(full) => Some(full),
-            Self::Partial(_) => None,
-        }
-    }
-
     pub fn as_partial(&self) -> &PartialComposer {
         match self {
             Self::Full(full) => full.as_partial(),
@@ -340,28 +324,21 @@ impl PartialOrFullComposer {
         }
     }
 
-    pub fn as_partial_mut(&mut self) -> &mut PartialComposer {
-        match self {
-            Self::Full(full) => full.as_partial_mut(),
-            Self::Partial(partial) => partial,
-        }
-    }
-
-    pub fn set_package(&mut self, package: RootPackageInterfaceHandle) {
+    pub fn set_package(&self, package: RootPackageInterfaceHandle) {
         match self {
             Self::Full(full) => full.set_package(package),
             Self::Partial(partial) => partial.set_package(package),
         }
     }
 
-    pub fn get_package(&self) -> &RootPackageInterfaceHandle {
+    pub fn get_package(&self) -> RootPackageInterfaceHandle {
         match self {
             Self::Full(full) => full.get_package(),
             Self::Partial(partial) => partial.get_package(),
         }
     }
 
-    pub fn set_config(&mut self, config: std::rc::Rc<Config>) {
+    pub fn set_config(&self, config: std::rc::Rc<Config>) {
         match self {
             Self::Full(full) => full.set_config(config),
             Self::Partial(partial) => partial.set_config(config),
@@ -375,7 +352,7 @@ impl PartialOrFullComposer {
         }
     }
 
-    pub fn set_loop(&mut self, r#loop: std::rc::Rc<std::cell::RefCell<Loop>>) {
+    pub fn set_loop(&self, r#loop: std::rc::Rc<std::cell::RefCell<Loop>>) {
         match self {
             Self::Full(full) => full.set_loop(r#loop),
             Self::Partial(partial) => partial.set_loop(r#loop),
@@ -389,7 +366,7 @@ impl PartialOrFullComposer {
         }
     }
 
-    pub fn set_repository_manager(&mut self, manager: std::rc::Rc<dyn RepositoryManagerInterface>) {
+    pub fn set_repository_manager(&self, manager: std::rc::Rc<dyn RepositoryManagerInterface>) {
         match self {
             Self::Full(full) => full.set_repository_manager(manager),
             Self::Partial(partial) => partial.set_repository_manager(manager),
@@ -403,10 +380,7 @@ impl PartialOrFullComposer {
         }
     }
 
-    pub fn set_installation_manager(
-        &mut self,
-        manager: std::rc::Rc<dyn InstallationManagerInterface>,
-    ) {
+    pub fn set_installation_manager(&self, manager: std::rc::Rc<dyn InstallationManagerInterface>) {
         match self {
             Self::Full(full) => full.set_installation_manager(manager),
             Self::Partial(partial) => partial.set_installation_manager(manager),
@@ -420,7 +394,7 @@ impl PartialOrFullComposer {
         }
     }
 
-    pub fn set_event_dispatcher(&mut self, dispatcher: std::rc::Rc<dyn EventDispatcherInterface>) {
+    pub fn set_event_dispatcher(&self, dispatcher: std::rc::Rc<dyn EventDispatcherInterface>) {
         match self {
             Self::Full(full) => full.set_event_dispatcher(dispatcher),
             Self::Partial(partial) => partial.set_event_dispatcher(dispatcher),
@@ -441,7 +415,7 @@ impl PartialOrFullComposer {
         }
     }
 
-    pub fn set_global(&mut self) {
+    pub fn set_global(&self) {
         match self {
             Self::Full(full) => full.set_global(),
             Self::Partial(partial) => partial.set_global(),
@@ -452,24 +426,16 @@ impl PartialOrFullComposer {
 /// Shared reference to \Composer\PartialComposer or \Composer\Composer.
 /// Use this for parameters or fields typed as \Composer\PartialComposer in PHP.
 #[derive(Debug, Clone)]
-pub struct PartialComposerHandle(std::rc::Rc<std::cell::RefCell<PartialOrFullComposer>>);
+pub struct PartialComposerHandle(std::rc::Rc<PartialOrFullComposer>);
 
 impl PartialComposerHandle {
-    pub fn borrow_partial(&self) -> std::cell::Ref<'_, PartialComposer> {
-        std::cell::Ref::map(self.0.borrow(), |c| c.as_partial())
-    }
-
-    pub fn borrow_partial_mut(&self) -> std::cell::RefMut<'_, PartialComposer> {
-        std::cell::RefMut::map(self.0.borrow_mut(), |c| c.as_partial_mut())
-    }
-
     pub fn is_full(&self) -> bool {
-        self.0.borrow().is_full()
+        self.0.is_full()
     }
 
     /// Downcast to a full Composer handle. PHP `$composer instanceof Composer`.
     pub fn as_full(&self) -> Option<ComposerHandle> {
-        if self.0.borrow().is_full() {
+        if self.0.is_full() {
             Some(ComposerHandle::from_rc_unchecked(self.0.clone()))
         } else {
             None
@@ -480,25 +446,25 @@ impl PartialComposerHandle {
         PartialComposerWeakHandle(std::rc::Rc::downgrade(&self.0))
     }
 
-    pub fn from_rc(rc: std::rc::Rc<std::cell::RefCell<PartialOrFullComposer>>) -> Self {
+    pub fn from_rc(rc: std::rc::Rc<PartialOrFullComposer>) -> Self {
         Self(rc)
     }
 
-    pub fn as_rc(&self) -> &std::rc::Rc<std::cell::RefCell<PartialOrFullComposer>> {
+    pub fn as_rc(&self) -> &std::rc::Rc<PartialOrFullComposer> {
         &self.0
     }
 }
 
 /// Shared weak reference to \Composer\PartialComposer or \Composer\Composer.
 #[derive(Debug, Clone)]
-pub struct PartialComposerWeakHandle(std::rc::Weak<std::cell::RefCell<PartialOrFullComposer>>);
+pub struct PartialComposerWeakHandle(std::rc::Weak<PartialOrFullComposer>);
 
 impl PartialComposerWeakHandle {
     pub fn upgrade(&self) -> Option<PartialComposerHandle> {
         self.0.upgrade().map(PartialComposerHandle)
     }
 
-    pub fn from_weak(weak: std::rc::Weak<std::cell::RefCell<PartialOrFullComposer>>) -> Self {
+    pub fn from_weak(weak: std::rc::Weak<PartialOrFullComposer>) -> Self {
         Self(weak)
     }
 }
@@ -506,23 +472,9 @@ impl PartialComposerWeakHandle {
 /// Shared reference to \Composer\Composer.
 /// Use this for parameters or fields typed as \Composer\Composer in PHP.
 #[derive(Debug, Clone)]
-pub struct ComposerHandle(std::rc::Rc<std::cell::RefCell<PartialOrFullComposer>>);
+pub struct ComposerHandle(std::rc::Rc<PartialOrFullComposer>);
 
 impl ComposerHandle {
-    pub fn borrow(&self) -> std::cell::Ref<'_, Composer> {
-        std::cell::Ref::map(self.0.borrow(), |c| {
-            c.as_full()
-                .expect("Composer handle invariant: inner is Full")
-        })
-    }
-
-    pub fn borrow_mut(&self) -> std::cell::RefMut<'_, Composer> {
-        std::cell::RefMut::map(self.0.borrow_mut(), |c| {
-            c.as_full_mut()
-                .expect("Composer handle invariant: inner is Full")
-        })
-    }
-
     pub fn upcast(&self) -> PartialComposerHandle {
         PartialComposerHandle::from_rc(self.0.clone())
     }
@@ -531,12 +483,30 @@ impl ComposerHandle {
         ComposerWeakHandle(std::rc::Rc::downgrade(&self.0))
     }
 
-    pub fn from_rc_unchecked(rc: std::rc::Rc<std::cell::RefCell<PartialOrFullComposer>>) -> Self {
+    pub fn from_rc_unchecked(rc: std::rc::Rc<PartialOrFullComposer>) -> Self {
         Self(rc)
     }
 
-    pub fn as_rc(&self) -> &std::rc::Rc<std::cell::RefCell<PartialOrFullComposer>> {
+    pub fn as_rc(&self) -> &std::rc::Rc<PartialOrFullComposer> {
         &self.0
+    }
+}
+
+impl std::ops::Deref for PartialComposerHandle {
+    type Target = PartialComposer;
+
+    fn deref(&self) -> &PartialComposer {
+        self.0.as_partial()
+    }
+}
+
+impl std::ops::Deref for ComposerHandle {
+    type Target = Composer;
+
+    fn deref(&self) -> &Composer {
+        self.0
+            .as_full()
+            .expect("Composer handle invariant: inner is Full")
     }
 }
 
@@ -548,14 +518,14 @@ impl From<ComposerHandle> for PartialComposerHandle {
 
 /// Shared weak reference to \Composer\Composer.
 #[derive(Debug, Clone)]
-pub struct ComposerWeakHandle(std::rc::Weak<std::cell::RefCell<PartialOrFullComposer>>);
+pub struct ComposerWeakHandle(std::rc::Weak<PartialOrFullComposer>);
 
 impl ComposerWeakHandle {
     pub fn upgrade(&self) -> Option<ComposerHandle> {
         self.0.upgrade().map(ComposerHandle)
     }
 
-    pub fn from_weak(weak: std::rc::Weak<std::cell::RefCell<PartialOrFullComposer>>) -> Self {
+    pub fn from_weak(weak: std::rc::Weak<PartialOrFullComposer>) -> Self {
         Self(weak)
     }
 }
@@ -564,9 +534,9 @@ impl ComposerWeakHandle {
 ///
 /// Commands obtain their Composer through `require_composer` / `create_composer_instance`,
 /// which always yield a fully-loaded instance, so the downcast is infallible here.
-pub fn composer_full(composer: &PartialComposerHandle) -> std::cell::Ref<'_, Composer> {
-    std::cell::Ref::map(composer.as_rc().borrow(), |c| {
-        c.as_full()
-            .expect("a fully loaded Composer is required here")
-    })
+pub fn composer_full(composer: &PartialComposerHandle) -> &Composer {
+    composer
+        .as_rc()
+        .as_full()
+        .expect("a fully loaded Composer is required here")
 }

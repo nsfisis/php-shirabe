@@ -43,7 +43,7 @@ fn installation_manager(
 
 #[test]
 fn test_set_get_package() {
-    let mut composer = Composer::new();
+    let composer = Composer::new();
     let package: RootPackageInterfaceHandle = RootPackageHandle::new(
         BString::from("foo"),
         BString::from("1.0.0.0"),
@@ -57,7 +57,7 @@ fn test_set_get_package() {
 
 #[test]
 fn test_set_get_locker() {
-    let mut composer = Composer::new();
+    let composer = Composer::new();
     let io = null_io();
     let json_file = JsonFile::new("composer.lock", None, None).unwrap();
     let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
@@ -77,7 +77,7 @@ fn test_set_get_locker() {
 
 #[test]
 fn test_set_get_repository_manager() {
-    let mut composer = Composer::new();
+    let composer = Composer::new();
     let io = null_io();
     let config = std::rc::Rc::new(Config::new(false, None));
     let manager: std::rc::Rc<dyn RepositoryManagerInterface> = std::rc::Rc::new(
@@ -93,7 +93,7 @@ fn test_set_get_repository_manager() {
 
 #[test]
 fn test_set_get_download_manager() {
-    let mut composer = Composer::new();
+    let composer = Composer::new();
     let manager: std::rc::Rc<dyn DownloadManagerInterface> =
         std::rc::Rc::new(DownloadManager::new(null_io(), false, None));
     composer.set_download_manager(manager.clone());
@@ -106,7 +106,7 @@ fn test_set_get_download_manager() {
 
 #[test]
 fn test_set_get_installation_manager() {
-    let mut composer = Composer::new();
+    let composer = Composer::new();
     let io = null_io();
     let manager: std::rc::Rc<dyn InstallationManagerInterface> = installation_manager(&io);
     composer.set_installation_manager(manager.clone());

@@ -366,7 +366,6 @@ impl Installer {
         if self.install && self.execute_operations {
             // force binaries re-generation in case they are missing
             let repository_manager = self.repository_manager.clone();
-            let repository_manager = repository_manager;
             for package in repository_manager.get_local_repository().get_packages()? {
                 self.installation_manager
                     .ensure_binaries_presence(package.clone())?;
@@ -385,7 +384,6 @@ impl Installer {
         if show_funding {
             let mut funding_count: i64 = 0;
             let repository_manager = self.repository_manager.clone();
-            let repository_manager = repository_manager;
             for package in repository_manager.get_local_repository().get_packages()? {
                 if let Some(cp) = package.as_complete()
                     && package.as_alias().is_none()
@@ -447,7 +445,6 @@ impl Installer {
                     IndexMap::new(),
                 );
                 let repository_manager = self.repository_manager.clone();
-                let repository_manager = repository_manager;
                 for repo in repository_manager.get_repositories() {
                     repo_set.add_repository(repo.clone())?;
                 }
@@ -551,7 +548,6 @@ impl Installer {
         let mut repository_set =
             self.create_repository_set(true, &platform_repo, &aliases, None)?;
         let repository_manager = self.repository_manager.clone();
-        let repository_manager = repository_manager;
         let repositories = repository_manager.get_repositories();
         for repository in repositories {
             repository_set.add_repository(repository.clone())?;
