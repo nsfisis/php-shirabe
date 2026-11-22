@@ -10,6 +10,10 @@ namespace Shirabe;
 
 final class ThrowableRecord
 {
+    // ref: composer/src/Composer/Downloader/TransportException.php sha1:b7bd47db7402a92d600ea4ce8abd9c66d23f1b27
+    // ref: composer/src/Composer/Package/Loader/InvalidPackageException.php sha1:be37904970764b3091d04e97838ad5969a8a12c3
+    // ref: composer/src/Composer/Json/JsonValidationException.php sha1:12472643e8abf0e6f472b8f333040bf2d4501f24
+    // ref: composer/vendor/symfony/console/Exception/CommandNotFoundException.php sha1:4cbfe3d0bd964e1153c09786e456a73af9234eb9
     /**
      * The state each class whose state the Rust side ports declares beyond message and code, by
      * the names it declares it under.

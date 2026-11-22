@@ -15,6 +15,7 @@ final class ComposerEntryPoints
     {
         return [
             '__shirabe_xdebug_active' => static fn($args) => self::xdebugActive(),
+            // ref: composer/vendor/composer/xdebug-handler/src/XdebugHandler.php sha1:b9341902dbfe674026faa2c362fc6513277ef605
             '__shirabe_get_all_ini_files' => static function ($args) {
                 $paths = [(string) php_ini_loaded_file()];
                 $scanned = php_ini_scanned_files();
@@ -23,6 +24,7 @@ final class ComposerEntryPoints
                 }
                 return $paths;
             },
+            // ref: composer/src/Composer/Repository/PlatformRepository.php sha1:0bf0ef70b423a02ec1928d6f4987614af7e3ab6a
             // The names reported on arrive with the query: constants as ltrim($class.'::'.$constant, ':'),
             // classes, and the extensions whose info() output is reported when they are loaded.
             '__shirabe_platform' => static function ($args) {
@@ -163,6 +165,7 @@ final class ComposerEntryPoints
                 self::enableScriptAutoloader();
                 return true;
             },
+            // ref: composer/src/Composer/Autoload/AutoloadGenerator.php sha1:77752b534c8ad1453f45addaa2adb044eb4dd8be
             // The body of \Composer\Autoload\composerRequire (AutoloadGenerator.php), sharing its
             // $GLOBALS guard so files already required by a real Composer autoloader in this process
             // are not required twice.
@@ -175,6 +178,7 @@ final class ComposerEntryPoints
                 }
                 return true;
             },
+            // ref: composer/src/Composer/Repository/FilesystemRepository.php sha1:5d96f85f11239302b49400fe9625697a25ad0428
             // Mirrors the tail of FilesystemRepository::write into this child: the unconditional
             // `InstalledVersions::reload($versions)` plus the reflection-based selfDir /
             // installedIsLocalDir restore. Skipped only when the class is not even autoloadable here
@@ -202,6 +206,7 @@ final class ComposerEntryPoints
                 }
                 return true;
             },
+            // ref: composer/src/Composer/Factory.php sha1:7a476d1c754885b1552953a806535ddcff25cd94
             // The InstalledVersions part of Factory::createComposer, run once the Composer PHP runtime is
             // loaded into this child. The project's installed.php is loaded only while no
             // InstalledVersions class is defined here yet, as in Composer.
@@ -274,6 +279,7 @@ final class ComposerEntryPoints
         ];
     }
 
+    // ref: composer/vendor/composer/xdebug-handler/src/XdebugHandler.php sha1:b9341902dbfe674026faa2c362fc6513277ef605
     /**
      * Port of Composer\XdebugHandler\XdebugHandler::setXdebugDetails(), which the
      * `__shirabe_xdebug_active` query and the `__shirabe_diagnose` payload both report.

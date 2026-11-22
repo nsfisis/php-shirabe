@@ -1,5 +1,7 @@
 <?php
 
+// ref: composer/vendor/symfony/process/Process.php sha1:d81bd61719c0997634421f36adad98e9601bbbb9
+//
 // The Process an executeAsync() promise of the proxied Composer\Util\ProcessExecutor resolves
 // with. The child was spawned by the Rust side, so there is no proc_open() resource in this
 // process for the real class to work on; this subclass keeps `instanceof Process` true and

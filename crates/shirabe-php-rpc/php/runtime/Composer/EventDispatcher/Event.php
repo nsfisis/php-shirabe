@@ -1,5 +1,7 @@
 <?php
 
+// ref: composer/src/Composer/EventDispatcher/Event.php sha1:bba4e2fefb94fd89492284ee0fe42112847e6608
+//
 // Shirabe's own definition of Composer\EventDispatcher\Event for the plugin worker. This class
 // lives on both sides at once: an instance revived from a Rust entity handle proxies every call
 // over RPC (like a generated stub), while an instance constructed natively — real Composer code in

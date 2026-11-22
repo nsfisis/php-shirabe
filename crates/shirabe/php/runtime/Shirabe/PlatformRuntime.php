@@ -1,5 +1,7 @@
 <?php
 
+// ref: composer/src/Composer/Platform/Runtime.php sha1:00118c1dbb725bd89c2e8fea9bf7f282917c6dae
+
 namespace Shirabe;
 
 /**

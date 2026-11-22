@@ -1,3 +1,5 @@
+//! ref: composer/vendor/seld/signal-handler/src/SignalHandler.php sha1:d3ed84c126cd74a4175301e939006714caf27836
+//!
 //! Subscription to the signals that abort a Shirabe run: SIGINT, SIGTERM and SIGHUP. Plugins and
 //! scripts cannot subscribe; `docs/dev/signals.md` says why.
 //!

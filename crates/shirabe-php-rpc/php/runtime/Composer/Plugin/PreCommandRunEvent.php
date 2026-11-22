@@ -1,5 +1,7 @@
 <?php
 
+// ref: composer/src/Composer/Plugin/PreCommandRunEvent.php sha1:0d6e0f6ec661b502b6461814365548d5e52fb136
+//
 // Shirabe's own definition of Composer\Plugin\PreCommandRunEvent for the plugin worker, dual-mode
 // like its parent Composer\EventDispatcher\Event: an instance revived from a Rust entity handle
 // (the event a built-in command dispatches on the Rust side) forwards every call over RPC, while an

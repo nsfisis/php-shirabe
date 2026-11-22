@@ -1,3 +1,5 @@
+//! ref: composer/src/Composer/Json/JsonManipulator.php sha1:0839a5737a15817bd43d87e1cbc3b8df934a8dee
+//!
 //! Hand-written port of the recursive JSON grammar that `JsonManipulator` expresses in PHP via a
 //! PCRE `(?(DEFINE) ... )` block with `(?&json)` subroutine calls. The `regex` crate cannot express
 //! recursive subpatterns, so — per docs/dev/regex-porting.md — the grammar is decomposed here into

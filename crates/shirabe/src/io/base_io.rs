@@ -1,4 +1,5 @@
 //! ref: composer/src/Composer/IO/BaseIO.php sha1:cee231e6b4585671e764fd85798fc7a060a99fff
+//! ref: composer/vendor/psr/log/Psr/Log/LogLevel.php sha1:b38b37be0c6622eae7b8928f399d4abeef9cc0b2
 
 use crate::config::Config;
 use crate::io::{IOInterface, IOInterfaceWrite, io_interface};
@@ -11,7 +12,6 @@ use shirabe_php_shim::{
     php_str, preg_is_match,
 };
 
-/// ref: composer/vendor/psr/log/Psr/Log/LogLevel.php
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LogLevel;
 

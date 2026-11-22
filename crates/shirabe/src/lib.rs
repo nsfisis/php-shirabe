@@ -1,3 +1,5 @@
+//! ref: composer/bin/composer sha1:ccaa40f848b5fa236d5cd8d824b315e2fea2d819
+
 use bstr::BString;
 use shirabe_php_shim::{path_from_bytes, path_to_bytes, realpath};
 pub mod advisory;
@@ -37,7 +39,6 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 // See also `__shirabe_installed_versions_reload` in
 // crates/shirabe/php/runtime/Shirabe/ComposerEntryPoints.php.
 
-/// ref: composer/bin/composer
 pub async fn run(argv: Vec<bstr::BString>) -> anyhow::Result<i32> {
     use crate::console::ApplicationHandle;
     use crate::util::{ErrorHandler, Platform};

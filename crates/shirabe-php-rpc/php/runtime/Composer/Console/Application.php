@@ -1,5 +1,7 @@
 <?php
 
+// ref: composer/src/Composer/Console/Application.php sha1:9a852708df1cec141ed6fe16e70143ed4a6b8a3f
+//
 // Shirabe's own definition of Composer\Console\Application for the plugin worker. The real
 // class file is never autoloaded in this process: plugin-provided commands run here under a
 // genuine Symfony console application, and this class supplies the Composer-specific surface

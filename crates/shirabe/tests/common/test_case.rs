@@ -1,3 +1,5 @@
+//! ref: composer/tests/Composer/Test/TestCase.php sha1:23fb0e112d513b882921f5c986910fa65b45c1b1
+//!
 //! Shared test helpers ported from composer/tests/Composer/Test/TestCase.php.
 #![allow(dead_code)]
 

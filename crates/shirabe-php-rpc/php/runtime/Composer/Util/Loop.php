@@ -1,5 +1,7 @@
 <?php declare(strict_types=1);
 
+// ref: composer/src/Composer/Util/Loop.php sha1:54f0907047c3f5d67ef41b69d9696ed6a88804e2
+//
 // Shirabe's own definition of Composer\Util\Loop for the plugin worker: a port of the real
 // class, running here on top of the HttpDownloader and ProcessExecutor proxy stubs. The Rust side
 // keeps a Loop of its own for the execution itself, and the two are siblings over one promise

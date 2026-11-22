@@ -1,3 +1,5 @@
+//! ref: composer/src/Composer/Util/RemoteFilesystem.php sha1:27ac0473e50d4f24137f3c4ac66fe7843aa34e9f
+//!
 //! Reads `file://` URLs and plain local paths for `HttpDownloader`, which Composer hands to
 //! `RemoteFilesystem` along with every other request curl does not take. It reproduces what
 //! `RemoteFilesystem::get()` does for a local read without the PHP worker. The parts of that
