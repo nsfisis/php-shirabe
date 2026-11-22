@@ -226,7 +226,7 @@ impl AutoloadGeneratorInterface for StubAutoloadGenerator {
         _target_dir: &bstr::BStr,
         _scan_psr_packages: bool,
         _suffix: Option<bstr::BString>,
-        _locker: Option<std::rc::Rc<std::cell::RefCell<dyn LockerInterface>>>,
+        _locker: Option<std::rc::Rc<dyn LockerInterface>>,
         _strict_ambiguous: bool,
     ) -> anyhow::Result<ClassMap> {
         Ok(ClassMap::new())
@@ -448,14 +448,13 @@ fn test_installer() {
         let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
             io.clone(),
         ))));
-        let locker: std::rc::Rc<std::cell::RefCell<dyn LockerInterface>> =
-            std::rc::Rc::new(std::cell::RefCell::new(Locker::new(
-                io.clone(),
-                lock_json,
-                installation_manager.clone(),
-                "{}",
-                process,
-            )));
+        let locker: std::rc::Rc<dyn LockerInterface> = std::rc::Rc::new(Locker::new(
+            io.clone(),
+            lock_json,
+            installation_manager.clone(),
+            "{}",
+            process,
+        ));
 
         let autoload_generator: std::rc::Rc<std::cell::RefCell<dyn AutoloadGeneratorInterface>> =
             std::rc::Rc::new(std::cell::RefCell::new(StubAutoloadGenerator));
@@ -974,9 +973,7 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&BString>) 
         JsonFile::encode_with_options(&case.composer, shirabe::json::JsonEncodeOptions::none())
             .unwrap();
     let locker = Locker::new(io.clone(), lock_json, locker_im, &contents, process);
-    composer
-        .borrow_mut()
-        .set_locker(std::rc::Rc::new(std::cell::RefCell::new(locker)));
+    composer.borrow_mut().set_locker(std::rc::Rc::new(locker));
 
     composer
         .borrow_mut()

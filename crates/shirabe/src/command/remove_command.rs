@@ -221,7 +221,7 @@ impl Command for RemoveCommand {
             let composer = composer_full(&composer);
             {
                 let locker = composer.get_locker().clone();
-                let mut locker = locker.borrow_mut();
+                let locker = locker;
                 if !locker.is_locked() {
                     return Err(UnexpectedValueException::new(BString::from(
                         "A valid composer.lock file is required to run this command with --unused",
@@ -230,10 +230,7 @@ impl Command for RemoveCommand {
                 }
             }
 
-            let locked_repo = composer
-                .get_locker()
-                .borrow_mut()
-                .get_locked_repository(true)?;
+            let locked_repo = composer.get_locker().get_locked_repository(true)?;
             let locked_packages = locked_repo.borrow_mut().get_packages()?;
 
             let mut required: IndexMap<BString, bool> = IndexMap::new();
@@ -650,7 +647,7 @@ impl Command for RemoveCommand {
 
         // if no lock is present, we do not do a partial update as
         // this is not supported by the Installer
-        if composer.get_locker().borrow_mut().is_locked() {
+        if composer.get_locker().is_locked() {
             install.set_update_allow_list(packages.clone());
         }
 

@@ -389,7 +389,7 @@ impl RequireCommand {
 
         // if no lock is present, or the file is brand new, we do not do a
         // partial update as this is not supported by the Installer
-        if !self.first_require.get() && composer.get_locker().borrow_mut().is_locked() {
+        if !self.first_require.get() && composer.get_locker().is_locked() {
             install.set_update_allow_list(array_keys(requirements));
         }
 
@@ -428,7 +428,7 @@ impl RequireCommand {
     ) -> anyhow::Result<i64> {
         let composer = self.require_composer(None, None)?;
         let composer = composer_full(&composer);
-        let locker_is_locked = composer.get_locker().borrow_mut().is_locked();
+        let locker_is_locked = composer.get_locker().is_locked();
         let mut requirements: IndexMap<BString, BString> = IndexMap::new();
         let mut version_selector = VersionSelector::new(
             std::rc::Rc::new(std::cell::RefCell::new(RepositorySet::new(
@@ -442,11 +442,7 @@ impl RequireCommand {
             None,
         )?;
         let repo: RepositoryInterfaceHandle = if locker_is_locked {
-            composer
-                .get_locker()
-                .borrow_mut()
-                .get_locked_repository(true)?
-                .into()
+            composer.get_locker().get_locked_repository(true)?.into()
         } else {
             composer
                 .get_repository_manager()
@@ -516,7 +512,7 @@ impl RequireCommand {
                     bstr::BStr::new(&composer.get_package().get_minimum_stability()),
                     IndexMap::new(),
                 );
-                composer.get_locker().borrow_mut().update_hash(
+                composer.get_locker().update_hash(
                     &json.borrow(),
                     Some(Box::new(move |mut lock_data| {
                         let section = lock_data

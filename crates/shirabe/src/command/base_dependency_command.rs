@@ -72,7 +72,7 @@ pub trait BaseDependencyCommand: BaseCommand {
             .unwrap_or(false)
         {
             let locker = composer.get_locker().clone();
-            let mut locker = locker.borrow_mut();
+            let locker = locker;
 
             if !locker.is_locked() {
                 return Err(UnexpectedValueException::new(BString::from(

@@ -150,7 +150,7 @@ impl PartialComposer {
 #[derive(Debug)]
 pub struct Composer {
     partial: PartialComposer,
-    locker: Option<std::rc::Rc<std::cell::RefCell<dyn LockerInterface>>>,
+    locker: Option<std::rc::Rc<dyn LockerInterface>>,
     download_manager: Option<std::rc::Rc<std::cell::RefCell<dyn DownloadManagerInterface>>>,
     // TODO(plugin): plugin_manager is part of the plugin API
     plugin_manager: Option<std::rc::Rc<std::cell::RefCell<PluginManager>>>,
@@ -177,11 +177,11 @@ impl Composer {
         }
     }
 
-    pub fn set_locker(&mut self, locker: std::rc::Rc<std::cell::RefCell<dyn LockerInterface>>) {
+    pub fn set_locker(&mut self, locker: std::rc::Rc<dyn LockerInterface>) {
         self.locker = Some(locker);
     }
 
-    pub fn get_locker(&self) -> std::rc::Rc<std::cell::RefCell<dyn LockerInterface>> {
+    pub fn get_locker(&self) -> std::rc::Rc<dyn LockerInterface> {
         self.locker.as_ref().unwrap().clone()
     }
 

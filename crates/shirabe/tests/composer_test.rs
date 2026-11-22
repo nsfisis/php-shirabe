@@ -67,14 +67,13 @@ fn test_set_get_locker() {
     let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
         io.clone(),
     ))));
-    let locker: std::rc::Rc<std::cell::RefCell<dyn LockerInterface>> =
-        std::rc::Rc::new(std::cell::RefCell::new(Locker::new(
-            io.clone(),
-            json_file,
-            installation_manager(&io),
-            "{}",
-            process,
-        )));
+    let locker: std::rc::Rc<dyn LockerInterface> = std::rc::Rc::new(Locker::new(
+        io.clone(),
+        json_file,
+        installation_manager(&io),
+        "{}",
+        process,
+    ));
     composer.set_locker(locker.clone());
 
     assert!(std::rc::Rc::ptr_eq(&composer.get_locker(), &locker));

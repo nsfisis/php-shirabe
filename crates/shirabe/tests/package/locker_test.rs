@@ -70,7 +70,7 @@ fn make_locker(
 #[test]
 fn test_is_locked() {
     let json_content = get_json_content(&[]);
-    let (mut locker, _temp_dir, _io) = make_locker(
+    let (locker, _temp_dir, _io) = make_locker(
         json_content.as_bstr(),
         Some(BStr::new(r#"{"packages": []}"#)),
     );
@@ -82,7 +82,7 @@ fn test_is_locked() {
 fn test_get_not_locked_packages() {
     let json_content = get_json_content(&[]);
     // No lock file written => JsonFile::exists() is false.
-    let (mut locker, _temp_dir, _io) = make_locker(json_content.as_bstr(), None);
+    let (locker, _temp_dir, _io) = make_locker(json_content.as_bstr(), None);
 
     let err = locker
         .get_locked_repository(false)
@@ -102,7 +102,7 @@ fn test_get_locked_packages() {
         {"name": "pkg2", "version": "0.1.10"}
     ]}"#,
     );
-    let (mut locker, _temp_dir, _io) = make_locker(json_content.as_bstr(), Some(lock));
+    let (locker, _temp_dir, _io) = make_locker(json_content.as_bstr(), Some(lock));
 
     let repo: RepositoryInterfaceHandle = locker.get_locked_repository(false).unwrap().into();
 
@@ -127,7 +127,7 @@ fn test_get_locked_packages() {
 #[test]
 fn test_set_lock_data() {
     let json_content = bformat!("{}  ", get_json_content(&[]));
-    let (mut locker, temp_dir, _io) = make_locker(json_content.as_bstr(), None);
+    let (locker, temp_dir, _io) = make_locker(json_content.as_bstr(), None);
 
     let package1: PackageInterfaceHandle = CompletePackageHandle::new(
         BString::from("pkg1"),
@@ -209,7 +209,7 @@ fn test_set_lock_data() {
 #[test]
 fn test_lock_bad_packages() {
     let json_content = get_json_content(&[]);
-    let (mut locker, _temp_dir, _io) = make_locker(json_content.as_bstr(), None);
+    let (locker, _temp_dir, _io) = make_locker(json_content.as_bstr(), None);
 
     // PHP mocks a PackageInterface with only getPrettyName()='pkg1' (and an empty pretty version),
     // which makes lockPackages throw a LogicException. A real package with an empty pretty version
@@ -246,7 +246,7 @@ fn test_lock_bad_packages() {
 fn test_is_fresh() {
     let json_content = get_json_content(&[]);
     let lock = bformat!("{{\"hash\": \"{}\"}}", hash("md5", &json_content));
-    let (mut locker, _temp_dir, _io) = make_locker(json_content.as_bstr(), Some(lock.as_bstr()));
+    let (locker, _temp_dir, _io) = make_locker(json_content.as_bstr(), Some(lock.as_bstr()));
 
     assert!(locker.is_fresh().unwrap());
 }
@@ -266,7 +266,7 @@ fn test_is_fresh_false() {
         JsonEncodeOptions::none(),
     )
     .unwrap();
-    let (mut locker, _temp_dir, _io) =
+    let (locker, _temp_dir, _io) =
         make_locker(json_content.as_bstr(), Some(lock.to_owned().as_bstr()));
 
     assert!(!locker.is_fresh().unwrap());
@@ -280,7 +280,7 @@ fn test_is_fresh_with_content_hash() {
         hash("md5", bformat!("{json_content}  ")),
         hash("md5", &json_content)
     );
-    let (mut locker, _temp_dir, _io) = make_locker(json_content.as_bstr(), Some(lock.as_bstr()));
+    let (locker, _temp_dir, _io) = make_locker(json_content.as_bstr(), Some(lock.as_bstr()));
 
     assert!(locker.is_fresh().unwrap());
 }
@@ -289,7 +289,7 @@ fn test_is_fresh_with_content_hash() {
 fn test_is_fresh_with_content_hash_and_no_hash() {
     let json_content = get_json_content(&[]);
     let lock = bformat!("{{\"content-hash\": \"{}\"}}", hash("md5", &json_content));
-    let (mut locker, _temp_dir, _io) = make_locker(json_content.as_bstr(), Some(lock.as_bstr()));
+    let (locker, _temp_dir, _io) = make_locker(json_content.as_bstr(), Some(lock.as_bstr()));
 
     assert!(locker.is_fresh().unwrap());
 }
@@ -303,7 +303,7 @@ fn test_is_fresh_false_with_content_hash() {
     );
     let lock =
         bformat!("{{\"hash\": \"{different_hash}\", \"content-hash\": \"{different_hash}\"}}");
-    let (mut locker, _temp_dir, _io) = make_locker(json_content.as_bstr(), Some(lock.as_bstr()));
+    let (locker, _temp_dir, _io) = make_locker(json_content.as_bstr(), Some(lock.as_bstr()));
 
     assert!(!locker.is_fresh().unwrap());
 }

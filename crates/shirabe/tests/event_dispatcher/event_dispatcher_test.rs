@@ -486,7 +486,7 @@ mod mock_autoload_generator {
                 target_dir: &bstr::BStr,
                 scan_psr_packages: bool,
                 suffix: Option<bstr::BString>,
-                locker: Option<std::rc::Rc<std::cell::RefCell<dyn LockerInterface>>>,
+                locker: Option<std::rc::Rc<dyn LockerInterface>>,
                 strict_ambiguous: bool,
             ) -> anyhow::Result<ClassMap>;
             fn build_package_map(

@@ -305,7 +305,7 @@ pub fn create_composer_lock(
     let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
         io.clone(),
     ))));
-    let mut locker = Locker::new(
+    let locker = Locker::new(
         io.clone(),
         json_file,
         installation_manager(&io),

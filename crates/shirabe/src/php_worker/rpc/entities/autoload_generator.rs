@@ -76,7 +76,7 @@ fn dump(
     let target_dir = call.arg::<BString>(4)?;
     let scan_psr_packages = call.arg::<bool>(5)?;
     let suffix = call.arg::<Option<BString>>(6)?;
-    let locker = call.optional_entity::<std::rc::Rc<std::cell::RefCell<dyn LockerInterface>>>(7)?;
+    let locker = call.optional_entity::<std::rc::Rc<dyn LockerInterface>>(7)?;
     let strict_ambiguous = call.arg::<bool>(8)?;
     let class_map = generator
         .borrow()

@@ -273,7 +273,7 @@ impl CreateProjectCommand {
                 .set_apcu_autoloader(apcu_autoloader, None)
                 .set_audit_config(audit_config);
 
-            if !composer.get_locker().borrow_mut().is_locked() {
+            if !composer.get_locker().is_locked() {
                 installer.set_update(true);
             }
 

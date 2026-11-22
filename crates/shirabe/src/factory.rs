@@ -734,8 +734,7 @@ impl Factory {
                                 file_get_contents(composer_file_path).unwrap_or_default(),
                                 process,
                             );
-                            composer_full
-                                .set_locker(std::rc::Rc::new(std::cell::RefCell::new(locker)));
+                            composer_full.set_locker(std::rc::Rc::new(locker));
                         } else {
                             let lock_contents = JsonFile::encode(&PhpMixed::Array(
                                 local_config_data
@@ -754,8 +753,7 @@ impl Factory {
                                 &lock_contents,
                                 process,
                             );
-                            composer_full
-                                .set_locker(std::rc::Rc::new(std::cell::RefCell::new(locker)));
+                            composer_full.set_locker(std::rc::Rc::new(locker));
                         }
                     }
 

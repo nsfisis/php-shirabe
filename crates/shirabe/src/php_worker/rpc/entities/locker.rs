@@ -4,7 +4,7 @@ use crate::package::{__php_binding_locker, __php_binding_locker_interface, Locke
 use shirabe_php_binding_macros::php_entity;
 
 php_entity! {
-    handle: std::rc::Rc<std::cell::RefCell<dyn LockerInterface>>,
+    handle: std::rc::Rc<dyn LockerInterface>,
     type_error: "a Locker",
     classes: {
         r"Composer\Package\Locker": { constructor: unimplemented },
@@ -14,8 +14,7 @@ php_entity! {
             instance: {
                 adapters: __php_binding_locker_interface,
                 target: dyn LockerInterface,
-                borrow: |handle| handle.borrow(),
-                borrow_mut: |handle| handle.borrow_mut(),
+                deref: |handle| &**handle,
             },
             static: { adapters: __php_binding_locker },
             refused: {

@@ -1655,7 +1655,7 @@ impl Command for ShowCommand {
                 .borrow()
                 .get_local_repository();
             let locker_rc = composer_ref.get_locker().clone();
-            let mut locker = locker_rc.borrow_mut();
+            let locker = locker_rc;
             if locker.is_locked() {
                 let lr_handle: RepositoryInterfaceHandle =
                     locker.get_locked_repository(true)?.into();
@@ -1705,7 +1705,6 @@ impl Command for ShowCommand {
             if composer.is_none()
                 || !composer_full(composer.as_ref().unwrap())
                     .get_locker()
-                    .borrow_mut()
                     .is_locked()
             {
                 return Err(UnexpectedValueException::new(BString::from("A valid composer.json and composer.lock files is required to run this command with --locked"))
@@ -1713,7 +1712,7 @@ impl Command for ShowCommand {
             }
             let composer_ref = composer_full(composer.as_ref().unwrap());
             let locker_rc = composer_ref.get_locker().clone();
-            let mut locker = locker_rc.borrow_mut();
+            let locker = locker_rc;
             let lr = locker.get_locked_repository(
                 input.borrow().get_option("no-dev")?.as_bool() != Some(true),
             )?;

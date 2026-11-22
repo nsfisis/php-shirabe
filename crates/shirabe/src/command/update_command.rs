@@ -93,11 +93,8 @@ impl UpdateCommand {
         io.write_error("<info>Loading packages that can be updated...</info>");
         let mut autocompleter_values: IndexMap<BString, BString> = IndexMap::new();
         let installed_packages: Vec<PackageInterfaceHandle> =
-            if composer_ref.get_locker().borrow_mut().is_locked() {
-                let locked_repo = composer_ref
-                    .get_locker()
-                    .borrow_mut()
-                    .get_locked_repository(true)?;
+            if composer_ref.get_locker().is_locked() {
+                let locked_repo = composer_ref.get_locker().get_locked_repository(true)?;
                 locked_repo.borrow_mut().get_canonical_packages()?
             } else {
                 composer_ref
@@ -397,7 +394,7 @@ impl Command for UpdateCommand {
             .as_bool()
             .unwrap_or(false)
         {
-            if !composer.get_locker().borrow_mut().is_locked() {
+            if !composer.get_locker().is_locked() {
                 return Err(InvalidArgumentException::new(BString::from(
                     "patch-only can only be used with a lock file present",
                 ))
@@ -405,7 +402,6 @@ impl Command for UpdateCommand {
             }
             for package in composer
                 .get_locker()
-                .borrow_mut()
                 .get_locked_repository(true)?
                 .borrow_mut()
                 .get_canonical_packages()?

@@ -124,11 +124,8 @@ impl Command for SuggestsCommand {
                 RootPackageInterfaceHandle::dup(composer.get_package()),
             ))];
 
-        if composer.get_locker().borrow_mut().is_locked() {
-            let platform_overrides = composer
-                .get_locker()
-                .borrow_mut()
-                .get_platform_overrides()?;
+        if composer.get_locker().is_locked() {
+            let platform_overrides = composer.get_locker().get_platform_overrides()?;
             let platform_overrides: IndexMap<BString, PhpMixed> = platform_overrides
                 .into_iter()
                 .map(|(k, v)| (k, PhpMixed::string(v)))
@@ -139,7 +136,7 @@ impl Command for SuggestsCommand {
                 None,
                 None,
             )?));
-            let locked_repo = composer.get_locker().borrow_mut().get_locked_repository(
+            let locked_repo = composer.get_locker().get_locked_repository(
                 !input
                     .borrow()
                     .get_option("no-dev")?

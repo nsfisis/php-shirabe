@@ -1298,10 +1298,10 @@ impl Command for DiagnoseCommand {
             let r = self.check_composer_schema()?;
             self.output_result(r);
 
-            if c.get_locker().borrow_mut().is_locked() {
+            if c.get_locker().is_locked() {
                 io.write_no_newline("Checking composer.lock: ");
                 let locker = c.get_locker().clone();
-                let locker = locker.borrow();
+                let locker = locker;
                 let r = self.check_composer_lock_schema(&*locker)?;
                 self.output_result(r);
             }

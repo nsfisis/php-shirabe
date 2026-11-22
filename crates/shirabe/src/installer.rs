@@ -80,7 +80,7 @@ pub struct Installer {
     fixed_root_package: RootPackageInterfaceHandle,
     download_manager: std::rc::Rc<std::cell::RefCell<dyn DownloadManagerInterface>>,
     repository_manager: std::rc::Rc<std::cell::RefCell<dyn RepositoryManagerInterface>>,
-    locker: std::rc::Rc<std::cell::RefCell<dyn LockerInterface>>,
+    locker: std::rc::Rc<dyn LockerInterface>,
     installation_manager: std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>,
     event_dispatcher: std::rc::Rc<dyn EventDispatcherInterface>,
     autoload_generator: std::rc::Rc<std::cell::RefCell<dyn AutoloadGeneratorInterface>>,
@@ -136,7 +136,7 @@ impl Installer {
         package: RootPackageInterfaceHandle,
         download_manager: std::rc::Rc<std::cell::RefCell<dyn DownloadManagerInterface>>,
         repository_manager: std::rc::Rc<std::cell::RefCell<dyn RepositoryManagerInterface>>,
-        locker: std::rc::Rc<std::cell::RefCell<dyn LockerInterface>>,
+        locker: std::rc::Rc<dyn LockerInterface>,
         installation_manager: std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>,
         event_dispatcher: std::rc::Rc<dyn EventDispatcherInterface>,
         autoload_generator: std::rc::Rc<std::cell::RefCell<dyn AutoloadGeneratorInterface>>,
@@ -213,7 +213,7 @@ impl Installer {
             .is_fresh();
 
         // Force update if there is no lock file present
-        if !self.update && !self.locker.borrow_mut().is_locked() {
+        if !self.update && !self.locker.is_locked() {
             self.io.write_error("<warning>No composer.lock file present. Updating dependencies to latest instead of installing from lock file. See https://getcomposer.org/install for more information.</warning>");
             self.update = true;
         }
@@ -300,11 +300,8 @@ impl Installer {
         }
 
         if self.update {
-            let locked_repository_handle: RepositoryInterfaceHandle = self
-                .locker
-                .borrow_mut()
-                .get_locked_repository(self.dev_mode)?
-                .into();
+            let locked_repository_handle: RepositoryInterfaceHandle =
+                self.locker.get_locked_repository(self.dev_mode)?.into();
             let mut installed_repo = InstalledRepository::new(vec![
                 locked_repository_handle,
                 self.create_platform_repo(false)?.into(),
@@ -323,7 +320,7 @@ impl Installer {
         }
 
         // Find abandoned packages and warn user
-        let locked_repository = self.locker.borrow_mut().get_locked_repository(true)?;
+        let locked_repository = self.locker.get_locked_repository(true)?;
         let packages = locked_repository.borrow_mut().get_canonical_packages()?;
         for package in packages {
             let complete = match package.as_complete_package() {
@@ -524,8 +521,8 @@ impl Installer {
 
         let try_load_locked =
             || -> anyhow::Result<Result<Option<LockArrayRepositoryHandle>, anyhow::Error>> {
-                if self.locker.borrow_mut().is_locked() {
-                    match self.locker.borrow_mut().get_locked_repository(true) {
+                if self.locker.is_locked() {
+                    match self.locker.get_locked_repository(true) {
                         Ok(r) => Ok(Ok(Some(r))),
                         Err(e) if e.is_instanceof::<ParsingException>() => Ok(Err(e)),
                         Err(e) => Err(e),
@@ -665,7 +662,7 @@ impl Installer {
 
             if self.minimal_update
                 && self.update_allow_list.is_none()
-                && self.locker.borrow_mut().is_fresh().unwrap_or(false)
+                && self.locker.is_fresh().unwrap_or(false)
             {
                 self.io.write_error("<warning>The --minimal-changes option should be used with package arguments or after modifying composer.json requirements, otherwise it will likely not yield any dependency changes.</warning>");
             }
@@ -811,7 +808,7 @@ impl Installer {
             .get_map_or_empty("platform")?
             .into_iter()
             .collect();
-        let updated_lock = self.locker.borrow_mut().set_lock_data(
+        let updated_lock = self.locker.set_lock_data(
             lock_transaction.get_new_lock_packages(false, self.update_mirrors),
             Some(lock_transaction.get_new_lock_packages(true, self.update_mirrors)),
             platform_reqs,
@@ -935,10 +932,7 @@ impl Installer {
             ));
         }
 
-        let locked_repository = self
-            .locker
-            .borrow_mut()
-            .get_locked_repository(self.dev_mode)?;
+        let locked_repository = self.locker.get_locked_repository(self.dev_mode)?;
 
         // verify that the lock file works with the current platform repository
         // we can skip this part if we're doing this as the second step after an update
@@ -966,14 +960,13 @@ impl Installer {
             let mut request =
                 self.create_request(fixed_root_package, &platform_repo, Some(&locked_repository))?;
 
-            if !self.locker.borrow_mut().is_fresh()? {
+            if !self.locker.is_fresh()? {
                 self.io.write_error_with_verbosity("<warning>Warning: The lock file is not up to date with the latest changes in composer.json. You may be getting outdated dependencies. It is recommended that you run `shirabe update` or `shirabe update <package name>`.</warning>", io_interface::QUIET);
             }
 
             let package_for_missing = self.package.clone();
             let missing_requirement_info = self
                 .locker
-                .borrow_mut()
                 .get_missing_requirement_info(package_for_missing, self.dev_mode)?;
             if !missing_requirement_info.is_empty() {
                 self.io
@@ -1006,7 +999,6 @@ impl Installer {
 
             for link in self
                 .locker
-                .borrow_mut()
                 .get_platform_requirements(self.dev_mode)?
                 .into_values()
             {
@@ -1148,7 +1140,7 @@ impl Installer {
         }
 
         if self.execute_operations {
-            local_repo.set_dev_package_names(self.locker.borrow_mut().get_dev_package_names()?);
+            local_repo.set_dev_package_names(self.locker.get_dev_package_names()?);
             self.installation_manager
                 .borrow()
                 .execute(
@@ -1194,7 +1186,6 @@ impl Installer {
                 .collect()
         } else {
             self.locker
-                .borrow_mut()
                 .get_platform_overrides()
                 .unwrap_or_default()
                 .into_iter()
@@ -1240,16 +1231,8 @@ impl Installer {
             }
             requires = tmp;
         } else {
-            minimum_stability = self
-                .locker
-                .borrow_mut()
-                .get_minimum_stability()
-                .unwrap_or_default();
-            stability_flags = self
-                .locker
-                .borrow_mut()
-                .get_stability_flags()
-                .unwrap_or_default();
+            minimum_stability = self.locker.get_minimum_stability().unwrap_or_default();
+            stability_flags = self.locker.get_stability_flags().unwrap_or_default();
 
             let mut tmp: IndexMap<BString, AnyConstraint> = IndexMap::new();
             for package in locked_repository.unwrap().get_packages()? {
@@ -1354,8 +1337,8 @@ impl Installer {
         let mut prefer_stable: Option<bool> = None;
         let mut prefer_lowest: Option<bool> = None;
         if !for_update {
-            prefer_stable = self.locker.borrow_mut().get_prefer_stable().unwrap_or(None);
-            prefer_lowest = self.locker.borrow_mut().get_prefer_lowest().unwrap_or(None);
+            prefer_stable = self.locker.get_prefer_stable().unwrap_or(None);
+            prefer_lowest = self.locker.get_prefer_lowest().unwrap_or(None);
         }
         // old lock file without prefer stable/lowest will return null
         // so in this case we use the composer.json info
@@ -1453,7 +1436,7 @@ impl Installer {
         // if we're updating mirrors we want to keep exactly the same versions installed which are in the lock file, but we want current remote metadata
         if self.update_mirrors {
             let excluded_packages: indexmap::IndexSet<BString> = if !include_dev_requires {
-                let names = self.locker.borrow_mut().get_dev_package_names()?;
+                let names = self.locker.get_dev_package_names()?;
                 names.into_iter().collect()
             } else {
                 indexmap::IndexSet::new()
@@ -1498,7 +1481,7 @@ impl Installer {
         if for_update {
             self.package.get_aliases().to_vec()
         } else {
-            self.locker.borrow_mut().get_aliases().unwrap_or_default()
+            self.locker.get_aliases().unwrap_or_default()
         }
     }
 

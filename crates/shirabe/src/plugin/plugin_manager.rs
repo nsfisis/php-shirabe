@@ -72,11 +72,8 @@ impl PluginManager {
             .upgrade()
             .expect("PluginManager must not outlive Composer");
         let allow_plugins_config = composer_rc.borrow().get_config().get_allow_plugins()?;
-        let locker = composer_rc.borrow().get_locker().clone();
-        let mut locker = locker.borrow_mut();
-        let allow_plugin_rules =
-            Self::parse_allowed_plugins(allow_plugins_config, Some(&mut *locker));
-        drop(locker);
+        let locker = composer_rc.borrow().get_locker();
+        let allow_plugin_rules = Self::parse_allowed_plugins(allow_plugins_config, Some(&*locker));
         let allow_global_plugin_rules = Self::parse_allowed_plugins(
             match &global_composer {
                 Some(gc) => gc.borrow_partial().get_config().get_allow_plugins()?,
@@ -996,13 +993,13 @@ impl PluginManager {
 
     fn parse_allowed_plugins(
         allow_plugins_config: AllowPlugins,
-        mut locker: Option<&mut dyn LockerInterface>,
+        locker: Option<&dyn LockerInterface>,
     ) -> Option<IndexMap<BString, bool>> {
         // PHP: [] === $allowPluginsConfig && $locker !== null && $locker->isLocked() && version_compare($locker->getPluginApi(), '2.2.0', '<')
         let is_empty_array =
             matches!(&allow_plugins_config, AllowPlugins::Rules(rules) if rules.is_empty());
         let plugin_api_under_2_2_0 = if is_empty_array {
-            match locker.as_deref_mut() {
+            match locker {
                 Some(l) => {
                     if l.is_locked() {
                         let api = l.get_plugin_api().unwrap_or_default();

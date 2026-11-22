@@ -58,8 +58,8 @@ pub trait CompletionTrait: BaseCommand {
             }
 
             let locker = composer.get_locker();
-            if locker.borrow_mut().is_locked() {
-                installed_repos.push(locker.borrow_mut().get_locked_repository(true)?.into());
+            if locker.is_locked() {
+                installed_repos.push(locker.get_locked_repository(true)?.into());
             } else {
                 installed_repos.push(
                     composer
@@ -71,9 +71,8 @@ pub trait CompletionTrait: BaseCommand {
 
             let mut platform_hint: Vec<BString> = vec![];
             if include_platform_packages {
-                let mut platform_repo = if locker.borrow_mut().is_locked() {
+                let mut platform_repo = if locker.is_locked() {
                     let overrides: IndexMap<BString, PhpMixed> = locker
-                        .borrow_mut()
                         .get_platform_overrides()?
                         .into_iter()
                         .map(|(k, v)| (k, PhpMixed::string(v)))
@@ -145,8 +144,8 @@ pub trait CompletionTrait: BaseCommand {
             }
 
             let locker = composer.get_locker();
-            if locker.borrow_mut().is_locked() {
-                installed_repos.push(locker.borrow_mut().get_locked_repository(true)?.into());
+            if locker.is_locked() {
+                installed_repos.push(locker.get_locked_repository(true)?.into());
             } else {
                 installed_repos.push(
                     composer

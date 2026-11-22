@@ -115,7 +115,7 @@ impl AutoloadGenerator {
         target_dir: &BStr,
         scan_psr_packages: bool,
         suffix: Option<BString>,
-        locker: Option<std::rc::Rc<std::cell::RefCell<dyn LockerInterface>>>,
+        locker: Option<std::rc::Rc<dyn LockerInterface>>,
         strict_ambiguous: bool,
     ) -> anyhow::Result<ClassMap> {
         let mut scan_psr_packages = scan_psr_packages;
@@ -539,10 +539,9 @@ impl AutoloadGenerator {
 
             if suffix.is_none() {
                 suffix = Some(if let Some(l) = locker {
-                    let is_locked = l.borrow_mut().is_locked();
+                    let is_locked = l.is_locked();
                     if is_locked {
-                        l.borrow_mut()
-                            .get_lock_data()?
+                        l.get_lock_data()?
                             .get(B("content-hash"))
                             .and_then(|v| v.as_string())
                             .unwrap_or_default()
@@ -1937,7 +1936,7 @@ pub trait AutoloadGeneratorInterface: std::fmt::Debug {
         target_dir: &BStr,
         scan_psr_packages: bool,
         suffix: Option<BString>,
-        locker: Option<std::rc::Rc<std::cell::RefCell<dyn LockerInterface>>>,
+        locker: Option<std::rc::Rc<dyn LockerInterface>>,
         strict_ambiguous: bool,
     ) -> anyhow::Result<ClassMap>;
     #[php(skip)]
@@ -2000,7 +1999,7 @@ impl AutoloadGeneratorInterface for AutoloadGenerator {
         target_dir: &BStr,
         scan_psr_packages: bool,
         suffix: Option<BString>,
-        locker: Option<std::rc::Rc<std::cell::RefCell<dyn LockerInterface>>>,
+        locker: Option<std::rc::Rc<dyn LockerInterface>>,
         strict_ambiguous: bool,
     ) -> anyhow::Result<ClassMap> {
         self.dump(

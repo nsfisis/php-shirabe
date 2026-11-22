@@ -20,7 +20,7 @@ use bstr::{B, BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_binding_macros::php_binding;
 use shirabe_php_shim::{
-    Catch as _, DATE_RFC3339, LogicException, PhpMixed, RuntimeException, ToPhpString,
+    Catch as _, DATE_RFC3339, LogicException, PhpMixed, PhpProp, RuntimeException, ToPhpString,
     array_intersect, array_keys, array_map, array_merge, bformat, display_to_bytes, empty,
     file_get_contents, filemtime, hash, in_array_loose, intval, is_int, ksort, php_regex,
     preg_is_match, preg_match, realpath, strcmp, strtolower, touch_with_mtime, trim, usort,
@@ -37,8 +37,8 @@ pub struct Locker {
     loader: ArrayLoader,
     dumper: ArrayDumper,
     process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
-    lock_data_cache: std::cell::RefCell<Option<IndexMap<BString, PhpMixed>>>,
-    virtual_file_written: bool,
+    lock_data_cache: PhpProp<Option<std::rc::Rc<IndexMap<BString, PhpMixed>>>>,
+    virtual_file_written: PhpProp<bool>,
 }
 
 #[php_binding(r"Composer\Package\Locker", members = static)]
@@ -60,8 +60,8 @@ impl Locker {
             loader: ArrayLoader::new(None, true),
             dumper: ArrayDumper::new(),
             process,
-            lock_data_cache: std::cell::RefCell::new(None),
-            virtual_file_written: false,
+            lock_data_cache: PhpProp::new(None),
+            virtual_file_written: PhpProp::new(false),
         }
     }
 
@@ -129,8 +129,8 @@ impl Locker {
     }
 
     /// Checks whether locker has been locked (lockfile found).
-    pub fn is_locked(&mut self) -> bool {
-        if !self.virtual_file_written && !self.lock_file.exists() {
+    pub fn is_locked(&self) -> bool {
+        if !self.virtual_file_written.cloned() && !self.lock_file.exists() {
             return false;
         }
 
@@ -142,7 +142,7 @@ impl Locker {
     }
 
     /// Checks whether the lock file is still up to date with the current hash
-    pub fn is_fresh(&mut self) -> anyhow::Result<bool> {
+    pub fn is_fresh(&self) -> anyhow::Result<bool> {
         let lock = self.lock_file.read()?;
         let lock_map: IndexMap<BString, PhpMixed> = match lock {
             PhpMixed::Array(m) => m.into_iter().collect(),
@@ -171,7 +171,7 @@ impl Locker {
 
     /// Searches and returns an array of locked packages, retrieved from registered repositories.
     pub fn get_locked_repository(
-        &mut self,
+        &self,
         with_dev_reqs: bool,
     ) -> anyhow::Result<LockArrayRepositoryHandle> {
         let lock_data = self.get_lock_data()?;
@@ -266,7 +266,7 @@ impl Locker {
         .into())
     }
 
-    pub fn get_dev_package_names(&mut self) -> anyhow::Result<Vec<BString>> {
+    pub fn get_dev_package_names(&self) -> anyhow::Result<Vec<BString>> {
         let mut names: Vec<BString> = vec![];
         let lock_data = self.get_lock_data()?;
         if let Some(PhpMixed::List(list)) = lock_data.get(B("packages-dev")) {
@@ -286,7 +286,7 @@ impl Locker {
 
     /// Returns the platform requirements stored in the lock file
     pub fn get_platform_requirements(
-        &mut self,
+        &self,
         with_dev_reqs: bool,
     ) -> anyhow::Result<IndexMap<BString, Link>> {
         let lock_data = self.get_lock_data()?;
@@ -330,7 +330,7 @@ impl Locker {
         Ok(requirements)
     }
 
-    pub fn get_minimum_stability(&mut self) -> anyhow::Result<BString> {
+    pub fn get_minimum_stability(&self) -> anyhow::Result<BString> {
         let lock_data = self.get_lock_data()?;
 
         Ok(BString::from(
@@ -343,7 +343,7 @@ impl Locker {
 
     /// The values are BasePackage::STABILITIES ints, written verbatim by set_lock_data,
     /// despite the upstream `@return array<string, string>` docblock.
-    pub fn get_stability_flags(&mut self) -> anyhow::Result<IndexMap<BString, i64>> {
+    pub fn get_stability_flags(&self) -> anyhow::Result<IndexMap<BString, i64>> {
         let lock_data = self.get_lock_data()?;
 
         Ok(lock_data
@@ -359,7 +359,7 @@ impl Locker {
             .unwrap_or_default())
     }
 
-    pub fn get_prefer_stable(&mut self) -> anyhow::Result<Option<bool>> {
+    pub fn get_prefer_stable(&self) -> anyhow::Result<Option<bool>> {
         let lock_data = self.get_lock_data()?;
 
         // return null if not set to allow caller logic to choose the
@@ -367,13 +367,13 @@ impl Locker {
         Ok(lock_data.get(B("prefer-stable")).and_then(|v| v.as_bool()))
     }
 
-    pub fn get_prefer_lowest(&mut self) -> anyhow::Result<Option<bool>> {
+    pub fn get_prefer_lowest(&self) -> anyhow::Result<Option<bool>> {
         let lock_data = self.get_lock_data()?;
 
         Ok(lock_data.get(B("prefer-lowest")).and_then(|v| v.as_bool()))
     }
 
-    pub fn get_platform_overrides(&mut self) -> anyhow::Result<IndexMap<BString, BString>> {
+    pub fn get_platform_overrides(&self) -> anyhow::Result<IndexMap<BString, BString>> {
         let lock_data = self.get_lock_data()?;
 
         Ok(lock_data
@@ -389,7 +389,7 @@ impl Locker {
             .unwrap_or_default())
     }
 
-    pub fn get_aliases(&mut self) -> anyhow::Result<Vec<IndexMap<BString, BString>>> {
+    pub fn get_aliases(&self) -> anyhow::Result<Vec<IndexMap<BString, BString>>> {
         let lock_data = self.get_lock_data()?;
 
         Ok(lock_data
@@ -417,7 +417,7 @@ impl Locker {
             .unwrap_or_default())
     }
 
-    pub fn get_plugin_api(&mut self) -> anyhow::Result<BString> {
+    pub fn get_plugin_api(&self) -> anyhow::Result<BString> {
         let lock_data = self.get_lock_data()?;
 
         Ok(BString::from(
@@ -428,9 +428,9 @@ impl Locker {
         ))
     }
 
-    pub fn get_lock_data(&mut self) -> anyhow::Result<IndexMap<BString, PhpMixed>> {
-        if let Some(cache) = self.lock_data_cache.borrow().clone() {
-            return Ok(cache);
+    pub fn get_lock_data(&self) -> anyhow::Result<IndexMap<BString, PhpMixed>> {
+        if let Some(cache) = self.lock_data_cache.cloned() {
+            return Ok(std::rc::Rc::unwrap_or_clone(cache));
         }
 
         if !self.lock_file.exists() {
@@ -445,7 +445,8 @@ impl Locker {
             PhpMixed::Array(m) => m.into_iter().collect(),
             _ => IndexMap::new(),
         };
-        *self.lock_data_cache.borrow_mut() = Some(data.clone());
+        self.lock_data_cache
+            .set(Some(std::rc::Rc::new(data.clone())));
         Ok(data)
     }
 
@@ -453,7 +454,7 @@ impl Locker {
     #[allow(clippy::too_many_arguments, reason = "to keep PHP signature")]
     #[tracing::instrument(skip_all)]
     pub fn set_lock_data(
-        &mut self,
+        &self,
         packages: Vec<PackageInterfaceHandle>,
         dev_packages: Option<Vec<PackageInterfaceHandle>>,
         platform_reqs: IndexMap<BString, BString>,
@@ -595,10 +596,10 @@ impl Locker {
             if write {
                 self.lock_file
                     .write(PhpMixed::Array(lock.into_iter().collect()))?;
-                *self.lock_data_cache.borrow_mut() = None;
-                self.virtual_file_written = false;
+                self.lock_data_cache.set(None);
+                self.virtual_file_written.set(false);
             } else {
-                self.virtual_file_written = true;
+                self.virtual_file_written.set(true);
                 let parsed = JsonFile::parse_json(
                     Some(&JsonFile::encode(&PhpMixed::Array(
                         lock.into_iter().collect(),
@@ -609,7 +610,7 @@ impl Locker {
                     PhpMixed::Array(m) => m.into_iter().collect(),
                     _ => IndexMap::new(),
                 };
-                *self.lock_data_cache.borrow_mut() = Some(parsed_map);
+                self.lock_data_cache.set(Some(std::rc::Rc::new(parsed_map)));
             }
 
             return Ok(true);
@@ -618,13 +619,13 @@ impl Locker {
         Ok(false)
     }
 
-    fn is_locked_result(&mut self) -> anyhow::Result<bool> {
+    fn is_locked_result(&self) -> anyhow::Result<bool> {
         Ok(self.is_locked())
     }
 
     /// Updates the lock file's hash in-place from a given composer.json's JsonFile
     pub fn update_hash(
-        &mut self,
+        &self,
         composer_json: &JsonFile,
         data_processor: Option<
             Box<dyn FnOnce(IndexMap<BString, PhpMixed>) -> IndexMap<BString, PhpMixed>>,
@@ -658,8 +659,8 @@ impl Locker {
         self.lock_file.write(PhpMixed::Array(
             self.fixup_json_data_type(lock_data).into_iter().collect(),
         ))?;
-        *self.lock_data_cache.borrow_mut() = None;
-        self.virtual_file_written = false;
+        self.lock_data_cache.set(None);
+        self.virtual_file_written.set(false);
         if let Some(mtime) = lock_mtime
             && is_int(&PhpMixed::Int(mtime))
         {
@@ -697,7 +698,7 @@ impl Locker {
         lock_data
     }
 
-    fn lock_packages(&mut self, packages: &[PackageInterfaceHandle]) -> anyhow::Result<PhpMixed> {
+    fn lock_packages(&self, packages: &[PackageInterfaceHandle]) -> anyhow::Result<PhpMixed> {
         let mut locked: Vec<IndexMap<BString, PhpMixed>> = vec![];
 
         for package in packages {
@@ -776,10 +777,7 @@ impl Locker {
     }
 
     /// Returns the packages's datetime for its source reference.
-    fn get_package_time(
-        &mut self,
-        package: PackageInterfaceHandle,
-    ) -> anyhow::Result<Option<BString>> {
+    fn get_package_time(&self, package: PackageInterfaceHandle) -> anyhow::Result<Option<BString>> {
         let path = self
             .installation_manager
             .borrow_mut()
@@ -859,7 +857,7 @@ impl Locker {
     }
 
     pub fn get_missing_requirement_info(
-        &mut self,
+        &self,
         package: RootPackageInterfaceHandle,
         include_dev: bool,
     ) -> anyhow::Result<Vec<BString>> {
@@ -961,34 +959,33 @@ impl Locker {
 }
 
 // Composer's Composer::setLocker() accepts any Locker subclass, so plugins may swap in a
-// replacement. The interface captures the methods reached through Composer's accessor and through
-// the `&mut dyn LockerInterface` / `&dyn LockerInterface` references fed from it.
+// replacement. The interface captures the methods reached through Composer's accessor.
 #[php_binding(r"Composer\Package\Locker")]
 pub trait LockerInterface: std::fmt::Debug {
     #[php(skip)]
     fn get_json_file(&self) -> &JsonFile;
-    fn is_locked(&mut self) -> bool;
-    fn is_fresh(&mut self) -> anyhow::Result<bool>;
+    fn is_locked(&self) -> bool;
+    fn is_fresh(&self) -> anyhow::Result<bool>;
     fn get_locked_repository(
-        &mut self,
+        &self,
         with_dev_reqs: bool,
     ) -> anyhow::Result<LockArrayRepositoryHandle>;
-    fn get_dev_package_names(&mut self) -> anyhow::Result<Vec<BString>>;
+    fn get_dev_package_names(&self) -> anyhow::Result<Vec<BString>>;
     fn get_platform_requirements(
-        &mut self,
+        &self,
         with_dev_reqs: bool,
     ) -> anyhow::Result<IndexMap<BString, Link>>;
-    fn get_minimum_stability(&mut self) -> anyhow::Result<BString>;
-    fn get_stability_flags(&mut self) -> anyhow::Result<IndexMap<BString, i64>>;
-    fn get_prefer_stable(&mut self) -> anyhow::Result<Option<bool>>;
-    fn get_prefer_lowest(&mut self) -> anyhow::Result<Option<bool>>;
-    fn get_platform_overrides(&mut self) -> anyhow::Result<IndexMap<BString, BString>>;
-    fn get_aliases(&mut self) -> anyhow::Result<Vec<IndexMap<BString, BString>>>;
-    fn get_plugin_api(&mut self) -> anyhow::Result<BString>;
-    fn get_lock_data(&mut self) -> anyhow::Result<IndexMap<BString, PhpMixed>>;
+    fn get_minimum_stability(&self) -> anyhow::Result<BString>;
+    fn get_stability_flags(&self) -> anyhow::Result<IndexMap<BString, i64>>;
+    fn get_prefer_stable(&self) -> anyhow::Result<Option<bool>>;
+    fn get_prefer_lowest(&self) -> anyhow::Result<Option<bool>>;
+    fn get_platform_overrides(&self) -> anyhow::Result<IndexMap<BString, BString>>;
+    fn get_aliases(&self) -> anyhow::Result<Vec<IndexMap<BString, BString>>>;
+    fn get_plugin_api(&self) -> anyhow::Result<BString>;
+    fn get_lock_data(&self) -> anyhow::Result<IndexMap<BString, PhpMixed>>;
     #[allow(clippy::too_many_arguments, reason = "to keep PHP signature")]
     fn set_lock_data(
-        &mut self,
+        &self,
         packages: Vec<PackageInterfaceHandle>,
         dev_packages: Option<Vec<PackageInterfaceHandle>>,
         platform_reqs: IndexMap<BString, BString>,
@@ -1003,14 +1000,14 @@ pub trait LockerInterface: std::fmt::Debug {
     ) -> anyhow::Result<bool>;
     #[php(skip)]
     fn update_hash(
-        &mut self,
+        &self,
         composer_json: &JsonFile,
         data_processor: Option<
             Box<dyn FnOnce(IndexMap<BString, PhpMixed>) -> IndexMap<BString, PhpMixed>>,
         >,
     ) -> anyhow::Result<()>;
     fn get_missing_requirement_info(
-        &mut self,
+        &self,
         package: RootPackageInterfaceHandle,
         include_dev: bool,
     ) -> anyhow::Result<Vec<BString>>;
@@ -1021,67 +1018,67 @@ impl LockerInterface for Locker {
         self.get_json_file()
     }
 
-    fn is_locked(&mut self) -> bool {
+    fn is_locked(&self) -> bool {
         self.is_locked()
     }
 
-    fn is_fresh(&mut self) -> anyhow::Result<bool> {
+    fn is_fresh(&self) -> anyhow::Result<bool> {
         self.is_fresh()
     }
 
     fn get_locked_repository(
-        &mut self,
+        &self,
         with_dev_reqs: bool,
     ) -> anyhow::Result<LockArrayRepositoryHandle> {
         self.get_locked_repository(with_dev_reqs)
     }
 
-    fn get_dev_package_names(&mut self) -> anyhow::Result<Vec<BString>> {
+    fn get_dev_package_names(&self) -> anyhow::Result<Vec<BString>> {
         self.get_dev_package_names()
     }
 
     fn get_platform_requirements(
-        &mut self,
+        &self,
         with_dev_reqs: bool,
     ) -> anyhow::Result<IndexMap<BString, Link>> {
         self.get_platform_requirements(with_dev_reqs)
     }
 
-    fn get_minimum_stability(&mut self) -> anyhow::Result<BString> {
+    fn get_minimum_stability(&self) -> anyhow::Result<BString> {
         self.get_minimum_stability()
     }
 
-    fn get_stability_flags(&mut self) -> anyhow::Result<IndexMap<BString, i64>> {
+    fn get_stability_flags(&self) -> anyhow::Result<IndexMap<BString, i64>> {
         self.get_stability_flags()
     }
 
-    fn get_prefer_stable(&mut self) -> anyhow::Result<Option<bool>> {
+    fn get_prefer_stable(&self) -> anyhow::Result<Option<bool>> {
         self.get_prefer_stable()
     }
 
-    fn get_prefer_lowest(&mut self) -> anyhow::Result<Option<bool>> {
+    fn get_prefer_lowest(&self) -> anyhow::Result<Option<bool>> {
         self.get_prefer_lowest()
     }
 
-    fn get_platform_overrides(&mut self) -> anyhow::Result<IndexMap<BString, BString>> {
+    fn get_platform_overrides(&self) -> anyhow::Result<IndexMap<BString, BString>> {
         self.get_platform_overrides()
     }
 
-    fn get_aliases(&mut self) -> anyhow::Result<Vec<IndexMap<BString, BString>>> {
+    fn get_aliases(&self) -> anyhow::Result<Vec<IndexMap<BString, BString>>> {
         self.get_aliases()
     }
 
-    fn get_plugin_api(&mut self) -> anyhow::Result<BString> {
+    fn get_plugin_api(&self) -> anyhow::Result<BString> {
         self.get_plugin_api()
     }
 
-    fn get_lock_data(&mut self) -> anyhow::Result<IndexMap<BString, PhpMixed>> {
+    fn get_lock_data(&self) -> anyhow::Result<IndexMap<BString, PhpMixed>> {
         self.get_lock_data()
     }
 
     #[allow(clippy::too_many_arguments, reason = "to keep PHP signature")]
     fn set_lock_data(
-        &mut self,
+        &self,
         packages: Vec<PackageInterfaceHandle>,
         dev_packages: Option<Vec<PackageInterfaceHandle>>,
         platform_reqs: IndexMap<BString, BString>,
@@ -1110,7 +1107,7 @@ impl LockerInterface for Locker {
     }
 
     fn update_hash(
-        &mut self,
+        &self,
         composer_json: &JsonFile,
         data_processor: Option<
             Box<dyn FnOnce(IndexMap<BString, PhpMixed>) -> IndexMap<BString, PhpMixed>>,
@@ -1120,7 +1117,7 @@ impl LockerInterface for Locker {
     }
 
     fn get_missing_requirement_info(
-        &mut self,
+        &self,
         package: RootPackageInterfaceHandle,
         include_dev: bool,
     ) -> anyhow::Result<Vec<BString>> {

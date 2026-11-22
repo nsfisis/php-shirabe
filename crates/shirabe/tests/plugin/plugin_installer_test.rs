@@ -365,14 +365,13 @@ pub(crate) fn set_up() -> SetUp {
         let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
             io_dyn.clone(),
         ))));
-        let locker: std::rc::Rc<std::cell::RefCell<dyn LockerInterface>> =
-            std::rc::Rc::new(std::cell::RefCell::new(Locker::new(
-                io_dyn.clone(),
-                json_file,
-                locker_installation_manager(&io_dyn),
-                "{}",
-                process,
-            )));
+        let locker: std::rc::Rc<dyn LockerInterface> = std::rc::Rc::new(Locker::new(
+            io_dyn.clone(),
+            json_file,
+            locker_installation_manager(&io_dyn),
+            "{}",
+            process,
+        ));
         composer.borrow_mut().set_locker(locker);
     }
 

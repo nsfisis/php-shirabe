@@ -294,7 +294,7 @@ impl Command for ValidateCommand {
                 .as_bool()
                 .unwrap_or(false);
         let locker = composer.get_locker().clone();
-        let mut locker = locker.borrow_mut();
+        let locker = locker;
         if locker.is_locked() && !locker.is_fresh()? {
             lock_errors.push(BString::from("- The lock file is not up to date with the latest changes in composer.json, it is recommended that you run `shirabe update` or `shirabe update <package name>`."));
         }
