@@ -339,7 +339,6 @@ impl Command for ValidateCommand {
             for package in packages {
                 let path = composer
                     .get_installation_manager()
-                    .borrow_mut()
                     .get_install_path(package.clone())?;
                 let path = match path {
                     Some(p) => p,

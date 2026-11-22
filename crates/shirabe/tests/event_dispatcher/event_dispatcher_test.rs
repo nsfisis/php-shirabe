@@ -71,9 +71,7 @@ fn create_composer_instance() -> ComposerHandle {
         .set_repository_manager(std::rc::Rc::new(repository_manager));
     composer
         .borrow_mut()
-        .set_installation_manager(std::rc::Rc::new(std::cell::RefCell::new(
-            MockInstallationManager::new(),
-        )));
+        .set_installation_manager(std::rc::Rc::new(MockInstallationManager::new()));
     let generator = AutoloadGenerator::new(
         std::rc::Rc::new(EventDispatcher::new(
             composer.upcast().downgrade(),
@@ -480,7 +478,7 @@ mod mock_autoload_generator {
                 config: &Config,
                 local_repo: shirabe::repository::RepositoryInterfaceHandle,
                 root_package: RootPackageInterfaceHandle,
-                installation_manager: std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>,
+                installation_manager: std::rc::Rc<dyn InstallationManagerInterface>,
                 target_dir: &bstr::BStr,
                 scan_psr_packages: bool,
                 suffix: Option<bstr::BString>,
@@ -489,7 +487,7 @@ mod mock_autoload_generator {
             ) -> anyhow::Result<ClassMap>;
             fn build_package_map(
                 &self,
-                installation_manager: std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>,
+                installation_manager: std::rc::Rc<dyn InstallationManagerInterface>,
                 root_package: RootPackageInterfaceHandle,
                 packages: Vec<PackageInterfaceHandle>,
             ) -> anyhow::Result<Vec<(PackageInterfaceHandle, Option<std::path::PathBuf>)>>;
@@ -553,13 +551,13 @@ mod mock_installation_manager {
         impl InstallationManagerInterface for InstallationManager {
             fn add_installer(&self, installer: std::rc::Rc<dyn InstallerInterface>);
             fn remove_installer(&self, installer: &dyn InstallerInterface);
-            fn disable_plugins(&mut self);
+            fn disable_plugins(&self);
             fn is_package_installed(
-                &mut self,
+                &self,
                 repo: &shirabe::repository::InstalledRepositoryInterfaceHandle,
                 package: PackageInterfaceHandle,
             ) -> anyhow::Result<bool>;
-            fn ensure_binaries_presence(&mut self, package: PackageInterfaceHandle) -> anyhow::Result<()>;
+            fn ensure_binaries_presence(&self, package: PackageInterfaceHandle) -> anyhow::Result<()>;
             async fn execute(
                 &self,
                 repo: &shirabe::repository::InstalledRepositoryInterfaceHandle,
@@ -569,8 +567,8 @@ mod mock_installation_manager {
                 download_only: bool,
             ) -> anyhow::Result<()>;
             fn get_install_path(&self, package: PackageInterfaceHandle) -> anyhow::Result<Option<std::path::PathBuf>>;
-            fn set_output_progress(&mut self, output_progress: bool);
-            async fn notify_installs(&mut self, io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>);
+            fn set_output_progress(&self, output_progress: bool);
+            async fn notify_installs(&self, io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>);
         }
     }
 }
@@ -644,9 +642,7 @@ fn test_dispatcher_pass_dev_mode_to_autoload_generator_for_script_events() {
             .set_repository_manager(std::rc::Rc::new(repository_manager));
         composer
             .borrow_mut()
-            .set_installation_manager(std::rc::Rc::new(std::cell::RefCell::new(
-                MockInstallationManager::new(),
-            )));
+            .set_installation_manager(std::rc::Rc::new(MockInstallationManager::new()));
 
         let (process, _process_guard) =
             get_process_executor_mock(vec![], false, MockHandler::default());

@@ -320,16 +320,13 @@ impl RequireCommand {
             Some(std::rc::Rc::new(std::cell::RefCell::new(command_event))),
         )?;
 
-        composer
-            .get_installation_manager()
-            .borrow_mut()
-            .set_output_progress(
-                !input
-                    .borrow()
-                    .get_option("no-progress")?
-                    .as_bool()
-                    .unwrap_or(false),
-            );
+        composer.get_installation_manager().set_output_progress(
+            !input
+                .borrow()
+                .get_option("no-progress")?
+                .as_bool()
+                .unwrap_or(false),
+        );
 
         let mut install = Installer::create(io.clone(), &composer_handle);
 

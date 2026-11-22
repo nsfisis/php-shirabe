@@ -451,9 +451,7 @@ impl ShowCommand {
                 .require_composer(None, None)?
                 .borrow_partial()
                 .get_installation_manager();
-            let path = installation_manager
-                .borrow_mut()
-                .get_install_path(package.clone().into())?;
+            let path = installation_manager.get_install_path(package.clone().into())?;
             if let Some(p) = path {
                 self.get_io().write(bformat!(
                     "<info>path</info>     : {}",
@@ -686,9 +684,7 @@ impl ShowCommand {
         {
             let composer = self.require_composer(None, None)?;
             let installation_manager = composer.borrow_partial().get_installation_manager();
-            let path = installation_manager
-                .borrow_mut()
-                .get_install_path(package.clone().into())?;
+            let path = installation_manager.get_install_path(package.clone().into())?;
             match path {
                 Some(p) => {
                     if let Some(r) = realpath(&p) {
@@ -1948,7 +1944,6 @@ impl Command for ShowCommand {
                     composer_ref
                         .borrow_partial()
                         .get_installation_manager()
-                        .borrow_mut()
                         .get_install_path(package.clone().into())?
                 };
                 if let Some(path) = path {
@@ -2326,9 +2321,7 @@ impl Command for ShowCommand {
                                 .unwrap()
                                 .borrow_partial()
                                 .get_installation_manager();
-                            let path = installation_manager
-                                .borrow_mut()
-                                .get_install_path(package.clone())?;
+                            let path = installation_manager.get_install_path(package.clone())?;
                             if let Some(p) = path {
                                 let r = realpath(&p).unwrap_or_default();
                                 package_view_data.path = Some(Some(BString::from(

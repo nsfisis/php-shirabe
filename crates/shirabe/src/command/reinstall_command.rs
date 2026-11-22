@@ -204,7 +204,7 @@ impl Command for ReinstallCommand {
         let download_manager = composer.get_download_manager();
         let package = composer.get_package();
 
-        installation_manager.borrow_mut().set_output_progress(
+        installation_manager.set_output_progress(
             !input
                 .borrow()
                 .get_option("no-progress")?
@@ -217,7 +217,7 @@ impl Command for ReinstallCommand {
             .as_bool()
             .unwrap_or(false)
         {
-            installation_manager.borrow_mut().disable_plugins();
+            installation_manager.disable_plugins();
         }
 
         download_manager.borrow().set_prefer_source(prefer_source);
@@ -239,11 +239,9 @@ impl Command for ReinstallCommand {
             .collect();
         let repo = InstalledRepositoryInterfaceHandle::from_repository_handle(&local_repo);
         installation_manager
-            .borrow()
             .execute(&repo, uninstall_operations, dev_mode, true, false)
             .await?;
         installation_manager
-            .borrow()
             .execute(&repo, install_operations.clone(), dev_mode, true, false)
             .await?;
 

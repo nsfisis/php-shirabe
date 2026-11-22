@@ -25,6 +25,7 @@ final class PhpObjectModel implements Linter
     private const STRUCTS = [
         'crates/shirabe/src/config.rs' => ['Config'],
         'crates/shirabe/src/event_dispatcher/event_dispatcher.rs' => ['EventDispatcher'],
+        'crates/shirabe/src/installer/installation_manager.rs' => ['InstallationManager'],
         'crates/shirabe/src/package/locker.rs' => ['Locker'],
         'crates/shirabe/src/repository/repository_manager.rs' => ['RepositoryManager'],
     ];
@@ -33,6 +34,8 @@ final class PhpObjectModel implements Linter
     private const HANDLE_TYPES = [
         'Config',
         'EventDispatcherInterface',
+        'InstallationManager',
+        'InstallationManagerInterface',
         'Locker',
         'LockerInterface',
         'RepositoryManager',

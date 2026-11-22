@@ -220,9 +220,7 @@ impl AutoloadGeneratorInterface for StubAutoloadGenerator {
         _config: &Config,
         _local_repo: shirabe::repository::RepositoryInterfaceHandle,
         _root_package: RootPackageInterfaceHandle,
-        _installation_manager: std::rc::Rc<
-            std::cell::RefCell<dyn shirabe::installer::InstallationManagerInterface>,
-        >,
+        _installation_manager: std::rc::Rc<dyn shirabe::installer::InstallationManagerInterface>,
         _target_dir: &bstr::BStr,
         _scan_psr_packages: bool,
         _suffix: Option<bstr::BString>,
@@ -233,9 +231,7 @@ impl AutoloadGeneratorInterface for StubAutoloadGenerator {
     }
     fn build_package_map(
         &self,
-        _installation_manager: std::rc::Rc<
-            std::cell::RefCell<dyn shirabe::installer::InstallationManagerInterface>,
-        >,
+        _installation_manager: std::rc::Rc<dyn shirabe::installer::InstallationManagerInterface>,
         _root_package: RootPackageInterfaceHandle,
         _packages: Vec<PackageInterfaceHandle>,
     ) -> anyhow::Result<Vec<(PackageInterfaceHandle, Option<std::path::PathBuf>)>> {
@@ -433,12 +429,8 @@ fn test_installer() {
             http_downloader.clone(),
             None,
         )));
-        let installation_manager: std::rc::Rc<std::cell::RefCell<InstallationManager>> =
-            std::rc::Rc::new(std::cell::RefCell::new(InstallationManager::__new_mock(
-                r#loop,
-                io.clone(),
-                None,
-            )));
+        let installation_manager: std::rc::Rc<InstallationManager> =
+            std::rc::Rc::new(InstallationManager::__new_mock(r#loop, io.clone(), None));
 
         // emulate a writable lock file: a real JsonFile over a fresh temp path (initially absent, so
         // the installer falls back to an update; PHP uses an in-memory JsonFile mock instead).
@@ -480,7 +472,7 @@ fn test_installer() {
         let output = str_replace("\r", "", io_buffer.borrow().get_output());
         assert_eq!(0, result, "{}", output.display_lossy());
 
-        let installed = installation_manager.borrow().__get_installed_packages();
+        let installed = installation_manager.__get_installed_packages();
         assert_eq!(
             make_packages_comparable(&case.expected_install),
             make_packages_comparable(&installed),
@@ -488,10 +480,10 @@ fn test_installer() {
             output.display_lossy()
         );
 
-        let updated = installation_manager.borrow().__get_updated_packages();
+        let updated = installation_manager.__get_updated_packages();
         assert_eq!(case.expected_update, updated);
 
-        let uninstalled = installation_manager.borrow().__get_uninstalled_packages();
+        let uninstalled = installation_manager.__get_uninstalled_packages();
         assert_eq!(case.expected_uninstall, uninstalled);
     }
 }
@@ -958,11 +950,11 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&BString>) 
         io.clone(),
     ))));
     let locker_loop = composer.borrow().get_loop();
-    let locker_im = std::rc::Rc::new(std::cell::RefCell::new(InstallationManager::__new_mock(
+    let locker_im = std::rc::Rc::new(InstallationManager::__new_mock(
         locker_loop,
         io.clone(),
         None,
-    )));
+    ));
     // Must match the encoding used for the lock's auto-computed "hash" field in
     // load_integration_tests (PHP: `json_encode($composerConfig)`, i.e. options=0 with slashes
     // escaped), or the freshness check spuriously fails on any composer.json containing "/"
@@ -1302,7 +1294,7 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&BString>) 
 
     // trace from the composer's recording InstallationManager.
     let im_handle = composer.borrow().get_installation_manager();
-    let im_ref = im_handle.borrow();
+    let im_ref = im_handle;
     let trace = im_ref
         .as_any()
         .downcast_ref::<InstallationManager>()

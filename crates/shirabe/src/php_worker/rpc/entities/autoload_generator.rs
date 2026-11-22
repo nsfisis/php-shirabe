@@ -71,8 +71,7 @@ fn dump(
     let config = call.entity::<std::rc::Rc<Config>>(0)?;
     let local_repo = call.arg::<RepositoryInterfaceHandle>(1)?;
     let root_package = root_package(call, 2)?;
-    let installation_manager =
-        call.entity::<std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>>(3)?;
+    let installation_manager = call.entity::<std::rc::Rc<dyn InstallationManagerInterface>>(3)?;
     let target_dir = call.arg::<BString>(4)?;
     let scan_psr_packages = call.arg::<bool>(5)?;
     let suffix = call.arg::<Option<BString>>(6)?;
@@ -99,8 +98,7 @@ fn build_package_map(
     generator: &std::rc::Rc<std::cell::RefCell<dyn AutoloadGeneratorInterface>>,
     call: &mut Call<'_>,
 ) -> Result<RpcValue, PhpThrow> {
-    let installation_manager =
-        call.entity::<std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>>(0)?;
+    let installation_manager = call.entity::<std::rc::Rc<dyn InstallationManagerInterface>>(0)?;
     // TODO(type-model): PHP takes any PackageInterface as the root package here, while the
     // Rust signature narrows it to a RootPackageInterface.
     let root_package = root_package(call, 1)?;

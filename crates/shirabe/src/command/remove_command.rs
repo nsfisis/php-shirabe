@@ -536,16 +536,13 @@ impl Command for RemoveCommand {
             }
         }
 
-        composer
-            .get_installation_manager()
-            .borrow_mut()
-            .set_output_progress(
-                !input
-                    .borrow()
-                    .get_option("no-progress")?
-                    .as_bool()
-                    .unwrap_or(false),
-            );
+        composer.get_installation_manager().set_output_progress(
+            !input
+                .borrow()
+                .get_option("no-progress")?
+                .as_bool()
+                .unwrap_or(false),
+        );
 
         let mut install = Installer::create(self.get_io().clone(), &composer_handle);
 

@@ -481,7 +481,6 @@ impl PluginManager {
                 composer
                     .borrow()
                     .get_installation_manager()
-                    .borrow()
                     .add_installer(installer.clone());
                 self.registered_plugins
                     .entry(package.get_name())
@@ -541,7 +540,7 @@ impl PluginManager {
                     if let PluginOrInstaller::Installer(inst) =
                         &self.registered_plugins.get(&name).unwrap()[index]
                     {
-                        installation_manager.borrow().remove_installer(&**inst);
+                        installation_manager.remove_installer(&**inst);
                     }
                 }
             }
@@ -579,7 +578,7 @@ impl PluginManager {
                     if let PluginOrInstaller::Installer(inst) =
                         &self.registered_plugins.get(&name).unwrap()[index]
                     {
-                        installation_manager.borrow().remove_installer(&**inst);
+                        installation_manager.remove_installer(&**inst);
                     }
                 }
             }
@@ -867,7 +866,6 @@ impl PluginManager {
                 .composer_full()
                 .borrow()
                 .get_installation_manager()
-                .borrow()
                 .get_install_path(package);
         }
 
@@ -877,7 +875,6 @@ impl PluginManager {
             .unwrap()
             .borrow_partial()
             .get_installation_manager()
-            .borrow()
             .get_install_path(package)
     }
 

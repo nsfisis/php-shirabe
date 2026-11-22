@@ -14,7 +14,7 @@ use shirabe_php_shim::bformat;
 
 // TODO(plugin): the remaining InstallationManager surface is widened on demand.
 php_entity! {
-    handle: std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>,
+    handle: std::rc::Rc<dyn InstallationManagerInterface>,
     type_error: "an InstallationManager",
     classes: {
         r"Composer\Installer\InstallationManager": { constructor: unimplemented },
@@ -25,8 +25,7 @@ php_entity! {
             instance: {
                 adapters: __php_binding_installation_manager_interface,
                 target: dyn InstallationManagerInterface,
-                borrow: |im| im.borrow(),
-                borrow_mut: |im| im.borrow_mut(),
+                deref: |im| &**im,
             },
             unimplemented: [
                 disablePlugins,
@@ -73,21 +72,21 @@ fn installer_arg(call: &Call<'_>) -> Result<PhpEntityHandle, PhpThrow> {
 }
 
 fn add_installer(
-    im: &std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>,
+    im: &std::rc::Rc<dyn InstallationManagerInterface>,
     call: &mut Call<'_>,
 ) -> Result<RpcValue, PhpThrow> {
     let handle = installer_arg(call)?;
-    im.borrow().add_installer(php_installer_proxy(handle));
+    im.add_installer(php_installer_proxy(handle));
     Ok(RpcValue::Null)
 }
 
 fn remove_installer(
-    im: &std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>,
+    im: &std::rc::Rc<dyn InstallationManagerInterface>,
     call: &mut Call<'_>,
 ) -> Result<RpcValue, PhpThrow> {
     let handle = installer_arg(call)?;
     let installer = php_installer_proxy(handle.clone());
-    im.borrow().remove_installer(&*installer);
+    im.remove_installer(&*installer);
     forget_php_installer_proxy(&handle);
     Ok(RpcValue::Null)
 }

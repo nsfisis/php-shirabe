@@ -130,7 +130,7 @@ struct SetUp {
     repository: shirabe::repository::RepositoryInterfaceHandle,
     /// ref: `$this->configValueMap['use-include-path']`, which testUseGlobalIncludePath mutates.
     use_include_path: bool,
-    im: std::rc::Rc<std::cell::RefCell<dyn shirabe::installer::InstallationManagerInterface>>,
+    im: std::rc::Rc<dyn shirabe::installer::InstallationManagerInterface>,
     io: std::rc::Rc<std::cell::RefCell<BufferIO>>,
     generator: AutoloadGenerator,
     event_dispatcher: std::rc::Rc<EventDispatcher>,
@@ -182,11 +182,9 @@ fn set_up() -> SetUp {
     ));
 
     let dispatcher_io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io.clone();
-    let im: std::rc::Rc<std::cell::RefCell<dyn shirabe::installer::InstallationManagerInterface>> =
-        std::rc::Rc::new(std::cell::RefCell::new(make_installation_manager(
-            &vendor_dir,
-            dispatcher_io.clone(),
-        )));
+    let im: std::rc::Rc<dyn shirabe::installer::InstallationManagerInterface> = std::rc::Rc::new(
+        make_installation_manager(&vendor_dir, dispatcher_io.clone()),
+    );
 
     let repository = shirabe::repository::RepositoryInterfaceHandle::new(
         InstalledArrayRepository::new().unwrap(),
@@ -564,10 +562,9 @@ fn test_vendor_dir_same_as_working_dir() {
     let mut s = set_up();
     s.vendor_dir = s.working_dir.clone();
     // Re-register the install-path stub so getInstallPath uses the new vendor dir.
-    s.im.borrow()
-        .add_installer(std::rc::Rc::new(InstallPathStubInstaller {
-            vendor_dir: s.vendor_dir.clone(),
-        }));
+    s.im.add_installer(std::rc::Rc::new(InstallPathStubInstaller {
+        vendor_dir: s.vendor_dir.clone(),
+    }));
 
     let package = new_root_pkg(BStr::new("root/a"));
     package.set_autoload(autoload(vec![
@@ -643,10 +640,9 @@ fn test_root_package_autoloading_alternative_vendor_dir() {
     ]));
 
     s.vendor_dir = s.vendor_dir.join("subdir");
-    s.im.borrow()
-        .add_installer(std::rc::Rc::new(InstallPathStubInstaller {
-            vendor_dir: s.vendor_dir.clone(),
-        }));
+    s.im.add_installer(std::rc::Rc::new(InstallPathStubInstaller {
+        vendor_dir: s.vendor_dir.clone(),
+    }));
 
     s.ensure_dir(s.vendor_dir.join("composer"));
     s.ensure_dir(s.working_dir.join("src"));
@@ -2506,11 +2502,8 @@ fn test_vendor_dir_excluded_from_working_dir() {
 
     s.set_canonical_packages(vec![vendor_package.into()]);
 
-    let im: std::rc::Rc<std::cell::RefCell<dyn shirabe::installer::InstallationManagerInterface>> =
-        std::rc::Rc::new(std::cell::RefCell::new(make_installation_manager(
-            &vendor_dir,
-            s.io.clone(),
-        )));
+    let im: std::rc::Rc<dyn shirabe::installer::InstallationManagerInterface> =
+        std::rc::Rc::new(make_installation_manager(&vendor_dir, s.io.clone()));
 
     s.ensure_dir(working_dir.join("src/Foo"));
     s.ensure_dir(working_dir.join("classmap"));

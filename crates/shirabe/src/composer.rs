@@ -67,7 +67,7 @@ pub struct PartialComposer {
     package: Option<RootPackageInterfaceHandle>,
     r#loop: Option<std::rc::Rc<std::cell::RefCell<Loop>>>,
     repository_manager: Option<std::rc::Rc<dyn RepositoryManagerInterface>>,
-    installation_manager: Option<std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>>,
+    installation_manager: Option<std::rc::Rc<dyn InstallationManagerInterface>>,
     config: Option<std::rc::Rc<Config>>,
     event_dispatcher: Option<std::rc::Rc<dyn EventDispatcherInterface>>,
 }
@@ -110,14 +110,12 @@ impl PartialComposer {
 
     pub fn set_installation_manager(
         &mut self,
-        manager: std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>,
+        manager: std::rc::Rc<dyn InstallationManagerInterface>,
     ) {
         self.installation_manager = Some(manager);
     }
 
-    pub fn get_installation_manager(
-        &self,
-    ) -> std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>> {
+    pub fn get_installation_manager(&self) -> std::rc::Rc<dyn InstallationManagerInterface> {
         self.installation_manager.as_ref().unwrap().clone()
     }
 
@@ -277,14 +275,12 @@ impl Composer {
 
     pub fn set_installation_manager(
         &mut self,
-        manager: std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>,
+        manager: std::rc::Rc<dyn InstallationManagerInterface>,
     ) {
         self.partial.set_installation_manager(manager);
     }
 
-    pub fn get_installation_manager(
-        &self,
-    ) -> std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>> {
+    pub fn get_installation_manager(&self) -> std::rc::Rc<dyn InstallationManagerInterface> {
         self.partial.get_installation_manager()
     }
 
@@ -414,7 +410,7 @@ impl PartialOrFullComposer {
 
     pub fn set_installation_manager(
         &mut self,
-        manager: std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>,
+        manager: std::rc::Rc<dyn InstallationManagerInterface>,
     ) {
         match self {
             Self::Full(full) => full.set_installation_manager(manager),
@@ -422,9 +418,7 @@ impl PartialOrFullComposer {
         }
     }
 
-    pub fn get_installation_manager(
-        &self,
-    ) -> std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>> {
+    pub fn get_installation_manager(&self) -> std::rc::Rc<dyn InstallationManagerInterface> {
         match self {
             Self::Full(full) => full.get_installation_manager(),
             Self::Partial(partial) => partial.get_installation_manager(),

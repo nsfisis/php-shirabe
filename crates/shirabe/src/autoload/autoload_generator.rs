@@ -111,7 +111,7 @@ impl AutoloadGenerator {
         config: &Config,
         local_repo: RepositoryInterfaceHandle,
         root_package: RootPackageInterfaceHandle,
-        installation_manager: std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>,
+        installation_manager: std::rc::Rc<dyn InstallationManagerInterface>,
         target_dir: &BStr,
         scan_psr_packages: bool,
         suffix: Option<BString>,
@@ -786,7 +786,7 @@ impl AutoloadGenerator {
 
     pub fn build_package_map(
         &self,
-        installation_manager: std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>,
+        installation_manager: std::rc::Rc<dyn InstallationManagerInterface>,
         root_package: RootPackageInterfaceHandle,
         packages: Vec<PackageInterfaceHandle>,
     ) -> anyhow::Result<Vec<(PackageInterfaceHandle, Option<std::path::PathBuf>)>> {
@@ -800,9 +800,7 @@ impl AutoloadGenerator {
                 continue;
             }
             self.validate_package(package.clone())?;
-            let install_path = installation_manager
-                .borrow()
-                .get_install_path(package.clone())?;
+            let install_path = installation_manager.get_install_path(package.clone())?;
             package_map.push((package, install_path));
         }
 
@@ -1932,7 +1930,7 @@ pub trait AutoloadGeneratorInterface: std::fmt::Debug {
         config: &Config,
         local_repo: RepositoryInterfaceHandle,
         root_package: RootPackageInterfaceHandle,
-        installation_manager: std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>,
+        installation_manager: std::rc::Rc<dyn InstallationManagerInterface>,
         target_dir: &BStr,
         scan_psr_packages: bool,
         suffix: Option<BString>,
@@ -1942,7 +1940,7 @@ pub trait AutoloadGeneratorInterface: std::fmt::Debug {
     #[php(skip)]
     fn build_package_map(
         &self,
-        installation_manager: std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>,
+        installation_manager: std::rc::Rc<dyn InstallationManagerInterface>,
         root_package: RootPackageInterfaceHandle,
         packages: Vec<PackageInterfaceHandle>,
     ) -> anyhow::Result<Vec<(PackageInterfaceHandle, Option<std::path::PathBuf>)>>;
@@ -1995,7 +1993,7 @@ impl AutoloadGeneratorInterface for AutoloadGenerator {
         config: &Config,
         local_repo: RepositoryInterfaceHandle,
         root_package: RootPackageInterfaceHandle,
-        installation_manager: std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>,
+        installation_manager: std::rc::Rc<dyn InstallationManagerInterface>,
         target_dir: &BStr,
         scan_psr_packages: bool,
         suffix: Option<BString>,
@@ -2017,7 +2015,7 @@ impl AutoloadGeneratorInterface for AutoloadGenerator {
 
     fn build_package_map(
         &self,
-        installation_manager: std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>,
+        installation_manager: std::rc::Rc<dyn InstallationManagerInterface>,
         root_package: RootPackageInterfaceHandle,
         packages: Vec<PackageInterfaceHandle>,
     ) -> anyhow::Result<Vec<(PackageInterfaceHandle, Option<std::path::PathBuf>)>> {

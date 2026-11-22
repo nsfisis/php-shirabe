@@ -670,12 +670,10 @@ impl Factory {
 
                     // initialize installation manager
                     let im = im
-                        .insert(std::rc::Rc::new(std::cell::RefCell::new(
-                            self.create_installation_manager(
-                                r#loop.clone(),
-                                io.clone(),
-                                Some(dispatcher.clone()),
-                            ),
+                        .insert(std::rc::Rc::new(self.create_installation_manager(
+                            r#loop.clone(),
+                            io.clone(),
+                            Some(dispatcher.clone()),
                         )))
                         .clone();
                     composer.set_installation_manager(im.clone());
@@ -849,7 +847,7 @@ impl Factory {
             let local_repository = rm.get_local_repository();
             self.purge_packages(
                 &InstalledRepositoryInterfaceHandle::from_repository_handle(&local_repository),
-                &im.borrow(),
+                &im,
             )?;
         }
 
@@ -1183,7 +1181,7 @@ impl Factory {
 
     fn create_default_installers(
         &self,
-        im: &std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>,
+        im: &std::rc::Rc<dyn InstallationManagerInterface>,
         composer: PartialComposerWeakHandle,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         process: Option<&std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,
@@ -1224,23 +1222,20 @@ impl Factory {
                 Some(vendor_dir),
             )));
 
-        im.borrow_mut()
-            .add_installer(std::rc::Rc::new(LibraryInstaller::new(
-                io.clone(),
-                composer.clone(),
-                None,
-                Some(fs.clone()),
-                Some(binary_installer.clone()),
-            )?));
-        im.borrow_mut()
-            .add_installer(std::rc::Rc::new(PluginInstaller::new(
-                io.clone(),
-                composer,
-                Some(fs),
-                Some(binary_installer),
-            )?));
-        im.borrow_mut()
-            .add_installer(std::rc::Rc::new(MetapackageInstaller::new(io)));
+        im.add_installer(std::rc::Rc::new(LibraryInstaller::new(
+            io.clone(),
+            composer.clone(),
+            None,
+            Some(fs.clone()),
+            Some(binary_installer.clone()),
+        )?));
+        im.add_installer(std::rc::Rc::new(PluginInstaller::new(
+            io.clone(),
+            composer,
+            Some(fs),
+            Some(binary_installer),
+        )?));
+        im.add_installer(std::rc::Rc::new(MetapackageInstaller::new(io)));
         Ok(())
     }
 

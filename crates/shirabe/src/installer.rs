@@ -81,7 +81,7 @@ pub struct Installer {
     download_manager: std::rc::Rc<std::cell::RefCell<dyn DownloadManagerInterface>>,
     repository_manager: std::rc::Rc<dyn RepositoryManagerInterface>,
     locker: std::rc::Rc<dyn LockerInterface>,
-    installation_manager: std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>,
+    installation_manager: std::rc::Rc<dyn InstallationManagerInterface>,
     event_dispatcher: std::rc::Rc<dyn EventDispatcherInterface>,
     autoload_generator: std::rc::Rc<std::cell::RefCell<dyn AutoloadGeneratorInterface>>,
     prefer_source: bool,
@@ -137,7 +137,7 @@ impl Installer {
         download_manager: std::rc::Rc<std::cell::RefCell<dyn DownloadManagerInterface>>,
         repository_manager: std::rc::Rc<dyn RepositoryManagerInterface>,
         locker: std::rc::Rc<dyn LockerInterface>,
-        installation_manager: std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>,
+        installation_manager: std::rc::Rc<dyn InstallationManagerInterface>,
         event_dispatcher: std::rc::Rc<dyn EventDispatcherInterface>,
         autoload_generator: std::rc::Rc<std::cell::RefCell<dyn AutoloadGeneratorInterface>>,
     ) -> Self {
@@ -279,7 +279,6 @@ impl Installer {
                     && self.config.get_truthy("notify-on-install")?
                 {
                     self.installation_manager
-                        .borrow_mut()
                         .notify_installs(self.io.clone())
                         .await;
                 }
@@ -290,7 +289,6 @@ impl Installer {
 
         if self.execute_operations && self.install && self.config.get_truthy("notify-on-install")? {
             self.installation_manager
-                .borrow_mut()
                 .notify_installs(self.io.clone())
                 .await;
         }
@@ -375,7 +373,6 @@ impl Installer {
             let repository_manager = repository_manager;
             for package in repository_manager.get_local_repository().get_packages()? {
                 self.installation_manager
-                    .borrow_mut()
                     .ensure_binaries_presence(package.clone())?;
             }
         }
@@ -1137,7 +1134,6 @@ impl Installer {
         if self.execute_operations {
             local_repo.set_dev_package_names(self.locker.get_dev_package_names()?);
             self.installation_manager
-                .borrow()
                 .execute(
                     &InstalledRepositoryInterfaceHandle::from_repository_handle(&local_repo),
                     local_repo_transaction.get_operations().clone(),
@@ -1861,7 +1857,7 @@ impl Installer {
     /// custom third-party installers.
     pub fn disable_plugins(&mut self) -> &mut Self {
         // TODO(plugin): plugin disabling is part of the plugin API
-        self.installation_manager.borrow_mut().disable_plugins();
+        self.installation_manager.disable_plugins();
 
         self
     }

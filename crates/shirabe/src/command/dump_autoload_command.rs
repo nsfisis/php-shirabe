@@ -94,7 +94,6 @@ impl Command for DumpAutoloadCommand {
             for local_pkg in local_repo.get_canonical_packages()? {
                 let install_path = composer
                     .get_installation_manager()
-                    .borrow_mut()
                     .get_install_path(local_pkg)?;
                 if install_path.as_deref().is_some_and(|p| !file_exists(p)) {
                     missing_dependencies = true;

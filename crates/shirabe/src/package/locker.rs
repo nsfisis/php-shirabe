@@ -31,7 +31,7 @@ use shirabe_seld_json_lint::ParsingException;
 #[derive(Debug)]
 pub struct Locker {
     lock_file: JsonFile,
-    installation_manager: std::rc::Rc<std::cell::RefCell<InstallationManager>>,
+    installation_manager: std::rc::Rc<InstallationManager>,
     hash: BString,
     content_hash: BString,
     loader: ArrayLoader,
@@ -47,7 +47,7 @@ impl Locker {
     pub fn new(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         lock_file: JsonFile,
-        installation_manager: std::rc::Rc<std::cell::RefCell<InstallationManager>>,
+        installation_manager: std::rc::Rc<InstallationManager>,
         composer_file_contents: impl AsRef<[u8]>,
         process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     ) -> Self {
@@ -780,7 +780,6 @@ impl Locker {
     fn get_package_time(&self, package: PackageInterfaceHandle) -> anyhow::Result<Option<BString>> {
         let path = self
             .installation_manager
-            .borrow_mut()
             .get_install_path(package.clone())?;
         if path.is_none() {
             return Ok(None);

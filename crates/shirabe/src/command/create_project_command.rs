@@ -247,7 +247,6 @@ impl CreateProjectCommand {
         if !no_install {
             composer
                 .get_installation_manager()
-                .borrow_mut()
                 .set_output_progress(!no_progress);
 
             let optimize_autoloader = config.get_strict_bool("optimize-autoloader")?;
@@ -689,16 +688,12 @@ impl CreateProjectCommand {
         dm.borrow_mut().set_prefer_dist(prefer_dist);
 
         let project_installer = ProjectInstaller::new(&directory, dm.clone(), fs);
-        let installation_manager = composer.get_installation_manager().clone();
-        {
-            let mut im = installation_manager.borrow_mut();
-            im.set_output_progress(!no_progress);
-            im.add_installer(std::rc::Rc::new(project_installer));
-        }
+        let installation_manager = composer.get_installation_manager();
+        installation_manager.set_output_progress(!no_progress);
+        installation_manager.add_installer(std::rc::Rc::new(project_installer));
         let installed_repo =
             InstalledRepositoryInterfaceHandle::new(InstalledArrayRepository::new()?);
         let executed = installation_manager
-            .borrow()
             .execute(
                 &installed_repo,
                 vec![std::rc::Rc::new(
@@ -715,10 +710,7 @@ impl CreateProjectCommand {
             abort_on_signal(signals);
         }
         executed?;
-        installation_manager
-            .borrow_mut()
-            .notify_installs(io.clone())
-            .await;
+        installation_manager.notify_installs(io.clone()).await;
 
         // collect suggestions
         self.suggested_packages_reporter

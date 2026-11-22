@@ -98,7 +98,6 @@ impl StatusCommand {
         for package in packages {
             let target_dir = composer
                 .get_installation_manager()
-                .borrow_mut()
                 .get_install_path(package.clone())?;
             let target_path = match target_dir {
                 Some(d) => d,

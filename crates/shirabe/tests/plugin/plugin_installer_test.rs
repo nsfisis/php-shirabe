@@ -162,17 +162,17 @@ impl InstallationManagerInterface for MockInstallationManager {
 
     fn remove_installer(&self, _installer: &dyn InstallerInterface) {}
 
-    fn disable_plugins(&mut self) {}
+    fn disable_plugins(&self) {}
 
     fn is_package_installed(
-        &mut self,
+        &self,
         _repo: &InstalledRepositoryInterfaceHandle,
         _package: PackageInterfaceHandle,
     ) -> anyhow::Result<bool> {
         Ok(false)
     }
 
-    fn ensure_binaries_presence(&mut self, _package: PackageInterfaceHandle) -> anyhow::Result<()> {
+    fn ensure_binaries_presence(&self, _package: PackageInterfaceHandle) -> anyhow::Result<()> {
         Ok(())
     }
 
@@ -201,9 +201,9 @@ impl InstallationManagerInterface for MockInstallationManager {
         ))
     }
 
-    fn set_output_progress(&mut self, _output_progress: bool) {}
+    fn set_output_progress(&self, _output_progress: bool) {}
 
-    async fn notify_installs(&mut self, _io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>) {}
+    async fn notify_installs(&self, _io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>) {}
 }
 
 /// Equivalent to PHP setUp()'s `new InstallationManager(...)`, used only to satisfy
@@ -211,7 +211,7 @@ impl InstallationManagerInterface for MockInstallationManager {
 /// the Locker, which never touches it in these tests).
 fn locker_installation_manager(
     io: &std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-) -> std::rc::Rc<std::cell::RefCell<InstallationManager>> {
+) -> std::rc::Rc<InstallationManager> {
     let config = std::rc::Rc::new(Config::new(false, None));
     let http_downloader = std::rc::Rc::new(std::cell::RefCell::new(
         HttpDownloader::new(
@@ -223,11 +223,7 @@ fn locker_installation_manager(
         .unwrap(),
     ));
     let r#loop = std::rc::Rc::new(std::cell::RefCell::new(Loop::new(http_downloader, None)));
-    std::rc::Rc::new(std::cell::RefCell::new(InstallationManager::new(
-        r#loop,
-        io.clone(),
-        None,
-    )))
+    std::rc::Rc::new(InstallationManager::new(r#loop, io.clone(), None))
 }
 
 #[derive(Debug)]
@@ -334,9 +330,7 @@ pub(crate) fn set_up() -> SetUp {
         c.set_config(std::rc::Rc::new(config));
         c.set_download_manager(std::rc::Rc::new(std::cell::RefCell::new(dm)));
         c.set_repository_manager(std::rc::Rc::new(repository_manager));
-        c.set_installation_manager(std::rc::Rc::new(std::cell::RefCell::new(
-            installation_manager,
-        )));
+        c.set_installation_manager(std::rc::Rc::new(installation_manager));
         c.set_autoload_generator(autoload_generator.clone());
     }
     let real_dispatcher = std::rc::Rc::new(EventDispatcher::new(

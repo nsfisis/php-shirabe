@@ -33,16 +33,12 @@ fn http_downloader(
 
 fn installation_manager(
     io: &std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-) -> std::rc::Rc<std::cell::RefCell<InstallationManager>> {
+) -> std::rc::Rc<InstallationManager> {
     let r#loop = std::rc::Rc::new(std::cell::RefCell::new(Loop::new(
         http_downloader(io),
         None,
     )));
-    std::rc::Rc::new(std::cell::RefCell::new(InstallationManager::new(
-        r#loop,
-        io.clone(),
-        None,
-    )))
+    std::rc::Rc::new(InstallationManager::new(r#loop, io.clone(), None))
 }
 
 #[test]
@@ -113,8 +109,7 @@ fn test_set_get_download_manager() {
 fn test_set_get_installation_manager() {
     let mut composer = Composer::new();
     let io = null_io();
-    let manager: std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>> =
-        installation_manager(&io);
+    let manager: std::rc::Rc<dyn InstallationManagerInterface> = installation_manager(&io);
     composer.set_installation_manager(manager.clone());
 
     assert!(std::rc::Rc::ptr_eq(

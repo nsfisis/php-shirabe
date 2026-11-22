@@ -167,16 +167,13 @@ impl Command for InstallCommand {
                 .unwrap_or(false)
             || config.get_truthy("apcu-autoloader")?;
 
-        composer
-            .get_installation_manager()
-            .borrow_mut()
-            .set_output_progress(
-                !input
-                    .borrow()
-                    .get_option("no-progress")?
-                    .as_bool()
-                    .unwrap_or(false),
-            );
+        composer.get_installation_manager().set_output_progress(
+            !input
+                .borrow()
+                .get_option("no-progress")?
+                .as_bool()
+                .unwrap_or(false),
+        );
 
         install
             .set_dry_run(
