@@ -134,6 +134,7 @@ fn test_latest_version_is_returned() {
 
 #[test]
 fn test_latest_version_is_returned_that_matches_php_requirements() {
+    shirabe::php_worker::install();
     let package_name = BStr::new("foo/bar");
 
     let mut overrides: IndexMap<BString, PhpMixed> = IndexMap::new();
@@ -251,6 +252,7 @@ fn test_latest_version_is_returned_that_matches_php_requirements() {
 
 #[test]
 fn test_latest_version_is_returned_that_matches_ext_requirements() {
+    shirabe::php_worker::install();
     let package_name = BStr::new("foo/bar");
 
     let mut overrides: IndexMap<BString, PhpMixed> = IndexMap::new();
@@ -314,6 +316,7 @@ fn test_latest_version_is_returned_that_matches_ext_requirements() {
 
 #[test]
 fn test_latest_version_is_returned_that_matches_platform_ext() {
+    shirabe::php_worker::install();
     let package_name = BStr::new("foo/bar");
 
     let mut platform = PlatformRepository::new(vec![], IndexMap::new(), None, None).unwrap();
@@ -367,6 +370,7 @@ fn test_latest_version_is_returned_that_matches_platform_ext() {
 
 #[test]
 fn test_latest_version_is_returned_that_matches_composer_requirements() {
+    shirabe::php_worker::install();
     let package_name = BStr::new("foo/bar");
 
     let mut overrides: IndexMap<BString, PhpMixed> = IndexMap::new();
@@ -669,6 +673,7 @@ fn test_false_returned_on_no_packages() {
 
 #[test]
 fn test_find_recommended_require_version() {
+    shirabe::php_worker::install();
     let php = shirabe_php_rpc::get_php_version().unwrap();
     let php_version = bformat!("{}.{}.{}", php.major, php.minor, php.release);
     // real version, expected recommendation, [branch-alias], [pkg name]

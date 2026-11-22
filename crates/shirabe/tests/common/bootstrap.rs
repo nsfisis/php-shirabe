@@ -14,6 +14,9 @@ use shirabe::util::Platform;
 /// equivalent needs either the `ctor` crate (new dependency, user decision) or wiring a call into
 /// every shared fixture constructor.
 pub fn bootstrap() {
+    // What `main` registers before anything can spawn the PHP worker.
+    shirabe::php_worker::install();
+
     static ONCE: std::sync::Once = std::sync::Once::new();
     ONCE.call_once(|| {
         // PHP: error_reporting(E_ALL) has no counterpart here.

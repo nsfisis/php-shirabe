@@ -83,6 +83,7 @@ fn scan(root: &BStr, max_parse_threads: usize) -> ScanOutcome {
 
 #[test]
 fn parallel_scan_matches_sequential_scan() {
+    shirabe_php_rpc::set_worker_config_provider(shirabe_php_rpc::WorkerConfig::default);
     let dir = tempfile::tempdir().unwrap();
     let root = BString::from(path_to_bytes(&std::fs::canonicalize(dir.path()).unwrap()));
     let root: &BStr = root.as_ref();

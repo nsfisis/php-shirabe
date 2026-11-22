@@ -97,6 +97,12 @@ pub struct WorkerConfig {
     pub ini_settings: Vec<(BString, BString)>,
     /// Environment variables set in the worker's environment.
     pub env: Vec<(std::ffi::OsString, std::ffi::OsString)>,
+    /// PHP class files written into the autoload directory of `php/runtime/`, keyed by their path
+    /// relative to it (`Shirabe/Foo.php` for `Shirabe\Foo`), so they resolve the same way.
+    pub runtime_files: &'static [(&'static BStr, &'static [u8])],
+    /// The classes, among `runtime_files`, whose static `table()` adds named entry points to the
+    /// worker's dispatch table beside the protocol's own. A name may be defined only once.
+    pub entry_point_classes: Vec<BString>,
 }
 
 /// Builds the [`WorkerConfig`] a worker is spawned with.
@@ -105,17 +111,20 @@ static WORKER_CONFIG_PROVIDER: std::sync::OnceLock<fn() -> WorkerConfig> =
 
 /// Registers the function that builds the [`WorkerConfig`] the worker is spawned with. It is asked
 /// at spawn time, so a setting that depends on the environment sees the environment of that
-/// moment. Without one the worker is spawned with nothing added. A second registration is
-/// ignored.
+/// moment. It must be registered before anything spawns the worker; an embedder that adds nothing
+/// registers `WorkerConfig::default`. A second registration is ignored.
 pub fn set_worker_config_provider(provider: fn() -> WorkerConfig) {
     let _ = WORKER_CONFIG_PROVIDER.set(provider);
 }
 
 fn worker_config() -> WorkerConfig {
-    WORKER_CONFIG_PROVIDER
-        .get()
-        .map(|provider| provider())
-        .unwrap_or_default()
+    let provider = WORKER_CONFIG_PROVIDER.get().unwrap_or_else(|| {
+        panic!(
+            "PHP RPC: the worker is spawned before set_worker_config_provider is called; it would \
+             lack the embedder's settings and entry points for the rest of the process"
+        )
+    });
+    provider()
 }
 
 /// The PHP worker, spawned on first use.
@@ -204,6 +213,7 @@ fn spawn_worker(config: &WorkerConfig) -> anyhow::Result<Worker> {
     let files = STUB_FILES
         .iter()
         .chain(RUNTIME_FILES)
+        .chain(config.runtime_files)
         .map(|entry| (&stubs_dir, entry))
         .chain(GUARD_FILES.iter().map(|entry| (&guards_dir, entry)));
     for (dir, (relative_path, contents)) in files {
@@ -240,7 +250,8 @@ fn spawn_worker(config: &WorkerConfig) -> anyhow::Result<Worker> {
         .arg(&script_path)
         .arg(os_str_from_bytes(&WORKER_SOCKET_FD.to_php_string()))
         .arg(&stubs_dir)
-        .arg(&guards_dir);
+        .arg(&guards_dir)
+        .args(config.entry_point_classes.iter().map(os_str_from_bytes));
     // SAFETY: the closure only calls async-signal-safe syscalls, as required between fork and
     // exec. It owns the child end, so the descriptor stays alive until the exec happens.
     unsafe {

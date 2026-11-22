@@ -168,6 +168,7 @@ fn make_installation_manager(
 }
 
 fn set_up() -> SetUp {
+    shirabe::php_worker::install();
     let temp_dir = get_unique_tmp_directory();
     let working_dir = temp_dir.path().to_path_buf();
     let vendor_dir = working_dir.join("composer-test-autoload");

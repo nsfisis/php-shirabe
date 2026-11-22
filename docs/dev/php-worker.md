@@ -129,7 +129,9 @@ and `php/guards/` the guards for those whose treatment is `guard`. They are gene
 `scripts/plugin-stub-generator/generate-stubs` and must not be edited by hand; see
 [docs/dev/plugin-stub-generation.md](./plugin-stub-generation.md).
 
-`php/runtime/` holds hand-written worker-side classes that are not mechanical proxies:
+`php/runtime/` holds hand-written worker-side classes that are not mechanical proxies. The ones
+under `crates/shirabe-php-rpc/php/runtime/` come with the protocol; the ones under
+`crates/shirabe/php/runtime/` are added through `WorkerConfig::runtime_files` and are marked below.
 
 - `Composer\Console\Application` — a same-FQCN two-world implementation (never the real class
   file): plugin-provided commands run under it inside the worker, and its Composer-specific
@@ -160,12 +162,13 @@ and `php/guards/` the guards for those whose treatment is `guard`. They are gene
 - `Shirabe\RpcRuntime` — the PHP half of the protocol: the frame codec, the standing loop that
   serves requests, and `callRust`. `php/worker.php` only opens the socket, registers the
   autoloader for this directory and the stubs, and hands over to it.
-- `Shirabe\EntryPoints` — the dispatch table of named entry points (see "Entry points" above).
+- `Shirabe\EntryPoints` and `Shirabe\ComposerEntryPoints` (`crates/shirabe/`) — the dispatch
+  table of named entry points (see "Entry points" above).
 - `Shirabe\RustStubRegistry`, `Shirabe\PhpEntityTable` and `Shirabe\PromiseRegistry` — the
   worker's halves of the Rust entity table, the PHP entity table and the promise registry.
 - `Shirabe\RustStub` — the marker interface every proxy stub implements;
-  `Shirabe\UnsupportedClass` — the error the guard classes raise; `Shirabe\PlatformRuntime` — the
-  port of `Composer\Platform\Runtime` behind `__shirabe_platform`.
+  `Shirabe\UnsupportedClass` — the error the guard classes raise; `Shirabe\PlatformRuntime`
+  (`crates/shirabe/`) — the port of `Composer\Platform\Runtime` behind `__shirabe_platform`.
 - `Composer\EventDispatcher\Event` — dual-mode: revived from a Rust entity handle (through
   `__shirabeBind`) it proxies like a generated stub, while a natively-constructed instance (real
   Composer code in the worker does `new PreCommandRunEvent(...)`, whose parent constructor lands

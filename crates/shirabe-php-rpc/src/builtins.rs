@@ -128,10 +128,12 @@ pub fn stream_resolve_include_path(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{WorkerConfig, set_worker_config_provider};
     use shirabe_php_shim::utf8_text;
 
     #[test]
     fn queries_memory_usage() {
+        set_worker_config_provider(WorkerConfig::default);
         for real_usage in [false, true] {
             let usage = memory_get_usage(real_usage).unwrap();
             assert!(usage > 0);
@@ -141,6 +143,7 @@ mod tests {
 
     #[test]
     fn queries_real_php() {
+        set_worker_config_provider(WorkerConfig::default);
         let php = get_php_version().unwrap();
         assert!(!php.version.is_empty(), "expected a PHP version");
         assert_eq!(

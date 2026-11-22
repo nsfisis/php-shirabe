@@ -17,6 +17,7 @@ use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::output::{BufferedOutput, OutputInterface};
 
 fn set_up() {
+    shirabe::php_worker::install();
     Platform::put_env("COMPOSER_DISABLE_XDEBUG_WARN", "1").unwrap();
 }
 

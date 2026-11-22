@@ -10,7 +10,8 @@ use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_rpc::value::{serialize, unserialize};
 use shirabe_php_rpc::{
-    PhpObject, PhpThrow, RpcValue, RustEntityHandle, RustMethodDispatcher, call_function,
+    PhpObject, PhpThrow, RpcValue, RustEntityHandle, RustMethodDispatcher, WorkerConfig,
+    call_function, set_worker_config_provider,
 };
 
 /// The snippets these tests run never call back into Rust.
@@ -55,6 +56,7 @@ impl RustMethodDispatcher for NoCallbacks {
 
 /// Feeds raw serialize() bytes through the PHP core codec and returns what PHP re-serializes.
 fn php_reserialize(bytes: &[u8]) -> Vec<u8> {
+    set_worker_config_provider(WorkerConfig::default);
     let outcome = call_function(
         "__shirabe_oracle_roundtrip",
         vec![RpcValue::String(bytes.into())],
@@ -69,6 +71,7 @@ fn php_reserialize(bytes: &[u8]) -> Vec<u8> {
 
 /// Runs a PHP snippet and returns its `return` value.
 fn php_eval(code: impl AsRef<[u8]>) -> RpcValue {
+    set_worker_config_provider(WorkerConfig::default);
     call_function(
         "__shirabe_eval",
         vec![RpcValue::string(code.as_ref())],

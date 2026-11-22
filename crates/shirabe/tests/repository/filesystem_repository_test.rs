@@ -208,6 +208,7 @@ fn configure_links(
 // cwd-sensitive path_repository_test::test_url_remains_relative in this binary.
 #[serial_test::serial]
 fn test_repository_writes_installed_php() {
+    shirabe::php_worker::install();
     let guard = CwdGuard::new();
     let dir = guard.path();
 
@@ -340,6 +341,7 @@ fn test_repository_writes_installed_php() {
 // the same worker, which would replace the state asserted here.
 #[serial_test::serial]
 fn test_safely_load_installed_versions() {
+    shirabe::php_worker::install();
     load_composer_php_runtime();
 
     let fixtures_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))

@@ -156,10 +156,12 @@ pub fn get_diagnostics() -> anyhow::Result<&'static Diagnostics> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::php_worker::install;
     use shirabe_php_rpc::{get_php_binary, get_php_version};
 
     #[test]
     fn queries_diagnostics() {
+        install();
         let diagnostics = get_diagnostics().unwrap();
         assert_eq!(diagnostics.php_version, get_php_version().unwrap().version);
         assert!(diagnostics.php_version_id >= 70205);

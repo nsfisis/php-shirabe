@@ -134,6 +134,7 @@ fn entry_string(value: &PhpMixed, key: &BStr) -> BString {
 
 #[test]
 fn test_hhvm_package() {
+    shirabe::php_worker::install();
     let mut hhvm_detector = MockHhvmDetector::new();
     hhvm_detector
         .expect_get_version()

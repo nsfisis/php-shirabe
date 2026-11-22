@@ -34,7 +34,8 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
 // InstalledVersions is intentionally unported to Rust. It is a runtime API for plugins and project
 // code, never read by Composer itself. Its real state is stored in PHP's InstalledVersions class.
-// See also `__shirabe_installed_versions_reload` in crates/shirabe-php-rpc/php/runtime/Shirabe/EntryPoints.php.
+// See also `__shirabe_installed_versions_reload` in
+// crates/shirabe/php/runtime/Shirabe/ComposerEntryPoints.php.
 
 /// ref: composer/bin/composer
 pub async fn run(argv: Vec<bstr::BString>) -> anyhow::Result<i32> {

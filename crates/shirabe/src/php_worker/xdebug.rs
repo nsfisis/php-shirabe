@@ -35,11 +35,10 @@ fn switches_xdebug_off() -> bool {
     empty(&getenv(os_str_from_bytes(ALLOW)))
 }
 
-/// The [`WorkerConfig`] the worker is spawned with: Xdebug switched off unless the user allows
-/// it. The environment variable takes precedence over every ini setting, so switching the mode
-/// off takes both. See `docs/dev/xdebug.md`.
-pub(crate) fn worker_config() -> WorkerConfig {
-    let mut config = WorkerConfig::default();
+/// Adds to the [`WorkerConfig`] the worker is spawned with: Xdebug switched off unless the user
+/// allows it. The environment variable takes precedence over every ini setting, so switching the
+/// mode off takes both. See `docs/dev/xdebug.md`.
+pub(crate) fn add_worker_settings(config: &mut WorkerConfig) {
     if switches_xdebug_off() {
         config
             .ini_settings
@@ -54,7 +53,6 @@ pub(crate) fn worker_config() -> WorkerConfig {
             .ini_settings
             .push((BString::from(name), BString::from("0")));
     }
-    config
 }
 
 /// What `Composer\XdebugHandler\XdebugHandler::getAllIniFiles()` measures: `[(string)
@@ -74,9 +72,11 @@ fn xdebug_active() -> anyhow::Result<bool> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::php_worker::{install, worker_config};
 
     #[test]
     fn queries_string_lists() {
+        install();
         // XdebugHandler::getAllIniFiles() always yields at least one entry, which is the empty
         // string when no php.ini is loaded.
         assert!(!get_all_ini_files().unwrap().is_empty());

@@ -14,6 +14,7 @@ use shirabe_php_rpc::RpcValue;
 static PHP_WORKER_TESTS: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 pub fn lock_php_worker() -> std::sync::MutexGuard<'static, ()> {
+    shirabe::php_worker::install();
     PHP_WORKER_TESTS
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner())
@@ -24,6 +25,7 @@ pub fn lock_php_worker() -> std::sync::MutexGuard<'static, ()> {
 /// of the test binary unpacks it under a cache directory of this test run, never the one the
 /// developer's own Composer uses.
 pub fn load_composer_php_runtime() {
+    shirabe::php_worker::install();
     static CACHE: std::sync::OnceLock<tempfile::TempDir> = std::sync::OnceLock::new();
     let cache = CACHE.get_or_init(|| tempfile::tempdir().expect("no cache directory for the test"));
     shirabe::php_worker::runtime::__ensure_composer_php_runtime(cache.path()).unwrap();
@@ -35,6 +37,7 @@ pub fn php_call_static(
     method: impl AsRef<[u8]>,
     args: Vec<RpcValue>,
 ) -> RpcValue {
+    shirabe::php_worker::install();
     let class = BStr::new(class.as_ref());
     let method = BStr::new(method.as_ref());
     PhpCall::StaticMethod(class, method)
@@ -57,6 +60,7 @@ pub fn php_call_static(
 
 /// Runs a PHP snippet in the worker and returns its `return` value.
 pub fn php_eval(code: impl AsRef<[u8]>) -> RpcValue {
+    shirabe::php_worker::install();
     PhpCall::Function(BStr::new("__shirabe_eval"))
         .try_run(vec![RpcValue::string(code.as_ref())])
         .expect("eval request failed")

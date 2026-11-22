@@ -308,10 +308,12 @@ pub fn get_platform_info() -> anyhow::Result<&'static PlatformInfo> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::php_worker::install;
     use shirabe_php_rpc::get_php_version;
 
     #[test]
     fn queries_platform_info() {
+        install();
         let platform_info = get_platform_info().unwrap();
 
         let extensions = platform_info.get_extensions();

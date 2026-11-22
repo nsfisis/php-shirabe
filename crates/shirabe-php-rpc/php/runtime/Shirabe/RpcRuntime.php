@@ -22,7 +22,6 @@ final class RpcRuntime
     public static array $dispatch = [];
     /** Even correlation ids; the Rust side allocates odd ones. */
     private static int $nextCorrId = 2;
-    private static bool $scriptAutoloaderRegistered = false;
     private static bool $shuttingDown = false;
     /**
      * The worker-side Loop of each Composer entity, with the stub it was built for. Holding the
@@ -367,24 +366,5 @@ final class RpcRuntime
         }
         spl_autoload_unregister(self::$stubAutoloader);
         spl_autoload_register(self::$stubAutoloader, true, true);
-    }
-
-    /**
-     * Registers the script-class autoloader: classes referenced by composer.json scripts are
-     * resolved by asking the Rust-side ClassLoader (built by EventDispatcher::makeAutoloader)
-     * where the class file lives.
-     */
-    public static function enableScriptAutoloader(): void
-    {
-        if (self::$scriptAutoloaderRegistered) {
-            return;
-        }
-        self::$scriptAutoloaderRegistered = true;
-        spl_autoload_register(static function (string $class): void {
-            $file = RpcRuntime::callRustFunction('__shirabe_find_file', [$class]);
-            if (is_string($file) && $file !== '') {
-                require $file;
-            }
-        });
     }
 }

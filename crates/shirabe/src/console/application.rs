@@ -136,7 +136,7 @@ impl Application {
         }
         // Composer sets `xdebug.show_exception_trace` and `xdebug.scream` to `0` here when Xdebug
         // is loaded. Xdebug can only be loaded into the PHP worker, which is spawned with both
-        // settings instead (see `php_worker::xdebug::worker_config`).
+        // settings instead (see `php_worker::xdebug::add_worker_settings`).
 
         let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
             std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));

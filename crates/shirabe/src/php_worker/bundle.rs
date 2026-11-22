@@ -154,6 +154,7 @@ fn extract_into(root: &std::path::Path) -> anyhow::Result<std::path::PathBuf> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::php_worker::install;
     use shirabe_php_rpc::call_internal_function;
 
     fn sentinel_of(directory: &std::path::Path) -> BString {
@@ -190,6 +191,7 @@ mod tests {
 
     #[test]
     fn the_worker_reads_the_bundle_out_of_this_executable() {
+        install();
         let cache = tempfile::tempdir().unwrap();
         assert_eq!(
             base_path(|| Ok(cache.path().to_path_buf())).unwrap(),
@@ -201,6 +203,7 @@ mod tests {
     /// unpacked tree, and has to reach the same classes through it.
     #[test]
     fn the_worker_loads_the_composer_runtime_from_an_unpacked_bundle() {
+        install();
         let root = tempfile::tempdir().unwrap();
         let autoload = extract_into(root.path())
             .unwrap()

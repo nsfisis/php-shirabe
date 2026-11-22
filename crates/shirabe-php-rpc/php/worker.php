@@ -39,6 +39,17 @@ if (PHP_INT_SIZE !== 8) {
 
     \Shirabe\RpcRuntime::$socket = $client;
     \Shirabe\RpcRuntime::$stubAutoloader = $stubAutoloader;
-    \Shirabe\RpcRuntime::$dispatch = \Shirabe\EntryPoints::table();
+    // The arguments after the two autoload directories name the embedder's entry-point classes
+    // (`WorkerConfig::entry_point_classes`), whose tables join the protocol's own.
+    $dispatch = \Shirabe\EntryPoints::table();
+    foreach (array_slice($argv, 4) as $class) {
+        foreach ($class::table() as $name => $entryPoint) {
+            if (isset($dispatch[$name])) {
+                throw new \LogicException("The entry point {$name} is defined twice");
+            }
+            $dispatch[$name] = $entryPoint;
+        }
+    }
+    \Shirabe\RpcRuntime::$dispatch = $dispatch;
     \Shirabe\RpcRuntime::serveForever();
 })($argv);
