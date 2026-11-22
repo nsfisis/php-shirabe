@@ -296,8 +296,10 @@ fn rpc_call(
             }
             Frame::ReleaseHandle { entity_id } => {
                 // A one-way notification sent by a child-side stub's __destruct; the shirabe crate
-                // registers a hook that drops the matching Rust entity table entry. The hook is
-                // installed before any entry exists, so an unhooked release is a no-op.
+                // registers a hook that drops the matching Rust entity table entry.
+                // TODO(plugin): the hook and the Rust entity table are thread-local while the
+                // worker is process-global, so a release of an entity registered on another
+                // thread is dropped here, whether or not this thread has a hook.
                 RELEASE_RUST_ENTITY_HOOK.with(|hook| {
                     if let Some(hook) = hook.borrow().as_ref() {
                         hook(entity_id);

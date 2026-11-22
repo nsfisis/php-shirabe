@@ -19,10 +19,9 @@ use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, PhpMixed, RuntimeException, ToPhpString, array_pop,
     array_push, array_search_in_vec, array_splice, bformat, boolval, explode, explode_with_limit,
-    file_exists, get_class, hash, implode, ini_get, is_callable, is_dir, is_object, krsort,
-    os_str_from_bytes, path_from_bytes, path_to_bytes, php_regex, preg_is_match, preg_match,
-    preg_quote, preg_replace, preg_replace_callback, realpath, str_replace, strlen, strpos,
-    strtoupper, substr, trim_chars,
+    file_exists, hash, implode, ini_get, is_dir, krsort, os_str_from_bytes, path_from_bytes,
+    path_to_bytes, php_regex, preg_is_match, preg_match, preg_quote, preg_replace,
+    preg_replace_callback, realpath, str_replace, strlen, strpos, strtoupper, substr, trim_chars,
 };
 use shirabe_symfony_console::output::output_interface;
 use shirabe_symfony_process::{ExecutableFinder, PhpExecutableFinder};
@@ -32,12 +31,10 @@ use shirabe_symfony_process::{ExecutableFinder, PhpExecutableFinder};
 #[derive(Clone)]
 pub enum Callable {
     String(BString),
-    /// `[$className_or_object, $methodName]` array callable. The first element is represented
-    /// here as `PhpMixed` to keep parity with PHP's loose typing.
-    ///
-    /// TODO(plugin): only listeners whose object half lives in the PHP child (`PhpMethod`) are
-    /// invocable; an `ArrayCallable` carrying a `PhpMixed` object still has no invocation path.
-    ArrayCallable(Box<PhpMixed>, BString),
+    /// `[$className, $methodName]` array callable naming a static method of a class in the PHP
+    /// child process. An array callable whose first element is an object is a
+    /// [`Callable::PhpMethod`].
+    ArrayCallable(BString, BString),
     /// PHP `\Closure`, invoked with the event exactly like `$callable($event)` in
     /// `EventDispatcher::doDispatch`. Today this is only produced by Composer's own commands
     /// registering an inline listener on themselves (e.g. `RequireCommand`'s
@@ -345,7 +342,6 @@ impl EventDispatcher {
                     BString::default()
                 }
             );
-            let is_string_callable = matches!(callable, Callable::String(_));
             if let Callable::Closure(ref closure) = callable {
                 self.make_autoloader(event, &callable)?;
                 // Closures are always callable in PHP (is_callable() returns true for any \Closure),
@@ -375,43 +371,31 @@ impl EventDispatcher {
                     } else {
                         0
                     };
-            } else if !is_string_callable {
-                // TODO(plugin): an ArrayCallable whose object half is a PhpMixed has no
-                // invocation path; only the is_callable error lane and the verbose echo of the
-                // PHP branch are replicated here.
+            } else if let Callable::ArrayCallable(ref class_name, ref method_name) = callable {
                 self.make_autoloader(event, &callable)?;
-                if !is_callable(&PhpMixed::Null) {
-                    let (class_name, method) = match &callable {
-                        Callable::ArrayCallable(first, m) => {
-                            let cls = if is_object(first.as_ref()) {
-                                get_class(first.as_ref())
-                            } else if let PhpMixed::String(s) = first.as_ref() {
-                                s.clone()
-                            } else {
-                                BString::from("?")
-                            };
-                            (cls, m.clone())
-                        }
-                        _ => (BString::from("?"), BString::from("?")),
-                    };
-                    return Err(RuntimeException::new(bformat!("Subscriber {class_name}::{method} for event {} is not callable, make sure the function is defined and public", event_name.as_bstr()))
+                if !runtime::autoloading::is_callable(
+                    bformat!("{class_name}::{method_name}").as_bstr(),
+                )? {
+                    return Err(RuntimeException::new(bformat!("Subscriber {class_name}::{method_name} for event {} is not callable, make sure the function is defined and public", event_name.as_bstr()))
                     .into());
                 }
-                if let Callable::ArrayCallable(first, method_name) = &callable {
-                    let prefix = if is_object(first.as_ref()) {
-                        get_class(first.as_ref())
-                    } else if let PhpMixed::String(s) = first.as_ref() {
-                        s.clone()
-                    } else {
-                        BString::from("?")
-                    };
-                    self.io.write_error_with_verbosity(
-                        bformat!("> {formatted_event_name_with_args}: {prefix}->{method_name}"),
-                        VERBOSE,
-                    );
-                }
-                // TODO(plugin): actually invoke callable with $event and inspect result
-                r#return = 0;
+                self.io.write_error_with_verbosity(
+                    bformat!("> {formatted_event_name_with_args}: {class_name}->{method_name}"),
+                    VERBOSE,
+                );
+                r#return = if matches!(
+                    callable::call_static_with_event(
+                        class_name.as_bstr(),
+                        method_name.as_bstr(),
+                        event,
+                        || self.cache_dir(),
+                    )?,
+                    PhpMixed::Bool(false)
+                ) {
+                    1
+                } else {
+                    0
+                };
             } else {
                 match callable {
                     Callable::String(ref callable_str)
@@ -572,10 +556,7 @@ impl EventDispatcher {
 
                         self.make_autoloader(
                             event,
-                            &Callable::ArrayCallable(
-                                Box::new(PhpMixed::string(callable_str.clone())),
-                                BString::from("run"),
-                            ),
+                            &Callable::ArrayCallable(callable_str.clone(), BString::from("run")),
                         )?;
                         // The user's command class extends Symfony's Command, so the child
                         // process needs the real symfony/console classes before it can even
@@ -810,9 +791,7 @@ impl EventDispatcher {
                             .into());
                         }
                     }
-                    _ => {
-                        // unreachable in practice — the first match arm guard handles non-string callables.
-                    }
+                    _ => unreachable!("every non-string callable is dispatched above"),
                 }
             }
 
@@ -943,9 +922,6 @@ impl EventDispatcher {
     pub fn remove_listener(&mut self, listener: &shirabe_php_rpc::PhpEntityHandle) {
         for priorities in self.listeners.values_mut() {
             for listeners in priorities.values_mut() {
-                // TODO(plugin): an `ArrayCallable`'s object half is a `PhpMixed` without
-                // cross-RPC identity, so `$candidate[0] === $listener` is undecidable for it;
-                // only `PhpMethod` candidates are compared.
                 listeners.retain(|candidate| match candidate {
                     Callable::PhpMethod(handle, _) => handle != listener,
                     _ => true,
@@ -1153,10 +1129,7 @@ impl EventDispatcher {
 
         let callable_key = match callable {
             Callable::String(callable_str) => callable_str.clone(),
-            Callable::ArrayCallable(first, method) => match first.as_ref() {
-                PhpMixed::String(class) => bformat!("{class}::{method}"),
-                other => bformat!("{}::{method}", get_class(other)),
-            },
+            Callable::ArrayCallable(class, method) => bformat!("{class}::{method}"),
             // PHP: get_class($callable[0]).'::'.$callable[1] — the object half's runtime class.
             Callable::PhpMethod(handle, method) => {
                 bformat!("{}::{method}", handle.class())
