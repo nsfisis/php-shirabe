@@ -9,19 +9,28 @@
 # sidesteps that. Once the tests stop depending on process-wide state and `#[serial]` is no longer
 # needed, plain `cargo test` becomes fast enough and this script should be deleted.
 #
-# Usage: scripts/test-parallel [-j JOBS] [-- ARGS...]
-#   -j JOBS  number of `cargo test` processes to run at once (default: number of CPUs)
-#   ARGS     passed to every test binary, e.g. `-- --include-ignored`
+# Usage: scripts/test-parallel [-j JOBS] [--log-dir DIR] [-- ARGS...]
+#   -j JOBS        number of `cargo test` processes to run at once (default: number of CPUs)
+#   --log-dir DIR  keep the output of every target, not only of the failed ones, in DIR:
+#                  `build.log` for the build, and `<target>.log` and `<target>.status` (the exit
+#                  status) for each target, where <target> names it as `<package>.lib`,
+#                  `<package>.bin.<name>`, `<package>.test.<name>` or `<package>.doc`
+#   ARGS           passed to every test binary, e.g. `-- --include-ignored`
 
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
 jobs=$(nproc)
+log_dir=
 while [[ $# -gt 0 ]]; do
     case "$1" in
         -j)
             jobs="$2"
+            shift 2
+            ;;
+        --log-dir)
+            log_dir="$2"
             shift 2
             ;;
         --)
@@ -37,31 +46,40 @@ done
 test_args=("$@")
 
 targets=()
-while IFS= read -r line; do
-    targets+=("$line")
+names=()
+while IFS=$'\t' read -r args name; do
+    targets+=("$args")
+    names+=("$name")
 done < <(
     # Integration test binaries are the slowest, so they are started first.
     cargo metadata --no-deps --format-version 1 | jq -r '
         [
             .packages[] | .name as $pkg | .targets[] | select(.test or .doctest) |
             (if .test then
-                if .kind == ["lib"] then {order: 1, args: "-p \($pkg) --lib"}
-                elif .kind == ["bin"] then {order: 1, args: "-p \($pkg) --bin \(.name)"}
-                elif .kind == ["test"] then {order: 0, args: "-p \($pkg) --test \(.name)"}
+                if .kind == ["lib"] then {order: 1, args: "-p \($pkg) --lib", name: "\($pkg).lib"}
+                elif .kind == ["bin"] then
+                    {order: 1, args: "-p \($pkg) --bin \(.name)", name: "\($pkg).bin.\(.name)"}
+                elif .kind == ["test"] then
+                    {order: 0, args: "-p \($pkg) --test \(.name)", name: "\($pkg).test.\(.name)"}
                 else empty end
             else empty end),
-            (if .doctest then {order: 2, args: "-p \($pkg) --doc"} else empty end)
-        ] | sort_by(.order) | .[].args
+            (if .doctest then {order: 2, args: "-p \($pkg) --doc", name: "\($pkg).doc"} else empty end)
+        ] | sort_by(.order) | .[] | "\(.args)\t\(.name)"
     '
 )
 
-cargo test --workspace --no-run
-
-log_dir=$(mktemp -d)
-trap 'rm -rf "$log_dir"' EXIT
+if [[ -n $log_dir ]]; then
+    mkdir -p "$log_dir"
+    rm -f "$log_dir"/*.log "$log_dir"/*.status
+    cargo test --workspace --no-run 2>&1 | tee "$log_dir/build.log"
+else
+    log_dir=$(mktemp -d)
+    trap 'rm -rf "$log_dir"' EXIT
+    cargo test --workspace --no-run
+fi
 
 run_target() {
-    local index="$1"
+    local name="$1"
     local target="$2"
     local start=$SECONDS
     local status=0
@@ -69,8 +87,8 @@ run_target() {
     # would inherit that. Some tests check the default disposition of these signals.
     trap - INT QUIT
     # shellcheck disable=SC2086
-    cargo test $target -- "${test_args[@]}" > "$log_dir/$index.log" 2>&1 || status=$?
-    echo "$status" > "$log_dir/$index.status"
+    cargo test $target -- "${test_args[@]}" > "$log_dir/$name.log" 2>&1 || status=$?
+    echo "$status" > "$log_dir/$name.status"
     if [[ $status -eq 0 ]]; then
         printf 'ok      %4ds  %s\n' $((SECONDS - start)) "$target"
     else
@@ -84,18 +102,18 @@ for i in "${!targets[@]}"; do
         wait -n || true
         running=$((running - 1))
     fi
-    run_target "$i" "${targets[$i]}" &
+    run_target "${names[$i]}" "${targets[$i]}" &
     running=$((running + 1))
 done
 wait
 
 failed=0
 for i in "${!targets[@]}"; do
-    if [[ "$(cat "$log_dir/$i.status")" -ne 0 ]]; then
+    if [[ "$(cat "$log_dir/${names[$i]}.status")" -ne 0 ]]; then
         failed=$((failed + 1))
         echo
         echo "==== cargo test ${targets[$i]} ===="
-        cat "$log_dir/$i.log"
+        cat "$log_dir/${names[$i]}.log"
     fi
 done
 
