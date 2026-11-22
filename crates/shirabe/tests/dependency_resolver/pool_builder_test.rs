@@ -442,7 +442,7 @@ fn run_test_pool_builder(
     let config = std::rc::Rc::new(Config::new(false, None));
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
-    let mut rm = RepositoryFactory::manager(io.clone(), &config, None, None, None).unwrap();
+    let rm = RepositoryFactory::manager(io.clone(), &config, None, None, None).unwrap();
 
     // PHP: foreach ($packageRepos as $packages)
     for repo_entry in package_repos.as_list().unwrap() {
@@ -450,13 +450,9 @@ fn run_test_pool_builder(
         if let Some(repo_map) = repo_entry.as_array()
             && repo_map.contains_key(B("type"))
         {
-            let repo = RepositoryFactory::create_repo(
-                io.clone(),
-                &config,
-                repo_map.clone(),
-                Some(&mut rm),
-            )
-            .unwrap();
+            let repo =
+                RepositoryFactory::create_repo(io.clone(), &config, repo_map.clone(), Some(&rm))
+                    .unwrap();
             repository_set.add_repository(repo).unwrap();
             continue;
         }

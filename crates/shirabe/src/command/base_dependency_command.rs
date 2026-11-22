@@ -95,7 +95,7 @@ pub trait BaseDependencyCommand: BaseCommand {
             )?));
         } else {
             let repository_manager = composer.get_repository_manager().clone();
-            let repository_manager = repository_manager.borrow();
+            let repository_manager = repository_manager;
             let local_repo = repository_manager.get_local_repository();
             let root_pkg = composer.get_package();
 
@@ -166,7 +166,7 @@ pub trait BaseDependencyCommand: BaseCommand {
                     RepositoryFactory::default_repos(
                         Some(self.get_io()),
                         Some(composer.get_config()),
-                        Some(&mut *rm.borrow_mut()),
+                        Some(&*rm),
                     )?
                     .into_values()
                     .collect(),

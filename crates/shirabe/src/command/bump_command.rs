@@ -100,10 +100,7 @@ impl BumpCommand {
             }
             composer.get_locker().get_locked_repository(true)?.into()
         } else {
-            composer
-                .get_repository_manager()
-                .borrow()
-                .get_local_repository()
+            composer.get_repository_manager().get_local_repository()
         };
 
         if composer.get_package().get_type() != "project" && !dev_only {

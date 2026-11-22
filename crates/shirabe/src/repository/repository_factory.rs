@@ -89,7 +89,7 @@ impl RepositoryFactory {
         config: &std::rc::Rc<Config>,
         repository: impl AsRef<[u8]>,
         allow_filesystem: bool,
-        rm: Option<&mut dyn RepositoryManagerInterface>,
+        rm: Option<&dyn RepositoryManagerInterface>,
     ) -> anyhow::Result<RepositoryInterfaceHandle> {
         let repo_config =
             Self::config_from_string(io.clone(), config, repository, allow_filesystem)?;
@@ -100,7 +100,7 @@ impl RepositoryFactory {
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: &std::rc::Rc<Config>,
         repo_config: IndexMap<BString, PhpMixed>,
-        rm: Option<&mut dyn RepositoryManagerInterface>,
+        rm: Option<&dyn RepositoryManagerInterface>,
     ) -> anyhow::Result<RepositoryInterfaceHandle> {
         let mut owned_rm;
         let rm = if let Some(rm) = rm {
@@ -127,7 +127,7 @@ impl RepositoryFactory {
     pub fn default_repos(
         io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
         config: Option<std::rc::Rc<Config>>,
-        rm: Option<&mut dyn RepositoryManagerInterface>,
+        rm: Option<&dyn RepositoryManagerInterface>,
     ) -> anyhow::Result<IndexMap<BString, RepositoryInterfaceHandle>> {
         if rm.is_none() {
             // TODO(php-runtime): upstream raises this with the @ operator, which lowers
@@ -196,7 +196,7 @@ impl RepositoryFactory {
             }
         };
 
-        let mut rm = RepositoryManager::new(
+        let rm = RepositoryManager::new(
             io,
             config.clone(),
             http_downloader,
@@ -271,13 +271,13 @@ impl RepositoryFactory {
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     ) -> anyhow::Result<IndexMap<BString, RepositoryInterfaceHandle>> {
         let config = std::rc::Rc::new(Factory::create_config(Some(io.clone()), None)?);
-        let mut manager = Self::manager(io.clone(), &config, None, None, None)?;
+        let manager = Self::manager(io.clone(), &config, None, None, None)?;
         io.borrow_mut().load_configuration(&config)?;
-        Self::default_repos(Some(io), Some(config), Some(&mut manager))
+        Self::default_repos(Some(io), Some(config), Some(&manager))
     }
 
     fn create_repos(
-        rm: &mut dyn RepositoryManagerInterface,
+        rm: &dyn RepositoryManagerInterface,
         repo_configs: Vec<PhpMixed>,
     ) -> anyhow::Result<IndexMap<BString, RepositoryInterfaceHandle>> {
         let mut repo_map: IndexMap<BString, RepositoryInterfaceHandle> = IndexMap::new();

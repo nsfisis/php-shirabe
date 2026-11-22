@@ -88,7 +88,7 @@ impl Command for ReinstallCommand {
         let io = self.get_io();
 
         let repository_manager = composer.get_repository_manager().clone();
-        let repository_manager = repository_manager.borrow();
+        let repository_manager = repository_manager;
         let local_repo = repository_manager.get_local_repository();
         let mut packages_to_reinstall: Vec<PackageInterfaceHandle> = vec![];
         let mut package_names_to_reinstall: Vec<bstr::BString> = vec![];

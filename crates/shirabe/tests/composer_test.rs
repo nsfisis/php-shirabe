@@ -84,14 +84,9 @@ fn test_set_get_repository_manager() {
     let mut composer = Composer::new();
     let io = null_io();
     let config = std::rc::Rc::new(Config::new(false, None));
-    let manager: std::rc::Rc<std::cell::RefCell<dyn RepositoryManagerInterface>> =
-        std::rc::Rc::new(std::cell::RefCell::new(RepositoryManager::new(
-            io.clone(),
-            config,
-            http_downloader(&io),
-            None,
-            None,
-        )));
+    let manager: std::rc::Rc<dyn RepositoryManagerInterface> = std::rc::Rc::new(
+        RepositoryManager::new(io.clone(), config, http_downloader(&io), None, None),
+    );
     composer.set_repository_manager(manager.clone());
 
     assert!(std::rc::Rc::ptr_eq(

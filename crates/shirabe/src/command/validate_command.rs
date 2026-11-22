@@ -334,7 +334,6 @@ impl Command for ValidateCommand {
         {
             let packages = composer
                 .get_repository_manager()
-                .borrow()
                 .get_local_repository()
                 .get_packages()?;
             for package in packages {

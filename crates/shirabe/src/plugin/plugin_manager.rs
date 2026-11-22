@@ -123,7 +123,6 @@ impl PluginManager {
                 .composer_full()
                 .borrow()
                 .get_repository_manager()
-                .borrow()
                 .get_local_repository();
             self.load_repository(
                 &repo,
@@ -139,7 +138,6 @@ impl PluginManager {
                 .unwrap()
                 .borrow_partial()
                 .get_repository_manager()
-                .borrow()
                 .get_local_repository();
             self.load_repository(&repo, true, None)?;
         }
@@ -154,7 +152,6 @@ impl PluginManager {
                 .composer_full()
                 .borrow()
                 .get_repository_manager()
-                .borrow()
                 .get_local_repository();
             self.deactivate_repository(&repo, false)?;
         }
@@ -166,7 +163,6 @@ impl PluginManager {
                 .unwrap()
                 .borrow_partial()
                 .get_repository_manager()
-                .borrow()
                 .get_local_repository();
             self.deactivate_repository(&repo, true)?;
         }
@@ -299,12 +295,10 @@ impl PluginManager {
         let local_repo = composer
             .borrow()
             .get_repository_manager()
-            .borrow()
             .get_local_repository();
         let global_repo = self.global_composer.as_ref().map(|gc| {
             gc.borrow_partial()
                 .get_repository_manager()
-                .borrow()
                 .get_local_repository()
         });
 

@@ -117,7 +117,7 @@ impl HomeCommand {
                 RootPackageInterfaceHandle::dup(composer.get_package()),
             )));
             let repository_manager = composer.get_repository_manager();
-            let repository_manager = repository_manager.borrow();
+            let repository_manager = repository_manager;
             repos.push(repository_manager.get_local_repository());
             for repo in repository_manager.get_repositories() {
                 repos.push(repo.clone());

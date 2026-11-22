@@ -1267,7 +1267,6 @@ impl ShowCommand {
             rs.add_repository(RepositoryInterfaceHandle::new(CompositeRepository::new(
                 composer
                     .get_repository_manager()
-                    .borrow()
                     .get_repositories()
                     .to_vec(),
             )))?;
@@ -1627,16 +1626,10 @@ impl Command for ShowCommand {
                 repos = RepositoryInterfaceHandle::new(CompositeRepository::new(
                     composer
                         .get_repository_manager()
-                        .borrow()
                         .get_repositories()
                         .to_vec(),
                 ));
-                ir.add_repository(
-                    composer
-                        .get_repository_manager()
-                        .borrow()
-                        .get_local_repository(),
-                );
+                ir.add_repository(composer.get_repository_manager().get_local_repository());
                 installed_repo = RepositoryInterfaceHandle::new(ir);
             } else {
                 let default_repos =
@@ -1650,10 +1643,7 @@ impl Command for ShowCommand {
             }
         } else if input.borrow().get_option("all")?.as_bool() == Some(true) && composer.is_some() {
             let composer_ref = composer_full(composer.as_ref().unwrap());
-            let local_repo = composer_ref
-                .get_repository_manager()
-                .borrow()
-                .get_local_repository();
+            let local_repo = composer_ref.get_repository_manager().get_local_repository();
             let locker_rc = composer_ref.get_locker().clone();
             let locker = locker_rc;
             if locker.is_locked() {
@@ -1680,11 +1670,7 @@ impl Command for ShowCommand {
                         m
                     },
                 )?)];
-            for r in composer_ref
-                .get_repository_manager()
-                .borrow()
-                .get_repositories()
-            {
+            for r in composer_ref.get_repository_manager().get_repositories() {
                 composite_input.push(r.clone());
             }
             repos = RepositoryInterfaceHandle::new(CompositeRepository::new(composite_input));
@@ -1753,7 +1739,6 @@ impl Command for ShowCommand {
             if input.borrow().get_option("no-dev")?.as_bool() == Some(true) {
                 let local_packages = composer_local
                     .get_repository_manager()
-                    .borrow()
                     .get_local_repository()
                     .get_packages()?;
                 let packages = RepositoryUtils::filter_required_packages(
@@ -1774,7 +1759,7 @@ impl Command for ShowCommand {
                 repos = new_repo;
             } else {
                 let repository_manager = composer_local.get_repository_manager().clone();
-                let repository_manager = repository_manager.borrow();
+                let repository_manager = repository_manager;
                 let lr = repository_manager.get_local_repository();
                 installed_repo = RepositoryInterfaceHandle::new(InstalledRepository::new(vec![
                     root_repo.clone(),

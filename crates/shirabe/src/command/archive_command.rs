@@ -220,7 +220,7 @@ impl ArchiveCommand {
         if let Some(composer) = self.try_composer(None, None) {
             let composer = composer_full(&composer);
             let repository_manager = composer.get_repository_manager().clone();
-            let repository_manager = repository_manager.borrow();
+            let repository_manager = repository_manager;
             let local_repo = repository_manager.get_local_repository();
             let mut repos: Vec<RepositoryInterfaceHandle> = vec![local_repo];
             repos.extend(repository_manager.get_repositories().iter().cloned());

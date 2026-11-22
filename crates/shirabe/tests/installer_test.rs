@@ -413,7 +413,7 @@ fn test_installer() {
             HttpDownloader::__new_mock(io.clone(), config.clone()),
         ));
 
-        let mut repository_manager = RepositoryManager::new(
+        let repository_manager = RepositoryManager::new(
             io.clone(),
             config.clone(),
             http_downloader.clone(),
@@ -426,8 +426,8 @@ fn test_installer() {
         for repository in &case.repositories {
             repository_manager.add_repository(repository.clone());
         }
-        let repository_manager: std::rc::Rc<std::cell::RefCell<dyn RepositoryManagerInterface>> =
-            std::rc::Rc::new(std::cell::RefCell::new(repository_manager));
+        let repository_manager: std::rc::Rc<dyn RepositoryManagerInterface> =
+            std::rc::Rc::new(repository_manager);
 
         let r#loop = std::rc::Rc::new(std::cell::RefCell::new(Loop::new(
             http_downloader.clone(),
@@ -941,9 +941,7 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&BString>) 
     )
     .unwrap();
     let repository_manager = composer.borrow().get_repository_manager();
-    repository_manager
-        .borrow_mut()
-        .set_local_repository(RepositoryInterfaceHandle::new(local_repo));
+    repository_manager.set_local_repository(RepositoryInterfaceHandle::new(local_repo));
 
     // emulate a writable lock file: a real composer.lock over a temp path.
     let lock_dir = tempfile::TempDir::new().unwrap();
@@ -1264,7 +1262,7 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&BString>) 
 
     if let Some(expect_installed) = &case.expect_installed {
         let dumper = ArrayDumper::new();
-        let local_repo = repository_manager.borrow().get_local_repository();
+        let local_repo = repository_manager.get_local_repository();
         let mut actual_installed: Vec<IndexMap<BString, PhpMixed>> = local_repo
             .get_canonical_packages()
             .unwrap()

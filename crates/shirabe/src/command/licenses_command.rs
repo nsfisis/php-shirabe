@@ -164,7 +164,7 @@ impl Command for LicensesCommand {
             repo.borrow_mut().get_packages()?
         } else {
             let repository_manager = composer.get_repository_manager().clone();
-            let repository_manager = repository_manager.borrow();
+            let repository_manager = repository_manager;
             let repo = repository_manager.get_local_repository();
 
             if input

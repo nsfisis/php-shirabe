@@ -604,15 +604,13 @@ impl Factory {
 
                     // initialize repository manager
                     let rm = rm
-                        .insert(std::rc::Rc::new(std::cell::RefCell::new(
-                            RepositoryFactory::manager(
-                                io.clone(),
-                                &config,
-                                Some(http_downloader.clone()),
-                                Some(dispatcher.clone()),
-                                Some(process.clone()),
-                            )?,
-                        )))
+                        .insert(std::rc::Rc::new(RepositoryFactory::manager(
+                            io.clone(),
+                            &config,
+                            Some(http_downloader.clone()),
+                            Some(dispatcher.clone()),
+                            Some(process.clone()),
+                        )?))
                         .clone();
 
                     // force-set the version of the global package if not defined as
@@ -663,7 +661,7 @@ impl Factory {
                     // load local repository
                     self.add_local_repository(
                         io.clone(),
-                        &mut rm.borrow_mut(),
+                        &rm,
                         vendor_dir.as_ref(),
                         composer.get_package().clone(),
                         Some(&process),
@@ -848,7 +846,7 @@ impl Factory {
             // purge packages from local repos if they have been deleted on the filesystem
             let rm = rm.expect("set by the successful composer build");
             let im = im.expect("set by the successful composer build");
-            let local_repository = rm.borrow().get_local_repository();
+            let local_repository = rm.get_local_repository();
             self.purge_packages(
                 &InstalledRepositoryInterfaceHandle::from_repository_handle(&local_repository),
                 &im.borrow(),
@@ -872,7 +870,7 @@ impl Factory {
     fn add_local_repository(
         &self,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        rm: &mut RepositoryManager,
+        rm: &RepositoryManager,
         vendor_dir: &BStr,
         root_package: RootPackageInterfaceHandle,
         process: Option<&std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,
@@ -1262,7 +1260,7 @@ impl Factory {
 
     fn load_root_package(
         &self,
-        rm: std::rc::Rc<std::cell::RefCell<RepositoryManager>>,
+        rm: std::rc::Rc<RepositoryManager>,
         config: std::rc::Rc<Config>,
         parser: VersionParser,
         guesser: VersionGuesser,

@@ -71,10 +71,7 @@ impl AuditCommand {
         }
 
         let root_pkg = composer.get_package();
-        let local_repo = composer
-            .get_repository_manager()
-            .borrow()
-            .get_local_repository();
+        let local_repo = composer.get_repository_manager().get_local_repository();
         let mut installed_repo = InstalledRepository::new(vec![local_repo]);
 
         if input
@@ -203,11 +200,7 @@ impl Command for AuditCommand {
             indexmap::IndexMap::new(),
             indexmap::IndexMap::new(),
         );
-        for repo in composer
-            .get_repository_manager()
-            .borrow()
-            .get_repositories()
-        {
+        for repo in composer.get_repository_manager().get_repositories() {
             repo_set.add_repository(repo.clone())?;
         }
 

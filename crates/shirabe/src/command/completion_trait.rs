@@ -61,12 +61,7 @@ pub trait CompletionTrait: BaseCommand {
             if locker.is_locked() {
                 installed_repos.push(locker.get_locked_repository(true)?.into());
             } else {
-                installed_repos.push(
-                    composer
-                        .get_repository_manager()
-                        .borrow()
-                        .get_local_repository(),
-                );
+                installed_repos.push(composer.get_repository_manager().get_local_repository());
             }
 
             let mut platform_hint: Vec<BString> = vec![];
@@ -147,12 +142,7 @@ pub trait CompletionTrait: BaseCommand {
             if locker.is_locked() {
                 installed_repos.push(locker.get_locked_repository(true)?.into());
             } else {
-                installed_repos.push(
-                    composer
-                        .get_repository_manager()
-                        .borrow()
-                        .get_local_repository(),
-                );
+                installed_repos.push(composer.get_repository_manager().get_local_repository());
             }
 
             let mut installed_repo = InstalledRepository::new(installed_repos);
@@ -182,7 +172,7 @@ pub trait CompletionTrait: BaseCommand {
             let composer = this.require_composer(None, None)?;
             let composer = composer_full(&composer);
             let repository_manager = composer.get_repository_manager();
-            let repository_manager = repository_manager.borrow();
+            let repository_manager = repository_manager;
             let mut repos = CompositeRepository::new(repository_manager.get_repositories().clone());
 
             let mut results: Vec<SearchResult> = vec![];

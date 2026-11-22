@@ -152,12 +152,7 @@ impl Command for SuggestsCommand {
                 None,
                 None,
             )?));
-            installed_repos.push(
-                composer
-                    .get_repository_manager()
-                    .borrow()
-                    .get_local_repository(),
-            );
+            installed_repos.push(composer.get_repository_manager().get_local_repository());
         }
 
         let mut installed_repo = InstalledRepository::new(installed_repos);

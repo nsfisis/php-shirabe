@@ -99,7 +99,6 @@ impl UpdateCommand {
             } else {
                 composer_ref
                     .get_repository_manager()
-                    .borrow()
                     .get_local_repository()
                     .get_packages()?
             };
@@ -219,7 +218,6 @@ impl UpdateCommand {
         );
         let repositories: Vec<RepositoryInterfaceHandle> = composer
             .get_repository_manager()
-            .borrow()
             .get_repositories()
             .iter()
             .filter(|repository| !repository.is::<PlatformRepository>())

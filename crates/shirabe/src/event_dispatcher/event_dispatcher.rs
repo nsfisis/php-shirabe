@@ -1149,7 +1149,7 @@ impl EventDispatcher {
 
         let package = composer.borrow().get_package().clone();
         let repository_manager = composer.borrow().get_repository_manager();
-        let local_repository = repository_manager.borrow().get_local_repository();
+        let local_repository = repository_manager.get_local_repository();
         let packages = local_repository.get_canonical_packages()?;
         let generator = composer.borrow().get_autoload_generator();
         let mut hash_input = implode(

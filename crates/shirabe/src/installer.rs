@@ -79,7 +79,7 @@ pub struct Installer {
     // TODO can we get rid of the below and just use the package itself?
     fixed_root_package: RootPackageInterfaceHandle,
     download_manager: std::rc::Rc<std::cell::RefCell<dyn DownloadManagerInterface>>,
-    repository_manager: std::rc::Rc<std::cell::RefCell<dyn RepositoryManagerInterface>>,
+    repository_manager: std::rc::Rc<dyn RepositoryManagerInterface>,
     locker: std::rc::Rc<dyn LockerInterface>,
     installation_manager: std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>,
     event_dispatcher: std::rc::Rc<dyn EventDispatcherInterface>,
@@ -135,7 +135,7 @@ impl Installer {
         config: std::rc::Rc<Config>,
         package: RootPackageInterfaceHandle,
         download_manager: std::rc::Rc<std::cell::RefCell<dyn DownloadManagerInterface>>,
-        repository_manager: std::rc::Rc<std::cell::RefCell<dyn RepositoryManagerInterface>>,
+        repository_manager: std::rc::Rc<dyn RepositoryManagerInterface>,
         locker: std::rc::Rc<dyn LockerInterface>,
         installation_manager: std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>,
         event_dispatcher: std::rc::Rc<dyn EventDispatcherInterface>,
@@ -206,11 +206,7 @@ impl Installer {
             .into());
         }
 
-        let is_fresh_install = self
-            .repository_manager
-            .borrow()
-            .get_local_repository()
-            .is_fresh();
+        let is_fresh_install = self.repository_manager.get_local_repository().is_fresh();
 
         // Force update if there is no lock file present
         if !self.update && !self.locker.is_locked() {
@@ -225,7 +221,7 @@ impl Installer {
             self.write_lock = false;
             self.dump_autoloader = false;
             let repository_manager = self.repository_manager.clone();
-            self.mock_local_repositories(&mut *repository_manager.borrow_mut())?;
+            self.mock_local_repositories(&*repository_manager)?;
         }
 
         if self.download_only {
@@ -261,7 +257,7 @@ impl Installer {
             .borrow_mut()
             .set_prefer_dist(self.prefer_dist);
 
-        let local_repo = self.repository_manager.borrow().get_local_repository();
+        let local_repo = self.repository_manager.get_local_repository();
 
         let install = self.install;
         let res_result: anyhow::Result<i64> = if self.update {
@@ -359,7 +355,7 @@ impl Installer {
             self.autoload_generator
                 .borrow()
                 .set_platform_requirement_filter(self.platform_requirement_filter.clone());
-            let local_repo_handle = self.repository_manager.borrow().get_local_repository();
+            let local_repo_handle = self.repository_manager.get_local_repository();
             self.autoload_generator.borrow().dump(
                 &self.config,
                 local_repo_handle,
@@ -376,7 +372,7 @@ impl Installer {
         if self.install && self.execute_operations {
             // force binaries re-generation in case they are missing
             let repository_manager = self.repository_manager.clone();
-            let repository_manager = repository_manager.borrow();
+            let repository_manager = repository_manager;
             for package in repository_manager.get_local_repository().get_packages()? {
                 self.installation_manager
                     .borrow_mut()
@@ -396,7 +392,7 @@ impl Installer {
         if show_funding {
             let mut funding_count: i64 = 0;
             let repository_manager = self.repository_manager.clone();
-            let repository_manager = repository_manager.borrow();
+            let repository_manager = repository_manager;
             for package in repository_manager.get_local_repository().get_packages()? {
                 if let Some(cp) = package.as_complete()
                     && package.as_alias().is_none()
@@ -442,7 +438,6 @@ impl Installer {
             } else {
                 (
                     self.repository_manager
-                        .borrow()
                         .get_local_repository()
                         .get_canonical_packages()?,
                     "installed",
@@ -459,7 +454,7 @@ impl Installer {
                     IndexMap::new(),
                 );
                 let repository_manager = self.repository_manager.clone();
-                let repository_manager = repository_manager.borrow();
+                let repository_manager = repository_manager;
                 for repo in repository_manager.get_repositories() {
                     repo_set.add_repository(repo.clone())?;
                 }
@@ -563,7 +558,7 @@ impl Installer {
         let mut repository_set =
             self.create_repository_set(true, &platform_repo, &aliases, None)?;
         let repository_manager = self.repository_manager.clone();
-        let repository_manager = repository_manager.borrow();
+        let repository_manager = repository_manager;
         let repositories = repository_manager.get_repositories();
         for repository in repositories {
             repository_set.add_repository(repository.clone())?;
@@ -1505,10 +1500,7 @@ impl Installer {
     /// Replace local repositories with InstalledArrayRepository instances
     ///
     /// This is to prevent any accidental modification of the existing repos on disk
-    fn mock_local_repositories(
-        &self,
-        rm: &mut dyn RepositoryManagerInterface,
-    ) -> anyhow::Result<()> {
+    fn mock_local_repositories(&self, rm: &dyn RepositoryManagerInterface) -> anyhow::Result<()> {
         let mut packages: IndexMap<BString, PackageInterfaceHandle> = IndexMap::new();
         for package in rm.get_local_repository().get_packages()? {
             packages.insert(

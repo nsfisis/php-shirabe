@@ -93,7 +93,6 @@ impl StatusCommand {
         let dm = composer.get_download_manager().clone();
         let packages: Vec<_> = composer
             .get_repository_manager()
-            .borrow()
             .get_local_repository()
             .get_canonical_packages()?;
         for package in packages {

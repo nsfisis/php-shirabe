@@ -68,9 +68,7 @@ fn create_composer_instance() -> ComposerHandle {
         .returning(|| RepositoryInterfaceHandle::new(InstalledArrayRepository::new().unwrap()));
     composer
         .borrow_mut()
-        .set_repository_manager(std::rc::Rc::new(std::cell::RefCell::new(
-            repository_manager,
-        )));
+        .set_repository_manager(std::rc::Rc::new(repository_manager));
     composer
         .borrow_mut()
         .set_installation_manager(std::rc::Rc::new(std::cell::RefCell::new(
@@ -525,15 +523,15 @@ mod mock_repository_manager {
         pub RepositoryManager {}
         impl RepositoryManagerInterface for RepositoryManager {
             fn get_local_repository(&self) -> RepositoryInterfaceHandle;
-            fn get_repositories(&self) -> &Vec<RepositoryInterfaceHandle>;
+            fn get_repositories(&self) -> Vec<RepositoryInterfaceHandle>;
             fn create_repository<'a>(
                 &self,
                 r#type: &BStr,
                 config: IndexMap<BString, PhpMixed>,
                 name: Option<&'a bstr::BStr>,
             ) -> anyhow::Result<RepositoryInterfaceHandle>;
-            fn add_repository(&mut self, repository: RepositoryInterfaceHandle);
-            fn set_local_repository(&mut self, repository: RepositoryInterfaceHandle);
+            fn add_repository(&self, repository: RepositoryInterfaceHandle);
+            fn set_local_repository(&self, repository: RepositoryInterfaceHandle);
         }
     }
 }
@@ -643,9 +641,7 @@ fn test_dispatcher_pass_dev_mode_to_autoload_generator_for_script_events() {
             .returning(|| RepositoryInterfaceHandle::new(InstalledArrayRepository::new().unwrap()));
         composer
             .borrow_mut()
-            .set_repository_manager(std::rc::Rc::new(std::cell::RefCell::new(
-                repository_manager,
-            )));
+            .set_repository_manager(std::rc::Rc::new(repository_manager));
         composer
             .borrow_mut()
             .set_installation_manager(std::rc::Rc::new(std::cell::RefCell::new(

@@ -56,14 +56,14 @@ fn make_config() -> std::rc::Rc<Config> {
 fn make_manager(
     io: &std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     config: &std::rc::Rc<Config>,
-) -> std::rc::Rc<std::cell::RefCell<RepositoryManager>> {
-    std::rc::Rc::new(std::cell::RefCell::new(RepositoryManager::new(
+) -> std::rc::Rc<RepositoryManager> {
+    std::rc::Rc::new(RepositoryManager::new(
         io.clone(),
         config.clone(),
         http_downloader(io, config),
         None,
         None,
-    )))
+    ))
 }
 
 fn require_map(entries: &[(&BStr, &BStr)]) -> PhpMixed {
@@ -116,13 +116,13 @@ fn test_stability_flags_parsing() {
         config.merge(&cfg, "test");
     }
 
-    let manager = std::rc::Rc::new(std::cell::RefCell::new(RepositoryManager::new(
+    let manager = std::rc::Rc::new(RepositoryManager::new(
         io.clone(),
         config.clone(),
         http_downloader(&io, &config),
         None,
         None,
-    )));
+    ));
 
     let process_executor = ProcessExecutor::new(Some(io.clone()));
     process_executor.enable_async();

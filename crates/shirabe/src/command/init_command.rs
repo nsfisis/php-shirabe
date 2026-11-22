@@ -790,7 +790,7 @@ impl Command for InitCommand {
             if (repositories.len() as i64) > 0 {
                 let config = std::rc::Rc::new(Factory::create_config(Some(io.clone()), None)?);
                 io.borrow_mut().load_configuration(&config)?;
-                let mut repo_manager =
+                let repo_manager =
                     RepositoryFactory::manager(io.clone(), &config, None, None, None)?;
 
                 let mut repos: Vec<RepositoryInterfaceHandle> =
@@ -822,7 +822,7 @@ impl Command for InitCommand {
                         io.clone(),
                         &config,
                         repo_config,
-                        Some(&mut repo_manager),
+                        Some(&repo_manager),
                     )?);
                 }
 
@@ -838,7 +838,7 @@ impl Command for InitCommand {
                         io.clone(),
                         &config,
                         default_config,
-                        Some(&mut repo_manager),
+                        Some(&repo_manager),
                     )?);
                 }
 

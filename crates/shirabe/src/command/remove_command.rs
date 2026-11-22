@@ -663,7 +663,6 @@ impl Command for RemoveCommand {
             for package in &packages {
                 if !composer
                     .get_repository_manager()
-                    .borrow()
                     .get_local_repository()
                     .find_packages(bstr::BStr::new(package), None)?
                     .is_empty()

@@ -5,7 +5,7 @@ use shirabe_php_binding_macros::php_entity;
 
 // TODO(plugin): the remaining RepositoryManager surface is widened on demand.
 php_entity! {
-    handle: std::rc::Rc<std::cell::RefCell<dyn RepositoryManagerInterface>>,
+    handle: std::rc::Rc<dyn RepositoryManagerInterface>,
     type_error: "a RepositoryManager",
     classes: {
         r"Composer\Repository\RepositoryManager": { constructor: unimplemented },
@@ -15,8 +15,7 @@ php_entity! {
             instance: {
                 adapters: __php_binding_repository_manager_interface,
                 target: dyn RepositoryManagerInterface,
-                borrow: |rm| rm.borrow(),
-                borrow_mut: |rm| rm.borrow_mut(),
+                deref: |rm| &**rm,
             },
             unimplemented: [
                 addRepository,

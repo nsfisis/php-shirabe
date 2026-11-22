@@ -574,7 +574,7 @@ impl CreateProjectCommand {
                     io.clone(),
                     &config,
                     repo_config.clone(),
-                    Some(&mut *rm.borrow_mut()),
+                    Some(&*rm),
                 )?);
             }
         } else {
@@ -583,7 +583,7 @@ impl CreateProjectCommand {
                     RepositoryFactory::default_repos(
                         Some(io.clone()),
                         Some(config.clone()),
-                        Some(&mut *rm.borrow_mut()),
+                        Some(&*rm),
                     )?
                     .into_iter()
                     .map(|(_, v)| v)

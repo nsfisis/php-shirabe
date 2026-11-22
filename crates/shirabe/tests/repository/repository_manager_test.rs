@@ -81,14 +81,14 @@ fn test_prepend() {
 
     let io = null_io();
     let config = std::rc::Rc::new(Config::new(false, None));
-    let mut rm = RepositoryManager::new(io.clone(), config, http_downloader(&io), None, None);
+    let rm = RepositoryManager::new(io.clone(), config, http_downloader(&io), None, None);
 
     let repository1 = RepositoryInterfaceHandle::new(ArrayRepository::new(vec![]).unwrap());
     let repository2 = RepositoryInterfaceHandle::new(ArrayRepository::new(vec![]).unwrap());
     rm.add_repository(repository1.clone());
     rm.prepend_repository(repository2.clone());
 
-    assert_eq!(&vec![repository2, repository1], rm.get_repositories());
+    assert_eq!(vec![repository2, repository1], rm.get_repositories());
 }
 
 #[test]
@@ -98,8 +98,7 @@ fn test_repo_creation() {
 
     let io = null_io();
     let config = std::rc::Rc::new(Config::new(false, None));
-    let mut rm =
-        RepositoryManager::new(io.clone(), config.clone(), http_downloader(&io), None, None);
+    let rm = RepositoryManager::new(io.clone(), config.clone(), http_downloader(&io), None, None);
 
     config.merge(
         &str_config(&[(
@@ -259,7 +258,7 @@ fn test_filter_repo_wrapping() {
 
     let io = null_io();
     let config = std::rc::Rc::new(Config::new(false, None));
-    let mut rm = RepositoryManager::new(io.clone(), config, http_downloader(&io), None, None);
+    let rm = RepositoryManager::new(io.clone(), config, http_downloader(&io), None, None);
 
     rm.set_repository_class(
         bstr::BStr::new("path"),

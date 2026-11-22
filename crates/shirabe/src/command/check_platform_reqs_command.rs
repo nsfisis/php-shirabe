@@ -230,7 +230,7 @@ impl Command for CheckPlatformReqsCommand {
             composer.get_locker().get_locked_repository(!no_dev)?.into()
         } else {
             let repository_manager = composer.get_repository_manager().clone();
-            let repository_manager = repository_manager.borrow();
+            let repository_manager = repository_manager;
             let local_repo = repository_manager.get_local_repository();
             if local_repo.get_packages()?.is_empty() {
                 io.write_error(bformat!("<warning>No vendor dir present, checking {}platform requirements from the lock file</warning>", if no_dev { "non-dev " } else { "" }));

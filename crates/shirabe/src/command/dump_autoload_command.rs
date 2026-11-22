@@ -90,10 +90,7 @@ impl Command for DumpAutoloadCommand {
 
         let mut missing_dependencies = false;
         {
-            let local_repo = composer
-                .get_repository_manager()
-                .borrow()
-                .get_local_repository();
+            let local_repo = composer.get_repository_manager().get_local_repository();
             for local_pkg in local_repo.get_canonical_packages()? {
                 let install_path = composer
                     .get_installation_manager()
@@ -225,10 +222,7 @@ impl Command for DumpAutoloadCommand {
             .as_bool()
             .unwrap_or(false);
 
-        let local_repo_handle = composer
-            .get_repository_manager()
-            .borrow()
-            .get_local_repository();
+        let local_repo_handle = composer.get_repository_manager().get_local_repository();
         let package = composer.get_package().clone();
         let installation_manager = composer.get_installation_manager();
         let locker = composer.get_locker();

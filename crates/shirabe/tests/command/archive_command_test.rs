@@ -63,15 +63,15 @@ mod mock_repository_manager {
         pub RepositoryManager {}
         impl RepositoryManagerInterface for RepositoryManager {
             fn get_local_repository(&self) -> RepositoryInterfaceHandle;
-            fn get_repositories(&self) -> &Vec<RepositoryInterfaceHandle>;
+            fn get_repositories(&self) -> Vec<RepositoryInterfaceHandle>;
             fn create_repository<'a>(
                 &self,
                 r#type: &BStr,
                 config: IndexMap<BString, PhpMixed>,
                 name: Option<&'a bstr::BStr>,
             ) -> anyhow::Result<RepositoryInterfaceHandle>;
-            fn add_repository(&mut self, repository: RepositoryInterfaceHandle);
-            fn set_local_repository(&mut self, repository: RepositoryInterfaceHandle);
+            fn add_repository(&self, repository: RepositoryInterfaceHandle);
+            fn set_local_repository(&self, repository: RepositoryInterfaceHandle);
         }
     }
 }
@@ -279,16 +279,14 @@ fn test_uses_config_from_composer_object_with_package_name() {
     repository_manager
         .expect_get_repositories()
         .times(1)
-        .return_const(Vec::new());
+        .returning(Vec::new);
 
     let mut composer = Composer::new();
     composer.set_config(config);
     composer.set_archive_manager(std::rc::Rc::new(std::cell::RefCell::new(manager)));
     composer.set_event_dispatcher(std::rc::Rc::new(noop_event_dispatcher()));
     composer.set_package(package.into());
-    composer.set_repository_manager(std::rc::Rc::new(std::cell::RefCell::new(
-        repository_manager,
-    )));
+    composer.set_repository_manager(std::rc::Rc::new(repository_manager));
     let composer = full_composer(composer);
 
     let command = ArchiveCommand::new();

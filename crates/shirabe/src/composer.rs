@@ -66,7 +66,7 @@ pub struct PartialComposer {
     global: bool,
     package: Option<RootPackageInterfaceHandle>,
     r#loop: Option<std::rc::Rc<std::cell::RefCell<Loop>>>,
-    repository_manager: Option<std::rc::Rc<std::cell::RefCell<dyn RepositoryManagerInterface>>>,
+    repository_manager: Option<std::rc::Rc<dyn RepositoryManagerInterface>>,
     installation_manager: Option<std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>>,
     config: Option<std::rc::Rc<Config>>,
     event_dispatcher: Option<std::rc::Rc<dyn EventDispatcherInterface>>,
@@ -100,16 +100,11 @@ impl PartialComposer {
         self.r#loop.as_ref().unwrap().clone()
     }
 
-    pub fn set_repository_manager(
-        &mut self,
-        manager: std::rc::Rc<std::cell::RefCell<dyn RepositoryManagerInterface>>,
-    ) {
+    pub fn set_repository_manager(&mut self, manager: std::rc::Rc<dyn RepositoryManagerInterface>) {
         self.repository_manager = Some(manager);
     }
 
-    pub fn get_repository_manager(
-        &self,
-    ) -> std::rc::Rc<std::cell::RefCell<dyn RepositoryManagerInterface>> {
+    pub fn get_repository_manager(&self) -> std::rc::Rc<dyn RepositoryManagerInterface> {
         self.repository_manager.as_ref().unwrap().clone()
     }
 
@@ -272,16 +267,11 @@ impl Composer {
         self.partial.get_loop()
     }
 
-    pub fn set_repository_manager(
-        &mut self,
-        manager: std::rc::Rc<std::cell::RefCell<dyn RepositoryManagerInterface>>,
-    ) {
+    pub fn set_repository_manager(&mut self, manager: std::rc::Rc<dyn RepositoryManagerInterface>) {
         self.partial.set_repository_manager(manager);
     }
 
-    pub fn get_repository_manager(
-        &self,
-    ) -> std::rc::Rc<std::cell::RefCell<dyn RepositoryManagerInterface>> {
+    pub fn get_repository_manager(&self) -> std::rc::Rc<dyn RepositoryManagerInterface> {
         self.partial.get_repository_manager()
     }
 
@@ -408,19 +398,14 @@ impl PartialOrFullComposer {
         }
     }
 
-    pub fn set_repository_manager(
-        &mut self,
-        manager: std::rc::Rc<std::cell::RefCell<dyn RepositoryManagerInterface>>,
-    ) {
+    pub fn set_repository_manager(&mut self, manager: std::rc::Rc<dyn RepositoryManagerInterface>) {
         match self {
             Self::Full(full) => full.set_repository_manager(manager),
             Self::Partial(partial) => partial.set_repository_manager(manager),
         }
     }
 
-    pub fn get_repository_manager(
-        &self,
-    ) -> std::rc::Rc<std::cell::RefCell<dyn RepositoryManagerInterface>> {
+    pub fn get_repository_manager(&self) -> std::rc::Rc<dyn RepositoryManagerInterface> {
         match self {
             Self::Full(full) => full.get_repository_manager(),
             Self::Partial(partial) => partial.get_repository_manager(),

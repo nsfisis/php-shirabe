@@ -32,8 +32,8 @@ use shirabe::util::r#loop::Loop;
 use shirabe::util::{HttpDownloader, Platform, ProcessExecutor};
 use shirabe_php_rpc::RpcValue;
 use shirabe_php_shim::{
-    Catch as _, PhpMixed, RuntimeException, ToPhpString, UnexpectedValueException, bformat,
-    path_from_bytes, path_to_bytes,
+    Catch as _, PhpMixed, PhpProp, RuntimeException, ToPhpString, UnexpectedValueException,
+    bformat, path_from_bytes, path_to_bytes,
 };
 use shirabe_semver::VersionParser;
 use shirabe_symfony_console::output::VERBOSITY_NORMAL;
@@ -119,17 +119,17 @@ use mock_download_manager::MockDownloadManager;
 /// test repository; the other methods are never reached.
 #[derive(Debug)]
 struct MockRepositoryManager {
-    local: RepositoryInterfaceHandle,
+    local: PhpProp<RepositoryInterfaceHandle>,
     repositories: Vec<RepositoryInterfaceHandle>,
 }
 
 impl RepositoryManagerInterface for MockRepositoryManager {
     fn get_local_repository(&self) -> RepositoryInterfaceHandle {
-        self.local.clone()
+        self.local.cloned()
     }
 
-    fn get_repositories(&self) -> &Vec<RepositoryInterfaceHandle> {
-        &self.repositories
+    fn get_repositories(&self) -> Vec<RepositoryInterfaceHandle> {
+        self.repositories.clone()
     }
 
     fn create_repository(
@@ -141,12 +141,12 @@ impl RepositoryManagerInterface for MockRepositoryManager {
         unimplemented!("not exercised by PluginInstallerTest")
     }
 
-    fn add_repository(&mut self, _repository: RepositoryInterfaceHandle) {
+    fn add_repository(&self, _repository: RepositoryInterfaceHandle) {
         unimplemented!("not exercised by PluginInstallerTest")
     }
 
-    fn set_local_repository(&mut self, repository: RepositoryInterfaceHandle) {
-        self.local = repository;
+    fn set_local_repository(&self, repository: RepositoryInterfaceHandle) {
+        self.local.set(repository);
     }
 }
 
@@ -276,7 +276,7 @@ pub(crate) fn set_up() -> SetUp {
         InstalledRepositoryInterfaceHandle::new(InstalledArrayRepository::new().unwrap());
 
     let repository_manager = MockRepositoryManager {
-        local: repository.as_repository_handle(),
+        local: PhpProp::new(repository.as_repository_handle()),
         repositories: vec![],
     };
 
@@ -333,9 +333,7 @@ pub(crate) fn set_up() -> SetUp {
         let mut c = composer.borrow_mut();
         c.set_config(std::rc::Rc::new(config));
         c.set_download_manager(std::rc::Rc::new(std::cell::RefCell::new(dm)));
-        c.set_repository_manager(std::rc::Rc::new(std::cell::RefCell::new(
-            repository_manager,
-        )));
+        c.set_repository_manager(std::rc::Rc::new(repository_manager));
         c.set_installation_manager(std::rc::Rc::new(std::cell::RefCell::new(
             installation_manager,
         )));
@@ -670,7 +668,6 @@ fn set_plugin_api_version_with_plugins(
         .composer
         .borrow()
         .get_repository_manager()
-        .borrow_mut()
         .set_local_repository(repository.as_repository_handle());
 
     pm.borrow_mut().load_installed_plugins().unwrap();

@@ -167,21 +167,14 @@ impl Command for SearchCommand {
             self.create_composer_instance(input.clone(), io.clone(), None, false, None)?
         };
         let composer_ref = composer_full(&composer);
-        let local_repo = composer_ref
-            .get_repository_manager()
-            .borrow()
-            .get_local_repository();
+        let local_repo = composer_ref.get_repository_manager().get_local_repository();
         let installed_repo = CompositeRepository::new(vec![
             local_repo,
             RepositoryInterfaceHandle::new(platform_repo),
         ]);
         let mut all_repos: Vec<RepositoryInterfaceHandle> =
             vec![RepositoryInterfaceHandle::new(installed_repo)];
-        for r in composer_ref
-            .get_repository_manager()
-            .borrow()
-            .get_repositories()
-        {
+        for r in composer_ref.get_repository_manager().get_repositories() {
             all_repos.push(r.clone());
         }
         let mut repos = CompositeRepository::new(all_repos);
