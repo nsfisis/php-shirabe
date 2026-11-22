@@ -31,9 +31,7 @@ impl TestCase {
         let factory = Factory::default();
         let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
             std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
-        let config = std::rc::Rc::new(std::cell::RefCell::new(
-            Factory::__create_config_mock(None).unwrap(),
-        ));
+        let config = std::rc::Rc::new(Factory::__create_config_mock(None).unwrap());
         let http_downloader = std::rc::Rc::new(std::cell::RefCell::new(
             Factory::create_http_downloader(io.clone(), &config, StreamContextOptions::new())
                 .unwrap(),

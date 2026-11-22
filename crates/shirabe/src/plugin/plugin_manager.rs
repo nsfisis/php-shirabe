@@ -71,11 +71,7 @@ impl PluginManager {
         let composer_rc = composer
             .upgrade()
             .expect("PluginManager must not outlive Composer");
-        let allow_plugins_config = composer_rc
-            .borrow()
-            .get_config()
-            .borrow()
-            .get_allow_plugins()?;
+        let allow_plugins_config = composer_rc.borrow().get_config().get_allow_plugins()?;
         let locker = composer_rc.borrow().get_locker().clone();
         let mut locker = locker.borrow_mut();
         let allow_plugin_rules =
@@ -83,11 +79,7 @@ impl PluginManager {
         drop(locker);
         let allow_global_plugin_rules = Self::parse_allowed_plugins(
             match &global_composer {
-                Some(gc) => gc
-                    .borrow_partial()
-                    .get_config()
-                    .borrow()
-                    .get_allow_plugins()?,
+                Some(gc) => gc.borrow_partial().get_config().get_allow_plugins()?,
                 None => AllowPlugins::Bool(false),
             },
             None,
@@ -371,22 +363,14 @@ impl PluginManager {
             generator
                 .borrow()
                 .parse_autoloads(autoloads, root_package, PhpMixed::Bool(false));
-        let vendor_dir = composer
-            .borrow()
-            .get_config()
-            .borrow()
-            .get_path("vendor-dir")?;
+        let vendor_dir = composer.borrow().get_config().get_path("vendor-dir")?;
         let class_loader = generator.borrow().create_loader(&map, Some(vendor_dir))?;
         ClassLoader::register(&class_loader, false);
 
         // The plugin code runs in the PHP worker: load the Composer PHP runtime (contracts like
         // PluginInterface) and the reverse-RPC autoloader before touching plugin classes there.
         runtime::ensure_composer_php_runtime(|| {
-            let cache_dir = composer
-                .borrow()
-                .get_config()
-                .borrow()
-                .get_path("cache-dir")?;
+            let cache_dir = composer.borrow().get_config().get_path("cache-dir")?;
             Ok(path_from_bytes(&cache_dir).to_path_buf())
         })?;
         runtime::ensure_script_autoloader()?;
@@ -1163,28 +1147,23 @@ impl PluginManager {
 
                         // persist answer in composer.json if it wasn't simply discarded
                         if answer_str == b"y" || answer_str == b"n" {
-                            let allow_plugins_value = config.borrow().get("allow-plugins")?;
+                            let allow_plugins_value = config.get("allow-plugins")?;
                             if let Some(arr) = allow_plugins_value.as_array() {
                                 let mut allow_plugins = arr.clone();
                                 allow_plugins.insert(BString::from(package), PhpMixed::Bool(allow));
-                                if config.borrow().get_truthy("sort-packages")? {
+                                if config.get_truthy("sort-packages")? {
                                     ksort(&mut allow_plugins);
                                 }
-                                config
-                                    .borrow_mut()
-                                    .get_config_source_mut()
-                                    .add_config_setting(
-                                        bstr::BStr::new("allow-plugins"),
-                                        PhpMixed::Array(allow_plugins.clone()),
-                                    )?;
+                                config.get_config_source().add_config_setting(
+                                    bstr::BStr::new("allow-plugins"),
+                                    PhpMixed::Array(allow_plugins.clone()),
+                                )?;
                                 let mut inner = IndexMap::new();
                                 inner
                                     .insert("allow-plugins".into(), PhpMixed::Array(allow_plugins));
                                 let mut config_section = IndexMap::new();
                                 config_section.insert("config".into(), PhpMixed::Array(inner));
-                                config
-                                    .borrow_mut()
-                                    .merge(&config_section, Config::SOURCE_UNKNOWN);
+                                config.merge(&config_section, Config::SOURCE_UNKNOWN);
                             }
                         }
 

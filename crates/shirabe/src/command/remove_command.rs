@@ -287,7 +287,7 @@ impl Command for RemoveCommand {
         let composer_backup = std::fs::read(json_file.get_path())?;
 
         let json_file_for_source = JsonFile::new(file.clone(), None, None)?;
-        let mut json = JsonConfigSource::new(
+        let json = JsonConfigSource::new(
             std::rc::Rc::new(std::cell::RefCell::new(json_file_for_source)),
             false,
         );
@@ -507,7 +507,7 @@ impl Command for RemoveCommand {
             Some(std::rc::Rc::new(std::cell::RefCell::new(command_event))),
         )?;
 
-        let allow_plugins = composer.get_config().borrow().get("allow-plugins")?;
+        let allow_plugins = composer.get_config().get("allow-plugins")?;
         let removed_plugins: Vec<BString> =
             if let Some(allow_map) = allow_plugins.as_opt().and_then(|v| v.as_array()) {
                 packages
@@ -562,19 +562,13 @@ impl Command for RemoveCommand {
             .get_option("optimize-autoloader")?
             .as_bool()
             .unwrap_or(false)
-            || composer
-                .get_config()
-                .borrow()
-                .get_truthy("optimize-autoloader")?;
+            || composer.get_config().get_truthy("optimize-autoloader")?;
         let authoritative = input
             .borrow()
             .get_option("classmap-authoritative")?
             .as_bool()
             .unwrap_or(false)
-            || composer
-                .get_config()
-                .borrow()
-                .get_truthy("classmap-authoritative")?;
+            || composer.get_config().get_truthy("classmap-authoritative")?;
         let apcu_prefix = input
             .borrow()
             .get_option("apcu-autoloader-prefix")?
@@ -586,10 +580,7 @@ impl Command for RemoveCommand {
                 .get_option("apcu-autoloader")?
                 .as_bool()
                 .unwrap_or(false)
-            || composer
-                .get_config()
-                .borrow()
-                .get_truthy("apcu-autoloader")?;
+            || composer.get_config().get_truthy("apcu-autoloader")?;
         let minimal_changes = input
             .borrow()
             .get_option("minimal-changes")?
@@ -597,7 +588,6 @@ impl Command for RemoveCommand {
             .unwrap_or(false)
             || composer
                 .get_config()
-                .borrow()
                 .get_truthy("update-with-minimal-changes")?;
 
         let mut update_allow_transitive_dependencies =
@@ -655,9 +645,7 @@ impl Command for RemoveCommand {
         install
             .set_platform_requirement_filter(self.get_platform_requirement_filter(input.clone())?);
         install.set_dry_run(dry_run);
-        install.set_audit_config(
-            self.create_audit_config(&mut composer.get_config().borrow_mut(), input)?,
-        );
+        install.set_audit_config(self.create_audit_config(&composer.get_config(), input)?);
         install.set_minimal_update(minimal_changes);
 
         // if no lock is present, we do not do a partial update as

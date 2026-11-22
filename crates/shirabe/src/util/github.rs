@@ -15,7 +15,7 @@ use shirabe_php_shim::{
 #[derive(Debug)]
 pub struct GitHub {
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-    config: std::rc::Rc<std::cell::RefCell<Config>>,
+    config: std::rc::Rc<Config>,
     process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
 }
@@ -26,7 +26,7 @@ impl GitHub {
 
     pub fn new(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        config: std::rc::Rc<Config>,
         process: Option<std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,
         http_downloader: Option<std::rc::Rc<std::cell::RefCell<HttpDownloader>>>,
     ) -> anyhow::Result<Self> {
@@ -52,7 +52,7 @@ impl GitHub {
     }
 
     pub fn authorize_oauth(&mut self, origin_url: &BStr) -> anyhow::Result<bool> {
-        let github_domains = self.config.borrow().get_list("github-domains")?;
+        let github_domains = self.config.get_list("github-domains")?;
         if !in_array_loose(PhpMixed::string(origin_url), &github_domains) {
             return Ok(false);
         }
@@ -89,7 +89,7 @@ impl GitHub {
         }
 
         let mut note = BString::from("Shirabe");
-        let expose_hostname = self.config.borrow().get_github_expose_hostname()?;
+        let expose_hostname = self.config.get_github_expose_hostname()?;
         if expose_hostname {
             let mut output = BString::default();
             if self
@@ -104,7 +104,7 @@ impl GitHub {
         note = bformat!("{note} {}", date_local("Y-m-d Hi", None));
 
         let (local_name, auth_name): (Option<BString>, BString) = {
-            let cfg = self.config.borrow();
+            let cfg = &self.config;
             (
                 cfg.get_local_auth_config_source().map(|c| c.get_name()),
                 cfg.get_auth_config_source().get_name(),
@@ -239,26 +239,22 @@ impl GitHub {
             }
         }
 
-        let use_local = store_in_local_auth_config
-            && self
-                .config
-                .borrow()
-                .get_local_auth_config_source()
-                .is_some();
+        let use_local =
+            store_in_local_auth_config && self.config.get_local_auth_config_source().is_some();
         let key = bformat!("github-oauth.{origin_url}");
         {
-            let mut cfg = self.config.borrow_mut();
-            cfg.get_config_source_mut()
+            let cfg = &self.config;
+            cfg.get_config_source()
                 .remove_config_setting(bstr::BStr::new(&key))?;
         }
         if use_local {
-            let mut cfg = self.config.borrow_mut();
-            if let Some(local) = cfg.get_local_auth_config_source_mut() {
+            let cfg = &self.config;
+            if let Some(local) = cfg.get_local_auth_config_source() {
                 local.add_config_setting(bstr::BStr::new(&key), PhpMixed::string(token))?;
             }
         } else {
-            let mut cfg = self.config.borrow_mut();
-            cfg.get_auth_config_source_mut()
+            let cfg = &self.config;
+            cfg.get_auth_config_source()
                 .add_config_setting(bstr::BStr::new(&key), PhpMixed::string(token))?;
         }
 

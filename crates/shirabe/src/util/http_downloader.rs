@@ -26,7 +26,7 @@ use shirabe_semver::constraint::SimpleConstraint;
 #[derive(Debug)]
 pub struct HttpDownloader {
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-    config: std::rc::Rc<std::cell::RefCell<Config>>,
+    config: std::rc::Rc<Config>,
     options: StreamContextOptions,
     /// Replaces PHP's `$runningJobs`/`$maxJobs` counters: a permit is held for the duration of
     /// each in-flight request and released when it settles.
@@ -99,7 +99,7 @@ impl HttpDownloader {
     #[php(name = "__construct")]
     pub fn new(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        config: std::rc::Rc<Config>,
         options: StreamContextOptions,
         disable_tls: bool,
     ) -> anyhow::Result<Self> {
@@ -273,7 +273,7 @@ impl HttpDownloader {
         options: StreamContextOptions,
     ) -> anyhow::Result<(StreamContextOptions, BString)> {
         let options = self.options.clone().replace_recursive(options);
-        let origin = Url::get_origin(&self.config.borrow(), url)?;
+        let origin = Url::get_origin(&self.config, url)?;
 
         // capture username/password from URL if there is one
         if let Some(m) = preg_match(php_regex!(r"{^https?://([^:/]+):([^@/]+)@([^/]+)}i"), url) {
@@ -621,7 +621,7 @@ impl HttpDownloader {
     /// extends HttpDownloader but never performs curl I/O.
     pub fn __new_mock(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        config: std::rc::Rc<Config>,
     ) -> Self {
         Self {
             local: LocalFilesystem::new(io.clone(), config.clone()),

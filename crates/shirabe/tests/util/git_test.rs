@@ -25,7 +25,7 @@ struct NullConfigSource;
 
 impl ConfigSourceInterface for NullConfigSource {
     fn add_repository(
-        &mut self,
+        &self,
         _name: &bstr::BStr,
         _config: PhpMixed,
         _append: bool,
@@ -33,7 +33,7 @@ impl ConfigSourceInterface for NullConfigSource {
         unreachable!()
     }
     fn insert_repository(
-        &mut self,
+        &self,
         _name: &bstr::BStr,
         _config: PhpMixed,
         _reference_name: &bstr::BStr,
@@ -41,33 +41,33 @@ impl ConfigSourceInterface for NullConfigSource {
     ) -> anyhow::Result<()> {
         unreachable!()
     }
-    fn set_repository_url(&mut self, _name: &bstr::BStr, _url: &bstr::BStr) -> anyhow::Result<()> {
+    fn set_repository_url(&self, _name: &bstr::BStr, _url: &bstr::BStr) -> anyhow::Result<()> {
         unreachable!()
     }
-    fn remove_repository(&mut self, _name: &bstr::BStr) -> anyhow::Result<()> {
+    fn remove_repository(&self, _name: &bstr::BStr) -> anyhow::Result<()> {
         unreachable!()
     }
-    fn add_config_setting(&mut self, _name: &bstr::BStr, _value: PhpMixed) -> anyhow::Result<()> {
+    fn add_config_setting(&self, _name: &bstr::BStr, _value: PhpMixed) -> anyhow::Result<()> {
         Ok(())
     }
-    fn remove_config_setting(&mut self, _name: &bstr::BStr) -> anyhow::Result<()> {
+    fn remove_config_setting(&self, _name: &bstr::BStr) -> anyhow::Result<()> {
         Ok(())
     }
-    fn add_property(&mut self, _name: &bstr::BStr, _value: PhpMixed) -> anyhow::Result<()> {
+    fn add_property(&self, _name: &bstr::BStr, _value: PhpMixed) -> anyhow::Result<()> {
         unreachable!()
     }
-    fn remove_property(&mut self, _name: &bstr::BStr) -> anyhow::Result<()> {
+    fn remove_property(&self, _name: &bstr::BStr) -> anyhow::Result<()> {
         unreachable!()
     }
     fn add_link(
-        &mut self,
+        &self,
         _type: &bstr::BStr,
         _name: &bstr::BStr,
         _value: &bstr::BStr,
     ) -> anyhow::Result<()> {
         unreachable!()
     }
-    fn remove_link(&mut self, _type: &bstr::BStr, _name: &bstr::BStr) -> anyhow::Result<()> {
+    fn remove_link(&self, _type: &bstr::BStr, _name: &bstr::BStr) -> anyhow::Result<()> {
         unreachable!()
     }
     fn get_name(&self) -> bstr::BString {
@@ -82,7 +82,7 @@ fn build_git(
 ) -> Git {
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(io));
-    let config = std::rc::Rc::new(std::cell::RefCell::new(config));
+    let config = std::rc::Rc::new(config);
     let fs = std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(None)));
     Git::new(io, config, process, fs)
 }
@@ -442,7 +442,7 @@ fn run_command_private_bitbucket_interactive_with_oauth(
             CommandLine::Shell(BString::from("git command ok"))
         });
 
-    let mut config = ConfigStubBuilder::new()
+    let config = ConfigStubBuilder::new()
         .with(
             "gitlab-domains",
             PhpMixed::List(vec![PhpMixed::string(BString::from("gitlab.com"))]),
@@ -452,8 +452,8 @@ fn run_command_private_bitbucket_interactive_with_oauth(
             PhpMixed::List(vec![PhpMixed::string(BString::from("github.com"))]),
         )
         .build();
-    config.set_config_source(Box::new(NullConfigSource));
-    config.set_auth_config_source(Box::new(NullConfigSource));
+    config.set_config_source(std::rc::Rc::new(NullConfigSource));
+    config.set_auth_config_source(std::rc::Rc::new(NullConfigSource));
 
     let mut expected_calls: Vec<MockExpectation> = Vec::new();
     expected_calls.push(cmd_full("git command failing", 1, "", ""));

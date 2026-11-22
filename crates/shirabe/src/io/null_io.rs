@@ -155,7 +155,7 @@ impl IOInterfaceMutable for NullIO {
         <Self as BaseIO>::set_authentication(self, repository_name, username, password)
     }
 
-    fn load_configuration(&mut self, config: &mut Config) -> anyhow::Result<()> {
+    fn load_configuration(&mut self, config: &Config) -> anyhow::Result<()> {
         <Self as BaseIO>::load_configuration(self, config)
     }
 }

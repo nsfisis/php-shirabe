@@ -114,7 +114,6 @@ pub trait BaseDependencyCommand: BaseCommand {
 
             let platform_overrides: IndexMap<BString, PhpMixed> = composer
                 .get_config()
-                .borrow()
                 .get_map_or_empty("platform")?
                 .into_iter()
                 .collect();

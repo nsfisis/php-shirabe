@@ -19,7 +19,7 @@ fn null_io() -> std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
 fn http_downloader(
     io: &std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
 ) -> std::rc::Rc<std::cell::RefCell<HttpDownloader>> {
-    let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(false, None)));
+    let config = std::rc::Rc::new(Config::new(false, None));
     std::rc::Rc::new(std::cell::RefCell::new(
         HttpDownloader::new(
             io.clone(),
@@ -84,7 +84,7 @@ fn test_set_get_locker() {
 fn test_set_get_repository_manager() {
     let mut composer = Composer::new();
     let io = null_io();
-    let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(false, None)));
+    let config = std::rc::Rc::new(Config::new(false, None));
     let manager: std::rc::Rc<std::cell::RefCell<dyn RepositoryManagerInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(RepositoryManager::new(
             io.clone(),

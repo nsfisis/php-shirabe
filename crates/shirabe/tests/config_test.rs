@@ -234,7 +234,7 @@ fn data_add_packagist_repository() -> Vec<Case> {
 #[test]
 fn test_add_packagist_repository() {
     for case in data_add_packagist_repository() {
-        let mut config = Config::new(false, None);
+        let config = Config::new(false, None);
         if let Some(system) = case.system {
             let mut cfg: IndexMap<BString, PhpMixed> = IndexMap::new();
             cfg.insert("repositories".into(), PhpMixed::Array(system));
@@ -260,7 +260,7 @@ fn test_add_packagist_repository() {
 // ported yet.
 #[test]
 fn test_preferred_install_as_string() {
-    let mut config = Config::new(false, None);
+    let config = Config::new(false, None);
     config.merge(
         &config_section(vec![(
             BStr::new("preferred-install"),
@@ -284,7 +284,7 @@ fn test_preferred_install_as_string() {
 
 #[test]
 fn test_merge_preferred_install() {
-    let mut config = Config::new(false, None);
+    let config = Config::new(false, None);
     config.merge(
         &config_section(vec![(
             BStr::new("preferred-install"),
@@ -321,7 +321,7 @@ fn test_merge_preferred_install() {
 
 #[test]
 fn test_merge_github_oauth() {
-    let mut config = Config::new(false, None);
+    let config = Config::new(false, None);
     config.merge(
         &config_section(vec![(
             BStr::new("github-oauth"),
@@ -355,7 +355,7 @@ fn test_merge_github_oauth() {
 
 #[test]
 fn test_var_replacement() {
-    let mut config = Config::new(false, None);
+    let config = Config::new(false, None);
     config.merge(
         &config_section(vec![
             (BStr::new("a"), PhpMixed::string(BString::from("b"))),
@@ -398,7 +398,7 @@ fn test_var_replacement() {
 
 #[test]
 fn test_realpath_replacement() {
-    let mut config = Config::new(false, Some("/foo/bar".into()));
+    let config = Config::new(false, Some("/foo/bar".into()));
     config.merge(
         &config_section(vec![
             (
@@ -438,7 +438,7 @@ fn test_realpath_replacement() {
 
 #[test]
 fn test_stream_wrapper_dirs() {
-    let mut config = Config::new(false, Some("/foo/bar".into()));
+    let config = Config::new(false, Some("/foo/bar".into()));
     config.merge(
         &config_section(vec![(
             BStr::new("cache-dir"),
@@ -455,7 +455,7 @@ fn test_stream_wrapper_dirs() {
 
 #[test]
 fn test_fetching_relative_paths() {
-    let mut config = Config::new(false, Some("/foo/bar".into()));
+    let config = Config::new(false, Some("/foo/bar".into()));
     config.merge(
         &config_section(vec![
             (
@@ -494,7 +494,7 @@ fn test_fetching_relative_paths() {
 
 #[test]
 fn test_override_github_protocols() {
-    let mut config = Config::new(false, None);
+    let config = Config::new(false, None);
     config.merge(
         &config_section(vec![(
             BStr::new("github-protocols"),
@@ -521,7 +521,7 @@ fn test_override_github_protocols() {
 
 #[test]
 fn test_git_disabled_by_default_in_github_protocols() {
-    let mut config = Config::new(false, None);
+    let config = Config::new(false, None);
     config.merge(
         &config_section(vec![(
             BStr::new("github-protocols"),
@@ -563,7 +563,7 @@ fn test_allowed_urls_pass() {
         "ssh://[user@]host.xz[:port]/path/to/repo.git/",
     ];
     for url in urls {
-        let mut config = Config::new(false, None);
+        let config = Config::new(false, None);
         config
             .prohibit_url_by_config(url.into(), None, &IndexMap::new())
             .unwrap();
@@ -584,7 +584,7 @@ fn test_prohibited_urls_throw_exception() {
         "git://5.6.7.8/git.git",
     ];
     for url in urls {
-        let mut config = Config::new(false, None);
+        let config = Config::new(false, None);
         let err = config
             .prohibit_url_by_config(url.into(), None, &IndexMap::new())
             .unwrap_err();
@@ -610,7 +610,7 @@ fn test_prohibited_urls_warning_verify_peer() {
         )
         .unwrap();
 
-    let mut config = Config::new(false, None);
+    let config = Config::new(false, None);
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io_mock;
     let mut repo_options: IndexMap<BString, PhpMixed> = IndexMap::new();
     repo_options.insert(
@@ -627,7 +627,7 @@ fn test_prohibited_urls_warning_verify_peer() {
 
 #[test]
 fn test_disable_tls_can_be_overridden() {
-    let mut config = Config::new(true, None);
+    let config = Config::new(true, None);
     config.merge(
         &config_section(vec![(
             BStr::new("disable-tls"),
@@ -673,7 +673,7 @@ fn test_htaccess_protect() {
 fn test_get_source_of_value() {
     Platform::clear_env("COMPOSER_PROCESS_TIMEOUT").unwrap();
 
-    let mut config = Config::new(true, None);
+    let config = Config::new(true, None);
 
     assert_eq!(
         Config::SOURCE_DEFAULT,
@@ -705,7 +705,7 @@ fn test_get_source_of_value_env_variables() {
 #[test]
 #[serial_test::serial]
 fn test_audit() {
-    let mut config = Config::new(true, None);
+    let config = Config::new(true, None);
     let result = config.get("audit").unwrap();
     let result = result.as_array().unwrap();
     assert!(result.contains_key(B("abandoned")));
@@ -818,7 +818,7 @@ fn test_get_defaults_to_an_empty_array() {
 
 #[test]
 fn test_merges_plugin_config() {
-    let mut config = Config::new(false, None);
+    let config = Config::new(false, None);
     config.merge(
         &config_section(vec![(
             BStr::new("allow-plugins"),
@@ -858,7 +858,7 @@ fn test_merges_plugin_config() {
 
 #[test]
 fn test_overrides_global_boolean_plugins_config() {
-    let mut config = Config::new(false, None);
+    let config = Config::new(false, None);
     config.merge(
         &config_section(vec![(BStr::new("allow-plugins"), PhpMixed::Bool(true))]),
         "test",
@@ -886,7 +886,7 @@ fn test_overrides_global_boolean_plugins_config() {
 
 #[test]
 fn test_allows_all_plugins_from_local_boolean() {
-    let mut config = Config::new(false, None);
+    let config = Config::new(false, None);
     config.merge(
         &config_section(vec![(
             BStr::new("allow-plugins"),

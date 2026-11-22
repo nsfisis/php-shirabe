@@ -33,7 +33,7 @@ impl_php_class!(GitDownloader, r"Composer\Downloader\GitDownloader");
 impl GitDownloader {
     pub fn new(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        config: std::rc::Rc<Config>,
         process: Option<std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,
         fs: Option<std::rc::Rc<std::cell::RefCell<Filesystem>>>,
     ) -> Self {
@@ -494,11 +494,11 @@ impl GitDownloader {
         if let Some(match_) = preg_match(
             bformat!(
                 "{{^(?:https?|git)://{}/([^/]+)/([^/]+?)(?:\\.git)?$}}",
-                GitUtil::get_github_domains_regex(&self.inner.config.borrow())?
+                GitUtil::get_github_domains_regex(&self.inner.config)?
             ),
             url,
         ) {
-            let protocols = self.inner.config.borrow().get_github_protocols()?;
+            let protocols = self.inner.config.get_github_protocols()?;
             let m1 = match_.get(1).unwrap_or_default();
             let m2 = match_.get(2).unwrap_or_default();
             let m3 = match_.get(3).unwrap_or_default();
@@ -733,7 +733,7 @@ impl VcsDownloader for GitDownloader {
         self.inner.io.clone()
     }
 
-    fn config(&self) -> &std::rc::Rc<std::cell::RefCell<Config>> {
+    fn config(&self) -> &std::rc::Rc<Config> {
         &self.inner.config
     }
 
@@ -765,11 +765,7 @@ impl VcsDownloader for GitDownloader {
 
         let cache_path = std::path::PathBuf::from(path_from_bytes(&bformat!(
             "{}/{}/",
-            self.inner
-                .config
-                .borrow()
-                .get_path("cache-vcs-dir")?
-                .as_bstr(),
+            self.inner.config.get_path("cache-vcs-dir")?.as_bstr(),
             preg_replace(r"{[^a-z0-9.]}i", "-", Url::sanitize(url))
         )));
         let git_version = GitUtil::get_version(&self.inner.process)?;
@@ -829,11 +825,7 @@ impl VcsDownloader for GitDownloader {
         let path = self.normalize_path(path);
         let cache_path = bformat!(
             "{}/{}/",
-            self.inner
-                .config
-                .borrow()
-                .get_path("cache-vcs-dir")?
-                .as_bstr(),
+            self.inner.config.get_path("cache-vcs-dir")?.as_bstr(),
             preg_replace(r"{[^a-z0-9.]}i", "-", Url::sanitize(url))
         );
         let r#ref = package.get_source_reference().unwrap_or_default();
@@ -981,11 +973,7 @@ impl VcsDownloader for GitDownloader {
 
         let cache_path = bformat!(
             "{}/{}/",
-            self.inner
-                .config
-                .borrow()
-                .get_path("cache-vcs-dir")?
-                .as_bstr(),
+            self.inner.config.get_path("cache-vcs-dir")?.as_bstr(),
             preg_replace(r"{[^a-z0-9.]}i", "-", Url::sanitize(url))
         );
         let r#ref = target.get_source_reference().unwrap_or_default();
@@ -1113,7 +1101,7 @@ impl VcsDownloader for GitDownloader {
         let unpushed = self.get_unpushed_changes(package.clone(), &path)?;
         if let Some(unpushed) = unpushed.as_ref()
             && (self.inner.io.is_interactive()
-                || self.inner.config.borrow().get_discard_changes()? != DiscardChanges::Bool(true))
+                || self.inner.config.get_discard_changes()? != DiscardChanges::Bool(true))
         {
             return Err(RuntimeException::new(bformat!(
                 "Source directory {path} has unpushed changes on the current branch: \n{unpushed}"
@@ -1127,7 +1115,7 @@ impl VcsDownloader for GitDownloader {
         };
 
         if !self.inner.io.is_interactive() {
-            let discard_changes = self.inner.config.borrow().get_discard_changes()?;
+            let discard_changes = self.inner.config.get_discard_changes()?;
             if discard_changes == DiscardChanges::Bool(true) {
                 return self.discard_changes(&path).await;
             }

@@ -12,7 +12,7 @@ use shirabe_php_shim::{
 
 pub struct Versions {
     http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
-    config: std::rc::Rc<std::cell::RefCell<Config>>,
+    config: std::rc::Rc<Config>,
     channel: Option<BString>,
     versions_data: Option<PhpMixed>,
 }
@@ -36,7 +36,7 @@ impl Versions {
     ];
 
     pub fn new(
-        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        config: std::rc::Rc<Config>,
         http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
     ) -> Self {
         Self {
@@ -52,10 +52,7 @@ impl Versions {
             return Ok(ch.clone());
         }
 
-        let channel_file = bformat!(
-            "{}/update-channel",
-            self.config.borrow().get_home()?.as_bstr()
-        );
+        let channel_file = bformat!("{}/update-channel", self.config.get_home()?.as_bstr());
         let channel_file = path_from_bytes(&channel_file);
         if channel_file.exists() {
             let channel = trim(std::fs::read(channel_file)?);
@@ -84,10 +81,7 @@ impl Versions {
             ))));
         }
 
-        let channel_file = bformat!(
-            "{}/update-channel",
-            self.config.borrow().get_home()?.as_bstr()
-        );
+        let channel_file = bformat!("{}/update-channel", self.config.get_home()?.as_bstr());
         let channel_file = path_from_bytes(&channel_file);
         self.channel = Some(channel.clone());
 
@@ -151,7 +145,7 @@ impl Versions {
 
     fn get_versions_data(&mut self) -> anyhow::Result<PhpMixed> {
         if self.versions_data.is_none() {
-            let protocol = if self.config.borrow().get_bool("disable-tls") {
+            let protocol = if self.config.get_bool("disable-tls") {
                 "http"
             } else {
                 "https"

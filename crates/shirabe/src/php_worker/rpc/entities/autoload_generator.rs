@@ -68,7 +68,7 @@ fn dump(
     generator: &std::rc::Rc<std::cell::RefCell<dyn AutoloadGeneratorInterface>>,
     call: &mut Call<'_>,
 ) -> Result<RpcValue, PhpThrow> {
-    let config = call.entity::<std::rc::Rc<std::cell::RefCell<Config>>>(0)?;
+    let config = call.entity::<std::rc::Rc<Config>>(0)?;
     let local_repo = call.arg::<RepositoryInterfaceHandle>(1)?;
     let root_package = root_package(call, 2)?;
     let installation_manager =
@@ -81,7 +81,7 @@ fn dump(
     let class_map = generator
         .borrow()
         .dump(
-            &config.borrow(),
+            &config,
             local_repo,
             root_package,
             installation_manager,

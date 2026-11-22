@@ -23,7 +23,7 @@ use shirabe_php_shim::{
 #[derive(Debug)]
 pub struct VcsDownloaderBase {
     pub io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-    pub config: std::rc::Rc<std::cell::RefCell<Config>>,
+    pub config: std::rc::Rc<Config>,
     pub process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     pub filesystem: std::rc::Rc<std::cell::RefCell<Filesystem>>,
     pub has_cleaned_changes: std::cell::RefCell<IndexMap<BString, bool>>,
@@ -32,7 +32,7 @@ pub struct VcsDownloaderBase {
 impl VcsDownloaderBase {
     pub fn new(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        config: std::rc::Rc<Config>,
         process: Option<std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,
         fs: Option<std::rc::Rc<std::cell::RefCell<Filesystem>>>,
     ) -> Self {
@@ -77,7 +77,7 @@ pub trait VcsDownloader:
     DownloaderInterface + ChangeReportInterface + VcsCapableDownloaderInterface
 {
     fn io(&self) -> std::rc::Rc<std::cell::RefCell<dyn IOInterface>>;
-    fn config(&self) -> &std::rc::Rc<std::cell::RefCell<Config>>;
+    fn config(&self) -> &std::rc::Rc<Config>;
     fn process(&self) -> &std::rc::Rc<std::cell::RefCell<ProcessExecutor>>;
     fn filesystem(&self) -> &std::rc::Rc<std::cell::RefCell<Filesystem>>;
     fn has_cleaned_changes(&self) -> &std::cell::RefCell<IndexMap<BString, bool>>;

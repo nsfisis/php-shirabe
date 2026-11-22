@@ -26,7 +26,7 @@ fn http_body(
 // home directory.
 fn create_config() -> (Config, tempfile::TempDir) {
     let home = get_unique_tmp_directory();
-    let mut config = Config::new(true, None);
+    let config = Config::new(true, None);
     let mut top: IndexMap<BString, PhpMixed> = IndexMap::new();
     let mut config_section: IndexMap<BString, PhpMixed> = IndexMap::new();
     config_section.insert("home".into(), PhpMixed::string(path_to_bytes(&home.path())));
@@ -39,7 +39,7 @@ fn create_config() -> (Config, tempfile::TempDir) {
 }
 
 fn create_config_read_only() -> (Config, tempfile::TempDir) {
-    let (mut config, home) = create_config();
+    let (config, home) = create_config();
     let mut top: IndexMap<BString, PhpMixed> = IndexMap::new();
     let mut config_section: IndexMap<BString, PhpMixed> = IndexMap::new();
     config_section.insert("cache-read-only".into(), PhpMixed::Bool(true));

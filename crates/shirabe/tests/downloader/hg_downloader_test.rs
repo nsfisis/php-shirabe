@@ -76,9 +76,7 @@ fn get_downloader_mock(
         std::rc::Rc::new(std::cell::RefCell::new(IOStub::new()))
             as std::rc::Rc<std::cell::RefCell<dyn IOInterface>>
     });
-    let config = std::rc::Rc::new(std::cell::RefCell::new(
-        config.unwrap_or_else(|| Config::new(false, None)),
-    ));
+    let config = std::rc::Rc::new(config.unwrap_or_else(|| Config::new(false, None)));
     let fs = filesystem
         .unwrap_or_else(|| std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(None))));
     HgDownloader::new(io, config, process, fs)

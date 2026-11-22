@@ -33,7 +33,7 @@ pub struct VcsRepository {
     is_verbose: bool,
     is_very_verbose: bool,
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-    config: std::rc::Rc<std::cell::RefCell<Config>>,
+    config: std::rc::Rc<Config>,
     version_parser: std::cell::RefCell<Option<VersionParser>>,
     r#type: BString,
     loader: std::cell::RefCell<Option<Box<dyn LoaderInterface>>>,
@@ -64,7 +64,7 @@ impl VcsRepository {
     pub fn new(
         mut repo_config: IndexMap<BString, PhpMixed>,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        config: std::rc::Rc<Config>,
         http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
         dispatcher: Option<std::rc::Rc<EventDispatcher>>,
         process: Option<std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,

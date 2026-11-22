@@ -41,7 +41,7 @@ impl PathRepository {
     pub fn new(
         repo_config: IndexMap<BString, PhpMixed>,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        config: std::rc::Rc<Config>,
         http_downloader: Option<std::rc::Rc<std::cell::RefCell<HttpDownloader>>>,
         dispatcher: Option<std::rc::Rc<EventDispatcher>>,
         process: Option<std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,

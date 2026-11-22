@@ -267,7 +267,7 @@ impl IOInterfaceMutable for BufferIO {
     ) {
         IOInterfaceMutable::set_authentication(&mut self.inner, repository_name, username, password)
     }
-    fn load_configuration(&mut self, config: &mut Config) -> anyhow::Result<()> {
+    fn load_configuration(&mut self, config: &Config) -> anyhow::Result<()> {
         IOInterfaceMutable::load_configuration(&mut self.inner, config)
     }
 }

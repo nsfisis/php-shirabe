@@ -558,10 +558,7 @@ impl Command for InitCommand {
             .map(<[bstr::BString]>::to_vec)
             .unwrap_or_default();
         if (repositories.len() as i64) > 0 {
-            let config = std::rc::Rc::new(std::cell::RefCell::new(Factory::create_config(
-                Some(io.clone()),
-                None,
-            )?));
+            let config = std::rc::Rc::new(Factory::create_config(Some(io.clone()), None)?);
             for repo in &repositories {
                 let repo_config =
                     RepositoryFactory::config_from_string(io.clone(), &config, repo, true)?;
@@ -791,12 +788,8 @@ impl Command for InitCommand {
                 .map(<[bstr::BString]>::to_vec)
                 .unwrap_or_default();
             if (repositories.len() as i64) > 0 {
-                let config = std::rc::Rc::new(std::cell::RefCell::new(Factory::create_config(
-                    Some(io.clone()),
-                    None,
-                )?));
-                io.borrow_mut()
-                    .load_configuration(&mut config.borrow_mut())?;
+                let config = std::rc::Rc::new(Factory::create_config(Some(io.clone()), None)?);
+                io.borrow_mut().load_configuration(&config)?;
                 let mut repo_manager =
                     RepositoryFactory::manager(io.clone(), &config, None, None, None)?;
 

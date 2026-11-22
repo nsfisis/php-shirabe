@@ -25,7 +25,7 @@ impl_php_class!(FossilDownloader, r"Composer\Downloader\FossilDownloader");
 impl FossilDownloader {
     pub fn new(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        config: std::rc::Rc<Config>,
         process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
         fs: std::rc::Rc<std::cell::RefCell<Filesystem>>,
     ) -> Self {
@@ -63,7 +63,7 @@ impl VcsDownloader for FossilDownloader {
         self.inner.io.clone()
     }
 
-    fn config(&self) -> &std::rc::Rc<std::cell::RefCell<Config>> {
+    fn config(&self) -> &std::rc::Rc<Config> {
         &self.inner.config
     }
 
@@ -95,7 +95,7 @@ impl VcsDownloader for FossilDownloader {
         path: &std::path::Path,
         url: &bstr::BStr,
     ) -> anyhow::Result<Option<PhpMixed>> {
-        self.inner.config.borrow_mut().prohibit_url_by_config(
+        self.inner.config.prohibit_url_by_config(
             url,
             Some(self.inner.io.clone()),
             &indexmap::IndexMap::new(),
@@ -153,7 +153,7 @@ impl VcsDownloader for FossilDownloader {
         path: &std::path::Path,
         url: &bstr::BStr,
     ) -> anyhow::Result<Option<PhpMixed>> {
-        self.inner.config.borrow_mut().prohibit_url_by_config(
+        self.inner.config.prohibit_url_by_config(
             url,
             Some(self.inner.io.clone()),
             &indexmap::IndexMap::new(),

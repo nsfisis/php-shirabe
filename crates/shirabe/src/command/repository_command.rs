@@ -21,7 +21,7 @@ use shirabe_symfony_console::output::OutputInterface;
 pub struct RepositoryCommand {
     base_command_data: BaseCommandData,
 
-    config: std::cell::RefCell<Option<std::rc::Rc<std::cell::RefCell<Config>>>>,
+    config: std::cell::RefCell<Option<std::rc::Rc<Config>>>,
     config_file: std::cell::RefCell<Option<std::rc::Rc<std::cell::RefCell<JsonFile>>>>,
     config_source: std::cell::RefCell<Option<JsonConfigSource>>,
 }
@@ -347,10 +347,8 @@ impl Command for RepositoryCommand {
             _ => IndexMap::new(),
         };
         let config = self.config.borrow().as_ref().unwrap().clone();
-        config
-            .borrow_mut()
-            .merge(&config_data_map, path_to_bytes(&config_file_path));
-        let repos = config.borrow().get_repositories();
+        config.merge(&config_data_map, path_to_bytes(&config_file_path));
+        let repos = config.get_repositories();
 
         match action.as_slice() {
             b"list" | b"ls" | b"show" => {
@@ -587,11 +585,11 @@ impl BaseCommand for RepositoryCommand {
 }
 
 impl BaseConfigCommand for RepositoryCommand {
-    fn config(&self) -> Option<std::rc::Rc<std::cell::RefCell<Config>>> {
+    fn config(&self) -> Option<std::rc::Rc<Config>> {
         self.config.borrow().clone()
     }
 
-    fn set_config(&self, config: Option<std::rc::Rc<std::cell::RefCell<Config>>>) {
+    fn set_config(&self, config: Option<std::rc::Rc<Config>>) {
         *self.config.borrow_mut() = config;
     }
 

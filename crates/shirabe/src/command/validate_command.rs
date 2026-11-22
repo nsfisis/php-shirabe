@@ -287,7 +287,7 @@ impl Command for ValidateCommand {
         let composer =
             self.create_composer_instance(input.clone(), io.clone(), None, false, None)?;
         let composer = composer_full(&composer);
-        let check_lock = (check_lock && composer.get_config().borrow().get_bool("lock"))
+        let check_lock = (check_lock && composer.get_config().get_bool("lock"))
             || input
                 .borrow()
                 .get_option("check-lock")?

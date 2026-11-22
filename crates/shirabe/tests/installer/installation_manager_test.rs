@@ -25,9 +25,7 @@ struct SetUp {
 fn set_up() -> SetUp {
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
-    let config = std::rc::Rc::new(std::cell::RefCell::new(shirabe::config::Config::new(
-        false, None,
-    )));
+    let config = std::rc::Rc::new(shirabe::config::Config::new(false, None));
     // The PHP loop mock has its constructor disabled and is never exercised by these tests, so a
     // mock HttpDownloader (no real curl backend) stands in.
     let http_downloader = std::rc::Rc::new(std::cell::RefCell::new(HttpDownloader::__new_mock(

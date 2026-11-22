@@ -23,7 +23,7 @@ struct SetUp {
 
 fn set_up() -> SetUp {
     let home = get_unique_tmp_directory();
-    let mut config = Config::new(true, None);
+    let config = Config::new(true, None);
     let mut top: IndexMap<BString, PhpMixed> = IndexMap::new();
     let mut config_section: IndexMap<BString, PhpMixed> = IndexMap::new();
     config_section.insert("home".into(), PhpMixed::string(path_to_bytes(&home.path())));
@@ -69,16 +69,16 @@ mod mock_config_source {
         #[derive(Debug)]
         pub ConfigSource {}
         impl ConfigSourceInterface for ConfigSource {
-            fn add_repository(&mut self, name: &bstr::BStr, config: PhpMixed, append: bool) -> anyhow::Result<()>;
-            fn insert_repository(&mut self, name: &bstr::BStr, config: PhpMixed, reference_name: &bstr::BStr, offset: i64) -> anyhow::Result<()>;
-            fn set_repository_url(&mut self, name: &bstr::BStr, url: &bstr::BStr) -> anyhow::Result<()>;
-            fn remove_repository(&mut self, name: &bstr::BStr) -> anyhow::Result<()>;
-            fn add_config_setting(&mut self, name: &bstr::BStr, value: PhpMixed) -> anyhow::Result<()>;
-            fn remove_config_setting(&mut self, name: &bstr::BStr) -> anyhow::Result<()>;
-            fn add_property(&mut self, name: &bstr::BStr, value: PhpMixed) -> anyhow::Result<()>;
-            fn remove_property(&mut self, name: &bstr::BStr) -> anyhow::Result<()>;
-            fn add_link(&mut self, r#type: &bstr::BStr, name: &bstr::BStr, value: &bstr::BStr) -> anyhow::Result<()>;
-            fn remove_link(&mut self, r#type: &bstr::BStr, name: &bstr::BStr) -> anyhow::Result<()>;
+            fn add_repository(&self, name: &bstr::BStr, config: PhpMixed, append: bool) -> anyhow::Result<()>;
+            fn insert_repository(&self, name: &bstr::BStr, config: PhpMixed, reference_name: &bstr::BStr, offset: i64) -> anyhow::Result<()>;
+            fn set_repository_url(&self, name: &bstr::BStr, url: &bstr::BStr) -> anyhow::Result<()>;
+            fn remove_repository(&self, name: &bstr::BStr) -> anyhow::Result<()>;
+            fn add_config_setting(&self, name: &bstr::BStr, value: PhpMixed) -> anyhow::Result<()>;
+            fn remove_config_setting(&self, name: &bstr::BStr) -> anyhow::Result<()>;
+            fn add_property(&self, name: &bstr::BStr, value: PhpMixed) -> anyhow::Result<()>;
+            fn remove_property(&self, name: &bstr::BStr) -> anyhow::Result<()>;
+            fn add_link(&self, r#type: &bstr::BStr, name: &bstr::BStr, value: &bstr::BStr) -> anyhow::Result<()>;
+            fn remove_link(&self, r#type: &bstr::BStr, name: &bstr::BStr) -> anyhow::Result<()>;
             fn get_name(&self) -> bstr::BString;
         }
     }
@@ -151,7 +151,7 @@ fn test_supports() {
     for (expected, repo_url) in supports_provider() {
         let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
             std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
-        let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(true, None)));
+        let config = std::rc::Rc::new(Config::new(true, None));
 
         assert_eq!(
             expected,
@@ -171,7 +171,7 @@ fn test_private_repository() {
     let identifier = "v0.0.0";
     let sha = "SOMESHA";
 
-    let config = std::rc::Rc::new(std::cell::RefCell::new(config));
+    let config = std::rc::Rc::new(config);
 
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(
@@ -203,12 +203,8 @@ fn test_private_repository() {
         },
     );
 
-    config
-        .borrow_mut()
-        .set_config_source(Box::new(null_config_source()));
-    config
-        .borrow_mut()
-        .set_auth_config_source(Box::new(null_config_source()));
+    config.set_config_source(std::rc::Rc::new(null_config_source()));
+    config.set_auth_config_source(std::rc::Rc::new(null_config_source()));
 
     let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
     repo_config.insert("url".into(), PhpMixed::string(repo_url.to_php_string()));
@@ -260,7 +256,7 @@ fn test_public_repository() {
     let identifier = "v0.0.0";
     let sha = "SOMESHA";
 
-    let config = std::rc::Rc::new(std::cell::RefCell::new(config));
+    let config = std::rc::Rc::new(config);
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = std::rc::Rc::new(
         std::cell::RefCell::new(IOStub::new().with_is_interactive(true)),
     );
@@ -327,7 +323,7 @@ fn test_public_repository2() {
     let identifier = "feature/3.2-foo";
     let sha = "SOMESHA";
 
-    let config = std::rc::Rc::new(std::cell::RefCell::new(config));
+    let config = std::rc::Rc::new(config);
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = std::rc::Rc::new(
         std::cell::RefCell::new(IOStub::new().with_is_interactive(true)),
     );
@@ -426,7 +422,7 @@ fn test_invalid_support_data() {
     let identifier = "feature/3.2-foo";
     let sha = "SOMESHA";
 
-    let config = std::rc::Rc::new(std::cell::RefCell::new(config));
+    let config = std::rc::Rc::new(config);
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = std::rc::Rc::new(
         std::cell::RefCell::new(IOStub::new().with_is_interactive(true)),
     );
@@ -612,7 +608,7 @@ fn test_funding_format() {
         let identifier = "feature/3.2-foo";
         let sha = "SOMESHA";
 
-        let config = std::rc::Rc::new(std::cell::RefCell::new(config));
+        let config = std::rc::Rc::new(config);
         let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = std::rc::Rc::new(
             std::cell::RefCell::new(IOStub::new().with_is_interactive(true)),
         );
@@ -723,7 +719,7 @@ fn test_public_repository_archived() {
         "https://api.github.com/repos/composer/packagist/contents/composer.json?ref={sha}"
     );
 
-    let config = std::rc::Rc::new(std::cell::RefCell::new(config));
+    let config = std::rc::Rc::new(config);
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = std::rc::Rc::new(
         std::cell::RefCell::new(IOStub::new().with_is_interactive(true)),
     );
@@ -801,7 +797,7 @@ fn test_private_repository_no_interaction() {
     let identifier = "v0.0.0";
     let sha = "SOMESHA";
 
-    let config = std::rc::Rc::new(std::cell::RefCell::new(config));
+    let config = std::rc::Rc::new(config);
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = std::rc::Rc::new(
         std::cell::RefCell::new(IOStub::new().with_is_interactive(false)),
     );
@@ -827,11 +823,10 @@ fn test_private_repository_no_interaction() {
             PhpMixed::string(path_to_bytes(&cache_vcs_dir)),
         );
         top.insert("config".into(), PhpMixed::Array(config_section));
-        config.borrow_mut().merge(&top, Config::SOURCE_UNKNOWN);
+        config.merge(&top, Config::SOURCE_UNKNOWN);
     }
     let resolved_cache_vcs_dir = BString::from(
         config
-            .borrow_mut()
             .get("cache-vcs-dir")
             .unwrap()
             .as_string()
@@ -942,7 +937,7 @@ fn test_initialize_invalid_repo_url() {
         let SetUp { home, config } = set_up();
         let _tear_down = TearDown::new(home.path().to_path_buf());
 
-        let config = std::rc::Rc::new(std::cell::RefCell::new(config));
+        let config = std::rc::Rc::new(config);
         let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
             std::rc::Rc::new(std::cell::RefCell::new(IOStub::new()));
 
@@ -971,7 +966,7 @@ fn test_get_empty_file_content() {
 
     let repo_url = "http://github.com/composer/packagist";
 
-    let config = std::rc::Rc::new(std::cell::RefCell::new(config));
+    let config = std::rc::Rc::new(config);
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = std::rc::Rc::new(
         std::cell::RefCell::new(IOStub::new().with_is_interactive(true)),
     );

@@ -50,7 +50,7 @@ impl LibraryInstaller {
         let filesystem = filesystem
             .unwrap_or_else(|| std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(None))));
         let vendor_dir = std::path::PathBuf::from(path_from_bytes(&rtrim_chars(
-            composer_ref.get_config().borrow().get_path("vendor-dir")?,
+            composer_ref.get_config().get_path("vendor-dir")?,
             "/",
         )));
         let binary_installer: std::rc::Rc<std::cell::RefCell<dyn BinaryInstallerInterface>> =
@@ -58,10 +58,10 @@ impl LibraryInstaller {
                 Some(binary_installer) => binary_installer,
                 None => {
                     let bin_dir = std::path::PathBuf::from(path_from_bytes(&rtrim_chars(
-                        composer_ref.get_config().borrow().get_path("bin-dir")?,
+                        composer_ref.get_config().get_path("bin-dir")?,
                         "/",
                     )));
-                    let bin_compat = composer_ref.get_config().borrow().get_bin_compat()?;
+                    let bin_compat = composer_ref.get_config().get_bin_compat()?;
                     std::rc::Rc::new(std::cell::RefCell::new(BinaryInstaller::new(
                         io.clone(),
                         bin_dir,

@@ -39,7 +39,7 @@ impl GitHubDriver {
     pub fn new(
         repo_config: IndexMap<BString, PhpMixed>,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        config: std::rc::Rc<Config>,
         http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
         process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     ) -> Self {
@@ -92,11 +92,7 @@ impl GitHubDriver {
             self.inner.io.clone(),
             path_from_bytes(&bformat!(
                 "{}/{}/{}/{}",
-                self.inner
-                    .config
-                    .borrow()
-                    .get_path("cache-repo-dir")?
-                    .as_bstr(),
+                self.inner.config.get_path("cache-repo-dir")?.as_bstr(),
                 self.inner.origin_url,
                 self.owner,
                 self.repository
@@ -106,7 +102,7 @@ impl GitHubDriver {
             false,
         ));
         if let Some(c) = self.inner.cache.as_mut() {
-            c.set_read_only(self.inner.config.borrow().get_bool("cache-read-only"))
+            c.set_read_only(self.inner.config.get_bool("cache-read-only"))
         }
 
         if self
@@ -119,7 +115,7 @@ impl GitHubDriver {
             self.allow_git_fallback = false;
         }
 
-        if !self.inner.config.borrow().get_bool("use-github-api")
+        if !self.inner.config.get_bool("use-github-api")
             || self
                 .inner
                 .repo_config
@@ -877,7 +873,7 @@ impl GitHubDriver {
 
     pub fn supports(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        config: std::rc::Rc<Config>,
         url: &BStr,
         _deep: bool,
     ) -> anyhow::Result<bool> {
@@ -897,7 +893,7 @@ impl GitHubDriver {
             .unwrap_or_else(|| BString::from(matches.get(3).unwrap_or_default()));
         if !in_array_loose(
             strtolower(preg_replace(php_regex!(r"{^www\.}i"), "", &origin_url)),
-            config.borrow().get_list("github-domains")?.iter(),
+            config.get_list("github-domains")?.iter(),
         ) {
             return Ok(false);
         }
@@ -1308,7 +1304,7 @@ impl VcsDriverInterface for GitHubDriver {
 
     fn supports(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        config: std::rc::Rc<Config>,
         url: &BStr,
         deep: bool,
     ) -> anyhow::Result<bool> {

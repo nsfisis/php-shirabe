@@ -21,7 +21,7 @@ use shirabe_php_shim::{
 pub struct RootPackageLoader {
     inner: ArrayLoader,
     manager: std::rc::Rc<std::cell::RefCell<RepositoryManager>>,
-    config: std::rc::Rc<std::cell::RefCell<Config>>,
+    config: std::rc::Rc<Config>,
     version_guesser: Box<dyn VersionGuesserInterface>,
     io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
 }
@@ -29,7 +29,7 @@ pub struct RootPackageLoader {
 impl RootPackageLoader {
     pub fn new(
         manager: std::rc::Rc<std::cell::RefCell<RepositoryManager>>,
-        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        config: std::rc::Rc<Config>,
         parser: Option<VersionParser>,
         version_guesser: Option<Box<dyn VersionGuesserInterface>>,
         io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
@@ -235,7 +235,7 @@ impl RootPackageLoader {
         for (_, repo) in repos {
             self.manager.borrow_mut().add_repository(repo);
         }
-        real_package.set_repositories(self.config.borrow().get_repositories());
+        real_package.set_repositories(self.config.get_repositories());
 
         Ok(package)
     }

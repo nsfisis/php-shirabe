@@ -225,13 +225,11 @@ impl Application {
 
                 let min_space_free: f64 = 100.0 * 1024.0 * 1024.0;
                 let mut dir = path_from_bytes(config
-                    .borrow()
                     .get_home()?.as_bstr()).to_path_buf();
                 let df = disk_free_space(&dir);
                 let mut hit = df.map(|d| d < min_space_free).unwrap_or(false);
                 if !hit {
                     dir = path_from_bytes(config
-                        .borrow()
                         .get_path("vendor-dir")?.as_bstr()).to_path_buf();
                     let df = disk_free_space(&dir);
                     hit = df.map(|d| d < min_space_free).unwrap_or(false);
@@ -2285,11 +2283,7 @@ impl ApplicationHandle {
 
                                     let loader = generator.create_loader(
                                         &map,
-                                        composer
-                                            .get_config()
-                                            .borrow()
-                                            .get_path("vendor-dir")
-                                            .map(Some)?,
+                                        composer.get_config().get_path("vendor-dir").map(Some)?,
                                     )?;
                                     ClassLoader::register(&loader, false);
                                 }
@@ -2315,7 +2309,6 @@ impl ApplicationHandle {
                                                 Some(ref composer_handle) => {
                                                     composer_full(composer_handle)
                                                         .get_config()
-                                                        .borrow()
                                                         .get_path("cache-dir")?
                                                 }
                                                 None => {

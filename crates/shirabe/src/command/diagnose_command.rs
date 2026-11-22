@@ -191,7 +191,7 @@ impl DiagnoseCommand {
     fn check_http(
         &self,
         proto: &BStr,
-        config: &std::rc::Rc<std::cell::RefCell<Config>>,
+        config: &std::rc::Rc<Config>,
     ) -> anyhow::Result<CheckResult> {
         let result = self.check_connectivity_and_composer_network_http_enablement()?;
         if !matches!(result, CheckResult::Ok) {
@@ -200,7 +200,7 @@ impl DiagnoseCommand {
 
         let mut result_list: Vec<BString> = vec![];
         let mut tls_warning: Option<BString> = None;
-        if proto == "https" && config.borrow().get_bool("disable-tls") {
+        if proto == "https" && config.get_bool("disable-tls") {
             tls_warning = Some(BString::from(
                 "<warning>Shirabe is configured to disable SSL/TLS protection. This will leave remote HTTPS requests vulnerable to Man-In-The-Middle attacks.</warning>",
             ));
@@ -253,7 +253,7 @@ impl DiagnoseCommand {
     fn check_composer_repo(
         &self,
         url: &BStr,
-        config: &std::rc::Rc<std::cell::RefCell<Config>>,
+        config: &std::rc::Rc<Config>,
     ) -> anyhow::Result<CheckResult> {
         let result = self.check_connectivity_and_composer_network_http_enablement()?;
         if !matches!(result, CheckResult::Ok) {
@@ -262,7 +262,7 @@ impl DiagnoseCommand {
 
         let mut result_list: Vec<BString> = vec![];
         let mut tls_warning: Option<BString> = None;
-        if url.starts_with(b"https://") && config.borrow().get_bool("disable-tls") {
+        if url.starts_with(b"https://") && config.get_bool("disable-tls") {
             tls_warning = Some(BString::from(
                 "<warning>Shirabe is configured to disable SSL/TLS protection. This will leave remote HTTPS requests vulnerable to Man-In-The-Middle attacks.</warning>",
             ));
@@ -573,10 +573,7 @@ impl DiagnoseCommand {
         })
     }
 
-    fn check_version(
-        &self,
-        config: &std::rc::Rc<std::cell::RefCell<Config>>,
-    ) -> anyhow::Result<CheckResult> {
+    fn check_version(&self, config: &std::rc::Rc<Config>) -> anyhow::Result<CheckResult> {
         let result = self.check_connectivity_and_composer_network_http_enablement()?;
         if !matches!(result, CheckResult::Ok) {
             return Ok(result);
@@ -607,10 +604,7 @@ impl DiagnoseCommand {
         Ok(CheckResult::Ok)
     }
 
-    fn check_composer_audit(
-        &self,
-        config: &std::rc::Rc<std::cell::RefCell<Config>>,
-    ) -> anyhow::Result<CheckResult> {
+    fn check_composer_audit(&self, config: &std::rc::Rc<Config>) -> anyhow::Result<CheckResult> {
         let result = self.check_connectivity_and_composer_network_http_enablement()?;
         if !matches!(result, CheckResult::Ok) {
             return Ok(result);
@@ -657,7 +651,7 @@ impl DiagnoseCommand {
         let composer_repo_as_repo = RepositoryInterfaceHandle::new(ComposerRepository::new(
             repo_config,
             std::rc::Rc::new(std::cell::RefCell::new(NullIO::new())),
-            &config.borrow(),
+            config,
             self.http_downloader.borrow().clone().unwrap(),
             None,
         )?);
@@ -1137,7 +1131,7 @@ impl Command for DiagnoseCommand {
         let mut composer = self.try_composer(None, None);
         let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = self.get_io().clone();
 
-        let config: std::rc::Rc<std::cell::RefCell<Config>>;
+        let config: std::rc::Rc<Config>;
         if let Some(ref mut c) = composer {
             let c = composer_full(c);
             config = c.get_config();
@@ -1167,7 +1161,7 @@ impl Command for DiagnoseCommand {
                     }),
             );
         } else {
-            config = std::rc::Rc::new(std::cell::RefCell::new(Factory::create_config(None, None)?));
+            config = std::rc::Rc::new(Factory::create_config(None, None)?);
 
             *self.process.borrow_mut() = Some(std::rc::Rc::new(std::cell::RefCell::new(
                 ProcessExecutor::new(Some(io.clone())),
@@ -1178,10 +1172,8 @@ impl Command for DiagnoseCommand {
         let mut secure_http_wrap: IndexMap<BString, PhpMixed> = IndexMap::new();
         secure_http_wrap.insert("config".into(), PhpMixed::Array(config_inner));
         let config = config;
-        config
-            .borrow_mut()
-            .merge(&secure_http_wrap, Config::SOURCE_COMMAND);
-        let _ = config.borrow_mut().prohibit_url_by_config(
+        config.merge(&secure_http_wrap, Config::SOURCE_COMMAND);
+        let _ = config.prohibit_url_by_config(
             "http://repo.packagist.org".into(),
             Some(std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()))),
             &IndexMap::new(),
@@ -1196,7 +1188,7 @@ impl Command for DiagnoseCommand {
         // and version checks below never run.
         if strpos(file!(), "phar:") == Some(0) {
             io.write_no_newline("Checking pubkeys: ");
-            let r = self.check_pub_keys(&config.borrow())?;
+            let r = self.check_pub_keys(&config)?;
             self.output_result(r);
 
             io.write_no_newline("Checking Shirabe version: ");
@@ -1214,7 +1206,7 @@ impl Command for DiagnoseCommand {
         let r = self.check_composer_audit(&config)?;
         self.output_result(r);
 
-        let platform_overrides = config.borrow().get_map_or_empty("platform")?;
+        let platform_overrides = config.get_map_or_empty("platform")?;
         let platform_overrides_unboxed: indexmap::IndexMap<BString, PhpMixed> =
             platform_overrides.into_iter().collect();
         let mut platform_repo =
@@ -1331,7 +1323,7 @@ impl Command for DiagnoseCommand {
         let r = self.check_http(BStr::new("https"), &config)?;
         self.output_result(r);
 
-        let repositories = config.borrow().get_repositories();
+        let repositories = config.get_repositories();
         for repo in repositories {
             let repo_arr = repo.1.as_array().cloned().unwrap_or_default();
             if repo_arr.get(B("type")).and_then(|v| v.as_string()) == Some("composer".into())
@@ -1344,7 +1336,7 @@ impl Command for DiagnoseCommand {
                 let composer_repo = ComposerRepository::new(
                     repo_arr_unboxed,
                     self.get_io().clone(),
-                    &config.borrow(),
+                    &config,
                     self.http_downloader.borrow().clone().unwrap(),
                     None,
                 )
@@ -1371,7 +1363,7 @@ impl Command for DiagnoseCommand {
             }
         }
 
-        let protos: Vec<&BStr> = if config.borrow().get_bool("disable-tls") {
+        let protos: Vec<&BStr> = if config.get_bool("disable-tls") {
             vec![BStr::new("http")]
         } else {
             vec![BStr::new("http"), BStr::new("https")]
@@ -1405,7 +1397,7 @@ impl Command for DiagnoseCommand {
             }
         }
 
-        let oauth = config.borrow().get_map("github-oauth")?;
+        let oauth = config.get_map("github-oauth")?;
         if oauth.len() as i64 > 0 {
             for (domain, token) in &oauth {
                 io.write_no_newline(bformat!("Checking {domain} oauth access: "));
@@ -1438,7 +1430,7 @@ impl Command for DiagnoseCommand {
         }
 
         io.write_no_newline("Checking disk free space: ");
-        let r = self.check_disk_space(&config.borrow())?;
+        let r = self.check_disk_space(&config)?;
         self.output_result(r);
 
         Ok(self.exit_code.get())

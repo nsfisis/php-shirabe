@@ -153,7 +153,7 @@ fn make_installation_manager(
     vendor_dir: &std::path::Path,
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
 ) -> InstallationManager {
-    let config_for_downloader = std::rc::Rc::new(std::cell::RefCell::new(Config::new(false, None)));
+    let config_for_downloader = std::rc::Rc::new(Config::new(false, None));
     let http_downloader = std::rc::Rc::new(std::cell::RefCell::new(HttpDownloader::__new_mock(
         io.clone(),
         config_for_downloader,

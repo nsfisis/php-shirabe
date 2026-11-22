@@ -76,8 +76,8 @@ impl Command for ClearCacheCommand {
         } else {
             None
         };
-        let config_guard = config_rc.as_ref().map(|rc| rc.borrow());
-        let config: &Config = match (config_guard.as_deref(), created_config.as_ref()) {
+        let config_guard = config_rc.as_deref();
+        let config: &Config = match (config_guard, created_config.as_ref()) {
             (Some(config), _) => config,
             (None, Some(config)) => config,
             (None, None) => unreachable!(),

@@ -27,7 +27,7 @@ fn null_io() -> std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
 
 fn http_downloader(
     io: &std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-    config: &std::rc::Rc<std::cell::RefCell<Config>>,
+    config: &std::rc::Rc<Config>,
 ) -> std::rc::Rc<std::cell::RefCell<HttpDownloader>> {
     std::rc::Rc::new(std::cell::RefCell::new(
         HttpDownloader::new(
@@ -41,13 +41,13 @@ fn http_downloader(
 }
 
 // `$config = new Config; $config->merge(['repositories' => ['packagist' => false]]);`
-fn make_config() -> std::rc::Rc<std::cell::RefCell<Config>> {
-    let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(true, None)));
+fn make_config() -> std::rc::Rc<Config> {
+    let config = std::rc::Rc::new(Config::new(true, None));
     let mut repositories: IndexMap<BString, PhpMixed> = IndexMap::new();
     repositories.insert("packagist".into(), PhpMixed::Bool(false));
     let mut merge: IndexMap<BString, PhpMixed> = IndexMap::new();
     merge.insert("repositories".into(), PhpMixed::Array(repositories));
-    config.borrow_mut().merge(&merge, "test");
+    config.merge(&merge, "test");
     config
 }
 
@@ -55,7 +55,7 @@ fn make_config() -> std::rc::Rc<std::cell::RefCell<Config>> {
 // The loader only stores it and feeds it default repositories, so a real instance suffices.
 fn make_manager(
     io: &std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-    config: &std::rc::Rc<std::cell::RefCell<Config>>,
+    config: &std::rc::Rc<Config>,
 ) -> std::rc::Rc<std::cell::RefCell<RepositoryManager>> {
     std::rc::Rc::new(std::cell::RefCell::new(RepositoryManager::new(
         io.clone(),
@@ -102,7 +102,7 @@ use mock_version_guesser::MockVersionGuesser;
 #[test]
 fn test_stability_flags_parsing() {
     let io = null_io();
-    let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(true, None)));
+    let config = std::rc::Rc::new(Config::new(true, None));
     {
         let mut cfg = IndexMap::new();
         cfg.insert(
@@ -113,7 +113,7 @@ fn test_stability_flags_parsing() {
                 m
             }),
         );
-        config.borrow_mut().merge(&cfg, "test");
+        config.merge(&cfg, "test");
     }
 
     let manager = std::rc::Rc::new(std::cell::RefCell::new(RepositoryManager::new(

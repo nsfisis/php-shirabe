@@ -21,13 +21,13 @@ use shirabe_php_shim::{
 #[derive(Debug)]
 pub struct LocalFilesystem {
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-    config: std::rc::Rc<std::cell::RefCell<Config>>,
+    config: std::rc::Rc<Config>,
 }
 
 impl LocalFilesystem {
     pub fn new(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        config: std::rc::Rc<Config>,
     ) -> Self {
         Self { io, config }
     }
@@ -148,7 +148,7 @@ impl LocalFilesystem {
             &file_url,
         ) || (strpos(&file_url, "$").is_none() && strpos(&file_url, "%24").is_none())
         {
-            self.config.borrow_mut().prohibit_url_by_config(
+            self.config.prohibit_url_by_config(
                 file_url.as_ref(),
                 Some(self.io.clone()),
                 &IndexMap::new(),

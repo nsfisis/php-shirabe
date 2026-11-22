@@ -25,7 +25,7 @@ impl PerforceDriver {
     pub fn new(
         repo_config: IndexMap<BString, PhpMixed>,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        config: std::rc::Rc<Config>,
         http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
         process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     ) -> Self {
@@ -71,13 +71,7 @@ impl PerforceDriver {
             return Ok(());
         }
 
-        let cache_vcs_dir = BString::from(
-            self.inner
-                .config
-                .borrow()
-                .get_path("cache-vcs-dir")?
-                .as_bstr(),
-        );
+        let cache_vcs_dir = BString::from(self.inner.config.get_path("cache-vcs-dir")?.as_bstr());
         if !Cache::is_usable(path_from_bytes(&cache_vcs_dir)) {
             return Err(RuntimeException::new(BString::from("PerforceDriver requires a usable cache directory, and it looks like you set it to be disabled")).into());
         }
@@ -185,7 +179,7 @@ impl PerforceDriver {
 
     pub fn supports(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        _config: std::rc::Rc<std::cell::RefCell<Config>>,
+        _config: std::rc::Rc<Config>,
         url: &BStr,
         deep: bool,
     ) -> anyhow::Result<bool> {
@@ -295,7 +289,7 @@ impl VcsDriverInterface for PerforceDriver {
 
     fn supports(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        config: std::rc::Rc<Config>,
         url: &BStr,
         deep: bool,
     ) -> anyhow::Result<bool> {

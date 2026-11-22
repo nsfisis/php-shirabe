@@ -139,7 +139,7 @@ fn set_up() -> SetUp {
     let bin_dir = root_dir.join("bin");
     std::fs::create_dir_all(&bin_dir).unwrap();
 
-    let mut config = Config::new(false, None);
+    let config = Config::new(false, None);
     let mut config_section: IndexMap<BString, PhpMixed> = IndexMap::new();
     config_section.insert(
         "vendor-dir".into(),
@@ -149,7 +149,7 @@ fn set_up() -> SetUp {
     let mut merged: IndexMap<BString, PhpMixed> = IndexMap::new();
     merged.insert("config".into(), PhpMixed::Array(config_section));
     config.merge(&merged, Config::SOURCE_UNKNOWN);
-    let config_rc = std::rc::Rc::new(std::cell::RefCell::new(config));
+    let config_rc = std::rc::Rc::new(config);
 
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));

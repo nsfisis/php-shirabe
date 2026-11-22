@@ -1,8 +1,8 @@
 //! ref: composer/src/Composer/Config.php sha1:7e0a18fcbf536c9e5003f72a666077a4559cb226
 
 use shirabe_php_shim::{
-    E_USER_DEPRECATED, Error, PhpMixed, PregMatches, RuntimeException, ToPhpString, TypeError,
-    array_key_exists, array_merge, array_search_mixed, array_unique, bformat, boolval,
+    E_USER_DEPRECATED, Error, PhpMixed, PhpProp, PregMatches, RuntimeException, ToPhpString,
+    TypeError, array_key_exists, array_merge, array_search_mixed, array_unique, bformat, boolval,
     canonical_int_key, empty, filter_var_url, get_debug_type, implode, in_array_loose,
     in_array_strict, intval, is_array, is_numeric_string, is_string, loose_eq, parse_url,
     php_regex, php_str, preg_is_match, preg_match, preg_replace_callback, rtrim_chars, strtolower,
@@ -101,16 +101,16 @@ impl BumpAfterUpdate {
 
 #[derive(Debug)]
 pub struct Config {
-    config: IndexMap<BString, PhpMixed>,
-    base_dir: Option<BString>,
-    repositories: IndexMap<BString, PhpMixed>,
-    config_source: Option<Box<dyn ConfigSourceInterface>>,
-    auth_config_source: Option<Box<dyn ConfigSourceInterface>>,
-    local_auth_config_source: Option<Box<dyn ConfigSourceInterface>>,
+    config: PhpProp<std::rc::Rc<IndexMap<BString, PhpMixed>>>,
+    base_dir: PhpProp<Option<BString>>,
+    repositories: PhpProp<std::rc::Rc<IndexMap<BString, PhpMixed>>>,
+    config_source: PhpProp<Option<std::rc::Rc<dyn ConfigSourceInterface>>>,
+    auth_config_source: PhpProp<Option<std::rc::Rc<dyn ConfigSourceInterface>>>,
+    local_auth_config_source: PhpProp<Option<std::rc::Rc<dyn ConfigSourceInterface>>>,
     use_environment: bool,
-    warned_hosts: IndexMap<BString, bool>,
-    ssl_verify_warned_hosts: IndexMap<BString, bool>,
-    source_of_config_value: std::cell::RefCell<IndexMap<BString, BString>>,
+    warned_hosts: PhpProp<std::rc::Rc<IndexMap<BString, bool>>>,
+    ssl_verify_warned_hosts: PhpProp<std::rc::Rc<IndexMap<BString, bool>>>,
+    source_of_config_value: PhpProp<std::rc::Rc<IndexMap<BString, BString>>>,
 }
 
 #[php_binding(r"Composer\Config", members = instance)]
@@ -263,25 +263,25 @@ impl Config {
     pub fn new(use_environment: bool, base_dir: Option<BString>) -> Self {
         let this = Self {
             // load defaults
-            config: Self::default_config(),
-            repositories: Self::default_repositories(),
+            config: PhpProp::new(std::rc::Rc::new(Self::default_config())),
+            repositories: PhpProp::new(std::rc::Rc::new(Self::default_repositories())),
             use_environment,
-            base_dir: base_dir.filter(|s| !s.is_empty()),
-            config_source: None,
-            auth_config_source: None,
-            local_auth_config_source: None,
-            warned_hosts: IndexMap::new(),
-            ssl_verify_warned_hosts: IndexMap::new(),
-            source_of_config_value: std::cell::RefCell::new(IndexMap::new()),
+            base_dir: PhpProp::new(base_dir.filter(|s| !s.is_empty())),
+            config_source: PhpProp::new(None),
+            auth_config_source: PhpProp::new(None),
+            local_auth_config_source: PhpProp::new(None),
+            warned_hosts: PhpProp::default(),
+            ssl_verify_warned_hosts: PhpProp::default(),
+            source_of_config_value: PhpProp::default(),
         };
 
-        let config_clone = this.config.clone();
-        for (config_key, config_value) in &config_clone {
+        let config_clone = this.config.cloned();
+        for (config_key, config_value) in config_clone.iter() {
             this.set_source_of_config_value(config_value, config_key, Self::SOURCE_DEFAULT);
         }
 
-        let repositories_clone = this.repositories.clone();
-        for (config_key, config_value) in &repositories_clone {
+        let repositories_clone = this.repositories.cloned();
+        for (config_key, config_value) in repositories_clone.iter() {
             this.set_source_of_config_value(
                 config_value,
                 &bformat!("repositories.{config_key}"),
@@ -295,59 +295,43 @@ impl Config {
     /// Changing this can break path resolution for relative config paths so do not call this without knowing what you are doing
     ///
     /// The $baseDir should be an absolute path and without trailing slash
-    pub fn set_base_dir(&mut self, base_dir: Option<BString>) {
-        self.base_dir = base_dir;
+    pub fn set_base_dir(&self, base_dir: Option<BString>) {
+        self.base_dir.set(base_dir);
     }
 
     #[php(skip)]
-    pub fn set_config_source(&mut self, source: Box<dyn ConfigSourceInterface>) {
-        self.config_source = Some(source);
+    pub fn set_config_source(&self, source: std::rc::Rc<dyn ConfigSourceInterface>) {
+        self.config_source.set(Some(source));
     }
 
     #[php(skip)]
-    pub fn get_config_source(&self) -> &dyn ConfigSourceInterface {
-        self.config_source.as_ref().unwrap().as_ref()
-    }
-
-    pub fn get_config_source_mut(&mut self) -> &mut dyn ConfigSourceInterface {
-        self.config_source.as_mut().unwrap().as_mut()
+    pub fn get_config_source(&self) -> std::rc::Rc<dyn ConfigSourceInterface> {
+        self.config_source.cloned().unwrap()
     }
 
     #[php(skip)]
-    pub fn set_auth_config_source(&mut self, source: Box<dyn ConfigSourceInterface>) {
-        self.auth_config_source = Some(source);
+    pub fn set_auth_config_source(&self, source: std::rc::Rc<dyn ConfigSourceInterface>) {
+        self.auth_config_source.set(Some(source));
     }
 
     #[php(skip)]
-    pub fn get_auth_config_source(&self) -> &dyn ConfigSourceInterface {
-        self.auth_config_source.as_ref().unwrap().as_ref()
-    }
-
-    pub fn get_auth_config_source_mut(&mut self) -> &mut dyn ConfigSourceInterface {
-        self.auth_config_source.as_mut().unwrap().as_mut()
+    pub fn get_auth_config_source(&self) -> std::rc::Rc<dyn ConfigSourceInterface> {
+        self.auth_config_source.cloned().unwrap()
     }
 
     #[php(skip)]
-    pub fn set_local_auth_config_source(&mut self, source: Box<dyn ConfigSourceInterface>) {
-        self.local_auth_config_source = Some(source);
+    pub fn set_local_auth_config_source(&self, source: std::rc::Rc<dyn ConfigSourceInterface>) {
+        self.local_auth_config_source.set(Some(source));
     }
 
     #[php(skip)]
-    pub fn get_local_auth_config_source(&self) -> Option<&dyn ConfigSourceInterface> {
-        self.local_auth_config_source.as_deref()
-    }
-
-    pub fn get_local_auth_config_source_mut(
-        &mut self,
-    ) -> Option<&mut (dyn ConfigSourceInterface + 'static)> {
-        self.local_auth_config_source
-            .as_mut()
-            .map(|b| &mut **b as &mut dyn ConfigSourceInterface)
+    pub fn get_local_auth_config_source(&self) -> Option<std::rc::Rc<dyn ConfigSourceInterface>> {
+        self.local_auth_config_source.cloned()
     }
 
     /// Merges new config values with the existing ones (overriding)
     pub fn merge(
-        &mut self,
+        &self,
         config: &IndexMap<BString, PhpMixed>,
         #[php(decode = BString)] source: impl AsRef<[u8]>,
     ) {
@@ -359,126 +343,127 @@ impl Config {
                 PhpMixed::Array(m) => m,
                 _ => IndexMap::new(),
             };
-            for (key, val_box) in &config_section_map {
-                let key_str = key.as_slice();
-                let val = val_box.clone();
-                if matches!(
-                    key_str,
-                    b"bitbucket-oauth"
-                        | b"github-oauth"
-                        | b"gitlab-oauth"
-                        | b"gitlab-token"
-                        | b"http-basic"
-                        | b"bearer"
-                        | b"client-certificate"
-                        | b"forgejo-token"
-                ) && self.config.contains_key(key)
-                {
-                    let existing = self.config.get(key).cloned().unwrap_or(PhpMixed::Null);
-                    self.config
-                        .insert(key.clone(), array_merge(existing, val.clone()));
-                    self.set_source_of_config_value(&val, key_str, source);
-                } else if key == "allow-plugins"
-                    && self.config.contains_key(key)
-                    && is_array(self.config.get(key).unwrap_or(&PhpMixed::Null))
-                    && is_array(&val)
-                {
-                    // merging $val first to get the local config on top of the global one, then appending the global config,
-                    // then merging local one again to make sure the values from local win over global ones for keys present in both
-                    let existing = self.config.get(key).cloned().unwrap_or(PhpMixed::Null);
-                    self.config.insert(
-                        key.clone(),
-                        array_merge(array_merge(val.clone(), existing), val.clone()),
-                    );
-                    self.set_source_of_config_value(&val, key_str, source);
-                } else if matches!(key_str, b"gitlab-domains" | b"github-domains")
-                    && self.config.contains_key(key)
-                {
-                    let existing = self.config.get(key).cloned().unwrap_or(PhpMixed::Null);
-                    let merged = array_merge(existing, val.clone());
-                    let unique_list: Vec<BString> = match &merged {
-                        PhpMixed::List(l) => l
-                            .iter()
-                            .filter_map(|v| v.as_string().map(BStr::to_owned))
-                            .collect(),
-                        _ => vec![],
-                    };
-                    let deduped = array_unique(&unique_list);
-                    self.config.insert(
-                        key.clone(),
-                        PhpMixed::List(deduped.into_iter().map(PhpMixed::string).collect()),
-                    );
-                    self.set_source_of_config_value(&val, key_str, source);
-                } else if key == "preferred-install" && self.config.contains_key(key) {
-                    let mut val = val.clone();
-                    let existing = self.config.get(key).cloned().unwrap_or(PhpMixed::Null);
-                    if is_array(&val) || is_array(&existing) {
-                        if is_string(&val) {
-                            let mut m = IndexMap::new();
-                            m.insert("*".into(), val.clone());
-                            val = PhpMixed::Array(m);
-                        }
-                        let existing = self.config.get(key).cloned().unwrap_or(PhpMixed::Null);
-                        if is_string(&existing) {
-                            let mut m = IndexMap::new();
-                            m.insert("*".into(), existing);
-                            self.config.insert(key.clone(), PhpMixed::Array(m));
-                            self.source_of_config_value
-                                .borrow_mut()
-                                .insert(bformat!("{key}*"), source.into());
-                        }
-                        let cur = self.config.get(key).cloned().unwrap_or(PhpMixed::Null);
-                        self.config
-                            .insert(key.clone(), array_merge(cur, val.clone()));
+            self.config.update(|this_config| {
+                let this_config = std::rc::Rc::make_mut(this_config);
+                for (key, val_box) in &config_section_map {
+                    let key_str = key.as_slice();
+                    let val = val_box.clone();
+                    if matches!(
+                        key_str,
+                        b"bitbucket-oauth"
+                            | b"github-oauth"
+                            | b"gitlab-oauth"
+                            | b"gitlab-token"
+                            | b"http-basic"
+                            | b"bearer"
+                            | b"client-certificate"
+                            | b"forgejo-token"
+                    ) && this_config.contains_key(key)
+                    {
+                        let existing = this_config.get(key).cloned().unwrap_or(PhpMixed::Null);
+                        this_config.insert(key.clone(), array_merge(existing, val.clone()));
                         self.set_source_of_config_value(&val, key_str, source);
-                        // the full match pattern needs to be last
-                        let has_wildcard = matches!(
-                            self.config.get(key),
-                            Some(PhpMixed::Array(m)) if m.contains_key(B("*"))
+                    } else if key == "allow-plugins"
+                        && this_config.contains_key(key)
+                        && is_array(this_config.get(key).unwrap_or(&PhpMixed::Null))
+                        && is_array(&val)
+                    {
+                        // merging $val first to get the local config on top of the global one, then appending the global config,
+                        // then merging local one again to make sure the values from local win over global ones for keys present in both
+                        let existing = this_config.get(key).cloned().unwrap_or(PhpMixed::Null);
+                        this_config.insert(
+                            key.clone(),
+                            array_merge(array_merge(val.clone(), existing), val.clone()),
                         );
-                        if has_wildcard
-                            && let Some(PhpMixed::Array(m)) = self.config.get_mut(key)
-                            && let Some(wildcard) = m.shift_remove(B("*"))
-                        {
-                            m.insert("*".into(), wildcard);
+                        self.set_source_of_config_value(&val, key_str, source);
+                    } else if matches!(key_str, b"gitlab-domains" | b"github-domains")
+                        && this_config.contains_key(key)
+                    {
+                        let existing = this_config.get(key).cloned().unwrap_or(PhpMixed::Null);
+                        let merged = array_merge(existing, val.clone());
+                        let unique_list: Vec<BString> = match &merged {
+                            PhpMixed::List(l) => l
+                                .iter()
+                                .filter_map(|v| v.as_string().map(BStr::to_owned))
+                                .collect(),
+                            _ => vec![],
+                        };
+                        let deduped = array_unique(&unique_list);
+                        this_config.insert(
+                            key.clone(),
+                            PhpMixed::List(deduped.into_iter().map(PhpMixed::string).collect()),
+                        );
+                        self.set_source_of_config_value(&val, key_str, source);
+                    } else if key == "preferred-install" && this_config.contains_key(key) {
+                        let mut val = val.clone();
+                        let existing = this_config.get(key).cloned().unwrap_or(PhpMixed::Null);
+                        if is_array(&val) || is_array(&existing) {
+                            if is_string(&val) {
+                                let mut m = IndexMap::new();
+                                m.insert("*".into(), val.clone());
+                                val = PhpMixed::Array(m);
+                            }
+                            let existing = this_config.get(key).cloned().unwrap_or(PhpMixed::Null);
+                            if is_string(&existing) {
+                                let mut m = IndexMap::new();
+                                m.insert("*".into(), existing);
+                                this_config.insert(key.clone(), PhpMixed::Array(m));
+                                self.source_of_config_value.update(|sources| {
+                                    std::rc::Rc::make_mut(sources)
+                                        .insert(bformat!("{key}*"), source.into())
+                                });
+                            }
+                            let cur = this_config.get(key).cloned().unwrap_or(PhpMixed::Null);
+                            this_config.insert(key.clone(), array_merge(cur, val.clone()));
+                            self.set_source_of_config_value(&val, key_str, source);
+                            // the full match pattern needs to be last
+                            let has_wildcard = matches!(
+                                this_config.get(key),
+                                Some(PhpMixed::Array(m)) if m.contains_key(B("*"))
+                            );
+                            if has_wildcard
+                                && let Some(PhpMixed::Array(m)) = this_config.get_mut(key)
+                                && let Some(wildcard) = m.shift_remove(B("*"))
+                            {
+                                m.insert("*".into(), wildcard);
+                            }
+                        } else {
+                            this_config.insert(key.clone(), val.clone());
+                            self.set_source_of_config_value(&val, key_str, source);
+                        }
+                    } else if key == "audit" {
+                        let current_ignores = this_config
+                            .get(B("audit"))
+                            .and_then(|v| v.as_array())
+                            .and_then(|m| m.get(B("ignore")))
+                            .cloned()
+                            .unwrap_or(PhpMixed::List(vec![]));
+                        let merged = array_merge(
+                            this_config
+                                .get(B("audit"))
+                                .cloned()
+                                .unwrap_or(PhpMixed::Null),
+                            val.clone(),
+                        );
+                        this_config.insert(key.clone(), merged);
+                        self.set_source_of_config_value(&val, key_str, source);
+                        let val_ignore = match &val {
+                            PhpMixed::Array(m) => m
+                                .get(B("ignore"))
+                                .cloned()
+                                .unwrap_or(PhpMixed::List(vec![])),
+                            _ => PhpMixed::List(vec![]),
+                        };
+                        let new_ignores = array_merge(current_ignores, val_ignore);
+                        if let Some(PhpMixed::Array(audit)) = this_config.get_mut(B("audit")) {
+                            audit.insert("ignore".into(), new_ignores);
                         }
                     } else {
-                        self.config.insert(key.clone(), val.clone());
+                        this_config.insert(key.clone(), val.clone());
                         self.set_source_of_config_value(&val, key_str, source);
                     }
-                } else if key == "audit" {
-                    let current_ignores = self
-                        .config
-                        .get(B("audit"))
-                        .and_then(|v| v.as_array())
-                        .and_then(|m| m.get(B("ignore")))
-                        .cloned()
-                        .unwrap_or(PhpMixed::List(vec![]));
-                    let merged = array_merge(
-                        self.config
-                            .get(B("audit"))
-                            .cloned()
-                            .unwrap_or(PhpMixed::Null),
-                        val.clone(),
-                    );
-                    self.config.insert(key.clone(), merged);
-                    self.set_source_of_config_value(&val, key_str, source);
-                    let val_ignore = match &val {
-                        PhpMixed::Array(m) => m
-                            .get(B("ignore"))
-                            .cloned()
-                            .unwrap_or(PhpMixed::List(vec![])),
-                        _ => PhpMixed::List(vec![]),
-                    };
-                    let new_ignores = array_merge(current_ignores, val_ignore);
-                    if let Some(PhpMixed::Array(audit)) = self.config.get_mut(B("audit")) {
-                        audit.insert("ignore".into(), new_ignores);
-                    }
-                } else {
-                    self.config.insert(key.clone(), val.clone());
-                    self.set_source_of_config_value(&val, key_str, source);
                 }
-            }
+            });
         }
 
         let repositories_section = config
@@ -486,122 +471,122 @@ impl Config {
             .cloned()
             .unwrap_or(PhpMixed::Null);
         if !empty(&repositories_section) && is_array(&repositories_section) {
-            // PHP: array_reverse on IndexMap preserves keys (preserve_keys=true)
-            self.repositories = self
-                .repositories
-                .iter()
-                .rev()
-                .map(|(k, v)| (k.clone(), v.clone()))
-                .collect();
-            let new_repos_map: IndexMap<BString, PhpMixed> = match &repositories_section {
-                PhpMixed::Array(m) => m.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
-                // A JSON array decodes to a List; in PHP it is an array with integer keys.
-                PhpMixed::List(items) => items
+            self.repositories.update(|repositories| {
+                let repositories = std::rc::Rc::make_mut(repositories);
+                // PHP: array_reverse on IndexMap preserves keys (preserve_keys=true)
+                *repositories = repositories
                     .iter()
-                    .enumerate()
-                    .map(|(i, v)| (i.to_php_string(), v.clone()))
-                    .collect(),
-                _ => IndexMap::new(),
-            };
-            let new_repos: IndexMap<BString, PhpMixed> = new_repos_map.into_iter().rev().collect();
-            for (name, repository) in &new_repos {
-                // disable a repository by name
-                // this is a code path, that will be used less as the next check will be preferred
-                if matches!(repository, PhpMixed::Bool(false)) {
-                    self.disable_repo_by_name(name.as_ref());
-                    continue;
-                }
-
-                // disable a repository with an anonymous {"name": false} repo
-                if is_array(repository)
-                    && repository.as_array().map(|m| m.len()).unwrap_or(0) == 1
-                    && matches!(
-                        repository.as_array().and_then(|m| m.values().next()),
-                        Some(PhpMixed::Bool(false))
-                    )
-                {
-                    let name = repository
-                        .as_array()
-                        .and_then(|m| m.keys().next())
-                        .cloned()
-                        .unwrap_or_default();
-                    self.disable_repo_by_name(name.as_ref());
-                    continue;
-                }
-
-                // auto-deactivate the default packagist.org repo if it gets redefined
-                let is_composer = repository
-                    .as_array()
-                    .and_then(|m| m.get(B("type")))
-                    .and_then(|v| v.as_string())
-                    == Some("composer".into());
-                let repo_url = repository
-                    .as_array()
-                    .and_then(|m| m.get(B("url")))
-                    .and_then(|v| v.as_string())
-                    .unwrap_or_default();
-                if is_composer
-                    && preg_is_match(
-                        php_regex!(r"{^https?://(?:[a-z0-9-.]+\.)?packagist.org(/|$)}"),
-                        repo_url,
-                    )
-                {
-                    self.disable_repo_by_name(BStr::new("packagist.org"));
-                }
-
-                // store repo
-                let is_numeric_name = canonical_int_key(name).is_some();
-                if is_numeric_name {
-                    if !self.repositories.contains_key(name) {
-                        self.repositories.insert(name.clone(), repository.clone());
-                    } else {
-                        // PHP: $this->repositories[] = $repository
-                        // appending to numeric-keyed map
-                        let next_idx = self.repositories.len();
-                        self.repositories
-                            .insert(next_idx.to_php_string(), repository.clone());
+                    .rev()
+                    .map(|(k, v)| (k.clone(), v.clone()))
+                    .collect();
+                let new_repos_map: IndexMap<BString, PhpMixed> = match &repositories_section {
+                    PhpMixed::Array(m) => m.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
+                    // A JSON array decodes to a List; in PHP it is an array with integer keys.
+                    PhpMixed::List(items) => items
+                        .iter()
+                        .enumerate()
+                        .map(|(i, v)| (i.to_php_string(), v.clone()))
+                        .collect(),
+                    _ => IndexMap::new(),
+                };
+                let new_repos: IndexMap<BString, PhpMixed> =
+                    new_repos_map.into_iter().rev().collect();
+                for (name, repository) in &new_repos {
+                    // disable a repository by name
+                    // this is a code path, that will be used less as the next check will be preferred
+                    if matches!(repository, PhpMixed::Bool(false)) {
+                        Self::disable_repo_by_name(repositories, name.as_ref());
+                        continue;
                     }
-                    let found_key = array_search_mixed(
-                        repository,
-                        &PhpMixed::Array(self.repositories.clone()),
-                        true,
-                    )
-                    .and_then(|v| v.as_string().map(BStr::to_owned))
-                    .unwrap_or_default();
-                    self.set_source_of_config_value(
-                        repository,
-                        &bformat!("repositories.{found_key}"),
-                        source,
-                    );
-                } else if name == "packagist" {
-                    // BC support for default "packagist" named repo
-                    self.repositories
-                        .insert(bformat!("{name}.org"), repository.clone());
-                    self.set_source_of_config_value(
-                        repository,
-                        &bformat!("repositories.{name}.org"),
-                        source,
-                    );
-                } else {
-                    self.repositories.insert(name.clone(), repository.clone());
-                    self.set_source_of_config_value(
-                        repository,
-                        &bformat!("repositories.{name}"),
-                        source,
-                    );
+
+                    // disable a repository with an anonymous {"name": false} repo
+                    if is_array(repository)
+                        && repository.as_array().map(|m| m.len()).unwrap_or(0) == 1
+                        && matches!(
+                            repository.as_array().and_then(|m| m.values().next()),
+                            Some(PhpMixed::Bool(false))
+                        )
+                    {
+                        let name = repository
+                            .as_array()
+                            .and_then(|m| m.keys().next())
+                            .cloned()
+                            .unwrap_or_default();
+                        Self::disable_repo_by_name(repositories, name.as_ref());
+                        continue;
+                    }
+
+                    // auto-deactivate the default packagist.org repo if it gets redefined
+                    let is_composer = repository
+                        .as_array()
+                        .and_then(|m| m.get(B("type")))
+                        .and_then(|v| v.as_string())
+                        == Some("composer".into());
+                    let repo_url = repository
+                        .as_array()
+                        .and_then(|m| m.get(B("url")))
+                        .and_then(|v| v.as_string())
+                        .unwrap_or_default();
+                    if is_composer
+                        && preg_is_match(
+                            php_regex!(r"{^https?://(?:[a-z0-9-.]+\.)?packagist.org(/|$)}"),
+                            repo_url,
+                        )
+                    {
+                        Self::disable_repo_by_name(repositories, BStr::new("packagist.org"));
+                    }
+
+                    // store repo
+                    let is_numeric_name = canonical_int_key(name).is_some();
+                    if is_numeric_name {
+                        if !repositories.contains_key(name) {
+                            repositories.insert(name.clone(), repository.clone());
+                        } else {
+                            // PHP: $this->repositories[] = $repository
+                            // appending to numeric-keyed map
+                            let next_idx = repositories.len();
+                            repositories.insert(next_idx.to_php_string(), repository.clone());
+                        }
+                        let found_key = array_search_mixed(
+                            repository,
+                            &PhpMixed::Array(repositories.clone()),
+                            true,
+                        )
+                        .and_then(|v| v.as_string().map(BStr::to_owned))
+                        .unwrap_or_default();
+                        self.set_source_of_config_value(
+                            repository,
+                            &bformat!("repositories.{found_key}"),
+                            source,
+                        );
+                    } else if name == "packagist" {
+                        // BC support for default "packagist" named repo
+                        repositories.insert(bformat!("{name}.org"), repository.clone());
+                        self.set_source_of_config_value(
+                            repository,
+                            &bformat!("repositories.{name}.org"),
+                            source,
+                        );
+                    } else {
+                        repositories.insert(name.clone(), repository.clone());
+                        self.set_source_of_config_value(
+                            repository,
+                            &bformat!("repositories.{name}"),
+                            source,
+                        );
+                    }
                 }
-            }
-            self.repositories = self
-                .repositories
-                .iter()
-                .rev()
-                .map(|(k, v)| (k.clone(), v.clone()))
-                .collect();
+                *repositories = repositories
+                    .iter()
+                    .rev()
+                    .map(|(k, v)| (k.clone(), v.clone()))
+                    .collect();
+            });
         }
     }
 
     pub fn get_repositories(&self) -> IndexMap<BString, PhpMixed> {
-        self.repositories.clone()
+        std::rc::Rc::unwrap_or_clone(self.repositories.cloned())
     }
 
     /// Returns a setting
@@ -1060,6 +1045,7 @@ impl Config {
     /// `$this->config[$key]`, `null` for a missing key.
     fn raw_value(&self, key: impl AsRef<[u8]>) -> PhpMixed {
         self.config
+            .cloned()
             .get(B(key.as_ref()))
             .cloned()
             .unwrap_or(PhpMixed::Null)
@@ -1067,7 +1053,7 @@ impl Config {
 
     /// The `default:` branch of `get()`: the value neither cast nor validated.
     fn get_default(&self, key: &[u8], flags: i64) -> anyhow::Result<PhpMixed> {
-        match self.config.get(B(key)) {
+        match self.config.cloned().get(B(key)) {
             None | Some(PhpMixed::Null) => Ok(PhpMixed::Null),
             Some(v) => self.process(v.clone(), flags),
         }
@@ -1308,7 +1294,7 @@ impl Config {
             "repositories".into(),
             PhpMixed::Array(self.get_repositories()),
         );
-        let keys: Vec<BString> = self.config.keys().cloned().collect();
+        let keys: Vec<BString> = self.config.cloned().keys().cloned().collect();
         let mut config_section: IndexMap<BString, PhpMixed> = IndexMap::new();
         for key in keys {
             let value = self.get_with_flags(&key, flags)?;
@@ -1328,7 +1314,7 @@ impl Config {
 
         Ok(self
             .source_of_config_value
-            .borrow()
+            .cloned()
             .get(B(key))
             .cloned()
             .unwrap_or_else(|| Self::SOURCE_UNKNOWN.into()))
@@ -1343,8 +1329,7 @@ impl Config {
         let path = path.as_ref();
         let source = source.as_ref();
         self.source_of_config_value
-            .borrow_mut()
-            .insert(path.into(), source.into());
+            .update(|sources| std::rc::Rc::make_mut(sources).insert(path.into(), source.into()));
 
         if is_array(config_value) {
             let map = match config_value {
@@ -1366,14 +1351,17 @@ impl Config {
             "repositories".into(),
             PhpMixed::Array(self.get_repositories()),
         );
-        result.insert("config".into(), PhpMixed::Array(self.config.clone()));
+        result.insert(
+            "config".into(),
+            PhpMixed::Array(std::rc::Rc::unwrap_or_clone(self.config.cloned())),
+        );
         result
     }
 
     /// Checks whether a setting exists
     pub fn has(&self, #[php(decode = BString)] key: impl AsRef<[u8]>) -> bool {
         let key = key.as_ref();
-        array_key_exists(B(key), &self.config)
+        array_key_exists(B(key), &self.config.cloned())
     }
 
     /// Replaces {$refs} inside a config string
@@ -1402,7 +1390,7 @@ impl Config {
             return path.into();
         }
 
-        match &self.base_dir {
+        match &self.base_dir.cloned() {
             Some(base) => bformat!("{base}/{path}"),
             None => path.into(),
         }
@@ -1420,18 +1408,18 @@ impl Config {
         None
     }
 
-    fn disable_repo_by_name(&mut self, name: &BStr) {
-        if self.repositories.contains_key(B(name)) {
-            self.repositories.shift_remove(B(name));
+    fn disable_repo_by_name(repositories: &mut IndexMap<BString, PhpMixed>, name: &BStr) {
+        if repositories.contains_key(B(name)) {
+            repositories.shift_remove(B(name));
         } else if name == "packagist" {
             // BC support for default "packagist" named repo
-            self.repositories.shift_remove(B("packagist.org"));
+            repositories.shift_remove(B("packagist.org"));
         }
     }
 
     /// Validates that the passed URL is allowed to be used by current config, or throws an exception.
     pub fn prohibit_url_by_config(
-        &mut self,
+        &self,
         url: &BStr,
         io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
         repo_options: &IndexMap<BString, PhpMixed>,
@@ -1474,19 +1462,20 @@ impl Config {
             if let Some(ref io) = io
                 && let Some(ref hostname) = hostname
             {
-                if !self.warned_hosts.contains_key(hostname) {
+                if !self.warned_hosts.cloned().contains_key(hostname) {
                     io.write_error(bformat!("<warning>Warning: Accessing {hostname} over {} which is an insecure protocol.</warning>", scheme
                             .as_ref()
                             .map_or(B(""), |scheme| scheme.as_slice())
                             .as_bstr()));
                 }
-                self.warned_hosts.insert(hostname.clone(), true);
+                self.warned_hosts
+                    .update(|hosts| std::rc::Rc::make_mut(hosts).insert(hostname.clone(), true));
             }
         }
 
         if let Some(ref io) = io
             && let Some(ref hostname) = hostname
-            && !self.ssl_verify_warned_hosts.contains_key(hostname)
+            && !self.ssl_verify_warned_hosts.cloned().contains_key(hostname)
         {
             let mut warning: Option<BString> = None;
             let verify_peer = repo_options
@@ -1516,7 +1505,8 @@ impl Config {
                 io.write_error(bformat!(
                     "<warning>Warning: Accessing {hostname} with {w} disabled.</warning>"
                 ));
-                self.ssl_verify_warned_hosts.insert(hostname.clone(), true);
+                self.ssl_verify_warned_hosts
+                    .update(|hosts| std::rc::Rc::make_mut(hosts).insert(hostname.clone(), true));
             }
         }
 

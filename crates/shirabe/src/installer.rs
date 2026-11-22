@@ -74,7 +74,7 @@ use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
 #[derive(Debug)]
 pub struct Installer {
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-    config: std::rc::Rc<std::cell::RefCell<Config>>,
+    config: std::rc::Rc<Config>,
     package: RootPackageInterfaceHandle,
     // TODO can we get rid of the below and just use the package itself?
     fixed_root_package: RootPackageInterfaceHandle,
@@ -132,7 +132,7 @@ impl Installer {
     #[allow(clippy::too_many_arguments, reason = "to keep PHP signature")]
     pub fn new(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        config: std::rc::Rc<Config>,
         package: RootPackageInterfaceHandle,
         download_manager: std::rc::Rc<std::cell::RefCell<dyn DownloadManagerInterface>>,
         repository_manager: std::rc::Rc<std::cell::RefCell<dyn RepositoryManagerInterface>>,
@@ -145,7 +145,7 @@ impl Installer {
             SuggestedPackagesReporter::new(io.clone()),
         ));
         let platform_requirement_filter = PlatformRequirementFilterFactory::ignore_nothing();
-        let write_lock = config.borrow().get_bool("lock");
+        let write_lock = config.get_bool("lock");
 
         Self {
             io,
@@ -280,7 +280,7 @@ impl Installer {
             Err(e) => {
                 if self.execute_operations
                     && self.install
-                    && self.config.borrow().get_truthy("notify-on-install")?
+                    && self.config.get_truthy("notify-on-install")?
                 {
                     self.installation_manager
                         .borrow_mut()
@@ -292,10 +292,7 @@ impl Installer {
         };
         let _ = res;
 
-        if self.execute_operations
-            && self.install
-            && self.config.borrow().get_truthy("notify-on-install")?
-        {
+        if self.execute_operations && self.install && self.config.get_truthy("notify-on-install")? {
             self.installation_manager
                 .borrow_mut()
                 .notify_installs(self.io.clone())
@@ -367,7 +364,7 @@ impl Installer {
                 .set_platform_requirement_filter(self.platform_requirement_filter.clone());
             let local_repo_handle = self.repository_manager.borrow().get_local_repository();
             self.autoload_generator.borrow().dump(
-                &self.config.borrow(),
+                &self.config,
                 local_repo_handle,
                 self.package.clone(),
                 self.installation_manager.clone(),
@@ -731,7 +728,7 @@ impl Installer {
                 }
             }
 
-            if self.config.borrow().get_bool("lock") {
+            if self.config.get_bool("lock") {
                 self.io.write_error(bformat!(
                     "<info>Lock file operations: {} install{}, {} update{}, {} removal{}</info>",
                     (install_names.len() as i64),
@@ -782,7 +779,7 @@ impl Installer {
             }
 
             // output op if lock file is enabled, but alias op only in debug verbosity
-            if self.config.borrow().get_bool("lock")
+            if self.config.get_bool("lock")
                 && (strpos(operation.get_operation_type(), "Alias").is_none() || self.io.is_debug())
             {
                 let mut source_repo = BString::default();
@@ -811,7 +808,6 @@ impl Installer {
             .collect();
         let platform_overrides: IndexMap<BString, PhpMixed> = self
             .config
-            .borrow()
             .get_map_or_empty("platform")?
             .into_iter()
             .collect();
@@ -928,7 +924,7 @@ impl Installer {
         local_repo: RepositoryInterfaceHandle,
         already_solved: bool,
     ) -> anyhow::Result<i64> {
-        if self.config.borrow().get_bool("lock") {
+        if self.config.get_bool("lock") {
             self.io.write_error(bformat!(
                 "<info>Installing dependencies from lock file{}</info>",
                 if self.dev_mode {
@@ -983,11 +979,7 @@ impl Installer {
                 self.io
                     .write_error(implode("\n", &missing_requirement_info));
 
-                if !self
-                    .config
-                    .borrow()
-                    .get_truthy("allow-missing-requirements")?
-                {
+                if !self.config.get_truthy("allow-missing-requirements")? {
                     return Ok(Self::ERROR_LOCK_FILE_INVALID);
                 }
             }
@@ -1170,8 +1162,7 @@ impl Installer {
 
             // see https://github.com/composer/composer/issues/2764
             if !local_repo_transaction.get_operations().is_empty() {
-                let vendor_dir =
-                    BString::from(self.config.borrow().get_path("vendor-dir")?.as_bstr());
+                let vendor_dir = BString::from(self.config.get_path("vendor-dir")?.as_bstr());
                 let vendor_dir = path_from_bytes(&vendor_dir);
                 if is_dir(vendor_dir) {
                     // suppress errors as this fails sometimes on OSX for no apparent reason
@@ -1198,7 +1189,6 @@ impl Installer {
     ) -> anyhow::Result<PlatformRepositoryHandle> {
         let platform_overrides: IndexMap<BString, PhpMixed> = if for_update {
             self.config
-                .borrow()
                 .get_map_or_empty("platform")?
                 .into_iter()
                 .collect()
@@ -1597,7 +1587,7 @@ impl Installer {
     fn get_audit_config(&mut self) -> anyhow::Result<&AuditConfig> {
         if self.audit_config.is_none() {
             self.audit_config = Some(AuditConfig::from_config(
-                &mut self.config.borrow_mut(),
+                &self.config,
                 self.audit,
                 self.audit_format.as_bstr(),
             )?);
@@ -1773,7 +1763,7 @@ impl Installer {
     }
 
     /// set the config instance
-    pub fn set_config(&mut self, config: std::rc::Rc<std::cell::RefCell<Config>>) -> &mut Self {
+    pub fn set_config(&mut self, config: std::rc::Rc<Config>) -> &mut Self {
         self.config = config;
 
         self

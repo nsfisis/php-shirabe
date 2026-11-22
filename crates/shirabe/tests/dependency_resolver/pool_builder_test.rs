@@ -439,7 +439,7 @@ fn run_test_pool_builder(
         IndexMap::new(),
         IndexMap::new(),
     );
-    let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(false, None)));
+    let config = std::rc::Rc::new(Config::new(false, None));
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
     let mut rm = RepositoryFactory::manager(io.clone(), &config, None, None, None).unwrap();

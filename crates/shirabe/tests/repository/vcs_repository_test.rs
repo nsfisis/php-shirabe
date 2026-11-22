@@ -222,7 +222,7 @@ fn test_load_versions() {
     .map(|s| BString::from(*s))
     .collect();
 
-    let mut config = Config::new(true, None);
+    let config = Config::new(true, None);
     let mut top: IndexMap<BString, PhpMixed> = IndexMap::new();
     let mut config_section: IndexMap<BString, PhpMixed> = IndexMap::new();
     config_section.insert(
@@ -231,7 +231,7 @@ fn test_load_versions() {
     );
     top.insert("config".into(), PhpMixed::Array(config_section));
     config.merge(&top, Config::SOURCE_UNKNOWN);
-    let config = std::rc::Rc::new(std::cell::RefCell::new(config));
+    let config = std::rc::Rc::new(config);
 
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));

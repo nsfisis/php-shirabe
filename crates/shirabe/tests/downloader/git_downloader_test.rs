@@ -79,7 +79,7 @@ fn get_package(
 
 /// ref: GitDownloaderTest::setupConfig (seeds a temp `home` when none is set)
 fn setup_config(config: Config) -> Config {
-    let mut config = config;
+    let config = config;
     if !config.has("home") {
         let tmp_dir = tempfile::TempDir::new().unwrap().keep();
         let mut top: IndexMap<BString, PhpMixed> = IndexMap::new();
@@ -102,9 +102,9 @@ fn get_downloader_mock(
         std::rc::Rc::new(std::cell::RefCell::new(IOStub::new()))
             as std::rc::Rc<std::cell::RefCell<dyn IOInterface>>
     });
-    let config = std::rc::Rc::new(std::cell::RefCell::new(setup_config(
+    let config = std::rc::Rc::new(setup_config(
         config.unwrap_or_else(|| ConfigStubBuilder::new().build()),
-    )));
+    ));
     GitDownloader::new(io, config, Some(process), filesystem)
 }
 
@@ -620,7 +620,7 @@ fn test_download_and_set_push_url_use_custom_various_protocols_for_github() {
             Default::default(),
         );
 
-        let mut config = Config::new(false, None);
+        let config = Config::new(false, None);
         let mut top: IndexMap<BString, PhpMixed> = IndexMap::new();
         let mut section: IndexMap<BString, PhpMixed> = IndexMap::new();
         section.insert(

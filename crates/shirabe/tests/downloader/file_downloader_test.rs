@@ -26,16 +26,14 @@ fn get_package(name: &BStr, version: &BStr) -> PackageInterfaceHandle {
 }
 
 /// ref: TestCase::getConfig
-fn get_config(
-    config_options: IndexMap<BString, PhpMixed>,
-) -> std::rc::Rc<std::cell::RefCell<Config>> {
-    let mut config = Config::new(false, None);
+fn get_config(config_options: IndexMap<BString, PhpMixed>) -> std::rc::Rc<Config> {
+    let config = Config::new(false, None);
     if !config_options.is_empty() {
         let mut merged: IndexMap<BString, PhpMixed> = IndexMap::new();
         merged.insert("config".into(), PhpMixed::Array(config_options));
         config.merge(&merged, "test");
     }
-    std::rc::Rc::new(std::cell::RefCell::new(config))
+    std::rc::Rc::new(config)
 }
 
 /// The PHP `getDownloader` builds a HttpDownloader mock whose `addCopy` resolves to a 200 Response
@@ -44,15 +42,14 @@ fn get_config(
 /// so the verification step throws "could not be saved to" exactly as in PHP.
 fn get_downloader(
     io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
-    config: Option<std::rc::Rc<std::cell::RefCell<Config>>>,
+    config: Option<std::rc::Rc<Config>>,
 ) -> (
     FileDownloader,
     std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
     HttpDownloaderMockGuard,
 ) {
     let io = io.unwrap_or_else(|| std::rc::Rc::new(std::cell::RefCell::new(NullIO::new())));
-    let config = config
-        .unwrap_or_else(|| std::rc::Rc::new(std::cell::RefCell::new(Config::new(false, None))));
+    let config = config.unwrap_or_else(|| std::rc::Rc::new(Config::new(false, None)));
 
     let (http_downloader, guard) = get_http_downloader_mock(
         Vec::new(),

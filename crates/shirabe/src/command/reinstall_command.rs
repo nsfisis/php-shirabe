@@ -198,7 +198,7 @@ impl Command for ReinstallCommand {
 
         let config = composer.get_config();
         let (prefer_source, prefer_dist) =
-            self.get_preferred_install_options(&config.borrow(), input.clone(), false)?;
+            self.get_preferred_install_options(&config, input.clone(), false)?;
 
         let installation_manager = composer.get_installation_manager().clone();
         let download_manager = composer.get_download_manager();
@@ -258,13 +258,13 @@ impl Command for ReinstallCommand {
                 .get_option("optimize-autoloader")?
                 .as_bool()
                 .unwrap_or(false)
-                || config.borrow().get_truthy("optimize-autoloader")?;
+                || config.get_truthy("optimize-autoloader")?;
             let authoritative = input
                 .borrow()
                 .get_option("classmap-authoritative")?
                 .as_bool()
                 .unwrap_or(false)
-                || config.borrow().get_truthy("classmap-authoritative")?;
+                || config.get_truthy("classmap-authoritative")?;
             let apcu_prefix = input
                 .borrow()
                 .get_option("apcu-autoloader-prefix")?
@@ -276,7 +276,7 @@ impl Command for ReinstallCommand {
                     .get_option("apcu-autoloader")?
                     .as_bool()
                     .unwrap_or(false)
-                || config.borrow().get_truthy("apcu-autoloader")?;
+                || config.get_truthy("apcu-autoloader")?;
 
             let autoload_generator = composer.get_autoload_generator();
             autoload_generator
@@ -289,7 +289,7 @@ impl Command for ReinstallCommand {
 
             let locker = composer.get_locker();
             autoload_generator.borrow().dump(
-                &config.borrow(),
+                &config,
                 local_repo.clone(),
                 package.clone(),
                 installation_manager.clone(),

@@ -148,7 +148,7 @@ impl Command for SuggestsCommand {
             )?;
             installed_repos.push(locked_repo.into());
         } else {
-            let platform_overrides = composer.get_config().borrow().get_map("platform")?;
+            let platform_overrides = composer.get_config().get_map("platform")?;
             installed_repos.push(RepositoryInterfaceHandle::new(PlatformRepository::new(
                 vec![],
                 platform_overrides,

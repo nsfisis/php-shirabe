@@ -57,7 +57,7 @@ struct SetUp {
 }
 
 fn get_test_config(test_path: &std::path::Path) -> Config {
-    let mut config = Config::new(true, None);
+    let config = Config::new(true, None);
     let mut top: IndexMap<BString, PhpMixed> = IndexMap::new();
     let mut config_section: IndexMap<BString, PhpMixed> = IndexMap::new();
     config_section.insert("home".into(), PhpMixed::string(path_to_bytes(&test_path)));
@@ -94,7 +94,7 @@ fn make_driver(
 ) -> (PerforceDriver, ProcessExecutorMockGuard) {
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
-    let config = std::rc::Rc::new(std::cell::RefCell::new(config));
+    let config = std::rc::Rc::new(config);
     let http_downloader = std::rc::Rc::new(std::cell::RefCell::new(
         HttpDownloader::new(
             io.clone(),
@@ -136,7 +136,7 @@ impl Drop for TearDown {
 fn test_supports_returns_false_no_deep_check() {
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
-    let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(true, None)));
+    let config = std::rc::Rc::new(Config::new(true, None));
 
     assert!(!PerforceDriver::supports(io, config, bstr::BStr::new("existing.url"), false).unwrap());
 }

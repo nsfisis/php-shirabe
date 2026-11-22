@@ -89,8 +89,8 @@ impl BumpCommand {
 
         let composer = self.require_composer(None, None)?;
         let composer = composer_full(&composer);
-        let has_lock_file_disabled = !composer.get_config().borrow().has("lock")
-            || composer.get_config().borrow().get_bool("lock");
+        let has_lock_file_disabled =
+            !composer.get_config().has("lock") || composer.get_config().get_bool("lock");
         let repo: RepositoryInterfaceHandle = if !has_lock_file_disabled {
             composer
                 .get_locker()
@@ -239,7 +239,7 @@ impl BumpCommand {
 
         if !dry_run
             && composer.get_locker().borrow_mut().is_locked()
-            && composer.get_config().borrow().get_bool("lock")
+            && composer.get_config().get_bool("lock")
             && change_count > 0
         {
             composer

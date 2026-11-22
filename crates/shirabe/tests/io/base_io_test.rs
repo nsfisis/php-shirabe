@@ -24,10 +24,10 @@ fn github_oauth_config(token: &BStr) -> IndexMap<BString, PhpMixed> {
 fn test_load_configuration_accepts_valid_github_token() {
     for (name, token) in provide_valid_github_tokens() {
         let mut io = BufferIO::new(BString::default(), VERBOSITY_NORMAL, None).unwrap();
-        let mut config = Config::new(false, None);
+        let config = Config::new(false, None);
         config.merge(&github_oauth_config(token), Config::SOURCE_UNKNOWN);
 
-        io.load_configuration(&mut config)
+        io.load_configuration(&config)
             .unwrap_or_else(|e| panic!("data set {name:?}: {e}"));
 
         let auth = io.get_authentication(BStr::new("github.com"));
@@ -91,10 +91,10 @@ fn provide_valid_github_tokens() -> Vec<(&'static BStr, &'static BStr)> {
 fn test_load_configuration_rejects_token_with_url_breaking_characters() {
     for (name, token, offending) in provide_url_breaking_github_tokens() {
         let mut io = BufferIO::new(BString::default(), VERBOSITY_NORMAL, None).unwrap();
-        let mut config = Config::new(false, None);
+        let config = Config::new(false, None);
         config.merge(&github_oauth_config(token), Config::SOURCE_UNKNOWN);
 
-        match io.load_configuration(&mut config) {
+        match io.load_configuration(&config) {
             Ok(()) => panic!(
                 "data set {name:?}: Expected loadConfiguration to reject token containing {offending:?}"
             ),

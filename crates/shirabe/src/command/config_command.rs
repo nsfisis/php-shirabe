@@ -29,7 +29,7 @@ use shirabe_symfony_console::output::OutputInterface;
 pub struct ConfigCommand {
     base_command_data: BaseCommandData,
 
-    config: std::cell::RefCell<Option<std::rc::Rc<std::cell::RefCell<Config>>>>,
+    config: std::cell::RefCell<Option<std::rc::Rc<Config>>>,
     config_file: std::cell::RefCell<Option<std::rc::Rc<std::cell::RefCell<JsonFile>>>>,
     config_source: std::cell::RefCell<Option<JsonConfigSource>>,
 
@@ -104,14 +104,11 @@ impl ConfigCommand {
 
         if key == "disable-tls" {
             let config = self.config.borrow().as_ref().unwrap().clone();
-            if !normalized_value.as_bool().unwrap_or(false)
-                && config.borrow().get_bool("disable-tls")
-            {
+            if !normalized_value.as_bool().unwrap_or(false) && config.get_bool("disable-tls") {
                 self.get_io().write_error(
                     "<info>You are now running Shirabe with SSL/TLS protection enabled.</info>",
                 );
-            } else if normalized_value.as_bool().unwrap_or(false)
-                && !config.borrow().get_bool("disable-tls")
+            } else if normalized_value.as_bool().unwrap_or(false) && !config.get_bool("disable-tls")
             {
                 self.get_io().write_error("<warning>You are now running Shirabe with SSL/TLS protection disabled.</warning>");
             }
@@ -240,7 +237,6 @@ impl ConfigCommand {
                         .borrow()
                         .as_ref()
                         .unwrap()
-                        .borrow()
                         .get_source_of_value(bformat!("{}{key}", k.clone().unwrap_or_default()))?
                 )
             } else {
@@ -310,7 +306,7 @@ impl ConfigCommand {
             > = std::rc::Rc::new(std::cell::RefCell::new(input.clone()));
 
             // initialize configuration
-            let mut config = Factory::create_config(None, None)?;
+            let config = Factory::create_config(None, None)?;
 
             // load configuration
             let config_file = JsonFile::new(
@@ -489,7 +485,7 @@ impl Command for ConfigCommand {
         <Self as BaseConfigCommand>::initialize(self, input.clone(), output)?;
 
         let config = self.config.borrow().as_ref().unwrap().clone();
-        let auth_config_file = self.get_auth_config_file(input.clone(), &config.borrow())?;
+        let auth_config_file = self.get_auth_config_file(input.clone(), &config)?;
 
         let auth_config_file_jf = std::rc::Rc::new(std::cell::RefCell::new(JsonFile::new(
             auth_config_file,
@@ -596,9 +592,7 @@ impl Command for ConfigCommand {
                 _ => IndexMap::new(),
             };
             let config_file_path = config_file.borrow().get_path().to_path_buf();
-            config
-                .borrow_mut()
-                .merge(&config_map, path_to_bytes(&config_file_path));
+            config.merge(&config_map, path_to_bytes(&config_file_path));
             let auth_data: PhpMixed = if auth_config_file.borrow().exists() {
                 auth_config_file.borrow_mut().read()?
             } else {
@@ -607,22 +601,18 @@ impl Command for ConfigCommand {
             let mut wrap: IndexMap<BString, PhpMixed> = IndexMap::new();
             wrap.insert("config".into(), auth_data);
             let auth_config_file_path = auth_config_file.borrow().get_path().to_path_buf();
-            config
-                .borrow_mut()
-                .merge(&wrap, path_to_bytes(&auth_config_file_path));
+            config.merge(&wrap, path_to_bytes(&auth_config_file_path));
         }
 
         {
             let config_rc = config.clone();
-            self.get_io()
-                .borrow_mut()
-                .load_configuration(&mut config_rc.borrow_mut())?;
+            self.get_io().borrow_mut().load_configuration(&config_rc)?;
         }
 
         // List the configuration of the file settings
         if input.borrow().get_option("list")?.as_bool() == Some(true) {
-            let all_map = config.borrow().all(0)?;
-            let raw_map = config.borrow().raw();
+            let all_map = config.all(0)?;
+            let raw_map = config.raw();
             let to_mixed = |m: IndexMap<BString, PhpMixed>| -> PhpMixed {
                 PhpMixed::Array(m.into_iter().collect())
             };
@@ -675,8 +665,8 @@ impl Command for ConfigCommand {
             properties_defaults.insert("suggest".into(), PhpMixed::List(vec![]));
             properties_defaults.insert("extra".into(), PhpMixed::List(vec![]));
             let raw_data = config_file.borrow_mut().read()?;
-            let data = config.borrow_mut().all(0)?;
-            let mut source = config.borrow().get_source_of_value(&setting_key)?;
+            let data = config.all(0)?;
+            let mut source = config.get_source_of_value(&setting_key)?;
 
             let mut value: PhpMixed;
             if let Some(matches) = preg_match(
@@ -743,7 +733,7 @@ impl Command for ConfigCommand {
                 .map(|c| c.contains_key(B(&setting_key)))
                 .unwrap_or(false)
             {
-                value = config.borrow_mut().get_with_flags(
+                value = config.get_with_flags(
                     &setting_key,
                     if input.borrow().get_option("absolute")?.as_bool() == Some(true) {
                         0
@@ -864,7 +854,7 @@ impl Command for ConfigCommand {
             && (unique_config_values.contains_key(&setting_key)
                 || multi_config_values.contains_key(&setting_key))
         {
-            if setting_key == "disable-tls" && config.borrow().get_bool("disable-tls") {
+            if setting_key == "disable-tls" && config.get_bool("disable-tls") {
                 self.get_io().write_error(
                     "<info>You are now running Shirabe with SSL/TLS protection enabled.</info>",
                 );
@@ -2142,11 +2132,11 @@ fn flatten_setting_keys(config: PhpMixed, prefix: impl AsRef<[u8]>) -> Vec<BStri
 }
 
 impl BaseConfigCommand for ConfigCommand {
-    fn config(&self) -> Option<std::rc::Rc<std::cell::RefCell<Config>>> {
+    fn config(&self) -> Option<std::rc::Rc<Config>> {
         self.config.borrow().clone()
     }
 
-    fn set_config(&self, config: Option<std::rc::Rc<std::cell::RefCell<Config>>>) {
+    fn set_config(&self, config: Option<std::rc::Rc<Config>>) {
         *self.config.borrow_mut() = config;
     }
 

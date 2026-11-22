@@ -36,16 +36,16 @@ mod mock_config_source {
         #[derive(Debug)]
         pub ConfigSource {}
         impl ConfigSourceInterface for ConfigSource {
-            fn add_repository(&mut self, name: &bstr::BStr, config: PhpMixed, append: bool) -> anyhow::Result<()>;
-            fn insert_repository(&mut self, name: &bstr::BStr, config: PhpMixed, reference_name: &bstr::BStr, offset: i64) -> anyhow::Result<()>;
-            fn set_repository_url(&mut self, name: &bstr::BStr, url: &bstr::BStr) -> anyhow::Result<()>;
-            fn remove_repository(&mut self, name: &bstr::BStr) -> anyhow::Result<()>;
-            fn add_config_setting(&mut self, name: &bstr::BStr, value: PhpMixed) -> anyhow::Result<()>;
-            fn remove_config_setting(&mut self, name: &bstr::BStr) -> anyhow::Result<()>;
-            fn add_property(&mut self, name: &bstr::BStr, value: PhpMixed) -> anyhow::Result<()>;
-            fn remove_property(&mut self, name: &bstr::BStr) -> anyhow::Result<()>;
-            fn add_link(&mut self, r#type: &bstr::BStr, name: &bstr::BStr, value: &bstr::BStr) -> anyhow::Result<()>;
-            fn remove_link(&mut self, r#type: &bstr::BStr, name: &bstr::BStr) -> anyhow::Result<()>;
+            fn add_repository(&self, name: &bstr::BStr, config: PhpMixed, append: bool) -> anyhow::Result<()>;
+            fn insert_repository(&self, name: &bstr::BStr, config: PhpMixed, reference_name: &bstr::BStr, offset: i64) -> anyhow::Result<()>;
+            fn set_repository_url(&self, name: &bstr::BStr, url: &bstr::BStr) -> anyhow::Result<()>;
+            fn remove_repository(&self, name: &bstr::BStr) -> anyhow::Result<()>;
+            fn add_config_setting(&self, name: &bstr::BStr, value: PhpMixed) -> anyhow::Result<()>;
+            fn remove_config_setting(&self, name: &bstr::BStr) -> anyhow::Result<()>;
+            fn add_property(&self, name: &bstr::BStr, value: PhpMixed) -> anyhow::Result<()>;
+            fn remove_property(&self, name: &bstr::BStr) -> anyhow::Result<()>;
+            fn add_link(&self, r#type: &bstr::BStr, name: &bstr::BStr, value: &bstr::BStr) -> anyhow::Result<()>;
+            fn remove_link(&self, r#type: &bstr::BStr, name: &bstr::BStr) -> anyhow::Result<()>;
             fn get_name(&self) -> bstr::BString;
         }
     }
@@ -54,13 +54,13 @@ use mock_config_source::MockConfigSource;
 
 // A bare auth config source placeholder: getAuthConfigSource() is consulted (e.g. while
 // printing instructions), but no add/removeConfigSetting expectations are asserted.
-fn placeholder_auth_config_source() -> Box<MockConfigSource> {
+fn placeholder_auth_config_source() -> std::rc::Rc<MockConfigSource> {
     let mut mock = MockConfigSource::new();
     mock.expect_get_name()
         .returning(|| "auth-config-source".into());
     mock.expect_add_config_setting().returning(|_, _| Ok(()));
     mock.expect_remove_config_setting().returning(|_| Ok(()));
-    Box::new(mock)
+    std::rc::Rc::new(mock)
 }
 
 // Mirrors BitbucketTest::setUp: a DEBUG-verbosity IOMock, a mocked HttpDownloader, a
@@ -68,7 +68,7 @@ fn placeholder_auth_config_source() -> Box<MockConfigSource> {
 // run their assert_complete on drop at the end of the test scope.
 struct Fixture {
     io: std::rc::Rc<std::cell::RefCell<IOMock>>,
-    config: std::rc::Rc<std::cell::RefCell<Config>>,
+    config: std::rc::Rc<Config>,
     http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
     time: i64,
     bitbucket: Bitbucket,
@@ -77,7 +77,7 @@ struct Fixture {
 }
 
 fn set_up_with_config_and_http(
-    config: std::rc::Rc<std::cell::RefCell<Config>>,
+    config: std::rc::Rc<Config>,
     http_expectations: Vec<HttpDownloaderMockExpectation>,
 ) -> Fixture {
     let (io_mock, io_guard) = get_io_mock(io_interface::DEBUG).unwrap();
@@ -133,7 +133,7 @@ fn access_token_body() -> BString {
 // mirroring BitbucketTest::setExpectationsForStoringAccessToken. Verification happens
 // when the mocks are dropped together with the Config.
 fn set_expectations_for_storing_access_token(
-    config: &std::rc::Rc<std::cell::RefCell<Config>>,
+    config: &std::rc::Rc<Config>,
     time: i64,
     remove_basic_auth: bool,
 ) {
@@ -147,9 +147,7 @@ fn set_expectations_for_storing_access_token(
         .times(1)
         .withf(move |name| name == removed_key)
         .returning(|_| Ok(()));
-    config
-        .borrow_mut()
-        .set_config_source(Box::new(config_source));
+    config.set_config_source(std::rc::Rc::new(config_source));
 
     let mut auth_config_source = MockConfigSource::new();
     auth_config_source
@@ -170,9 +168,7 @@ fn set_expectations_for_storing_access_token(
             .withf(move |name| name == basic_key)
             .returning(|_| Ok(()));
     }
-    config
-        .borrow_mut()
-        .set_auth_config_source(Box::new(auth_config_source));
+    config.set_auth_config_source(std::rc::Rc::new(auth_config_source));
 }
 
 fn expected_stored_token(time: i64) -> PhpMixed {
@@ -496,7 +492,6 @@ fn test_authorize_oauth_interactively_with_empty_username() {
 
     // getAuthConfigSource() is consulted while printing the instructions.
     f.config
-        .borrow_mut()
         .set_auth_config_source(placeholder_auth_config_source());
 
     f.io.borrow_mut()
@@ -516,7 +511,6 @@ fn test_authorize_oauth_interactively_with_empty_password() {
     let mut f = set_up_with_config_and_http(config, vec![]);
 
     f.config
-        .borrow_mut()
         .set_auth_config_source(placeholder_auth_config_source());
 
     f.io.borrow_mut()
@@ -545,7 +539,6 @@ fn test_authorize_oauth_interactively_with_request_access_token_failure() {
     let mut f = set_up_with_config_and_http(config, vec![expect_full(url, None, 400, "", vec![])]);
 
     f.config
-        .borrow_mut()
         .set_auth_config_source(placeholder_auth_config_source());
 
     f.io.borrow_mut()

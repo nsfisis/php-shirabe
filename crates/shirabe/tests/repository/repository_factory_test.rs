@@ -12,7 +12,7 @@ use shirabe_php_shim::{PhpMixed, ToPhpString};
 fn test_manager_with_all_repository_types() {
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
-    let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(false, None)));
+    let config = std::rc::Rc::new(Config::new(false, None));
     let http_downloader = std::rc::Rc::new(std::cell::RefCell::new(
         HttpDownloader::new(
             io.clone(),

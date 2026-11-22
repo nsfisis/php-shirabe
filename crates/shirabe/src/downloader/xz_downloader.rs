@@ -26,7 +26,7 @@ impl_php_class!(XzDownloader, r"Composer\Downloader\XzDownloader");
 impl XzDownloader {
     pub fn new(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        config: std::rc::Rc<Config>,
         http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
         event_dispatcher: Option<std::rc::Rc<EventDispatcher>>,
         cache: Option<std::rc::Rc<std::cell::RefCell<Cache>>>,

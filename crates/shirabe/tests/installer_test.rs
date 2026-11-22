@@ -474,8 +474,7 @@ fn test_installer() {
             autoload_generator,
         );
         installer.set_audit_config(
-            AuditConfig::from_config(&mut config.borrow_mut(), false, Auditor::FORMAT_SUMMARY)
-                .unwrap(),
+            AuditConfig::from_config(&config, false, Auditor::FORMAT_SUMMARY).unwrap(),
         );
         let result = shirabe::util::sync_executor::block_on(installer.run()).unwrap();
 
@@ -1054,7 +1053,7 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&BString>) 
                 )
                 .set_audit_config(
                     AuditConfig::from_config(
-                        &mut composer_cl.borrow().get_config().borrow_mut(),
+                        &composer_cl.borrow().get_config(),
                         false,
                         Auditor::FORMAT_SUMMARY,
                     )
@@ -1154,7 +1153,7 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&BString>) 
                 )
                 .set_audit_config(
                     AuditConfig::from_config(
-                        &mut composer_cl.borrow().get_config().borrow_mut(),
+                        &composer_cl.borrow().get_config(),
                         false,
                         Auditor::FORMAT_SUMMARY,
                     )

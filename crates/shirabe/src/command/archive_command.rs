@@ -104,7 +104,7 @@ impl ArchiveCommand {
     pub async fn archive(
         &self,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        config: &std::rc::Rc<std::cell::RefCell<Config>>,
+        config: &std::rc::Rc<Config>,
         package_name: Option<BString>,
         version: Option<BString>,
         format: &BStr,
@@ -158,7 +158,7 @@ impl ArchiveCommand {
                 Some(process),
             )));
             owned_archive_manager =
-                factory.create_archive_manager(&config.borrow(), &download_manager, &loop_)?;
+                factory.create_archive_manager(config, &download_manager, &loop_)?;
             &mut owned_archive_manager
         };
 
@@ -359,7 +359,7 @@ impl Command for ArchiveCommand {
             );
             config
         } else {
-            std::rc::Rc::new(std::cell::RefCell::new(Factory::create_config(None, None)?))
+            std::rc::Rc::new(Factory::create_config(None, None)?)
         };
 
         let format_option = input
@@ -369,7 +369,7 @@ impl Command for ArchiveCommand {
             .map(BString::from);
         let format = match format_option {
             Some(format) => format,
-            None => config.borrow().get_string("archive-format")?,
+            None => config.get_string("archive-format")?,
         };
 
         let dir_option = input
@@ -379,7 +379,7 @@ impl Command for ArchiveCommand {
             .map(BString::from);
         let dir = match dir_option {
             Some(dir) => dir,
-            None => config.borrow().get_string("archive-dir")?,
+            None => config.get_string("archive-dir")?,
         };
 
         let io = self.get_io().clone();

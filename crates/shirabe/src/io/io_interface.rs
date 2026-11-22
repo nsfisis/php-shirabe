@@ -235,7 +235,7 @@ pub trait IOInterfaceMutable {
         password: Option<BString>,
     );
 
-    fn load_configuration(&mut self, config: &mut Config) -> anyhow::Result<()>;
+    fn load_configuration(&mut self, config: &Config) -> anyhow::Result<()>;
 }
 
 // PHP `IOInterface`. This is the type used for the shared trait object

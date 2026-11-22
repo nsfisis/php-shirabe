@@ -43,7 +43,7 @@ impl GitLabDriver {
     pub fn new(
         repo_config: IndexMap<BString, PhpMixed>,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        config: std::rc::Rc<Config>,
         http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
         process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     ) -> Self {
@@ -77,7 +77,7 @@ impl GitLabDriver {
             .filter(|s| !s.is_empty())
             .map(BString::from)
             .unwrap_or_else(|| BString::from(match_.name("domain2").unwrap_or_default()));
-        let configured_domains = self.inner.config.borrow().get_list("gitlab-domains")?;
+        let configured_domains = self.inner.config.get_list("gitlab-domains")?;
         let mut url_parts: Vec<BString> = explode("/", match_.name("parts").unwrap_or_default())
             .to_vec()
             .into_iter()
@@ -109,7 +109,7 @@ impl GitLabDriver {
         };
         self.inner.origin_url = origin;
 
-        if let Some(protocol) = self.inner.config.borrow().get_gitlab_protocol()? {
+        if let Some(protocol) = self.inner.config.get_gitlab_protocol()? {
             // https treated as a synonym for http.
             if !matches!(protocol.as_bytes(), b"git" | b"http" | b"https") {
                 return Err(RuntimeException::new(BString::from(
@@ -143,11 +143,7 @@ impl GitLabDriver {
             self.inner.io.clone(),
             path_from_bytes(&bformat!(
                 "{}/{}/{}/{}",
-                self.inner
-                    .config
-                    .borrow()
-                    .get_path("cache-repo-dir")?
-                    .as_bstr(),
+                self.inner.config.get_path("cache-repo-dir")?.as_bstr(),
                 self.inner.origin_url,
                 self.namespace,
                 self.repository
@@ -157,7 +153,7 @@ impl GitLabDriver {
             false,
         ));
         if let Some(c) = self.inner.cache.as_mut() {
-            c.set_read_only(self.inner.config.borrow().get_bool("cache-read-only"))
+            c.set_read_only(self.inner.config.get_bool("cache-read-only"))
         }
 
         self.fetch_project()?;
@@ -896,7 +892,7 @@ impl GitLabDriver {
     /// repository given.
     pub fn supports(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        config: std::rc::Rc<Config>,
         url: &BStr,
         _deep: bool,
     ) -> anyhow::Result<bool> {
@@ -916,7 +912,7 @@ impl GitLabDriver {
             .collect::<Vec<_>>();
 
         if Self::determine_origin(
-            &config.borrow().get_list("gitlab-domains")?,
+            &config.get_list("gitlab-domains")?,
             guessed_domain,
             &mut url_parts,
             match_.name("port").map(bstr::BString::from),
@@ -1084,7 +1080,7 @@ impl VcsDriverInterface for GitLabDriver {
 
     fn supports(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        config: std::rc::Rc<Config>,
         url: &BStr,
         deep: bool,
     ) -> anyhow::Result<bool> {

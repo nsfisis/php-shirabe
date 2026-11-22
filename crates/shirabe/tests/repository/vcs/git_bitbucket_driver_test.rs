@@ -21,7 +21,7 @@ struct SetUp {
 
 fn set_up() -> SetUp {
     let home = get_unique_tmp_directory();
-    let mut config = Config::new(true, None);
+    let config = Config::new(true, None);
     let mut top: IndexMap<BString, PhpMixed> = IndexMap::new();
     let mut config_section: IndexMap<BString, PhpMixed> = IndexMap::new();
     config_section.insert("home".into(), PhpMixed::string(path_to_bytes(&home.path())));
@@ -67,7 +67,7 @@ fn http_body(
 fn get_driver(
     url: &BStr,
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-    config: std::rc::Rc<std::cell::RefCell<Config>>,
+    config: std::rc::Rc<Config>,
     http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
 ) -> anyhow::Result<GitBitbucketDriver> {
     let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
@@ -87,7 +87,7 @@ fn test_get_root_identifier_wrong_scm_type() {
     let SetUp { home, config } = set_up();
     let _tear_down = TearDown::new(home.path().to_path_buf());
 
-    let config = std::rc::Rc::new(std::cell::RefCell::new(config));
+    let config = std::rc::Rc::new(config);
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(IOStub::new()));
 
@@ -125,7 +125,7 @@ fn test_driver() {
     let SetUp { home, config } = set_up();
     let _tear_down = TearDown::new(home.path().to_path_buf());
 
-    let config = std::rc::Rc::new(std::cell::RefCell::new(config));
+    let config = std::rc::Rc::new(config);
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(IOStub::new()));
 
@@ -283,7 +283,7 @@ fn test_initialize_invalid_repository_url() {
     let SetUp { home, config } = set_up();
     let _tear_down = TearDown::new(home.path().to_path_buf());
 
-    let config = std::rc::Rc::new(std::cell::RefCell::new(config));
+    let config = std::rc::Rc::new(config);
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(IOStub::new()));
 
@@ -308,7 +308,7 @@ fn test_invalid_support_data() {
     let SetUp { home, config } = set_up();
     let _tear_down = TearDown::new(home.path().to_path_buf());
 
-    let config = std::rc::Rc::new(std::cell::RefCell::new(config));
+    let config = std::rc::Rc::new(config);
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(IOStub::new()));
 
@@ -368,7 +368,7 @@ fn test_invalid_support_data() {
 fn test_supports() {
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
-    let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(true, None)));
+    let config = std::rc::Rc::new(Config::new(true, None));
 
     assert!(
         GitBitbucketDriver::supports(

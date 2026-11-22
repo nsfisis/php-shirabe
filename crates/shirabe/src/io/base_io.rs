@@ -83,7 +83,7 @@ pub trait BaseIO: IOInterface {
         BaseIO::set_authentication(self, repository_name, username, password);
     }
 
-    fn load_configuration(&mut self, config: &mut Config) -> anyhow::Result<()> {
+    fn load_configuration(&mut self, config: &Config) -> anyhow::Result<()> {
         let bitbucket_oauth = config.get_map("bitbucket-oauth")?;
         let github_oauth = config.get_map("github-oauth")?;
         let gitlab_oauth = config.get_map("gitlab-oauth")?;

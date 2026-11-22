@@ -230,7 +230,7 @@ pub trait BaseCommand: Command {
     /// Creates an AuditConfig from the Config object, optionally overriding security blocking based on input options
     fn create_audit_config(
         &self,
-        config: &mut Config,
+        config: &Config,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
     ) -> anyhow::Result<AuditConfig>;
 }
@@ -256,7 +256,7 @@ macro_rules! delegate_base_command_trait_impls_to_inner {
         shirabe_symfony_console::delegate_to_inner!($field, fn render_table(&self, table: Vec<Vec<bstr::BString>>, output: std::rc::Rc<std::cell::RefCell<dyn shirabe_symfony_console::output::OutputInterface>>) -> anyhow::Result<()>);
         shirabe_symfony_console::delegate_to_inner!($field, fn get_terminal_width(&self) -> i64);
         shirabe_symfony_console::delegate_to_inner!($field, fn get_audit_format(&self, input: std::rc::Rc<std::cell::RefCell<dyn shirabe_symfony_console::input::InputInterface>>, opt_name: &bstr::BStr) -> anyhow::Result<bstr::BString>);
-        shirabe_symfony_console::delegate_to_inner!($field, fn create_audit_config(&self, config: &mut $crate::config::Config, input: std::rc::Rc<std::cell::RefCell<dyn shirabe_symfony_console::input::InputInterface>>) -> anyhow::Result<$crate::advisory::AuditConfig>);
+        shirabe_symfony_console::delegate_to_inner!($field, fn create_audit_config(&self, config: &$crate::config::Config, input: std::rc::Rc<std::cell::RefCell<dyn shirabe_symfony_console::input::InputInterface>>) -> anyhow::Result<$crate::advisory::AuditConfig>);
     };
 }
 
@@ -656,7 +656,7 @@ impl BaseCommand for BaseCommandData {
 
     fn create_audit_config(
         &self,
-        config: &mut Config,
+        config: &Config,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
     ) -> anyhow::Result<AuditConfig> {
         // Handle both --audit and --no-audit flags

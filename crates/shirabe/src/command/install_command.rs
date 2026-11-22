@@ -140,20 +140,20 @@ impl Command for InstallCommand {
 
         let config = composer.get_config();
         let (prefer_source, prefer_dist) =
-            self.get_preferred_install_options(&config.borrow(), input.clone(), false)?;
+            self.get_preferred_install_options(&config, input.clone(), false)?;
 
         let optimize = input
             .borrow()
             .get_option("optimize-autoloader")?
             .as_bool()
             .unwrap_or(false)
-            || config.borrow().get_truthy("optimize-autoloader")?;
+            || config.get_truthy("optimize-autoloader")?;
         let authoritative = input
             .borrow()
             .get_option("classmap-authoritative")?
             .as_bool()
             .unwrap_or(false)
-            || config.borrow().get_truthy("classmap-authoritative")?;
+            || config.get_truthy("classmap-authoritative")?;
         let apcu_prefix = input
             .borrow()
             .get_option("apcu-autoloader-prefix")?
@@ -165,7 +165,7 @@ impl Command for InstallCommand {
                 .get_option("apcu-autoloader")?
                 .as_bool()
                 .unwrap_or(false)
-            || config.borrow().get_truthy("apcu-autoloader")?;
+            || config.get_truthy("apcu-autoloader")?;
 
         composer
             .get_installation_manager()
@@ -220,9 +220,7 @@ impl Command for InstallCommand {
             .set_class_map_authoritative(authoritative)
             .set_apcu_autoloader(apcu, apcu_prefix)
             .set_platform_requirement_filter(self.get_platform_requirement_filter(input.clone())?)
-            .set_audit_config(
-                self.create_audit_config(&mut composer.get_config().borrow_mut(), input.clone())?,
-            )
+            .set_audit_config(self.create_audit_config(&composer.get_config(), input.clone())?)
             .set_error_on_audit(
                 input
                     .borrow()

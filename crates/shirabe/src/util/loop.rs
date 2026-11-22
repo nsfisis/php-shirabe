@@ -168,7 +168,7 @@ mod tests {
     fn wait_advances_progress_over_active_jobs() {
         let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
             std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
-        let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(false, None)));
+        let config = std::rc::Rc::new(Config::new(false, None));
         let http_downloader = std::rc::Rc::new(std::cell::RefCell::new(
             HttpDownloader::new(io, config, StreamContextOptions::new(), true).unwrap(),
         ));

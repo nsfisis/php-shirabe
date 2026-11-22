@@ -33,7 +33,7 @@ fn test_capture_authentication_params_from_url() {
         .unwrap();
 
     // The PHP Config mock returns [] for github-domains/gitlab-domains.
-    let config: std::rc::Rc<std::cell::RefCell<Config>> = ConfigStubBuilder::new()
+    let config: std::rc::Rc<Config> = ConfigStubBuilder::new()
         .with("github-domains", PhpMixed::Array(IndexMap::new()))
         .with("gitlab-domains", PhpMixed::Array(IndexMap::new()))
         .build_shared();
@@ -151,7 +151,7 @@ fn test_constructor_rejects_an_unreadable_cafile() {
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = std::rc::Rc::new(
         std::cell::RefCell::new(BufferIO::new("", VERBOSITY_NORMAL, None).unwrap()),
     );
-    let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(false, None)));
+    let config = std::rc::Rc::new(Config::new(false, None));
     let mut ssl = IndexMap::new();
     ssl.insert(
         BString::from("cafile"),

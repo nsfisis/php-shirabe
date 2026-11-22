@@ -20,7 +20,7 @@ use shirabe_symfony_console::input::InputValue;
 #[derive(Debug)]
 pub struct Git {
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-    config: std::rc::Rc<std::cell::RefCell<Config>>,
+    config: std::rc::Rc<Config>,
     process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     filesystem: std::rc::Rc<std::cell::RefCell<Filesystem>>,
     http_downloader: Option<std::rc::Rc<std::cell::RefCell<HttpDownloader>>>,
@@ -31,7 +31,7 @@ static VERSION: std::sync::Mutex<Option<Option<BString>>> = std::sync::Mutex::ne
 impl Git {
     pub fn new(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        config: std::rc::Rc<Config>,
         process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
         fs: std::rc::Rc<std::cell::RefCell<Filesystem>>,
     ) -> Self {
@@ -131,11 +131,8 @@ impl Git {
         let mut last_command = CommandLine::Shell(BString::default());
 
         // Ensure we are allowed to use this URL by config
-        self.config.borrow_mut().prohibit_url_by_config(
-            url,
-            Some(self.io.clone()),
-            &IndexMap::new(),
-        )?;
+        self.config
+            .prohibit_url_by_config(url, Some(self.io.clone()), &IndexMap::new())?;
 
         let orig_cwd: Option<std::path::PathBuf> = if initial_clone {
             cwd.map(std::path::Path::to_path_buf)
@@ -212,12 +209,12 @@ impl Git {
             }
         }
 
-        let protocols = self.config.borrow().get_github_protocols()?;
+        let protocols = self.config.get_github_protocols()?;
         // public github, autoswitch protocols
         if let Some(m) = preg_match(
             bformat!(
                 "{{^(?:https?|git)://{}/(.*)}}",
-                Self::get_github_domains_regex(&self.config.borrow())?
+                Self::get_github_domains_regex(&self.config)?
             ),
             url,
         ) {
@@ -267,11 +264,11 @@ impl Git {
         }
 
         // if we have a private github url and the ssh protocol is disabled then we skip it and directly fallback to https
-        let protocols = self.config.borrow().get_github_protocols()?;
+        let protocols = self.config.get_github_protocols()?;
         let bypass_ssh_for_github = preg_is_match(
             bformat!(
                 "{{^git@{}:(.+?)\\.git$}}i",
-                Self::get_github_domains_regex(&self.config.borrow())?
+                Self::get_github_domains_regex(&self.config)?
             ),
             url,
         ) && !protocols.iter().any(|protocol| protocol == "ssh");
@@ -291,7 +288,7 @@ impl Git {
             let github_matched = match preg_match(
                 bformat!(
                     "{{^git@{}:(.+?)\\.git$}}i",
-                    Self::get_github_domains_regex(&self.config.borrow())?
+                    Self::get_github_domains_regex(&self.config)?
                 ),
                 url,
             ) {
@@ -299,7 +296,7 @@ impl Git {
                 None => preg_match(
                     bformat!(
                         "{{^https?://{}/(.*?)(?:\\.git)?$}}i",
-                        Self::get_github_domains_regex(&self.config.borrow())?
+                        Self::get_github_domains_regex(&self.config)?
                     ),
                     url,
                 ),
@@ -498,7 +495,7 @@ impl Git {
             } else if let Some(m) = match preg_match(
                 bformat!(
                     "{{^(git)@{}:(.+?\\.git)$}}i",
-                    Self::get_gitlab_domains_regex(&self.config.borrow())?
+                    Self::get_gitlab_domains_regex(&self.config)?
                 ),
                 url,
             ) {
@@ -506,7 +503,7 @@ impl Git {
                 None => preg_match(
                     bformat!(
                         "{{^(https?)://{}/(.*)}}i",
-                        Self::get_gitlab_domains_regex(&self.config.borrow())?
+                        Self::get_gitlab_domains_regex(&self.config)?
                     ),
                     url,
                 ),
@@ -631,7 +628,7 @@ impl Git {
                         self.io.ask_and_hide_answer("      Password: ")?,
                     );
                     auth = Some(auth_map);
-                    store_auth = self.config.borrow().get_store_auths()?;
+                    store_auth = self.config.get_store_auths()?;
                 }
 
                 if let Some(auth_inner) = auth.as_ref() {

@@ -29,7 +29,7 @@ impl_php_class!(SvnDownloader, r"Composer\Downloader\SvnDownloader");
 impl SvnDownloader {
     pub fn new(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        config: std::rc::Rc<Config>,
         process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
         fs: std::rc::Rc<std::cell::RefCell<Filesystem>>,
     ) -> Self {
@@ -107,7 +107,7 @@ impl VcsDownloader for SvnDownloader {
         self.inner.io.clone()
     }
 
-    fn config(&self) -> &std::rc::Rc<std::cell::RefCell<Config>> {
+    fn config(&self) -> &std::rc::Rc<Config> {
         &self.inner.config
     }
 
@@ -245,7 +245,7 @@ impl VcsDownloader for SvnDownloader {
         }
 
         if !self.inner.io.is_interactive() {
-            if self.inner.config.borrow().get_discard_changes()? == DiscardChanges::Bool(true) {
+            if self.inner.config.get_discard_changes()? == DiscardChanges::Bool(true) {
                 return self.discard_changes(path).await;
             }
 

@@ -33,7 +33,7 @@ pub trait VersionGuesserInterface: std::fmt::Debug {
 /// Try to guess the current version number based on different VCS configuration.
 #[derive(Debug)]
 pub struct VersionGuesser {
-    config: std::rc::Rc<std::cell::RefCell<Config>>,
+    config: std::rc::Rc<Config>,
 
     process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
 
@@ -57,7 +57,7 @@ pub struct VersionData {
 
 impl VersionGuesser {
     pub fn new(
-        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        config: std::rc::Rc<Config>,
         process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
         version_parser: VersionParser,
         io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
@@ -74,7 +74,7 @@ impl VersionGuesser {
     /// For testing only: builds a guesser whose `guess_version` always returns `None`, mirroring
     /// `Composer\Test\Mock\VersionGuesserMock`.
     pub fn __new_mock(
-        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        config: std::rc::Rc<Config>,
         process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
         version_parser: VersionParser,
         io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,

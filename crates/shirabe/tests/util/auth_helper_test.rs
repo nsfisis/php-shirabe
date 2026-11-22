@@ -16,12 +16,12 @@ use shirabe_symfony_console::input::InputValue;
 // shared with the AuthHelper under test. The IOMockGuard runs assert_complete on drop.
 struct Fixture {
     io: std::rc::Rc<std::cell::RefCell<IOMock>>,
-    config: std::rc::Rc<std::cell::RefCell<shirabe::config::Config>>,
+    config: std::rc::Rc<shirabe::config::Config>,
     auth_helper: AuthHelper,
     _guard: IOMockGuard,
 }
 
-fn set_up_with_config(config: std::rc::Rc<std::cell::RefCell<shirabe::config::Config>>) -> Fixture {
+fn set_up_with_config(config: std::rc::Rc<shirabe::config::Config>) -> Fixture {
     let (mock, guard) = get_io_mock(io_interface::DEBUG).unwrap();
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = mock.clone();
     let auth_helper = AuthHelper::new(io, config.clone());
@@ -481,16 +481,16 @@ mod mock_config_source {
         #[derive(Debug)]
         pub ConfigSource {}
         impl ConfigSourceInterface for ConfigSource {
-            fn add_repository(&mut self, name: &bstr::BStr, config: PhpMixed, append: bool) -> anyhow::Result<()>;
-            fn insert_repository(&mut self, name: &bstr::BStr, config: PhpMixed, reference_name: &bstr::BStr, offset: i64) -> anyhow::Result<()>;
-            fn set_repository_url(&mut self, name: &bstr::BStr, url: &bstr::BStr) -> anyhow::Result<()>;
-            fn remove_repository(&mut self, name: &bstr::BStr) -> anyhow::Result<()>;
-            fn add_config_setting(&mut self, name: &bstr::BStr, value: PhpMixed) -> anyhow::Result<()>;
-            fn remove_config_setting(&mut self, name: &bstr::BStr) -> anyhow::Result<()>;
-            fn add_property(&mut self, name: &bstr::BStr, value: PhpMixed) -> anyhow::Result<()>;
-            fn remove_property(&mut self, name: &bstr::BStr) -> anyhow::Result<()>;
-            fn add_link(&mut self, r#type: &bstr::BStr, name: &bstr::BStr, value: &bstr::BStr) -> anyhow::Result<()>;
-            fn remove_link(&mut self, r#type: &bstr::BStr, name: &bstr::BStr) -> anyhow::Result<()>;
+            fn add_repository(&self, name: &bstr::BStr, config: PhpMixed, append: bool) -> anyhow::Result<()>;
+            fn insert_repository(&self, name: &bstr::BStr, config: PhpMixed, reference_name: &bstr::BStr, offset: i64) -> anyhow::Result<()>;
+            fn set_repository_url(&self, name: &bstr::BStr, url: &bstr::BStr) -> anyhow::Result<()>;
+            fn remove_repository(&self, name: &bstr::BStr) -> anyhow::Result<()>;
+            fn add_config_setting(&self, name: &bstr::BStr, value: PhpMixed) -> anyhow::Result<()>;
+            fn remove_config_setting(&self, name: &bstr::BStr) -> anyhow::Result<()>;
+            fn add_property(&self, name: &bstr::BStr, value: PhpMixed) -> anyhow::Result<()>;
+            fn remove_property(&self, name: &bstr::BStr) -> anyhow::Result<()>;
+            fn add_link(&self, r#type: &bstr::BStr, name: &bstr::BStr, value: &bstr::BStr) -> anyhow::Result<()>;
+            fn remove_link(&self, r#type: &bstr::BStr, name: &bstr::BStr) -> anyhow::Result<()>;
             fn get_name(&self) -> bstr::BString;
         }
     }
@@ -531,9 +531,7 @@ fn test_store_auth_automatically() {
         .times(1)
         .withf(move |name, value| name == "http-basic.github.com" && *value == expected)
         .returning(|_, _| Ok(()));
-    f.config
-        .borrow_mut()
-        .set_auth_config_source(Box::new(source));
+    f.config.set_auth_config_source(std::rc::Rc::new(source));
 
     f.auth_helper
         .store_auth(BStr::new(origin), StoreAuth::Bool(true))
@@ -575,9 +573,7 @@ fn test_store_auth_with_prompt_yes_answer() {
         .times(1)
         .withf(move |name, value| name == "http-basic.github.com" && *value == expected)
         .returning(|_, _| Ok(()));
-    f.config
-        .borrow_mut()
-        .set_auth_config_source(Box::new(source));
+    f.config.set_auth_config_source(std::rc::Rc::new(source));
 
     f.auth_helper
         .store_auth(BStr::new(origin), StoreAuth::Prompt)
@@ -608,9 +604,7 @@ fn test_store_auth_with_prompt_no_answer() {
         .times(1)
         .returning(move || config_source_name.into());
     source.expect_add_config_setting().times(0);
-    f.config
-        .borrow_mut()
-        .set_auth_config_source(Box::new(source));
+    f.config.set_auth_config_source(std::rc::Rc::new(source));
 
     f.auth_helper
         .store_auth(BStr::new(origin), StoreAuth::Prompt)
@@ -639,7 +633,7 @@ fn test_store_auth_with_prompt_invalid_answer() {
         .expect_get_name()
         .times(1)
         .returning(|| "https://api.gitlab.com/source".into());
-    config.borrow_mut().set_auth_config_source(Box::new(source));
+    config.set_auth_config_source(std::rc::Rc::new(source));
 
     let auth_helper = AuthHelper::new(
         io.clone() as std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,

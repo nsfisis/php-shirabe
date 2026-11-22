@@ -17,7 +17,7 @@ use shirabe_symfony_console::input::InputValue;
 #[derive(Debug)]
 pub struct AuthHelper {
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-    config: std::rc::Rc<std::cell::RefCell<Config>>,
+    config: std::rc::Rc<Config>,
     displayed_origin_authentications: IndexMap<BString, BString>,
     bitbucket_retry: IndexMap<BString, bool>,
 }
@@ -37,7 +37,7 @@ pub enum StoreAuth {
 impl AuthHelper {
     pub fn new(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        config: std::rc::Rc<Config>,
     ) -> Self {
         Self {
             io,
@@ -49,8 +49,8 @@ impl AuthHelper {
 
     pub fn store_auth(&self, origin: &BStr, store_auth: StoreAuth) -> anyhow::Result<()> {
         let mut store: Option<()> = None;
-        let mut config = self.config.borrow_mut();
-        let config_source = config.get_auth_config_source_mut();
+        let config = &self.config;
+        let config_source = config.get_auth_config_source();
         if matches!(store_auth, StoreAuth::Bool(true)) {
             store = Some(());
         } else if matches!(store_auth, StoreAuth::Prompt) {
@@ -115,7 +115,7 @@ impl AuthHelper {
 
         if in_array_strict(
             PhpMixed::string(origin),
-            &self.config.borrow().get_list("github-domains")?,
+            &self.config.get_list("github-domains")?,
         ) {
             let mut git_hub_util = GitHub::new(self.io.clone(), self.config.clone(), None, None)?;
             let mut message = BString::from("\n");
@@ -211,7 +211,7 @@ impl AuthHelper {
             }
         } else if in_array_strict(
             PhpMixed::string(origin),
-            &self.config.borrow().get_list("gitlab-domains")?,
+            &self.config.get_list("gitlab-domains")?,
         ) {
             let message = bformat!(
                 "\nCould not fetch {url}, enter your {origin} credentials {}",
@@ -396,7 +396,7 @@ impl AuthHelper {
                 BString::from(username.as_string().unwrap_or_default()),
                 password,
             );
-            store_auth = self.config.borrow().get_store_auths()?;
+            store_auth = self.config.get_store_auths()?;
         }
 
         Ok(PromptAuthResult {
@@ -485,7 +485,7 @@ impl AuthHelper {
                 b"oauth2" | b"private-token" | b"gitlab-ci-token"
             ) && in_array_strict(
                 PhpMixed::string(origin),
-                &self.config.borrow().get_list("gitlab-domains")?,
+                &self.config.get_list("gitlab-domains")?,
             ) {
                 if password == "oauth2" {
                     options.http_mut().push_header(PhpMixed::string(bformat!(

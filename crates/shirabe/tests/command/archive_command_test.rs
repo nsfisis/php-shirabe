@@ -153,7 +153,7 @@ fn test_uses_config_from_composer_object() {
         std::cell::RefCell::new(BufferedOutput::new(None, false, None)),
     );
 
-    let config: std::rc::Rc<std::cell::RefCell<Config>> = ConfigStubBuilder::new()
+    let config: std::rc::Rc<Config> = ConfigStubBuilder::new()
         .with("archive-format", PhpMixed::from("zip"))
         .build_shared();
 
@@ -240,7 +240,7 @@ fn test_uses_config_from_composer_object_with_package_name() {
         std::cell::RefCell::new(BufferedOutput::new(None, false, None)),
     );
 
-    let config: std::rc::Rc<std::cell::RefCell<Config>> = ConfigStubBuilder::new()
+    let config: std::rc::Rc<Config> = ConfigStubBuilder::new()
         .with("archive-format", PhpMixed::from("zip"))
         .build_shared();
 

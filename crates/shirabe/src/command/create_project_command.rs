@@ -76,7 +76,7 @@ impl CreateProjectCommand {
     pub async fn install_project(
         &self,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        config: std::rc::Rc<Config>,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         package_name: Option<BString>,
         directory: Option<std::path::PathBuf>,
@@ -115,8 +115,7 @@ impl CreateProjectCommand {
             .unwrap_or_else(PlatformRequirementFilterFactory::ignore_nothing);
 
         // we need to manually load the configuration to pass the auth credentials to the io interface!
-        io.borrow_mut()
-            .load_configuration(&mut config.borrow_mut())?;
+        io.borrow_mut().load_configuration(&config)?;
 
         *self.suggested_packages_reporter.borrow_mut() = Some(std::rc::Rc::new(
             std::cell::RefCell::new(SuggestedPackagesReporter::new(io.clone())),
@@ -168,14 +167,13 @@ impl CreateProjectCommand {
                     RepositoryFactory::config_from_string(io.clone(), &config, repo, true)?;
                 let composer_json_repositories_config = composer_full(&composer_handle)
                     .get_config()
-                    .borrow()
                     .get_repositories();
                 let name = RepositoryFactory::generate_repository_name(
                     &PhpMixed::Int(index as i64),
                     &repo_config,
                     &composer_json_repositories_config,
                 );
-                let mut config_source = JsonConfigSource::new(
+                let config_source = JsonConfigSource::new(
                     std::rc::Rc::new(std::cell::RefCell::new(JsonFile::new(
                         "composer.json",
                         None,
@@ -241,8 +239,7 @@ impl CreateProjectCommand {
 
         // use the new config including the newly installed project
         let config = composer.get_config();
-        let (ps, pd) =
-            self.get_preferred_install_options(&config.borrow(), input.clone(), false)?;
+        let (ps, pd) = self.get_preferred_install_options(&config, input.clone(), false)?;
         prefer_source = ps;
         prefer_dist = pd;
 
@@ -253,11 +250,10 @@ impl CreateProjectCommand {
                 .borrow_mut()
                 .set_output_progress(!no_progress);
 
-            let optimize_autoloader = config.borrow().get_strict_bool("optimize-autoloader")?;
-            let class_map_authoritative =
-                config.borrow().get_strict_bool("classmap-authoritative")?;
-            let apcu_autoloader = config.borrow().get_strict_bool("apcu-autoloader")?;
-            let audit_config = self.create_audit_config(&mut config.borrow_mut(), input.clone())?;
+            let optimize_autoloader = config.get_strict_bool("optimize-autoloader")?;
+            let class_map_authoritative = config.get_strict_bool("classmap-authoritative")?;
+            let apcu_autoloader = config.get_strict_bool("apcu-autoloader")?;
+            let audit_config = self.create_audit_config(&config, input.clone())?;
 
             let mut installer = Installer::create(io.clone(), &composer_handle);
             installer
@@ -360,7 +356,7 @@ impl CreateProjectCommand {
         // rewriting self.version dependencies with explicit version numbers if the package's vcs metadata is gone
         if !has_vcs {
             let package = composer.get_package();
-            let mut config_source = JsonConfigSource::new(
+            let config_source = JsonConfigSource::new(
                 std::rc::Rc::new(std::cell::RefCell::new(JsonFile::new(
                     "composer.json",
                     None,
@@ -399,7 +395,7 @@ impl CreateProjectCommand {
         &self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        config: &std::rc::Rc<std::cell::RefCell<Config>>,
+        config: &std::rc::Rc<Config>,
         package_name: &BStr,
         platform_requirement_filter: std::rc::Rc<dyn PlatformRequirementFilterInterface>,
         directory: Option<std::path::PathBuf>,
@@ -452,17 +448,13 @@ impl CreateProjectCommand {
         }
 
         // set the base dir to ensure $config->all() below resolves the correct absolute paths to vendor-dir etc
-        config
-            .borrow_mut()
-            .set_base_dir(Some(BString::from(path_to_bytes(&directory))));
+        config.set_base_dir(Some(BString::from(path_to_bytes(&directory))));
         if !secure_http {
             let mut merge_map: indexmap::IndexMap<BString, PhpMixed> = indexmap::IndexMap::new();
             let mut inner_map: indexmap::IndexMap<BString, PhpMixed> = indexmap::IndexMap::new();
             inner_map.insert("secure-http".into(), PhpMixed::Bool(false));
             merge_map.insert("config".into(), PhpMixed::Array(inner_map));
-            config
-                .borrow_mut()
-                .merge(&merge_map, Config::SOURCE_COMMAND);
+            config.merge(&merge_map, Config::SOURCE_COMMAND);
         }
 
         io.write_error(bformat!(
@@ -524,16 +516,14 @@ impl CreateProjectCommand {
         let composer_handle = self.create_composer_instance(
             input,
             io.clone(),
-            Some(config.borrow_mut().all(0)?),
+            Some(config.all(0)?),
             disable_plugins,
             Some(disable_scripts),
         )?;
         let composer = composer_full(&composer_handle);
         let config = composer.get_config();
         // set the base dir here again on the new config instance, as otherwise in case the vendor dir is defined in an env var for example it would still override the value set above by $config->all()
-        config
-            .borrow_mut()
-            .set_base_dir(Some(BString::from(path_to_bytes(&directory))));
+        config.set_base_dir(Some(BString::from(path_to_bytes(&directory))));
         let rm = composer.get_repository_manager();
 
         let mut repository_set = RepositorySet::new(
@@ -602,7 +592,7 @@ impl CreateProjectCommand {
             ))?;
         }
 
-        let platform_overrides = config.borrow().get_map("platform")?;
+        let platform_overrides = config.get_map("platform")?;
         let mut platform_repo = PlatformRepository::new(vec![], platform_overrides, None, None)?;
 
         // find the latest version if there are multiple
@@ -826,11 +816,11 @@ impl Command for CreateProjectCommand {
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         _output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
-        let config = std::rc::Rc::new(std::cell::RefCell::new(Factory::create_config(None, None)?));
+        let config = std::rc::Rc::new(Factory::create_config(None, None)?);
         let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = self.get_io();
 
         let (prefer_source, prefer_dist) =
-            self.get_preferred_install_options(&config.borrow(), input.clone(), true)?;
+            self.get_preferred_install_options(&config, input.clone(), true)?;
 
         if input.borrow().get_option("dev")?.as_bool().unwrap_or(false) {
             io.write_error("<warning>You are using the deprecated option \"dev\". Dev packages are installed by default now.</warning>");

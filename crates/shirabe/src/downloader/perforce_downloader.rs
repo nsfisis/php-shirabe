@@ -27,7 +27,7 @@ impl_php_class!(
 impl PerforceDownloader {
     pub fn new(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        config: std::rc::Rc<Config>,
         process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
         fs: std::rc::Rc<std::cell::RefCell<Filesystem>>,
     ) -> Self {
@@ -90,7 +90,7 @@ impl VcsDownloader for PerforceDownloader {
         self.inner.io.clone()
     }
 
-    fn config(&self) -> &std::rc::Rc<std::cell::RefCell<Config>> {
+    fn config(&self) -> &std::rc::Rc<Config> {
         &self.inner.config
     }
 

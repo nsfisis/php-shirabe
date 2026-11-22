@@ -54,7 +54,7 @@ fn null_io() -> std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
 fn http_downloader(
     io: &std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
 ) -> std::rc::Rc<std::cell::RefCell<HttpDownloader>> {
-    let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(false, None)));
+    let config = std::rc::Rc::new(Config::new(false, None));
     std::rc::Rc::new(std::cell::RefCell::new(
         HttpDownloader::new(
             io.clone(),
@@ -80,7 +80,7 @@ fn test_prepend() {
     let _tear_down = TearDown::new(tmpdir.path().to_path_buf());
 
     let io = null_io();
-    let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(false, None)));
+    let config = std::rc::Rc::new(Config::new(false, None));
     let mut rm = RepositoryManager::new(io.clone(), config, http_downloader(&io), None, None);
 
     let repository1 = RepositoryInterfaceHandle::new(ArrayRepository::new(vec![]).unwrap());
@@ -97,11 +97,11 @@ fn test_repo_creation() {
     let _tear_down = TearDown::new(tmpdir.path().to_path_buf());
 
     let io = null_io();
-    let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(false, None)));
+    let config = std::rc::Rc::new(Config::new(false, None));
     let mut rm =
         RepositoryManager::new(io.clone(), config.clone(), http_downloader(&io), None, None);
 
-    config.borrow_mut().merge(
+    config.merge(
         &str_config(&[(
             BStr::new("config"),
             PhpMixed::Array(str_config(&[(
@@ -219,10 +219,10 @@ fn test_invalid_repo_creation_throws() {
     let _tear_down = TearDown::new(tmpdir.path().to_path_buf());
 
     let io = null_io();
-    let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(false, None)));
+    let config = std::rc::Rc::new(Config::new(false, None));
     let rm = RepositoryManager::new(io.clone(), config.clone(), http_downloader(&io), None, None);
 
-    config.borrow_mut().merge(
+    config.merge(
         &str_config(&[(
             BStr::new("config"),
             PhpMixed::Array(str_config(&[(
@@ -258,7 +258,7 @@ fn test_filter_repo_wrapping() {
     let _tear_down = TearDown::new(tmpdir.path().to_path_buf());
 
     let io = null_io();
-    let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(false, None)));
+    let config = std::rc::Rc::new(Config::new(false, None));
     let mut rm = RepositoryManager::new(io.clone(), config, http_downloader(&io), None, None);
 
     rm.set_repository_class(

@@ -12,7 +12,7 @@ fn create_composer_instance() -> ComposerHandle {
     let composer = ComposerHandle::from_rc_unchecked(std::rc::Rc::new(std::cell::RefCell::new(
         PartialOrFullComposer::new_full(),
     )));
-    let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(true, None)));
+    let config = std::rc::Rc::new(Config::new(true, None));
     composer.borrow_mut().set_config(config);
     let package: RootPackageInterfaceHandle = RootPackageHandle::new(
         BString::from("foo"),

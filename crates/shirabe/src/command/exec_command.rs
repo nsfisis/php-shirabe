@@ -45,7 +45,7 @@ impl ExecCommand {
     fn get_binaries(&self, for_display: bool) -> anyhow::Result<Vec<BString>> {
         let composer = self.require_composer(None, None)?;
         let composer_ref = composer_full(&composer);
-        let bin_dir = composer_ref.get_config().borrow().get_path("bin-dir")?;
+        let bin_dir = composer_ref.get_config().get_path("bin-dir")?;
         let bins = glob(bformat!("{bin_dir}/*"));
         let local_bins_raw = composer_ref.get_package().get_binaries();
         let local_bins: Vec<BString> = if for_display {
@@ -171,10 +171,7 @@ impl Command for ExecCommand {
         {
             let bins = self.get_binaries(true)?;
             if bins.is_empty() {
-                let bin_dir = composer_full(&composer)
-                    .get_config()
-                    .borrow()
-                    .get_path("bin-dir")?;
+                let bin_dir = composer_full(&composer).get_config().get_path("bin-dir")?;
                 return Err(RuntimeException::new(bformat!(
                     "No binaries found in composer.json or in bin-dir ({bin_dir})"
                 ))

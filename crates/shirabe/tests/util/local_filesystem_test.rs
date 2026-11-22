@@ -11,7 +11,7 @@ use shirabe_php_shim::{PhpMixed, bformat, file_get_contents, strpos, unlink};
 
 // Mirrors RemoteFilesystemTest::getConfigMock: get('github-domains') and
 // get('gitlab-domains') return [], everything else returns null.
-fn config_mock() -> std::rc::Rc<std::cell::RefCell<shirabe::config::Config>> {
+fn config_mock() -> std::rc::Rc<shirabe::config::Config> {
     ConfigStubBuilder::new()
         .with("github-domains", PhpMixed::List(vec![]))
         .with("gitlab-domains", PhpMixed::List(vec![]))

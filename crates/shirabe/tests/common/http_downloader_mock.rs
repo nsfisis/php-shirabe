@@ -62,7 +62,7 @@ pub fn get_http_downloader_mock(
 ) {
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
-    let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(false, None)));
+    let config = std::rc::Rc::new(Config::new(false, None));
     let downloader = std::rc::Rc::new(std::cell::RefCell::new(HttpDownloader::__new_mock(
         io, config,
     )));

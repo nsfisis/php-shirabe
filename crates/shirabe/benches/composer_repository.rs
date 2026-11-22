@@ -88,7 +88,7 @@ fn repository(
         std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
     let http_downloader = std::rc::Rc::new(std::cell::RefCell::new(HttpDownloader::__new_mock(
         io.clone(),
-        std::rc::Rc::new(std::cell::RefCell::new(Config::new(false, None))),
+        std::rc::Rc::new(Config::new(false, None)),
     )));
     http_downloader.borrow_mut().__expects(
         expectations,

@@ -68,7 +68,7 @@ pub struct PartialComposer {
     r#loop: Option<std::rc::Rc<std::cell::RefCell<Loop>>>,
     repository_manager: Option<std::rc::Rc<std::cell::RefCell<dyn RepositoryManagerInterface>>>,
     installation_manager: Option<std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>>,
-    config: Option<std::rc::Rc<std::cell::RefCell<Config>>>,
+    config: Option<std::rc::Rc<Config>>,
     event_dispatcher: Option<std::rc::Rc<dyn EventDispatcherInterface>>,
 }
 
@@ -82,11 +82,11 @@ impl PartialComposer {
         self.package.as_ref().unwrap()
     }
 
-    pub fn set_config(&mut self, config: std::rc::Rc<std::cell::RefCell<Config>>) {
+    pub fn set_config(&mut self, config: std::rc::Rc<Config>) {
         self.config = Some(config);
     }
 
-    pub fn get_config(&self) -> std::rc::Rc<std::cell::RefCell<Config>> {
+    pub fn get_config(&self) -> std::rc::Rc<Config> {
         self.config.as_ref().unwrap().clone()
     }
 
@@ -254,11 +254,11 @@ impl Composer {
         self.partial.get_package()
     }
 
-    pub fn set_config(&mut self, config: std::rc::Rc<std::cell::RefCell<Config>>) {
+    pub fn set_config(&mut self, config: std::rc::Rc<Config>) {
         self.partial.set_config(config);
     }
 
-    pub fn get_config(&self) -> std::rc::Rc<std::cell::RefCell<Config>> {
+    pub fn get_config(&self) -> std::rc::Rc<Config> {
         self.partial.get_config()
     }
 
@@ -380,14 +380,14 @@ impl PartialOrFullComposer {
         }
     }
 
-    pub fn set_config(&mut self, config: std::rc::Rc<std::cell::RefCell<Config>>) {
+    pub fn set_config(&mut self, config: std::rc::Rc<Config>) {
         match self {
             Self::Full(full) => full.set_config(config),
             Self::Partial(partial) => partial.set_config(config),
         }
     }
 
-    pub fn get_config(&self) -> std::rc::Rc<std::cell::RefCell<Config>> {
+    pub fn get_config(&self) -> std::rc::Rc<Config> {
         match self {
             Self::Full(full) => full.get_config(),
             Self::Partial(partial) => partial.get_config(),

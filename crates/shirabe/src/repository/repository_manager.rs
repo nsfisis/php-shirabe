@@ -23,7 +23,7 @@ pub struct RepositoryManager {
     repositories: Vec<RepositoryInterfaceHandle>,
     repository_classes: IndexMap<BString, BString>,
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-    config: std::rc::Rc<std::cell::RefCell<Config>>,
+    config: std::rc::Rc<Config>,
     http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
     event_dispatcher: Option<std::rc::Rc<EventDispatcher>>,
     process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
@@ -32,7 +32,7 @@ pub struct RepositoryManager {
 impl RepositoryManager {
     pub fn new(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        config: std::rc::Rc<Config>,
         http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
         event_dispatcher: Option<std::rc::Rc<EventDispatcher>>,
         process: Option<std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,
@@ -159,7 +159,7 @@ impl RepositoryManager {
                 Ok(RepositoryInterfaceHandle::new(ComposerRepository::new(
                     config,
                     self.io.clone(),
-                    &self.config.borrow(),
+                    &self.config,
                     self.http_downloader.clone(),
                     self.event_dispatcher.clone(),
                 )?))

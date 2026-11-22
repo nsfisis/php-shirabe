@@ -211,11 +211,8 @@ impl Command for AuditCommand {
             repo_set.add_repository(repo.clone())?;
         }
 
-        let audit_config = AuditConfig::from_config(
-            &mut composer.get_config().borrow_mut(),
-            true,
-            Auditor::FORMAT_SUMMARY,
-        )?;
+        let audit_config =
+            AuditConfig::from_config(&composer.get_config(), true, Auditor::FORMAT_SUMMARY)?;
 
         let abandoned = input
             .borrow()

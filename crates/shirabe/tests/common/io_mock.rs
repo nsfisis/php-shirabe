@@ -335,7 +335,7 @@ impl IOInterfaceMutable for IOMock {
         self.inner
             .set_authentication(repository_name, username, password)
     }
-    fn load_configuration(&mut self, config: &mut Config) -> anyhow::Result<()> {
+    fn load_configuration(&mut self, config: &Config) -> anyhow::Result<()> {
         self.inner.load_configuration(config)
     }
 }

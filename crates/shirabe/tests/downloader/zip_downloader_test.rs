@@ -23,7 +23,7 @@ use shirabe_semver::VersionParser;
 struct SetUp {
     test_dir: tempfile::TempDir,
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-    config: std::rc::Rc<std::cell::RefCell<Config>>,
+    config: std::rc::Rc<Config>,
     http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
     package: PackageInterfaceHandle,
     filename: std::path::PathBuf,
@@ -40,8 +40,8 @@ fn set_up() -> SetUp {
 
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(IOStub::new()));
-    let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(false, None)));
-    let dl_config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(false, None)));
+    let config = std::rc::Rc::new(Config::new(false, None));
+    let dl_config = std::rc::Rc::new(Config::new(false, None));
     let http_downloader = std::rc::Rc::new(std::cell::RefCell::new(HttpDownloader::__new_mock(
         io.clone(),
         dl_config,
@@ -125,7 +125,7 @@ fn test_error_messages() {
         std::rc::Rc::new(std::cell::RefCell::new(IOStub::new()));
 
     // $this->config->method('get')->with('vendor-dir')->willReturn($this->testDir)
-    let mut config = Config::new(false, None);
+    let config = Config::new(false, None);
     let mut config_options: IndexMap<BString, PhpMixed> = IndexMap::new();
     config_options.insert(
         "vendor-dir".into(),
@@ -134,10 +134,10 @@ fn test_error_messages() {
     let mut merged: IndexMap<BString, PhpMixed> = IndexMap::new();
     merged.insert("config".into(), PhpMixed::Array(config_options));
     config.merge(&merged, "test");
-    let config = std::rc::Rc::new(std::cell::RefCell::new(config));
+    let config = std::rc::Rc::new(config);
 
     // new HttpDownloader($this->io, $dlConfig): a real downloader (not the extract-path mock).
-    let dl_config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(false, None)));
+    let dl_config = std::rc::Rc::new(Config::new(false, None));
     let http_downloader = std::rc::Rc::new(std::cell::RefCell::new(
         HttpDownloader::new(
             io.clone(),

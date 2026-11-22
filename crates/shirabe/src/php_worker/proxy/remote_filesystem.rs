@@ -34,7 +34,7 @@ pub enum GetResult {
 #[derive(Debug)]
 pub struct RemoteFilesystem {
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-    config: std::rc::Rc<std::cell::RefCell<Config>>,
+    config: std::rc::Rc<Config>,
     options: StreamContextOptions,
     disable_tls: bool,
     entity: std::cell::OnceCell<PhpEntityHandle>,
@@ -45,7 +45,7 @@ impl RemoteFilesystem {
     /// `AuthHelper` cannot be passed over RPC, so the PHP instance always builds its own.
     pub fn new(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        config: std::rc::Rc<Config>,
         options: StreamContextOptions,
         disable_tls: bool,
     ) -> Self {
@@ -143,7 +143,7 @@ impl RemoteFilesystem {
         }
 
         runtime::ensure_composer_php_runtime(|| {
-            let cache_dir = self.config.borrow().get_path("cache-dir")?;
+            let cache_dir = self.config.get_path("cache-dir")?;
             Ok(path_from_bytes(&cache_dir).to_path_buf())
         })?;
         let handle: PhpEntityHandle = PhpCall::New(CLASS).run(vec![

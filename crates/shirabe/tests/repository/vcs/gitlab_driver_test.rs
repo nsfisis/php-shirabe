@@ -13,7 +13,7 @@ use shirabe_php_shim::{PhpMixed, ToPhpString, bformat, extension_loaded, path_to
 
 // Mirrors GitLabDriverTest::setUp's configuration.
 fn make_config(home: &std::path::Path) -> Config {
-    let mut config = Config::new(true, None);
+    let config = Config::new(true, None);
     let mut top: IndexMap<BString, PhpMixed> = IndexMap::new();
     let mut config_section: IndexMap<BString, PhpMixed> = IndexMap::new();
     config_section.insert("home".into(), PhpMixed::string(path_to_bytes(home)));
@@ -39,7 +39,7 @@ fn make_config(home: &std::path::Path) -> Config {
 struct Fixtures {
     home: tempfile::TempDir,
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-    config: std::rc::Rc<std::cell::RefCell<Config>>,
+    config: std::rc::Rc<Config>,
     process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     _process_guard: ProcessExecutorMockGuard,
 }
@@ -48,7 +48,7 @@ fn fixtures() -> Fixtures {
     let home = get_unique_tmp_directory();
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
-    let config = std::rc::Rc::new(std::cell::RefCell::new(make_config(home.path())));
+    let config = std::rc::Rc::new(make_config(home.path()));
     let (process, _process_guard) = get_process_executor_mock(vec![], true, MockHandler::default());
     Fixtures {
         home,
@@ -690,7 +690,7 @@ fn test_supports() {
         let home = get_unique_tmp_directory();
         let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
             std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
-        let config = std::rc::Rc::new(std::cell::RefCell::new(make_config(home.path())));
+        let config = std::rc::Rc::new(make_config(home.path()));
 
         assert_eq!(
             expected,
@@ -944,7 +944,7 @@ fn test_protocol_override_repository_url_generation() {
     let (http_downloader, _guard) = http_mock_with_body(api_url, project_data);
 
     // clone $this->config and merge gitlab-protocol => http.
-    let mut config = make_config(fixtures.home.path());
+    let config = make_config(fixtures.home.path());
     let mut top: IndexMap<BString, PhpMixed> = IndexMap::new();
     let mut config_section: IndexMap<BString, PhpMixed> = IndexMap::new();
     config_section.insert(
@@ -953,7 +953,7 @@ fn test_protocol_override_repository_url_generation() {
     );
     top.insert("config".into(), PhpMixed::Array(config_section));
     config.merge(&top, Config::SOURCE_UNKNOWN);
-    let config = std::rc::Rc::new(std::cell::RefCell::new(config));
+    let config = std::rc::Rc::new(config);
 
     let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
     repo_config.insert("url".into(), PhpMixed::string(url.to_php_string()));

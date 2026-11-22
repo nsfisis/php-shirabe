@@ -80,7 +80,7 @@ pub trait CompletionTrait: BaseCommand {
                         .collect();
                     PlatformRepository::new(vec![], overrides, None, None)?
                 } else {
-                    let overrides = composer.get_config().borrow().get_map("platform")?;
+                    let overrides = composer.get_config().get_map("platform")?;
                     PlatformRepository::new(vec![], overrides, None, None)?
                 };
                 if input.get_completion_value().is_empty() {
@@ -273,7 +273,7 @@ pub trait CompletionTrait: BaseCommand {
         SuggestedValues::Closure(Box::new(|this, input, _suggestions| {
             let composer = this.require_composer(None, None)?;
             let composer = composer_full(&composer);
-            let overrides = composer.get_config().borrow().get_map("platform")?;
+            let overrides = composer.get_config().get_map("platform")?;
             let mut repos = PlatformRepository::new(vec![], overrides, None, None)?;
 
             let pattern =

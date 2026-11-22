@@ -51,7 +51,7 @@ impl Drop for TearDown {
 
 /// ref: TestCase::getConfig
 fn get_config(config_options: IndexMap<BString, PhpMixed>, use_environment: bool) -> Config {
-    let mut config = Config::new(use_environment, None);
+    let config = Config::new(use_environment, None);
     let mut merged: IndexMap<BString, PhpMixed> = IndexMap::new();
     merged.insert("config".into(), PhpMixed::Array(config_options));
     config.merge(&merged, "test");
@@ -77,7 +77,7 @@ fn test_error_messages() {
         "vendor-dir".into(),
         PhpMixed::string(path_to_bytes(&test_dir)),
     );
-    let config = std::rc::Rc::new(std::cell::RefCell::new(get_config(config_options, false)));
+    let config = std::rc::Rc::new(get_config(config_options, false));
     let http_downloader = std::rc::Rc::new(std::cell::RefCell::new(
         HttpDownloader::new(
             io.clone(),

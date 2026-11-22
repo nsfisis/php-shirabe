@@ -217,7 +217,7 @@ impl Factory {
             None => Platform::get_cwd(true)?,
         };
 
-        let mut config = Config::new(true, Some(path_to_bytes(&cwd).into()));
+        let config = Config::new(true, Some(path_to_bytes(&cwd).into()));
 
         // determine and add main dirs to the config
         let home = Self::get_home_dir()?;
@@ -260,7 +260,7 @@ impl Factory {
             };
             config.merge(&read_data, path_to_bytes(file.get_path()));
         }
-        config.set_config_source(Box::new(JsonConfigSource::new(
+        config.set_config_source(std::rc::Rc::new(JsonConfigSource::new(
             std::rc::Rc::new(std::cell::RefCell::new(file)),
             false,
         )));
@@ -314,12 +314,12 @@ impl Factory {
             );
             config.merge(&wrapped, path_to_bytes(auth_file.get_path()));
         }
-        config.set_auth_config_source(Box::new(JsonConfigSource::new(
+        config.set_auth_config_source(std::rc::Rc::new(JsonConfigSource::new(
             std::rc::Rc::new(std::cell::RefCell::new(auth_file)),
             true,
         )));
 
-        Self::load_composer_auth_env(&mut config, io)?;
+        Self::load_composer_auth_env(&config, io)?;
 
         Ok(config)
     }
@@ -471,7 +471,7 @@ impl Factory {
         }
 
         // Load config and override with local config/auth config
-        let mut config = if self.mock {
+        let config = if self.mock {
             Self::__create_config_mock(Some(&cwd))?
         } else {
             Self::create_config(Some(io.clone()), Some(&cwd))?
@@ -491,7 +491,7 @@ impl Factory {
                 ),
                 DEBUG,
             );
-            config.set_config_source(Box::new(JsonConfigSource::new(
+            config.set_config_source(std::rc::Rc::new(JsonConfigSource::new(
                 std::rc::Rc::new(std::cell::RefCell::new(JsonFile::new(
                     realpath(composer_file_path).unwrap_or_default(),
                     None,
@@ -523,7 +523,7 @@ impl Factory {
                 let mut wrapped: IndexMap<BString, PhpMixed> = IndexMap::new();
                 wrapped.insert("config".into(), auth_read);
                 config.merge(&wrapped, path_to_bytes(local_auth_file.get_path()));
-                config.set_local_auth_config_source(Box::new(JsonConfigSource::new(
+                config.set_local_auth_config_source(std::rc::Rc::new(JsonConfigSource::new(
                     std::rc::Rc::new(std::cell::RefCell::new(local_auth_file)),
                     true,
                 )));
@@ -531,11 +531,11 @@ impl Factory {
         }
 
         // make sure we load the auth env again over the local auth.json + composer.json config
-        Self::load_composer_auth_env(&mut config, Some(io.clone()))?;
+        Self::load_composer_auth_env(&config, Some(io.clone()))?;
 
         let vendor_dir = config.get_path("vendor-dir")?;
 
-        let config = std::rc::Rc::new(std::cell::RefCell::new(config));
+        let config = std::rc::Rc::new(config);
 
         // initialize composer
         let mut build_error: Option<anyhow::Error> = None;
@@ -556,13 +556,12 @@ impl Factory {
 
                     if full_load {
                         // load auth configs into the IO instance
-                        io.borrow_mut()
-                            .load_configuration(&mut config.borrow_mut())?;
+                        io.borrow_mut().load_configuration(&config)?;
 
                         // load existing Composer\InstalledVersions instance if available and scripts/plugins are allowed, as they might need it
                         // we only load if the InstalledVersions class wasn't defined yet so that this is only loaded once
                         let installed_versions_path =
-                            path_from_bytes(&config.borrow().get_path("vendor-dir")?)
+                            path_from_bytes(&config.get_path("vendor-dir")?)
                                 .join("composer/installed.php");
                         // The two class_exists() checks run in the PHP worker, where
                         // InstalledVersions lives; see `__shirabe_safely_load_installed_versions`.
@@ -701,7 +700,7 @@ impl Factory {
                         ));
 
                         // initialize archive manager
-                        let am = self.create_archive_manager(&config.borrow(), &dm, &r#loop)?;
+                        let am = self.create_archive_manager(&config, &dm, &r#loop)?;
                         composer_full
                             .set_archive_manager(std::rc::Rc::new(std::cell::RefCell::new(am)));
                     }
@@ -715,7 +714,7 @@ impl Factory {
                     if let PartialOrFullComposer::Full(ref mut composer_full) = composer {
                         if let Some(ref composer_file_path) = composer_file {
                             let lock_file = Self::get_lock_file(composer_file_path);
-                            let lock_enabled = config.borrow().get_bool("lock");
+                            let lock_enabled = config.get_bool("lock");
                             if !lock_enabled && file_exists(&lock_file) {
                                 io.write_error(bformat!("<warning>{lock_file} is present but ignored as the \"lock\" config option is disabled.</warning>"));
                             }
@@ -808,7 +807,7 @@ impl Factory {
             let global_composer = if !is_global {
                 self.create_global_composer(
                     io.clone(),
-                    &config.borrow(),
+                    &config,
                     disable_plugins,
                     disable_scripts,
                     false,
@@ -953,21 +952,21 @@ impl Factory {
     pub fn create_download_manager(
         &self,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        config: &std::rc::Rc<std::cell::RefCell<Config>>,
+        config: &std::rc::Rc<Config>,
         http_downloader: &std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
         process: &std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
         event_dispatcher: Option<&std::rc::Rc<EventDispatcher>>,
     ) -> anyhow::Result<std::rc::Rc<std::cell::RefCell<DownloadManager>>> {
-        let cache_files_ttl = config.borrow().get_cache_files_ttl();
+        let cache_files_ttl = config.get_cache_files_ttl();
         let cache = if cache_files_ttl > 0 {
             let mut cache = Cache::new(
                 io.clone(),
-                path_from_bytes(&config.borrow().get_path("cache-files-dir")?),
+                path_from_bytes(&config.get_path("cache-files-dir")?),
                 Some(BStr::new("a-z0-9_./")),
                 None,
                 false,
             );
-            cache.set_read_only(config.borrow().get_bool("cache-read-only"));
+            cache.set_read_only(config.get_bool("cache-read-only"));
             Some(std::rc::Rc::new(std::cell::RefCell::new(cache)))
         } else {
             None
@@ -978,7 +977,7 @@ impl Factory {
         ))));
 
         let mut dm = DownloadManager::new(io.clone(), false, Some(fs.clone()));
-        let preferred = config.borrow().get_preferred_install()?;
+        let preferred = config.get_preferred_install()?;
         if preferred.loosely_equals("dist") {
             dm.set_prefer_dist(true);
         } else if preferred.loosely_equals("source") {
@@ -1208,12 +1207,12 @@ impl Factory {
             let composer_ref = composer_rc.borrow_partial();
             let config = composer_ref.get_config();
             let bin_dir = std::path::PathBuf::from(path_from_bytes(&rtrim_chars(
-                config.borrow().get_path("bin-dir")?,
+                config.get_path("bin-dir")?,
                 "/",
             )));
-            let bin_compat = config.borrow().get_bin_compat()?;
+            let bin_compat = config.get_bin_compat()?;
             let vendor_dir = std::path::PathBuf::from(path_from_bytes(&rtrim_chars(
-                config.borrow().get_path("vendor-dir")?,
+                config.get_path("vendor-dir")?,
                 "/",
             )));
             (bin_dir, bin_compat, vendor_dir)
@@ -1266,7 +1265,7 @@ impl Factory {
     fn load_root_package(
         &self,
         rm: std::rc::Rc<std::cell::RefCell<RepositoryManager>>,
-        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        config: std::rc::Rc<Config>,
         parser: VersionParser,
         guesser: VersionGuesser,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
@@ -1346,7 +1345,7 @@ impl Factory {
     pub fn __create_config_mock(cwd: Option<&std::path::Path>) -> anyhow::Result<Config> {
         static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
-        let mut config = Config::new(true, cwd.map(|cwd| path_to_bytes(cwd).into()));
+        let config = Config::new(true, cwd.map(|cwd| path_to_bytes(cwd).into()));
 
         let home = std::env::temp_dir().join(path_from_bytes(&bformat!(
             "shirabe-test-{}-{}",
@@ -1371,7 +1370,7 @@ impl Factory {
     /// If you are calling this in a plugin, you probably should instead use `$composer->getLoop()->getHttpDownloader()`
     pub fn create_http_downloader(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        config: &std::rc::Rc<std::cell::RefCell<Config>>,
+        config: &std::rc::Rc<Config>,
         options: StreamContextOptions,
     ) -> anyhow::Result<HttpDownloader> {
         // TODO(plugin): static `$warned` flag — port as a OnceCell or atomic.
@@ -1385,7 +1384,7 @@ impl Factory {
         {
             unsafe { WARNED = true };
             disable_tls = !extension_loaded("openssl");
-        } else if config.borrow().get_bool("disable-tls") {
+        } else if config.get_bool("disable-tls") {
             if !unsafe { WARNED } {
                 io.write_error(
                     "<warning>You are running Shirabe with SSL/TLS protection disabled.</warning>",
@@ -1398,11 +1397,11 @@ impl Factory {
         }
         let mut http_downloader_options = StreamContextOptions::new();
         if !disable_tls {
-            let cafile = config.borrow().get_path("cafile")?;
+            let cafile = config.get_path("cafile")?;
             if !cafile.is_empty() {
                 http_downloader_options.ssl_mut().set_cafile(cafile);
             }
-            let capath = config.borrow().get_path("capath")?;
+            let capath = config.get_path("capath")?;
             if !capath.is_empty() {
                 http_downloader_options.ssl_mut().set_capath(capath);
             }
@@ -1432,7 +1431,7 @@ impl Factory {
     }
 
     fn load_composer_auth_env(
-        config: &mut Config,
+        config: &Config,
         io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
     ) -> anyhow::Result<()> {
         let composer_auth_env = Platform::get_env("COMPOSER_AUTH");

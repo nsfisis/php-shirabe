@@ -250,7 +250,7 @@ fn null_io() -> std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
 pub(crate) fn installation_manager(
     io: &std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
 ) -> std::rc::Rc<std::cell::RefCell<InstallationManager>> {
-    let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(false, None)));
+    let config = std::rc::Rc::new(Config::new(false, None));
     let http_downloader = std::rc::Rc::new(std::cell::RefCell::new(HttpDownloader::__new_mock(
         io.clone(),
         config,

@@ -212,7 +212,7 @@ impl InstallationManagerInterface for MockInstallationManager {
 fn locker_installation_manager(
     io: &std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
 ) -> std::rc::Rc<std::cell::RefCell<InstallationManager>> {
-    let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(false, None)));
+    let config = std::rc::Rc::new(Config::new(false, None));
     let http_downloader = std::rc::Rc::new(std::cell::RefCell::new(
         HttpDownloader::new(
             io.clone(),
@@ -304,7 +304,7 @@ pub(crate) fn set_up() -> SetUp {
         Some(io_dyn.clone()),
     )));
 
-    let mut config = Config::new(false, None);
+    let config = Config::new(false, None);
     let mut config_section: IndexMap<BString, PhpMixed> = IndexMap::new();
     config_section.insert(
         "vendor-dir".into(),
@@ -331,7 +331,7 @@ pub(crate) fn set_up() -> SetUp {
 
     {
         let mut c = composer.borrow_mut();
-        c.set_config(std::rc::Rc::new(std::cell::RefCell::new(config)));
+        c.set_config(std::rc::Rc::new(config));
         c.set_download_manager(std::rc::Rc::new(std::cell::RefCell::new(dm)));
         c.set_repository_manager(std::rc::Rc::new(std::cell::RefCell::new(
             repository_manager,

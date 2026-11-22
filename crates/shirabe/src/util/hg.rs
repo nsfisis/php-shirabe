@@ -11,14 +11,14 @@ static VERSION: std::sync::Mutex<Option<Option<BString>>> = std::sync::Mutex::ne
 #[derive(Debug)]
 pub struct Hg {
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-    config: std::rc::Rc<std::cell::RefCell<Config>>,
+    config: std::rc::Rc<Config>,
     process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
 }
 
 impl Hg {
     pub fn new(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        config: std::rc::Rc<Config>,
         process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     ) -> Self {
         Self {
@@ -34,7 +34,7 @@ impl Hg {
         url: &BStr,
         cwd: Option<&std::path::Path>,
     ) -> anyhow::Result<()> {
-        self.config.borrow_mut().prohibit_url_by_config(
+        self.config.prohibit_url_by_config(
             url,
             Some(self.io.clone()),
             &indexmap::IndexMap::new(),

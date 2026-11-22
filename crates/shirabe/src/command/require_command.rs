@@ -247,19 +247,13 @@ impl RequireCommand {
             .get_option("optimize-autoloader")?
             .as_bool()
             .unwrap_or(false)
-            || composer
-                .get_config()
-                .borrow()
-                .get_truthy("optimize-autoloader")?;
+            || composer.get_config().get_truthy("optimize-autoloader")?;
         let authoritative = input
             .borrow()
             .get_option("classmap-authoritative")?
             .as_bool()
             .unwrap_or(false)
-            || composer
-                .get_config()
-                .borrow()
-                .get_truthy("classmap-authoritative")?;
+            || composer.get_config().get_truthy("classmap-authoritative")?;
         let apcu_prefix = input
             .borrow()
             .get_option("apcu-autoloader-prefix")?
@@ -271,10 +265,7 @@ impl RequireCommand {
                 .get_option("apcu-autoloader")?
                 .as_bool()
                 .unwrap_or(false)
-            || composer
-                .get_config()
-                .borrow()
-                .get_truthy("apcu-autoloader")?;
+            || composer.get_config().get_truthy("apcu-autoloader")?;
         let minimal_changes = input
             .borrow()
             .get_option("minimal-changes")?
@@ -282,7 +273,6 @@ impl RequireCommand {
             .unwrap_or(false)
             || composer
                 .get_config()
-                .borrow()
                 .get_truthy("update-with-minimal-changes")?;
 
         let mut update_allow_transitive_dependencies = UpdateAllowTransitiveDeps::UpdateOnlyListed;
@@ -343,11 +333,8 @@ impl RequireCommand {
 
         let mut install = Installer::create(io.clone(), &composer_handle);
 
-        let (prefer_source, prefer_dist) = self.get_preferred_install_options(
-            &composer.get_config().borrow(),
-            input.clone(),
-            false,
-        )?;
+        let (prefer_source, prefer_dist) =
+            self.get_preferred_install_options(&composer.get_config(), input.clone(), false)?;
 
         install
             .set_dry_run(
@@ -397,9 +384,7 @@ impl RequireCommand {
                     .as_bool()
                     .unwrap_or(false),
             )
-            .set_audit_config(
-                self.create_audit_config(&mut composer.get_config().borrow_mut(), input.clone())?,
-            )
+            .set_audit_config(self.create_audit_config(&composer.get_config(), input.clone())?)
             .set_minimal_update(minimal_changes);
 
         // if no lock is present, or the file is brand new, we do not do a
@@ -525,7 +510,7 @@ impl RequireCommand {
         if !dry_run {
             let json = self.json.borrow().as_ref().unwrap().clone();
             self.update_file(&json, &requirements, require_key, remove_key, sort_packages);
-            if locker_is_locked && composer.get_config().borrow().get_bool("lock") {
+            if locker_is_locked && composer.get_config().get_bool("lock") {
                 let stability_flags = RootPackageLoader::extract_stability_flags(
                     &(requirements),
                     bstr::BStr::new(&composer.get_package().get_minimum_stability()),
@@ -838,7 +823,7 @@ impl Command for RequireCommand {
         let repository_manager = repository_manager.borrow();
         let repos = repository_manager.get_repositories();
 
-        let platform_overrides_map = composer.get_config().borrow().get_map("platform")?;
+        let platform_overrides_map = composer.get_config().get_map("platform")?;
         // initialize self.repos as it is used by the PackageDiscoveryTrait
         let platform_repo = PlatformRepositoryHandle::new(PlatformRepository::new(
             vec![],
@@ -1071,7 +1056,7 @@ impl Command for RequireCommand {
             .get_option("sort-packages")?
             .as_bool()
             .unwrap_or(false)
-            || composer.get_config().borrow().get_truthy("sort-packages")?;
+            || composer.get_config().get_truthy("sort-packages")?;
 
         self.first_require.set(self.newly_created.get());
         if !self.first_require.get() {

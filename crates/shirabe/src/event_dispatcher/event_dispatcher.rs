@@ -1104,7 +1104,6 @@ impl EventDispatcher {
             .composer()
             .borrow_partial()
             .get_config()
-            .borrow()
             .get_path("bin-dir")?;
         let bin_dir = std::path::PathBuf::from(path_from_bytes(&bin_dir));
         if is_dir(&bin_dir) {
@@ -1205,11 +1204,7 @@ impl EventDispatcher {
             ClassLoader::unregister(&loader);
         }
 
-        let vendor_dir = composer
-            .borrow()
-            .get_config()
-            .borrow()
-            .get_path("vendor-dir")?;
+        let vendor_dir = composer.borrow().get_config().get_path("vendor-dir")?;
         let loader = generator.borrow().create_loader(&map, Some(vendor_dir))?;
         ClassLoader::register(&loader, false);
         self.loader.set(Some(loader));
@@ -1221,7 +1216,6 @@ impl EventDispatcher {
             .composer()
             .borrow_partial()
             .get_config()
-            .borrow()
             .get_path("cache-dir")?;
         Ok(path_from_bytes(&cache_dir).to_path_buf())
     }
