@@ -35,6 +35,7 @@ license of the package it is ported from:
 | [`shirabe-ca-bundle`](crates/shirabe-ca-bundle/LICENSE)                                         | composer/ca-bundle                                                   |
 | [`shirabe-class-map-generator`](crates/shirabe-class-map-generator/LICENSE)                     | composer/class-map-generator                                         |
 | [`shirabe-metadata-minifier`](crates/shirabe-metadata-minifier/LICENSE)                         | composer/metadata-minifier                                           |
+| [`shirabe-php-shim`](crates/shirabe-php-shim/LICENSE)                                           | composer/pcre                                                        |
 | [`shirabe-seld-json-lint`](crates/shirabe-seld-json-lint/LICENSE)                               | seld/jsonlint                                                        |
 | [`shirabe-semver`](crates/shirabe-semver/LICENSE)                                               | composer/semver                                                      |
 | [`shirabe-spdx-licenses`](crates/shirabe-spdx-licenses/LICENSE)                                 | composer/spdx-licenses                                               |
