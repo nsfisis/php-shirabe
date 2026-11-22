@@ -4,6 +4,7 @@
 
 * Follows Composer 2.9.8
 * PHP warnings and notices raised by plugins and scripts are turned into exceptions, and deprecation notices are reported, as in Composer.
+* HTTP downloads honor the proxy settings, the TLS options, and `COMPOSER_IPRESOLVE`.
 * Many bug fixes.
 
 

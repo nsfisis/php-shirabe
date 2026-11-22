@@ -12,8 +12,8 @@
 //!
 //! The PHP control flow (insecure-URL check, redirect following, transport/status retries,
 //! authenticated-retry detection, max_file_size enforcement, atomic rename of the `~` temp file)
-//! is preserved. Per-request TLS/proxy/IP-resolve settings that reqwest only exposes per-Client
-//! are simplified to a single default Client; see the TODOs below.
+//! is preserved. The TLS, proxy and IP-resolve settings PHP sets on each curl handle are taken by
+//! reqwest only per Client, so a request is sent through a Client built for its settings.
 //!
 //! TODO(async): PHP's `CurlDownloader::abortRequest()`, which `HttpDownloader`'s canceler calls,
 //! has no counterpart here. A request is cancelled by dropping the `download()` future instead, which
@@ -25,24 +25,21 @@ use crate::downloader::{MaxFileSizeExceededException, TransportException};
 use crate::io::{DEBUG, IOInterface, IOInterfaceWrite};
 use crate::util::http::{NativeHttpResponse, ProxyManager, Response};
 use crate::util::{
-    AuthHelper, HttpDownloader, HttpOptions, Platform, PromptAuthResult, StoreAuth,
+    AuthHelper, HttpDownloader, HttpOptions, Platform, PromptAuthResult, SslOptions, StoreAuth,
     StreamContextFactory, StreamContextOptions, Url,
 };
 use bstr::{B, BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PHP_EOL, PhpMixed, RuntimeException, ToPhpString, TypeError, bformat, boolval,
-    display_to_bytes, get_debug_type, in_array_loose, in_array_strict, intval, json_decode_assoc,
-    parse_url, path_from_bytes, path_to_bytes, php_regex, preg_is_match, preg_quote, preg_replace,
-    rename, stripos, strlen, strpos, strtolower, substr, trim, unlink_silent, utf8_text,
+    CURLOPT_PROXY, CURLOPT_PROXYUSERPWD, PHP_EOL, PhpMixed, RuntimeException, ToPhpString,
+    TypeError, base64_encode, bformat, boolval, display_to_bytes, get_debug_type, in_array_loose,
+    in_array_strict, intval, json_decode_assoc, parse_url, path_from_bytes, path_to_bytes,
+    php_regex, preg_is_match, preg_quote, preg_replace, rawurldecode, rename, stripos, strlen,
+    strpos, strtolower, substr, trim, unlink_silent, utf8_text,
 };
 
 #[derive(Debug)]
 pub struct NativeHttpDownloader {
-    /// Connection pool / cookie / TLS-session sharing — reqwest::Client handles this internally,
-    /// replacing the PHP multiHandle + shareHandle. Redirects are disabled because we follow them
-    /// manually (to control auth-header re-attachment), matching CURLOPT_FOLLOWLOCATION = false.
-    client: reqwest::Client,
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     config: std::rc::Rc<std::cell::RefCell<Config>>,
     auth_helper: std::cell::RefCell<AuthHelper>,
@@ -62,49 +59,204 @@ enum Decision {
     Failed(anyhow::Error),
 }
 
-/// The reqwest Client to use on the calling thread's tokio runtime.
+/// The settings PHP sets on each curl handle that reqwest only takes per Client: the `ssl` options
+/// of `CurlDownloader::$options`, the proxy of `RequestProxy::getCurlOptions()` and
+/// CURLOPT_IPRESOLVE.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+struct ConnectionOptions {
+    cafile: Option<std::path::PathBuf>,
+    capath: Option<std::path::PathBuf>,
+    verify_peer: bool,
+    verify_peer_name: bool,
+    local_cert: Option<std::path::PathBuf>,
+    local_pk: Option<std::path::PathBuf>,
+    /// CURLOPT_PROXY, `None` for the empty string (no proxy).
+    proxy: Option<BString>,
+    /// CURLOPT_PROXYUSERPWD.
+    proxy_auth: Option<BString>,
+    /// CURLOPT_IPRESOLVE: 4 or 6.
+    ip_resolve: Option<i64>,
+}
+
+/// The reqwest Client to send a request with the given connection settings on the calling thread's
+/// tokio runtime.
 ///
-/// Nothing in `NativeHttpDownloader::new` varies the Client (`options` and `disable_tls` are not
-/// applied to it; see the TODO in `send_once`), so one Client serves every NativeHttpDownloader a
-/// run builds and its connection pool survives across them. PHP instead hands each
-/// CurlDownloader its own curl multi handle.
+/// Clients are cached by their settings, so every NativeHttpDownloader a run builds shares them and
+/// their connection pools. PHP instead hands each CurlDownloader its own curl multi handle.
 ///
 /// A pooled connection is driven by a task on the runtime that opened it and hangs if it is later
-/// handed to another one, so the Client is cached per runtime: `main.rs` enters one runtime for the
-/// whole process and gets a single Client, while the disposable per-call runtimes
-/// `sync_executor::block_on` falls back to outside `main` get one each.
-fn runtime_client() -> reqwest::Client {
-    fn build() -> reqwest::Client {
-        reqwest::Client::builder()
-            .pool_max_idle_per_host(8)
-            .redirect(reqwest::redirect::Policy::none())
-            // CURLOPT_ENCODING = "": advertise and transparently decode every encoding curl
-            // supports. The body is decoded before read_body_with_limit sees it, so max_file_size
-            // applies to the decoded size, as in PHP.
-            .brotli(true)
-            .deflate(true)
-            .gzip(true)
-            .zstd(true)
-            .build()
-            // The default builder cannot realistically fail; if the TLS backend is unavailable we
-            // cannot proceed, mirroring PHP aborting when curl is missing.
-            .expect("failed to build reqwest client for NativeHttpDownloader")
+/// handed to another one, so the Clients are cached per runtime: `main.rs` enters one runtime for
+/// the whole process, while the disposable per-call runtimes `sync_executor::block_on` falls back
+/// to outside `main` get their own.
+fn runtime_client(connection: &ConnectionOptions) -> Result<reqwest::Client, BString> {
+    let Ok(handle) = tokio::runtime::Handle::try_current() else {
+        return build_client(connection);
+    };
+    static CACHED: std::sync::Mutex<
+        Option<(
+            tokio::runtime::Id,
+            IndexMap<ConnectionOptions, reqwest::Client>,
+        )>,
+    > = std::sync::Mutex::new(None);
+    let mut cached = CACHED.lock().unwrap();
+    if cached.as_ref().is_none_or(|(id, _)| *id != handle.id()) {
+        *cached = Some((handle.id(), IndexMap::new()));
+    }
+    let (_, clients) = cached.as_mut().unwrap();
+    if let Some(client) = clients.get(connection) {
+        return Ok(client.clone());
+    }
+    let client = build_client(connection)?;
+    clients.insert(connection.clone(), client.clone());
+    Ok(client)
+}
+
+fn build_client(connection: &ConnectionOptions) -> Result<reqwest::Client, BString> {
+    let mut builder = reqwest::Client::builder()
+        .pool_max_idle_per_host(8)
+        // Redirects are followed manually (to control auth-header re-attachment), matching
+        // CURLOPT_FOLLOWLOCATION = false.
+        .redirect(reqwest::redirect::Policy::none())
+        // CURLOPT_ENCODING = "": advertise and transparently decode every encoding curl
+        // supports. The body is decoded before read_body_with_limit sees it, so max_file_size
+        // applies to the decoded size, as in PHP.
+        .brotli(true)
+        .deflate(true)
+        .gzip(true)
+        .zstd(true)
+        // PHP always sets CURLOPT_PROXY, even to an empty string, so curl ignores the proxy
+        // environment variables: ProxyManager has already read them.
+        .no_proxy();
+
+    if connection.verify_peer {
+        // CURLOPT_CAINFO and CURLOPT_CAPATH replace curl's default CA store.
+        if connection.cafile.is_some() || connection.capath.is_some() {
+            let mut roots = Vec::new();
+            if let Some(cafile) = &connection.cafile {
+                roots.extend(read_pem_certificates(cafile)?);
+            }
+            if let Some(capath) = &connection.capath {
+                roots.extend(read_capath(capath)?);
+            }
+            builder = builder.tls_certs_only(roots);
+        }
+        if !connection.verify_peer_name {
+            // TODO(http): rustls skips only the host name check against explicitly given roots,
+            // so without a cafile or capath the Client fails to build.
+            builder = builder.tls_danger_accept_invalid_hostnames(true);
+        }
+    } else {
+        // TODO(http): curl still checks the host name when only CURLOPT_SSL_VERIFYPEER is off,
+        // while reqwest skips every check of the server certificate.
+        builder = builder.tls_danger_accept_invalid_certs(true);
     }
 
-    let Ok(handle) = tokio::runtime::Handle::try_current() else {
-        return build();
-    };
-    static CACHED: std::sync::Mutex<Option<(tokio::runtime::Id, reqwest::Client)>> =
-        std::sync::Mutex::new(None);
-    let mut cached = CACHED.lock().unwrap();
-    match &*cached {
-        Some((id, client)) if *id == handle.id() => client.clone(),
-        _ => {
-            let client = build();
-            *cached = Some((handle.id(), client.clone()));
-            client
+    // curl reads the private key from the CURLOPT_SSLCERT file unless CURLOPT_SSLKEY names another.
+    // TODO(http): `ssl.passphrase` (CURLOPT_SSLKEYPASSWD) is not applied: an encrypted private
+    // key cannot be read.
+    if let Some(local_cert) = &connection.local_cert {
+        let mut pem = read_file(local_cert)?;
+        if let Some(local_pk) = &connection.local_pk {
+            pem.push(b'\n');
+            pem.extend(read_file(local_pk)?);
+        }
+        builder = builder.identity(reqwest::Identity::from_pem(&pem).map_err(|e| error_chain(&e))?);
+    }
+
+    // TODO(http): reqwest verifies an `https://` proxy with the same settings as the server, while
+    // curl keeps verifying the proxy (CURLOPT_PROXY_SSL_VERIFYPEER) when `ssl.verify_peer` is off.
+    if let Some(proxy_url) = &connection.proxy {
+        let proxy_url = utf8_text(proxy_url).ok_or_else(|| {
+            display_to_bytes(format_args!("proxy URL is not valid UTF-8: {proxy_url:?}"))
+        })?;
+        let mut proxy = reqwest::Proxy::all(proxy_url).map_err(|e| error_chain(&e))?;
+        if let Some(auth) = &connection.proxy_auth {
+            // curl splits CURLOPT_PROXYUSERPWD at the first colon and URL-decodes both halves.
+            let (user, password) = auth.split_once_str(":").unwrap_or((auth.as_slice(), b""));
+            let credentials = bformat!("{}:{}", rawurldecode(user), rawurldecode(password));
+            let header = reqwest::header::HeaderValue::from_bytes(&bformat!(
+                "Basic {}",
+                base64_encode(credentials)
+            ))
+            .map_err(|e| display_to_bytes(&e))?;
+            proxy = proxy.custom_http_auth(header);
+        }
+        builder = builder.proxy(proxy);
+    }
+
+    // Binding the unspecified address of one family makes the connector try only the addresses of
+    // that family, which is what CURL_IPRESOLVE_V4 / CURL_IPRESOLVE_V6 do.
+    match connection.ip_resolve {
+        Some(4) => {
+            builder = builder.local_address(std::net::IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED));
+        }
+        Some(6) => {
+            builder = builder.local_address(std::net::IpAddr::V6(std::net::Ipv6Addr::UNSPECIFIED));
+        }
+        _ => {}
+    }
+
+    builder.build().map_err(|e| error_chain(&e))
+}
+
+fn read_file(path: &std::path::Path) -> Result<Vec<u8>, BString> {
+    std::fs::read(path)
+        .map_err(|e| display_to_bytes(format_args!("could not read {}: {e}", path.display())))
+}
+
+fn read_pem_certificates(path: &std::path::Path) -> Result<Vec<reqwest::Certificate>, BString> {
+    reqwest::Certificate::from_pem_bundle(&read_file(path)?).map_err(|e| {
+        bformat!(
+            "could not load certificates from {}: {}",
+            path_to_bytes(path),
+            error_chain(&e)
+        )
+    })
+}
+
+/// OpenSSL finds a CA in a capath by its subject-hash file name (`<8 hex digits>.<n>`), so the
+/// files named that way hold every certificate it can find there.
+fn read_capath(capath: &std::path::Path) -> Result<Vec<reqwest::Certificate>, BString> {
+    let entries = std::fs::read_dir(capath)
+        .map_err(|e| display_to_bytes(format_args!("could not read {}: {e}", capath.display())))?;
+    let mut paths = Vec::new();
+    for entry in entries {
+        let entry = entry.map_err(|e| {
+            display_to_bytes(format_args!("could not read {}: {e}", capath.display()))
+        })?;
+        let name = entry.file_name();
+        let is_hash_name = name
+            .as_encoded_bytes()
+            .split_once_str(".")
+            .is_some_and(|(hash, n)| {
+                hash.len() == 8
+                    && hash.iter().all(u8::is_ascii_hexdigit)
+                    && !n.is_empty()
+                    && n.iter().all(u8::is_ascii_digit)
+            });
+        if is_hash_name {
+            paths.push(entry.path());
         }
     }
+    paths.sort();
+    let mut certs = Vec::new();
+    for path in paths {
+        certs.extend(read_pem_certificates(&path)?);
+    }
+    Ok(certs)
+}
+
+/// The message of an error followed by those of its sources, which hold the detail of a reqwest
+/// builder error.
+fn error_chain(error: &dyn std::error::Error) -> BString {
+    let mut message = display_to_bytes(error);
+    let mut source = error.source();
+    while let Some(e) = source {
+        message.extend_from_slice(b": ");
+        message.extend_from_slice(&display_to_bytes(e));
+        source = e.source();
+    }
+    message
 }
 
 impl NativeHttpDownloader {
@@ -122,12 +274,10 @@ impl NativeHttpDownloader {
         // The libcurl version-specific multiplexing / accept-encoding workarounds are not needed.
         // TODO(http): cookie sharing (CURL_LOCK_DATA_COOKIE) would need reqwest's `cookies` feature
         // (.cookie_store(true)); omitted as it is not required for package downloads.
-        let client = runtime_client();
 
         let auth_helper = std::cell::RefCell::new(AuthHelper::new(io.clone(), config.clone()));
 
         Self {
-            client,
             io,
             config,
             auth_helper,
@@ -211,8 +361,6 @@ impl NativeHttpDownloader {
             }
             _ => "",
         };
-        // PHP logs the proxy in the "Downloading" line; resolving it here keeps that message
-        // faithful even though reqwest does not yet apply the proxy (see send_once TODO).
         let using_proxy = ProxyManager::get_instance()
             .as_ref()
             .map(|pm| pm.get_proxy_for_request(url))
@@ -243,8 +391,10 @@ impl NativeHttpDownloader {
                 StreamContextFactory::init_options(&current_url, send_options, true)??;
 
             let request = Self::curl_request_options(&send_options)?;
+            let connection =
+                Self::connection_options(current_url.as_bstr(), &send_options, &attributes)?;
             let send_result = self
-                .send_once(current_url.as_bstr(), &request, copy_to, &attributes)
+                .send_once(current_url.as_bstr(), &request, &connection, copy_to)
                 .await;
 
             match self
@@ -507,8 +657,8 @@ impl NativeHttpDownloader {
         &self,
         url: &BStr,
         request: &CurlRequestOptions,
+        connection: &ConnectionOptions,
         filename: Option<&std::path::Path>,
-        attributes: &IndexMap<BString, PhpMixed>,
     ) -> Result<RawResponse, TransportError> {
         let CurlRequestOptions {
             method,
@@ -519,11 +669,15 @@ impl NativeHttpDownloader {
         } = request;
         let (body, max_file_size) = (body.clone(), *max_file_size);
 
-        // TODO(http): the `ssl` options (cafile, capath, verify_peer, local_cert, ...) and the proxy
-        // are not applied: reqwest takes them per Client, not per request, so honoring them needs a
-        // Client for each set of connection options.
-        // TODO(http): CURLOPT_IPRESOLVE (force IPv4/IPv6) has no direct reqwest API.
-        let _ = attributes;
+        // curl reports a CA file, client certificate or proxy it cannot use as an error of the
+        // transfer.
+        let client = runtime_client(connection).map_err(|message| TransportError {
+            message,
+            retryable: false,
+            is_connect: false,
+            was_timeout: false,
+            is_max_file_size: false,
+        })?;
 
         let reqwest_method = reqwest::Method::from_bytes(method).unwrap_or(reqwest::Method::GET);
 
@@ -538,7 +692,7 @@ impl NativeHttpDownloader {
                 is_max_file_size: false,
             });
         };
-        let mut builder = self.client.request(reqwest_method, url);
+        let mut builder = client.request(reqwest_method, url);
         for header in headers {
             if let Some((name, value)) = header.split_once_str(":") {
                 // Skip the Connection header reqwest manages itself.
@@ -934,6 +1088,47 @@ impl NativeHttpDownloader {
         })
     }
 
+    /// The `ssl` part of PHP's `curl_setopt` loop over `self::$options`, and
+    /// `curl_setopt_array($curlHandle, $proxy->getCurlOptions($options['ssl'] ?? []))`.
+    fn connection_options(
+        url: &BStr,
+        options: &StreamContextOptions,
+        attributes: &IndexMap<BString, PhpMixed>,
+    ) -> anyhow::Result<ConnectionOptions> {
+        let ssl = options.ssl();
+        let isset = |name: &[u8]| ssl.and_then(|ssl| ssl.isset(name));
+        let path = |name: &[u8]| {
+            isset(name).map(|value| path_from_bytes(&value.to_php_string()).to_owned())
+        };
+        // curl_setopt() converts the value of a long option with zval_get_long(), and curl reads
+        // 0 as off. PHP passes 2 for a `verify_peer_name` of true.
+        let enabled = |name: &[u8]| isset(name).is_none_or(|value| intval(value) != 0);
+
+        let proxy = ProxyManager::get_instance()
+            .as_ref()
+            .expect("ProxyManager::get_instance() always creates the instance")
+            .get_proxy_for_request(url)?;
+        let proxy_options =
+            proxy.get_curl_options(&ssl.map(SslOptions::to_array).unwrap_or_default())?;
+
+        Ok(ConnectionOptions {
+            cafile: path(b"cafile"),
+            capath: path(b"capath"),
+            verify_peer: enabled(b"verify_peer"),
+            verify_peer_name: enabled(b"verify_peer_name"),
+            local_cert: path(b"local_cert"),
+            local_pk: path(b"local_pk"),
+            proxy: proxy_options
+                .get(&CURLOPT_PROXY)
+                .map(ToPhpString::to_php_string)
+                .filter(|proxy| !proxy.is_empty()),
+            proxy_auth: proxy_options
+                .get(&CURLOPT_PROXYUSERPWD)
+                .map(ToPhpString::to_php_string),
+            ip_resolve: attributes.get(B("ipResolve")).and_then(PhpMixed::as_int),
+        })
+    }
+
     fn method_is_get(options: &StreamContextOptions) -> bool {
         match options.http().and_then(HttpOptions::method) {
             None => true,
@@ -998,5 +1193,150 @@ impl RawResponse {
             body,
             IndexMap::new(),
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::{Read as _, Write as _};
+
+    // Serves one HTTP/1.1 request on a loopback port with a fixed response, and hands the request
+    // it received to the returned receiver.
+    fn serve_once() -> (std::net::SocketAddr, std::sync::mpsc::Receiver<Vec<u8>>) {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        let (sender, receiver) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut request = Vec::new();
+            let mut buf = [0u8; 1024];
+            while !request.ends_with(b"\r\n\r\n") {
+                let n = stream.read(&mut buf).unwrap();
+                if n == 0 {
+                    break;
+                }
+                request.extend_from_slice(&buf[..n]);
+            }
+            stream
+                .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\nok")
+                .unwrap();
+            sender.send(request).unwrap();
+        });
+        (addr, receiver)
+    }
+
+    fn connection() -> ConnectionOptions {
+        ConnectionOptions {
+            cafile: None,
+            capath: None,
+            verify_peer: true,
+            verify_peer_name: true,
+            local_cert: None,
+            local_pk: None,
+            proxy: None,
+            proxy_auth: None,
+            ip_resolve: None,
+        }
+    }
+
+    fn get(connection: &ConnectionOptions, url: &BStr) -> Result<Vec<u8>, BString> {
+        let client = build_client(connection)?;
+        let url = utf8_text(url).unwrap();
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(async {
+                let response = client.get(url).send().await?;
+                Ok(response.bytes().await?.to_vec())
+            })
+            .map_err(|e: reqwest::Error| error_chain(&e))
+    }
+
+    #[test]
+    fn sends_requests_through_the_proxy_with_its_credentials() {
+        let (addr, request) = serve_once();
+        let connection = ConnectionOptions {
+            proxy: Some(bformat!("http://{}", display_to_bytes(addr))),
+            proxy_auth: Some(BString::from("us%3Aer:p%40ss:word")),
+            ..connection()
+        };
+
+        assert_eq!(
+            get(&connection, BStr::new("http://example.invalid/foo")).unwrap(),
+            b"ok"
+        );
+
+        let request = BString::from(request.recv().unwrap());
+        assert!(
+            request.starts_with(b"GET http://example.invalid/foo HTTP/1.1\r\n"),
+            "{request:?}"
+        );
+        let header = bformat!(
+            "proxy-authorization: Basic {}\r\n",
+            base64_encode("us:er:p@ss:word")
+        );
+        assert!(request.contains_str(&header), "{request:?}");
+    }
+
+    #[test]
+    fn ip_resolve_restricts_the_address_family() {
+        let (addr, _request) = serve_once();
+        let url = bformat!("http://{}/", display_to_bytes(addr));
+
+        let ipv6 = ConnectionOptions {
+            ip_resolve: Some(6),
+            ..connection()
+        };
+        assert!(get(&ipv6, url.as_bstr()).is_err());
+
+        let ipv4 = ConnectionOptions {
+            ip_resolve: Some(4),
+            ..connection()
+        };
+        assert_eq!(get(&ipv4, url.as_bstr()).unwrap(), b"ok");
+    }
+
+    #[test]
+    fn an_unreadable_cafile_fails_to_build_the_client() {
+        let connection = ConnectionOptions {
+            cafile: Some("/nonexistent/cafile.pem".into()),
+            ..connection()
+        };
+        let message = build_client(&connection).unwrap_err();
+        assert!(
+            message.contains_str("/nonexistent/cafile.pem"),
+            "{message:?}"
+        );
+    }
+
+    #[test]
+    fn reads_the_ssl_options_as_curl_setopt_does() {
+        let mut ssl = SslOptions::new();
+        ssl.set_cafile("/ca/file.pem");
+        ssl.insert("capath", PhpMixed::Null);
+        ssl.insert("verify_peer", PhpMixed::string("0"));
+        ssl.insert("verify_peer_name", PhpMixed::Bool(true));
+        ssl.insert("local_cert", PhpMixed::string("/client.pem"));
+        let mut options = StreamContextOptions::new();
+        options.set_ssl(ssl);
+        let mut attributes = IndexMap::new();
+        attributes.insert(BString::from("ipResolve"), PhpMixed::Int(4));
+
+        let connection = NativeHttpDownloader::connection_options(
+            BStr::new("https://example.org/"),
+            &options,
+            &attributes,
+        )
+        .unwrap();
+
+        assert_eq!(connection.cafile, Some("/ca/file.pem".into()));
+        assert_eq!(connection.capath, None);
+        assert!(!connection.verify_peer);
+        assert!(connection.verify_peer_name);
+        assert_eq!(connection.local_cert, Some("/client.pem".into()));
+        assert_eq!(connection.local_pk, None);
+        assert_eq!(connection.ip_resolve, Some(4));
     }
 }

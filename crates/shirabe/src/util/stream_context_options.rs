@@ -380,8 +380,10 @@ impl SslOptions {
     }
 
     /// `$options['ssl'][$key]`, when it is set.
-    fn isset(&self, key: &[u8]) -> Option<&PhpMixed> {
-        self.entries.get(key).filter(|value| !value.is_null())
+    pub fn isset(&self, key: impl AsRef<[u8]>) -> Option<&PhpMixed> {
+        self.entries
+            .get(key.as_ref())
+            .filter(|value| !value.is_null())
     }
 
     pub fn insert(&mut self, key: impl Into<BString>, value: PhpMixed) {
