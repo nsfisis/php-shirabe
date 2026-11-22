@@ -4,9 +4,6 @@
 //! `current_thread` Runtime would need one instance per caller. Instead this holds a single
 //! process-wide `multi_thread` Runtime that tolerates concurrent `block_on()` callers, and every
 //! test bridges into async code through it.
-//!
-//! Included into each integration-test binary via
-//! `#[path = "../common/async_runtime.rs"] mod async_runtime;`.
 #![allow(dead_code)]
 
 static RUNTIME: std::sync::LazyLock<tokio::runtime::Runtime> = std::sync::LazyLock::new(|| {

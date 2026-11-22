@@ -1,7 +1,4 @@
 //! Shared test helpers ported from composer/tests/Composer/Test/TestCase.php.
-//!
-//! Included into each integration-test binary that needs them via
-//! `#[path = "../common/test_case.rs"] mod test_case;`.
 #![allow(dead_code)]
 
 use crate::bootstrap::bootstrap;

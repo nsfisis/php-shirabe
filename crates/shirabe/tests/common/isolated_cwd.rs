@@ -9,8 +9,6 @@
 //!
 //! Other platforms have no per-thread cwd, so tests using this helper must stay serial there:
 //! annotate them with `#[cfg_attr(not(target_os = "linux"), serial_test::serial)]`.
-//!
-//! Included via `#[path = "common/isolated_cwd.rs"] mod isolated_cwd;`.
 #![allow(dead_code)]
 
 pub struct RestoreCwd(std::path::PathBuf);

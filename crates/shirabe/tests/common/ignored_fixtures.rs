@@ -4,8 +4,6 @@
 //! `foo-ignored-fixtures.json` next to it: an object mapping the fixture's path, relative to the
 //! repository root (e.g. `composer/tests/Composer/Test/Fixtures/installer/foo.test`), to the
 //! `TODO(<tag>): <reason>` it is skipped for.
-//!
-//! Included via `#[path = "common/ignored_fixtures.rs"] mod ignored_fixtures;`.
 #![allow(dead_code)]
 
 use bstr::{BStr, BString, ByteSlice as _};

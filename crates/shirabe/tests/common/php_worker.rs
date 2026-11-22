@@ -1,7 +1,4 @@
 //! Shared access to the PHP worker for integration tests.
-//!
-//! Included into an integration-test binary via
-//! `#[path = "../common/php_worker.rs"] mod php_worker;`.
 #![allow(dead_code)]
 
 use bstr::BStr;
