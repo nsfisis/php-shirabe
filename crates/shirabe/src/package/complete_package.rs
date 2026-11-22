@@ -51,7 +51,10 @@ impl CompletePackage {
         self.inner.replace_version(version, pretty_version);
     }
 
-    pub fn set_release_date(&mut self, release_date: Option<chrono::DateTime<chrono::Utc>>) {
+    pub fn set_release_date(
+        &mut self,
+        release_date: Option<chrono::DateTime<chrono::FixedOffset>>,
+    ) {
         self.inner.set_release_date(release_date);
     }
 }
@@ -274,7 +277,7 @@ impl PackageInterface for CompletePackage {
         self.inner.get_full_pretty_version(truncate, display_mode)
     }
 
-    fn get_release_date(&self) -> Option<chrono::DateTime<chrono::Utc>> {
+    fn get_release_date(&self) -> Option<chrono::DateTime<chrono::FixedOffset>> {
         self.inner.get_release_date().copied()
     }
 

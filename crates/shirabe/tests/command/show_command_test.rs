@@ -8,8 +8,8 @@ use bstr::{BStr, BString, ByteSlice as _};
 use shirabe::package::{Link, PackageInterfaceHandle};
 use shirabe::repository::PlatformRepository;
 use shirabe_php_shim::{
-    STR_PAD_RIGHT, ToPhpString, bformat, date_local, error_message, implode, rtrim, str_pad, trim,
-    utf8_text,
+    STR_PAD_RIGHT, ToPhpString, bformat, date_local, date_time_immutable_now, error_message,
+    implode, rtrim, str_pad, trim, utf8_text,
 };
 
 /// Build a `Vec<(ParameterName, InputValue)>` command input from `(key, value)` pairs.
@@ -62,11 +62,13 @@ fn run_show_case(
     let pkg = get_complete_package("vendor/package", "v1.0.0");
     pkg.set_description(BString::from("description of installed package"));
     let major = get_complete_package("outdated/major", "v1.0.0");
-    major.set_release_date(Some(chrono::Utc::now()));
+    major.set_release_date(Some(date_time_immutable_now()));
     let minor = get_complete_package("outdated/minor", "1.0.0");
-    minor.set_release_date(Some(chrono::Utc::now() - chrono::Duration::days(365 * 2)));
+    minor.set_release_date(Some(
+        date_time_immutable_now() - chrono::Duration::days(365 * 2),
+    ));
     let patch = get_complete_package("outdated/patch", "1.0.0");
-    patch.set_release_date(Some(chrono::Utc::now() - chrono::Duration::weeks(2)));
+    patch.set_release_date(Some(date_time_immutable_now() - chrono::Duration::weeks(2)));
 
     let packages: Vec<PackageInterfaceHandle> =
         vec![pkg.into(), major.into(), minor.into(), patch.into()];
@@ -204,11 +206,6 @@ outdated/patch 1.0.0 <highlight>! 1.0.1</highlight>",
 
 #[test]
 #[serial_test::serial]
-// TODO(php-semantics): ShowCommand::get_relative_time formats the release date in UTC but takes
-// "today" from date(), which renders in the system default timezone, so a release date set to the
-// current instant is not recognised as today whenever the two dates differ.
-#[ignore = "get_relative_time renders \"from this week\" instead of \"from today\" for the \
-            just-released outdated/major whenever the local date differs from the UTC date"]
 fn test_show_outdated_deps_sorting_by_age() {
     run_show_case(
         input(vec![

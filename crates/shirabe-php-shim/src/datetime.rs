@@ -155,6 +155,13 @@ pub fn date_local(format: impl AsRef<[u8]>, timestamp: Option<i64>) -> BString {
     )
 }
 
+/// PHP: `new \DateTimeImmutable()`, the current time in the system's local timezone.
+pub fn date_time_immutable_now() -> chrono::DateTime<chrono::FixedOffset> {
+    chrono::Utc::now()
+        .with_timezone(&&local_timezone())
+        .fixed_offset()
+}
+
 /// The zone `$TZ` names, or the one `/etc/localtime` describes. Falls back to UTC when no tz
 /// database is readable, as PHP does when `date.timezone` is unset.
 fn local_timezone() -> tzfile::Tz {

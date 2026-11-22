@@ -380,7 +380,7 @@ impl ArrayLoader {
                 BString::from(time_str)
             };
 
-            if let Ok(date) = date_create::<chrono::Utc>(&time) {
+            if let Ok(date) = date_create::<chrono::FixedOffset>(&time) {
                 package.package_mut().set_release_date(Some(date));
             }
         }

@@ -1277,7 +1277,7 @@ impl ShowCommand {
         Ok(self.repository_set.borrow().as_ref().unwrap().clone())
     }
 
-    fn get_relative_time(&self, release_date: &chrono::DateTime<chrono::Utc>) -> BString {
+    fn get_relative_time(&self, release_date: &chrono::DateTime<chrono::FixedOffset>) -> BString {
         if display_to_bytes(release_date.format(date_format_to_strftime(b"Ymd")))
             == date_local("Ymd", None)
         {

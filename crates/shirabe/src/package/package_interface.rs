@@ -109,7 +109,7 @@ pub trait PackageInterface: std::fmt::Debug + PhpDisplay {
     fn get_full_pretty_version(&self, truncate: bool, display_mode: DisplayMode) -> BString;
 
     /// Returns the release date of the package
-    fn get_release_date(&self) -> Option<chrono::DateTime<chrono::Utc>>;
+    fn get_release_date(&self) -> Option<chrono::DateTime<chrono::FixedOffset>>;
 
     /// Returns the stability of this package: one of (dev, alpha, beta, RC, stable)
     fn get_stability(&self) -> &BStr;

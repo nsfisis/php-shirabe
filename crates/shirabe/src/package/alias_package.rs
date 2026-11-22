@@ -343,7 +343,7 @@ impl PackageInterface for AliasPackage {
         self.alias_of.get_php_ext()
     }
 
-    fn get_release_date(&self) -> Option<chrono::DateTime<chrono::Utc>> {
+    fn get_release_date(&self) -> Option<chrono::DateTime<chrono::FixedOffset>> {
         self.alias_of.get_release_date()
     }
 

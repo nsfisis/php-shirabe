@@ -468,6 +468,20 @@ impl FromRpcValue for chrono::DateTime<chrono::Utc> {
     }
 }
 
+// TODO(plugin): a date crosses rebased on UTC, so its UTC offset is lost in both directions,
+// while PHP hands the plugin the `\DateTimeInterface` with the offset it was created with.
+impl ToRpcValue for chrono::DateTime<chrono::FixedOffset> {
+    fn to_rpc_value(self) -> RpcValue {
+        self.to_utc().to_rpc_value()
+    }
+}
+
+impl FromRpcValue for chrono::DateTime<chrono::FixedOffset> {
+    fn from_rpc_value(value: &RpcValue) -> Result<Self, DecodeError> {
+        chrono::DateTime::<chrono::Utc>::from_rpc_value(value).map(|date| date.fixed_offset())
+    }
+}
+
 /// What an absent property or argument decodes from.
 pub const NULL: RpcValue = RpcValue::Null;
 

@@ -90,6 +90,7 @@ from_rpc_value_args!(
     Mirror,
     DisplayMode,
     chrono::DateTime<chrono::Utc>,
+    chrono::DateTime<chrono::FixedOffset>,
     StreamContextOptions,
 );
 
@@ -287,6 +288,12 @@ impl IntoRpcAnswer for &bstr::BStr {
 }
 
 impl IntoRpcAnswer for chrono::DateTime<chrono::Utc> {
+    fn into_rpc_answer(self, _: &dyn Fn(anyhow::Error) -> PhpThrow) -> Result<RpcValue, PhpThrow> {
+        Ok(self.to_rpc_value())
+    }
+}
+
+impl IntoRpcAnswer for chrono::DateTime<chrono::FixedOffset> {
     fn into_rpc_answer(self, _: &dyn Fn(anyhow::Error) -> PhpThrow) -> Result<RpcValue, PhpThrow> {
         Ok(self.to_rpc_value())
     }

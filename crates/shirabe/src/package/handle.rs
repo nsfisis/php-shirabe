@@ -321,7 +321,7 @@ macro_rules! delegate_package_interface_to_inner {
             ) -> BString {
                 self.$field.get_full_pretty_version(truncate, display_mode)
             }
-            fn get_release_date(&self) -> Option<chrono::DateTime<chrono::Utc>> {
+            fn get_release_date(&self) -> Option<chrono::DateTime<chrono::FixedOffset>> {
                 self.$field.get_release_date()
             }
             fn get_stability(&self) -> &BStr {
@@ -588,7 +588,7 @@ macro_rules! impl_package_interface_handle {
                     .get_full_pretty_version(truncate, display_mode)
             }
 
-            pub fn get_release_date(&self) -> Option<chrono::DateTime<chrono::Utc>> {
+            pub fn get_release_date(&self) -> Option<chrono::DateTime<chrono::FixedOffset>> {
                 self.0.borrow().as_package_interface().get_release_date()
             }
 
@@ -1633,7 +1633,7 @@ impl CompletePackageHandle {
         Self::from_complete_package(CompletePackage::new(name, version, pretty_version))
     }
 
-    pub fn set_release_date(&self, release_date: Option<chrono::DateTime<chrono::Utc>>) {
+    pub fn set_release_date(&self, release_date: Option<chrono::DateTime<chrono::FixedOffset>>) {
         match &mut *self.0.borrow_mut() {
             AnyPackage::CompletePackage(p) => p.set_release_date(release_date),
             _ => unreachable!("CompletePackageHandle invariant"),
@@ -1659,7 +1659,7 @@ impl RootPackageHandle {
         }
     }
 
-    pub fn set_release_date(&self, release_date: Option<chrono::DateTime<chrono::Utc>>) {
+    pub fn set_release_date(&self, release_date: Option<chrono::DateTime<chrono::FixedOffset>>) {
         match &mut *self.0.borrow_mut() {
             AnyPackage::RootPackage(p) => p.set_release_date(release_date),
             _ => unreachable!("RootPackageHandle invariant"),

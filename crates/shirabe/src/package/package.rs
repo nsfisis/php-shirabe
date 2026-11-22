@@ -44,7 +44,7 @@ pub struct Package {
     dist_mirrors: Option<Vec<Mirror>>,
     version: BString,
     pretty_version: BString,
-    release_date: Option<chrono::DateTime<chrono::Utc>>,
+    release_date: Option<chrono::DateTime<chrono::FixedOffset>>,
     extra: IndexMap<BString, PhpMixed>,
     binaries: Vec<BString>,
     dev: bool,
@@ -279,11 +279,14 @@ impl Package {
         self.pretty_version.as_bstr()
     }
 
-    pub fn set_release_date(&mut self, release_date: Option<chrono::DateTime<chrono::Utc>>) {
+    pub fn set_release_date(
+        &mut self,
+        release_date: Option<chrono::DateTime<chrono::FixedOffset>>,
+    ) {
         self.release_date = release_date;
     }
 
-    pub fn get_release_date(&self) -> Option<&chrono::DateTime<chrono::Utc>> {
+    pub fn get_release_date(&self) -> Option<&chrono::DateTime<chrono::FixedOffset>> {
         self.release_date.as_ref()
     }
 
@@ -682,7 +685,7 @@ impl PackageInterface for Package {
     fn get_full_pretty_version(&self, truncate: bool, display_mode: DisplayMode) -> BString {
         BasePackage::get_full_pretty_version(self, truncate, display_mode)
     }
-    fn get_release_date(&self) -> Option<chrono::DateTime<chrono::Utc>> {
+    fn get_release_date(&self) -> Option<chrono::DateTime<chrono::FixedOffset>> {
         self.release_date
     }
     fn get_stability(&self) -> &BStr {
