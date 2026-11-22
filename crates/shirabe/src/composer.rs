@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Composer.php sha1:0855f16a82789ec64c5c5c7d946e3ffd67c05b11
+//! ref: composer/src/Composer/Composer.php sha1:aff4004371b3b4537982f01c4ec1397072390aa0
 //! ref: composer/src/Composer/PartialComposer.php sha1:dc5eb5f37ab64d0b51dbb5bbe66c442e8a71b063
 
 use crate::autoload::AutoloadGeneratorInterface;
@@ -18,9 +18,9 @@ use shirabe_php_shim::{bformat, php_regex, php_str, preg_is_match};
 /// The Composer version this port tracks. Kept as-is so `Composer::VERSION`, the `composer`
 /// platform package and the HTTP User-Agent keep reporting a value plugins and servers can
 /// interpret. What Shirabe calls itself is `SHIRABE_VERSION`.
-pub const VERSION: &BStr = php_str(b"2.9.7");
+pub const VERSION: &BStr = php_str(b"2.9.8");
 pub const BRANCH_ALIAS_VERSION: &BStr = php_str(b"");
-pub const RELEASE_DATE: &BStr = php_str(b"2026-04-14 13:31:52");
+pub const RELEASE_DATE: &BStr = php_str(b"2026-05-13 09:28:38");
 pub const SOURCE_VERSION: &BStr = php_str(b"");
 pub const RUNTIME_API_VERSION: &BStr = php_str(b"2.2.2");
 

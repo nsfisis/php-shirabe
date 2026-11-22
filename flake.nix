@@ -83,7 +83,7 @@
 
           outputHashMode = "recursive";
           outputHashAlgo = "sha256";
-          outputHash = "sha256-oohNQuoXHAhi9gDz/wZqllwB8h5suPDG3PwPh/nhIlw=";
+          outputHash = "sha256-T93zR3g1NKqbMiUDbqh5Wo15WWRw3obQZyUS2nIl78U=";
         };
 
         commitHash = self.rev or (pkgs.lib.removeSuffix "-dirty" self.dirtyRev);

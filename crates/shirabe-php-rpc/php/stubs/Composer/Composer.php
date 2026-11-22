@@ -14,9 +14,9 @@ use Composer\Package\Archiver\ArchiveManager;
 
 class Composer extends PartialComposer
 {
-    public const VERSION = '2.9.7';
+    public const VERSION = '2.9.8';
     public const BRANCH_ALIAS_VERSION = '';
-    public const RELEASE_DATE = '2026-04-14 13:31:52';
+    public const RELEASE_DATE = '2026-05-13 09:28:38';
     public const SOURCE_VERSION = '';
     public const RUNTIME_API_VERSION = '2.2.2';
 

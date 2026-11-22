@@ -25,7 +25,7 @@ See [assets/logo/LICENSE.md](assets/logo/LICENSE.md).
 
 ## Composer and its dependencies.
 
-Shirabe is a port of Composer v2.9.7 with its dependencies, all of which are
+Shirabe is a port of Composer v2.9.8 with its dependencies, all of which are
 under The MIT License. Every crate that contains ported code carries the
 license of the package it is ported from:
 

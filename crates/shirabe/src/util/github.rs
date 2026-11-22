@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/Util/GitHub.php sha1:6cba0f9d259e3f70cc889ffbe76d543bd8b4f8e9
+//! ref: composer/src/Composer/Util/GitHub.php sha1:2f5c4e6d4c926b56174e154a4b988afdc57315bb
 
 use crate::config::Config;
 use crate::downloader::TransportException;
@@ -22,7 +22,7 @@ pub struct GitHub {
 
 impl GitHub {
     pub const GITHUB_TOKEN_REGEX: &'static BStr =
-        php_str(r"{^([a-f0-9]{12,}|gh[a-z]_[a-zA-Z0-9_]+|github_pat_[a-zA-Z0-9_]+)$}".as_bytes());
+        php_str(r"{^([a-f0-9]{12,}|gh[a-z]_[a-zA-Z0-9_.-]+|github_pat_[a-zA-Z0-9_]+)$}".as_bytes());
 
     pub fn new(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,

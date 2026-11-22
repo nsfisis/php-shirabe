@@ -1,4 +1,4 @@
-//! ref: composer/src/Composer/IO/BaseIO.php sha1:cee231e6b4585671e764fd85798fc7a060a99fff
+//! ref: composer/src/Composer/IO/BaseIO.php sha1:a285d0522ebec533868233b23c478b84773d86cd
 //! ref: composer/vendor/psr/log/Psr/Log/LogLevel.php sha1:b38b37be0c6622eae7b8928f399d4abeef9cc0b2
 
 use crate::config::Config;
@@ -134,10 +134,13 @@ pub trait BaseIO: IOInterface {
                 config.merge(&config_outer, "implicit-due-to-auth");
             }
 
-            if !preg_is_match(php_regex!(r"{^[.A-Za-z0-9_]+$}"), token_str.as_bstr()) {
-                return Err(UnexpectedValueException::new(bformat!("Your github oauth token for {domain} contains invalid characters: \"{token_str}\""))
+            if !preg_is_match(php_regex!(r"{^[.A-Za-z0-9_-]+$}"), token_str.as_bstr()) {
+                return Err(UnexpectedValueException::new(bformat!(
+                    "Your github oauth token for {domain} contains invalid characters."
+                ))
                 .into());
             }
+
             self.check_and_set_authentication(
                 domain,
                 token_str,

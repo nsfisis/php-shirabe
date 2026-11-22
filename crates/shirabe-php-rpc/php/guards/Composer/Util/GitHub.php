@@ -13,7 +13,7 @@ use Composer\Config;
 
 class GitHub
 {
-    public const GITHUB_TOKEN_REGEX = '{^([a-f0-9]{12,}|gh[a-z]_[a-zA-Z0-9_]+|github_pat_[a-zA-Z0-9_]+)$}';
+    public const GITHUB_TOKEN_REGEX = '{^([a-f0-9]{12,}|gh[a-z]_[a-zA-Z0-9_.-]+|github_pat_[a-zA-Z0-9_]+)$}';
 
     public function __construct(IOInterface $io, Config $config, ?ProcessExecutor $process = null, ?HttpDownloader $httpDownloader = null)
     {
