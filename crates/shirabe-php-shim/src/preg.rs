@@ -1,8 +1,12 @@
-//! PHP's `preg_*` functions. Composer reaches PCRE through the `Composer\Pcre\Preg` wrapper; its
-//! call sites are ported straight onto these functions. `Preg`'s `*StrictGroups()` variants have no
-//! counterpart here because `Option` already tells a non-participating capture group from an empty
-//! one, and a pattern that fails to compile panics instead of raising `PcreException`: Composer
-//! never assembles a pattern that PCRE rejects, so such a failure is a programming error.
+//! ref: composer/vendor/composer/pcre/src/Preg.php sha1:e9e16ea360c2abd40f812f9e92e1421d94fbea76
+//!
+//! PHP's `preg_*` functions. Composer reaches PCRE through the `Composer\Pcre\Preg` wrapper of
+//! composer/pcre. That package has no crate of its own: the semantics of `Preg` are folded into this
+//! module, and its call sites are ported straight onto these functions. `Preg`'s `*StrictGroups()`
+//! variants have no counterpart here because `Option` already tells a non-participating capture
+//! group from an empty one, and a pattern that fails to compile panics instead of raising
+//! `PcreException`: Composer never assembles a pattern that PCRE rejects, so such a failure is a
+//! programming error.
 //!
 //! This module's functions do not mirror the PHP signatures for two reasons.
 //!
