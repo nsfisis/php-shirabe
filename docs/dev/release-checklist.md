@@ -11,7 +11,7 @@
     4. All GitHub Actions CI runs pass on `origin/main`.
 2. Review the whole diff since the previous release, and fill in anything missing from the CHANGELOG.
     - `git log <previous tag>..HEAD --format=%s`
-3. Rewrite `## Unreleased (based on Composer A.B.C)` in the CHANGELOG to `## vX.Y.Z (based on Composer A.B.C)`.
+3. Rewrite `## Unreleased` in the CHANGELOG to `## vX.Y.Z (based on Composer A.B.C)`.
 4. Remove `-dev` from `[workspace.package] version` in `Cargo.toml`.
 5. Update `Cargo.lock` with `cargo metadata --offline --format-version 1 >/dev/null`, and check that nothing other than the versions of the workspace crates has changed.
 
@@ -44,5 +44,5 @@
 ## Post-release
 
 1. Set the version in `Cargo.toml` to the next development version (with `-dev`), and update `Cargo.lock`.
-2. Add `## Unreleased (based on Composer A.B.C)` at the top of the CHANGELOG.
+2. Add `## Unreleased` at the top of the CHANGELOG.
 3. Commit (`chore: bump version to X.(Y+1).0-dev`) and push.
