@@ -92,15 +92,12 @@ fn setup_config(config: Config) -> Config {
 
 /// ref: GitDownloaderTest::getDownloaderMock (defaults the IO/Config/Filesystem)
 fn get_downloader_mock(
-    io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
+    io: Option<std::rc::Rc<dyn IOInterface>>,
     config: Option<Config>,
     process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     filesystem: Option<std::rc::Rc<std::cell::RefCell<Filesystem>>>,
 ) -> GitDownloader {
-    let io = io.unwrap_or_else(|| {
-        std::rc::Rc::new(std::cell::RefCell::new(IOStub::new()))
-            as std::rc::Rc<std::cell::RefCell<dyn IOInterface>>
-    });
+    let io = io.unwrap_or_else(|| std::rc::Rc::new(IOStub::new()) as std::rc::Rc<dyn IOInterface>);
     let config = std::rc::Rc::new(setup_config(
         config.unwrap_or_else(|| ConfigStubBuilder::new().build()),
     ));
@@ -1248,10 +1245,9 @@ fn test_downgrade_shows_appropriate_message() {
 
     let (io_mock, _io_guard) = get_io_mock(io_interface::NORMAL).unwrap();
     io_mock
-        .borrow_mut()
         .expects(vec![Expectation::text_regex("{Downgrading .*}")], false)
         .unwrap();
-    let io = io_mock as std::rc::Rc<std::cell::RefCell<dyn IOInterface>>;
+    let io = io_mock as std::rc::Rc<dyn IOInterface>;
 
     let mut fs = Filesystem::new(None);
     fs.ensure_directory_exists(working_dir.path().join(".git"))
@@ -1335,10 +1331,9 @@ fn test_not_using_downgrading_with_references() {
 
     let (io_mock, _io_guard) = get_io_mock(io_interface::NORMAL).unwrap();
     io_mock
-        .borrow_mut()
         .expects(vec![Expectation::text_regex("{Upgrading .*}")], false)
         .unwrap();
-    let io = io_mock as std::rc::Rc<std::cell::RefCell<dyn IOInterface>>;
+    let io = io_mock as std::rc::Rc<dyn IOInterface>;
 
     let mut fs = Filesystem::new(None);
     fs.ensure_directory_exists(working_dir.path().join(".git"))

@@ -5,7 +5,7 @@ use crate::composer::{ComposerHandle, ComposerWeakHandle, PartialComposerHandle}
 use crate::config::{AllowPlugins, Config};
 use crate::factory::DisablePlugins;
 use crate::installer::InstallerInterface;
-use crate::io::{DEBUG, IOInterface, IOInterfaceImmutable, IOInterfaceWrite};
+use crate::io::{DEBUG, IOInterface, IOInterfaceWrite};
 use crate::package::version::VersionParser;
 use crate::package::{
     BasePackageHandle, LockerInterface, PackageInterfaceHandle, RootPackageInterfaceHandle,
@@ -40,7 +40,7 @@ use shirabe_symfony_console::input::InputValue;
 #[derive(Debug)]
 pub struct PluginManager {
     composer: ComposerWeakHandle,
-    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    io: std::rc::Rc<dyn IOInterface>,
     global_composer: Option<PartialComposerHandle>,
     version_parser: VersionParser,
     disable_plugins: DisablePlugins,
@@ -63,7 +63,7 @@ static CLASS_COUNTER: std::sync::atomic::AtomicI64 = std::sync::atomic::AtomicI6
 
 impl PluginManager {
     pub fn new(
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: std::rc::Rc<dyn IOInterface>,
         composer: ComposerWeakHandle,
         global_composer: Option<PartialComposerHandle>,
         disable_plugins: DisablePlugins,

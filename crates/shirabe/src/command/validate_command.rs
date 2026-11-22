@@ -44,7 +44,7 @@ impl ValidateCommand {
     #[allow(clippy::too_many_arguments, reason = "to keep PHP signature")]
     fn output_result(
         &self,
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: std::rc::Rc<dyn IOInterface>,
         name: &BStr,
         errors: &mut Vec<BString>,
         warnings: &mut Vec<BString>,

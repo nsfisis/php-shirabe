@@ -67,7 +67,7 @@ fn placeholder_auth_config_source() -> std::rc::Rc<MockConfigSource> {
 // real Config, the captured `time()`, and the Bitbucket under test. The mock guards
 // run their assert_complete on drop at the end of the test scope.
 struct Fixture {
-    io: std::rc::Rc<std::cell::RefCell<IOMock>>,
+    io: std::rc::Rc<IOMock>,
     config: std::rc::Rc<Config>,
     http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
     time: i64,
@@ -87,7 +87,7 @@ fn set_up_with_config_and_http(
         HttpDownloaderMockHandler::default(),
     );
 
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io_mock.clone();
+    let io: std::rc::Rc<dyn IOInterface> = io_mock.clone();
     let time = time();
     let bitbucket = Bitbucket::new(
         io,
@@ -203,16 +203,15 @@ fn test_request_access_token_with_valid_oauth_consumer() {
         )],
     );
 
-    f.io.borrow_mut()
-        .expects(
-            vec![Expectation::auth(
-                ORIGIN,
-                CONSUMER_KEY,
-                Some(CONSUMER_SECRET.to_php_string()),
-            )],
-            false,
-        )
-        .unwrap();
+    f.io.expects(
+        vec![Expectation::auth(
+            ORIGIN,
+            CONSUMER_KEY,
+            Some(CONSUMER_SECRET.to_php_string()),
+        )],
+        false,
+    )
+    .unwrap();
 
     set_expectations_for_storing_access_token(&f.config, f.time, false);
 
@@ -304,16 +303,15 @@ fn test_request_access_token_with_valid_oauth_consumer_and_expired_access_token(
     );
     f.time = time;
 
-    f.io.borrow_mut()
-        .expects(
-            vec![Expectation::auth(
-                ORIGIN,
-                CONSUMER_KEY,
-                Some(CONSUMER_SECRET.to_php_string()),
-            )],
-            false,
-        )
-        .unwrap();
+    f.io.expects(
+        vec![Expectation::auth(
+            ORIGIN,
+            CONSUMER_KEY,
+            Some(CONSUMER_SECRET.to_php_string()),
+        )],
+        false,
+    )
+    .unwrap();
 
     set_expectations_for_storing_access_token(&f.config, f.time, false);
 
@@ -345,26 +343,24 @@ fn test_request_access_token_with_username_and_password() {
         )],
     );
 
-    f.io
-        .borrow_mut()
-        .expects(
-            vec![
-                Expectation::auth(ORIGIN, USERNAME, Some(PASSWORD.to_php_string())),
-                Expectation::text("Invalid OAuth consumer provided."),
-                Expectation::text("This can have three reasons:"),
-                Expectation::text(
-                    "1. You are authenticating with a bitbucket username/password combination",
-                ),
-                Expectation::text(
-                    "2. You are using an OAuth consumer, but didn't configure a (dummy) callback url",
-                ),
-                Expectation::text(
-                    "3. You are using an OAuth consumer, but didn't configure it as private consumer",
-                ),
-            ],
-            true,
-        )
-        .unwrap();
+    f.io.expects(
+        vec![
+            Expectation::auth(ORIGIN, USERNAME, Some(PASSWORD.to_php_string())),
+            Expectation::text("Invalid OAuth consumer provided."),
+            Expectation::text("This can have three reasons:"),
+            Expectation::text(
+                "1. You are authenticating with a bitbucket username/password combination",
+            ),
+            Expectation::text(
+                "2. You are using an OAuth consumer, but didn't configure a (dummy) callback url",
+            ),
+            Expectation::text(
+                "3. You are using an OAuth consumer, but didn't configure it as private consumer",
+            ),
+        ],
+        true,
+    )
+    .unwrap();
 
     assert_eq!(
         f.bitbucket
@@ -393,7 +389,6 @@ fn test_request_access_token_with_username_and_password_with_unauthorized_respon
     );
 
     f.io
-        .borrow_mut()
         .expects(
             vec![
                 Expectation::auth(ORIGIN, USERNAME, Some(PASSWORD.to_php_string())),
@@ -432,16 +427,15 @@ fn test_request_access_token_with_username_and_password_with_not_found_response(
         )],
     );
 
-    f.io.borrow_mut()
-        .expects(
-            vec![Expectation::auth(
-                ORIGIN,
-                USERNAME,
-                Some(PASSWORD.to_php_string()),
-            )],
-            false,
-        )
-        .unwrap();
+    f.io.expects(
+        vec![Expectation::auth(
+            ORIGIN,
+            USERNAME,
+            Some(PASSWORD.to_php_string()),
+        )],
+        false,
+    )
+    .unwrap();
 
     let result = f.bitbucket.request_token(
         bstr::BStr::new(ORIGIN),
@@ -465,16 +459,15 @@ fn test_username_password_authentication_flow() {
     let mut f =
         set_up_with_config_and_http(config, vec![expect_full(url, None, 200, body, vec![])]);
 
-    f.io.borrow_mut()
-        .expects(
-            vec![
-                Expectation::text(MESSAGE),
-                Expectation::ask("Consumer Key (hidden): ", CONSUMER_KEY),
-                Expectation::ask("Consumer Secret (hidden): ", CONSUMER_SECRET),
-            ],
-            false,
-        )
-        .unwrap();
+    f.io.expects(
+        vec![
+            Expectation::text(MESSAGE),
+            Expectation::ask("Consumer Key (hidden): ", CONSUMER_KEY),
+            Expectation::ask("Consumer Secret (hidden): ", CONSUMER_SECRET),
+        ],
+        false,
+    )
+    .unwrap();
 
     set_expectations_for_storing_access_token(&f.config, f.time, true);
 
@@ -494,8 +487,7 @@ fn test_authorize_oauth_interactively_with_empty_username() {
     f.config
         .set_auth_config_source(placeholder_auth_config_source());
 
-    f.io.borrow_mut()
-        .expects(vec![Expectation::ask("Consumer Key (hidden): ", "")], false)
+    f.io.expects(vec![Expectation::ask("Consumer Key (hidden): ", "")], false)
         .unwrap();
 
     assert!(
@@ -513,16 +505,15 @@ fn test_authorize_oauth_interactively_with_empty_password() {
     f.config
         .set_auth_config_source(placeholder_auth_config_source());
 
-    f.io.borrow_mut()
-        .expects(
-            vec![
-                Expectation::text(MESSAGE),
-                Expectation::ask("Consumer Key (hidden): ", CONSUMER_KEY),
-                Expectation::ask("Consumer Secret (hidden): ", ""),
-            ],
-            false,
-        )
-        .unwrap();
+    f.io.expects(
+        vec![
+            Expectation::text(MESSAGE),
+            Expectation::ask("Consumer Key (hidden): ", CONSUMER_KEY),
+            Expectation::ask("Consumer Secret (hidden): ", ""),
+        ],
+        false,
+    )
+    .unwrap();
 
     assert!(
         !f.bitbucket
@@ -541,16 +532,15 @@ fn test_authorize_oauth_interactively_with_request_access_token_failure() {
     f.config
         .set_auth_config_source(placeholder_auth_config_source());
 
-    f.io.borrow_mut()
-        .expects(
-            vec![
-                Expectation::text(MESSAGE),
-                Expectation::ask("Consumer Key (hidden): ", CONSUMER_KEY),
-                Expectation::ask("Consumer Secret (hidden): ", CONSUMER_SECRET),
-            ],
-            false,
-        )
-        .unwrap();
+    f.io.expects(
+        vec![
+            Expectation::text(MESSAGE),
+            Expectation::ask("Consumer Key (hidden): ", CONSUMER_KEY),
+            Expectation::ask("Consumer Secret (hidden): ", CONSUMER_SECRET),
+        ],
+        false,
+    )
+    .unwrap();
 
     assert!(
         !f.bitbucket
@@ -592,7 +582,7 @@ fn test_authorize_oauth_without_available_git_config_token() {
         },
     );
 
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io_mock;
+    let io: std::rc::Rc<dyn IOInterface> = io_mock;
     let time = time();
     let mut bitbucket =
         Bitbucket::new(io, config, Some(process), Some(http_downloader), Some(time)).unwrap();
@@ -609,7 +599,7 @@ fn test_authorize_oauth_with_available_git_config_token() {
     let (process, _process_guard) =
         get_process_executor_mock(vec![], false, MockHandler::default());
 
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io_mock;
+    let io: std::rc::Rc<dyn IOInterface> = io_mock;
     let time = time();
     let mut bitbucket =
         Bitbucket::new(io, config, Some(process), Some(http_downloader), Some(time)).unwrap();

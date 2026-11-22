@@ -66,7 +66,7 @@ fn http_body(
 // then calls initialize().
 fn get_driver(
     url: &BStr,
-    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    io: std::rc::Rc<dyn IOInterface>,
     config: std::rc::Rc<Config>,
     http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
 ) -> anyhow::Result<GitBitbucketDriver> {
@@ -88,8 +88,7 @@ fn test_get_root_identifier_wrong_scm_type() {
     let _tear_down = TearDown::new(home.path().to_path_buf());
 
     let config = std::rc::Rc::new(config);
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
-        std::rc::Rc::new(std::cell::RefCell::new(IOStub::new()));
+    let io: std::rc::Rc<dyn IOInterface> = std::rc::Rc::new(IOStub::new());
 
     let (http_downloader, _http_guard): (_, HttpDownloaderMockGuard) = get_http_downloader_mock(
         vec![http_body(
@@ -126,8 +125,7 @@ fn test_driver() {
     let _tear_down = TearDown::new(home.path().to_path_buf());
 
     let config = std::rc::Rc::new(config);
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
-        std::rc::Rc::new(std::cell::RefCell::new(IOStub::new()));
+    let io: std::rc::Rc<dyn IOInterface> = std::rc::Rc::new(IOStub::new());
 
     let urls = [
         BStr::new("https://api.bitbucket.org/2.0/repositories/user/repo?fields=-project%2C-owner"),
@@ -284,8 +282,7 @@ fn test_initialize_invalid_repository_url() {
     let _tear_down = TearDown::new(home.path().to_path_buf());
 
     let config = std::rc::Rc::new(config);
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
-        std::rc::Rc::new(std::cell::RefCell::new(IOStub::new()));
+    let io: std::rc::Rc<dyn IOInterface> = std::rc::Rc::new(IOStub::new());
 
     let (http_downloader, _http_guard) =
         get_http_downloader_mock(vec![], true, HttpDownloaderMockHandler::default());
@@ -309,8 +306,7 @@ fn test_invalid_support_data() {
     let _tear_down = TearDown::new(home.path().to_path_buf());
 
     let config = std::rc::Rc::new(config);
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
-        std::rc::Rc::new(std::cell::RefCell::new(IOStub::new()));
+    let io: std::rc::Rc<dyn IOInterface> = std::rc::Rc::new(IOStub::new());
 
     let repo_url = BStr::new("https://bitbucket.org/user/repo.git");
 
@@ -366,8 +362,7 @@ fn test_invalid_support_data() {
 
 #[test]
 fn test_supports() {
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
-        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
+    let io: std::rc::Rc<dyn IOInterface> = std::rc::Rc::new(NullIO::new());
     let config = std::rc::Rc::new(Config::new(true, None));
 
     assert!(

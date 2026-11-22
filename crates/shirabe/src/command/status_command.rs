@@ -7,7 +7,7 @@ use crate::composer::composer_full;
 use crate::console::input::InputOption;
 use crate::delegate_base_command_trait_impls_to_inner;
 use crate::event_dispatcher::EventFlags;
-use crate::io::{IOInterfaceImmutable, IOInterfaceWrite};
+use crate::io::IOInterfaceWrite;
 use crate::package::dumper::ArrayDumper;
 use crate::package::version::{VersionGuesser, VersionParser};
 use crate::plugin::{CommandEvent, PluginEvents};

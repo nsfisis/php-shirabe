@@ -122,8 +122,7 @@ fn as_dyn(downloader: MockDownloader) -> std::rc::Rc<std::cell::RefCell<dyn Down
 }
 
 fn create_manager() -> DownloadManager {
-    let io = std::rc::Rc::new(std::cell::RefCell::new(IOStub::new()))
-        as std::rc::Rc<std::cell::RefCell<dyn IOInterface>>;
+    let io = std::rc::Rc::new(IOStub::new()) as std::rc::Rc<dyn IOInterface>;
     DownloadManager::new(io, false, None)
 }
 

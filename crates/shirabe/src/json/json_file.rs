@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/Json/JsonFile.php sha1:1769fe849f0bf7f8e0727be30497de38ce137aac
 
 use crate::downloader::TransportException;
-use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite};
+use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::json::JsonValidationException;
 use crate::util::{Filesystem, HttpDownloader, StreamContextOptions};
 use bstr::{BStr, BString, ByteSlice as _, ByteVec as _};
@@ -65,7 +65,7 @@ impl JsonEncodeOptions {
 pub struct JsonFile {
     path: std::path::PathBuf,
     http_downloader: Option<std::rc::Rc<std::cell::RefCell<HttpDownloader>>>,
-    io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
+    io: Option<std::rc::Rc<dyn IOInterface>>,
     indent: std::cell::RefCell<BString>,
 }
 
@@ -96,7 +96,7 @@ impl JsonFile {
     pub fn new(
         path: impl AsRef<std::path::Path>,
         http_downloader: Option<std::rc::Rc<std::cell::RefCell<HttpDownloader>>>,
-        io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
+        io: Option<std::rc::Rc<dyn IOInterface>>,
     ) -> anyhow::Result<Self> {
         let path = path.as_ref().to_path_buf();
         if http_downloader.is_none()

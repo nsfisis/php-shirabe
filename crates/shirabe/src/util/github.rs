@@ -14,7 +14,7 @@ use shirabe_php_shim::{
 
 #[derive(Debug)]
 pub struct GitHub {
-    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    io: std::rc::Rc<dyn IOInterface>,
     config: std::rc::Rc<Config>,
     process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
@@ -25,7 +25,7 @@ impl GitHub {
         php_str(r"{^([a-f0-9]{12,}|gh[a-z]_[a-zA-Z0-9_.-]+|github_pat_[a-zA-Z0-9_]+)$}".as_bytes());
 
     pub fn new(
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: std::rc::Rc<dyn IOInterface>,
         config: std::rc::Rc<Config>,
         process: Option<std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,
         http_downloader: Option<std::rc::Rc<std::cell::RefCell<HttpDownloader>>>,
@@ -68,7 +68,7 @@ impl GitHub {
             None,
         )? == 0
         {
-            self.io.borrow_mut().set_authentication(
+            self.io.set_authentication(
                 origin_url.into(),
                 trim(&output),
                 Some(BString::from("x-oauth-basic")),
@@ -203,7 +203,7 @@ impl GitHub {
             return Ok(false);
         }
 
-        self.io.borrow_mut().set_authentication(
+        self.io.set_authentication(
             origin_url.into(),
             token.clone(),
             Some(BString::from("x-oauth-basic")),

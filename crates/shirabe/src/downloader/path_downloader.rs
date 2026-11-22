@@ -33,7 +33,7 @@ impl PathDownloader {
     const STRATEGY_MIRROR: i64 = 20;
 
     pub fn new(
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: std::rc::Rc<dyn IOInterface>,
         config: std::rc::Rc<Config>,
         http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
         event_dispatcher: Option<std::rc::Rc<EventDispatcher>>,

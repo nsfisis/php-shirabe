@@ -23,7 +23,7 @@ pub struct RootPackageLoader {
     manager: std::rc::Rc<RepositoryManager>,
     config: std::rc::Rc<Config>,
     version_guesser: Box<dyn VersionGuesserInterface>,
-    io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
+    io: Option<std::rc::Rc<dyn IOInterface>>,
 }
 
 impl RootPackageLoader {
@@ -32,7 +32,7 @@ impl RootPackageLoader {
         config: std::rc::Rc<Config>,
         parser: Option<VersionParser>,
         version_guesser: Option<Box<dyn VersionGuesserInterface>>,
-        io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
+        io: Option<std::rc::Rc<dyn IOInterface>>,
     ) -> Self {
         let inner = ArrayLoader::new(parser, true);
         let version_guesser = version_guesser.unwrap_or_else(|| {

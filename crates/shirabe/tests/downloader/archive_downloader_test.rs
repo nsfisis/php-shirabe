@@ -25,8 +25,7 @@ fn get_package(name: &BStr, version: &BStr) -> PackageInterfaceHandle {
 /// ref: ArchiveDownloaderTest::getArchiveDownloaderMock (the inherited getFileName/processUrl
 /// live on FileDownloader, so the concrete downloader is built directly).
 fn get_archive_downloader(vendor_dir: Option<&BStr>) -> FileDownloader {
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
-        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
+    let io: std::rc::Rc<dyn IOInterface> = std::rc::Rc::new(NullIO::new());
 
     let config = Config::new(false, None);
     if let Some(vendor_dir) = vendor_dir {

@@ -112,7 +112,7 @@ struct SetUp {
     root: tempfile::TempDir,
     vendor_dir: std::path::PathBuf,
     bin_dir: std::path::PathBuf,
-    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    io: std::rc::Rc<dyn IOInterface>,
     composer: PartialComposerWeakHandle,
     fs: Filesystem,
     composer_full: ComposerHandle,
@@ -150,8 +150,7 @@ fn set_up() -> SetUp {
     config.merge(&merged, Config::SOURCE_UNKNOWN);
     let config_rc = std::rc::Rc::new(config);
 
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
-        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
+    let io: std::rc::Rc<dyn IOInterface> = std::rc::Rc::new(NullIO::new());
 
     let composer_rc = std::rc::Rc::new(PartialOrFullComposer::new_full());
     let composer = ComposerHandle::from_rc_unchecked(composer_rc.clone());

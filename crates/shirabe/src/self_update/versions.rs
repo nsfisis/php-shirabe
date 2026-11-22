@@ -72,7 +72,7 @@ impl Versions {
     pub fn set_channel(
         &mut self,
         channel: BString,
-        io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
+        io: Option<std::rc::Rc<dyn IOInterface>>,
     ) -> anyhow::Result<Result<(), InvalidArgumentException>> {
         if !Self::CHANNELS.contains(&channel.as_bstr()) {
             return Ok(Err(InvalidArgumentException::new(bformat!(

@@ -601,7 +601,6 @@ fn test_prohibited_urls_throw_exception() {
 fn test_prohibited_urls_warning_verify_peer() {
     let (io_mock, _io_guard) = get_io_mock(io_interface::DEBUG).unwrap();
     io_mock
-        .borrow_mut()
         .expects(
             vec![Expectation::text(
                 "<warning>Warning: Accessing example.org with verify_peer and verify_peer_name disabled.</warning>",
@@ -611,7 +610,7 @@ fn test_prohibited_urls_warning_verify_peer() {
         .unwrap();
 
     let config = Config::new(false, None);
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io_mock;
+    let io: std::rc::Rc<dyn IOInterface> = io_mock;
     let mut repo_options: IndexMap<BString, PhpMixed> = IndexMap::new();
     repo_options.insert(
         "ssl".into(),

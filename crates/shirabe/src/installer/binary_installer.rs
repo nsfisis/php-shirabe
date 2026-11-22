@@ -44,14 +44,14 @@ impl BinaryInstallerInterface for BinaryInstaller {
 pub struct BinaryInstaller {
     bin_dir: std::path::PathBuf,
     bin_compat: BString,
-    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    io: std::rc::Rc<dyn IOInterface>,
     filesystem: std::rc::Rc<std::cell::RefCell<Filesystem>>,
     vendor_dir: Option<std::path::PathBuf>,
 }
 
 impl BinaryInstaller {
     pub fn new(
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: std::rc::Rc<dyn IOInterface>,
         bin_dir: std::path::PathBuf,
         bin_compat: BString,
         filesystem: Option<std::rc::Rc<std::cell::RefCell<Filesystem>>>,

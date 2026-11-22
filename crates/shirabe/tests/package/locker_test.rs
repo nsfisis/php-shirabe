@@ -13,8 +13,8 @@ use shirabe_php_shim::{
     Catch as _, LogicException, PhpMixed, ToPhpString, bformat, hash, trim, utf8_text,
 };
 
-fn null_io() -> std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
-    std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()))
+fn null_io() -> std::rc::Rc<dyn IOInterface> {
+    std::rc::Rc::new(NullIO::new())
 }
 
 /// ref: LockerTest::getJsonContent — `JsonFile::encode(ksort([minimum-stability, name]), 0).unwrap()`.
@@ -41,11 +41,7 @@ fn get_json_content(custom_data: &[(&BStr, &BStr)]) -> BString {
 fn make_locker(
     json_content: &BStr,
     lock_contents: Option<&BStr>,
-) -> (
-    Locker,
-    tempfile::TempDir,
-    std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-) {
+) -> (Locker, tempfile::TempDir, std::rc::Rc<dyn IOInterface>) {
     let temp_dir = tempfile::TempDir::new().unwrap();
     let lock_path = temp_dir.path().join("composer.lock");
     if let Some(contents) = lock_contents {

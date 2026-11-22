@@ -1,6 +1,6 @@
 //! ref: composer/src/Composer/Util/ProcessExecutor.php sha1:1852637f6e0380d92e650c6305e11f6c8cbc43ae
 
-use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface};
+use crate::io::{IOInterface, IOInterfaceWrite, io_interface};
 use crate::php_worker::job::{JobOwner, record_internal_job};
 use crate::signal::SignalSubscription;
 use crate::util::{GitHub, Platform};
@@ -36,7 +36,7 @@ pub enum CommandLine {
 pub struct ProcessExecutor {
     capture_output: std::cell::Cell<bool>,
     error_output: std::cell::RefCell<BString>,
-    io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
+    io: Option<std::rc::Rc<dyn IOInterface>>,
     max_jobs: std::cell::Cell<i64>,
     /// PHP throttles async jobs through the $jobs queue and $maxJobs; here concurrent
     /// `execute_async`/`execute_async_php` calls hold a permit for the duration of the
@@ -172,7 +172,7 @@ impl ProcessExecutor {
     ];
 
     #[php(name = "__construct")]
-    pub fn new(io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>) -> Self {
+    pub fn new(io: Option<std::rc::Rc<dyn IOInterface>>) -> Self {
         let this = Self {
             capture_output: std::cell::Cell::new(false),
             error_output: std::cell::RefCell::new(BString::default()),
@@ -682,7 +682,7 @@ impl ProcessExecutor {
 
     fn output_handler(
         capture_output: bool,
-        io: &mut Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
+        io: &mut Option<std::rc::Rc<dyn IOInterface>>,
         r#type: &BStr,
         buffer: &BStr,
     ) {
@@ -768,7 +768,7 @@ impl ProcessExecutor {
     }
 
     fn output_command_run_with(
-        io: &Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
+        io: &Option<std::rc::Rc<dyn IOInterface>>,
         command: &CommandLine,
         cwd: Option<&std::path::Path>,
         r#async: bool,

@@ -64,7 +64,7 @@ pub fn php_binding(
 ///
 /// ```ignore
 /// php_entity! {
-///     handle: std::rc::Rc<std::cell::RefCell<dyn LockerInterface>>,
+///     handle: std::rc::Rc<dyn LockerInterface>,
 ///     type_error: "a Locker",
 ///     classes: {
 ///         r"Composer\Package\Locker": { constructor: unimplemented },
@@ -74,8 +74,7 @@ pub fn php_binding(
 ///             instance: {
 ///                 adapters: crate::package::__php_binding_locker_interface,
 ///                 target: dyn LockerInterface,
-///                 borrow: |locker| locker.borrow(),
-///                 borrow_mut: |locker| locker.borrow_mut(),
+///                 deref: |locker| &**locker,
 ///             },
 ///             static: { adapters: crate::package::__php_binding_locker },
 ///             refused: { getJsonFile: "JsonFile cannot cross the boundary" },

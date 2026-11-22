@@ -1,9 +1,6 @@
 //! The methods a `Composer\IO\IOInterface` entity answers over RPC.
 
-use crate::io::{
-    __php_binding_buffer_io, __php_binding_io_interface_immutable, BufferIO, IOInterface,
-    IOInterfaceImmutable,
-};
+use crate::io::{__php_binding_buffer_io, __php_binding_io_interface, BufferIO, IOInterface};
 use crate::php_worker::rpc::entity::Call;
 use bstr::{BString, ByteSlice as _};
 use shirabe_php_binding_macros::php_entity;
@@ -13,9 +10,9 @@ use shirabe_php_rpc::{PhpThrow, RpcValue};
 // demand. The ask* methods take `InputValue` defaults and validators, which cannot hold an int or
 // float default, a non-string choice, or a validator returning any other PHP value.
 php_entity! {
-    handle: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    handle: std::rc::Rc<dyn IOInterface>,
     type_error: "an IOInterface",
-    class_of: |io| io.borrow().php_class().map(|class| class.as_bytes()).ok_or_else(|| {
+    class_of: |io| io.php_class().map(|class| class.as_bytes()).ok_or_else(|| {
         // TODO(plugin): only IO implementations with a generated proxy stub can cross the
         // boundary; the rest are an explicit error until stubs of their own are generated.
         PhpThrow::runtime("no proxy stub class is available for this IO implementation")
@@ -30,11 +27,9 @@ php_entity! {
         r"Composer\IO\IOInterface": {
             handwritten: { module: messages, members: [write, writeError] },
             instance: {
-                adapters: __php_binding_io_interface_immutable,
-                target: dyn IOInterfaceImmutable,
-                borrow: |io| std::cell::Ref::map(io.borrow(), |io| {
-                    io as &(dyn IOInterfaceImmutable + 'static)
-                }),
+                adapters: __php_binding_io_interface,
+                target: dyn IOInterface,
+                deref: |io| &**io,
             },
             unimplemented: [
                 ask,
@@ -74,11 +69,11 @@ php_entity! {
             instance: {
                 adapters: __php_binding_buffer_io,
                 target: BufferIO,
-                borrow: |io| std::cell::Ref::map(io.borrow(), |io| {
+                deref: |io| {
                     io.as_any()
                         .downcast_ref::<BufferIO>()
                         .expect("only a BufferIO crosses as Composer\\IO\\BufferIO")
-                }),
+                },
             },
         },
     },
@@ -101,11 +96,10 @@ mod messages {
     }
 
     pub(super) fn write(
-        io: &std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: &std::rc::Rc<dyn IOInterface>,
         call: &mut Call<'_>,
     ) -> Result<RpcValue, PhpThrow> {
         let (messages, newline, verbosity) = write_args(call)?;
-        let io = io.borrow();
         for message in &messages {
             io.write_bytes(message.as_bstr(), newline, verbosity);
         }
@@ -113,11 +107,10 @@ mod messages {
     }
 
     pub(super) fn write_error(
-        io: &std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: &std::rc::Rc<dyn IOInterface>,
         call: &mut Call<'_>,
     ) -> Result<RpcValue, PhpThrow> {
         let (messages, newline, verbosity) = write_args(call)?;
-        let io = io.borrow();
         for message in &messages {
             io.write_error_bytes(message.as_bstr(), newline, verbosity);
         }
@@ -127,9 +120,7 @@ mod messages {
 
 // A BufferIO writes into a memory stream of its own and reads from its own string input, so a
 // plugin-built one is a complete instance rather than a second view on the graph's IO.
-fn construct_buffer_io(
-    call: &mut Call<'_>,
-) -> Result<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>, PhpThrow> {
+fn construct_buffer_io(call: &mut Call<'_>) -> Result<std::rc::Rc<dyn IOInterface>, PhpThrow> {
     // TODO(plugin): an OutputFormatterInterface is a Symfony object the plugin builds in its
     // own process, and no proxy carries one to the Rust side.
     if !matches!(call.args().get(2), None | Some(RpcValue::Null)) {
@@ -139,5 +130,5 @@ fn construct_buffer_io(
     }
     let io =
         BufferIO::new(call.arg::<BString>(0)?, call.arg::<i64>(1)?, None).map_err(call.failed())?;
-    Ok(std::rc::Rc::new(std::cell::RefCell::new(io)))
+    Ok(std::rc::Rc::new(io))
 }

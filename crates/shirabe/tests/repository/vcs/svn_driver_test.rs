@@ -62,8 +62,7 @@ fn support_provider() -> Vec<(&'static BStr, bool)> {
 #[test]
 fn test_support() {
     for (url, assertion) in support_provider() {
-        let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
-            std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
+        let io: std::rc::Rc<dyn IOInterface> = std::rc::Rc::new(NullIO::new());
         let config = std::rc::Rc::new(Config::new(true, None));
 
         assert_eq!(
@@ -79,8 +78,7 @@ fn test_wrong_credentials_in_url() {
     let _tear_down = TearDown::new(home.path().to_path_buf());
 
     let config = std::rc::Rc::new(config);
-    let console: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
-        std::rc::Rc::new(std::cell::RefCell::new(IOStub::new()));
+    let console: std::rc::Rc<dyn IOInterface> = std::rc::Rc::new(IOStub::new());
 
     let (http_downloader, _http_guard): (_, HttpDownloaderMockGuard) =
         get_http_downloader_mock(vec![], false, HttpDownloaderMockHandler::default());

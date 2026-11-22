@@ -60,8 +60,7 @@ fn url_provider() -> Vec<(&'static BStr, Vec<&'static BStr>)> {
 #[test]
 fn test_credentials() {
     for (url, expect) in url_provider() {
-        let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
-            std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
+        let io: std::rc::Rc<dyn IOInterface> = std::rc::Rc::new(NullIO::new());
         let config = std::rc::Rc::new(Config::new(true, None));
         let mut svn = Svn::new(url.into(), io, config, None);
 
@@ -74,8 +73,7 @@ fn test_credentials() {
 fn test_interactive_string() {
     let url = "http://svn.example.org";
 
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
-        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
+    let io: std::rc::Rc<dyn IOInterface> = std::rc::Rc::new(NullIO::new());
     let config = std::rc::Rc::new(Config::new(true, None));
     let mut svn = Svn::new(url.into(), io, config, None);
 
@@ -106,8 +104,7 @@ fn test_credentials_from_config() {
         "test",
     );
 
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
-        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
+    let io: std::rc::Rc<dyn IOInterface> = std::rc::Rc::new(NullIO::new());
     let mut svn = Svn::new(url.into(), io, std::rc::Rc::new(config), None);
 
     assert_eq!(
@@ -135,8 +132,7 @@ fn test_credentials_from_config_with_cache_credentials_true() {
         "test",
     );
 
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
-        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
+    let io: std::rc::Rc<dyn IOInterface> = std::rc::Rc::new(NullIO::new());
     let mut svn = Svn::new(url.into(), io, std::rc::Rc::new(config), None);
     svn.set_cache_credentials(true);
 
@@ -165,8 +161,7 @@ fn test_credentials_from_config_with_cache_credentials_false() {
         "test",
     );
 
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
-        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
+    let io: std::rc::Rc<dyn IOInterface> = std::rc::Rc::new(NullIO::new());
     let mut svn = Svn::new(url.into(), io, std::rc::Rc::new(config), None);
     svn.set_cache_credentials(false);
 

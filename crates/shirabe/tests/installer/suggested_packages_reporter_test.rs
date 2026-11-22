@@ -12,13 +12,9 @@ use shirabe::repository::{InstalledRepository, LockArrayRepository, RepositoryIn
 ///
 /// Builds an IO mock and a SuggestedPackagesReporter sharing it. The IOMockGuard runs
 /// assert_complete when it drops at the end of the test scope.
-fn set_up() -> (
-    std::rc::Rc<std::cell::RefCell<IOMock>>,
-    SuggestedPackagesReporter,
-    IOMockGuard,
-) {
+fn set_up() -> (std::rc::Rc<IOMock>, SuggestedPackagesReporter, IOMockGuard) {
     let (mock, guard) = get_io_mock(io_interface::NORMAL).unwrap();
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = mock.clone();
+    let io: std::rc::Rc<dyn IOInterface> = mock.clone();
     let reporter = SuggestedPackagesReporter::new(io);
     (mock, reporter, guard)
 }
@@ -33,17 +29,14 @@ fn get_suggested_package_array() -> IndexMap<BString, BString> {
 }
 
 fn reporter() -> SuggestedPackagesReporter {
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
-        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
+    let io: std::rc::Rc<dyn IOInterface> = std::rc::Rc::new(NullIO::new());
     SuggestedPackagesReporter::new(io)
 }
 
 #[test]
 fn test_constructor() {
     let (mock, mut reporter, _guard) = set_up();
-    mock.borrow_mut()
-        .expects(vec![Expectation::text("b")], true)
-        .unwrap();
+    mock.expects(vec![Expectation::text("b")], true).unwrap();
 
     reporter.add_package(BString::from("a"), BString::from("b"), BString::from("c"));
     reporter
@@ -127,16 +120,15 @@ fn test_output() {
     let (mock, mut reporter, _guard) = set_up();
     reporter.add_package(BString::from("a"), BString::from("b"), BString::from("c"));
 
-    mock.borrow_mut()
-        .expects(
-            vec![
-                Expectation::text("a suggests:"),
-                Expectation::text(" - b: c"),
-                Expectation::text(""),
-            ],
-            true,
-        )
-        .unwrap();
+    mock.expects(
+        vec![
+            Expectation::text("a suggests:"),
+            Expectation::text(" - b: c"),
+            Expectation::text(""),
+        ],
+        true,
+    )
+    .unwrap();
 
     reporter
         .output(SuggestedPackagesReporter::MODE_BY_PACKAGE, None, None)
@@ -148,16 +140,15 @@ fn test_output_with_no_suggestion_reason() {
     let (mock, mut reporter, _guard) = set_up();
     reporter.add_package(BString::from("a"), BString::from("b"), BString::from(""));
 
-    mock.borrow_mut()
-        .expects(
-            vec![
-                Expectation::text("a suggests:"),
-                Expectation::text(" - b"),
-                Expectation::text(""),
-            ],
-            true,
-        )
-        .unwrap();
+    mock.expects(
+        vec![
+            Expectation::text("a suggests:"),
+            Expectation::text(" - b"),
+            Expectation::text(""),
+        ],
+        true,
+    )
+    .unwrap();
 
     reporter
         .output(SuggestedPackagesReporter::MODE_BY_PACKAGE, None, None)
@@ -178,17 +169,16 @@ fn test_output_ignores_formatting() {
         BString::from("<bg=green>Like us on Facebook</>"),
     );
 
-    mock.borrow_mut()
-        .expects(
-            vec![
-                Expectation::text("source suggests:"),
-                Expectation::text(" - target1: [1;37;42m Like us on Facebook [0m"),
-                Expectation::text(" - target2: <bg=green>Like us on Facebook</>"),
-                Expectation::text(""),
-            ],
-            true,
-        )
-        .unwrap();
+    mock.expects(
+        vec![
+            Expectation::text("source suggests:"),
+            Expectation::text(" - target1: [1;37;42m Like us on Facebook [0m"),
+            Expectation::text(" - target2: <bg=green>Like us on Facebook</>"),
+            Expectation::text(""),
+        ],
+        true,
+    )
+    .unwrap();
 
     reporter
         .output(SuggestedPackagesReporter::MODE_BY_PACKAGE, None, None)
@@ -205,19 +195,18 @@ fn test_output_multiple_packages() {
         BString::from("because reasons"),
     );
 
-    mock.borrow_mut()
-        .expects(
-            vec![
-                Expectation::text("a suggests:"),
-                Expectation::text(" - b: c"),
-                Expectation::text(""),
-                Expectation::text("source package suggests:"),
-                Expectation::text(" - target: because reasons"),
-                Expectation::text(""),
-            ],
-            true,
-        )
-        .unwrap();
+    mock.expects(
+        vec![
+            Expectation::text("a suggests:"),
+            Expectation::text(" - b: c"),
+            Expectation::text(""),
+            Expectation::text("source package suggests:"),
+            Expectation::text(" - target: because reasons"),
+            Expectation::text(""),
+        ],
+        true,
+    )
+    .unwrap();
 
     reporter
         .output(SuggestedPackagesReporter::MODE_BY_PACKAGE, None, None)
@@ -243,16 +232,15 @@ fn test_output_skip_installed_packages() {
         BString::from("because reasons"),
     );
 
-    mock.borrow_mut()
-        .expects(
-            vec![
-                Expectation::text("source package suggests:"),
-                Expectation::text(" - target: because reasons"),
-                Expectation::text(""),
-            ],
-            true,
-        )
-        .unwrap();
+    mock.expects(
+        vec![
+            Expectation::text("source package suggests:"),
+            Expectation::text(" - target: because reasons"),
+            Expectation::text(""),
+        ],
+        true,
+    )
+    .unwrap();
 
     reporter
         .output(

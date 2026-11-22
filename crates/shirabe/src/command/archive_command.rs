@@ -103,7 +103,7 @@ impl ArchiveCommand {
     #[allow(clippy::too_many_arguments, reason = "to keep PHP signature")]
     pub async fn archive(
         &self,
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: std::rc::Rc<dyn IOInterface>,
         config: &std::rc::Rc<Config>,
         package_name: Option<BString>,
         version: Option<BString>,
@@ -207,7 +207,7 @@ impl ArchiveCommand {
 
     pub fn select_package(
         &self,
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: std::rc::Rc<dyn IOInterface>,
         package_name: &BStr,
         version: Option<&BStr>,
     ) -> anyhow::Result<Option<CompletePackageInterfaceHandle>> {

@@ -36,7 +36,7 @@ use shirabe_symfony_console::formatter::OutputFormatter;
 #[derive(Debug)]
 pub struct AutoloadGenerator {
     event_dispatcher: std::rc::Rc<EventDispatcher>,
-    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    io: std::rc::Rc<dyn IOInterface>,
     // `dump()` dispatches script events whose listeners reach back here through
     // `Composer::getAutoloadGenerator()` and mutate this instance mid-dump.
     dev_mode: std::cell::Cell<Option<bool>>,
@@ -52,10 +52,10 @@ pub struct AutoloadGenerator {
 impl AutoloadGenerator {
     pub fn new(
         event_dispatcher: std::rc::Rc<EventDispatcher>,
-        io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
+        io: Option<std::rc::Rc<dyn IOInterface>>,
     ) -> Self {
-        let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
-            io.unwrap_or_else(|| std::rc::Rc::new(std::cell::RefCell::new(NullIO::new())));
+        let io: std::rc::Rc<dyn IOInterface> =
+            io.unwrap_or_else(|| std::rc::Rc::new(NullIO::new()));
 
         Self {
             event_dispatcher,

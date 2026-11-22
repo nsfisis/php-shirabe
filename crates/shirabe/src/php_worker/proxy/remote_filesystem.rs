@@ -33,7 +33,7 @@ pub enum GetResult {
 
 #[derive(Debug)]
 pub struct RemoteFilesystem {
-    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    io: std::rc::Rc<dyn IOInterface>,
     config: std::rc::Rc<Config>,
     options: StreamContextOptions,
     disable_tls: bool,
@@ -44,7 +44,7 @@ impl RemoteFilesystem {
     /// TODO(plugin): PHP's trailing `?AuthHelper $authHelper` parameter is not offered: a Rust
     /// `AuthHelper` cannot be passed over RPC, so the PHP instance always builds its own.
     pub fn new(
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: std::rc::Rc<dyn IOInterface>,
         config: std::rc::Rc<Config>,
         options: StreamContextOptions,
         disable_tls: bool,

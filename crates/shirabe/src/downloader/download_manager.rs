@@ -2,7 +2,7 @@
 
 use crate::downloader::DownloaderInterface;
 use crate::exception::IrrecoverableDownloadException;
-use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite};
+use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::package::PackageInterfaceHandle;
 use crate::util::Filesystem;
 use bstr::{BStr, BString, ByteSlice as _};
@@ -18,7 +18,7 @@ use shirabe_php_shim::{
 /// Downloaders manager.
 #[derive(Debug)]
 pub struct DownloadManager {
-    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    io: std::rc::Rc<dyn IOInterface>,
     prefer_dist: PhpProp<bool>,
     prefer_source: PhpProp<bool>,
     package_preferences: PhpProp<std::rc::Rc<IndexMap<BString, BString>>>,
@@ -31,7 +31,7 @@ pub struct DownloadManager {
 impl DownloadManager {
     /// Initializes download manager.
     pub fn new(
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: std::rc::Rc<dyn IOInterface>,
         prefer_source: bool,
         filesystem: Option<std::rc::Rc<std::cell::RefCell<Filesystem>>>,
     ) -> Self {

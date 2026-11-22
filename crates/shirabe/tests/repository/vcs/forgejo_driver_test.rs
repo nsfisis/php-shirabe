@@ -14,7 +14,7 @@ use shirabe_php_shim::{PhpMixed, ToPhpString, path_to_bytes};
 struct SetUp {
     home: tempfile::TempDir,
     config: std::rc::Rc<Config>,
-    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    io: std::rc::Rc<dyn IOInterface>,
 }
 
 fn set_up() -> SetUp {
@@ -32,8 +32,7 @@ fn set_up() -> SetUp {
 
     // PHP mocks IOInterface with isInteractive() => true; on the passing (200) paths
     // exercised here the interactivity flag is never consulted, so a bare NullIO matches.
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
-        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
+    let io: std::rc::Rc<dyn IOInterface> = std::rc::Rc::new(NullIO::new());
 
     SetUp {
         home,

@@ -11,9 +11,7 @@ pub struct ErrorHandler;
 
 impl ErrorHandler {
     /// Register error handler.
-    pub fn register(
-        io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
-    ) -> anyhow::Result<()> {
+    pub fn register(io: Option<std::rc::Rc<dyn IOInterface>>) -> anyhow::Result<()> {
         error_handler::register(io)
     }
 }

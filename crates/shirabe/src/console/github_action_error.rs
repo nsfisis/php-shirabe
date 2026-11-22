@@ -7,11 +7,11 @@ use shirabe_php_shim::{bformat, boolval, empty, str_replace};
 
 #[derive(Debug)]
 pub struct GithubActionError {
-    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    io: std::rc::Rc<dyn IOInterface>,
 }
 
 impl GithubActionError {
-    pub fn new(io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>) -> Self {
+    pub fn new(io: std::rc::Rc<dyn IOInterface>) -> Self {
         Self { io }
     }
 

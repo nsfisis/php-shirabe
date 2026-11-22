@@ -241,14 +241,14 @@ impl Drop for RestoreEnv {
     }
 }
 
-fn null_io() -> std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
-    std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()))
+fn null_io() -> std::rc::Rc<dyn IOInterface> {
+    std::rc::Rc::new(NullIO::new())
 }
 
 /// ref: FactoryMock::createInstallationManager (the real installers are never created in tests, so a
 /// bare InstallationManager over a mock HttpDownloader suffices).
 pub(crate) fn installation_manager(
-    io: &std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    io: &std::rc::Rc<dyn IOInterface>,
 ) -> std::rc::Rc<InstallationManager> {
     let config = std::rc::Rc::new(Config::new(false, None));
     let http_downloader = std::rc::Rc::new(std::cell::RefCell::new(HttpDownloader::__new_mock(

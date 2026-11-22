@@ -51,7 +51,7 @@ impl BumpCommand {
 
     pub fn do_bump(
         &self,
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: std::rc::Rc<dyn IOInterface>,
         dev_only: bool,
         no_dev_only: bool,
         dry_run: bool,

@@ -45,7 +45,7 @@ pub struct Locker {
 impl Locker {
     /// Initializes packages locker.
     pub fn new(
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: std::rc::Rc<dyn IOInterface>,
         lock_file: JsonFile,
         installation_manager: std::rc::Rc<InstallationManager>,
         composer_file_contents: impl AsRef<[u8]>,

@@ -203,14 +203,14 @@ impl InstallationManagerInterface for MockInstallationManager {
 
     fn set_output_progress(&self, _output_progress: bool) {}
 
-    async fn notify_installs(&self, _io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>) {}
+    async fn notify_installs(&self, _io: std::rc::Rc<dyn IOInterface>) {}
 }
 
 /// Equivalent to PHP setUp()'s `new InstallationManager(...)`, used only to satisfy
 /// `Locker::new`'s concrete constructor argument (PHP hands the same InstallationManager mock to
 /// the Locker, which never touches it in these tests).
 fn locker_installation_manager(
-    io: &std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    io: &std::rc::Rc<dyn IOInterface>,
 ) -> std::rc::Rc<InstallationManager> {
     let config = std::rc::Rc::new(Config::new(false, None));
     let http_downloader = std::rc::Rc::new(std::cell::RefCell::new(
@@ -228,8 +228,8 @@ fn locker_installation_manager(
 
 #[derive(Debug)]
 pub(crate) struct SetUp {
-    pub(crate) io: std::rc::Rc<std::cell::RefCell<BufferIO>>,
-    io_dyn: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    pub(crate) io: std::rc::Rc<BufferIO>,
+    io_dyn: std::rc::Rc<dyn IOInterface>,
     pub(crate) pm: std::rc::Rc<std::cell::RefCell<PluginManager>>,
     autoload_generator: std::rc::Rc<std::cell::RefCell<AutoloadGenerator>>,
     packages: Vec<PackageInterfaceHandle>,
@@ -278,10 +278,8 @@ pub(crate) fn set_up() -> SetUp {
 
     let installation_manager = MockInstallationManager;
 
-    let io = std::rc::Rc::new(std::cell::RefCell::new(
-        BufferIO::new(BString::default(), VERBOSITY_NORMAL, None).unwrap(),
-    ));
-    let io_dyn: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io.clone();
+    let io = std::rc::Rc::new(BufferIO::new(BString::default(), VERBOSITY_NORMAL, None).unwrap());
+    let io_dyn: std::rc::Rc<dyn IOInterface> = io.clone();
 
     let composer_rc = std::rc::Rc::new(PartialOrFullComposer::Full(Composer::new()));
     let composer = ComposerHandle::from_rc_unchecked(composer_rc.clone());
@@ -433,7 +431,7 @@ fn test_install_new_plugin() {
         "installer-v1",
         plugin_property(&plugins[0], BStr::new("version"))
     );
-    assert_eq!("activate v1\n", set_up.io.borrow().get_output());
+    assert_eq!("activate v1\n", set_up.io.get_output());
 }
 
 #[test]
@@ -461,7 +459,7 @@ fn test_install_plugin_with_root_package_having_files_autoload() {
 
     let pm = set_up.pm.borrow();
     let plugins = pm.get_plugins();
-    assert_eq!("activate v1\n", set_up.io.borrow().get_output());
+    assert_eq!("activate v1\n", set_up.io.get_output());
     assert_eq!(
         "installer-v1",
         plugin_property(&plugins[0], BStr::new("version"))
@@ -497,7 +495,7 @@ fn test_install_multiple_plugins() {
     );
     assert_eq!(
         "activate v4-plugin1\nactivate v4-plugin2\n",
-        set_up.io.borrow().get_output()
+        set_up.io.get_output()
     );
 }
 
@@ -533,7 +531,7 @@ fn test_upgrade_with_new_class_name() {
     );
     assert_eq!(
         "activate v1\ndeactivate v1\nactivate v2\n",
-        set_up.io.borrow().get_output()
+        set_up.io.get_output()
     );
 }
 
@@ -556,7 +554,7 @@ fn test_uninstall() {
     assert_eq!(0, plugins.len());
     assert_eq!(
         "activate v1\ndeactivate v1\nuninstall v1\n",
-        set_up.io.borrow().get_output()
+        set_up.io.get_output()
     );
 }
 
@@ -588,7 +586,7 @@ fn test_upgrade_with_same_class_name() {
     );
     assert_eq!(
         "activate v2\ndeactivate v2\nactivate v3\n",
-        set_up.io.borrow().get_output()
+        set_up.io.get_output()
     );
 }
 
@@ -614,7 +612,7 @@ fn test_register_plugin_only_one_time() {
         "installer-v1",
         plugin_property(&plugins[0], BStr::new("version"))
     );
-    assert_eq!("activate v1\n", set_up.io.borrow().get_output());
+    assert_eq!("activate v1\n", set_up.io.get_output());
 }
 
 /// PHP `setPluginApiVersionWithPlugins`: swaps in a plugin manager reporting
@@ -805,7 +803,7 @@ impl PluginInterface for NoopPlugin {
     fn activate(
         &mut self,
         _composer: ComposerHandle,
-        _io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        _io: std::rc::Rc<dyn IOInterface>,
     ) -> anyhow::Result<()> {
         Ok(())
     }
@@ -813,7 +811,7 @@ impl PluginInterface for NoopPlugin {
     fn deactivate(
         &mut self,
         _composer: ComposerHandle,
-        _io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        _io: std::rc::Rc<dyn IOInterface>,
     ) -> anyhow::Result<()> {
         Ok(())
     }
@@ -821,7 +819,7 @@ impl PluginInterface for NoopPlugin {
     fn uninstall(
         &mut self,
         _composer: ComposerHandle,
-        _io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        _io: std::rc::Rc<dyn IOInterface>,
     ) -> anyhow::Result<()> {
         Ok(())
     }
@@ -998,7 +996,7 @@ impl PluginInterface for CapablePlugin {
     fn activate(
         &mut self,
         _composer: ComposerHandle,
-        _io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        _io: std::rc::Rc<dyn IOInterface>,
     ) -> anyhow::Result<()> {
         Ok(())
     }
@@ -1006,7 +1004,7 @@ impl PluginInterface for CapablePlugin {
     fn deactivate(
         &mut self,
         _composer: ComposerHandle,
-        _io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        _io: std::rc::Rc<dyn IOInterface>,
     ) -> anyhow::Result<()> {
         Ok(())
     }
@@ -1014,7 +1012,7 @@ impl PluginInterface for CapablePlugin {
     fn uninstall(
         &mut self,
         _composer: ComposerHandle,
-        _io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        _io: std::rc::Rc<dyn IOInterface>,
     ) -> anyhow::Result<()> {
         Ok(())
     }

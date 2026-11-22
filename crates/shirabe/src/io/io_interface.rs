@@ -19,7 +19,7 @@ pub const DEBUG: i64 = 16;
 // Composer actually invokes through an IO are folded directly into this trait
 // (each is annotated as originating from LoggerInterface).
 #[php_binding(r"Composer\IO\IOInterface")]
-pub trait IOInterfaceImmutable: std::fmt::Debug {
+pub trait IOInterface: std::fmt::Debug {
     fn is_interactive(&self) -> bool;
 
     fn is_verbose(&self) -> bool;
@@ -99,12 +99,44 @@ pub trait IOInterfaceImmutable: std::fmt::Debug {
     fn warning_bytes(&self, message: &BStr, context: &[(&BStr, &BStr)]);
 
     fn debug_bytes(&self, message: &BStr, context: &[(&BStr, &BStr)]);
+
+    #[php(skip)]
+    fn set_authentication(
+        &self,
+        repository_name: BString,
+        username: BString,
+        password: Option<BString>,
+    );
+
+    #[php(skip)]
+    fn load_configuration(&self, config: &Config) -> anyhow::Result<()>;
+
+    #[php(skip)]
+    fn as_any(&self) -> &dyn std::any::Any;
+
+    /// The PHP class this IO crosses the plugin boundary as, or `None` for an implementation
+    /// with no proxy stub.
+    #[php(skip)]
+    fn php_class(&self) -> Option<&'static BStr> {
+        None
+    }
+
+    #[php(skip)]
+    fn as_base_io(&self) -> Option<&dyn BaseIO> {
+        None
+    }
+
+    // PHP: only `ConsoleIO::enableDebugging` exists; the interface itself does not declare it.
+    #[php(skip)]
+    fn enable_debugging(&self, _start_time: f64) {
+        panic!("enable_debugging is only supported by ConsoleIO/BufferIO");
+    }
 }
 
 // The overloads of the PHP methods taking a string (`write()`, `writeError()`, `ask()`,
 // `select()`, `error()`, ...), which accept any byte string. They are generic, so they live outside
 // the `dyn IOInterface` vtable.
-pub trait IOInterfaceWrite: IOInterfaceImmutable {
+pub trait IOInterfaceWrite: IOInterface {
     fn write(&self, message: impl AsRef<[u8]>) {
         self.write_bytes(BStr::new(message.as_ref()), true, NORMAL)
     }
@@ -224,158 +256,4 @@ pub trait IOInterfaceWrite: IOInterfaceImmutable {
     }
 }
 
-impl<T: IOInterfaceImmutable + ?Sized> IOInterfaceWrite for T {}
-
-// The `&mut self` part of PHP `IOInterface`.
-pub trait IOInterfaceMutable {
-    fn set_authentication(
-        &mut self,
-        repository_name: BString,
-        username: BString,
-        password: Option<BString>,
-    );
-
-    fn load_configuration(&mut self, config: &Config) -> anyhow::Result<()>;
-}
-
-// PHP `IOInterface`. This is the type used for the shared trait object
-// `dyn IOInterface`; its vtable carries both the immutable and mutable methods.
-pub trait IOInterface: IOInterfaceImmutable + IOInterfaceMutable {
-    fn as_any(&self) -> &dyn std::any::Any;
-
-    /// The PHP class this IO crosses the plugin boundary as, or `None` for an implementation
-    /// with no proxy stub.
-    fn php_class(&self) -> Option<&'static BStr> {
-        None
-    }
-
-    fn as_base_io_mut(&mut self) -> Option<&mut dyn BaseIO> {
-        None
-    }
-
-    // PHP: only `ConsoleIO::enableDebugging` exists; the interface itself does not declare it.
-    fn enable_debugging(&mut self, _start_time: f64) {
-        panic!("enable_debugging is only supported by ConsoleIO/BufferIO");
-    }
-}
-
-impl IOInterfaceImmutable for std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
-    fn is_interactive(&self) -> bool {
-        self.borrow().is_interactive()
-    }
-
-    fn is_verbose(&self) -> bool {
-        self.borrow().is_verbose()
-    }
-
-    fn is_very_verbose(&self) -> bool {
-        self.borrow().is_very_verbose()
-    }
-
-    fn is_debug(&self) -> bool {
-        self.borrow().is_debug()
-    }
-
-    fn is_decorated(&self) -> bool {
-        self.borrow().is_decorated()
-    }
-
-    fn write_bytes(&self, message: &BStr, newline: bool, verbosity: i64) {
-        self.borrow().write_bytes(message, newline, verbosity)
-    }
-
-    fn write_error_bytes(&self, message: &BStr, newline: bool, verbosity: i64) {
-        self.borrow().write_error_bytes(message, newline, verbosity)
-    }
-
-    fn write_raw_bytes(&self, message: &BStr, newline: bool, verbosity: i64) {
-        self.borrow().write_raw_bytes(message, newline, verbosity)
-    }
-
-    fn write_error_raw_bytes(&self, message: &BStr, newline: bool, verbosity: i64) {
-        self.borrow()
-            .write_error_raw_bytes(message, newline, verbosity)
-    }
-
-    fn overwrite_bytes(&self, message: &BStr, newline: bool, size: Option<i64>, verbosity: i64) {
-        self.borrow()
-            .overwrite_bytes(message, newline, size, verbosity)
-    }
-
-    fn overwrite_error_bytes(
-        &self,
-        message: &BStr,
-        newline: bool,
-        size: Option<i64>,
-        verbosity: i64,
-    ) {
-        self.borrow()
-            .overwrite_error_bytes(message, newline, size, verbosity)
-    }
-
-    fn ask_bytes(&self, question: &BStr, default: InputValue) -> anyhow::Result<InputValue> {
-        self.borrow().ask_bytes(question, default)
-    }
-
-    fn ask_confirmation_bytes(&self, question: &BStr, default: bool) -> anyhow::Result<bool> {
-        self.borrow().ask_confirmation_bytes(question, default)
-    }
-
-    fn ask_and_validate_bytes(
-        &self,
-        question: &BStr,
-        validator: Box<dyn Fn(InputValue) -> anyhow::Result<InputValue>>,
-        attempts: Option<i64>,
-        default: InputValue,
-    ) -> anyhow::Result<InputValue> {
-        self.borrow()
-            .ask_and_validate_bytes(question, validator, attempts, default)
-    }
-
-    fn ask_and_hide_answer_bytes(&self, question: &BStr) -> anyhow::Result<Option<BString>> {
-        self.borrow().ask_and_hide_answer_bytes(question)
-    }
-
-    fn select_bytes(
-        &self,
-        question: &BStr,
-        choices: IndexMap<BString, BString>,
-        default: InputValue,
-        attempts: Option<i64>,
-        error_message: &BStr,
-        multiselect: bool,
-    ) -> anyhow::Result<InputValue> {
-        self.borrow().select_bytes(
-            question,
-            choices,
-            default,
-            attempts,
-            error_message,
-            multiselect,
-        )
-    }
-
-    fn get_authentications(&self) -> IndexMap<BString, IndexMap<BString, Option<BString>>> {
-        self.borrow().get_authentications()
-    }
-
-    fn has_authentication(&self, repository_name: &BStr) -> bool {
-        self.borrow().has_authentication(repository_name)
-    }
-
-    fn get_authentication(&self, repository_name: &BStr) -> IndexMap<BString, Option<BString>> {
-        self.borrow().get_authentication(repository_name)
-    }
-
-    fn error_bytes(&self, message: &BStr, context: &[(&BStr, &BStr)]) {
-        self.borrow().error_bytes(message, context)
-    }
-
-    fn warning_bytes(&self, message: &BStr, context: &[(&BStr, &BStr)]) {
-        self.borrow().warning_bytes(message, context)
-    }
-
-    fn debug_bytes(&self, message: &BStr, context: &[(&BStr, &BStr)]) {
-        self.borrow().debug_bytes(message, context)
-    }
-}
+impl<T: IOInterface + ?Sized> IOInterfaceWrite for T {}

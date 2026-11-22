@@ -53,7 +53,7 @@ impl Command for AboutCommand {
         let composer_version = composer::VERSION;
         let _ = (input, output);
 
-        self.get_io().borrow().write(bformat!("<info>Shirabe - Dependency Manager for PHP - version {shirabe_version} (based on Composer {composer_version})</info>\n<comment>Shirabe is a dependency manager tracking local dependencies of your projects and libraries.\nSee https://getcomposer.org/ for more information.</comment>"));
+        self.get_io().write(bformat!("<info>Shirabe - Dependency Manager for PHP - version {shirabe_version} (based on Composer {composer_version})</info>\n<comment>Shirabe is a dependency manager tracking local dependencies of your projects and libraries.\nSee https://getcomposer.org/ for more information.</comment>"));
 
         Ok(0)
     }

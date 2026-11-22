@@ -38,7 +38,7 @@ fn make_config(home: &std::path::Path) -> Config {
 // strict expectation set both matches PHP and catches unexpected process calls.
 struct Fixtures {
     home: tempfile::TempDir,
-    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    io: std::rc::Rc<dyn IOInterface>,
     config: std::rc::Rc<Config>,
     process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     _process_guard: ProcessExecutorMockGuard,
@@ -46,8 +46,7 @@ struct Fixtures {
 
 fn fixtures() -> Fixtures {
     let home = get_unique_tmp_directory();
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
-        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
+    let io: std::rc::Rc<dyn IOInterface> = std::rc::Rc::new(NullIO::new());
     let config = std::rc::Rc::new(make_config(home.path()));
     let (process, _process_guard) = get_process_executor_mock(vec![], true, MockHandler::default());
     Fixtures {
@@ -688,8 +687,7 @@ fn test_get_branches() {
 fn test_supports() {
     for (url, expected) in data_for_test_supports() {
         let home = get_unique_tmp_directory();
-        let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
-            std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
+        let io: std::rc::Rc<dyn IOInterface> = std::rc::Rc::new(NullIO::new());
         let config = std::rc::Rc::new(make_config(home.path()));
 
         assert_eq!(

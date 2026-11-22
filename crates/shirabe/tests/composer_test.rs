@@ -12,12 +12,12 @@ use shirabe::repository::{RepositoryManager, RepositoryManagerInterface};
 use shirabe::util::r#loop::Loop;
 use shirabe::util::{HttpDownloader, ProcessExecutor};
 
-fn null_io() -> std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
-    std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()))
+fn null_io() -> std::rc::Rc<dyn IOInterface> {
+    std::rc::Rc::new(NullIO::new())
 }
 
 fn http_downloader(
-    io: &std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    io: &std::rc::Rc<dyn IOInterface>,
 ) -> std::rc::Rc<std::cell::RefCell<HttpDownloader>> {
     let config = std::rc::Rc::new(Config::new(false, None));
     std::rc::Rc::new(std::cell::RefCell::new(
@@ -31,9 +31,7 @@ fn http_downloader(
     ))
 }
 
-fn installation_manager(
-    io: &std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-) -> std::rc::Rc<InstallationManager> {
+fn installation_manager(io: &std::rc::Rc<dyn IOInterface>) -> std::rc::Rc<InstallationManager> {
     let r#loop = std::rc::Rc::new(std::cell::RefCell::new(Loop::new(
         http_downloader(io),
         None,

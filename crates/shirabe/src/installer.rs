@@ -46,7 +46,7 @@ use crate::filter::platform_requirement_filter::{
     IgnoreListPlatformRequirementFilter, PlatformRequirementFilterFactory,
     PlatformRequirementFilterInterface,
 };
-use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface};
+use crate::io::{IOInterface, IOInterfaceWrite, io_interface};
 use crate::package::dumper::ArrayDumper;
 use crate::package::loader::{ArrayLoader, LoaderInterface};
 use crate::package::version::VersionParser;
@@ -73,7 +73,7 @@ use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
 
 #[derive(Debug)]
 pub struct Installer {
-    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    io: std::rc::Rc<dyn IOInterface>,
     config: std::rc::Rc<Config>,
     package: RootPackageInterfaceHandle,
     // TODO can we get rid of the below and just use the package itself?
@@ -131,7 +131,7 @@ impl Installer {
 
     #[allow(clippy::too_many_arguments, reason = "to keep PHP signature")]
     pub fn new(
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: std::rc::Rc<dyn IOInterface>,
         config: std::rc::Rc<Config>,
         package: RootPackageInterfaceHandle,
         download_manager: std::rc::Rc<dyn DownloadManagerInterface>,
@@ -1576,10 +1576,7 @@ impl Installer {
     }
 
     /// Create Installer
-    pub fn create(
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        composer: &PartialComposerHandle,
-    ) -> Self {
+    pub fn create(io: std::rc::Rc<dyn IOInterface>, composer: &PartialComposerHandle) -> Self {
         let composer = composer_full(composer);
         Self::new(
             io,

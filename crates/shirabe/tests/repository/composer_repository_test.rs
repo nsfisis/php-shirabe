@@ -48,8 +48,8 @@ fn create_config_read_only() -> (Config, tempfile::TempDir) {
     (config, home)
 }
 
-fn null_io() -> std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
-    std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()))
+fn null_io() -> std::rc::Rc<dyn IOInterface> {
+    std::rc::Rc::new(NullIO::new())
 }
 
 fn repo_config(url: &BStr) -> IndexMap<BString, PhpMixed> {

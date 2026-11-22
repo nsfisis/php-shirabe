@@ -21,12 +21,12 @@ use shirabe::util::{
 };
 use shirabe_php_shim::{PhpMixed, ToPhpString};
 
-fn null_io() -> std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
-    std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()))
+fn null_io() -> std::rc::Rc<dyn IOInterface> {
+    std::rc::Rc::new(NullIO::new())
 }
 
 fn http_downloader(
-    io: &std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    io: &std::rc::Rc<dyn IOInterface>,
     config: &std::rc::Rc<Config>,
 ) -> std::rc::Rc<std::cell::RefCell<HttpDownloader>> {
     std::rc::Rc::new(std::cell::RefCell::new(
@@ -54,7 +54,7 @@ fn make_config() -> std::rc::Rc<Config> {
 // Stands in for `getMockBuilder('Composer\Repository\RepositoryManager')->disableOriginalConstructor()`.
 // The loader only stores it and feeds it default repositories, so a real instance suffices.
 fn make_manager(
-    io: &std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    io: &std::rc::Rc<dyn IOInterface>,
     config: &std::rc::Rc<Config>,
 ) -> std::rc::Rc<RepositoryManager> {
     std::rc::Rc::new(RepositoryManager::new(

@@ -49,7 +49,7 @@ fn root_file() -> BString {
 
 /// A config whose cache is read-only, so the measurement stays off the filesystem.
 fn config(home: &tempfile::TempDir) -> Config {
-    let mut config = Config::new(true, None);
+    let config = Config::new(true, None);
     let mut settings: IndexMap<BString, PhpMixed> = IndexMap::new();
     settings.insert("home".into(), PhpMixed::string(path_to_bytes(home.path())));
     settings.insert("cache-read-only".into(), PhpMixed::Bool(true));
@@ -84,8 +84,7 @@ fn repository(
         },
     ];
 
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
-        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
+    let io: std::rc::Rc<dyn IOInterface> = std::rc::Rc::new(NullIO::new());
     let http_downloader = std::rc::Rc::new(std::cell::RefCell::new(HttpDownloader::__new_mock(
         io.clone(),
         std::rc::Rc::new(Config::new(false, None)),

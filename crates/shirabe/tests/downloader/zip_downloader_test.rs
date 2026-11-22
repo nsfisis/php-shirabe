@@ -22,7 +22,7 @@ use shirabe_semver::VersionParser;
 
 struct SetUp {
     test_dir: tempfile::TempDir,
-    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    io: std::rc::Rc<dyn IOInterface>,
     config: std::rc::Rc<Config>,
     http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
     package: PackageInterfaceHandle,
@@ -38,8 +38,7 @@ struct SetUp {
 fn set_up() -> SetUp {
     let test_dir = get_unique_tmp_directory();
 
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
-        std::rc::Rc::new(std::cell::RefCell::new(IOStub::new()));
+    let io: std::rc::Rc<dyn IOInterface> = std::rc::Rc::new(IOStub::new());
     let config = std::rc::Rc::new(Config::new(false, None));
     let dl_config = std::rc::Rc::new(Config::new(false, None));
     let http_downloader = std::rc::Rc::new(std::cell::RefCell::new(HttpDownloader::__new_mock(
@@ -121,8 +120,7 @@ fn test_error_messages() {
     let test_dir = get_unique_tmp_directory();
     let _tear_down = TearDown::new(test_dir.path().to_path_buf());
 
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
-        std::rc::Rc::new(std::cell::RefCell::new(IOStub::new()));
+    let io: std::rc::Rc<dyn IOInterface> = std::rc::Rc::new(IOStub::new());
 
     // $this->config->method('get')->with('vendor-dir')->willReturn($this->testDir)
     let config = Config::new(false, None);

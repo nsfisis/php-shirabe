@@ -606,7 +606,7 @@ impl Command for ConfigCommand {
 
         {
             let config_rc = config.clone();
-            self.get_io().borrow_mut().load_configuration(&config_rc)?;
+            self.get_io().load_configuration(&config_rc)?;
         }
 
         // List the configuration of the file settings

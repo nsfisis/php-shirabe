@@ -20,15 +20,12 @@ use shirabe_php_shim::{
 
 #[derive(Debug)]
 pub struct LocalFilesystem {
-    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    io: std::rc::Rc<dyn IOInterface>,
     config: std::rc::Rc<Config>,
 }
 
 impl LocalFilesystem {
-    pub fn new(
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        config: std::rc::Rc<Config>,
-    ) -> Self {
+    pub fn new(io: std::rc::Rc<dyn IOInterface>, config: std::rc::Rc<Config>) -> Self {
         Self { io, config }
     }
 

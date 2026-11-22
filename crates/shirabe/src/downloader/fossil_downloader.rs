@@ -24,7 +24,7 @@ impl_php_class!(FossilDownloader, r"Composer\Downloader\FossilDownloader");
 
 impl FossilDownloader {
     pub fn new(
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: std::rc::Rc<dyn IOInterface>,
         config: std::rc::Rc<Config>,
         process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
         fs: std::rc::Rc<std::cell::RefCell<Filesystem>>,
@@ -59,7 +59,7 @@ impl FossilDownloader {
 }
 
 impl VcsDownloader for FossilDownloader {
-    fn io(&self) -> std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
+    fn io(&self) -> std::rc::Rc<dyn IOInterface> {
         self.inner.io.clone()
     }
 

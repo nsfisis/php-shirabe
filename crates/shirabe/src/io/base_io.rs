@@ -7,7 +7,7 @@ use crate::util::ProcessExecutor;
 use bstr::{B, BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    JSON_INVALID_UTF8_IGNORE, JSON_UNESCAPED_SLASHES, JSON_UNESCAPED_UNICODE, PhpMixed,
+    JSON_INVALID_UTF8_IGNORE, JSON_UNESCAPED_SLASHES, JSON_UNESCAPED_UNICODE, PhpMixed, PhpProp,
     UnexpectedValueException, array_merge, bformat, in_array_strict, json_encode_ex, php_regex,
     php_str, preg_is_match,
 };
@@ -27,24 +27,26 @@ impl LogLevel {
 }
 
 pub trait BaseIO: IOInterface {
-    fn authentications(&self) -> &IndexMap<BString, IndexMap<BString, Option<BString>>>;
-    fn authentications_mut(&mut self)
-    -> &mut IndexMap<BString, IndexMap<BString, Option<BString>>>;
+    fn authentications(
+        &self,
+    ) -> &PhpProp<std::rc::Rc<IndexMap<BString, IndexMap<BString, Option<BString>>>>>;
 
     fn get_authentications(&self) -> IndexMap<BString, IndexMap<BString, Option<BString>>> {
-        self.authentications().clone()
+        std::rc::Rc::unwrap_or_clone(self.authentications().cloned())
     }
 
-    fn reset_authentications(&mut self) {
-        *self.authentications_mut() = IndexMap::new();
+    fn reset_authentications(&self) {
+        self.authentications().set(std::rc::Rc::default());
     }
 
     fn has_authentication(&self, repository_name: &BStr) -> bool {
-        self.authentications().contains_key(repository_name)
+        self.authentications()
+            .cloned()
+            .contains_key(repository_name)
     }
 
     fn get_authentication(&self, repository_name: &BStr) -> IndexMap<BString, Option<BString>> {
-        if let Some(auth) = self.authentications().get(repository_name) {
+        if let Some(auth) = self.authentications().cloned().get(repository_name) {
             return auth.clone();
         }
         let mut result = IndexMap::new();
@@ -54,7 +56,7 @@ pub trait BaseIO: IOInterface {
     }
 
     fn set_authentication(
-        &mut self,
+        &self,
         repository_name: BString,
         username: BString,
         password: Option<BString>,
@@ -62,11 +64,13 @@ pub trait BaseIO: IOInterface {
         let mut auth = IndexMap::new();
         auth.insert(BString::from("username"), Some(username));
         auth.insert(BString::from("password"), password);
-        self.authentications_mut().insert(repository_name, auth);
+        self.authentications().update(|authentications| {
+            std::rc::Rc::make_mut(authentications).insert(repository_name, auth)
+        });
     }
 
     fn check_and_set_authentication(
-        &mut self,
+        &self,
         repository_name: BString,
         username: BString,
         password: Option<BString>,
@@ -83,7 +87,7 @@ pub trait BaseIO: IOInterface {
         BaseIO::set_authentication(self, repository_name, username, password);
     }
 
-    fn load_configuration(&mut self, config: &Config) -> anyhow::Result<()> {
+    fn load_configuration(&self, config: &Config) -> anyhow::Result<()> {
         let bitbucket_oauth = config.get_map("bitbucket-oauth")?;
         let github_oauth = config.get_map("github-oauth")?;
         let gitlab_oauth = config.get_map("gitlab-oauth")?;

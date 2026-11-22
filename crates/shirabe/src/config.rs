@@ -1421,7 +1421,7 @@ impl Config {
     pub fn prohibit_url_by_config(
         &self,
         url: &BStr,
-        io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
+        io: Option<std::rc::Rc<dyn IOInterface>>,
         repo_options: &IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<()> {
         // Return right away if the URL is malformed or custom (see issue #5173), but only for non-HTTP(S) URLs

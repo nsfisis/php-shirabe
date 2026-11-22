@@ -391,10 +391,9 @@ fn test_installer() {
     let _tear_down = TearDown::new();
 
     for case in provide_installer() {
-        let io_buffer = std::rc::Rc::new(std::cell::RefCell::new(
-            BufferIO::new(BString::default(), VERBOSITY_NORMAL, None).unwrap(),
-        ));
-        let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io_buffer.clone();
+        let io_buffer =
+            std::rc::Rc::new(BufferIO::new(BString::default(), VERBOSITY_NORMAL, None).unwrap());
+        let io: std::rc::Rc<dyn IOInterface> = io_buffer.clone();
 
         let config = ConfigStubBuilder::new()
             .with("vendor-dir", PhpMixed::string(BString::from("foo")))
@@ -469,7 +468,7 @@ fn test_installer() {
         );
         let result = shirabe::util::sync_executor::block_on(installer.run()).unwrap();
 
-        let output = str_replace("\r", "", io_buffer.borrow().get_output());
+        let output = str_replace("\r", "", io_buffer.get_output());
         assert_eq!(0, result, "{}", output.display_lossy());
 
         let installed = installation_manager.__get_installed_packages();
@@ -879,10 +878,9 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&BString>) 
         return; // markTestSkipped
     }
 
-    let io_buffer = std::rc::Rc::new(std::cell::RefCell::new(
-        BufferIO::new(BString::default(), VERBOSITY_NORMAL, None).unwrap(),
-    ));
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io_buffer.clone();
+    let io_buffer =
+        std::rc::Rc::new(BufferIO::new(BString::default(), VERBOSITY_NORMAL, None).unwrap());
+    let io: std::rc::Rc<dyn IOInterface> = io_buffer.clone();
 
     let is_exception = matches!(case.expect_result, ExpectResult::Exception(_));
 
@@ -1175,7 +1173,7 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&BString>) 
     let app_run =
         shirabe::util::sync_executor::block_on(application.run(Some(input), Some(output)));
 
-    let output_string: BString = io_buffer.borrow().get_output().replace("\r", "").into();
+    let output_string: BString = io_buffer.get_output().replace("\r", "").into();
 
     // Shouldn't check output and results if an exception was expected by this point.
     if is_exception {

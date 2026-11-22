@@ -9,7 +9,7 @@ use crate::delegate_base_command_trait_impls_to_inner;
 use crate::dependency_resolver::{DefaultPolicy, PolicyInterface};
 use crate::event_dispatcher::EventFlags;
 use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
-use crate::io::{IOInterfaceImmutable, IOInterfaceWrite};
+use crate::io::IOInterfaceWrite;
 use crate::json::JsonFile;
 use crate::package::version::{ShowWarnings, VersionParser, VersionSelector};
 use crate::package::{

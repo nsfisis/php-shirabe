@@ -399,7 +399,7 @@ impl DiagnoseCommand {
             return Ok(result);
         }
 
-        self.get_io().borrow_mut().set_authentication(
+        self.get_io().set_authentication(
             BString::from(domain),
             BString::from(token),
             Some(BString::from("x-oauth-basic")),
@@ -460,7 +460,7 @@ impl DiagnoseCommand {
         }
 
         if let Some(t) = token {
-            self.get_io().borrow_mut().set_authentication(
+            self.get_io().set_authentication(
                 BString::from(domain),
                 BString::from(t),
                 Some(BString::from("x-oauth-basic")),
@@ -650,19 +650,18 @@ impl DiagnoseCommand {
         );
         let composer_repo_as_repo = RepositoryInterfaceHandle::new(ComposerRepository::new(
             repo_config,
-            std::rc::Rc::new(std::cell::RefCell::new(NullIO::new())),
+            std::rc::Rc::new(NullIO::new()),
             config,
             self.http_downloader.borrow().clone().unwrap(),
             None,
         )?);
         repo_set.add_repository(composer_repo_as_repo)?;
 
-        let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
-            std::rc::Rc::new(std::cell::RefCell::new(BufferIO::new(
-                BString::default(),
-                shirabe_symfony_console::output::VERBOSITY_NORMAL,
-                None,
-            )?));
+        let io: std::rc::Rc<dyn IOInterface> = std::rc::Rc::new(BufferIO::new(
+            BString::default(),
+            shirabe_symfony_console::output::VERBOSITY_NORMAL,
+            None,
+        )?);
         let result = match auditor.audit(
             &io,
             &repo_set,
@@ -687,11 +686,7 @@ impl DiagnoseCommand {
         if result > 0 {
             return Ok(CheckResult::Message(bformat!(
                 "<highlight>Audit found some issues:</>{PHP_EOL}{}",
-                io.borrow()
-                    .as_any()
-                    .downcast_ref::<BufferIO>()
-                    .unwrap()
-                    .get_output()
+                io.as_any().downcast_ref::<BufferIO>().unwrap().get_output()
             )));
         }
 
@@ -1129,7 +1124,7 @@ impl Command for DiagnoseCommand {
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
         let mut composer = self.try_composer(None, None);
-        let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = self.get_io().clone();
+        let io: std::rc::Rc<dyn IOInterface> = self.get_io().clone();
 
         let config: std::rc::Rc<Config>;
         if let Some(ref mut c) = composer {
@@ -1174,7 +1169,7 @@ impl Command for DiagnoseCommand {
         config.merge(&secure_http_wrap, Config::SOURCE_COMMAND);
         let _ = config.prohibit_url_by_config(
             "http://repo.packagist.org".into(),
-            Some(std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()))),
+            Some(std::rc::Rc::new(NullIO::new())),
             &IndexMap::new(),
         );
 

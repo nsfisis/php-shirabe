@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/Util/Svn.php sha1:49634190b2b4684ef42c9ccf8a263f365d7eb904
 
 use crate::config::Config;
-use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite};
+use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::util::{Platform, ProcessExecutor};
 use bstr::{B, BStr, BString, ByteSlice as _, ByteVec as _};
 use shirabe_php_shim::{
@@ -20,7 +20,7 @@ pub struct SvnCredentials {
 pub struct Svn {
     credentials: Option<SvnCredentials>,
     has_auth: Option<bool>,
-    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    io: std::rc::Rc<dyn IOInterface>,
     url: BString,
     cache_credentials: bool,
     process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
@@ -35,7 +35,7 @@ impl Svn {
 
     pub fn new(
         url: BString,
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: std::rc::Rc<dyn IOInterface>,
         config: std::rc::Rc<Config>,
         process: Option<std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,
     ) -> Self {
@@ -124,7 +124,7 @@ impl Svn {
                     .get_or_insert_with(BString::default)
                     .push_str(buffer);
                 if verbose {
-                    io.borrow().write_error_no_newline(buffer);
+                    io.write_error_no_newline(buffer);
                 }
                 Ok(false)
             });

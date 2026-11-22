@@ -10,9 +10,7 @@ use crate::downloader::{
 };
 use crate::event_dispatcher::EventDispatcher;
 use crate::exception::IrrecoverableDownloadException;
-use crate::io::{
-    IOInterface, IOInterfaceImmutable, IOInterfaceWrite, NullIO, VERY_VERBOSE, io_interface,
-};
+use crate::io::{IOInterface, IOInterfaceWrite, NullIO, VERY_VERBOSE, io_interface};
 use crate::package::comparer::Comparer;
 use crate::package::{DisplayMode, PackageInterfaceHandle};
 use crate::plugin::{
@@ -42,7 +40,7 @@ pub static RESPONSE_HEADERS: std::sync::LazyLock<
 /// Base downloader for files
 #[derive(Debug)]
 pub struct FileDownloader {
-    pub(crate) io: std::cell::RefCell<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
+    pub(crate) io: std::cell::RefCell<std::rc::Rc<dyn IOInterface>>,
     pub(crate) config: std::rc::Rc<Config>,
     http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
     pub(crate) filesystem: std::rc::Rc<std::cell::RefCell<Filesystem>>,
@@ -66,7 +64,7 @@ impl FileDownloader {
 
     /// Constructor.
     pub fn new(
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: std::rc::Rc<dyn IOInterface>,
         config: std::rc::Rc<Config>,
         http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
         event_dispatcher: Option<std::rc::Rc<EventDispatcher>>,
@@ -123,14 +121,9 @@ impl FileDownloader {
         package: PackageInterfaceHandle,
         path: &std::path::Path,
     ) -> anyhow::Result<Option<bstr::BString>> {
-        let prev_io = std::mem::replace(
-            &mut *self.io.borrow_mut(),
-            std::rc::Rc::new(std::cell::RefCell::new(NullIO::new())),
-        );
-        self.io
-            .borrow()
-            .borrow_mut()
-            .load_configuration(&self.config)?;
+        let prev_io =
+            std::mem::replace(&mut *self.io.borrow_mut(), std::rc::Rc::new(NullIO::new()));
+        self.io.borrow().load_configuration(&self.config)?;
 
         let target_dir = Filesystem::trim_trailing_slash(path);
         // PHP attaches an onRejected handler to capture the error and drives the promise via

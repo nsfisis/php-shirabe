@@ -14,7 +14,7 @@ struct SetUp {
     root: tempfile::TempDir,
     vendor_dir: std::path::PathBuf,
     bin_dir: std::path::PathBuf,
-    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    io: std::rc::Rc<dyn IOInterface>,
     fs: Filesystem,
 }
 
@@ -30,8 +30,7 @@ fn set_up() -> SetUp {
     let bin_dir = root_dir.join("bin");
     std::fs::create_dir_all(&bin_dir).unwrap();
 
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
-        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
+    let io: std::rc::Rc<dyn IOInterface> = std::rc::Rc::new(NullIO::new());
 
     SetUp {
         root,

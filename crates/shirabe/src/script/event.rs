@@ -12,7 +12,7 @@ use shirabe_php_binding_macros::php_binding;
 pub struct Event {
     inner: BaseEvent,
     composer: ComposerWeakHandle,
-    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    io: std::rc::Rc<dyn IOInterface>,
     dev_mode: bool,
     originating_event: Option<OriginatingEvent>,
 }
@@ -28,7 +28,7 @@ impl Event {
     pub fn new(
         name: impl Into<BString>,
         composer: ComposerWeakHandle,
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: std::rc::Rc<dyn IOInterface>,
         dev_mode: bool,
         args: Vec<BString>,
         flags: EventFlags,
@@ -46,7 +46,7 @@ impl Event {
         &self.composer
     }
 
-    pub fn get_io(&self) -> std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
+    pub fn get_io(&self) -> std::rc::Rc<dyn IOInterface> {
         self.io.clone()
     }
 

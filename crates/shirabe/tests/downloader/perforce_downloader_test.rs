@@ -83,8 +83,7 @@ fn test_init_perforce_instantiates_a_new_perforce_object() {
     // RepositoryInterface), so it cannot be held in a RepositoryInterfaceHandle. The package
     // is therefore built without a repository, yielding an empty repo config.
     let test_path = get_unique_tmp_directory();
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
-        std::rc::Rc::new(std::cell::RefCell::new(IOStub::new()));
+    let io: std::rc::Rc<dyn IOInterface> = std::rc::Rc::new(IOStub::new());
     let config = std::rc::Rc::new(get_config(test_path.path()));
     let package = make_package(None);
 
@@ -99,8 +98,7 @@ fn test_init_perforce_instantiates_a_new_perforce_object() {
 #[test]
 fn test_init_perforce_does_nothing_if_perforce_already_set() {
     let test_path = get_unique_tmp_directory();
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
-        std::rc::Rc::new(std::cell::RefCell::new(IOStub::new()));
+    let io: std::rc::Rc<dyn IOInterface> = std::rc::Rc::new(IOStub::new());
     let config = std::rc::Rc::new(get_config(test_path.path()));
     let (process, _process_guard) =
         get_process_executor_mock(vec![], false, MockHandler::default());
@@ -135,13 +133,12 @@ fn do_install_workflow(source_ref: &'static BStr, expected_label: Option<BString
 
     let (io_mock, _io_guard) = get_io_mock(NORMAL).unwrap();
     io_mock
-        .borrow_mut()
         .expects(
             vec![Expectation::text_regex(bformat!("Cloning {source_ref}"))],
             false,
         )
         .unwrap();
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io_mock;
+    let io: std::rc::Rc<dyn IOInterface> = io_mock;
     let config = std::rc::Rc::new(get_config(test_path.path()));
     let (process, _process_guard) =
         get_process_executor_mock(vec![], false, MockHandler::default());

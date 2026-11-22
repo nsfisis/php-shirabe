@@ -5,7 +5,7 @@ use crate::downloader::{
     ChangeReportInterface, DownloaderInterface, VcsCapableDownloaderInterface, VcsDownloader,
     VcsDownloaderBase,
 };
-use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite};
+use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::package::PackageInterfaceHandle;
 use crate::repository::VcsRepository;
 use crate::util::{Filesystem, ProcessExecutor, Svn as SvnUtil};
@@ -28,7 +28,7 @@ impl_php_class!(SvnDownloader, r"Composer\Downloader\SvnDownloader");
 
 impl SvnDownloader {
     pub fn new(
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: std::rc::Rc<dyn IOInterface>,
         config: std::rc::Rc<Config>,
         process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
         fs: std::rc::Rc<std::cell::RefCell<Filesystem>>,
@@ -103,7 +103,7 @@ impl SvnDownloader {
 }
 
 impl VcsDownloader for SvnDownloader {
-    fn io(&self) -> std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
+    fn io(&self) -> std::rc::Rc<dyn IOInterface> {
         self.inner.io.clone()
     }
 

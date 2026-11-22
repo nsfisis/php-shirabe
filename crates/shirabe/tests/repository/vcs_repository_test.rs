@@ -233,8 +233,7 @@ fn test_load_versions() {
     config.merge(&top, Config::SOURCE_UNKNOWN);
     let config = std::rc::Rc::new(config);
 
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
-        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
+    let io: std::rc::Rc<dyn IOInterface> = std::rc::Rc::new(NullIO::new());
     let http_downloader = std::rc::Rc::new(std::cell::RefCell::new(
         HttpDownloader::new(
             io.clone(),

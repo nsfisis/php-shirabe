@@ -32,7 +32,6 @@ fn test_default_values_are_as_expected() {
 
     let (io_mock, _io_guard) = get_io_mock(io_interface::DEBUG).unwrap();
     io_mock
-        .borrow_mut()
         .expects(
             vec![Expectation::text(
                 "<warning>You are running Shirabe with SSL/TLS protection disabled.</warning>",
@@ -45,7 +44,7 @@ fn test_default_values_are_as_expected() {
         .with("disable-tls", PhpMixed::Bool(true))
         .build_shared();
 
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io_mock;
+    let io: std::rc::Rc<dyn IOInterface> = io_mock;
     Factory::create_http_downloader(io, &config, shirabe::util::StreamContextOptions::new())
         .unwrap();
 }

@@ -577,11 +577,9 @@ Found 2 abandoned packages:
 
     for case in cases {
         let repo_set = get_repo_set();
-        let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
-            std::rc::Rc::new(std::cell::RefCell::new(
-                BufferIO::new(BString::default(), output_interface::VERBOSITY_NORMAL, None)
-                    .unwrap(),
-            ));
+        let io: std::rc::Rc<dyn IOInterface> = std::rc::Rc::new(
+            BufferIO::new(BString::default(), output_interface::VERBOSITY_NORMAL, None).unwrap(),
+        );
         let auditor = Auditor;
         let result = auditor
             .audit(
@@ -603,11 +601,7 @@ Found 2 abandoned packages:
             trim(str_replace(
                 "\r",
                 "",
-                io.borrow()
-                    .as_any()
-                    .downcast_ref::<BufferIO>()
-                    .unwrap()
-                    .get_output()
+                io.as_any().downcast_ref::<BufferIO>().unwrap().get_output()
             ))
         );
     }
@@ -815,7 +809,7 @@ fn test_audit_with_ignore() {
         let repo_set = get_repo_set();
         let (io_mock, _io_guard) = get_io_mock(io_interface::NORMAL).unwrap();
         let auditor = Auditor;
-        let io_dyn: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io_mock.clone();
+        let io_dyn: std::rc::Rc<dyn IOInterface> = io_mock.clone();
         let result = auditor
             .audit(
                 &io_dyn,
@@ -830,10 +824,7 @@ fn test_audit_with_ignore() {
                 IndexMap::new(),
             )
             .unwrap();
-        io_mock
-            .borrow_mut()
-            .expects(case.expected_output.clone(), true)
-            .unwrap();
+        io_mock.expects(case.expected_output.clone(), true).unwrap();
         assert_eq!(case.exit_code, result);
     }
 }
@@ -915,11 +906,9 @@ fn test_audit_with_ignore_unreachable() {
     // Without the ignoreUnreachable flag the TransportException propagates.
     {
         let repo_set = make_repo_set();
-        let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
-            std::rc::Rc::new(std::cell::RefCell::new(
-                BufferIO::new(BString::default(), output_interface::VERBOSITY_NORMAL, None)
-                    .unwrap(),
-            ));
+        let io: std::rc::Rc<dyn IOInterface> = std::rc::Rc::new(
+            BufferIO::new(BString::default(), output_interface::VERBOSITY_NORMAL, None).unwrap(),
+        );
         let err = auditor
             .audit(
                 &io,
@@ -940,11 +929,9 @@ fn test_audit_with_ignore_unreachable() {
     // With the ignoreUnreachable flag the advisories from reachable repos are reported.
     {
         let repo_set = make_repo_set();
-        let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
-            std::rc::Rc::new(std::cell::RefCell::new(
-                BufferIO::new(BString::default(), output_interface::VERBOSITY_NORMAL, None)
-                    .unwrap(),
-            ));
+        let io: std::rc::Rc<dyn IOInterface> = std::rc::Rc::new(
+            BufferIO::new(BString::default(), output_interface::VERBOSITY_NORMAL, None).unwrap(),
+        );
         let result = auditor
             .audit(
                 &io,
@@ -961,12 +948,7 @@ fn test_audit_with_ignore_unreachable() {
             .unwrap();
         assert_eq!(Auditor::STATUS_VULNERABLE, result);
 
-        let output = io
-            .borrow()
-            .as_any()
-            .downcast_ref::<BufferIO>()
-            .unwrap()
-            .get_output();
+        let output = io.as_any().downcast_ref::<BufferIO>().unwrap().get_output();
         assert!(output.contains_str("The following repositories were unreachable:"));
         assert!(output.contains_str("HTTP/1.1 404 Not Found"));
         assert!(output.contains_str("First repo advisory"));
@@ -978,11 +960,9 @@ fn test_audit_with_ignore_unreachable() {
     // With JSON format the unreachable repositories and advisories are both included.
     {
         let repo_set = make_repo_set();
-        let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
-            std::rc::Rc::new(std::cell::RefCell::new(
-                BufferIO::new(BString::default(), output_interface::VERBOSITY_NORMAL, None)
-                    .unwrap(),
-            ));
+        let io: std::rc::Rc<dyn IOInterface> = std::rc::Rc::new(
+            BufferIO::new(BString::default(), output_interface::VERBOSITY_NORMAL, None).unwrap(),
+        );
         let result = auditor
             .audit(
                 &io,
@@ -999,14 +979,9 @@ fn test_audit_with_ignore_unreachable() {
             .unwrap();
         assert_eq!(Auditor::STATUS_VULNERABLE, result);
 
-        let json: serde_json::Value = serde_json::from_slice(
-            &io.borrow()
-                .as_any()
-                .downcast_ref::<BufferIO>()
-                .unwrap()
-                .get_output(),
-        )
-        .unwrap();
+        let json: serde_json::Value =
+            serde_json::from_slice(&io.as_any().downcast_ref::<BufferIO>().unwrap().get_output())
+                .unwrap();
         let unreachable = json
             .get("unreachable-repositories")
             .and_then(|v| v.as_array())
@@ -1082,7 +1057,7 @@ fn test_audit_with_ignore_severity() {
         let repo_set = get_repo_set();
         let (io_mock, _io_guard) = get_io_mock(io_interface::NORMAL).unwrap();
         let auditor = Auditor;
-        let io_dyn: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io_mock.clone();
+        let io_dyn: std::rc::Rc<dyn IOInterface> = io_mock.clone();
         let result = auditor
             .audit(
                 &io_dyn,
@@ -1097,10 +1072,7 @@ fn test_audit_with_ignore_severity() {
                 IndexMap::new(),
             )
             .unwrap();
-        io_mock
-            .borrow_mut()
-            .expects(case.expected_output.clone(), true)
-            .unwrap();
+        io_mock.expects(case.expected_output.clone(), true).unwrap();
         assert_eq!(case.exit_code, result);
     }
 }

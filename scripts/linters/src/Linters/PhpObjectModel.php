@@ -28,6 +28,9 @@ final class PhpObjectModel implements Linter
         'crates/shirabe/src/downloader/download_manager.rs' => ['DownloadManager'],
         'crates/shirabe/src/event_dispatcher/event_dispatcher.rs' => ['EventDispatcher'],
         'crates/shirabe/src/installer/installation_manager.rs' => ['InstallationManager'],
+        'crates/shirabe/src/io/buffer_io.rs' => ['BufferIO'],
+        'crates/shirabe/src/io/console_io.rs' => ['ConsoleIO'],
+        'crates/shirabe/src/io/null_io.rs' => ['NullIO'],
         'crates/shirabe/src/package/locker.rs' => ['Locker'],
         'crates/shirabe/src/repository/repository_manager.rs' => ['RepositoryManager'],
     ];
@@ -41,6 +44,7 @@ final class PhpObjectModel implements Linter
         'EventDispatcherInterface',
         'InstallationManager',
         'InstallationManagerInterface',
+        'IOInterface',
         'Locker',
         'LockerInterface',
         'PartialComposer',

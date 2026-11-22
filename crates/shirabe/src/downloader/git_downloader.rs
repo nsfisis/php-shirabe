@@ -6,7 +6,7 @@ use crate::downloader::{
     ChangeReportInterface, DownloaderInterface, DvcsDownloaderInterface,
     VcsCapableDownloaderInterface, VcsDownloader, VcsDownloaderBase,
 };
-use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface};
+use crate::io::{IOInterface, IOInterfaceWrite, io_interface};
 use crate::package::{DisplayMode, PackageInterfaceHandle};
 use crate::util::{Filesystem, Git as GitUtil, Platform, ProcessExecutor, Url};
 use bstr::{B, BStr, BString, ByteSlice as _};
@@ -32,7 +32,7 @@ impl_php_class!(GitDownloader, r"Composer\Downloader\GitDownloader");
 
 impl GitDownloader {
     pub fn new(
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: std::rc::Rc<dyn IOInterface>,
         config: std::rc::Rc<Config>,
         process: Option<std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,
         fs: Option<std::rc::Rc<std::cell::RefCell<Filesystem>>>,
@@ -729,7 +729,7 @@ impl VcsCapableDownloaderInterface for GitDownloader {
 }
 
 impl VcsDownloader for GitDownloader {
-    fn io(&self) -> std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
+    fn io(&self) -> std::rc::Rc<dyn IOInterface> {
         self.inner.io.clone()
     }
 

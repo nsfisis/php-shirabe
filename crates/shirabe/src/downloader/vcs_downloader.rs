@@ -7,7 +7,7 @@ use crate::dependency_resolver::operation::{
 use crate::downloader::{
     ChangeReportInterface, DownloaderInterface, VcsCapableDownloaderInterface,
 };
-use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite};
+use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::package::PackageInterfaceHandle;
 use crate::package::dumper::ArrayDumper;
 use crate::package::version::{VersionGuesser, VersionParser};
@@ -22,7 +22,7 @@ use shirabe_php_shim::{
 
 #[derive(Debug)]
 pub struct VcsDownloaderBase {
-    pub io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    pub io: std::rc::Rc<dyn IOInterface>,
     pub config: std::rc::Rc<Config>,
     pub process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     pub filesystem: std::rc::Rc<std::cell::RefCell<Filesystem>>,
@@ -31,7 +31,7 @@ pub struct VcsDownloaderBase {
 
 impl VcsDownloaderBase {
     pub fn new(
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: std::rc::Rc<dyn IOInterface>,
         config: std::rc::Rc<Config>,
         process: Option<std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,
         fs: Option<std::rc::Rc<std::cell::RefCell<Filesystem>>>,
@@ -76,7 +76,7 @@ impl VcsDownloaderBase {
 pub trait VcsDownloader:
     DownloaderInterface + ChangeReportInterface + VcsCapableDownloaderInterface
 {
-    fn io(&self) -> std::rc::Rc<std::cell::RefCell<dyn IOInterface>>;
+    fn io(&self) -> std::rc::Rc<dyn IOInterface>;
     fn config(&self) -> &std::rc::Rc<Config>;
     fn process(&self) -> &std::rc::Rc<std::cell::RefCell<ProcessExecutor>>;
     fn filesystem(&self) -> &std::rc::Rc<std::cell::RefCell<Filesystem>>;

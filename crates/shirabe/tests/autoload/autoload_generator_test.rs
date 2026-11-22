@@ -131,7 +131,7 @@ struct SetUp {
     /// ref: `$this->configValueMap['use-include-path']`, which testUseGlobalIncludePath mutates.
     use_include_path: bool,
     im: std::rc::Rc<dyn shirabe::installer::InstallationManagerInterface>,
-    io: std::rc::Rc<std::cell::RefCell<BufferIO>>,
+    io: std::rc::Rc<BufferIO>,
     generator: AutoloadGenerator,
     event_dispatcher: std::rc::Rc<EventDispatcher>,
 }
@@ -151,7 +151,7 @@ fn null_path(s: &BStr) -> BString {
 /// exercised here, so a mock HttpDownloader (no real curl backend) stands in for the loop.
 fn make_installation_manager(
     vendor_dir: &std::path::Path,
-    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    io: std::rc::Rc<dyn IOInterface>,
 ) -> InstallationManager {
     let config_for_downloader = std::rc::Rc::new(Config::new(false, None));
     let http_downloader = std::rc::Rc::new(std::cell::RefCell::new(HttpDownloader::__new_mock(
@@ -177,11 +177,11 @@ fn set_up() -> SetUp {
     let prev_cwd = std::env::current_dir().unwrap();
     std::env::set_current_dir(&working_dir).unwrap();
 
-    let io = std::rc::Rc::new(std::cell::RefCell::new(
+    let io = std::rc::Rc::new(
         BufferIO::new(BString::default(), output_interface::VERBOSITY_NORMAL, None).unwrap(),
-    ));
+    );
 
-    let dispatcher_io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io.clone();
+    let dispatcher_io: std::rc::Rc<dyn IOInterface> = io.clone();
     let im: std::rc::Rc<dyn shirabe::installer::InstallationManagerInterface> = std::rc::Rc::new(
         make_installation_manager(&vendor_dir, dispatcher_io.clone()),
     );
@@ -762,7 +762,7 @@ fn test_duplicate_files_warning() {
         composer_out.join("autoload_files.php"),
     );
     let expected = "<warning>The following \"files\" autoload rules are included multiple times, this may cause issues and should be resolved:</warning>\n<warning> - $baseDir . '/foo.php'</warning>\n";
-    assert_eq!(expected, s.io.borrow().get_output());
+    assert_eq!(expected, s.io.get_output());
 }
 
 #[test]
@@ -3146,7 +3146,7 @@ fn test_absolute_symlink_with_psr4_does_not_generate_warnings() {
 
     dump(&mut s, package.into(), true, BStr::new("_9")).unwrap();
 
-    let output = s.io.borrow().get_output();
+    let output = s.io.get_output();
 
     // Should not contain PSR-4 violation warnings
     assert!(!output.contains_str("does not comply with psr-4 autoloading standard"));

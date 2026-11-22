@@ -2,7 +2,7 @@
 
 use crate::config::Config;
 use crate::downloader::TransportException;
-use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface};
+use crate::io::{IOInterface, IOInterfaceWrite, io_interface};
 use crate::util::{Bitbucket, GitHub, GitLab, HttpOptions, StreamContextOptions};
 use bstr::{B, BStr, BString, ByteSlice as _, ByteVec as _};
 use indexmap::IndexMap;
@@ -16,7 +16,7 @@ use shirabe_symfony_console::input::InputValue;
 
 #[derive(Debug)]
 pub struct AuthHelper {
-    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    io: std::rc::Rc<dyn IOInterface>,
     config: std::rc::Rc<Config>,
     displayed_origin_authentications: IndexMap<BString, BString>,
     bitbucket_retry: IndexMap<BString, bool>,
@@ -35,10 +35,7 @@ pub enum StoreAuth {
 }
 
 impl AuthHelper {
-    pub fn new(
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        config: std::rc::Rc<Config>,
-    ) -> Self {
+    pub fn new(io: std::rc::Rc<dyn IOInterface>, config: std::rc::Rc<Config>) -> Self {
         Self {
             io,
             config,
@@ -89,7 +86,6 @@ impl AuthHelper {
                 bstr::BStr::new(&bformat!("http-basic.{origin}")),
                 PhpMixed::Array(
                     self.io
-                        .borrow()
                         .get_authentication(origin)
                         .into_iter()
                         .map(|(k, v)| (k, v.map_or(PhpMixed::Null, PhpMixed::string)))
@@ -293,7 +289,7 @@ impl AuthHelper {
                         password.as_bstr(),
                     )?;
                     if !access_token.is_empty() {
-                        self.io.borrow_mut().set_authentication(
+                        self.io.set_authentication(
                             origin.into(),
                             BString::from("x-token-auth"),
                             Some(access_token),
@@ -391,7 +387,7 @@ impl AuthHelper {
             ));
             let username = self.io.ask("      Username: ", InputValue::Null)?;
             let password = self.io.ask_and_hide_answer("      Password: ")?;
-            self.io.borrow_mut().set_authentication(
+            self.io.set_authentication(
                 origin.into(),
                 BString::from(username.as_string().unwrap_or_default()),
                 password,

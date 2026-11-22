@@ -33,8 +33,7 @@ fn set_up() -> SetUp {
 
     // PHP mocks Cache::getFinder and keeps the real Filesystem; here the CacheMock finder seam plays
     // that role and the Cache otherwise operates on the real temp directory.
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
-        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
+    let io: std::rc::Rc<dyn IOInterface> = std::rc::Rc::new(NullIO::new());
     let cache = Cache::new(io, root.path(), None, None, false);
 
     SetUp { root, files, cache }
@@ -119,8 +118,7 @@ fn test_remove_files_when_cache_is_too_large() {
 #[test]
 fn test_clear_cache() {
     let root = get_unique_tmp_directory();
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
-        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
+    let io: std::rc::Rc<dyn IOInterface> = std::rc::Rc::new(NullIO::new());
     let mut cache = Cache::new(io, root.path(), Some(BStr::new("a-z0-9.")), None, false);
 
     assert!(cache.clear());

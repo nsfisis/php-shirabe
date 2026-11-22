@@ -28,7 +28,7 @@ fn install_subscriber_plugin(set_up: &SetUp) {
     let installer = new_installer(set_up);
     set_up.pm.borrow_mut().load_installed_plugins().unwrap();
     run(installer.install(&set_up.repository, subscriber_fixture_package())).unwrap();
-    assert_eq!("activate subscriber-v1\n", set_up.io.borrow().get_output());
+    assert_eq!("activate subscriber-v1\n", set_up.io.get_output());
 }
 
 fn dispatch(set_up: &SetUp, event_name: &BStr) -> i64 {
@@ -50,7 +50,7 @@ fn test_subscriber_listener_receives_event() {
     assert_eq!(0, return_code);
     assert_eq!(
         "activate subscriber-v1\nsubscriber saw post-install-cmd\n",
-        set_up.io.borrow().get_output()
+        set_up.io.get_output()
     );
 }
 
@@ -66,7 +66,7 @@ fn test_subscriber_listeners_run_in_priority_order() {
     assert_eq!(0, return_code);
     assert_eq!(
         "activate subscriber-v1\nearly listener\nlate listener\n",
-        set_up.io.borrow().get_output()
+        set_up.io.get_output()
     );
 }
 
@@ -83,7 +83,7 @@ fn test_subscriber_listener_returning_false_sets_return_code() {
     assert_eq!(1, return_code);
     assert_eq!(
         "activate subscriber-v1\nfailing listener\n",
-        set_up.io.borrow().get_output()
+        set_up.io.get_output()
     );
 }
 
@@ -100,7 +100,7 @@ fn test_listener_can_dispatch_through_the_same_dispatcher() {
     assert_eq!(0, return_code);
     assert_eq!(
         "activate subscriber-v1\nnested dispatch returned 0\n",
-        set_up.io.borrow().get_output()
+        set_up.io.get_output()
     );
 }
 
@@ -135,7 +135,7 @@ fn test_remove_plugin_removes_its_subscribed_listeners() {
     assert_eq!(0, return_code);
     assert_eq!(
         "activate subscriber-v1\nsubscriber saw post-install-cmd\n",
-        set_up.io.borrow().get_output()
+        set_up.io.get_output()
     );
 }
 
@@ -148,5 +148,5 @@ fn test_unrelated_event_does_not_reach_the_subscriber() {
     let return_code = dispatch(&set_up, BStr::new("shirabe-unrelated-event"));
 
     assert_eq!(0, return_code);
-    assert_eq!("activate subscriber-v1\n", set_up.io.borrow().get_output());
+    assert_eq!("activate subscriber-v1\n", set_up.io.get_output());
 }

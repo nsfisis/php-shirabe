@@ -440,8 +440,7 @@ fn run_test_pool_builder(
         IndexMap::new(),
     );
     let config = std::rc::Rc::new(Config::new(false, None));
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
-        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
+    let io: std::rc::Rc<dyn IOInterface> = std::rc::Rc::new(NullIO::new());
     let rm = RepositoryFactory::manager(io.clone(), &config, None, None, None).unwrap();
 
     // PHP: foreach ($packageRepos as $packages)

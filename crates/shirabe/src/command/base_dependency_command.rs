@@ -2,7 +2,7 @@
 
 use crate::command::BaseCommand;
 use crate::composer::composer_full;
-use crate::io::{IOInterfaceImmutable, IOInterfaceWrite};
+use crate::io::IOInterfaceWrite;
 use crate::package::version::VersionParser;
 use crate::package::{
     Package, PackageHandle, PackageInterfaceHandle, RootPackage, RootPackageInterfaceHandle,

@@ -20,8 +20,7 @@ fn fixtures_dir() -> std::path::PathBuf {
 
 /// ref: PathRepositoryTest::createPathRepo
 fn create_path_repo(options: IndexMap<BString, PhpMixed>) -> PathRepository {
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
-        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
+    let io: std::rc::Rc<dyn IOInterface> = std::rc::Rc::new(NullIO::new());
 
     let config = std::rc::Rc::new(Config::new(true, None));
     let proc = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(None)));

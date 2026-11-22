@@ -74,7 +74,7 @@ fn test_alias_packages_cross_the_plugin_boundary() {
          root aliasOf identity: same\n\
          root minimum stability: stable\n\
          built: Composer\\Package\\CompleteAliasPackage vendor/aliased 9.9.9 of Composer\\Package\\CompletePackage 1.0.0\n",
-        set_up.io.borrow().get_output()
+        set_up.io.get_output()
     );
 
     // The flag the plugin set landed on the Rust-side entity, not on a child-side copy.

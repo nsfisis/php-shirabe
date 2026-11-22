@@ -3,7 +3,7 @@
 use crate::config::Config;
 use crate::downloader::TransportException;
 use crate::event_dispatcher::EventDispatcher;
-use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite};
+use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::package::loader::{
     ArrayLoader, InvalidPackageException, LoaderInterface, ValidatingArrayLoader,
 };
@@ -32,7 +32,7 @@ pub struct VcsRepository {
     package_name: std::cell::RefCell<Option<BString>>,
     is_verbose: bool,
     is_very_verbose: bool,
-    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    io: std::rc::Rc<dyn IOInterface>,
     config: std::rc::Rc<Config>,
     version_parser: std::cell::RefCell<Option<VersionParser>>,
     r#type: BString,
@@ -63,7 +63,7 @@ impl VcsRepository {
     #[allow(clippy::too_many_arguments, reason = "to keep PHP signature")]
     pub fn new(
         mut repo_config: IndexMap<BString, PhpMixed>,
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: std::rc::Rc<dyn IOInterface>,
         config: std::rc::Rc<Config>,
         http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
         dispatcher: Option<std::rc::Rc<EventDispatcher>>,

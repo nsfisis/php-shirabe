@@ -80,8 +80,7 @@ fn build_git(
     config: Config,
     process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
 ) -> Git {
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
-        std::rc::Rc::new(std::cell::RefCell::new(io));
+    let io: std::rc::Rc<dyn IOInterface> = std::rc::Rc::new(io);
     let config = std::rc::Rc::new(config);
     let fs = std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(None)));
     Git::new(io, config, process, fs)

@@ -50,7 +50,7 @@ shirabe_php_rpc::rpc_value_record! {
 #[derive(Debug)]
 pub(crate) struct PhpConsoleApplicationContext {
     composer: Option<ComposerHandle>,
-    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    io: std::rc::Rc<dyn IOInterface>,
     initial_working_directory: Option<std::path::PathBuf>,
     disable_plugins_by_default: bool,
     disable_scripts_by_default: bool,
@@ -81,7 +81,7 @@ pub(crate) fn take_pending_plugin_command_handles() -> Vec<PhpEntityHandle> {
 
 pub(crate) fn publish_console_application_context(
     composer: Option<&ComposerHandle>,
-    io: &std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    io: &std::rc::Rc<dyn IOInterface>,
     initial_working_directory: Option<std::path::PathBuf>,
     disable_plugins_by_default: bool,
     disable_scripts_by_default: bool,

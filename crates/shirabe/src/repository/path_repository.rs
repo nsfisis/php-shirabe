@@ -40,7 +40,7 @@ impl ConfigurableRepositoryInterface for PathRepository {
 impl PathRepository {
     pub fn new(
         repo_config: IndexMap<BString, PhpMixed>,
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: std::rc::Rc<dyn IOInterface>,
         config: std::rc::Rc<Config>,
         http_downloader: Option<std::rc::Rc<std::cell::RefCell<HttpDownloader>>>,
         dispatcher: Option<std::rc::Rc<EventDispatcher>>,

@@ -10,14 +10,14 @@ use shirabe_symfony_console::input::InputValue;
 
 #[derive(Debug)]
 pub struct Forgejo {
-    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    io: std::rc::Rc<dyn IOInterface>,
     config: std::rc::Rc<Config>,
     http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
 }
 
 impl Forgejo {
     pub fn new(
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: std::rc::Rc<dyn IOInterface>,
         config: std::rc::Rc<Config>,
         http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
     ) -> Self {
@@ -87,11 +87,8 @@ impl Forgejo {
             return Ok(Ok(false));
         }
 
-        self.io.borrow_mut().set_authentication(
-            origin_url.into(),
-            username.clone(),
-            Some(token.clone()),
-        );
+        self.io
+            .set_authentication(origin_url.into(), username.clone(), Some(token.clone()));
 
         match self.http_downloader.borrow_mut().get(
             bformat!("https://{origin_url}/api/v1/version"),

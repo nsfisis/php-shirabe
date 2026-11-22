@@ -68,11 +68,11 @@ fn get_conf_json_mock(origin: &BStr) -> std::rc::Rc<MockConfigSource> {
 }
 
 fn build_github(
-    io_mock: &std::rc::Rc<std::cell::RefCell<IOMock>>,
+    io_mock: &std::rc::Rc<IOMock>,
     config: std::rc::Rc<Config>,
     http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
 ) -> GitHub {
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io_mock.clone();
+    let io: std::rc::Rc<dyn IOInterface> = io_mock.clone();
     GitHub::new(io, config, None, Some(http_downloader)).unwrap()
 }
 
@@ -89,7 +89,6 @@ fn build_config() -> std::rc::Rc<Config> {
 fn test_username_password_authentication_flow() {
     let (io_mock, _io_guard) = get_io_mock(io_interface::NORMAL).unwrap();
     io_mock
-        .borrow_mut()
         .expects(
             vec![
                 Expectation::text(MESSAGE),
@@ -129,7 +128,6 @@ fn test_username_password_authentication_flow() {
 fn test_username_password_failure() {
     let (io_mock, _io_guard) = get_io_mock(io_interface::NORMAL).unwrap();
     io_mock
-        .borrow_mut()
         .expects(vec![Expectation::ask("Token (hidden): ", PASSWORD)], false)
         .unwrap();
 

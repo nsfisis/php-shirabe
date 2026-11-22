@@ -79,7 +79,7 @@ pub struct ComposerRepository {
     url: BString,
     /// non-empty-string
     base_url: BString,
-    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    io: std::rc::Rc<dyn IOInterface>,
     http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
     r#loop: std::rc::Rc<std::cell::RefCell<Loop>>,
     cache: std::cell::RefCell<Cache>,
@@ -214,7 +214,7 @@ impl ConfigurableRepositoryInterface for ComposerRepository {
 impl ComposerRepository {
     pub fn new(
         mut repo_config: IndexMap<BString, PhpMixed>,
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: std::rc::Rc<dyn IOInterface>,
         config: &Config,
         http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
         event_dispatcher: Option<std::rc::Rc<EventDispatcher>>,

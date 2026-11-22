@@ -149,8 +149,7 @@ fn test_supports() {
     let _tear_down = TearDown::new(home.path().to_path_buf());
 
     for (expected, repo_url) in supports_provider() {
-        let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
-            std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
+        let io: std::rc::Rc<dyn IOInterface> = std::rc::Rc::new(NullIO::new());
         let config = std::rc::Rc::new(Config::new(true, None));
 
         assert_eq!(
@@ -173,12 +172,11 @@ fn test_private_repository() {
 
     let config = std::rc::Rc::new(config);
 
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
-        std::rc::Rc::new(std::cell::RefCell::new(
-            IOStub::new()
-                .with_is_interactive(true)
-                .with_ask_and_hide_answer(Some(BString::from("sometoken"))),
-        ));
+    let io: std::rc::Rc<dyn IOInterface> = std::rc::Rc::new(
+        IOStub::new()
+            .with_is_interactive(true)
+            .with_ask_and_hide_answer(Some(BString::from("sometoken"))),
+    );
 
     let (http_downloader, _http_guard): (_, HttpDownloaderMockGuard) = get_http_downloader_mock(
         vec![
@@ -257,9 +255,8 @@ fn test_public_repository() {
     let sha = "SOMESHA";
 
     let config = std::rc::Rc::new(config);
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = std::rc::Rc::new(
-        std::cell::RefCell::new(IOStub::new().with_is_interactive(true)),
-    );
+    let io: std::rc::Rc<dyn IOInterface> =
+        std::rc::Rc::new(IOStub::new().with_is_interactive(true));
 
     let (http_downloader, _http_guard) = get_http_downloader_mock(
         vec![http_body(
@@ -324,9 +321,8 @@ fn test_public_repository2() {
     let sha = "SOMESHA";
 
     let config = std::rc::Rc::new(config);
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = std::rc::Rc::new(
-        std::cell::RefCell::new(IOStub::new().with_is_interactive(true)),
-    );
+    let io: std::rc::Rc<dyn IOInterface> =
+        std::rc::Rc::new(IOStub::new().with_is_interactive(true));
 
     let (http_downloader, _http_guard) = get_http_downloader_mock(
         vec![
@@ -423,9 +419,8 @@ fn test_invalid_support_data() {
     let sha = "SOMESHA";
 
     let config = std::rc::Rc::new(config);
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = std::rc::Rc::new(
-        std::cell::RefCell::new(IOStub::new().with_is_interactive(true)),
-    );
+    let io: std::rc::Rc<dyn IOInterface> =
+        std::rc::Rc::new(IOStub::new().with_is_interactive(true));
 
     let (http_downloader, _http_guard) = get_http_downloader_mock(
         vec![
@@ -609,9 +604,8 @@ fn test_funding_format() {
         let sha = "SOMESHA";
 
         let config = std::rc::Rc::new(config);
-        let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = std::rc::Rc::new(
-            std::cell::RefCell::new(IOStub::new().with_is_interactive(true)),
-        );
+        let io: std::rc::Rc<dyn IOInterface> =
+            std::rc::Rc::new(IOStub::new().with_is_interactive(true));
 
         let (http_downloader, _http_guard) = get_http_downloader_mock(
             vec![
@@ -720,9 +714,8 @@ fn test_public_repository_archived() {
     );
 
     let config = std::rc::Rc::new(config);
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = std::rc::Rc::new(
-        std::cell::RefCell::new(IOStub::new().with_is_interactive(true)),
-    );
+    let io: std::rc::Rc<dyn IOInterface> =
+        std::rc::Rc::new(IOStub::new().with_is_interactive(true));
 
     let (http_downloader, _http_guard) = get_http_downloader_mock(
         vec![
@@ -798,9 +791,8 @@ fn test_private_repository_no_interaction() {
     let sha = "SOMESHA";
 
     let config = std::rc::Rc::new(config);
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = std::rc::Rc::new(
-        std::cell::RefCell::new(IOStub::new().with_is_interactive(false)),
-    );
+    let io: std::rc::Rc<dyn IOInterface> =
+        std::rc::Rc::new(IOStub::new().with_is_interactive(false));
 
     let (http_downloader, _http_guard) = get_http_downloader_mock(
         vec![http_status(repo_api_url, 404)],
@@ -938,8 +930,7 @@ fn test_initialize_invalid_repo_url() {
         let _tear_down = TearDown::new(home.path().to_path_buf());
 
         let config = std::rc::Rc::new(config);
-        let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
-            std::rc::Rc::new(std::cell::RefCell::new(IOStub::new()));
+        let io: std::rc::Rc<dyn IOInterface> = std::rc::Rc::new(IOStub::new());
 
         let (http_downloader, _http_guard) =
             get_http_downloader_mock(vec![], true, HttpDownloaderMockHandler::default());
@@ -967,9 +958,8 @@ fn test_get_empty_file_content() {
     let repo_url = "http://github.com/composer/packagist";
 
     let config = std::rc::Rc::new(config);
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = std::rc::Rc::new(
-        std::cell::RefCell::new(IOStub::new().with_is_interactive(true)),
-    );
+    let io: std::rc::Rc<dyn IOInterface> =
+        std::rc::Rc::new(IOStub::new().with_is_interactive(true));
 
     let (http_downloader, _http_guard) = get_http_downloader_mock(
         vec![

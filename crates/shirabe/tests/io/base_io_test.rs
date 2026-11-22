@@ -3,7 +3,7 @@
 use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe::config::Config;
-use shirabe::io::{BufferIO, IOInterfaceImmutable, IOInterfaceMutable};
+use shirabe::io::{BufferIO, IOInterface};
 use shirabe_php_shim::{Catch as _, PhpMixed, UnexpectedValueException, error_message};
 use shirabe_symfony_console::output::VERBOSITY_NORMAL;
 
@@ -23,7 +23,7 @@ fn github_oauth_config(token: &BStr) -> IndexMap<BString, PhpMixed> {
 #[test]
 fn test_load_configuration_accepts_valid_github_token() {
     for (name, token) in provide_valid_github_tokens() {
-        let mut io = BufferIO::new(BString::default(), VERBOSITY_NORMAL, None).unwrap();
+        let io = BufferIO::new(BString::default(), VERBOSITY_NORMAL, None).unwrap();
         let config = Config::new(false, None);
         config.merge(&github_oauth_config(token), Config::SOURCE_UNKNOWN);
 
@@ -90,7 +90,7 @@ fn provide_valid_github_tokens() -> Vec<(&'static BStr, &'static BStr)> {
 #[test]
 fn test_load_configuration_rejects_token_with_url_breaking_characters() {
     for (name, token, offending) in provide_url_breaking_github_tokens() {
-        let mut io = BufferIO::new(BString::default(), VERBOSITY_NORMAL, None).unwrap();
+        let io = BufferIO::new(BString::default(), VERBOSITY_NORMAL, None).unwrap();
         let config = Config::new(false, None);
         config.merge(&github_oauth_config(token), Config::SOURCE_UNKNOWN);
 

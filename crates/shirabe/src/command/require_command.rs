@@ -12,7 +12,7 @@ use crate::dependency_resolver::UpdateAllowTransitiveDeps;
 use crate::event_dispatcher::Callable;
 use crate::factory::Factory;
 use crate::installer::{Installer, InstallerEvents};
-use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface};
+use crate::io::{IOInterface, IOInterfaceWrite, io_interface};
 use crate::json::{JsonFile, JsonManipulator};
 use crate::package::loader::{ArrayLoader, RootPackageLoader};
 use crate::package::version::{VersionParser, VersionSelector};
@@ -159,7 +159,7 @@ impl RequireCommand {
         &self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: std::rc::Rc<dyn IOInterface>,
         requirements: &IndexMap<BString, BString>,
         require_key: &BStr,
         _remove_key: &BStr,

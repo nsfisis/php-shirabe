@@ -77,7 +77,6 @@ impl GlobalCommand {
 
         if !quiet {
             self.get_io()
-                .borrow()
                 .write_error(bformat!("<info>Changed current directory to {home}</info>"));
         }
 

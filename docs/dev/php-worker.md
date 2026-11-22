@@ -200,7 +200,7 @@ that answers, so the two stubs never share one entity.
 no per-plugin bookkeeping: an entry lives as long as a stub for it is reachable in the worker,
 which is also how long Composer keeps an object a plugin holds on to.
 
-A kind of entity is a handle type (`Rc<RefCell<dyn LockerInterface>>`, `PackageInterfaceHandle`,
+A kind of entity is a handle type (`Rc<dyn LockerInterface>`, `PackageInterfaceHandle`,
 ...) implementing `Entity`: the allocation that
 is its identity, the PHP class it appears as in the worker, and optionally its clone and property semantics. An
 entity is handed to the child only through `entity_value`, which registers it and builds the Rust

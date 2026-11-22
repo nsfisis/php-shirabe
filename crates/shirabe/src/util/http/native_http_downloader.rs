@@ -40,7 +40,7 @@ use shirabe_php_shim::{
 
 #[derive(Debug)]
 pub struct NativeHttpDownloader {
-    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    io: std::rc::Rc<dyn IOInterface>,
     config: std::rc::Rc<Config>,
     auth_helper: std::cell::RefCell<AuthHelper>,
     max_redirects: i64,
@@ -261,7 +261,7 @@ fn error_chain(error: &dyn std::error::Error) -> BString {
 
 impl NativeHttpDownloader {
     pub fn new(
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: std::rc::Rc<dyn IOInterface>,
         config: std::rc::Rc<Config>,
         _options: StreamContextOptions,
         _disable_tls: bool,

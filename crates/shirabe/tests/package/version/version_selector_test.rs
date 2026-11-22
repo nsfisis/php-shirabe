@@ -85,7 +85,7 @@ fn find_best(
             dyn shirabe::filter::platform_requirement_filter::PlatformRequirementFilterInterface,
         >,
     >,
-    io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
+    io: Option<std::rc::Rc<dyn IOInterface>>,
 ) -> Option<PackageInterfaceHandle> {
     version_selector
         .find_best_candidate(
@@ -188,10 +188,10 @@ fn test_latest_version_is_returned_that_matches_php_requirements() {
     let mut version_selector =
         VersionSelector::new(into_seam(repository_set), Some(&mut platform)).unwrap();
 
-    let io = std::rc::Rc::new(std::cell::RefCell::new(
+    let io = std::rc::Rc::new(
         BufferIO::new(BString::default(), output_interface::VERBOSITY_NORMAL, None).unwrap(),
-    ));
-    let io_dyn: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io.clone();
+    );
+    let io_dyn: std::rc::Rc<dyn IOInterface> = io.clone();
     let best = find_best(
         &mut version_selector,
         package_name,
@@ -206,18 +206,18 @@ fn test_latest_version_is_returned_that_matches_php_requirements() {
     );
     assert_eq!(
         "<warning>Cannot use foo/bar's latest version 2.1.0 as it requires php >=5.6 which is not satisfied by your platform.\n",
-        io.borrow().get_output()
+        io.get_output()
     );
 
-    let io = std::rc::Rc::new(std::cell::RefCell::new(
+    let io = std::rc::Rc::new(
         BufferIO::new(
             BString::default(),
             output_interface::VERBOSITY_VERBOSE,
             None,
         )
         .unwrap(),
-    ));
-    let io_dyn: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io.clone();
+    );
+    let io_dyn: std::rc::Rc<dyn IOInterface> = io.clone();
     let best = find_best(
         &mut version_selector,
         package_name,
@@ -233,7 +233,7 @@ fn test_latest_version_is_returned_that_matches_php_requirements() {
     assert_eq!(
         "<warning>Cannot use foo/bar's latest version 2.1.0 as it requires php >=5.6 which is not satisfied by your platform.\n\
          <warning>Cannot use foo/bar 2.0.0 as it requires php >=5.6 which is not satisfied by your platform.\n",
-        io.borrow().get_output()
+        io.get_output()
     );
 
     let best = find_best(

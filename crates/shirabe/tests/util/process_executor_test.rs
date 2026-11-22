@@ -32,10 +32,8 @@ fn test_execute_outputs_if_not_captured() {
 fn test_use_io_is_not_null_and_if_not_captured() {
     use crate::io_stub::IOStub;
 
-    let io = std::rc::Rc::new(std::cell::RefCell::new(IOStub::new()));
-    let process = ProcessExecutor::new(Some(
-        io.clone() as std::rc::Rc<std::cell::RefCell<dyn IOInterface>>
-    ));
+    let io = std::rc::Rc::new(IOStub::new());
+    let process = ProcessExecutor::new(Some(io.clone() as std::rc::Rc<dyn IOInterface>));
 
     process
         .execute("echo foo", ProcessExecutor::FORWARD_OUTPUT, None)
@@ -43,7 +41,7 @@ fn test_use_io_is_not_null_and_if_not_captured() {
 
     assert_eq!(
         vec![(bformat!("foo{PHP_EOL}"), false)],
-        io.borrow().write_raw_calls()
+        io.write_raw_calls()
     );
 }
 
@@ -110,38 +108,32 @@ fn hide_password_provider() -> Vec<(&'static BStr, &'static BStr)> {
 #[test]
 fn test_hide_passwords() {
     for (command, expected_command_output) in hide_password_provider() {
-        let buffer = std::rc::Rc::new(std::cell::RefCell::new(
-            BufferIO::new(BString::default(), VERBOSITY_DEBUG, None).unwrap(),
-        ));
-        let process = ProcessExecutor::new(Some(
-            buffer.clone() as std::rc::Rc<std::cell::RefCell<dyn IOInterface>>
-        ));
+        let buffer =
+            std::rc::Rc::new(BufferIO::new(BString::default(), VERBOSITY_DEBUG, None).unwrap());
+        let process = ProcessExecutor::new(Some(buffer.clone() as std::rc::Rc<dyn IOInterface>));
         let mut output = BString::default();
         process
             .execute(command.to_owned(), &mut output, None)
             .unwrap();
         assert_eq!(
             bformat!("Executing command (CWD): {expected_command_output}"),
-            trim(buffer.borrow().get_output())
+            trim(buffer.get_output())
         );
     }
 }
 
 #[test]
 fn test_doesnt_hide_ports() {
-    let buffer = std::rc::Rc::new(std::cell::RefCell::new(
-        BufferIO::new(BString::default(), VERBOSITY_DEBUG, None).unwrap(),
-    ));
-    let process = ProcessExecutor::new(Some(
-        buffer.clone() as std::rc::Rc<std::cell::RefCell<dyn IOInterface>>
-    ));
+    let buffer =
+        std::rc::Rc::new(BufferIO::new(BString::default(), VERBOSITY_DEBUG, None).unwrap());
+    let process = ProcessExecutor::new(Some(buffer.clone() as std::rc::Rc<dyn IOInterface>));
     let mut output = BString::default();
     process
         .execute("echo https://localhost:1234/", &mut output, None)
         .unwrap();
     assert_eq!(
         "Executing command (CWD): echo https://localhost:1234/",
-        trim(buffer.borrow().get_output())
+        trim(buffer.get_output())
     );
 }
 
@@ -173,8 +165,9 @@ fn test_console_io_does_not_format_symfony_console_style() {
         output.clone() as std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         QuestionHelper::default(),
     );
-    let process = ProcessExecutor::new(Some(std::rc::Rc::new(std::cell::RefCell::new(console_io))
-        as std::rc::Rc<std::cell::RefCell<dyn IOInterface>>));
+    let process = ProcessExecutor::new(Some(
+        std::rc::Rc::new(console_io) as std::rc::Rc<dyn IOInterface>
+    ));
 
     process
         .execute(

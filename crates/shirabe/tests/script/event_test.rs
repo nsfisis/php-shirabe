@@ -25,8 +25,7 @@ fn create_composer_instance() -> ComposerHandle {
 
 #[test]
 fn test_event_sets_originating_event() {
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
-        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
+    let io: std::rc::Rc<dyn IOInterface> = std::rc::Rc::new(NullIO::new());
     let composer = create_composer_instance();
 
     let originating_event = BaseEvent::new(
@@ -63,8 +62,7 @@ fn test_event_sets_originating_event() {
 
 #[test]
 fn test_event_calculates_nested_originating_event() {
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
-        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
+    let io: std::rc::Rc<dyn IOInterface> = std::rc::Rc::new(NullIO::new());
     let composer = create_composer_instance();
 
     let originating_event = BaseEvent::new(

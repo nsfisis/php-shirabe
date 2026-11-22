@@ -9,7 +9,7 @@ use crate::event_dispatcher::{
     SubscribedEventEntry,
 };
 use crate::installer::{BinaryInstaller, InstallerEvent, PackageEvent};
-use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, QUIET, VERBOSE};
+use crate::io::{IOInterface, IOInterfaceWrite, QUIET, VERBOSE};
 use crate::php_worker::{callable, runtime};
 use crate::repository::InstalledRepositoryInterfaceHandle;
 use crate::script::Event as ScriptEvent;
@@ -74,7 +74,7 @@ impl std::fmt::Debug for Callable {
 #[derive(Debug)]
 pub struct EventDispatcher {
     composer: PartialComposerWeakHandle,
-    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    io: std::rc::Rc<dyn IOInterface>,
     loader: PhpProp<Option<std::rc::Rc<std::cell::RefCell<ClassLoader>>>>,
     process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     listeners: PhpProp<std::rc::Rc<IndexMap<BString, IndexMap<i64, Vec<Callable>>>>>,
@@ -116,7 +116,7 @@ impl std::fmt::Debug for DispatchScriptOverride {
 impl EventDispatcher {
     pub fn new(
         composer: PartialComposerWeakHandle,
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: std::rc::Rc<dyn IOInterface>,
         process: Option<std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,
     ) -> Self {
         let process = process.unwrap_or_else(|| {
@@ -1210,7 +1210,7 @@ impl EventDispatcher {
         Ok(path_from_bytes(&cache_dir).to_path_buf())
     }
 
-    fn io_clone(&self) -> std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
+    fn io_clone(&self) -> std::rc::Rc<dyn IOInterface> {
         self.io.clone()
     }
 

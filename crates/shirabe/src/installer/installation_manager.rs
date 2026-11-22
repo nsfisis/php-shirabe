@@ -8,9 +8,7 @@ use crate::dependency_resolver::operation::{
 use crate::downloader::FileDownloader;
 use crate::event_dispatcher::EventDispatcher;
 use crate::installer::{InstallerInterface, PackageEvents};
-use crate::io::{
-    BufferIO, ConsoleIO, IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface,
-};
+use crate::io::{BufferIO, ConsoleIO, IOInterface, IOInterfaceWrite, io_interface};
 use crate::package::PackageInterfaceHandle;
 use crate::repository::{InstalledRepositoryInterface, InstalledRepositoryInterfaceHandle};
 use crate::signal::SignalSubscription;
@@ -33,7 +31,7 @@ pub struct InstallationManager {
     cache: PhpProp<std::rc::Rc<IndexMap<BString, std::rc::Rc<dyn InstallerInterface>>>>,
     notifiable_packages: PhpProp<std::rc::Rc<IndexMap<BString, Vec<PackageInterfaceHandle>>>>,
     loop_: std::rc::Rc<std::cell::RefCell<Loop>>,
-    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    io: std::rc::Rc<dyn IOInterface>,
     event_dispatcher: Option<std::rc::Rc<EventDispatcher>>,
     output_progress: PhpProp<bool>,
     /// For testing only: present iff this manager behaves like
@@ -54,7 +52,7 @@ struct InstallationManagerMockState {
 impl InstallationManager {
     pub fn new(
         loop_: std::rc::Rc<std::cell::RefCell<Loop>>,
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: std::rc::Rc<dyn IOInterface>,
         event_dispatcher: Option<std::rc::Rc<EventDispatcher>>,
     ) -> Self {
         Self {
@@ -73,7 +71,7 @@ impl InstallationManager {
     /// mirroring `Composer\Test\Mock\InstallationManagerMock`.
     pub fn __new_mock(
         loop_: std::rc::Rc<std::cell::RefCell<Loop>>,
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: std::rc::Rc<dyn IOInterface>,
         event_dispatcher: Option<std::rc::Rc<EventDispatcher>>,
     ) -> Self {
         Self {
@@ -836,7 +834,7 @@ impl InstallationManager {
     }
 
     #[tracing::instrument(skip_all)]
-    pub async fn notify_installs(&self, _io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>) {
+    pub async fn notify_installs(&self, _io: std::rc::Rc<dyn IOInterface>) {
         // For testing only (ref InstallationManagerMock::notifyInstalls is a noop).
         if self.mock.is_some() {
             return;
@@ -958,7 +956,7 @@ impl InstallationManager {
             && !self.io.is_debug()
             && promises.len() > 1
         {
-            let io_ref = self.io.borrow();
+            let io_ref = &self.io;
             // BufferIO extends ConsoleIO in PHP but is modeled as composition here.
             progress = io_ref
                 .as_any()
@@ -1079,7 +1077,7 @@ pub trait InstallationManagerInterface: std::fmt::Debug {
     ) -> anyhow::Result<Option<std::path::PathBuf>>;
     fn set_output_progress(&self, output_progress: bool);
     #[php(skip)]
-    async fn notify_installs(&self, io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>);
+    async fn notify_installs(&self, io: std::rc::Rc<dyn IOInterface>);
 }
 
 #[async_trait::async_trait(?Send)]
@@ -1135,7 +1133,7 @@ impl InstallationManagerInterface for InstallationManager {
         self.set_output_progress(output_progress);
     }
 
-    async fn notify_installs(&self, io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>) {
+    async fn notify_installs(&self, io: std::rc::Rc<dyn IOInterface>) {
         self.notify_installs(io).await;
     }
 }

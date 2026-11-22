@@ -13,7 +13,7 @@ use shirabe_php_shim::{
 
 #[derive(Debug)]
 pub struct Bitbucket {
-    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    io: std::rc::Rc<dyn IOInterface>,
     config: std::rc::Rc<Config>,
     process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
@@ -26,7 +26,7 @@ impl Bitbucket {
         php_str(b"https://bitbucket.org/site/oauth2/access_token");
 
     pub fn new(
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: std::rc::Rc<dyn IOInterface>,
         config: std::rc::Rc<Config>,
         process: Option<std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,
         http_downloader: Option<std::rc::Rc<std::cell::RefCell<HttpDownloader>>>,
@@ -79,7 +79,7 @@ impl Bitbucket {
         )? == 0
         {
             let output_str = trim(output.as_string().unwrap_or_default());
-            self.io.borrow_mut().set_authentication(
+            self.io.set_authentication(
                 origin_url.into(),
                 BString::from("x-token-auth"),
                 Some(output_str),
@@ -213,7 +213,7 @@ impl Bitbucket {
             return Ok(false);
         }
 
-        self.io.borrow_mut().set_authentication(
+        self.io.set_authentication(
             origin_url.into(),
             consumer_key.clone(),
             Some(consumer_secret.clone()),
@@ -255,7 +255,7 @@ impl Bitbucket {
                 .unwrap_or_default());
         }
 
-        self.io.borrow_mut().set_authentication(
+        self.io.set_authentication(
             origin_url.into(),
             consumer_key.into(),
             Some(consumer_secret.into()),

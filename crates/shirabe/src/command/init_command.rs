@@ -287,7 +287,7 @@ impl InitCommand {
         .await;
 
         if result.is_err() {
-            self.get_io().borrow().write_error(
+            self.get_io().write_error(
                 "Could not update dependencies. Run `shirabe update` to see more information.",
             );
         }
@@ -313,9 +313,7 @@ impl InitCommand {
         .await;
 
         if result.is_err() {
-            self.get_io()
-                .borrow()
-                .write_error("Could not run dump-autoload.");
+            self.get_io().write_error("Could not run dump-autoload.");
         }
     }
 
@@ -789,7 +787,7 @@ impl Command for InitCommand {
                 .unwrap_or_default();
             if (repositories.len() as i64) > 0 {
                 let config = std::rc::Rc::new(Factory::create_config(Some(io.clone()), None)?);
-                io.borrow_mut().load_configuration(&config)?;
+                io.load_configuration(&config)?;
                 let repo_manager =
                     RepositoryFactory::manager(io.clone(), &config, None, None, None)?;
 

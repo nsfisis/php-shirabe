@@ -119,8 +119,7 @@ fn check_solver_result_repo_set(
     expected: Vec<ExpectedJob>,
 ) {
     // createSolver()
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
-        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
+    let io: std::rc::Rc<dyn IOInterface> = std::rc::Rc::new(NullIO::new());
     let pool = repo_set
         .create_pool(&mut request, io.clone(), None, None, vec![], None, None)
         .unwrap();
@@ -213,8 +212,7 @@ fn solve_expecting_problems(
         .unwrap();
     repo_set.add_repository(repo_locked.into()).unwrap();
 
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
-        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
+    let io: std::rc::Rc<dyn IOInterface> = std::rc::Rc::new(NullIO::new());
     let pool = std::rc::Rc::new(std::cell::RefCell::new(
         repo_set
             .create_pool(&mut request, io.clone(), None, None, vec![], None, None)
@@ -2609,8 +2607,7 @@ fn test_learn_positive_literal() {
     let mut request = fixtures.request;
     request.require_name(bstr::BStr::new("A"), None).unwrap();
 
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
-        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
+    let io: std::rc::Rc<dyn IOInterface> = std::rc::Rc::new(NullIO::new());
     let pool = repo_set
         .create_pool(&mut request, io.clone(), None, None, vec![], None, None)
         .unwrap();

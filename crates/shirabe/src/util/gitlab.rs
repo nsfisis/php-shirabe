@@ -15,7 +15,7 @@ use shirabe_symfony_console::input::InputValue;
 
 #[derive(Debug)]
 pub struct GitLab {
-    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    io: std::rc::Rc<dyn IOInterface>,
     config: std::rc::Rc<Config>,
     process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
@@ -23,7 +23,7 @@ pub struct GitLab {
 
 impl GitLab {
     pub fn new(
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: std::rc::Rc<dyn IOInterface>,
         config: std::rc::Rc<Config>,
         process: Option<std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,
         http_downloader: Option<std::rc::Rc<std::cell::RefCell<HttpDownloader>>>,
@@ -72,7 +72,7 @@ impl GitLab {
             None,
         )? == 0
         {
-            self.io.borrow_mut().set_authentication(
+            self.io.set_authentication(
                 origin_url.into(),
                 trim(&output),
                 Some(BString::from("oauth2")),
@@ -102,7 +102,7 @@ impl GitLab {
                 None,
             )? == 0
         {
-            self.io.borrow_mut().set_authentication(
+            self.io.set_authentication(
                 origin_url.into(),
                 trim(&token_user),
                 Some(trim(&token_password)),
@@ -152,17 +152,11 @@ impl GitLab {
             if [B("private-token"), B("gitlab-ci-token"), B("oauth2")]
                 .contains(&username.as_slice())
             {
-                self.io.borrow_mut().set_authentication(
-                    origin_url.into(),
-                    password,
-                    Some(username),
-                );
+                self.io
+                    .set_authentication(origin_url.into(), password, Some(username));
             } else {
-                self.io.borrow_mut().set_authentication(
-                    origin_url.into(),
-                    username,
-                    Some(password),
-                );
+                self.io
+                    .set_authentication(origin_url.into(), username, Some(password));
             }
 
             return Ok(true);
@@ -263,7 +257,7 @@ impl GitLab {
                     .unwrap_or_default(),
             );
 
-            self.io.borrow_mut().set_authentication(
+            self.io.set_authentication(
                 origin_url.into(),
                 access_token.clone(),
                 Some(BString::from("oauth2")),
@@ -341,7 +335,7 @@ impl GitLab {
                 .unwrap_or_default(),
         );
 
-        self.io.borrow_mut().set_authentication(
+        self.io.set_authentication(
             origin_url.into(),
             access_token.clone(),
             Some(BString::from("oauth2")),

@@ -38,7 +38,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                 PlatformRepository::new(vec![], IndexMap::new(), None, None)
                     .expect("PlatformRepository::new should not fail"),
             )];
-            let io_owned: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = self.get_io();
+            let io_owned: std::rc::Rc<dyn IOInterface> = self.get_io();
             for (_, repo) in RepositoryFactory::default_repos_with_default_manager(io_owned)
                 .unwrap()
                 .into_iter()
@@ -398,7 +398,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
     /// This returns a version with the ~ operator prefixed when possible.
     fn find_best_version_and_name_for_package(
         &self,
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: std::rc::Rc<dyn IOInterface>,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         name: &BStr,
         platform_repo: Option<&PlatformRepositoryHandle>,

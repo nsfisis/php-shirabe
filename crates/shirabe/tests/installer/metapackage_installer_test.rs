@@ -10,8 +10,7 @@ use shirabe::io::{IOInterface, NullIO};
 use shirabe::repository::{InstalledArrayRepository, InstalledRepositoryInterfaceHandle};
 
 fn installer() -> MetapackageInstaller {
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
-        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
+    let io: std::rc::Rc<dyn IOInterface> = std::rc::Rc::new(NullIO::new());
     MetapackageInstaller::new(io)
 }
 

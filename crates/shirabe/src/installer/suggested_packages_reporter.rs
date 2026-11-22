@@ -11,7 +11,7 @@ use shirabe_symfony_console::formatter::OutputFormatter;
 #[derive(Debug)]
 pub struct SuggestedPackagesReporter {
     suggested_packages: Vec<IndexMap<BString, BString>>,
-    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    io: std::rc::Rc<dyn IOInterface>,
 }
 
 impl SuggestedPackagesReporter {
@@ -19,7 +19,7 @@ impl SuggestedPackagesReporter {
     pub const MODE_BY_PACKAGE: i64 = 2;
     pub const MODE_BY_SUGGESTION: i64 = 4;
 
-    pub fn new(io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>) -> Self {
+    pub fn new(io: std::rc::Rc<dyn IOInterface>) -> Self {
         Self {
             suggested_packages: Vec::new(),
             io,

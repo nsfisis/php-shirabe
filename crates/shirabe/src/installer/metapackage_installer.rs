@@ -12,11 +12,11 @@ use shirabe_php_shim::{InvalidArgumentException, PhpMixed, ToPhpString, bformat}
 
 #[derive(Debug)]
 pub struct MetapackageInstaller {
-    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    io: std::rc::Rc<dyn IOInterface>,
 }
 
 impl MetapackageInstaller {
-    pub fn new(io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>) -> Self {
+    pub fn new(io: std::rc::Rc<dyn IOInterface>) -> Self {
         Self { io }
     }
 }

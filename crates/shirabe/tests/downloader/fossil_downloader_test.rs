@@ -64,15 +64,12 @@ fn get_package(
 
 /// ref: FossilDownloaderTest::getDownloaderMock
 fn get_downloader_mock(
-    io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
+    io: Option<std::rc::Rc<dyn IOInterface>>,
     config: Option<Config>,
     process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     filesystem: Option<std::rc::Rc<std::cell::RefCell<Filesystem>>>,
 ) -> FossilDownloader {
-    let io = io.unwrap_or_else(|| {
-        std::rc::Rc::new(std::cell::RefCell::new(IOStub::new()))
-            as std::rc::Rc<std::cell::RefCell<dyn IOInterface>>
-    });
+    let io = io.unwrap_or_else(|| std::rc::Rc::new(IOStub::new()) as std::rc::Rc<dyn IOInterface>);
     // ref: getConfig(['secure-http' => false])
     let config = std::rc::Rc::new(config.unwrap_or_else(|| {
         ConfigStubBuilder::new()

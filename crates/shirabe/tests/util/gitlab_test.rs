@@ -57,7 +57,7 @@ fn get_auth_json_mock() -> std::rc::Rc<MockAuthJson> {
     std::rc::Rc::new(mock)
 }
 
-fn set_up(io_mock: &std::rc::Rc<std::cell::RefCell<IOMock>>, config: &std::rc::Rc<Config>) {
+fn set_up(io_mock: &std::rc::Rc<IOMock>, config: &std::rc::Rc<Config>) {
     config.set_auth_config_source(get_auth_json_mock());
     let _ = io_mock;
 }
@@ -66,7 +66,6 @@ fn set_up(io_mock: &std::rc::Rc<std::cell::RefCell<IOMock>>, config: &std::rc::R
 fn test_username_password_authentication_flow() {
     let (io_mock, _io_guard) = get_io_mock(io_interface::NORMAL).unwrap();
     io_mock
-        .borrow_mut()
         .expects(
             vec![
                 Expectation::text(MESSAGE),
@@ -95,7 +94,7 @@ fn test_username_password_authentication_flow() {
     let config = ConfigStubBuilder::new().build_shared();
     set_up(&io_mock, &config);
 
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io_mock;
+    let io: std::rc::Rc<dyn IOInterface> = io_mock;
     let mut gitlab = GitLab::new(io, config, None, Some(http_downloader)).unwrap();
 
     assert!(
@@ -113,7 +112,6 @@ fn test_username_password_authentication_flow() {
 fn test_username_password_failure() {
     let (io_mock, _io_guard) = get_io_mock(io_interface::NORMAL).unwrap();
     io_mock
-        .borrow_mut()
         .expects(
             vec![
                 Expectation::ask("Username: ", USERNAME),
@@ -146,7 +144,7 @@ fn test_username_password_failure() {
     let config = ConfigStubBuilder::new().build_shared();
     set_up(&io_mock, &config);
 
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io_mock;
+    let io: std::rc::Rc<dyn IOInterface> = io_mock;
     let mut gitlab = GitLab::new(io, config, None, Some(http_downloader)).unwrap();
 
     let err = gitlab

@@ -34,8 +34,7 @@ fn this_file() -> std::path::PathBuf {
 
 #[test]
 fn test_get_contents() {
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
-        std::rc::Rc::new(std::cell::RefCell::new(IOStub::new()));
+    let io: std::rc::Rc<dyn IOInterface> = std::rc::Rc::new(IOStub::new());
     let fs = LocalFilesystem::new(io, config_mock());
 
     let res = fs
@@ -51,8 +50,7 @@ fn test_get_contents() {
 
 #[test]
 fn test_copy() {
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
-        std::rc::Rc::new(std::cell::RefCell::new(IOStub::new()));
+    let io: std::rc::Rc<dyn IOInterface> = std::rc::Rc::new(IOStub::new());
     let fs = LocalFilesystem::new(io, config_mock());
 
     let file = tempfile::NamedTempFile::new().unwrap();

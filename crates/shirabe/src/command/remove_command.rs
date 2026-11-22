@@ -11,7 +11,7 @@ use crate::delegate_base_command_trait_impls_to_inner;
 use crate::dependency_resolver::UpdateAllowTransitiveDeps;
 use crate::factory::Factory;
 use crate::installer::Installer;
-use crate::io::{IOInterfaceImmutable, IOInterfaceWrite};
+use crate::io::IOInterfaceWrite;
 use crate::json::JsonFile;
 use crate::package::base_package;
 use crate::plugin::{CommandEvent, PluginEvents};

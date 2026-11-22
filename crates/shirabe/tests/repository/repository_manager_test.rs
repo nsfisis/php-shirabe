@@ -47,12 +47,12 @@ impl Drop for TearDown {
     }
 }
 
-fn null_io() -> std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
-    std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()))
+fn null_io() -> std::rc::Rc<dyn IOInterface> {
+    std::rc::Rc::new(NullIO::new())
 }
 
 fn http_downloader(
-    io: &std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    io: &std::rc::Rc<dyn IOInterface>,
 ) -> std::rc::Rc<std::cell::RefCell<HttpDownloader>> {
     let config = std::rc::Rc::new(Config::new(false, None));
     std::rc::Rc::new(std::cell::RefCell::new(

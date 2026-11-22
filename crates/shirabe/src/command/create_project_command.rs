@@ -16,7 +16,7 @@ use crate::filter::platform_requirement_filter::{
     PlatformRequirementFilterInterface,
 };
 use crate::installer::{Installer, ProjectInstaller, SuggestedPackagesReporter};
-use crate::io::{DEBUG, IOInterface, IOInterfaceImmutable, IOInterfaceWrite};
+use crate::io::{DEBUG, IOInterface, IOInterfaceWrite};
 use crate::json::JsonFile;
 use crate::package::version::{ShowWarnings, VersionParser, VersionSelector};
 use crate::package::{DisplayMode, STABILITIES, SUPPORTED_LINK_TYPES, stability_priority};
@@ -75,7 +75,7 @@ impl CreateProjectCommand {
     #[allow(clippy::too_many_arguments)]
     pub async fn install_project(
         &self,
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: std::rc::Rc<dyn IOInterface>,
         config: std::rc::Rc<Config>,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         package_name: Option<BString>,
@@ -115,7 +115,7 @@ impl CreateProjectCommand {
             .unwrap_or_else(PlatformRequirementFilterFactory::ignore_nothing);
 
         // we need to manually load the configuration to pass the auth credentials to the io interface!
-        io.borrow_mut().load_configuration(&config)?;
+        io.load_configuration(&config)?;
 
         *self.suggested_packages_reporter.borrow_mut() = Some(std::rc::Rc::new(
             std::cell::RefCell::new(SuggestedPackagesReporter::new(io.clone())),
@@ -393,7 +393,7 @@ impl CreateProjectCommand {
     async fn install_root_package(
         &self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: std::rc::Rc<dyn IOInterface>,
         config: &std::rc::Rc<Config>,
         package_name: &BStr,
         platform_requirement_filter: std::rc::Rc<dyn PlatformRequirementFilterInterface>,
@@ -809,7 +809,7 @@ impl Command for CreateProjectCommand {
         _output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
         let config = std::rc::Rc::new(Factory::create_config(None, None)?);
-        let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = self.get_io();
+        let io: std::rc::Rc<dyn IOInterface> = self.get_io();
 
         let (prefer_source, prefer_dist) =
             self.get_preferred_install_options(&config, input.clone(), true)?;

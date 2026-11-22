@@ -209,7 +209,7 @@ impl Factory {
     }
 
     pub fn create_config(
-        io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
+        io: Option<std::rc::Rc<dyn IOInterface>>,
         cwd: Option<&std::path::Path>,
     ) -> anyhow::Result<Config> {
         let cwd = match cwd {
@@ -390,7 +390,7 @@ impl Factory {
     #[tracing::instrument(skip_all)]
     pub fn create_composer(
         &self,
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: std::rc::Rc<dyn IOInterface>,
         local_config: Option<LocalConfigInput>,
         disable_plugins: DisablePlugins,
         cwd: Option<&std::path::Path>,
@@ -556,7 +556,7 @@ impl Factory {
 
                     if full_load {
                         // load auth configs into the IO instance
-                        io.borrow_mut().load_configuration(&config)?;
+                        io.load_configuration(&config)?;
 
                         // load existing Composer\InstalledVersions instance if available and scripts/plugins are allowed, as they might need it
                         // we only load if the InstalledVersions class wasn't defined yet so that this is only loaded once
@@ -843,7 +843,7 @@ impl Factory {
     }
 
     pub fn create_global(
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: std::rc::Rc<dyn IOInterface>,
         disable_plugins: DisablePlugins,
         disable_scripts: bool,
     ) -> anyhow::Result<Option<PartialComposerHandle>> {
@@ -855,7 +855,7 @@ impl Factory {
 
     fn add_local_repository(
         &self,
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: std::rc::Rc<dyn IOInterface>,
         rm: &RepositoryManager,
         vendor_dir: &BStr,
         root_package: RootPackageInterfaceHandle,
@@ -891,7 +891,7 @@ impl Factory {
 
     fn create_global_composer(
         &self,
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: std::rc::Rc<dyn IOInterface>,
         config: &Config,
         disable_plugins: DisablePlugins,
         disable_scripts: bool,
@@ -933,7 +933,7 @@ impl Factory {
 
     pub fn create_download_manager(
         &self,
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: std::rc::Rc<dyn IOInterface>,
         config: &std::rc::Rc<Config>,
         http_downloader: &std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
         process: &std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
@@ -1146,7 +1146,7 @@ impl Factory {
 
     fn create_plugin_manager(
         &self,
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: std::rc::Rc<dyn IOInterface>,
         composer: ComposerWeakHandle,
         global_composer: Option<PartialComposerHandle>,
         disable_plugins: DisablePlugins,
@@ -1157,7 +1157,7 @@ impl Factory {
     pub fn create_installation_manager(
         &self,
         r#loop: std::rc::Rc<std::cell::RefCell<Loop>>,
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: std::rc::Rc<dyn IOInterface>,
         event_dispatcher: Option<std::rc::Rc<EventDispatcher>>,
     ) -> InstallationManager {
         // FactoryMock::createInstallationManager returns a recording InstallationManagerMock.
@@ -1171,7 +1171,7 @@ impl Factory {
         &self,
         im: &std::rc::Rc<dyn InstallationManagerInterface>,
         composer: PartialComposerWeakHandle,
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: std::rc::Rc<dyn IOInterface>,
         process: Option<&std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,
     ) -> anyhow::Result<()> {
         // FactoryMock::createDefaultInstallers is a noop (no installers registered).
@@ -1247,13 +1247,13 @@ impl Factory {
         config: std::rc::Rc<Config>,
         parser: VersionParser,
         guesser: VersionGuesser,
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: std::rc::Rc<dyn IOInterface>,
     ) -> RootPackageLoader {
         RootPackageLoader::new(rm, config, Some(parser), Some(Box::new(guesser)), Some(io))
     }
 
     pub fn create(
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: std::rc::Rc<dyn IOInterface>,
         config: Option<LocalConfigInput>,
         disable_plugins: DisablePlugins,
         disable_scripts: bool,
@@ -1291,7 +1291,7 @@ impl Factory {
     /// branches in `create_composer`/`add_local_repository`/`create_installation_manager`/
     /// `create_default_installers`).
     pub fn __create_mock(
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: std::rc::Rc<dyn IOInterface>,
         config: Option<LocalConfigInput>,
         disable_plugins: DisablePlugins,
         disable_scripts: bool,
@@ -1348,7 +1348,7 @@ impl Factory {
 
     /// If you are calling this in a plugin, you probably should instead use `$composer->getLoop()->getHttpDownloader()`
     pub fn create_http_downloader(
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: std::rc::Rc<dyn IOInterface>,
         config: &std::rc::Rc<Config>,
         options: StreamContextOptions,
     ) -> anyhow::Result<HttpDownloader> {
@@ -1411,7 +1411,7 @@ impl Factory {
 
     fn load_composer_auth_env(
         config: &Config,
-        io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
+        io: Option<std::rc::Rc<dyn IOInterface>>,
     ) -> anyhow::Result<()> {
         let composer_auth_env = Platform::get_env("COMPOSER_AUTH");
         let composer_auth_env_str = match composer_auth_env {
@@ -1471,7 +1471,7 @@ impl Factory {
     }
 
     fn validate_json_schema(
-        io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
+        io: Option<std::rc::Rc<dyn IOInterface>>,
         file_or_data: ValidateJsonInput<'_>,
         schema: i64,
         source: Option<&BStr>,

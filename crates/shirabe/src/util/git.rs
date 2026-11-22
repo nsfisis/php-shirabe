@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/Util/Git.php sha1:122bf88edc1ff375541af8c8ccf697c0f330408a
 
 use crate::config::Config;
-use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface};
+use crate::io::{IOInterface, IOInterfaceWrite, io_interface};
 use crate::util::{
     AuthHelper, Bitbucket, CommandLine, Filesystem, GitHub, GitLab, HttpDownloader, Platform,
     ProcessExecutor, StoreAuth, Url,
@@ -19,7 +19,7 @@ use shirabe_symfony_console::input::InputValue;
 
 #[derive(Debug)]
 pub struct Git {
-    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    io: std::rc::Rc<dyn IOInterface>,
     config: std::rc::Rc<Config>,
     process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     filesystem: std::rc::Rc<std::cell::RefCell<Filesystem>>,
@@ -30,7 +30,7 @@ static VERSION: std::sync::Mutex<Option<Option<BString>>> = std::sync::Mutex::ne
 
 impl Git {
     pub fn new(
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: std::rc::Rc<dyn IOInterface>,
         config: std::rc::Rc<Config>,
         process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
         fs: std::rc::Rc<std::cell::RefCell<Filesystem>>,
@@ -47,7 +47,7 @@ impl Git {
     pub fn check_for_repo_ownership_error(
         output: &BStr,
         path: &std::path::Path,
-        io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
+        io: Option<std::rc::Rc<dyn IOInterface>>,
     ) -> anyhow::Result<()> {
         if output.contains_str("fatal: detected dubious ownership") {
             let msg = bformat!(
@@ -200,7 +200,7 @@ impl Git {
             ) {
                 let m3 = m.get(3).unwrap_or_default();
                 if !self.io.has_authentication(m3) {
-                    self.io.borrow_mut().set_authentication(
+                    self.io.set_authentication(
                         m3.to_owned(),
                         rawurldecode(m.get(1).unwrap_or_default()),
                         Some(rawurldecode(m.get(2).unwrap_or_default())),
@@ -379,7 +379,7 @@ impl Git {
                         bitbucket_util
                             .authorize_oauth_interactively(domain, Some(BStr::new(message)))?;
                         let access_token = bitbucket_util.get_token();
-                        self.io.borrow_mut().set_authentication(
+                        self.io.set_authentication(
                             domain.to_owned(),
                             BString::from("x-token-auth"),
                             Some(access_token),
@@ -434,7 +434,7 @@ impl Git {
                             password.as_bstr(),
                         )?;
                         if !access_token.is_empty() {
-                            self.io.borrow_mut().set_authentication(
+                            self.io.set_authentication(
                                 domain.to_owned(),
                                 BString::from("x-token-auth"),
                                 Some(access_token),
@@ -655,11 +655,8 @@ impl Git {
                         &mut command_output,
                     ) == 0
                     {
-                        self.io.borrow_mut().set_authentication(
-                            origin.clone(),
-                            username,
-                            Some(password),
-                        );
+                        self.io
+                            .set_authentication(origin.clone(), username, Some(password));
                         let auth_helper = AuthHelper::new(self.io.clone(), self.config.clone());
                         auth_helper.store_auth(origin.as_bstr(), store_auth.clone())?;
 

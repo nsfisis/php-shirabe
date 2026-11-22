@@ -61,8 +61,7 @@ fn support_provider() -> Vec<(&'static BStr, bool)> {
 #[test]
 fn test_support() {
     for (url, assertion) in support_provider() {
-        let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
-            std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
+        let io: std::rc::Rc<dyn IOInterface> = std::rc::Rc::new(NullIO::new());
         let config = std::rc::Rc::new(Config::new(true, None));
         let result = FossilDriver::supports(io, config, bstr::BStr::new(url), false).unwrap();
         assert_eq!(assertion, result);
