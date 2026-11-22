@@ -29,6 +29,7 @@ use Shirabe\Lint\Linters\PluginGeneratedStubs;
 use Shirabe\Lint\Linters\RustEntityHandleConstruction;
 use Shirabe\Lint\Linters\SortedDependencies;
 use Shirabe\Lint\Linters\UpstreamFileHash;
+use Shirabe\Lint\Linters\UpstreamIncludeRef;
 use Shirabe\Lint\Runner;
 
 $rootDir = dirname(__DIR__, 2);
@@ -106,6 +107,7 @@ $runner = new Runner($rootDir, [
     ]],
     [new SortedDependencies(), []],
     [new UpstreamFileHash(), []],
+    [new UpstreamIncludeRef(), []],
 ]);
 
 exit($runner->run() ? 0 : 1);

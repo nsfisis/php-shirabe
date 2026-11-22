@@ -41,8 +41,17 @@ Do not merge multiple PHP files into a single Rust file, except in rare cases. W
 
 The hash records the version of the upstream file that the port follows, so that a change upstream
 is detected when `composer/` is updated. `scripts/linters/upstream-file-hash update <rust-file>...`
-writes the current hash into every `//! ref:` line of the files, adding it where it is missing. On
-a mismatch, compare the upstream change with the Rust port and update the port first.
+writes the current hash into every `ref:` line of the files, adding it where it is missing. On a
+mismatch, compare the upstream change with the Rust port and update the port first.
+
+Where Rust code embeds a file under `composer/` with `include_str!` or `include_bytes!`, write a
+`// ref:` comment for that file directly above the statement or item that embeds it:
+
+```rust
+// ref: composer/res/composer-schema.json sha1:<40 hex digits>
+pub const COMPOSER_SCHEMA_JSON: &'static [u8] =
+    include_bytes!("../../../../composer/res/composer-schema.json");
+```
 
 ## Identifiers and class structure
 

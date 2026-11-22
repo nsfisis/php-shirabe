@@ -7,8 +7,10 @@ use shirabe_php_shim::{bformat, strtolower};
 // PHP reads the resource files from `dirname(__DIR__) . '/res'` at runtime via
 // file_get_contents. Composer's res directory ships with the vendored package; embed it at compile
 // time so the data is available without filesystem access.
+// ref: composer/vendor/composer/spdx-licenses/res/spdx-licenses.json sha1:b4b8677aea222c5cc251399f83e4b1d7dded9397
 const LICENSES_JSON: &[u8] =
     include_bytes!("../../../composer/vendor/composer/spdx-licenses/res/spdx-licenses.json");
+// ref: composer/vendor/composer/spdx-licenses/res/spdx-exceptions.json sha1:25a703094ea7e5629b6195cb2ea3795709bbf5ee
 const EXCEPTIONS_JSON: &[u8] =
     include_bytes!("../../../composer/vendor/composer/spdx-licenses/res/spdx-exceptions.json");
 

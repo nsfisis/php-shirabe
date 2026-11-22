@@ -85,8 +85,10 @@ impl JsonFile {
     pub const LOCK_SCHEMA_PATH: &'static BStr =
         php_str(b"shirabe:///res/composer-lock-schema.json");
 
+    // ref: composer/res/composer-schema.json sha1:3e0ff493c6f75858cea3ef4fde25b303bd619ea3
     pub const COMPOSER_SCHEMA_JSON: &'static [u8] =
         include_bytes!("../../../../composer/res/composer-schema.json");
+    // ref: composer/res/composer-lock-schema.json sha1:ca08fe414ed26c0f1f489c7bb2639ced310fad3d
     const LOCK_SCHEMA_JSON: &'static [u8] =
         include_bytes!("../../../../composer/res/composer-lock-schema.json");
 

@@ -331,6 +331,7 @@ impl FilesystemRepository {
                 path_from_bytes(&bformat!("{repo_dir}/installed.php")),
                 &installed_php,
             );
+            // ref: composer/src/Composer/InstalledVersions.php sha1:83f18357495e7b5aa064f20620f6de75f40f82d4
             self.filesystem.borrow_mut().file_put_contents_if_modified(
                 path_from_bytes(&bformat!("{repo_dir}/InstalledVersions.php")),
                 include_str!("../../../../composer/src/Composer/InstalledVersions.php"),

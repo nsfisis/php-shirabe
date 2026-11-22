@@ -688,10 +688,12 @@ impl AutoloadGenerator {
         // PHP copies these out of the Composer source tree at __DIR__. The binary has no such
         // tree at run time, so they are embedded at build time, as InstalledVersions.php is in
         // FilesystemRepository.
+        // ref: composer/src/Composer/Autoload/ClassLoader.php sha1:7f146de662b0599355b3b049a161e23cbdbbdaeb
         filesystem.file_put_contents_if_modified(
             target_file(BStr::new("ClassLoader.php")),
             include_str!("../../../../composer/src/Composer/Autoload/ClassLoader.php"),
         )?;
+        // ref: composer/LICENSE sha1:8bff0b392ab60b65a95ecc07e1029d6d0d48261e
         filesystem.file_put_contents_if_modified(
             target_file(BStr::new("LICENSE")),
             include_str!("../../../../composer/LICENSE"),

@@ -509,6 +509,7 @@ fn test_worker_loads_the_installed_versions_file_shirabe_dumps() {
             (new \ReflectionClass(\Composer\InstalledVersions::class))->getFileName()
         );",
     ));
+    // ref: composer/src/Composer/InstalledVersions.php sha1:83f18357495e7b5aa064f20620f6de75f40f82d4
     assert_eq!(
         include_str!("../../../composer/src/Composer/InstalledVersions.php"),
         contents,

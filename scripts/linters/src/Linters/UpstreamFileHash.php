@@ -18,7 +18,7 @@ final class UpstreamFileHash implements Linter
 
     public function failureIntro(): string
     {
-        return "Found `//! ref: <file> sha1:<hash>` headers that do not match the sources under\n"
+        return "Found `ref: <file> sha1:<hash>` lines that do not match the sources under\n"
             . "composer/. On a hash mismatch, the file changed upstream: check that the Rust port\n"
             . "follows it, then run `scripts/linters/upstream-file-hash update <rust-file>...`:";
     }
@@ -44,7 +44,7 @@ final class UpstreamFileHash implements Linter
                     $errors[] = "{$location}: malformed header, or no hash: {$line}";
                     continue;
                 }
-                [, $file, $recorded] = $m;
+                [, , $file, $recorded] = $m;
 
                 try {
                     $actual = RefHeader::hash($rootDir, $file);

@@ -4,24 +4,29 @@ declare(strict_types=1);
 
 namespace Shirabe\Lint\Support;
 
-// The `//! ref:` header naming the upstream file a Rust file ports, with the SHA-1 of that file's
-// content. The definition is documented in docs/dev/porting-rules.md ("File and directory layout").
+// A `ref:` line naming an upstream file, with the SHA-1 of that file's content. It is either the
+// `//! ref:` header of a Rust file that ports the upstream file, or a `// ref:` comment next to an
+// `include_str!` / `include_bytes!` that embeds it. The definition is documented in
+// docs/dev/porting-rules.md ("File and directory layout").
 final class RefHeader
 {
-    // Any `//! ref:` line, so that one without a hash is reported instead of being skipped.
-    public const CANDIDATE_RE = '/^\/\/! ref:/';
+    // Any `ref:` line, so that one without a hash is reported instead of being skipped. A `// ref:`
+    // comment counts only when it names a file under composer/: the tests also write `// ref:`
+    // followed by the upstream test method a helper stands for.
+    public const CANDIDATE_RE = '/^(?:\/\/! ref:|\s*\/\/ ref: composer\/)/';
 
-    // `//! ref: composer/src/Composer/Json/JsonFile.php sha1:<40 hex>`
-    public const HEADER_RE = '/^\/\/! ref: (\S+) sha1:([0-9a-f]{40})$/';
+    // `//! ref: composer/src/Composer/Json/JsonFile.php sha1:<40 hex>`, or the same with an
+    // indented `//`. Groups: the leading comment marker, the file, the hash.
+    public const HEADER_RE = '/^(\/\/!|\s*\/\/) ref: (\S+) sha1:([0-9a-f]{40})$/';
 
-    // A header with or without the hash, as `update` accepts it.
-    public const UPDATABLE_RE = '/^\/\/! ref: (\S+)( sha1:[0-9a-f]{40})?$/';
+    // A `ref:` line with or without the hash, as `update` accepts it.
+    public const UPDATABLE_RE = '/^(\/\/!|\s*\/\/) ref: (\S+)(?: sha1:[0-9a-f]{40})?$/';
 
     public const SOURCE_PREFIX = 'composer/';
 
-    public static function format(string $file, string $hash): string
+    public static function format(string $marker, string $file, string $hash): string
     {
-        return "//! ref: {$file} sha1:{$hash}";
+        return "{$marker} ref: {$file} sha1:{$hash}";
     }
 
     /**

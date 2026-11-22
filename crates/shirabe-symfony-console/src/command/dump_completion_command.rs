@@ -12,8 +12,9 @@ use shirabe_php_shim::{
 };
 use shirabe_symfony_process::Process;
 
-/// __DIR__.'/../Resources/completion.bash', embedded at compile time (this port ships as a
-/// single binary and does not install the Resources directory alongside it).
+// __DIR__.'/../Resources/completion.bash', embedded at compile time (this port ships as a
+// single binary and does not install the Resources directory alongside it).
+// ref: composer/vendor/symfony/console/Resources/completion.bash sha1:293636e327eb5b298b89f644fc8e320925ece81a
 const COMPLETION_BASH: &BStr = php_str(include_bytes!(
     "../../../../composer/vendor/symfony/console/Resources/completion.bash"
 ));
