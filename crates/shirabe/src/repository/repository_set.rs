@@ -401,7 +401,7 @@ impl RepositorySet {
         &mut self,
         request: &mut Request,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<dyn EventDispatcherInterface>>>,
+        event_dispatcher: Option<std::rc::Rc<dyn EventDispatcherInterface>>,
         pool_optimizer: Option<PoolOptimizer>,
         ignored_types: Vec<BString>,
         allowed_types: Option<Vec<BString>>,

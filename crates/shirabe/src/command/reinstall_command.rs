@@ -191,7 +191,7 @@ impl Command for ReinstallCommand {
             CommandEvent::new(PluginEvents::COMMAND, "reinstall", input.clone(), output);
         let command_event_name = command_event.get_name().to_owned();
         let event_dispatcher = composer.get_event_dispatcher();
-        event_dispatcher.borrow_mut().dispatch(
+        event_dispatcher.dispatch(
             Some(command_event_name.as_ref()),
             Some(std::rc::Rc::new(std::cell::RefCell::new(command_event))),
         )?;
@@ -226,7 +226,7 @@ impl Command for ReinstallCommand {
         let dev_mode = local_repo.get_dev_mode().unwrap_or(true);
 
         Platform::put_env("COMPOSER_DEV_MODE", if dev_mode { "1" } else { "0" })?;
-        event_dispatcher.borrow_mut().dispatch_script(
+        event_dispatcher.dispatch_script(
             ScriptEvents::PRE_INSTALL_CMD,
             dev_mode,
             vec![],
@@ -301,7 +301,7 @@ impl Command for ReinstallCommand {
             )?;
         }
 
-        event_dispatcher.borrow_mut().dispatch_script(
+        event_dispatcher.dispatch_script(
             ScriptEvents::POST_INSTALL_CMD,
             dev_mode,
             vec![],

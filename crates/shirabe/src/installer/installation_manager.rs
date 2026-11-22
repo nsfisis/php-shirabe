@@ -34,7 +34,7 @@ pub struct InstallationManager {
     notifiable_packages: std::cell::RefCell<IndexMap<BString, Vec<PackageInterfaceHandle>>>,
     loop_: std::rc::Rc<std::cell::RefCell<Loop>>,
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-    event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
+    event_dispatcher: Option<std::rc::Rc<EventDispatcher>>,
     output_progress: bool,
     /// For testing only: present iff this manager behaves like
     /// `Composer\Test\Mock\InstallationManagerMock`, recording operations instead of executing
@@ -55,7 +55,7 @@ impl InstallationManager {
     pub fn new(
         loop_: std::rc::Rc<std::cell::RefCell<Loop>>,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
+        event_dispatcher: Option<std::rc::Rc<EventDispatcher>>,
     ) -> Self {
         Self {
             installers: std::cell::RefCell::new(vec![]),
@@ -74,7 +74,7 @@ impl InstallationManager {
     pub fn __new_mock(
         loop_: std::rc::Rc<std::cell::RefCell<Loop>>,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
+        event_dispatcher: Option<std::rc::Rc<EventDispatcher>>,
     ) -> Self {
         Self {
             mock: Some(std::cell::RefCell::new(
@@ -614,7 +614,7 @@ impl InstallationManager {
             };
 
             if run_scripts && let Some(event_dispatcher) = &self.event_dispatcher {
-                event_dispatcher.borrow_mut().dispatch_package_event(
+                event_dispatcher.dispatch_package_event(
                     event_name,
                     dev_mode,
                     repo.clone(),
@@ -692,7 +692,7 @@ impl InstallationManager {
                 let repo = repo.clone();
                 let all_operations = all_operations.to_vec();
                 post_exec_callbacks.push(Box::new(move || {
-                    event_dispatcher.borrow_mut().dispatch_package_event(
+                    event_dispatcher.dispatch_package_event(
                         event_name,
                         dev_mode,
                         repo.clone(),

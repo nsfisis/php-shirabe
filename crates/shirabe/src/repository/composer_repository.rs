@@ -96,7 +96,7 @@ pub struct ComposerRepository {
     provider_listing: Option<IndexMap<BString, ProviderListingEntry>>,
     loader: ArrayLoader,
     allow_ssl_downgrade: bool,
-    event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
+    event_dispatcher: Option<std::rc::Rc<EventDispatcher>>,
     source_mirrors: Option<IndexMap<BString, Vec<SourceMirror>>>,
     dist_mirrors: Option<Vec<DistMirror>>,
     degraded_mode: std::cell::Cell<bool>,
@@ -217,7 +217,7 @@ impl ComposerRepository {
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: &Config,
         http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
-        event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
+        event_dispatcher: Option<std::rc::Rc<EventDispatcher>>,
     ) -> anyhow::Result<Self> {
         // parent::__construct();
         let inner = ArrayRepository::new(Vec::new());
@@ -2715,7 +2715,6 @@ impl ComposerRepository {
             let attempt: anyhow::Result<()> = (|| -> anyhow::Result<()> {
                 let mut options = self.options.clone();
                 if let Some(dispatcher) = self.event_dispatcher.as_ref() {
-                    let mut dispatcher = dispatcher.borrow_mut();
                     let mut pre_file_download_event = PreFileDownloadEvent::new(
                         PluginEvents::PRE_FILE_DOWNLOAD.to_php_string(),
                         self.http_downloader.clone(),
@@ -2759,7 +2758,6 @@ impl ComposerRepository {
                 }
 
                 if let Some(dispatcher) = self.event_dispatcher.as_ref() {
-                    let mut dispatcher = dispatcher.borrow_mut();
                     let post_file_download_event = PostFileDownloadEvent::new(
                         PluginEvents::POST_FILE_DOWNLOAD.to_php_string(),
                         None,
@@ -2882,7 +2880,6 @@ impl ComposerRepository {
         let result: anyhow::Result<FetchFileIfLastModifiedResult> = (|| {
             let mut options = self.options.clone();
             if let Some(dispatcher) = self.event_dispatcher.as_ref() {
-                let mut dispatcher = dispatcher.borrow_mut();
                 let mut pre_file_download_event = PreFileDownloadEvent::new(
                     PluginEvents::PRE_FILE_DOWNLOAD.to_php_string(),
                     self.http_downloader.clone(),
@@ -2920,7 +2917,6 @@ impl ComposerRepository {
             }
 
             if let Some(dispatcher) = self.event_dispatcher.as_ref() {
-                let mut dispatcher = dispatcher.borrow_mut();
                 let post_file_download_event = PostFileDownloadEvent::new(
                     PluginEvents::POST_FILE_DOWNLOAD.to_php_string(),
                     None,
@@ -3017,7 +3013,6 @@ impl ComposerRepository {
         let mut filename = BString::from(filename);
         let mut options = self.options.clone();
         if let Some(dispatcher) = self.event_dispatcher.as_ref() {
-            let mut dispatcher = dispatcher.borrow_mut();
             let mut pre_file_download_event = PreFileDownloadEvent::new(
                 PluginEvents::PRE_FILE_DOWNLOAD.to_php_string(),
                 self.http_downloader.clone(),
@@ -3093,7 +3088,7 @@ impl ComposerRepository {
                 Some(FileDownloadContext::Repository),
             );
             let post_file_download_event_name = post_file_download_event.get_name().to_owned();
-            dispatcher.borrow_mut().dispatch(
+            dispatcher.dispatch(
                 Some(post_file_download_event_name.as_ref()),
                 Some(std::rc::Rc::new(std::cell::RefCell::new(
                     post_file_download_event,

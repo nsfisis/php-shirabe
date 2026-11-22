@@ -492,7 +492,7 @@ impl Command for UpdateCommand {
         let command_event =
             CommandEvent::new(PluginEvents::COMMAND, "update", input.clone(), output);
         let command_event_name = command_event.get_name().to_owned();
-        composer.get_event_dispatcher().borrow_mut().dispatch(
+        composer.get_event_dispatcher().dispatch(
             Some(command_event_name.as_ref()),
             Some(std::rc::Rc::new(std::cell::RefCell::new(command_event))),
         )?;

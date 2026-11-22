@@ -695,7 +695,7 @@ impl PluginManager {
         let plugin_ref = plugin.borrow();
         if let Some(subscriber) = plugin_ref.as_event_subscriber() {
             let event_dispatcher = self.composer_full().borrow().get_event_dispatcher();
-            let result = event_dispatcher.borrow_mut().add_subscriber(subscriber);
+            let result = event_dispatcher.add_subscriber(subscriber);
             result?;
         }
         Ok(())
@@ -736,7 +736,7 @@ impl PluginManager {
             .map(|s| s.subscriber_handle());
         if let Some(handle) = subscriber_handle {
             let event_dispatcher = self.composer_full().borrow().get_event_dispatcher();
-            event_dispatcher.borrow_mut().remove_listener(&handle);
+            event_dispatcher.remove_listener(&handle);
         }
         Ok(())
     }

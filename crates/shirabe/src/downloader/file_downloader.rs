@@ -47,7 +47,7 @@ pub struct FileDownloader {
     http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
     pub(crate) filesystem: std::rc::Rc<std::cell::RefCell<Filesystem>>,
     cache: Option<std::rc::Rc<std::cell::RefCell<Cache>>>,
-    event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
+    event_dispatcher: Option<std::rc::Rc<EventDispatcher>>,
     pub(crate) process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     last_cache_writes: std::sync::Mutex<IndexMap<BString, BString>>,
     additional_cleanup_paths: std::cell::RefCell<IndexMap<BString, Vec<std::path::PathBuf>>>,
@@ -69,7 +69,7 @@ impl FileDownloader {
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
         http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
-        event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
+        event_dispatcher: Option<std::rc::Rc<EventDispatcher>>,
         cache: Option<std::rc::Rc<std::cell::RefCell<Cache>>>,
         filesystem: Option<std::rc::Rc<std::cell::RefCell<Filesystem>>>,
         process: Option<std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,
@@ -418,7 +418,7 @@ impl DownloaderInterface for FileDownloader {
                     )));
                 let pre_file_download_event_name =
                     pre_file_download_event.borrow().get_name().to_owned();
-                event_dispatcher.borrow_mut().dispatch(
+                event_dispatcher.dispatch(
                     Some(pre_file_download_event_name.as_ref()),
                     Some(pre_file_download_event.clone()),
                 )?;
@@ -632,7 +632,7 @@ impl DownloaderInterface for FileDownloader {
                     Some(FileDownloadContext::Package(package.clone())),
                 );
                 let post_file_download_event_name = post_file_download_event.get_name().to_owned();
-                event_dispatcher.borrow_mut().dispatch(
+                event_dispatcher.dispatch(
                     Some(post_file_download_event_name.as_ref()),
                     Some(std::rc::Rc::new(std::cell::RefCell::new(
                         post_file_download_event,

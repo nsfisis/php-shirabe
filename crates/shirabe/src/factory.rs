@@ -593,13 +593,13 @@ impl Factory {
 
                     // initialize event dispatcher with the Composer back-reference
                     let dispatcher = {
-                        let mut d = EventDispatcher::new(
+                        let d = EventDispatcher::new(
                             PartialComposerWeakHandle::from_weak(composer_weak.clone()),
                             io.clone(),
                             Some(process.clone()),
                         );
                         d.set_run_scripts(!disable_scripts);
-                        std::rc::Rc::new(std::cell::RefCell::new(d))
+                        std::rc::Rc::new(d)
                     };
                     composer.set_event_dispatcher(dispatcher.clone());
 
@@ -842,7 +842,7 @@ impl Factory {
             let init_event = Event::from_name(PluginEvents::INIT.to_php_string());
             let init_event_name = init_event.get_name().to_owned();
             let dispatcher = composer.borrow().get_event_dispatcher();
-            dispatcher.borrow_mut().dispatch(
+            dispatcher.dispatch(
                 Some(init_event_name.as_ref()),
                 Some(std::rc::Rc::new(std::cell::RefCell::new(init_event))),
             )?;
@@ -956,7 +956,7 @@ impl Factory {
         config: &std::rc::Rc<std::cell::RefCell<Config>>,
         http_downloader: &std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
         process: &std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
-        event_dispatcher: Option<&std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
+        event_dispatcher: Option<&std::rc::Rc<EventDispatcher>>,
     ) -> anyhow::Result<std::rc::Rc<std::cell::RefCell<DownloadManager>>> {
         let cache_files_ttl = config.borrow().get_cache_files_ttl();
         let cache = if cache_files_ttl > 0 {
@@ -1177,7 +1177,7 @@ impl Factory {
         &self,
         r#loop: std::rc::Rc<std::cell::RefCell<Loop>>,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
+        event_dispatcher: Option<std::rc::Rc<EventDispatcher>>,
     ) -> InstallationManager {
         // FactoryMock::createInstallationManager returns a recording InstallationManagerMock.
         if self.mock {

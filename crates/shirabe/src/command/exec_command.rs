@@ -199,9 +199,7 @@ impl Command for ExecCommand {
         );
 
         let dispatcher = composer_full(&composer).get_event_dispatcher().clone();
-        dispatcher
-            .borrow_mut()
-            .add_listener("__exec_command".into(), Callable::String(binary), 0);
+        dispatcher.add_listener("__exec_command".into(), Callable::String(binary), 0);
 
         let initial_working_directory = self.get_application().and_then(|application| {
             let application = application.borrow();
@@ -231,12 +229,7 @@ impl Command for ExecCommand {
             .map(<[bstr::BString]>::to_vec)
             .unwrap_or_default();
 
-        dispatcher.borrow_mut().dispatch_script(
-            "__exec_command".into(),
-            true,
-            args,
-            EventFlags::default(),
-        )
+        dispatcher.dispatch_script("__exec_command".into(), true, args, EventFlags::default())
     }
 
     fn initialize(

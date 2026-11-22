@@ -347,11 +347,11 @@ impl Command for ArchiveCommand {
                 CommandEvent::new(PluginEvents::COMMAND, "archive", input.clone(), output);
             let command_event_name = command_event.get_name().to_owned();
             let event_dispatcher = composer.borrow_partial().get_event_dispatcher();
-            event_dispatcher.borrow_mut().dispatch(
+            event_dispatcher.dispatch(
                 Some(command_event_name.as_ref()),
                 Some(std::rc::Rc::new(std::cell::RefCell::new(command_event))),
             )?;
-            event_dispatcher.borrow_mut().dispatch_script(
+            event_dispatcher.dispatch_script(
                 ScriptEvents::PRE_ARCHIVE_CMD,
                 true,
                 vec![],
@@ -419,7 +419,6 @@ impl Command for ArchiveCommand {
             composer
                 .borrow_partial()
                 .get_event_dispatcher()
-                .borrow_mut()
                 .dispatch_script(
                     ScriptEvents::POST_ARCHIVE_CMD,
                     true,

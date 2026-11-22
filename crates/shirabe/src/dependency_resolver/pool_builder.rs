@@ -28,7 +28,7 @@ pub struct PoolBuilder {
     root_aliases: IndexMap<BString, IndexMap<BString, IndexMap<BString, BString>>>,
     root_references: IndexMap<BString, BString>,
     temporary_constraints: IndexMap<BString, AnyConstraint>,
-    event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<dyn EventDispatcherInterface>>>,
+    event_dispatcher: Option<std::rc::Rc<dyn EventDispatcherInterface>>,
     pool_optimizer: Option<PoolOptimizer>,
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     alias_map: IndexMap<BString, IndexMap<i64, AliasPackageHandle>>,
@@ -73,7 +73,7 @@ impl PoolBuilder {
         root_aliases: IndexMap<BString, IndexMap<BString, IndexMap<BString, BString>>>,
         root_references: IndexMap<BString, BString>,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<dyn EventDispatcherInterface>>>,
+        event_dispatcher: Option<std::rc::Rc<dyn EventDispatcherInterface>>,
         pool_optimizer: Option<PoolOptimizer>,
         temporary_constraints: IndexMap<BString, AnyConstraint>,
         security_advisory_pool_filter: Option<SecurityAdvisoryPoolFilter>,
@@ -321,7 +321,7 @@ impl PoolBuilder {
                     unacceptable_fixed_or_locked_packages,
                 )));
             let pre_pool_create_event_name = pre_pool_create_event.borrow().get_name().to_owned();
-            let dispatched = event_dispatcher.borrow_mut().dispatch(
+            let dispatched = event_dispatcher.dispatch(
                 Some(pre_pool_create_event_name.as_ref()),
                 Some(pre_pool_create_event.clone()),
             );

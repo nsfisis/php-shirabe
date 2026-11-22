@@ -77,11 +77,11 @@ fn create_composer_instance() -> ComposerHandle {
             MockInstallationManager::new(),
         )));
     let generator = AutoloadGenerator::new(
-        std::rc::Rc::new(std::cell::RefCell::new(EventDispatcher::new(
+        std::rc::Rc::new(EventDispatcher::new(
             composer.upcast().downgrade(),
             null_io(),
             None,
-        ))),
+        )),
         None,
     );
     composer
@@ -165,7 +165,7 @@ fn dispatcher_with_listeners(
     process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     callback: Box<dyn Fn(&dyn EventInterface) -> Vec<Callable>>,
 ) -> EventDispatcher {
-    let mut dispatcher = EventDispatcher::new(composer.upcast().downgrade(), io, Some(process));
+    let dispatcher = EventDispatcher::new(composer.upcast().downgrade(), io, Some(process));
     dispatcher.__set_get_listeners_override(callback);
     dispatcher
 }
@@ -177,7 +177,7 @@ fn dispatcher_stub_for_listeners_test(
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     listeners: Vec<&BStr>,
 ) -> EventDispatcher {
-    let mut dispatcher = EventDispatcher::new(composer.upcast().downgrade(), io, None);
+    let dispatcher = EventDispatcher::new(composer.upcast().downgrade(), io, None);
     dispatcher.__set_get_listeners_override(listeners_const(listeners));
     dispatcher
 }
@@ -197,7 +197,7 @@ fn test_dispatcher_can_execute_single_command_line_script() {
             get_process_executor_mock(vec![cmd(command)], true, MockHandler::default());
 
         let composer = create_composer_instance();
-        let mut dispatcher = dispatcher_with_listeners(
+        let dispatcher = dispatcher_with_listeners(
             &composer,
             null_io(),
             process,
@@ -241,7 +241,7 @@ fn test_dispatcher_can_execute_composer_script_groups() {
             b"subgroup" => vec![Callable::String("echo -n baz".into())],
             _ => vec![],
         });
-    let mut dispatcher = dispatcher_with_listeners(&composer, io_dyn.clone(), process, callback);
+    let dispatcher = dispatcher_with_listeners(&composer, io_dyn.clone(), process, callback);
 
     let event = ScriptEvent::new(
         BString::from("root"),
@@ -288,7 +288,7 @@ fn test_recursion_in_scripts_names() {
             b"helloWorld" => vec![Callable::String("@hello World".into())],
             _ => vec![],
         });
-    let mut dispatcher = dispatcher_with_listeners(&composer, io_dyn.clone(), process, callback);
+    let dispatcher = dispatcher_with_listeners(&composer, io_dyn.clone(), process, callback);
 
     let event = ScriptEvent::new(
         BString::from("helloWorld"),
@@ -328,7 +328,7 @@ fn test_dispatcher_detect_infinite_recursion() {
             b"recurse" => vec![Callable::String("@root".into())],
             _ => vec![],
         });
-    let mut dispatcher = dispatcher_with_listeners(&composer, io.clone(), process, callback);
+    let dispatcher = dispatcher_with_listeners(&composer, io.clone(), process, callback);
 
     let event = ScriptEvent::new(
         BString::from("root"),
@@ -357,7 +357,7 @@ fn test_dispatcher_installer_events() {
         get_process_executor_mock(vec![], false, MockHandler::default());
 
     let composer = create_composer_instance();
-    let mut dispatcher =
+    let dispatcher =
         dispatcher_with_listeners(&composer, null_io(), process, listeners_const(vec![]));
 
     let transaction = std::rc::Rc::new(AnyTransaction::Transaction(Transaction::new(
@@ -396,8 +396,7 @@ fn test_dispatcher_doesnt_return_skipped_scripts() {
 
     let (process, _process_guard) =
         get_process_executor_mock(vec![], false, MockHandler::default());
-    let mut dispatcher =
-        EventDispatcher::new(composer.upcast().downgrade(), null_io(), Some(process));
+    let dispatcher = EventDispatcher::new(composer.upcast().downgrade(), null_io(), Some(process));
 
     let mut event = ScriptEvent::new(
         BString::from("scriptName"),
@@ -423,7 +422,7 @@ fn test_listener_exceptions_are_caught() {
     let io_dyn: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io_mock.clone();
 
     let composer = create_composer_instance();
-    let mut dispatcher = dispatcher_stub_for_listeners_test(
+    let dispatcher = dispatcher_stub_for_listeners_test(
         &composer,
         io_dyn,
         vec![BStr::new(
@@ -655,7 +654,7 @@ fn test_dispatcher_pass_dev_mode_to_autoload_generator_for_script_events() {
 
         let (process, _process_guard) =
             get_process_executor_mock(vec![], false, MockHandler::default());
-        let mut dispatcher =
+        let dispatcher =
             EventDispatcher::new(composer.upcast().downgrade(), null_io(), Some(process));
 
         let event = ScriptEvent::new(
@@ -688,7 +687,7 @@ fn test_dispatcher_remove_listener() {
         get_process_executor_mock(vec![], false, MockHandler::default());
     let io = buffer_io_verbose();
     let io_dyn: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io.clone();
-    let mut dispatcher = EventDispatcher::new(composer.upcast().downgrade(), io_dyn, Some(process));
+    let dispatcher = EventDispatcher::new(composer.upcast().downgrade(), io_dyn, Some(process));
 
     // PHP's `[$this, 'someMethod']` is an array callable whose object half is the test instance.
     // `Callable::PhpMethod` is the port's shape for an object-half callable: it carries the
@@ -745,7 +744,7 @@ fn test_dispatcher_can_execute_cli_and_php_in_same_event_script_stack() {
     let io = buffer_io_verbose();
     let io_dyn: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io.clone();
 
-    let mut dispatcher = dispatcher_with_listeners(
+    let dispatcher = dispatcher_with_listeners(
         &composer,
         io_dyn,
         process,
@@ -784,7 +783,7 @@ fn test_dispatcher_can_put_env() {
     let io = buffer_io_verbose();
     let io_dyn: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io.clone();
 
-    let mut dispatcher = dispatcher_with_listeners(
+    let dispatcher = dispatcher_with_listeners(
         &composer,
         io_dyn,
         process,
@@ -833,7 +832,7 @@ fn test_dispatcher_appends_dir_bin_on_path_for_every_listener() {
     let io = buffer_io_verbose();
     let io_dyn: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io.clone();
 
-    let mut dispatcher = dispatcher_with_listeners(
+    let dispatcher = dispatcher_with_listeners(
         &composer,
         io_dyn,
         process,
@@ -899,7 +898,7 @@ fn test_dispatcher_support_for_additional_args() {
         MockHandler::default(),
     );
 
-    let mut dispatcher = dispatcher_with_listeners(
+    let dispatcher = dispatcher_with_listeners(
         &composer,
         io_dyn,
         process,
@@ -937,7 +936,7 @@ fn test_dispatcher_outputs_command() {
         io_dyn.clone(),
     ))));
 
-    let mut dispatcher = dispatcher_with_listeners(
+    let dispatcher = dispatcher_with_listeners(
         &composer,
         io_dyn,
         process,
@@ -982,7 +981,7 @@ fn test_dispatcher_outputs_error_on_failed_command() {
     let io_dyn: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io.clone();
 
     let code = BStr::new("exit 1");
-    let mut dispatcher =
+    let dispatcher =
         dispatcher_with_listeners(&composer, io_dyn, process, listeners_const(vec![code]));
 
     let result = dispatcher.dispatch_script(
@@ -1025,7 +1024,7 @@ fn test_dispatcher_runs_composer_scripts_through_the_running_binary() {
     let io = buffer_io_verbose();
     let io_dyn: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io.clone();
 
-    let mut dispatcher = dispatcher_with_listeners(
+    let dispatcher = dispatcher_with_listeners(
         &composer,
         io_dyn,
         process,
@@ -1057,7 +1056,7 @@ fn test_listeners_are_keyed_by_the_bytes_of_the_event_name() {
     let composer = create_composer_instance();
     let io = buffer_io_verbose();
     let io_dyn: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io.clone();
-    let mut dispatcher = EventDispatcher::new(composer.upcast().downgrade(), io_dyn, None);
+    let dispatcher = EventDispatcher::new(composer.upcast().downgrade(), io_dyn, None);
     let called = std::rc::Rc::new(std::cell::Cell::new(0));
     let called_by_listener = called.clone();
     dispatcher.add_listener(

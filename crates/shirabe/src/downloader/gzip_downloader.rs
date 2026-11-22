@@ -30,7 +30,7 @@ impl GzipDownloader {
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
         http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
-        event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
+        event_dispatcher: Option<std::rc::Rc<EventDispatcher>>,
         cache: Option<std::rc::Rc<std::cell::RefCell<Cache>>>,
         filesystem: std::rc::Rc<std::cell::RefCell<Filesystem>>,
         process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,

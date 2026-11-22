@@ -17,10 +17,10 @@ use crate::util::{Platform, ProcessExecutor};
 use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    Catch as _, InvalidArgumentException, PhpMixed, RuntimeException, ToPhpString, array_pop,
-    array_push, array_search_in_vec, array_splice, bformat, boolval, explode, explode_with_limit,
-    file_exists, hash, implode, ini_get, is_dir, krsort, os_str_from_bytes, path_from_bytes,
-    path_to_bytes, php_regex, preg_is_match, preg_match, preg_quote, preg_replace,
+    Catch as _, InvalidArgumentException, PhpMixed, PhpProp, RuntimeException, ToPhpString,
+    array_pop, array_push, array_search_in_vec, array_splice, bformat, boolval, explode,
+    explode_with_limit, file_exists, hash, implode, ini_get, is_dir, krsort, os_str_from_bytes,
+    path_from_bytes, path_to_bytes, php_regex, preg_is_match, preg_match, preg_quote, preg_replace,
     preg_replace_callback, realpath, str_replace, strlen, strpos, strtoupper, substr, trim_chars,
 };
 use shirabe_symfony_console::output::output_interface;
@@ -75,22 +75,22 @@ impl std::fmt::Debug for Callable {
 pub struct EventDispatcher {
     composer: PartialComposerWeakHandle,
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-    loader: Option<std::rc::Rc<std::cell::RefCell<ClassLoader>>>,
+    loader: PhpProp<Option<std::rc::Rc<std::cell::RefCell<ClassLoader>>>>,
     process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
-    listeners: IndexMap<BString, IndexMap<i64, Vec<Callable>>>,
-    run_scripts: bool,
-    event_stack: Vec<BString>,
+    listeners: PhpProp<std::rc::Rc<IndexMap<BString, IndexMap<i64, Vec<Callable>>>>>,
+    run_scripts: PhpProp<bool>,
+    event_stack: PhpProp<std::rc::Rc<Vec<BString>>>,
     skip_scripts: Vec<BString>,
-    previous_hash: Option<BString>,
-    previous_listeners: IndexMap<BString, bool>,
+    previous_hash: PhpProp<Option<BString>>,
+    previous_listeners: PhpProp<std::rc::Rc<IndexMap<BString, bool>>>,
     /// For testing only. Mirrors PHPUnit's `getMockBuilder(EventDispatcher)->onlyMethods(['getListeners'])`:
     /// when set, `get_listeners` returns this closure's result verbatim instead of resolving
     /// registered listeners and package scripts.
-    get_listeners_override: Option<GetListenersOverride>,
+    get_listeners_override: PhpProp<Option<std::rc::Rc<GetListenersOverride>>>,
     /// For testing only. Mirrors PHPUnit's `getMockBuilder(EventDispatcher)->onlyMethods(['dispatchScript'])`:
     /// when set, `dispatch_script` returns this closure's result instead of building and
     /// dispatching a script event.
-    dispatch_script_override: Option<DispatchScriptOverride>,
+    dispatch_script_override: PhpProp<Option<std::rc::Rc<DispatchScriptOverride>>>,
 }
 
 /// For testing only. Holds a closure standing in for an overridden `getListeners` method.
@@ -134,16 +134,16 @@ impl EventDispatcher {
         Self {
             composer,
             io,
-            loader: None,
+            loader: PhpProp::new(None),
             process,
-            listeners: IndexMap::new(),
-            run_scripts: true,
-            event_stack,
+            listeners: PhpProp::default(),
+            run_scripts: PhpProp::new(true),
+            event_stack: PhpProp::new(std::rc::Rc::new(event_stack)),
             skip_scripts,
-            previous_hash: None,
-            previous_listeners: IndexMap::new(),
-            get_listeners_override: None,
-            dispatch_script_override: None,
+            previous_hash: PhpProp::new(None),
+            previous_listeners: PhpProp::default(),
+            get_listeners_override: PhpProp::new(None),
+            dispatch_script_override: PhpProp::new(None),
         }
     }
 
@@ -151,19 +151,21 @@ impl EventDispatcher {
     /// PHPUnit's `onlyMethods(['getListeners'])->will($this->returnValue(...))` /
     /// `->will($this->returnCallback(...))`.
     pub fn __set_get_listeners_override(
-        &mut self,
+        &self,
         callback: Box<dyn Fn(&dyn EventInterface) -> Vec<Callable>>,
     ) {
-        self.get_listeners_override = Some(GetListenersOverride(callback));
+        self.get_listeners_override
+            .set(Some(std::rc::Rc::new(GetListenersOverride(callback))));
     }
 
     /// For testing only. Installs a closure that overrides `dispatch_script`, mirroring PHPUnit's
     /// `onlyMethods(['dispatchScript'])->willReturnCallback(...)`.
     pub fn __set_dispatch_script_override(
-        &mut self,
+        &self,
         callback: Box<dyn Fn(&BStr, bool, &[BString], &EventFlags) -> anyhow::Result<i64>>,
     ) {
-        self.dispatch_script_override = Some(DispatchScriptOverride(callback));
+        self.dispatch_script_override
+            .set(Some(std::rc::Rc::new(DispatchScriptOverride(callback))));
     }
 
     /// For testing only. Exposes the protected `getPhpExecCommand`, mirroring the PHP tests'
@@ -173,13 +175,13 @@ impl EventDispatcher {
     }
 
     /// Set whether script handlers are active or not
-    pub fn set_run_scripts(&mut self, run_scripts: bool) {
-        self.run_scripts = run_scripts;
+    pub fn set_run_scripts(&self, run_scripts: bool) {
+        self.run_scripts.set(run_scripts);
     }
 
     /// Dispatch an event
     pub fn dispatch(
-        &mut self,
+        &self,
         event_name: Option<&BStr>,
         event: Option<std::rc::Rc<std::cell::RefCell<dyn EventInterface>>>,
     ) -> anyhow::Result<i64> {
@@ -199,13 +201,13 @@ impl EventDispatcher {
 
     /// Dispatch a script event.
     pub fn dispatch_script(
-        &mut self,
+        &self,
         event_name: &BStr,
         dev_mode: bool,
         additional_args: Vec<BString>,
         flags: EventFlags,
     ) -> anyhow::Result<i64> {
-        if let Some(over) = &self.dispatch_script_override {
+        if let Some(over) = self.dispatch_script_override.cloned() {
             return (over.0)(event_name, dev_mode, &additional_args, &flags);
         }
 
@@ -228,7 +230,7 @@ impl EventDispatcher {
 
     /// Dispatch a package event.
     pub fn dispatch_package_event(
-        &mut self,
+        &self,
         event_name: &BStr,
         dev_mode: bool,
         local_repo: InstalledRepositoryInterfaceHandle,
@@ -255,7 +257,7 @@ impl EventDispatcher {
 
     /// Dispatch a installer event.
     pub fn dispatch_installer_event(
-        &mut self,
+        &self,
         event_name: &BStr,
         dev_mode: bool,
         execute_operations: bool,
@@ -280,7 +282,7 @@ impl EventDispatcher {
 
     /// Triggers the listeners of an event.
     fn do_dispatch(
-        &mut self,
+        &self,
         event: &std::rc::Rc<std::cell::RefCell<dyn EventInterface>>,
     ) -> anyhow::Result<i64> {
         if boolval(&Platform::get_env("COMPOSER_DEBUG_EVENTS")) {
@@ -313,7 +315,7 @@ impl EventDispatcher {
     }
 
     fn do_dispatch_body(
-        &mut self,
+        &self,
         event: &std::rc::Rc<std::cell::RefCell<dyn EventInterface>>,
         listeners: Vec<Callable>,
     ) -> anyhow::Result<i64> {
@@ -804,21 +806,21 @@ impl EventDispatcher {
         Ok(return_max)
     }
 
-    fn do_dispatch_script(&mut self, event: ScriptEvent) -> anyhow::Result<i64> {
+    fn do_dispatch_script(&self, event: ScriptEvent) -> anyhow::Result<i64> {
         self.do_dispatch(
             &(std::rc::Rc::new(std::cell::RefCell::new(event))
                 as std::rc::Rc<std::cell::RefCell<dyn EventInterface>>),
         )
     }
 
-    fn do_dispatch_package(&mut self, event: PackageEvent) -> anyhow::Result<i64> {
+    fn do_dispatch_package(&self, event: PackageEvent) -> anyhow::Result<i64> {
         self.do_dispatch(
             &(std::rc::Rc::new(std::cell::RefCell::new(event))
                 as std::rc::Rc<std::cell::RefCell<dyn EventInterface>>),
         )
     }
 
-    fn do_dispatch_installer(&mut self, event: InstallerEvent) -> anyhow::Result<i64> {
+    fn do_dispatch_installer(&self, event: InstallerEvent) -> anyhow::Result<i64> {
         self.do_dispatch(
             &(std::rc::Rc::new(std::cell::RefCell::new(event))
                 as std::rc::Rc<std::cell::RefCell<dyn EventInterface>>),
@@ -905,13 +907,15 @@ impl EventDispatcher {
     }
 
     /// Add a listener for a particular event
-    pub fn add_listener(&mut self, event_name: &BStr, listener: Callable, priority: i64) {
-        self.listeners
-            .entry(event_name.to_owned())
-            .or_default()
-            .entry(priority)
-            .or_default()
-            .push(listener);
+    pub fn add_listener(&self, event_name: &BStr, listener: Callable, priority: i64) {
+        self.listeners.update(|listeners| {
+            std::rc::Rc::make_mut(listeners)
+                .entry(event_name.to_owned())
+                .or_default()
+                .entry(priority)
+                .or_default()
+                .push(listener);
+        });
     }
 
     /// PHP's parameter is `callable|object`; every caller in Composer and its test suite
@@ -919,22 +923,21 @@ impl EventDispatcher {
     /// narrowed to the object's cross-RPC identity (its PHP entity handle). Of PHP's two match
     /// conditions only `$candidate[0] === $listener` can fire for an object listener; it maps
     /// to handle equality on `Callable::PhpMethod`.
-    pub fn remove_listener(&mut self, listener: &shirabe_php_rpc::PhpEntityHandle) {
-        for priorities in self.listeners.values_mut() {
-            for listeners in priorities.values_mut() {
-                listeners.retain(|candidate| match candidate {
-                    Callable::PhpMethod(handle, _) => handle != listener,
-                    _ => true,
-                });
+    pub fn remove_listener(&self, listener: &shirabe_php_rpc::PhpEntityHandle) {
+        self.listeners.update(|all| {
+            for priorities in std::rc::Rc::make_mut(all).values_mut() {
+                for listeners in priorities.values_mut() {
+                    listeners.retain(|candidate| match candidate {
+                        Callable::PhpMethod(handle, _) => handle != listener,
+                        _ => true,
+                    });
+                }
             }
-        }
+        });
     }
 
     /// Adds object methods as listeners for the events in getSubscribedEvents
-    pub fn add_subscriber(
-        &mut self,
-        subscriber: &dyn EventSubscriberInterface,
-    ) -> anyhow::Result<()> {
+    pub fn add_subscriber(&self, subscriber: &dyn EventSubscriberInterface) -> anyhow::Result<()> {
         for (event_name, params) in subscriber.get_subscribed_events()? {
             match params {
                 SubscribedEventEntry::Method(method) => {
@@ -966,53 +969,52 @@ impl EventDispatcher {
     }
 
     /// Retrieves all listeners for a given event
-    fn get_listeners(&mut self, event: &dyn EventInterface) -> Vec<Callable> {
+    fn get_listeners(&self, event: &dyn EventInterface) -> Vec<Callable> {
         // For testing only: a test may override this method, mirroring PHPUnit's
         // `onlyMethods(['getListeners'])`.
-        if let Some(override_cb) = &self.get_listeners_override {
+        if let Some(override_cb) = self.get_listeners_override.cloned() {
             return override_cb.0(event);
         }
 
-        let script_listeners: Vec<Callable> = if self.run_scripts {
+        let script_listeners: Vec<Callable> = if self.run_scripts.cloned() {
             self.get_script_listeners(event)
         } else {
             Vec::new()
         };
 
         let name = event.get_name().to_owned();
-        if !self
-            .listeners
-            .get(&name)
-            .map(|m| m.contains_key(&0_i64))
-            .unwrap_or(false)
-        {
-            self.listeners
-                .entry(name.clone())
-                .or_default()
-                .insert(0, Vec::new());
-        }
-        if let Some(priorities) = self.listeners.get_mut(&name) {
-            krsort(priorities);
-        }
+        self.listeners.update(|all| {
+            if !all
+                .get(&name)
+                .map(|m| m.contains_key(&0_i64))
+                .unwrap_or(false)
+            {
+                std::rc::Rc::make_mut(all)
+                    .entry(name.clone())
+                    .or_default()
+                    .insert(0, Vec::new());
+            }
+            if let Some(priorities) = std::rc::Rc::make_mut(all).get_mut(&name) {
+                krsort(priorities);
+            }
+        });
 
-        let mut listeners = self.listeners.clone();
-        if let Some(priorities) = listeners.get_mut(&name)
-            && let Some(zero_list) = priorities.get_mut(&0)
-        {
-            zero_list.extend(script_listeners);
-        }
-
+        let listeners = self.listeners.cloned();
+        let mut script_listeners = Some(script_listeners);
         let mut result: Vec<Callable> = Vec::new();
         if let Some(priorities) = listeners.get(&name) {
-            for (_priority, list) in priorities {
-                result.extend(list.clone());
+            for (priority, list) in priorities {
+                result.extend(list.iter().cloned());
+                if *priority == 0 {
+                    result.extend(script_listeners.take().expect("priorities are unique"));
+                }
             }
         }
         result
     }
 
     /// Checks if an event has listeners registered
-    pub fn has_event_listeners(&mut self, event: &dyn EventInterface) -> bool {
+    pub fn has_event_listeners(&self, event: &dyn EventInterface) -> bool {
         let listeners = self.get_listeners(event);
 
         !listeners.is_empty()
@@ -1066,21 +1068,24 @@ impl EventDispatcher {
     }
 
     /// Push an event to the stack of active event
-    fn push_event(&mut self, event: &dyn EventInterface) -> anyhow::Result<i64> {
+    fn push_event(&self, event: &dyn EventInterface) -> anyhow::Result<i64> {
         let event_name = event.get_name().to_owned();
-        if self.event_stack.iter().any(|n| n == &event_name) {
+        if self.event_stack.cloned().iter().any(|n| n == &event_name) {
             return Err(RuntimeException::new(bformat!(
                 "Circular call to script handler '{event_name}' detected"
             ))
             .into());
         }
 
-        Ok(array_push(&mut self.event_stack, event_name))
+        Ok(self
+            .event_stack
+            .update(|stack| array_push(std::rc::Rc::make_mut(stack), event_name)))
     }
 
     /// Pops the active event from the stack
-    fn pop_event(&mut self) -> Option<BString> {
-        array_pop(&mut self.event_stack)
+    fn pop_event(&self) -> Option<BString> {
+        self.event_stack
+            .update(|stack| array_pop(std::rc::Rc::make_mut(stack)))
     }
 
     fn ensure_bin_dir_is_in_path(&self) -> anyhow::Result<()> {
@@ -1118,7 +1123,7 @@ impl EventDispatcher {
     }
 
     fn make_autoloader(
-        &mut self,
+        &self,
         event: &std::rc::Rc<std::cell::RefCell<dyn EventInterface>>,
         callable: &Callable,
     ) -> anyhow::Result<()> {
@@ -1136,10 +1141,12 @@ impl EventDispatcher {
             }
             Callable::Closure(_) => BString::from("closure"),
         };
-        if self.previous_listeners.contains_key(&callable_key) {
+        if self.previous_listeners.cloned().contains_key(&callable_key) {
             return Ok(());
         }
-        self.previous_listeners.insert(callable_key, true);
+        self.previous_listeners.update(|previous| {
+            std::rc::Rc::make_mut(previous).insert(callable_key, true);
+        });
 
         let package = composer.borrow().get_package().clone();
         let repository_manager = composer.borrow().get_repository_manager();
@@ -1178,11 +1185,11 @@ impl EventDispatcher {
         }
         let hash = hash("sha256", &hash_input);
 
-        if self.previous_hash.as_ref() == Some(&hash) {
+        if self.previous_hash.cloned().as_ref() == Some(&hash) {
             return Ok(());
         }
 
-        self.previous_hash = Some(hash);
+        self.previous_hash.set(Some(hash));
 
         let installation_manager = composer.borrow().get_installation_manager();
         let package_map = generator.borrow().build_package_map(
@@ -1194,8 +1201,8 @@ impl EventDispatcher {
             .borrow()
             .parse_autoloads(package_map, package, PhpMixed::Bool(false));
 
-        if let Some(loader) = &self.loader {
-            ClassLoader::unregister(loader);
+        if let Some(loader) = self.loader.cloned() {
+            ClassLoader::unregister(&loader);
         }
 
         let vendor_dir = composer
@@ -1205,7 +1212,7 @@ impl EventDispatcher {
             .get_path("vendor-dir")?;
         let loader = generator.borrow().create_loader(&map, Some(vendor_dir))?;
         ClassLoader::register(&loader, false);
-        self.loader = Some(loader);
+        self.loader.set(Some(loader));
         Ok(())
     }
 
@@ -1232,36 +1239,36 @@ impl EventDispatcher {
 
 // Composer's PartialComposer::setEventDispatcher() accepts any EventDispatcher subclass, so plugins
 // may swap in a replacement. The interface captures the methods reached through Composer's accessor
-// and through the `Rc<RefCell<dyn EventDispatcherInterface>>` references fed from it.
+// and through the `Rc<dyn EventDispatcherInterface>` references fed from it.
 pub trait EventDispatcherInterface: std::fmt::Debug {
     fn dispatch(
-        &mut self,
+        &self,
         event_name: Option<&BStr>,
         event: Option<std::rc::Rc<std::cell::RefCell<dyn EventInterface>>>,
     ) -> anyhow::Result<i64>;
     fn dispatch_script(
-        &mut self,
+        &self,
         event_name: &BStr,
         dev_mode: bool,
         additional_args: Vec<BString>,
         flags: EventFlags,
     ) -> anyhow::Result<i64>;
     fn dispatch_installer_event(
-        &mut self,
+        &self,
         event_name: &BStr,
         dev_mode: bool,
         execute_operations: bool,
         transaction: std::rc::Rc<AnyTransaction>,
     ) -> anyhow::Result<i64>;
-    fn add_listener(&mut self, event_name: &BStr, listener: Callable, priority: i64);
-    fn add_subscriber(&mut self, subscriber: &dyn EventSubscriberInterface) -> anyhow::Result<()>;
-    fn remove_listener(&mut self, listener: &shirabe_php_rpc::PhpEntityHandle);
-    fn has_event_listeners(&mut self, event: &dyn EventInterface) -> bool;
+    fn add_listener(&self, event_name: &BStr, listener: Callable, priority: i64);
+    fn add_subscriber(&self, subscriber: &dyn EventSubscriberInterface) -> anyhow::Result<()>;
+    fn remove_listener(&self, listener: &shirabe_php_rpc::PhpEntityHandle);
+    fn has_event_listeners(&self, event: &dyn EventInterface) -> bool;
 }
 
 impl EventDispatcherInterface for EventDispatcher {
     fn dispatch(
-        &mut self,
+        &self,
         event_name: Option<&BStr>,
         event: Option<std::rc::Rc<std::cell::RefCell<dyn EventInterface>>>,
     ) -> anyhow::Result<i64> {
@@ -1269,7 +1276,7 @@ impl EventDispatcherInterface for EventDispatcher {
     }
 
     fn dispatch_script(
-        &mut self,
+        &self,
         event_name: &BStr,
         dev_mode: bool,
         additional_args: Vec<BString>,
@@ -1279,7 +1286,7 @@ impl EventDispatcherInterface for EventDispatcher {
     }
 
     fn dispatch_installer_event(
-        &mut self,
+        &self,
         event_name: &BStr,
         dev_mode: bool,
         execute_operations: bool,
@@ -1288,19 +1295,19 @@ impl EventDispatcherInterface for EventDispatcher {
         self.dispatch_installer_event(event_name, dev_mode, execute_operations, transaction)
     }
 
-    fn add_listener(&mut self, event_name: &BStr, listener: Callable, priority: i64) {
+    fn add_listener(&self, event_name: &BStr, listener: Callable, priority: i64) {
         self.add_listener(event_name, listener, priority);
     }
 
-    fn add_subscriber(&mut self, subscriber: &dyn EventSubscriberInterface) -> anyhow::Result<()> {
+    fn add_subscriber(&self, subscriber: &dyn EventSubscriberInterface) -> anyhow::Result<()> {
         self.add_subscriber(subscriber)
     }
 
-    fn remove_listener(&mut self, listener: &shirabe_php_rpc::PhpEntityHandle) {
+    fn remove_listener(&self, listener: &shirabe_php_rpc::PhpEntityHandle) {
         self.remove_listener(listener);
     }
 
-    fn has_event_listeners(&mut self, event: &dyn EventInterface) -> bool {
+    fn has_event_listeners(&self, event: &dyn EventInterface) -> bool {
         self.has_event_listeners(event)
     }
 }

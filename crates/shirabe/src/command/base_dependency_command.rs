@@ -55,7 +55,7 @@ pub trait BaseDependencyCommand: BaseCommand {
         );
         let command_event_name = command_event.get_name().to_owned();
         let event_dispatcher = composer.borrow_partial().get_event_dispatcher();
-        event_dispatcher.borrow_mut().dispatch(
+        event_dispatcher.dispatch(
             Some(command_event_name.as_ref()),
             Some(std::rc::Rc::new(std::cell::RefCell::new(command_event))),
         )?;

@@ -161,14 +161,14 @@ struct StubEventDispatcher;
 
 impl EventDispatcherInterface for StubEventDispatcher {
     fn dispatch(
-        &mut self,
+        &self,
         _event_name: Option<&bstr::BStr>,
         _event: Option<std::rc::Rc<std::cell::RefCell<dyn EventInterface>>>,
     ) -> anyhow::Result<i64> {
         Ok(0)
     }
     fn dispatch_script(
-        &mut self,
+        &self,
         _event_name: &bstr::BStr,
         _dev_mode: bool,
         _additional_args: Vec<bstr::BString>,
@@ -177,7 +177,7 @@ impl EventDispatcherInterface for StubEventDispatcher {
         Ok(0)
     }
     fn dispatch_installer_event(
-        &mut self,
+        &self,
         _event_name: &bstr::BStr,
         _dev_mode: bool,
         _execute_operations: bool,
@@ -185,15 +185,15 @@ impl EventDispatcherInterface for StubEventDispatcher {
     ) -> anyhow::Result<i64> {
         Ok(0)
     }
-    fn add_listener(&mut self, _event_name: &bstr::BStr, _listener: Callable, _priority: i64) {}
+    fn add_listener(&self, _event_name: &bstr::BStr, _listener: Callable, _priority: i64) {}
     fn add_subscriber(
-        &mut self,
+        &self,
         _subscriber: &dyn shirabe::event_dispatcher::EventSubscriberInterface,
     ) -> anyhow::Result<()> {
         Ok(())
     }
-    fn remove_listener(&mut self, _listener: &shirabe_php_rpc::PhpEntityHandle) {}
-    fn has_event_listeners(&mut self, _event: &dyn EventInterface) -> bool {
+    fn remove_listener(&self, _listener: &shirabe_php_rpc::PhpEntityHandle) {}
+    fn has_event_listeners(&self, _event: &dyn EventInterface) -> bool {
         false
     }
 }
@@ -470,7 +470,7 @@ fn test_installer() {
             repository_manager,
             locker,
             installation_manager.clone(),
-            std::rc::Rc::new(std::cell::RefCell::new(StubEventDispatcher)),
+            std::rc::Rc::new(StubEventDispatcher),
             autoload_generator,
         );
         installer.set_audit_config(
@@ -986,9 +986,7 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&BString>) 
         )));
     composer
         .borrow_mut()
-        .set_event_dispatcher(std::rc::Rc::new(std::cell::RefCell::new(
-            StubEventDispatcher,
-        )));
+        .set_event_dispatcher(std::rc::Rc::new(StubEventDispatcher));
 
     let installer = std::rc::Rc::new(std::cell::RefCell::new(Installer::create(
         io.clone(),

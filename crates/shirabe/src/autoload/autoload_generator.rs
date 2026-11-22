@@ -35,7 +35,7 @@ use shirabe_symfony_console::formatter::OutputFormatter;
 
 #[derive(Debug)]
 pub struct AutoloadGenerator {
-    event_dispatcher: std::rc::Rc<std::cell::RefCell<EventDispatcher>>,
+    event_dispatcher: std::rc::Rc<EventDispatcher>,
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     // `dump()` dispatches script events whose listeners reach back here through
     // `Composer::getAutoloadGenerator()` and mutate this instance mid-dump.
@@ -51,7 +51,7 @@ pub struct AutoloadGenerator {
 
 impl AutoloadGenerator {
     pub fn new(
-        event_dispatcher: std::rc::Rc<std::cell::RefCell<EventDispatcher>>,
+        event_dispatcher: std::rc::Rc<EventDispatcher>,
         io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
     ) -> Self {
         let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
@@ -165,7 +165,7 @@ impl AutoloadGenerator {
                 )?;
             }
 
-            self.event_dispatcher.borrow_mut().dispatch_script(
+            self.event_dispatcher.dispatch_script(
                 ScriptEvents::PRE_AUTOLOAD_DUMP,
                 self.dev_mode.get().unwrap_or(false),
                 vec![],
@@ -700,7 +700,7 @@ impl AutoloadGenerator {
         )?;
 
         if self.run_scripts.get() {
-            self.event_dispatcher.borrow_mut().dispatch_script(
+            self.event_dispatcher.dispatch_script(
                 ScriptEvents::POST_AUTOLOAD_DUMP,
                 self.dev_mode.get().unwrap_or(false),
                 vec![],

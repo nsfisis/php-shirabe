@@ -133,7 +133,7 @@ struct SetUp {
     im: std::rc::Rc<std::cell::RefCell<dyn shirabe::installer::InstallationManagerInterface>>,
     io: std::rc::Rc<std::cell::RefCell<BufferIO>>,
     generator: AutoloadGenerator,
-    event_dispatcher: std::rc::Rc<std::cell::RefCell<EventDispatcher>>,
+    event_dispatcher: std::rc::Rc<EventDispatcher>,
 }
 
 impl Drop for SetUp {
@@ -197,11 +197,11 @@ fn set_up() -> SetUp {
     let composer = ComposerHandle::from_rc_unchecked(std::rc::Rc::new(std::cell::RefCell::new(
         PartialOrFullComposer::new_full(),
     )));
-    let event_dispatcher = std::rc::Rc::new(std::cell::RefCell::new(EventDispatcher::new(
+    let event_dispatcher = std::rc::Rc::new(EventDispatcher::new(
         composer.upcast().downgrade(),
         dispatcher_io.clone(),
         None,
-    )));
+    ));
 
     let generator = AutoloadGenerator::new(event_dispatcher.clone(), Some(dispatcher_io));
 
@@ -2400,15 +2400,15 @@ fn test_pre_and_post_events_are_dispatched_during_autoload_dump() {
     let dispatched = std::rc::Rc::new(std::cell::Cell::new(0));
     let series_for_cb = series.clone();
     let dispatched_for_cb = dispatched.clone();
-    s.event_dispatcher
-        .borrow_mut()
-        .__set_dispatch_script_override(Box::new(move |r#type, dev, _args, _flags| {
+    s.event_dispatcher.__set_dispatch_script_override(Box::new(
+        move |r#type, dev, _args, _flags| {
             dispatched_for_cb.set(dispatched_for_cb.get() + 1);
             let expected = series_for_cb.borrow_mut().remove(0);
             assert_eq!(expected, (r#type, dev));
 
             Ok(0)
-        }));
+        },
+    ));
 
     let package = new_root_pkg(BStr::new("root/a"));
     package.set_autoload(autoload(vec![(

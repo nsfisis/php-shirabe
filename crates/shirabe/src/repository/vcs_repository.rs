@@ -50,7 +50,7 @@ pub struct VcsRepository {
     empty_references: std::cell::RefCell<Vec<BString>>,
     version_transport_exceptions:
         std::cell::RefCell<IndexMap<BString, IndexMap<BString, TransportException>>>,
-    _dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
+    _dispatcher: Option<std::rc::Rc<EventDispatcher>>,
 }
 
 impl ConfigurableRepositoryInterface for VcsRepository {
@@ -66,7 +66,7 @@ impl VcsRepository {
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
         http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
-        dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
+        dispatcher: Option<std::rc::Rc<EventDispatcher>>,
         process: Option<std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,
         drivers: Option<IndexMap<BString, VcsDriverKind>>,
         version_cache: Option<Box<dyn VersionCacheInterface>>,

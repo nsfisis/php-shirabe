@@ -294,11 +294,11 @@ pub(crate) fn set_up() -> SetUp {
 
     // PHP hands the AutoloadGenerator a mocked EventDispatcher (disabled constructor); the Rust
     // AutoloadGenerator requires a concrete EventDispatcher, and none of these tests reach it.
-    let dispatcher = std::rc::Rc::new(std::cell::RefCell::new(EventDispatcher::new(
+    let dispatcher = std::rc::Rc::new(EventDispatcher::new(
         composer.upcast().downgrade(),
         io_dyn.clone(),
         None,
-    )));
+    ));
     let autoload_generator = std::rc::Rc::new(std::cell::RefCell::new(AutoloadGenerator::new(
         dispatcher,
         Some(io_dyn.clone()),
@@ -341,11 +341,11 @@ pub(crate) fn set_up() -> SetUp {
         )));
         c.set_autoload_generator(autoload_generator.clone());
     }
-    let real_dispatcher = std::rc::Rc::new(std::cell::RefCell::new(EventDispatcher::new(
+    let real_dispatcher = std::rc::Rc::new(EventDispatcher::new(
         composer.upcast().downgrade(),
         io_dyn.clone(),
         None,
-    )));
+    ));
     composer.borrow_mut().set_event_dispatcher(real_dispatcher);
     composer.borrow_mut().set_package(
         RootPackageHandle::new(

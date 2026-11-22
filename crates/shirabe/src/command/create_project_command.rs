@@ -232,15 +232,12 @@ impl CreateProjectCommand {
         let mut fs = Filesystem::new(process);
 
         // dispatch event
-        composer
-            .get_event_dispatcher()
-            .borrow_mut()
-            .dispatch_script(
-                ScriptEvents::POST_ROOT_PACKAGE_INSTALL,
-                install_dev_packages,
-                vec![],
-                EventFlags::default(),
-            );
+        composer.get_event_dispatcher().dispatch_script(
+            ScriptEvents::POST_ROOT_PACKAGE_INSTALL,
+            install_dev_packages,
+            vec![],
+            EventFlags::default(),
+        );
 
         // use the new config including the newly installed project
         let config = composer.get_config();
@@ -385,15 +382,12 @@ impl CreateProjectCommand {
         }
 
         // dispatch event
-        composer
-            .get_event_dispatcher()
-            .borrow_mut()
-            .dispatch_script(
-                ScriptEvents::POST_CREATE_PROJECT_CMD,
-                install_dev_packages,
-                vec![],
-                EventFlags::default(),
-            );
+        composer.get_event_dispatcher().dispatch_script(
+            ScriptEvents::POST_CREATE_PROJECT_CMD,
+            install_dev_packages,
+            vec![],
+            EventFlags::default(),
+        );
 
         chdir(&old_cwd);
 

@@ -82,7 +82,7 @@ pub struct Installer {
     repository_manager: std::rc::Rc<std::cell::RefCell<dyn RepositoryManagerInterface>>,
     locker: std::rc::Rc<std::cell::RefCell<dyn LockerInterface>>,
     installation_manager: std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>,
-    event_dispatcher: std::rc::Rc<std::cell::RefCell<dyn EventDispatcherInterface>>,
+    event_dispatcher: std::rc::Rc<dyn EventDispatcherInterface>,
     autoload_generator: std::rc::Rc<std::cell::RefCell<dyn AutoloadGeneratorInterface>>,
     prefer_source: bool,
     prefer_dist: bool,
@@ -138,7 +138,7 @@ impl Installer {
         repository_manager: std::rc::Rc<std::cell::RefCell<dyn RepositoryManagerInterface>>,
         locker: std::rc::Rc<std::cell::RefCell<dyn LockerInterface>>,
         installation_manager: std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>,
-        event_dispatcher: std::rc::Rc<std::cell::RefCell<dyn EventDispatcherInterface>>,
+        event_dispatcher: std::rc::Rc<dyn EventDispatcherInterface>,
         autoload_generator: std::rc::Rc<std::cell::RefCell<dyn AutoloadGeneratorInterface>>,
     ) -> Self {
         let suggested_packages_reporter = std::rc::Rc::new(std::cell::RefCell::new(
@@ -246,7 +246,7 @@ impl Installer {
             } else {
                 ScriptEvents::PRE_INSTALL_CMD
             };
-            self.event_dispatcher.borrow_mut().dispatch_script(
+            self.event_dispatcher.dispatch_script(
                 event_name,
                 self.dev_mode,
                 vec![],
@@ -429,7 +429,7 @@ impl Installer {
             } else {
                 ScriptEvents::POST_INSTALL_CMD
             };
-            self.event_dispatcher.borrow_mut().dispatch_script(
+            self.event_dispatcher.dispatch_script(
                 event_name,
                 self.dev_mode,
                 vec![],
@@ -1093,14 +1093,12 @@ impl Installer {
                 )?,
             ))
         };
-        self.event_dispatcher
-            .borrow_mut()
-            .dispatch_installer_event(
-                InstallerEvents::PRE_OPERATIONS_EXEC,
-                self.dev_mode,
-                self.execute_operations,
-                local_repo_transaction.clone(),
-            )?;
+        self.event_dispatcher.dispatch_installer_event(
+            InstallerEvents::PRE_OPERATIONS_EXEC,
+            self.dev_mode,
+            self.execute_operations,
+            local_repo_transaction.clone(),
+        )?;
 
         let mut installs: Vec<BString> = vec![];
         let mut updates: Vec<BString> = vec![];

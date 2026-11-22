@@ -11,11 +11,15 @@ class Plugin implements PluginInterface, EventSubscriberInterface
 {
     public $version = 'subscriber-v1';
 
+    /** @var Composer */
+    private $composer;
+
     /** @var IOInterface */
     private $io;
 
     public function activate(Composer $composer, IOInterface $io)
     {
+        $this->composer = $composer;
         $this->io = $io;
         $io->write('activate subscriber-v1');
     }
@@ -34,6 +38,7 @@ class Plugin implements PluginInterface, EventSubscriberInterface
             'post-install-cmd' => 'onPostInstall',
             'shirabe-priority-event' => [['early', 10], ['late', -10]],
             'shirabe-false-event' => ['returnsFalse', 0],
+            'shirabe-reentrant-event' => 'dispatchesNested',
         ];
     }
 
@@ -57,5 +62,11 @@ class Plugin implements PluginInterface, EventSubscriberInterface
         $this->io->write('failing listener');
 
         return false;
+    }
+
+    public function dispatchesNested($event)
+    {
+        $result = $this->composer->getEventDispatcher()->dispatch('shirabe-unrelated-event');
+        $this->io->write('nested dispatch returned ' . var_export($result, true));
     }
 }

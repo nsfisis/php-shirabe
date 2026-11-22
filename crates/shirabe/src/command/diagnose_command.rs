@@ -1151,7 +1151,7 @@ impl Command for DiagnoseCommand {
                 EventFlags::default(),
             );
             let command_event_name = command_event.get_name().to_owned();
-            c.get_event_dispatcher().borrow_mut().dispatch(
+            c.get_event_dispatcher().dispatch(
                 Some(command_event_name.as_ref()),
                 Some(std::rc::Rc::new(std::cell::RefCell::new(command_event))),
             )?;

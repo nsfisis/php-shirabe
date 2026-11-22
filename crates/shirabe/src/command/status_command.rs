@@ -323,35 +323,29 @@ impl Command for StatusCommand {
             let command_event =
                 CommandEvent::new(PluginEvents::COMMAND, "status", input.clone(), output);
             let command_event_name = command_event.get_name().to_owned();
-            composer.get_event_dispatcher().borrow_mut().dispatch(
+            composer.get_event_dispatcher().dispatch(
                 Some(command_event_name.as_ref()),
                 Some(std::rc::Rc::new(std::cell::RefCell::new(command_event))),
             )?;
 
-            composer
-                .get_event_dispatcher()
-                .borrow_mut()
-                .dispatch_script(
-                    ScriptEvents::PRE_STATUS_CMD,
-                    true,
-                    vec![],
-                    EventFlags::default(),
-                );
+            composer.get_event_dispatcher().dispatch_script(
+                ScriptEvents::PRE_STATUS_CMD,
+                true,
+                vec![],
+                EventFlags::default(),
+            );
         }
 
         let exit_code = self.do_execute(input).await?;
 
         {
             let composer = composer_full(&composer_rc);
-            composer
-                .get_event_dispatcher()
-                .borrow_mut()
-                .dispatch_script(
-                    ScriptEvents::POST_STATUS_CMD,
-                    true,
-                    vec![],
-                    EventFlags::default(),
-                );
+            composer.get_event_dispatcher().dispatch_script(
+                ScriptEvents::POST_STATUS_CMD,
+                true,
+                vec![],
+                EventFlags::default(),
+            );
         }
 
         Ok(exit_code)

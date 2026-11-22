@@ -33,7 +33,7 @@ fn install_subscriber_plugin(set_up: &SetUp) {
 
 fn dispatch(set_up: &SetUp, event_name: &BStr) -> i64 {
     let dispatcher = set_up.composer.borrow().get_event_dispatcher();
-    let result = dispatcher.borrow_mut().dispatch(Some(event_name), None);
+    let result = dispatcher.dispatch(Some(event_name), None);
     result.unwrap()
 }
 
@@ -83,6 +83,23 @@ fn test_subscriber_listener_returning_false_sets_return_code() {
     assert_eq!(1, return_code);
     assert_eq!(
         "activate subscriber-v1\nfailing listener\n",
+        set_up.io.borrow().get_output()
+    );
+}
+
+#[test]
+fn test_listener_can_dispatch_through_the_same_dispatcher() {
+    let _worker = lock_php_worker();
+    let set_up = set_up();
+    install_subscriber_plugin(&set_up);
+
+    // 'shirabe-reentrant-event' => 'dispatchesNested': the listener dispatches an event without
+    // listeners through `$composer->getEventDispatcher()` while the outer dispatch is running.
+    let return_code = dispatch(&set_up, BStr::new("shirabe-reentrant-event"));
+
+    assert_eq!(0, return_code);
+    assert_eq!(
+        "activate subscriber-v1\nnested dispatch returned 0\n",
         set_up.io.borrow().get_output()
     );
 }

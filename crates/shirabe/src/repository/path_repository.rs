@@ -43,7 +43,7 @@ impl PathRepository {
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
         http_downloader: Option<std::rc::Rc<std::cell::RefCell<HttpDownloader>>>,
-        dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
+        dispatcher: Option<std::rc::Rc<EventDispatcher>>,
         process: Option<std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,
     ) -> anyhow::Result<Self> {
         if !repo_config.contains_key(B("url")) {

@@ -69,7 +69,7 @@ pub struct PartialComposer {
     repository_manager: Option<std::rc::Rc<std::cell::RefCell<dyn RepositoryManagerInterface>>>,
     installation_manager: Option<std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>>,
     config: Option<std::rc::Rc<std::cell::RefCell<Config>>>,
-    event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<dyn EventDispatcherInterface>>>,
+    event_dispatcher: Option<std::rc::Rc<dyn EventDispatcherInterface>>,
 }
 
 #[php_binding(r"Composer\PartialComposer", members = instance)]
@@ -128,14 +128,12 @@ impl PartialComposer {
 
     pub fn set_event_dispatcher(
         &mut self,
-        event_dispatcher: std::rc::Rc<std::cell::RefCell<dyn EventDispatcherInterface>>,
+        event_dispatcher: std::rc::Rc<dyn EventDispatcherInterface>,
     ) {
         self.event_dispatcher = Some(event_dispatcher);
     }
 
-    pub fn get_event_dispatcher(
-        &self,
-    ) -> std::rc::Rc<std::cell::RefCell<dyn EventDispatcherInterface>> {
+    pub fn get_event_dispatcher(&self) -> std::rc::Rc<dyn EventDispatcherInterface> {
         self.event_dispatcher.as_ref().unwrap().clone()
     }
 
@@ -300,16 +298,11 @@ impl Composer {
         self.partial.get_installation_manager()
     }
 
-    pub fn set_event_dispatcher(
-        &mut self,
-        dispatcher: std::rc::Rc<std::cell::RefCell<dyn EventDispatcherInterface>>,
-    ) {
+    pub fn set_event_dispatcher(&mut self, dispatcher: std::rc::Rc<dyn EventDispatcherInterface>) {
         self.partial.set_event_dispatcher(dispatcher);
     }
 
-    pub fn get_event_dispatcher(
-        &self,
-    ) -> std::rc::Rc<std::cell::RefCell<dyn EventDispatcherInterface>> {
+    pub fn get_event_dispatcher(&self) -> std::rc::Rc<dyn EventDispatcherInterface> {
         self.partial.get_event_dispatcher()
     }
 
@@ -453,19 +446,14 @@ impl PartialOrFullComposer {
         }
     }
 
-    pub fn set_event_dispatcher(
-        &mut self,
-        dispatcher: std::rc::Rc<std::cell::RefCell<dyn EventDispatcherInterface>>,
-    ) {
+    pub fn set_event_dispatcher(&mut self, dispatcher: std::rc::Rc<dyn EventDispatcherInterface>) {
         match self {
             Self::Full(full) => full.set_event_dispatcher(dispatcher),
             Self::Partial(partial) => partial.set_event_dispatcher(dispatcher),
         }
     }
 
-    pub fn get_event_dispatcher(
-        &self,
-    ) -> std::rc::Rc<std::cell::RefCell<dyn EventDispatcherInterface>> {
+    pub fn get_event_dispatcher(&self) -> std::rc::Rc<dyn EventDispatcherInterface> {
         match self {
             Self::Full(full) => full.get_event_dispatcher(),
             Self::Partial(partial) => partial.get_event_dispatcher(),

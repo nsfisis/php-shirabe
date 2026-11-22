@@ -92,31 +92,31 @@ mod mock_event_dispatcher {
         pub EventDispatcher {}
         impl EventDispatcherInterface for EventDispatcher {
             fn dispatch<'a>(
-                &mut self,
+                &self,
                 event_name: Option<&'a bstr::BStr>,
                 event: Option<std::rc::Rc<std::cell::RefCell<dyn EventInterface>>>,
             ) -> anyhow::Result<i64>;
             fn dispatch_script(
-                &mut self,
+                &self,
                 event_name: &bstr::BStr,
                 dev_mode: bool,
                 additional_args: Vec<bstr::BString>,
                 flags: shirabe::event_dispatcher::EventFlags,
             ) -> anyhow::Result<i64>;
             fn dispatch_installer_event(
-                &mut self,
+                &self,
                 event_name: &bstr::BStr,
                 dev_mode: bool,
                 execute_operations: bool,
                 transaction: std::rc::Rc<AnyTransaction>,
             ) -> anyhow::Result<i64>;
-            fn add_listener(&mut self, event_name: &bstr::BStr, listener: Callable, priority: i64);
+            fn add_listener(&self, event_name: &bstr::BStr, listener: Callable, priority: i64);
             fn add_subscriber<'a>(
-                &mut self,
+                &self,
                 subscriber: &'a dyn shirabe::event_dispatcher::EventSubscriberInterface,
             ) -> anyhow::Result<()>;
-            fn remove_listener<'a>(&mut self, listener: &'a shirabe_php_rpc::PhpEntityHandle);
-            fn has_event_listeners(&mut self, event: &dyn EventInterface) -> bool;
+            fn remove_listener<'a>(&self, listener: &'a shirabe_php_rpc::PhpEntityHandle);
+            fn has_event_listeners(&self, event: &dyn EventInterface) -> bool;
         }
     }
 }
@@ -180,9 +180,7 @@ fn test_uses_config_from_composer_object() {
     let mut composer = Composer::new();
     composer.set_config(config);
     composer.set_archive_manager(std::rc::Rc::new(std::cell::RefCell::new(manager)));
-    composer.set_event_dispatcher(std::rc::Rc::new(std::cell::RefCell::new(
-        noop_event_dispatcher(),
-    )));
+    composer.set_event_dispatcher(std::rc::Rc::new(noop_event_dispatcher()));
     composer.set_package(package.into());
     let composer = full_composer(composer);
 
@@ -286,9 +284,7 @@ fn test_uses_config_from_composer_object_with_package_name() {
     let mut composer = Composer::new();
     composer.set_config(config);
     composer.set_archive_manager(std::rc::Rc::new(std::cell::RefCell::new(manager)));
-    composer.set_event_dispatcher(std::rc::Rc::new(std::cell::RefCell::new(
-        noop_event_dispatcher(),
-    )));
+    composer.set_event_dispatcher(std::rc::Rc::new(noop_event_dispatcher()));
     composer.set_package(package.into());
     composer.set_repository_manager(std::rc::Rc::new(std::cell::RefCell::new(
         repository_manager,
