@@ -14,7 +14,9 @@ use shirabe_symfony_process::Process;
 
 /// __DIR__.'/../Resources/completion.bash', embedded at compile time (this port ships as a
 /// single binary and does not install the Resources directory alongside it).
-const COMPLETION_BASH: &BStr = php_str(include_bytes!("../Resources/completion.bash"));
+const COMPLETION_BASH: &BStr = php_str(include_bytes!(
+    "../../../../composer/vendor/symfony/console/Resources/completion.bash"
+));
 
 /// Dumps the completion script for the current shell.
 #[derive(Debug)]
