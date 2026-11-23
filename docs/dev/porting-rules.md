@@ -112,6 +112,21 @@ through `$this->`, a method that a child overrides, port it with the following p
   compute its result at the call site and pass it as an argument (e.g. `install_operation_appendix`
   of `base_update`).
 
+## Shared objects
+
+PHP objects have reference semantics, and a method running on `$this` does not lock the object: a
+listener, a plugin or an RPC callback may call back into the same object while the method runs. Port
+a PHP class whose instances are shared (held by several objects, or reachable from PHP through RPC)
+as follows:
+
+* Share it as `Rc<dyn T>` (`Rc<T>` for a class without an interface), not as `Rc<RefCell<...>>`, and
+  make every method take `&self`.
+* Keep a property that changes after construction in `shirabe_php_shim::PhpProp<T>` (see its doc
+  comment for how to use it), and a property that never changes as a plain field.
+* Do not give such a class a raw `Cell` or `RefCell` field.
+
+A struct that is only used locally keeps `&mut self` methods.
+
 ## PHP built-in functions
 
 * When the exact equivalent of a PHP built-in function is needed, add a function with the same name to
