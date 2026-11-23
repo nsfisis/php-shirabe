@@ -8,9 +8,7 @@ use crate::dependency_resolver::operation::{
 use crate::downloader::FileDownloader;
 use crate::event_dispatcher::EventDispatcher;
 use crate::installer::{InstallerInterface, PackageEvents};
-use crate::io::{
-    BufferIO, ConsoleIO, IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface,
-};
+use crate::io::{BufferIO, ConsoleIO, IOInterface, IOInterfaceWrite, io_interface};
 use crate::package::PackageInterfaceHandle;
 use crate::repository::{InstalledRepositoryInterface, InstalledRepositoryInterfaceHandle};
 use crate::signal::SignalSubscription;
@@ -20,7 +18,7 @@ use bstr::{B, BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_binding_macros::php_binding;
 use shirabe_php_shim::{
-    InvalidArgumentException, PhpMixed, array_splice, array_unshift, bformat, boolval,
+    InvalidArgumentException, PhpMixed, PhpProp, array_splice, array_unshift, bformat, boolval,
     http_build_query, json_encode, path_from_bytes, str_replace, strip_tags, strpos, strtolower,
     ucfirst,
 };
@@ -28,18 +26,18 @@ use shirabe_php_shim::{
 /// Package operation manager.
 #[derive(Debug)]
 pub struct InstallationManager {
-    installers: std::cell::RefCell<Vec<std::rc::Rc<dyn InstallerInterface>>>,
+    installers: PhpProp<std::rc::Rc<Vec<std::rc::Rc<dyn InstallerInterface>>>>,
     /// Maps a package type to its installer.
-    cache: std::cell::RefCell<IndexMap<BString, std::rc::Rc<dyn InstallerInterface>>>,
-    notifiable_packages: std::cell::RefCell<IndexMap<BString, Vec<PackageInterfaceHandle>>>,
+    cache: PhpProp<std::rc::Rc<IndexMap<BString, std::rc::Rc<dyn InstallerInterface>>>>,
+    notifiable_packages: PhpProp<std::rc::Rc<IndexMap<BString, Vec<PackageInterfaceHandle>>>>,
     loop_: std::rc::Rc<std::cell::RefCell<Loop>>,
-    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-    event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
-    output_progress: bool,
+    io: std::rc::Rc<dyn IOInterface>,
+    event_dispatcher: Option<std::rc::Rc<EventDispatcher>>,
+    output_progress: PhpProp<bool>,
     /// For testing only: present iff this manager behaves like
     /// `Composer\Test\Mock\InstallationManagerMock`, recording operations instead of executing
     /// them. `None` in production.
-    mock: Option<std::cell::RefCell<InstallationManagerMockState>>,
+    mock: Option<PhpProp<InstallationManagerMockState>>,
 }
 
 /// For testing only: recorded operations for the `InstallationManagerMock` behavior.
@@ -54,17 +52,17 @@ struct InstallationManagerMockState {
 impl InstallationManager {
     pub fn new(
         loop_: std::rc::Rc<std::cell::RefCell<Loop>>,
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
+        io: std::rc::Rc<dyn IOInterface>,
+        event_dispatcher: Option<std::rc::Rc<EventDispatcher>>,
     ) -> Self {
         Self {
-            installers: std::cell::RefCell::new(vec![]),
-            cache: std::cell::RefCell::new(IndexMap::new()),
-            notifiable_packages: std::cell::RefCell::new(IndexMap::new()),
+            installers: PhpProp::default(),
+            cache: PhpProp::default(),
+            notifiable_packages: PhpProp::default(),
             loop_,
             io,
             event_dispatcher,
-            output_progress: false,
+            output_progress: PhpProp::new(false),
             mock: None,
         }
     }
@@ -73,13 +71,11 @@ impl InstallationManager {
     /// mirroring `Composer\Test\Mock\InstallationManagerMock`.
     pub fn __new_mock(
         loop_: std::rc::Rc<std::cell::RefCell<Loop>>,
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
+        io: std::rc::Rc<dyn IOInterface>,
+        event_dispatcher: Option<std::rc::Rc<EventDispatcher>>,
     ) -> Self {
         Self {
-            mock: Some(std::cell::RefCell::new(
-                InstallationManagerMockState::default(),
-            )),
+            mock: Some(PhpProp::default()),
             ..Self::new(loop_, io, event_dispatcher)
         }
     }
@@ -88,7 +84,7 @@ impl InstallationManager {
     pub fn __get_trace(&self) -> Vec<BString> {
         self.mock
             .as_ref()
-            .map(|m| m.borrow().trace.clone())
+            .map(|m| m.update(|m| m.trace.clone()))
             .unwrap_or_default()
     }
 
@@ -96,7 +92,7 @@ impl InstallationManager {
     pub fn __get_installed_packages(&self) -> Vec<PackageInterfaceHandle> {
         self.mock
             .as_ref()
-            .map(|m| m.borrow().installed.clone())
+            .map(|m| m.update(|m| m.installed.clone()))
             .unwrap_or_default()
     }
 
@@ -104,7 +100,7 @@ impl InstallationManager {
     pub fn __get_updated_packages(&self) -> Vec<(PackageInterfaceHandle, PackageInterfaceHandle)> {
         self.mock
             .as_ref()
-            .map(|m| m.borrow().updated.clone())
+            .map(|m| m.update(|m| m.updated.clone()))
             .unwrap_or_default()
     }
 
@@ -112,31 +108,35 @@ impl InstallationManager {
     pub fn __get_uninstalled_packages(&self) -> Vec<PackageInterfaceHandle> {
         self.mock
             .as_ref()
-            .map(|m| m.borrow().uninstalled.clone())
+            .map(|m| m.update(|m| m.uninstalled.clone()))
             .unwrap_or_default()
     }
 
-    pub fn reset(&mut self) {
-        self.notifiable_packages = std::cell::RefCell::new(IndexMap::new());
+    pub fn reset(&self) {
+        self.notifiable_packages.set(std::rc::Rc::default());
         FileDownloader::reset_download_metadata();
     }
 
     /// Adds installer
     pub fn add_installer(&self, installer: std::rc::Rc<dyn InstallerInterface>) {
-        array_unshift(&mut self.installers.borrow_mut(), installer);
-        self.cache.borrow_mut().clear();
+        self.installers
+            .update(|installers| array_unshift(std::rc::Rc::make_mut(installers), installer));
+        self.cache.set(std::rc::Rc::default());
     }
 
     /// Removes installer
     pub fn remove_installer(&self, installer: &dyn InstallerInterface) {
         let target = installer as *const dyn InstallerInterface as *const ();
-        let mut installers = self.installers.borrow_mut();
-        let key = installers
+        let key = self
+            .installers
+            .cloned()
             .iter()
             .position(|inst| &**inst as *const dyn InstallerInterface as *const () == target);
         if let Some(k) = key {
-            array_splice(&mut installers, k as i64, Some(1), vec![]);
-            self.cache.borrow_mut().clear();
+            self.installers.update(|installers| {
+                array_splice(std::rc::Rc::make_mut(installers), k as i64, Some(1), vec![])
+            });
+            self.cache.set(std::rc::Rc::default());
         }
     }
 
@@ -145,9 +145,8 @@ impl InstallationManager {
     /// We prevent any plugins from being instantiated by
     /// disabling the PluginManager. This ensures that no third-party
     /// code is ever executed.
-    pub fn disable_plugins(&mut self) {
-        // Cloned out: `disablePlugins` reaches into the plugin manager, which may reach back.
-        let installers = self.installers.borrow().clone();
+    pub fn disable_plugins(&self) {
+        let installers = self.installers.cloned();
         for installer in installers.iter() {
             if let Some(plugin_installer) = installer.as_plugin_installer() {
                 plugin_installer.disable_plugins();
@@ -162,19 +161,17 @@ impl InstallationManager {
     ) -> anyhow::Result<std::rc::Rc<dyn InstallerInterface>> {
         let r#type = strtolower(r#type);
 
-        if let Some(installer) = self.cache.borrow().get(r#type.as_bstr()) {
+        if let Some(installer) = self.cache.cloned().get(r#type.as_bstr()) {
             return Ok(installer.clone());
         }
 
-        // Cloned out: a PHP-backed installer answers `supports` over RPC, and the plugin behind
-        // it can register a further installer from that call.
-        let installers = self.installers.borrow().clone();
-        for installer in installers {
+        let installers = self.installers.cloned();
+        for installer in installers.iter() {
             if installer.supports(r#type.as_bstr())? {
-                self.cache
-                    .borrow_mut()
-                    .insert(r#type.clone(), installer.clone());
-                return Ok(installer);
+                self.cache.update(|cache| {
+                    std::rc::Rc::make_mut(cache).insert(r#type.clone(), installer.clone())
+                });
+                return Ok(installer.clone());
             }
         }
 
@@ -235,50 +232,52 @@ impl InstallationManager {
         // For testing only: the mock records each operation and mutates the repo directly,
         // skipping the download step (ref InstallationManagerMock::execute).
         if let Some(mock) = self.mock.as_ref() {
-            let mut mock = mock.borrow_mut();
-            let _ = (dev_mode, run_scripts, download_only);
-            let mut repo = repo.borrow_mut();
-            for operation in operations {
-                let trace = strip_tags(operation.show(false));
-                match &*operation {
-                    AnyOperation::Install(op) => {
-                        let package = op.get_package();
-                        mock.installed.push(package.clone());
-                        mock.trace.push(trace);
-                        repo.add_package(PackageInterfaceHandle::dup(&package));
-                    }
-                    AnyOperation::Update(op) => {
-                        let initial = op.get_initial_package();
-                        let target = op.get_target_package();
-                        mock.updated.push((initial.clone(), target.clone()));
-                        mock.trace.push(trace);
-                        repo.remove_package(initial);
-                        if !repo.has_package(target.clone())? {
-                            repo.add_package(PackageInterfaceHandle::dup(&target));
-                        }
-                    }
-                    AnyOperation::Uninstall(op) => {
-                        let package = op.get_package();
-                        mock.uninstalled.push(package.clone());
-                        mock.trace.push(trace);
-                        repo.remove_package(package);
-                    }
-                    AnyOperation::MarkAliasInstalled(op) => {
-                        let package: PackageInterfaceHandle = op.get_package().into();
-                        mock.installed.push(package.clone());
-                        mock.trace.push(trace);
-                        if !repo.has_package(package.clone())? {
+            mock.update(|mock| -> anyhow::Result<()> {
+                let _ = (dev_mode, run_scripts, download_only);
+                let mut repo = repo.borrow_mut();
+                for operation in operations {
+                    let trace = strip_tags(operation.show(false));
+                    match &*operation {
+                        AnyOperation::Install(op) => {
+                            let package = op.get_package();
+                            mock.installed.push(package.clone());
+                            mock.trace.push(trace);
                             repo.add_package(PackageInterfaceHandle::dup(&package));
                         }
-                    }
-                    AnyOperation::MarkAliasUninstalled(op) => {
-                        let package: PackageInterfaceHandle = op.get_package().into();
-                        mock.uninstalled.push(package.clone());
-                        mock.trace.push(trace);
-                        repo.remove_package(package);
+                        AnyOperation::Update(op) => {
+                            let initial = op.get_initial_package();
+                            let target = op.get_target_package();
+                            mock.updated.push((initial.clone(), target.clone()));
+                            mock.trace.push(trace);
+                            repo.remove_package(initial);
+                            if !repo.has_package(target.clone())? {
+                                repo.add_package(PackageInterfaceHandle::dup(&target));
+                            }
+                        }
+                        AnyOperation::Uninstall(op) => {
+                            let package = op.get_package();
+                            mock.uninstalled.push(package.clone());
+                            mock.trace.push(trace);
+                            repo.remove_package(package);
+                        }
+                        AnyOperation::MarkAliasInstalled(op) => {
+                            let package: PackageInterfaceHandle = op.get_package().into();
+                            mock.installed.push(package.clone());
+                            mock.trace.push(trace);
+                            if !repo.has_package(package.clone())? {
+                                repo.add_package(PackageInterfaceHandle::dup(&package));
+                            }
+                        }
+                        AnyOperation::MarkAliasUninstalled(op) => {
+                            let package: PackageInterfaceHandle = op.get_package().into();
+                            mock.uninstalled.push(package.clone());
+                            mock.trace.push(trace);
+                            repo.remove_package(package);
+                        }
                     }
                 }
-            }
+                Ok(())
+            })?;
             return Ok(());
         }
 
@@ -614,7 +613,7 @@ impl InstallationManager {
             };
 
             if run_scripts && let Some(event_dispatcher) = &self.event_dispatcher {
-                event_dispatcher.borrow_mut().dispatch_package_event(
+                event_dispatcher.dispatch_package_event(
                     event_name,
                     dev_mode,
                     repo.clone(),
@@ -692,7 +691,7 @@ impl InstallationManager {
                 let repo = repo.clone();
                 let all_operations = all_operations.to_vec();
                 post_exec_callbacks.push(Box::new(move || {
-                    event_dispatcher.borrow_mut().dispatch_package_event(
+                    event_dispatcher.dispatch_package_event(
                         event_name,
                         dev_mode,
                         repo.clone(),
@@ -830,12 +829,12 @@ impl InstallationManager {
         installer.get_install_path(package)
     }
 
-    pub fn set_output_progress(&mut self, output_progress: bool) {
-        self.output_progress = output_progress;
+    pub fn set_output_progress(&self, output_progress: bool) {
+        self.output_progress.set(output_progress);
     }
 
     #[tracing::instrument(skip_all)]
-    pub async fn notify_installs(&mut self, _io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>) {
+    pub async fn notify_installs(&self, _io: std::rc::Rc<dyn IOInterface>) {
         // For testing only (ref InstallationManagerMock::notifyInstalls is a noop).
         if self.mock.is_some() {
             return;
@@ -847,7 +846,8 @@ impl InstallationManager {
             let mut promises: Vec<
                 std::pin::Pin<Box<dyn std::future::Future<Output = anyhow::Result<()>> + '_>>,
             > = vec![];
-            for (repo_url, packages) in self.notifiable_packages.borrow().iter() {
+            let notifiable_packages = self.notifiable_packages.cloned();
+            for (repo_url, packages) in notifiable_packages.iter() {
                 // non-batch API, deprecated
                 if repo_url.contains_str("%package%") {
                     for package in packages {
@@ -935,11 +935,12 @@ impl InstallationManager {
 
     fn mark_for_notification(&self, package: PackageInterfaceHandle) {
         if let Some(notification_url) = package.get_notification_url() {
-            self.notifiable_packages
-                .borrow_mut()
-                .entry(bstr::BString::from(&notification_url[..]))
-                .or_default()
-                .push(package);
+            self.notifiable_packages.update(|notifiable_packages| {
+                std::rc::Rc::make_mut(notifiable_packages)
+                    .entry(bstr::BString::from(&notification_url[..]))
+                    .or_default()
+                    .push(package)
+            });
         }
     }
 
@@ -950,12 +951,12 @@ impl InstallationManager {
         >,
     ) -> anyhow::Result<()> {
         let mut progress = None;
-        if self.output_progress
+        if self.output_progress.cloned()
             && !boolval(&Platform::get_env("CI"))
             && !self.io.is_debug()
             && promises.len() > 1
         {
-            let io_ref = self.io.borrow();
+            let io_ref = &self.io;
             // BufferIO extends ConsoleIO in PHP but is modeled as composition here.
             progress = io_ref
                 .as_any()
@@ -1039,7 +1040,7 @@ impl InstallationManager {
 
 // Composer's PartialComposer::setInstallationManager() accepts any InstallationManager subclass, so
 // plugins may swap in a replacement. The interface captures the methods reached through Composer's
-// accessor and through the `&mut dyn InstallationManagerInterface` references fed from it.
+// accessor.
 #[php_binding(r"Composer\Installer\InstallationManager")]
 #[async_trait::async_trait(?Send)]
 pub trait InstallationManagerInterface: std::fmt::Debug {
@@ -1053,14 +1054,14 @@ pub trait InstallationManagerInterface: std::fmt::Debug {
     fn add_installer(&self, installer: std::rc::Rc<dyn InstallerInterface>);
     #[php(skip)]
     fn remove_installer(&self, installer: &dyn InstallerInterface);
-    fn disable_plugins(&mut self);
+    fn disable_plugins(&self);
     #[php(skip)]
     fn is_package_installed(
-        &mut self,
+        &self,
         repo: &InstalledRepositoryInterfaceHandle,
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<bool>;
-    fn ensure_binaries_presence(&mut self, package: PackageInterfaceHandle) -> anyhow::Result<()>;
+    fn ensure_binaries_presence(&self, package: PackageInterfaceHandle) -> anyhow::Result<()>;
     #[php(skip)]
     async fn execute(
         &self,
@@ -1074,9 +1075,9 @@ pub trait InstallationManagerInterface: std::fmt::Debug {
         &self,
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<std::path::PathBuf>>;
-    fn set_output_progress(&mut self, output_progress: bool);
+    fn set_output_progress(&self, output_progress: bool);
     #[php(skip)]
-    async fn notify_installs(&mut self, io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>);
+    async fn notify_installs(&self, io: std::rc::Rc<dyn IOInterface>);
 }
 
 #[async_trait::async_trait(?Send)]
@@ -1093,19 +1094,19 @@ impl InstallationManagerInterface for InstallationManager {
         InstallationManager::remove_installer(self, installer);
     }
 
-    fn disable_plugins(&mut self) {
+    fn disable_plugins(&self) {
         self.disable_plugins();
     }
 
     fn is_package_installed(
-        &mut self,
+        &self,
         repo: &InstalledRepositoryInterfaceHandle,
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<bool> {
         InstallationManager::is_package_installed(self, repo, package)
     }
 
-    fn ensure_binaries_presence(&mut self, package: PackageInterfaceHandle) -> anyhow::Result<()> {
+    fn ensure_binaries_presence(&self, package: PackageInterfaceHandle) -> anyhow::Result<()> {
         InstallationManager::ensure_binaries_presence(self, package)
     }
 
@@ -1128,11 +1129,11 @@ impl InstallationManagerInterface for InstallationManager {
         self.get_install_path(package)
     }
 
-    fn set_output_progress(&mut self, output_progress: bool) {
+    fn set_output_progress(&self, output_progress: bool) {
         self.set_output_progress(output_progress);
     }
 
-    async fn notify_installs(&mut self, io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>) {
+    async fn notify_installs(&self, io: std::rc::Rc<dyn IOInterface>) {
         self.notify_installs(io).await;
     }
 }

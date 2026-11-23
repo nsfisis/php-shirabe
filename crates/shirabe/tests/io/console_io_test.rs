@@ -13,7 +13,7 @@
 
 use bstr::{BStr, BString};
 use indexmap::{IndexMap, indexmap};
-use shirabe::io::{ConsoleIO, IOInterfaceImmutable, IOInterfaceMutable, IOInterfaceWrite};
+use shirabe::io::{ConsoleIO, IOInterface, IOInterfaceWrite};
 use shirabe_php_shim::{
     PhpResource, bformat, fwrite_resource, php_fopen_resource, rewind, str_repeat,
 };
@@ -243,7 +243,7 @@ fn test_select() {
 
 #[test]
 fn test_set_and_get_authentication() {
-    let mut console_io = make_console_io();
+    let console_io = make_console_io();
     console_io.set_authentication(
         bstr::BString::from("repoName"),
         bstr::BString::from("l3l0"),
@@ -277,7 +277,7 @@ fn test_get_authentication_when_did_not_set() {
 
 #[test]
 fn test_has_authentication() {
-    let mut console_io = make_console_io();
+    let console_io = make_console_io();
     console_io.set_authentication(
         bstr::BString::from("repoName"),
         bstr::BString::from("l3l0"),

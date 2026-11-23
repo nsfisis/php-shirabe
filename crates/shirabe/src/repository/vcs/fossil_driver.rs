@@ -27,8 +27,8 @@ pub struct FossilDriver {
 impl FossilDriver {
     pub fn new(
         repo_config: IndexMap<BString, PhpMixed>,
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        io: std::rc::Rc<dyn IOInterface>,
+        config: std::rc::Rc<Config>,
         http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
         process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     ) -> Self {
@@ -47,7 +47,7 @@ impl FossilDriver {
         self.check_fossil()?;
 
         // Ensure we are allowed to use this URL by config.
-        self.inner.config.borrow_mut().prohibit_url_by_config(
+        self.inner.config.prohibit_url_by_config(
             self.inner.url.as_bstr(),
             Some(self.inner.io.clone()),
             &indexmap::IndexMap::new(),
@@ -59,22 +59,10 @@ impl FossilDriver {
             self.checkout_dir = self.inner.url.clone();
         } else {
             let cache_repo_dir = BString::from(
-                &BString::from(
-                    self.inner
-                        .config
-                        .borrow()
-                        .get_path("cache-repo-dir")?
-                        .as_bstr(),
-                )[..],
+                &BString::from(self.inner.config.get_path("cache-repo-dir")?.as_bstr())[..],
             );
             let cache_vcs_dir = BString::from(
-                &BString::from(
-                    self.inner
-                        .config
-                        .borrow()
-                        .get_path("cache-vcs-dir")?
-                        .as_bstr(),
-                )[..],
+                &BString::from(self.inner.config.get_path("cache-vcs-dir")?.as_bstr())[..],
             );
             if !Cache::is_usable(path_from_bytes(&cache_repo_dir))
                 || !Cache::is_usable(path_from_bytes(&cache_vcs_dir))
@@ -308,8 +296,8 @@ impl FossilDriver {
     }
 
     pub fn supports(
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        _config: std::rc::Rc<std::cell::RefCell<Config>>,
+        io: std::rc::Rc<dyn IOInterface>,
+        _config: std::rc::Rc<Config>,
         url: &BStr,
         deep: bool,
     ) -> anyhow::Result<bool> {
@@ -433,8 +421,8 @@ impl VcsDriverInterface for FossilDriver {
     }
 
     fn supports(
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        io: std::rc::Rc<dyn IOInterface>,
+        config: std::rc::Rc<Config>,
         url: &BStr,
         deep: bool,
     ) -> anyhow::Result<bool> {

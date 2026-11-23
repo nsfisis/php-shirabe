@@ -209,7 +209,7 @@ impl Factory {
     }
 
     pub fn create_config(
-        io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
+        io: Option<std::rc::Rc<dyn IOInterface>>,
         cwd: Option<&std::path::Path>,
     ) -> anyhow::Result<Config> {
         let cwd = match cwd {
@@ -217,7 +217,7 @@ impl Factory {
             None => Platform::get_cwd(true)?,
         };
 
-        let mut config = Config::new(true, Some(path_to_bytes(&cwd).into()));
+        let config = Config::new(true, Some(path_to_bytes(&cwd).into()));
 
         // determine and add main dirs to the config
         let home = Self::get_home_dir()?;
@@ -260,7 +260,7 @@ impl Factory {
             };
             config.merge(&read_data, path_to_bytes(file.get_path()));
         }
-        config.set_config_source(Box::new(JsonConfigSource::new(
+        config.set_config_source(std::rc::Rc::new(JsonConfigSource::new(
             std::rc::Rc::new(std::cell::RefCell::new(file)),
             false,
         )));
@@ -314,12 +314,12 @@ impl Factory {
             );
             config.merge(&wrapped, path_to_bytes(auth_file.get_path()));
         }
-        config.set_auth_config_source(Box::new(JsonConfigSource::new(
+        config.set_auth_config_source(std::rc::Rc::new(JsonConfigSource::new(
             std::rc::Rc::new(std::cell::RefCell::new(auth_file)),
             true,
         )));
 
-        Self::load_composer_auth_env(&mut config, io)?;
+        Self::load_composer_auth_env(&config, io)?;
 
         Ok(config)
     }
@@ -390,7 +390,7 @@ impl Factory {
     #[tracing::instrument(skip_all)]
     pub fn create_composer(
         &self,
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: std::rc::Rc<dyn IOInterface>,
         local_config: Option<LocalConfigInput>,
         disable_plugins: DisablePlugins,
         cwd: Option<&std::path::Path>,
@@ -471,7 +471,7 @@ impl Factory {
         }
 
         // Load config and override with local config/auth config
-        let mut config = if self.mock {
+        let config = if self.mock {
             Self::__create_config_mock(Some(&cwd))?
         } else {
             Self::create_config(Some(io.clone()), Some(&cwd))?
@@ -491,7 +491,7 @@ impl Factory {
                 ),
                 DEBUG,
             );
-            config.set_config_source(Box::new(JsonConfigSource::new(
+            config.set_config_source(std::rc::Rc::new(JsonConfigSource::new(
                 std::rc::Rc::new(std::cell::RefCell::new(JsonFile::new(
                     realpath(composer_file_path).unwrap_or_default(),
                     None,
@@ -523,7 +523,7 @@ impl Factory {
                 let mut wrapped: IndexMap<BString, PhpMixed> = IndexMap::new();
                 wrapped.insert("config".into(), auth_read);
                 config.merge(&wrapped, path_to_bytes(local_auth_file.get_path()));
-                config.set_local_auth_config_source(Box::new(JsonConfigSource::new(
+                config.set_local_auth_config_source(std::rc::Rc::new(JsonConfigSource::new(
                     std::rc::Rc::new(std::cell::RefCell::new(local_auth_file)),
                     true,
                 )));
@@ -531,18 +531,18 @@ impl Factory {
         }
 
         // make sure we load the auth env again over the local auth.json + composer.json config
-        Self::load_composer_auth_env(&mut config, Some(io.clone()))?;
+        Self::load_composer_auth_env(&config, Some(io.clone()))?;
 
         let vendor_dir = config.get_path("vendor-dir")?;
 
-        let config = std::rc::Rc::new(std::cell::RefCell::new(config));
+        let config = std::rc::Rc::new(config);
 
         // initialize composer
         let mut build_error: Option<anyhow::Error> = None;
         let mut rm = None;
         let mut im = None;
         let composer = std::rc::Rc::new_cyclic(
-            |composer_weak: &std::rc::Weak<std::cell::RefCell<PartialOrFullComposer>>| {
+            |composer_weak: &std::rc::Weak<PartialOrFullComposer>| {
                 let mut build = || -> anyhow::Result<PartialOrFullComposer> {
                     let mut composer: PartialOrFullComposer = if full_load {
                         PartialOrFullComposer::new_full()
@@ -556,13 +556,12 @@ impl Factory {
 
                     if full_load {
                         // load auth configs into the IO instance
-                        io.borrow_mut()
-                            .load_configuration(&mut config.borrow_mut())?;
+                        io.load_configuration(&config)?;
 
                         // load existing Composer\InstalledVersions instance if available and scripts/plugins are allowed, as they might need it
                         // we only load if the InstalledVersions class wasn't defined yet so that this is only loaded once
                         let installed_versions_path =
-                            path_from_bytes(&config.borrow().get_path("vendor-dir")?)
+                            path_from_bytes(&config.get_path("vendor-dir")?)
                                 .join("composer/installed.php");
                         // The two class_exists() checks run in the PHP worker, where
                         // InstalledVersions lives; see `__shirabe_safely_load_installed_versions`.
@@ -593,27 +592,25 @@ impl Factory {
 
                     // initialize event dispatcher with the Composer back-reference
                     let dispatcher = {
-                        let mut d = EventDispatcher::new(
+                        let d = EventDispatcher::new(
                             PartialComposerWeakHandle::from_weak(composer_weak.clone()),
                             io.clone(),
                             Some(process.clone()),
                         );
                         d.set_run_scripts(!disable_scripts);
-                        std::rc::Rc::new(std::cell::RefCell::new(d))
+                        std::rc::Rc::new(d)
                     };
                     composer.set_event_dispatcher(dispatcher.clone());
 
                     // initialize repository manager
                     let rm = rm
-                        .insert(std::rc::Rc::new(std::cell::RefCell::new(
-                            RepositoryFactory::manager(
-                                io.clone(),
-                                &config,
-                                Some(http_downloader.clone()),
-                                Some(dispatcher.clone()),
-                                Some(process.clone()),
-                            )?,
-                        )))
+                        .insert(std::rc::Rc::new(RepositoryFactory::manager(
+                            io.clone(),
+                            &config,
+                            Some(http_downloader.clone()),
+                            Some(dispatcher.clone()),
+                            Some(process.clone()),
+                        )?))
                         .clone();
 
                     // force-set the version of the global package if not defined as
@@ -664,7 +661,7 @@ impl Factory {
                     // load local repository
                     self.add_local_repository(
                         io.clone(),
-                        &mut rm.borrow_mut(),
+                        &rm,
                         vendor_dir.as_ref(),
                         composer.get_package().clone(),
                         Some(&process),
@@ -673,12 +670,10 @@ impl Factory {
 
                     // initialize installation manager
                     let im = im
-                        .insert(std::rc::Rc::new(std::cell::RefCell::new(
-                            self.create_installation_manager(
-                                r#loop.clone(),
-                                io.clone(),
-                                Some(dispatcher.clone()),
-                            ),
+                        .insert(std::rc::Rc::new(self.create_installation_manager(
+                            r#loop.clone(),
+                            io.clone(),
+                            Some(dispatcher.clone()),
                         )))
                         .clone();
                     composer.set_installation_manager(im.clone());
@@ -701,7 +696,7 @@ impl Factory {
                         ));
 
                         // initialize archive manager
-                        let am = self.create_archive_manager(&config.borrow(), &dm, &r#loop)?;
+                        let am = self.create_archive_manager(&config, &dm, &r#loop)?;
                         composer_full
                             .set_archive_manager(std::rc::Rc::new(std::cell::RefCell::new(am)));
                     }
@@ -715,7 +710,7 @@ impl Factory {
                     if let PartialOrFullComposer::Full(ref mut composer_full) = composer {
                         if let Some(ref composer_file_path) = composer_file {
                             let lock_file = Self::get_lock_file(composer_file_path);
-                            let lock_enabled = config.borrow().get_bool("lock");
+                            let lock_enabled = config.get_bool("lock");
                             if !lock_enabled && file_exists(&lock_file) {
                                 io.write_error(bformat!("<warning>{lock_file} is present but ignored as the \"lock\" config option is disabled.</warning>"));
                             }
@@ -735,8 +730,7 @@ impl Factory {
                                 file_get_contents(composer_file_path).unwrap_or_default(),
                                 process,
                             );
-                            composer_full
-                                .set_locker(std::rc::Rc::new(std::cell::RefCell::new(locker)));
+                            composer_full.set_locker(std::rc::Rc::new(locker));
                         } else {
                             let lock_contents = JsonFile::encode(&PhpMixed::Array(
                                 local_config_data
@@ -755,18 +749,17 @@ impl Factory {
                                 &lock_contents,
                                 process,
                             );
-                            composer_full
-                                .set_locker(std::rc::Rc::new(std::cell::RefCell::new(locker)));
+                            composer_full.set_locker(std::rc::Rc::new(locker));
                         }
                     }
 
                     Ok(composer)
                 };
                 match build() {
-                    Ok(composer) => std::cell::RefCell::new(composer),
+                    Ok(composer) => composer,
                     Err(e) => {
                         build_error = Some(e);
-                        std::cell::RefCell::new(PartialOrFullComposer::new_partial())
+                        PartialOrFullComposer::new_partial()
                     }
                 }
             },
@@ -780,13 +773,8 @@ impl Factory {
         // upgrade the Composer back-reference in their constructors, which only becomes upgradeable
         // once Rc::new_cyclic has returned.
         {
-            let im = composer.borrow().get_installation_manager();
-            let process = composer
-                .borrow()
-                .get_loop()
-                .borrow()
-                .get_process_executor()
-                .cloned();
+            let im = composer.get_installation_manager();
+            let process = composer.get_loop().borrow().get_process_executor().cloned();
             self.create_default_installers(
                 &im,
                 PartialComposerWeakHandle::from_weak(std::rc::Rc::downgrade(&composer)),
@@ -800,15 +788,12 @@ impl Factory {
         // PluginManager::new upgrades the Composer back-reference to read its config and locker, so
         // it must be built after Rc::new_cyclic returns; inside the closure the Rc is not yet
         // constructed and the weak handle cannot upgrade.
-        let (is_full, is_global) = {
-            let c = composer.borrow();
-            (c.is_full(), c.is_global())
-        };
+        let (is_full, is_global) = (composer.is_full(), composer.is_global());
         if is_full {
             let global_composer = if !is_global {
                 self.create_global_composer(
                     io.clone(),
-                    &config.borrow(),
+                    &config,
                     disable_plugins,
                     disable_scripts,
                     false,
@@ -824,11 +809,7 @@ impl Factory {
                 disable_plugins,
             )?;
             let pm = std::rc::Rc::new(std::cell::RefCell::new(pm));
-            composer
-                .borrow_mut()
-                .as_full_mut()
-                .unwrap()
-                .set_plugin_manager(pm.clone());
+            composer.as_full().unwrap().set_plugin_manager(pm.clone());
 
             if is_global {
                 pm.borrow_mut().set_running_in_global_dir(true);
@@ -841,8 +822,8 @@ impl Factory {
             // the Composer through the dispatcher) is safe only after the Rc has been constructed.
             let init_event = Event::from_name(PluginEvents::INIT.to_php_string());
             let init_event_name = init_event.get_name().to_owned();
-            let dispatcher = composer.borrow().get_event_dispatcher();
-            dispatcher.borrow_mut().dispatch(
+            let dispatcher = composer.get_event_dispatcher();
+            dispatcher.dispatch(
                 Some(init_event_name.as_ref()),
                 Some(std::rc::Rc::new(std::cell::RefCell::new(init_event))),
             )?;
@@ -851,10 +832,10 @@ impl Factory {
             // purge packages from local repos if they have been deleted on the filesystem
             let rm = rm.expect("set by the successful composer build");
             let im = im.expect("set by the successful composer build");
-            let local_repository = rm.borrow().get_local_repository();
+            let local_repository = rm.get_local_repository();
             self.purge_packages(
                 &InstalledRepositoryInterfaceHandle::from_repository_handle(&local_repository),
-                &im.borrow(),
+                &im,
             )?;
         }
 
@@ -862,7 +843,7 @@ impl Factory {
     }
 
     pub fn create_global(
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: std::rc::Rc<dyn IOInterface>,
         disable_plugins: DisablePlugins,
         disable_scripts: bool,
     ) -> anyhow::Result<Option<PartialComposerHandle>> {
@@ -874,8 +855,8 @@ impl Factory {
 
     fn add_local_repository(
         &self,
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        rm: &mut RepositoryManager,
+        io: std::rc::Rc<dyn IOInterface>,
+        rm: &RepositoryManager,
         vendor_dir: &BStr,
         root_package: RootPackageInterfaceHandle,
         process: Option<&std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,
@@ -910,7 +891,7 @@ impl Factory {
 
     fn create_global_composer(
         &self,
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: std::rc::Rc<dyn IOInterface>,
         config: &Config,
         disable_plugins: DisablePlugins,
         disable_scripts: bool,
@@ -952,22 +933,22 @@ impl Factory {
 
     pub fn create_download_manager(
         &self,
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        config: &std::rc::Rc<std::cell::RefCell<Config>>,
+        io: std::rc::Rc<dyn IOInterface>,
+        config: &std::rc::Rc<Config>,
         http_downloader: &std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
         process: &std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
-        event_dispatcher: Option<&std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
-    ) -> anyhow::Result<std::rc::Rc<std::cell::RefCell<DownloadManager>>> {
-        let cache_files_ttl = config.borrow().get_cache_files_ttl();
+        event_dispatcher: Option<&std::rc::Rc<EventDispatcher>>,
+    ) -> anyhow::Result<std::rc::Rc<DownloadManager>> {
+        let cache_files_ttl = config.get_cache_files_ttl();
         let cache = if cache_files_ttl > 0 {
             let mut cache = Cache::new(
                 io.clone(),
-                path_from_bytes(&config.borrow().get_path("cache-files-dir")?),
+                path_from_bytes(&config.get_path("cache-files-dir")?),
                 Some(BStr::new("a-z0-9_./")),
                 None,
                 false,
             );
-            cache.set_read_only(config.borrow().get_bool("cache-read-only"));
+            cache.set_read_only(config.get_bool("cache-read-only"));
             Some(std::rc::Rc::new(std::cell::RefCell::new(cache)))
         } else {
             None
@@ -977,8 +958,8 @@ impl Factory {
             process.clone(),
         ))));
 
-        let mut dm = DownloadManager::new(io.clone(), false, Some(fs.clone()));
-        let preferred = config.borrow().get_preferred_install()?;
+        let dm = DownloadManager::new(io.clone(), false, Some(fs.clone()));
+        let preferred = config.get_preferred_install()?;
         if preferred.loosely_equals("dist") {
             dm.set_prefer_dist(true);
         } else if preferred.loosely_equals("source") {
@@ -1144,13 +1125,13 @@ impl Factory {
             )?)),
         );
 
-        Ok(std::rc::Rc::new(std::cell::RefCell::new(dm)))
+        Ok(std::rc::Rc::new(dm))
     }
 
     pub fn create_archive_manager(
         &self,
         _config: &Config,
-        dm: &std::rc::Rc<std::cell::RefCell<DownloadManager>>,
+        dm: &std::rc::Rc<DownloadManager>,
         r#loop: &std::rc::Rc<std::cell::RefCell<Loop>>,
     ) -> anyhow::Result<ArchiveManager> {
         let mut am = ArchiveManager::new(dm.clone(), r#loop.clone());
@@ -1165,7 +1146,7 @@ impl Factory {
 
     fn create_plugin_manager(
         &self,
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: std::rc::Rc<dyn IOInterface>,
         composer: ComposerWeakHandle,
         global_composer: Option<PartialComposerHandle>,
         disable_plugins: DisablePlugins,
@@ -1176,8 +1157,8 @@ impl Factory {
     pub fn create_installation_manager(
         &self,
         r#loop: std::rc::Rc<std::cell::RefCell<Loop>>,
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
+        io: std::rc::Rc<dyn IOInterface>,
+        event_dispatcher: Option<std::rc::Rc<EventDispatcher>>,
     ) -> InstallationManager {
         // FactoryMock::createInstallationManager returns a recording InstallationManagerMock.
         if self.mock {
@@ -1188,9 +1169,9 @@ impl Factory {
 
     fn create_default_installers(
         &self,
-        im: &std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>,
+        im: &std::rc::Rc<dyn InstallationManagerInterface>,
         composer: PartialComposerWeakHandle,
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: std::rc::Rc<dyn IOInterface>,
         process: Option<&std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,
     ) -> anyhow::Result<()> {
         // FactoryMock::createDefaultInstallers is a noop (no installers registered).
@@ -1205,15 +1186,15 @@ impl Factory {
             let composer_rc = composer
                 .upgrade()
                 .expect("Composer must outlive create_default_installers");
-            let composer_ref = composer_rc.borrow_partial();
+            let composer_ref = &composer_rc;
             let config = composer_ref.get_config();
             let bin_dir = std::path::PathBuf::from(path_from_bytes(&rtrim_chars(
-                config.borrow().get_path("bin-dir")?,
+                config.get_path("bin-dir")?,
                 "/",
             )));
-            let bin_compat = config.borrow().get_bin_compat()?;
+            let bin_compat = config.get_bin_compat()?;
             let vendor_dir = std::path::PathBuf::from(path_from_bytes(&rtrim_chars(
-                config.borrow().get_path("vendor-dir")?,
+                config.get_path("vendor-dir")?,
                 "/",
             )));
             (bin_dir, bin_compat, vendor_dir)
@@ -1229,23 +1210,20 @@ impl Factory {
                 Some(vendor_dir),
             )));
 
-        im.borrow_mut()
-            .add_installer(std::rc::Rc::new(LibraryInstaller::new(
-                io.clone(),
-                composer.clone(),
-                None,
-                Some(fs.clone()),
-                Some(binary_installer.clone()),
-            )?));
-        im.borrow_mut()
-            .add_installer(std::rc::Rc::new(PluginInstaller::new(
-                io.clone(),
-                composer,
-                Some(fs),
-                Some(binary_installer),
-            )?));
-        im.borrow_mut()
-            .add_installer(std::rc::Rc::new(MetapackageInstaller::new(io)));
+        im.add_installer(std::rc::Rc::new(LibraryInstaller::new(
+            io.clone(),
+            composer.clone(),
+            None,
+            Some(fs.clone()),
+            Some(binary_installer.clone()),
+        )?));
+        im.add_installer(std::rc::Rc::new(PluginInstaller::new(
+            io.clone(),
+            composer,
+            Some(fs),
+            Some(binary_installer),
+        )?));
+        im.add_installer(std::rc::Rc::new(MetapackageInstaller::new(io)));
         Ok(())
     }
 
@@ -1265,17 +1243,17 @@ impl Factory {
 
     fn load_root_package(
         &self,
-        rm: std::rc::Rc<std::cell::RefCell<RepositoryManager>>,
-        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        rm: std::rc::Rc<RepositoryManager>,
+        config: std::rc::Rc<Config>,
         parser: VersionParser,
         guesser: VersionGuesser,
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: std::rc::Rc<dyn IOInterface>,
     ) -> RootPackageLoader {
         RootPackageLoader::new(rm, config, Some(parser), Some(Box::new(guesser)), Some(io))
     }
 
     pub fn create(
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: std::rc::Rc<dyn IOInterface>,
         config: Option<LocalConfigInput>,
         disable_plugins: DisablePlugins,
         disable_scripts: bool,
@@ -1313,7 +1291,7 @@ impl Factory {
     /// branches in `create_composer`/`add_local_repository`/`create_installation_manager`/
     /// `create_default_installers`).
     pub fn __create_mock(
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: std::rc::Rc<dyn IOInterface>,
         config: Option<LocalConfigInput>,
         disable_plugins: DisablePlugins,
         disable_scripts: bool,
@@ -1346,7 +1324,7 @@ impl Factory {
     pub fn __create_config_mock(cwd: Option<&std::path::Path>) -> anyhow::Result<Config> {
         static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
-        let mut config = Config::new(true, cwd.map(|cwd| path_to_bytes(cwd).into()));
+        let config = Config::new(true, cwd.map(|cwd| path_to_bytes(cwd).into()));
 
         let home = std::env::temp_dir().join(path_from_bytes(&bformat!(
             "shirabe-test-{}-{}",
@@ -1370,8 +1348,8 @@ impl Factory {
 
     /// If you are calling this in a plugin, you probably should instead use `$composer->getLoop()->getHttpDownloader()`
     pub fn create_http_downloader(
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        config: &std::rc::Rc<std::cell::RefCell<Config>>,
+        io: std::rc::Rc<dyn IOInterface>,
+        config: &std::rc::Rc<Config>,
         options: StreamContextOptions,
     ) -> anyhow::Result<HttpDownloader> {
         // TODO(plugin): static `$warned` flag — port as a OnceCell or atomic.
@@ -1385,7 +1363,7 @@ impl Factory {
         {
             unsafe { WARNED = true };
             disable_tls = !extension_loaded("openssl");
-        } else if config.borrow().get_bool("disable-tls") {
+        } else if config.get_bool("disable-tls") {
             if !unsafe { WARNED } {
                 io.write_error(
                     "<warning>You are running Shirabe with SSL/TLS protection disabled.</warning>",
@@ -1398,11 +1376,11 @@ impl Factory {
         }
         let mut http_downloader_options = StreamContextOptions::new();
         if !disable_tls {
-            let cafile = config.borrow().get_path("cafile")?;
+            let cafile = config.get_path("cafile")?;
             if !cafile.is_empty() {
                 http_downloader_options.ssl_mut().set_cafile(cafile);
             }
-            let capath = config.borrow().get_path("capath")?;
+            let capath = config.get_path("capath")?;
             if !capath.is_empty() {
                 http_downloader_options.ssl_mut().set_capath(capath);
             }
@@ -1432,8 +1410,8 @@ impl Factory {
     }
 
     fn load_composer_auth_env(
-        config: &mut Config,
-        io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
+        config: &Config,
+        io: Option<std::rc::Rc<dyn IOInterface>>,
     ) -> anyhow::Result<()> {
         let composer_auth_env = Platform::get_env("COMPOSER_AUTH");
         let composer_auth_env_str = match composer_auth_env {
@@ -1493,7 +1471,7 @@ impl Factory {
     }
 
     fn validate_json_schema(
-        io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
+        io: Option<std::rc::Rc<dyn IOInterface>>,
         file_or_data: ValidateJsonInput<'_>,
         schema: i64,
         source: Option<&BStr>,

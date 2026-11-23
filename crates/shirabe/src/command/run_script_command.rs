@@ -287,7 +287,7 @@ impl Command for RunScriptCommand {
             vec![],
             EventFlags::default(),
         );
-        let has_listeners = dispatcher.borrow_mut().has_event_listeners(&event);
+        let has_listeners = dispatcher.has_event_listeners(&event);
         if !has_listeners {
             return Err(InvalidArgumentException::new(bformat!(
                 "Script \"{script}\" is not defined in this package"
@@ -317,12 +317,7 @@ impl Command for RunScriptCommand {
 
         Platform::put_env("COMPOSER_DEV_MODE", if dev_mode { "1" } else { "0" })?;
 
-        dispatcher.borrow_mut().dispatch_script(
-            script.as_ref(),
-            dev_mode,
-            args,
-            EventFlags::default(),
-        )
+        dispatcher.dispatch_script(script.as_ref(), dev_mode, args, EventFlags::default())
     }
 
     fn initialize(

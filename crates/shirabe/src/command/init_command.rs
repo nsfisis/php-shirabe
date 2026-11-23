@@ -287,7 +287,7 @@ impl InitCommand {
         .await;
 
         if result.is_err() {
-            self.get_io().borrow().write_error(
+            self.get_io().write_error(
                 "Could not update dependencies. Run `shirabe update` to see more information.",
             );
         }
@@ -313,9 +313,7 @@ impl InitCommand {
         .await;
 
         if result.is_err() {
-            self.get_io()
-                .borrow()
-                .write_error("Could not run dump-autoload.");
+            self.get_io().write_error("Could not run dump-autoload.");
         }
     }
 
@@ -558,10 +556,7 @@ impl Command for InitCommand {
             .map(<[bstr::BString]>::to_vec)
             .unwrap_or_default();
         if (repositories.len() as i64) > 0 {
-            let config = std::rc::Rc::new(std::cell::RefCell::new(Factory::create_config(
-                Some(io.clone()),
-                None,
-            )?));
+            let config = std::rc::Rc::new(Factory::create_config(Some(io.clone()), None)?);
             for repo in &repositories {
                 let repo_config =
                     RepositoryFactory::config_from_string(io.clone(), &config, repo, true)?;
@@ -791,13 +786,9 @@ impl Command for InitCommand {
                 .map(<[bstr::BString]>::to_vec)
                 .unwrap_or_default();
             if (repositories.len() as i64) > 0 {
-                let config = std::rc::Rc::new(std::cell::RefCell::new(Factory::create_config(
-                    Some(io.clone()),
-                    None,
-                )?));
-                io.borrow_mut()
-                    .load_configuration(&mut config.borrow_mut())?;
-                let mut repo_manager =
+                let config = std::rc::Rc::new(Factory::create_config(Some(io.clone()), None)?);
+                io.load_configuration(&config)?;
+                let repo_manager =
                     RepositoryFactory::manager(io.clone(), &config, None, None, None)?;
 
                 let mut repos: Vec<RepositoryInterfaceHandle> =
@@ -829,7 +820,7 @@ impl Command for InitCommand {
                         io.clone(),
                         &config,
                         repo_config,
-                        Some(&mut repo_manager),
+                        Some(&repo_manager),
                     )?);
                 }
 
@@ -845,7 +836,7 @@ impl Command for InitCommand {
                         io.clone(),
                         &config,
                         default_config,
-                        Some(&mut repo_manager),
+                        Some(&repo_manager),
                     )?);
                 }
 

@@ -33,13 +33,13 @@ pub trait VersionGuesserInterface: std::fmt::Debug {
 /// Try to guess the current version number based on different VCS configuration.
 #[derive(Debug)]
 pub struct VersionGuesser {
-    config: std::rc::Rc<std::cell::RefCell<Config>>,
+    config: std::rc::Rc<Config>,
 
     process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
 
     version_parser: VersionParser,
 
-    io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
+    io: Option<std::rc::Rc<dyn IOInterface>>,
 
     /// For testing only: when true, `guess_version` always returns `None`, mirroring
     /// `Composer\Test\Mock\VersionGuesserMock`. `false` in production.
@@ -57,10 +57,10 @@ pub struct VersionData {
 
 impl VersionGuesser {
     pub fn new(
-        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        config: std::rc::Rc<Config>,
         process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
         version_parser: VersionParser,
-        io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
+        io: Option<std::rc::Rc<dyn IOInterface>>,
     ) -> Self {
         Self {
             config,
@@ -74,10 +74,10 @@ impl VersionGuesser {
     /// For testing only: builds a guesser whose `guess_version` always returns `None`, mirroring
     /// `Composer\Test\Mock\VersionGuesserMock`.
     pub fn __new_mock(
-        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        config: std::rc::Rc<Config>,
         process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
         version_parser: VersionParser,
-        io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
+        io: Option<std::rc::Rc<dyn IOInterface>>,
     ) -> Self {
         Self {
             mock: true,
@@ -390,10 +390,8 @@ impl VersionGuesser {
             // re-use the HgDriver to fetch branches (this properly includes bookmarks)
             let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
             repo_config.insert("url".into(), PhpMixed::string(path_to_bytes(path)));
-            let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
-                std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
-            let http_io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
-                std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
+            let io: std::rc::Rc<dyn IOInterface> = std::rc::Rc::new(NullIO::new());
+            let http_io: std::rc::Rc<dyn IOInterface> = std::rc::Rc::new(NullIO::new());
             let http_downloader = std::rc::Rc::new(std::cell::RefCell::new(HttpDownloader::new(
                 http_io,
                 self.config.clone(),

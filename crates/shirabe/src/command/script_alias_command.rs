@@ -140,9 +140,7 @@ impl Command for ScriptAliasCommand {
             .map(<[bstr::BString]>::to_vec)
             .unwrap_or_default();
 
-        dispatcher
-            .borrow_mut()
-            .dispatch_script(self.script.as_ref(), dev_mode, args_value, flags)
+        dispatcher.dispatch_script(self.script.as_ref(), dev_mode, args_value, flags)
     }
 
     fn initialize(

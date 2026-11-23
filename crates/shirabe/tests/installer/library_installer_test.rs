@@ -112,7 +112,7 @@ struct SetUp {
     root: tempfile::TempDir,
     vendor_dir: std::path::PathBuf,
     bin_dir: std::path::PathBuf,
-    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    io: std::rc::Rc<dyn IOInterface>,
     composer: PartialComposerWeakHandle,
     fs: Filesystem,
     composer_full: ComposerHandle,
@@ -123,8 +123,7 @@ struct SetUp {
 fn set_download_manager(setup: &SetUp, dm: MockDownloadManager) {
     setup
         .composer_full
-        .borrow_mut()
-        .set_download_manager(std::rc::Rc::new(std::cell::RefCell::new(dm)));
+        .set_download_manager(std::rc::Rc::new(dm));
 }
 
 fn set_up() -> SetUp {
@@ -139,7 +138,7 @@ fn set_up() -> SetUp {
     let bin_dir = root_dir.join("bin");
     std::fs::create_dir_all(&bin_dir).unwrap();
 
-    let mut config = Config::new(false, None);
+    let config = Config::new(false, None);
     let mut config_section: IndexMap<BString, PhpMixed> = IndexMap::new();
     config_section.insert(
         "vendor-dir".into(),
@@ -149,22 +148,17 @@ fn set_up() -> SetUp {
     let mut merged: IndexMap<BString, PhpMixed> = IndexMap::new();
     merged.insert("config".into(), PhpMixed::Array(config_section));
     config.merge(&merged, Config::SOURCE_UNKNOWN);
-    let config_rc = std::rc::Rc::new(std::cell::RefCell::new(config));
+    let config_rc = std::rc::Rc::new(config);
 
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
-        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
+    let io: std::rc::Rc<dyn IOInterface> = std::rc::Rc::new(NullIO::new());
 
-    let composer_rc = std::rc::Rc::new(std::cell::RefCell::new(PartialOrFullComposer::new_full()));
+    let composer_rc = std::rc::Rc::new(PartialOrFullComposer::new_full());
     let composer = ComposerHandle::from_rc_unchecked(composer_rc.clone());
-    composer.borrow_mut().set_config(config_rc);
+    composer.set_config(config_rc);
     // Default unconfigured mock so LibraryInstaller::new can resolve a DownloadManager even in
     // tests that exercise no downloader call; tests that assert calls install their own via
     // set_download_manager.
-    composer
-        .borrow_mut()
-        .set_download_manager(std::rc::Rc::new(std::cell::RefCell::new(
-            MockDownloadManager::new(),
-        )));
+    composer.set_download_manager(std::rc::Rc::new(MockDownloadManager::new()));
 
     let weak = PartialComposerHandle::from_rc(composer_rc).downgrade();
 

@@ -9,7 +9,8 @@
 use bstr::BString;
 use indexmap::IndexMap;
 use shirabe::config::Config;
-use shirabe::io::{BaseIO, IOInterface, IOInterfaceImmutable, IOInterfaceMutable};
+use shirabe::io::{BaseIO, IOInterface};
+use shirabe_php_shim::PhpProp;
 use shirabe_symfony_console::input::InputValue;
 
 // Records call arguments for a stubbed method, equivalent to PHPUnit's
@@ -35,8 +36,14 @@ impl<T: Clone> CallRecorder<T> {
 
 #[derive(Debug, Default)]
 pub struct IOStub {
-    authentications:
-        indexmap::IndexMap<bstr::BString, indexmap::IndexMap<bstr::BString, Option<bstr::BString>>>,
+    authentications: PhpProp<
+        std::rc::Rc<
+            indexmap::IndexMap<
+                bstr::BString,
+                indexmap::IndexMap<bstr::BString, Option<bstr::BString>>,
+            >,
+        >,
+    >,
 
     is_interactive: Option<bool>,
     is_decorated: Option<bool>,
@@ -48,7 +55,7 @@ pub struct IOStub {
     // willReturn that applies to any argument, so a single Option<bool> matches.
     has_authentication: Option<bool>,
     // `getAuthentication` willReturn is a `['username' => ..., 'password' => ...]` array.
-    get_authentication: Option<indexmap::IndexMap<bstr::BString, Option<bstr::BString>>>,
+    get_authentication: PhpProp<Option<indexmap::IndexMap<bstr::BString, Option<bstr::BString>>>>,
 
     ask: Option<InputValue>,
     // When set, `askAndValidate` invokes the caller's validator with this value and returns/
@@ -108,20 +115,20 @@ impl IOStub {
         self
     }
     pub fn with_get_authentication(
-        mut self,
+        self,
         value: indexmap::IndexMap<bstr::BString, Option<bstr::BString>>,
     ) -> Self {
-        self.get_authentication = Some(value);
+        self.get_authentication.set(Some(value));
         self
     }
     // Mutator counterpart of `with_get_authentication`, for tests that reconfigure the stub's
     // response between calls (equivalent to PHPUnit's `willReturnCallback` sequencing via
     // `array_shift`).
     pub fn set_get_authentication(
-        &mut self,
+        &self,
         value: indexmap::IndexMap<bstr::BString, Option<bstr::BString>>,
     ) {
-        self.get_authentication = Some(value);
+        self.get_authentication.set(Some(value));
     }
     pub fn with_ask(mut self, value: InputValue) -> Self {
         self.ask = Some(value);
@@ -151,7 +158,7 @@ impl IOStub {
     // reads a captured `$initial_config`. Reads delegate to `BaseIO` as long as the
     // `with_has_authentication`/`with_get_authentication` overrides are left unset.
     pub fn with_authentication(
-        mut self,
+        self,
         repository_name: impl Into<bstr::BString>,
         username: impl Into<bstr::BString>,
         password: Option<bstr::BString>,
@@ -159,7 +166,9 @@ impl IOStub {
         let mut auth = indexmap::IndexMap::new();
         auth.insert(bstr::BString::from("username"), Some(username.into()));
         auth.insert(bstr::BString::from("password"), password);
-        self.authentications.insert(repository_name.into(), auth);
+        self.authentications.update(|authentications| {
+            std::rc::Rc::make_mut(authentications).insert(repository_name.into(), auth)
+        });
         self
     }
 
@@ -196,7 +205,7 @@ impl IOStub {
     }
 }
 
-impl IOInterfaceImmutable for IOStub {
+impl IOInterface for IOStub {
     fn is_interactive(&self) -> bool {
         self.is_interactive.unwrap_or(false)
     }
@@ -303,7 +312,7 @@ impl IOInterfaceImmutable for IOStub {
     ) -> indexmap::IndexMap<bstr::BString, Option<bstr::BString>> {
         self.get_authentication_calls
             .push(repository_name.to_owned());
-        match &self.get_authentication {
+        match &self.get_authentication.cloned() {
             Some(value) => value.clone(),
             None => <Self as BaseIO>::get_authentication(self, repository_name),
         }
@@ -318,11 +327,9 @@ impl IOInterfaceImmutable for IOStub {
     fn debug_bytes(&self, message: &bstr::BStr, context: &[(&bstr::BStr, &bstr::BStr)]) {
         <Self as BaseIO>::debug(self, message, context);
     }
-}
 
-impl IOInterfaceMutable for IOStub {
     fn set_authentication(
-        &mut self,
+        &self,
         repository_name: bstr::BString,
         username: bstr::BString,
         password: Option<bstr::BString>,
@@ -334,16 +341,14 @@ impl IOInterfaceMutable for IOStub {
         ));
         <Self as BaseIO>::set_authentication(self, repository_name, username, password)
     }
-    fn load_configuration(&mut self, config: &mut Config) -> anyhow::Result<()> {
+    fn load_configuration(&self, config: &Config) -> anyhow::Result<()> {
         <Self as BaseIO>::load_configuration(self, config)
     }
-}
 
-impl IOInterface for IOStub {
     fn as_any(&self) -> &dyn std::any::Any {
         self
     }
-    fn as_base_io_mut(&mut self) -> Option<&mut dyn BaseIO> {
+    fn as_base_io(&self) -> Option<&dyn BaseIO> {
         Some(self)
     }
 }
@@ -351,16 +356,14 @@ impl IOInterface for IOStub {
 impl BaseIO for IOStub {
     fn authentications(
         &self,
-    ) -> &indexmap::IndexMap<bstr::BString, indexmap::IndexMap<bstr::BString, Option<bstr::BString>>>
-    {
-        &self.authentications
-    }
-    fn authentications_mut(
-        &mut self,
-    ) -> &mut indexmap::IndexMap<
-        bstr::BString,
-        indexmap::IndexMap<bstr::BString, Option<bstr::BString>>,
+    ) -> &PhpProp<
+        std::rc::Rc<
+            indexmap::IndexMap<
+                bstr::BString,
+                indexmap::IndexMap<bstr::BString, Option<bstr::BString>>,
+            >,
+        >,
     > {
-        &mut self.authentications
+        &self.authentications
     }
 }

@@ -42,8 +42,8 @@ pub trait VcsDriverInterface: std::fmt::Debug {
     fn cleanup(&mut self) -> anyhow::Result<()>;
 
     fn supports(
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        io: std::rc::Rc<dyn IOInterface>,
+        config: std::rc::Rc<Config>,
         url: &BStr,
         deep: bool,
     ) -> anyhow::Result<bool>

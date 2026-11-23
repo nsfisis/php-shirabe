@@ -7,7 +7,7 @@ use shirabe_php_binding_macros::php_entity;
 // proxy stubs for ConfigSourceInterface implementations, and prohibitUrlByConfig needs the IO
 // argument decoded back into the Rust-side instance.
 php_entity! {
-    handle: std::rc::Rc<std::cell::RefCell<Config>>,
+    handle: std::rc::Rc<Config>,
     type_error: "a Config",
     classes: {
         r"Composer\Config": { constructor: unimplemented },
@@ -17,8 +17,7 @@ php_entity! {
             instance: {
                 adapters: __php_binding_config,
                 target: Config,
-                borrow: |config| config.borrow(),
-                borrow_mut: |config| config.borrow_mut(),
+                deref: |config| &**config,
             },
             unimplemented: [
                 getAuthConfigSource,

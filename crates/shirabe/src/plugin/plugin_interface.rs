@@ -21,19 +21,19 @@ pub trait PluginInterface: std::fmt::Debug {
     fn activate(
         &mut self,
         composer: ComposerHandle,
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: std::rc::Rc<dyn IOInterface>,
     ) -> anyhow::Result<()>;
 
     fn deactivate(
         &mut self,
         composer: ComposerHandle,
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: std::rc::Rc<dyn IOInterface>,
     ) -> anyhow::Result<()>;
 
     fn uninstall(
         &mut self,
         composer: ComposerHandle,
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: std::rc::Rc<dyn IOInterface>,
     ) -> anyhow::Result<()>;
 
     /// PHP: `get_class($plugin)`. Rust has no runtime class name, so each implementor carries

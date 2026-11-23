@@ -23,7 +23,7 @@ pub struct ArtifactRepository {
     loader: Box<dyn LoaderInterface>,
     lookup: BString,
     repo_config: IndexMap<BString, PhpMixed>,
-    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    io: std::rc::Rc<dyn IOInterface>,
 }
 
 impl std::fmt::Debug for ArtifactRepository {
@@ -38,7 +38,7 @@ impl std::fmt::Debug for ArtifactRepository {
 impl ArtifactRepository {
     pub fn new(
         repo_config: IndexMap<BString, PhpMixed>,
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: std::rc::Rc<dyn IOInterface>,
     ) -> anyhow::Result<Self> {
         if !extension_loaded("zip") {
             return Err(RuntimeException::new(BString::from(

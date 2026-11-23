@@ -141,7 +141,7 @@ fn describe_links(links: &IndexMap<BString, Link>) -> Vec<BString> {
 fn test_links_and_release_date_round_trip_through_the_plugin() {
     let _worker = lock_php_worker();
     let set_up = set_up();
-    let package = set_up.composer.borrow().get_package().clone();
+    let package = set_up.composer.get_package().clone();
     package
         .set_requires(
             seeded_requires()
@@ -162,7 +162,7 @@ fn test_links_and_release_date_round_trip_through_the_plugin() {
          foo/all | dummy/root | foo/all | requires | * | MatchAllConstraint() pretty=*\n\
          foo/none | dummy/root | foo/none | requires |  | MatchNoneConstraint() pretty=nothing\n\
          release date: 2024-03-03T20:06:07.123456+00:00\n",
-        set_up.io.borrow().get_output()
+        set_up.io.get_output()
     );
 
     // What the plugin wrote back: links it built PHP-side, decoded into Rust values.
@@ -203,7 +203,7 @@ fn link_pretty_constraint_fixture_package() -> PackageInterfaceHandle {
 fn test_link_without_pretty_constraint_throws_on_both_sides() {
     let _worker = lock_php_worker();
     let set_up = set_up();
-    let package = set_up.composer.borrow().get_package().clone();
+    let package = set_up.composer.get_package().clone();
     let mut requires = IndexMap::new();
     requires.insert(
         BString::from("foo/set"),
@@ -232,7 +232,7 @@ fn test_link_without_pretty_constraint_throws_on_both_sides() {
     assert_eq!(
         "foo/set: *\n\
          foo/unset: UnexpectedValueException: Link dummy/root requires foo/unset (*) has been misconfigured and had no prettyConstraint given.\n",
-        set_up.io.borrow().get_output()
+        set_up.io.get_output()
     );
 
     let requires = package.get_requires();

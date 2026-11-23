@@ -3,7 +3,7 @@
 use crate::config::Config;
 use crate::downloader::TransportException;
 use crate::event_dispatcher::EventDispatcher;
-use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite};
+use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::package::loader::{
     ArrayLoader, InvalidPackageException, LoaderInterface, ValidatingArrayLoader,
 };
@@ -32,8 +32,8 @@ pub struct VcsRepository {
     package_name: std::cell::RefCell<Option<BString>>,
     is_verbose: bool,
     is_very_verbose: bool,
-    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-    config: std::rc::Rc<std::cell::RefCell<Config>>,
+    io: std::rc::Rc<dyn IOInterface>,
+    config: std::rc::Rc<Config>,
     version_parser: std::cell::RefCell<Option<VersionParser>>,
     r#type: BString,
     loader: std::cell::RefCell<Option<Box<dyn LoaderInterface>>>,
@@ -50,7 +50,7 @@ pub struct VcsRepository {
     empty_references: std::cell::RefCell<Vec<BString>>,
     version_transport_exceptions:
         std::cell::RefCell<IndexMap<BString, IndexMap<BString, TransportException>>>,
-    _dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
+    _dispatcher: Option<std::rc::Rc<EventDispatcher>>,
 }
 
 impl ConfigurableRepositoryInterface for VcsRepository {
@@ -63,10 +63,10 @@ impl VcsRepository {
     #[allow(clippy::too_many_arguments, reason = "to keep PHP signature")]
     pub fn new(
         mut repo_config: IndexMap<BString, PhpMixed>,
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        io: std::rc::Rc<dyn IOInterface>,
+        config: std::rc::Rc<Config>,
         http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
-        dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
+        dispatcher: Option<std::rc::Rc<EventDispatcher>>,
         process: Option<std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,
         drivers: Option<IndexMap<BString, VcsDriverKind>>,
         version_cache: Option<Box<dyn VersionCacheInterface>>,

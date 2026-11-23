@@ -20,8 +20,8 @@ pub struct VcsDriverBase {
     pub url: BString,
     pub origin_url: BString,
     pub repo_config: IndexMap<BString, PhpMixed>,
-    pub io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-    pub config: std::rc::Rc<std::cell::RefCell<Config>>,
+    pub io: std::rc::Rc<dyn IOInterface>,
+    pub config: std::rc::Rc<Config>,
     pub process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     pub http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
     pub info_cache: IndexMap<BString, Option<IndexMap<BString, PhpMixed>>>,
@@ -31,8 +31,8 @@ pub struct VcsDriverBase {
 impl VcsDriverBase {
     pub fn new(
         repo_config: IndexMap<BString, PhpMixed>,
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        io: std::rc::Rc<dyn IOInterface>,
+        config: std::rc::Rc<Config>,
         http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
         process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     ) -> Self {

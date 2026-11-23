@@ -17,7 +17,7 @@ use shirabe_php_rpc::RpcValue;
 enum State {
     /// The Composer PHP runtime is not loaded into the worker yet. Holds the `$io` of each
     /// handler registered so far, innermost last.
-    Pending(Vec<Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>>),
+    Pending(Vec<Option<std::rc::Rc<dyn IOInterface>>>),
     /// The runtime is loaded, and every call goes to the worker as it is made.
     Forwarding,
 }
@@ -27,9 +27,7 @@ thread_local! {
 }
 
 /// `ErrorHandler::register($io)`.
-pub(crate) fn register(
-    io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
-) -> anyhow::Result<()> {
+pub(crate) fn register(io: Option<std::rc::Rc<dyn IOInterface>>) -> anyhow::Result<()> {
     let io = STATE.with(|state| match &mut *state.borrow_mut() {
         State::Pending(stack) => {
             stack.push(io);
@@ -75,9 +73,7 @@ pub(crate) fn register_pending() -> anyhow::Result<()> {
 }
 
 /// Pushes `ErrorHandler::$io` into the worker through `ErrorHandler::register($io)`.
-pub(crate) fn push_io(
-    io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
-) -> anyhow::Result<()> {
+pub(crate) fn push_io(io: Option<std::rc::Rc<dyn IOInterface>>) -> anyhow::Result<()> {
     let io = match io {
         Some(io) => entity_value(&io).map_err(throw_into_error)?,
         None => RpcValue::Null,

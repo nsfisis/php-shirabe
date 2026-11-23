@@ -7,7 +7,7 @@ use crate::composer::composer_full;
 use crate::console::input::InputOption;
 use crate::delegate_base_command_trait_impls_to_inner;
 use crate::event_dispatcher::EventFlags;
-use crate::io::{IOInterfaceImmutable, IOInterfaceWrite};
+use crate::io::IOInterfaceWrite;
 use crate::package::dumper::ArrayDumper;
 use crate::package::version::{VersionGuesser, VersionParser};
 use crate::plugin::{CommandEvent, PluginEvents};
@@ -93,20 +93,18 @@ impl StatusCommand {
         let dm = composer.get_download_manager().clone();
         let packages: Vec<_> = composer
             .get_repository_manager()
-            .borrow()
             .get_local_repository()
             .get_canonical_packages()?;
         for package in packages {
             let target_dir = composer
                 .get_installation_manager()
-                .borrow_mut()
                 .get_install_path(package.clone())?;
             let target_path = match target_dir {
                 Some(d) => d,
                 None => continue,
             };
             let target_dir = BString::from(path_to_bytes(&target_path));
-            let downloader_handle = match dm.borrow().get_downloader_for_package(package.clone())? {
+            let downloader_handle = match dm.get_downloader_for_package(package.clone())? {
                 Some(d) => d,
                 None => continue,
             };
@@ -323,35 +321,29 @@ impl Command for StatusCommand {
             let command_event =
                 CommandEvent::new(PluginEvents::COMMAND, "status", input.clone(), output);
             let command_event_name = command_event.get_name().to_owned();
-            composer.get_event_dispatcher().borrow_mut().dispatch(
+            composer.get_event_dispatcher().dispatch(
                 Some(command_event_name.as_ref()),
                 Some(std::rc::Rc::new(std::cell::RefCell::new(command_event))),
             )?;
 
-            composer
-                .get_event_dispatcher()
-                .borrow_mut()
-                .dispatch_script(
-                    ScriptEvents::PRE_STATUS_CMD,
-                    true,
-                    vec![],
-                    EventFlags::default(),
-                );
+            composer.get_event_dispatcher().dispatch_script(
+                ScriptEvents::PRE_STATUS_CMD,
+                true,
+                vec![],
+                EventFlags::default(),
+            );
         }
 
         let exit_code = self.do_execute(input).await?;
 
         {
             let composer = composer_full(&composer_rc);
-            composer
-                .get_event_dispatcher()
-                .borrow_mut()
-                .dispatch_script(
-                    ScriptEvents::POST_STATUS_CMD,
-                    true,
-                    vec![],
-                    EventFlags::default(),
-                );
+            composer.get_event_dispatcher().dispatch_script(
+                ScriptEvents::POST_STATUS_CMD,
+                true,
+                vec![],
+                EventFlags::default(),
+            );
         }
 
         Ok(exit_code)

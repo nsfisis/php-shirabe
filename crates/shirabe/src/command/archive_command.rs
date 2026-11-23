@@ -103,8 +103,8 @@ impl ArchiveCommand {
     #[allow(clippy::too_many_arguments, reason = "to keep PHP signature")]
     pub async fn archive(
         &self,
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        config: &std::rc::Rc<std::cell::RefCell<Config>>,
+        io: std::rc::Rc<dyn IOInterface>,
+        config: &std::rc::Rc<Config>,
         package_name: Option<BString>,
         version: Option<BString>,
         format: &BStr,
@@ -158,7 +158,7 @@ impl ArchiveCommand {
                 Some(process),
             )));
             owned_archive_manager =
-                factory.create_archive_manager(&config.borrow(), &download_manager, &loop_)?;
+                factory.create_archive_manager(config, &download_manager, &loop_)?;
             &mut owned_archive_manager
         };
 
@@ -207,7 +207,7 @@ impl ArchiveCommand {
 
     pub fn select_package(
         &self,
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: std::rc::Rc<dyn IOInterface>,
         package_name: &BStr,
         version: Option<&BStr>,
     ) -> anyhow::Result<Option<CompletePackageInterfaceHandle>> {
@@ -220,7 +220,6 @@ impl ArchiveCommand {
         if let Some(composer) = self.try_composer(None, None) {
             let composer = composer_full(&composer);
             let repository_manager = composer.get_repository_manager().clone();
-            let repository_manager = repository_manager.borrow();
             let local_repo = repository_manager.get_local_repository();
             let mut repos: Vec<RepositoryInterfaceHandle> = vec![local_repo];
             repos.extend(repository_manager.get_repositories().iter().cloned());
@@ -342,16 +341,16 @@ impl Command for ArchiveCommand {
         let composer = self.try_composer(None, None);
 
         let config = if let Some(ref composer) = composer {
-            let config = composer.borrow_partial().get_config();
+            let config = composer.get_config();
             let command_event =
                 CommandEvent::new(PluginEvents::COMMAND, "archive", input.clone(), output);
             let command_event_name = command_event.get_name().to_owned();
-            let event_dispatcher = composer.borrow_partial().get_event_dispatcher();
-            event_dispatcher.borrow_mut().dispatch(
+            let event_dispatcher = composer.get_event_dispatcher();
+            event_dispatcher.dispatch(
                 Some(command_event_name.as_ref()),
                 Some(std::rc::Rc::new(std::cell::RefCell::new(command_event))),
             )?;
-            event_dispatcher.borrow_mut().dispatch_script(
+            event_dispatcher.dispatch_script(
                 ScriptEvents::PRE_ARCHIVE_CMD,
                 true,
                 vec![],
@@ -359,7 +358,7 @@ impl Command for ArchiveCommand {
             );
             config
         } else {
-            std::rc::Rc::new(std::cell::RefCell::new(Factory::create_config(None, None)?))
+            std::rc::Rc::new(Factory::create_config(None, None)?)
         };
 
         let format_option = input
@@ -369,7 +368,7 @@ impl Command for ArchiveCommand {
             .map(BString::from);
         let format = match format_option {
             Some(format) => format,
-            None => config.borrow().get_string("archive-format")?,
+            None => config.get_string("archive-format")?,
         };
 
         let dir_option = input
@@ -379,7 +378,7 @@ impl Command for ArchiveCommand {
             .map(BString::from);
         let dir = match dir_option {
             Some(dir) => dir,
-            None => config.borrow().get_string("archive-dir")?,
+            None => config.get_string("archive-dir")?,
         };
 
         let io = self.get_io().clone();
@@ -416,16 +415,12 @@ impl Command for ArchiveCommand {
         if return_code == 0
             && let Some(ref composer) = composer
         {
-            composer
-                .borrow_partial()
-                .get_event_dispatcher()
-                .borrow_mut()
-                .dispatch_script(
-                    ScriptEvents::POST_ARCHIVE_CMD,
-                    true,
-                    vec![],
-                    EventFlags::default(),
-                );
+            composer.get_event_dispatcher().dispatch_script(
+                ScriptEvents::POST_ARCHIVE_CMD,
+                true,
+                vec![],
+                EventFlags::default(),
+            );
         }
 
         Ok(return_code)

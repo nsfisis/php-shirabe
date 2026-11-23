@@ -24,8 +24,8 @@ impl_php_class!(HgDownloader, r"Composer\Downloader\HgDownloader");
 
 impl HgDownloader {
     pub fn new(
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        io: std::rc::Rc<dyn IOInterface>,
+        config: std::rc::Rc<Config>,
         process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
         fs: std::rc::Rc<std::cell::RefCell<Filesystem>>,
     ) -> Self {
@@ -36,11 +36,11 @@ impl HgDownloader {
 }
 
 impl VcsDownloader for HgDownloader {
-    fn io(&self) -> std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
+    fn io(&self) -> std::rc::Rc<dyn IOInterface> {
         self.inner.io.clone()
     }
 
-    fn config(&self) -> &std::rc::Rc<std::cell::RefCell<Config>> {
+    fn config(&self) -> &std::rc::Rc<Config> {
         &self.inner.config
     }
 

@@ -60,7 +60,7 @@ fn test_add_repository() {
     let tear_down = set_up();
     let config = tear_down.working_dir().join("composer.json");
     std::fs::copy(fixture_path("composer-repositories.json"), &config).unwrap();
-    let mut json_config_source = json_config_source(&config);
+    let json_config_source = json_config_source(&config);
 
     let mut repo = IndexMap::new();
     repo.insert("type".into(), PhpMixed::string(BString::from("git")));
@@ -80,7 +80,7 @@ fn test_add_repository_as_list() {
     let tear_down = set_up();
     let config = tear_down.working_dir().join("composer.json");
     std::fs::copy(fixture_path("composer-repositories.json"), &config).unwrap();
-    let mut json_config_source = json_config_source(&config);
+    let json_config_source = json_config_source(&config);
 
     let mut repo = IndexMap::new();
     repo.insert("type".into(), PhpMixed::string(BString::from("git")));
@@ -100,7 +100,7 @@ fn test_add_repository_with_options() {
     let tear_down = set_up();
     let config = tear_down.working_dir().join("composer.json");
     std::fs::copy(fixture_path("composer-repositories.json"), &config).unwrap();
-    let mut json_config_source = json_config_source(&config);
+    let json_config_source = json_config_source(&config);
 
     let mut repo = IndexMap::new();
     repo.insert("type".into(), PhpMixed::string(BString::from("composer")));
@@ -138,7 +138,7 @@ fn test_remove_repository() {
         &config,
     )
     .unwrap();
-    let mut json_config_source = json_config_source(&config);
+    let json_config_source = json_config_source(&config);
     json_config_source
         .remove_repository(bstr::BStr::new("example_tld"))
         .unwrap();
@@ -151,7 +151,7 @@ fn test_add_packagist_repository_with_false_value() {
     let tear_down = set_up();
     let config = tear_down.working_dir().join("composer.json");
     std::fs::copy(fixture_path("composer-repositories.json"), &config).unwrap();
-    let mut json_config_source = json_config_source(&config);
+    let json_config_source = json_config_source(&config);
     json_config_source
         .add_repository(bstr::BStr::new("packagist"), PhpMixed::Bool(false), true)
         .unwrap();
@@ -171,7 +171,7 @@ fn test_remove_packagist() {
         &config,
     )
     .unwrap();
-    let mut json_config_source = json_config_source(&config);
+    let json_config_source = json_config_source(&config);
     json_config_source
         .remove_repository(bstr::BStr::new("packagist"))
         .unwrap();
@@ -343,7 +343,7 @@ fn test_add_link() {
         let tear_down = set_up();
         let composer_json = tear_down.working_dir().join("composer.json");
         std::fs::copy(&source_file, &composer_json).unwrap();
-        let mut json_config_source = json_config_source(&composer_json);
+        let json_config_source = json_config_source(&composer_json);
 
         json_config_source
             .add_link(
@@ -505,7 +505,7 @@ fn test_remove_link() {
         let tear_down = set_up();
         let composer_json = tear_down.working_dir().join("composer.json");
         std::fs::copy(&source_file, &composer_json).unwrap();
-        let mut json_config_source = json_config_source(&composer_json);
+        let json_config_source = json_config_source(&composer_json);
 
         json_config_source
             .remove_link(bstr::BStr::new(r#type), bstr::BStr::new(name))

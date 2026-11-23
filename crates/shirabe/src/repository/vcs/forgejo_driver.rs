@@ -3,7 +3,7 @@
 use crate::cache::Cache;
 use crate::config::Config;
 use crate::downloader::TransportException;
-use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface};
+use crate::io::{IOInterface, IOInterfaceWrite, io_interface};
 use crate::json::{JsonEncodeOptions, JsonFile};
 use crate::repository::vcs::{GitDriver, VcsDriverBase, VcsDriverInterface};
 use crate::util::http::Response;
@@ -29,8 +29,8 @@ pub struct ForgejoDriver {
 impl ForgejoDriver {
     pub fn new(
         repo_config: IndexMap<BString, PhpMixed>,
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        io: std::rc::Rc<dyn IOInterface>,
+        config: std::rc::Rc<Config>,
         http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
         process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     ) -> Self {
@@ -50,11 +50,7 @@ impl ForgejoDriver {
 
         let cache_dir = bformat!(
             "{}/{}/{}/{}",
-            self.inner
-                .config
-                .borrow()
-                .get_path("cache-repo-dir")?
-                .as_bstr(),
+            self.inner.config.get_path("cache-repo-dir")?.as_bstr(),
             forgejo_url.origin_url,
             forgejo_url.owner,
             forgejo_url.repository
@@ -69,7 +65,7 @@ impl ForgejoDriver {
             false,
         ));
         if let Some(c) = self.inner.cache.as_mut() {
-            c.set_read_only(self.inner.config.borrow().get_bool("cache-read-only"))
+            c.set_read_only(self.inner.config.get_bool("cache-read-only"))
         }
 
         self.fetch_repository_data()?;
@@ -449,8 +445,8 @@ impl ForgejoDriver {
     }
 
     pub fn supports(
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        io: std::rc::Rc<dyn IOInterface>,
+        config: std::rc::Rc<Config>,
         url: &BStr,
         _deep: bool,
     ) -> anyhow::Result<bool> {
@@ -462,7 +458,7 @@ impl ForgejoDriver {
 
         if !in_array_strict(
             PhpMixed::string(strtolower(&forgejo_url.origin_url)),
-            &config.borrow().get_list("forgejo-domains")?,
+            &config.get_list("forgejo-domains")?,
         ) {
             return Ok(false);
         }
@@ -685,8 +681,8 @@ impl VcsDriverInterface for ForgejoDriver {
     }
 
     fn supports(
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        io: std::rc::Rc<dyn IOInterface>,
+        config: std::rc::Rc<Config>,
         url: &BStr,
         deep: bool,
     ) -> anyhow::Result<bool> {

@@ -62,7 +62,7 @@ impl VersionSelector {
         preferred_stability: &BStr,
         platform_requirement_filter: Option<std::rc::Rc<dyn PlatformRequirementFilterInterface>>,
         repo_set_flags: i64,
-        io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
+        io: Option<std::rc::Rc<dyn IOInterface>>,
         show_warnings: ShowWarnings,
     ) -> anyhow::Result<Option<PackageInterfaceHandle>> {
         let Some(min_priority) = base_package::stability_priority(preferred_stability) else {

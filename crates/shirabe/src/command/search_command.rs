@@ -167,21 +167,14 @@ impl Command for SearchCommand {
             self.create_composer_instance(input.clone(), io.clone(), None, false, None)?
         };
         let composer_ref = composer_full(&composer);
-        let local_repo = composer_ref
-            .get_repository_manager()
-            .borrow()
-            .get_local_repository();
+        let local_repo = composer_ref.get_repository_manager().get_local_repository();
         let installed_repo = CompositeRepository::new(vec![
             local_repo,
             RepositoryInterfaceHandle::new(platform_repo),
         ]);
         let mut all_repos: Vec<RepositoryInterfaceHandle> =
             vec![RepositoryInterfaceHandle::new(installed_repo)];
-        for r in composer_ref
-            .get_repository_manager()
-            .borrow()
-            .get_repositories()
-        {
+        for r in composer_ref.get_repository_manager().get_repositories() {
             all_repos.push(r.clone());
         }
         let mut repos = CompositeRepository::new(all_repos);
@@ -190,8 +183,7 @@ impl Command for SearchCommand {
             CommandEvent::new(PluginEvents::COMMAND, "search", input.clone(), output);
         let command_event_name = command_event.get_name().to_owned();
         let dispatcher = composer_ref.get_event_dispatcher().clone();
-        drop(composer_ref);
-        dispatcher.borrow_mut().dispatch(
+        dispatcher.dispatch(
             Some(command_event_name.as_ref()),
             Some(std::rc::Rc::new(std::cell::RefCell::new(command_event))),
         )?;

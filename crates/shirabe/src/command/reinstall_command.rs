@@ -88,7 +88,6 @@ impl Command for ReinstallCommand {
         let io = self.get_io();
 
         let repository_manager = composer.get_repository_manager().clone();
-        let repository_manager = repository_manager.borrow();
         let local_repo = repository_manager.get_local_repository();
         let mut packages_to_reinstall: Vec<PackageInterfaceHandle> = vec![];
         let mut package_names_to_reinstall: Vec<bstr::BString> = vec![];
@@ -191,20 +190,20 @@ impl Command for ReinstallCommand {
             CommandEvent::new(PluginEvents::COMMAND, "reinstall", input.clone(), output);
         let command_event_name = command_event.get_name().to_owned();
         let event_dispatcher = composer.get_event_dispatcher();
-        event_dispatcher.borrow_mut().dispatch(
+        event_dispatcher.dispatch(
             Some(command_event_name.as_ref()),
             Some(std::rc::Rc::new(std::cell::RefCell::new(command_event))),
         )?;
 
         let config = composer.get_config();
         let (prefer_source, prefer_dist) =
-            self.get_preferred_install_options(&config.borrow(), input.clone(), false)?;
+            self.get_preferred_install_options(&config, input.clone(), false)?;
 
         let installation_manager = composer.get_installation_manager().clone();
         let download_manager = composer.get_download_manager();
         let package = composer.get_package();
 
-        installation_manager.borrow_mut().set_output_progress(
+        installation_manager.set_output_progress(
             !input
                 .borrow()
                 .get_option("no-progress")?
@@ -217,16 +216,16 @@ impl Command for ReinstallCommand {
             .as_bool()
             .unwrap_or(false)
         {
-            installation_manager.borrow_mut().disable_plugins();
+            installation_manager.disable_plugins();
         }
 
-        download_manager.borrow().set_prefer_source(prefer_source);
-        download_manager.borrow().set_prefer_dist(prefer_dist);
+        download_manager.set_prefer_source(prefer_source);
+        download_manager.set_prefer_dist(prefer_dist);
 
         let dev_mode = local_repo.get_dev_mode().unwrap_or(true);
 
         Platform::put_env("COMPOSER_DEV_MODE", if dev_mode { "1" } else { "0" })?;
-        event_dispatcher.borrow_mut().dispatch_script(
+        event_dispatcher.dispatch_script(
             ScriptEvents::PRE_INSTALL_CMD,
             dev_mode,
             vec![],
@@ -239,11 +238,9 @@ impl Command for ReinstallCommand {
             .collect();
         let repo = InstalledRepositoryInterfaceHandle::from_repository_handle(&local_repo);
         installation_manager
-            .borrow()
             .execute(&repo, uninstall_operations, dev_mode, true, false)
             .await?;
         installation_manager
-            .borrow()
             .execute(&repo, install_operations.clone(), dev_mode, true, false)
             .await?;
 
@@ -258,13 +255,13 @@ impl Command for ReinstallCommand {
                 .get_option("optimize-autoloader")?
                 .as_bool()
                 .unwrap_or(false)
-                || config.borrow().get_truthy("optimize-autoloader")?;
+                || config.get_truthy("optimize-autoloader")?;
             let authoritative = input
                 .borrow()
                 .get_option("classmap-authoritative")?
                 .as_bool()
                 .unwrap_or(false)
-                || config.borrow().get_truthy("classmap-authoritative")?;
+                || config.get_truthy("classmap-authoritative")?;
             let apcu_prefix = input
                 .borrow()
                 .get_option("apcu-autoloader-prefix")?
@@ -276,7 +273,7 @@ impl Command for ReinstallCommand {
                     .get_option("apcu-autoloader")?
                     .as_bool()
                     .unwrap_or(false)
-                || config.borrow().get_truthy("apcu-autoloader")?;
+                || config.get_truthy("apcu-autoloader")?;
 
             let autoload_generator = composer.get_autoload_generator();
             autoload_generator
@@ -289,7 +286,7 @@ impl Command for ReinstallCommand {
 
             let locker = composer.get_locker();
             autoload_generator.borrow().dump(
-                &config.borrow(),
+                &config,
                 local_repo.clone(),
                 package.clone(),
                 installation_manager.clone(),
@@ -301,7 +298,7 @@ impl Command for ReinstallCommand {
             )?;
         }
 
-        event_dispatcher.borrow_mut().dispatch_script(
+        event_dispatcher.dispatch_script(
             ScriptEvents::POST_INSTALL_CMD,
             dev_mode,
             vec![],

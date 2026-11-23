@@ -12,7 +12,7 @@ use crate::dependency_resolver::UpdateAllowTransitiveDeps;
 use crate::event_dispatcher::Callable;
 use crate::factory::Factory;
 use crate::installer::{Installer, InstallerEvents};
-use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface};
+use crate::io::{IOInterface, IOInterfaceWrite, io_interface};
 use crate::json::{JsonFile, JsonManipulator};
 use crate::package::loader::{ArrayLoader, RootPackageLoader};
 use crate::package::version::{VersionParser, VersionSelector};
@@ -159,7 +159,7 @@ impl RequireCommand {
         &self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: std::rc::Rc<dyn IOInterface>,
         requirements: &IndexMap<BString, BString>,
         require_key: &BStr,
         _remove_key: &BStr,
@@ -173,7 +173,7 @@ impl RequireCommand {
         // PHP: $composer->getEventDispatcher()->addListener(InstallerEvents::PRE_OPERATIONS_EXEC,
         //   function () use (&$dependencyResolutionCompleted) { $dependencyResolutionCompleted = true; }, 10000);
         let dependency_resolution_completed = self.dependency_resolution_completed.clone();
-        composer.get_event_dispatcher().borrow_mut().add_listener(
+        composer.get_event_dispatcher().add_listener(
             InstallerEvents::PRE_OPERATIONS_EXEC,
             Callable::Closure(std::rc::Rc::new(move |_event| {
                 dependency_resolution_completed.set(true);
@@ -247,19 +247,13 @@ impl RequireCommand {
             .get_option("optimize-autoloader")?
             .as_bool()
             .unwrap_or(false)
-            || composer
-                .get_config()
-                .borrow()
-                .get_truthy("optimize-autoloader")?;
+            || composer.get_config().get_truthy("optimize-autoloader")?;
         let authoritative = input
             .borrow()
             .get_option("classmap-authoritative")?
             .as_bool()
             .unwrap_or(false)
-            || composer
-                .get_config()
-                .borrow()
-                .get_truthy("classmap-authoritative")?;
+            || composer.get_config().get_truthy("classmap-authoritative")?;
         let apcu_prefix = input
             .borrow()
             .get_option("apcu-autoloader-prefix")?
@@ -271,10 +265,7 @@ impl RequireCommand {
                 .get_option("apcu-autoloader")?
                 .as_bool()
                 .unwrap_or(false)
-            || composer
-                .get_config()
-                .borrow()
-                .get_truthy("apcu-autoloader")?;
+            || composer.get_config().get_truthy("apcu-autoloader")?;
         let minimal_changes = input
             .borrow()
             .get_option("minimal-changes")?
@@ -282,7 +273,6 @@ impl RequireCommand {
             .unwrap_or(false)
             || composer
                 .get_config()
-                .borrow()
                 .get_truthy("update-with-minimal-changes")?;
 
         let mut update_allow_transitive_dependencies = UpdateAllowTransitiveDeps::UpdateOnlyListed;
@@ -325,29 +315,23 @@ impl RequireCommand {
         let command_event =
             CommandEvent::new(PluginEvents::COMMAND, "require", input.clone(), output);
         let command_event_name = command_event.get_name().to_owned();
-        composer.get_event_dispatcher().borrow_mut().dispatch(
+        composer.get_event_dispatcher().dispatch(
             Some(command_event_name.as_ref()),
             Some(std::rc::Rc::new(std::cell::RefCell::new(command_event))),
         )?;
 
-        composer
-            .get_installation_manager()
-            .borrow_mut()
-            .set_output_progress(
-                !input
-                    .borrow()
-                    .get_option("no-progress")?
-                    .as_bool()
-                    .unwrap_or(false),
-            );
+        composer.get_installation_manager().set_output_progress(
+            !input
+                .borrow()
+                .get_option("no-progress")?
+                .as_bool()
+                .unwrap_or(false),
+        );
 
         let mut install = Installer::create(io.clone(), &composer_handle);
 
-        let (prefer_source, prefer_dist) = self.get_preferred_install_options(
-            &composer.get_config().borrow(),
-            input.clone(),
-            false,
-        )?;
+        let (prefer_source, prefer_dist) =
+            self.get_preferred_install_options(&composer.get_config(), input.clone(), false)?;
 
         install
             .set_dry_run(
@@ -397,14 +381,12 @@ impl RequireCommand {
                     .as_bool()
                     .unwrap_or(false),
             )
-            .set_audit_config(
-                self.create_audit_config(&mut composer.get_config().borrow_mut(), input.clone())?,
-            )
+            .set_audit_config(self.create_audit_config(&composer.get_config(), input.clone())?)
             .set_minimal_update(minimal_changes);
 
         // if no lock is present, or the file is brand new, we do not do a
         // partial update as this is not supported by the Installer
-        if !self.first_require.get() && composer.get_locker().borrow_mut().is_locked() {
+        if !self.first_require.get() && composer.get_locker().is_locked() {
             install.set_update_allow_list(array_keys(requirements));
         }
 
@@ -443,7 +425,7 @@ impl RequireCommand {
     ) -> anyhow::Result<i64> {
         let composer = self.require_composer(None, None)?;
         let composer = composer_full(&composer);
-        let locker_is_locked = composer.get_locker().borrow_mut().is_locked();
+        let locker_is_locked = composer.get_locker().is_locked();
         let mut requirements: IndexMap<BString, BString> = IndexMap::new();
         let mut version_selector = VersionSelector::new(
             std::rc::Rc::new(std::cell::RefCell::new(RepositorySet::new(
@@ -457,16 +439,9 @@ impl RequireCommand {
             None,
         )?;
         let repo: RepositoryInterfaceHandle = if locker_is_locked {
-            composer
-                .get_locker()
-                .borrow_mut()
-                .get_locked_repository(true)?
-                .into()
+            composer.get_locker().get_locked_repository(true)?.into()
         } else {
-            composer
-                .get_repository_manager()
-                .borrow()
-                .get_local_repository()
+            composer.get_repository_manager().get_local_repository()
         };
         for package_name in requirements_to_update {
             let mut package = repo.find_package(
@@ -525,13 +500,13 @@ impl RequireCommand {
         if !dry_run {
             let json = self.json.borrow().as_ref().unwrap().clone();
             self.update_file(&json, &requirements, require_key, remove_key, sort_packages);
-            if locker_is_locked && composer.get_config().borrow().get_bool("lock") {
+            if locker_is_locked && composer.get_config().get_bool("lock") {
                 let stability_flags = RootPackageLoader::extract_stability_flags(
                     &(requirements),
                     bstr::BStr::new(&composer.get_package().get_minimum_stability()),
                     IndexMap::new(),
                 );
-                composer.get_locker().borrow_mut().update_hash(
+                composer.get_locker().update_hash(
                     &json.borrow(),
                     Some(Box::new(move |mut lock_data| {
                         let section = lock_data
@@ -835,10 +810,9 @@ impl Command for RequireCommand {
         let composer = self.require_composer(None, None)?;
         let composer = composer_full(&composer);
         let repository_manager = composer.get_repository_manager().clone();
-        let repository_manager = repository_manager.borrow();
         let repos = repository_manager.get_repositories();
 
-        let platform_overrides_map = composer.get_config().borrow().get_map("platform")?;
+        let platform_overrides_map = composer.get_config().get_map("platform")?;
         // initialize self.repos as it is used by the PackageDiscoveryTrait
         let platform_repo = PlatformRepositoryHandle::new(PlatformRepository::new(
             vec![],
@@ -1071,7 +1045,7 @@ impl Command for RequireCommand {
             .get_option("sort-packages")?
             .as_bool()
             .unwrap_or(false)
-            || composer.get_config().borrow().get_truthy("sort-packages")?;
+            || composer.get_config().get_truthy("sort-packages")?;
 
         self.first_require.set(self.newly_created.get());
         if !self.first_require.get() {

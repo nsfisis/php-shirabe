@@ -23,7 +23,7 @@ impl JsonConfigSource {
     }
 
     fn manipulate_json(
-        &mut self,
+        &self,
         clean: impl FnOnce(&mut JsonManipulator) -> anyhow::Result<bool>,
         fallback: impl FnOnce(&mut PhpMixed) -> anyhow::Result<()>,
     ) -> anyhow::Result<()> {
@@ -279,12 +279,7 @@ impl ConfigSourceInterface for JsonConfigSource {
         path_to_bytes(self.file.borrow().get_path()).into()
     }
 
-    fn add_repository(
-        &mut self,
-        name: &BStr,
-        config: PhpMixed,
-        append: bool,
-    ) -> anyhow::Result<()> {
+    fn add_repository(&self, name: &BStr, config: PhpMixed, append: bool) -> anyhow::Result<()> {
         let config_cloned = config.clone();
         self.manipulate_json(
             move |m| m.add_repository(name, config_cloned, append),
@@ -352,7 +347,7 @@ impl ConfigSourceInterface for JsonConfigSource {
     }
 
     fn insert_repository(
-        &mut self,
+        &self,
         name: &BStr,
         config: PhpMixed,
         reference_name: &BStr,
@@ -420,7 +415,7 @@ impl ConfigSourceInterface for JsonConfigSource {
         )
     }
 
-    fn set_repository_url(&mut self, name: &BStr, url: &BStr) -> anyhow::Result<()> {
+    fn set_repository_url(&self, name: &BStr, url: &BStr) -> anyhow::Result<()> {
         self.manipulate_json(
             move |m| m.set_repository_url(name, url),
             move |cfg| {
@@ -461,7 +456,7 @@ impl ConfigSourceInterface for JsonConfigSource {
         )
     }
 
-    fn remove_repository(&mut self, name: &BStr) -> anyhow::Result<()> {
+    fn remove_repository(&self, name: &BStr) -> anyhow::Result<()> {
         self.manipulate_json(
             move |m| m.remove_repository(name),
             move |cfg| {
@@ -492,7 +487,7 @@ impl ConfigSourceInterface for JsonConfigSource {
         )
     }
 
-    fn add_config_setting(&mut self, name: &BStr, value: PhpMixed) -> anyhow::Result<()> {
+    fn add_config_setting(&self, name: &BStr, value: PhpMixed) -> anyhow::Result<()> {
         let auth_config = self.auth_config;
         let value_cloned = value.clone();
         self.manipulate_json(
@@ -531,7 +526,7 @@ impl ConfigSourceInterface for JsonConfigSource {
         )
     }
 
-    fn remove_config_setting(&mut self, name: &BStr) -> anyhow::Result<()> {
+    fn remove_config_setting(&self, name: &BStr) -> anyhow::Result<()> {
         let auth_config = self.auth_config;
         self.manipulate_json(
             // override manipulator method for auth config files
@@ -567,7 +562,7 @@ impl ConfigSourceInterface for JsonConfigSource {
         )
     }
 
-    fn add_property(&mut self, name: &BStr, value: PhpMixed) -> anyhow::Result<()> {
+    fn add_property(&self, name: &BStr, value: PhpMixed) -> anyhow::Result<()> {
         let value_cloned = value.clone();
         self.manipulate_json(
             move |m| m.add_property(name, value_cloned),
@@ -610,7 +605,7 @@ impl ConfigSourceInterface for JsonConfigSource {
         )
     }
 
-    fn remove_property(&mut self, name: &BStr) -> anyhow::Result<()> {
+    fn remove_property(&self, name: &BStr) -> anyhow::Result<()> {
         self.manipulate_json(
             move |m| m.remove_property(name),
             move |cfg| {
@@ -647,7 +642,7 @@ impl ConfigSourceInterface for JsonConfigSource {
         )
     }
 
-    fn add_link(&mut self, r#type: &BStr, name: &BStr, value: &BStr) -> anyhow::Result<()> {
+    fn add_link(&self, r#type: &BStr, name: &BStr, value: &BStr) -> anyhow::Result<()> {
         self.manipulate_json(
             move |m| m.add_link(r#type, name, value, false),
             move |cfg| {
@@ -660,7 +655,7 @@ impl ConfigSourceInterface for JsonConfigSource {
         )
     }
 
-    fn remove_link(&mut self, r#type: &BStr, name: &BStr) -> anyhow::Result<()> {
+    fn remove_link(&self, r#type: &BStr, name: &BStr) -> anyhow::Result<()> {
         self.manipulate_json(
             move |m| m.remove_sub_node(r#type, name),
             move |cfg| {

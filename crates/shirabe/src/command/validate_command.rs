@@ -44,7 +44,7 @@ impl ValidateCommand {
     #[allow(clippy::too_many_arguments, reason = "to keep PHP signature")]
     fn output_result(
         &self,
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: std::rc::Rc<dyn IOInterface>,
         name: &BStr,
         errors: &mut Vec<BString>,
         warnings: &mut Vec<BString>,
@@ -287,14 +287,13 @@ impl Command for ValidateCommand {
         let composer =
             self.create_composer_instance(input.clone(), io.clone(), None, false, None)?;
         let composer = composer_full(&composer);
-        let check_lock = (check_lock && composer.get_config().borrow().get_bool("lock"))
+        let check_lock = (check_lock && composer.get_config().get_bool("lock"))
             || input
                 .borrow()
                 .get_option("check-lock")?
                 .as_bool()
                 .unwrap_or(false);
         let locker = composer.get_locker().clone();
-        let mut locker = locker.borrow_mut();
         if locker.is_locked() && !locker.is_fresh()? {
             lock_errors.push(BString::from("- The lock file is not up to date with the latest changes in composer.json, it is recommended that you run `shirabe update` or `shirabe update <package name>`."));
         }
@@ -334,13 +333,11 @@ impl Command for ValidateCommand {
         {
             let packages = composer
                 .get_repository_manager()
-                .borrow()
                 .get_local_repository()
                 .get_packages()?;
             for package in packages {
                 let path = composer
                     .get_installation_manager()
-                    .borrow_mut()
                     .get_install_path(package.clone())?;
                 let path = match path {
                     Some(p) => p,
@@ -377,7 +374,7 @@ impl Command for ValidateCommand {
 
         let command_event = CommandEvent::new(PluginEvents::COMMAND, "validate", input, output);
         let command_event_name = command_event.get_name().to_owned();
-        let event_code = composer.get_event_dispatcher().borrow_mut().dispatch(
+        let event_code = composer.get_event_dispatcher().dispatch(
             Some(command_event_name.as_ref()),
             Some(std::rc::Rc::new(std::cell::RefCell::new(command_event))),
         )?;

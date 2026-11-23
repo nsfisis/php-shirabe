@@ -25,10 +25,9 @@ fn get_package(name: &BStr, version: &BStr) -> PackageInterfaceHandle {
 /// ref: ArchiveDownloaderTest::getArchiveDownloaderMock (the inherited getFileName/processUrl
 /// live on FileDownloader, so the concrete downloader is built directly).
 fn get_archive_downloader(vendor_dir: Option<&BStr>) -> FileDownloader {
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
-        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
+    let io: std::rc::Rc<dyn IOInterface> = std::rc::Rc::new(NullIO::new());
 
-    let mut config = Config::new(false, None);
+    let config = Config::new(false, None);
     if let Some(vendor_dir) = vendor_dir {
         let mut config_options: IndexMap<BString, PhpMixed> = IndexMap::new();
         config_options.insert(
@@ -39,7 +38,7 @@ fn get_archive_downloader(vendor_dir: Option<&BStr>) -> FileDownloader {
         merged.insert("config".into(), PhpMixed::Array(config_options));
         config.merge(&merged, "test");
     }
-    let config = std::rc::Rc::new(std::cell::RefCell::new(config));
+    let config = std::rc::Rc::new(config);
 
     let http_downloader = std::rc::Rc::new(std::cell::RefCell::new(
         HttpDownloader::new(

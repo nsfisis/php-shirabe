@@ -22,6 +22,7 @@ use Shirabe\Lint\Linters\NoStdCollectionsMaps;
 use Shirabe\Lint\Linters\NoSuperPath;
 use Shirabe\Lint\Linters\NoUseAsAlias;
 use Shirabe\Lint\Linters\OneUsePerModule;
+use Shirabe\Lint\Linters\PhpObjectModel;
 use Shirabe\Lint\Linters\PhpSrcDerivationBoundary;
 use Shirabe\Lint\Linters\PhpThrowConversion;
 use Shirabe\Lint\Linters\PluginClassification;
@@ -94,6 +95,7 @@ $runner = new Runner($rootDir, [
     ]],
     [new NoUseAsAlias(), []],
     [new OneUsePerModule(), []],
+    [new PhpObjectModel(), []],
     [new PhpSrcDerivationBoundary(), []],
     [new PhpThrowConversion(), [
         // Defines `error_throw`, the one place an error without an exception is described.

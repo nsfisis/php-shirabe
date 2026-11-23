@@ -3,9 +3,11 @@
 use bstr::{BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe::config::Config;
-use shirabe::io::{BufferIO, IOInterface, IOInterfaceImmutable, IOInterfaceMutable, io_interface};
+use shirabe::io::{BufferIO, IOInterface, io_interface};
 use shirabe::util::Platform;
-use shirabe_php_shim::{PHP_EOL, bformat, php_regex, preg_is_match, preg_quote, preg_split};
+use shirabe_php_shim::{
+    PHP_EOL, PhpProp, bformat, php_regex, preg_is_match, preg_quote, preg_split,
+};
 use shirabe_symfony_console::input::InputValue;
 use shirabe_symfony_console::output::output_interface;
 
@@ -68,9 +70,9 @@ impl Expectation {
 #[derive(Debug)]
 pub struct IOMock {
     inner: BufferIO,
-    expectations: Option<Vec<Expectation>>,
-    strict: bool,
-    auth_log: Vec<(bstr::BString, bstr::BString, Option<bstr::BString>)>,
+    expectations: PhpProp<Option<Vec<Expectation>>>,
+    strict: PhpProp<bool>,
+    auth_log: PhpProp<Vec<(bstr::BString, bstr::BString, Option<bstr::BString>)>>,
 }
 
 impl IOMock {
@@ -86,14 +88,14 @@ impl IOMock {
 
         Ok(Self {
             inner: BufferIO::new("", sf_verbosity, None)?,
-            expectations: None,
-            strict: false,
-            auth_log: Vec::new(),
+            expectations: PhpProp::new(None),
+            strict: PhpProp::new(false),
+            auth_log: PhpProp::default(),
         })
     }
 
     // `$strict` set to true requires *all* expected messages, not just a subset.
-    pub fn expects(&mut self, expectations: Vec<Expectation>, strict: bool) -> anyhow::Result<()> {
+    pub fn expects(&self, expectations: Vec<Expectation>, strict: bool) -> anyhow::Result<()> {
         let inputs: Vec<BString> = expectations
             .iter()
             .filter_map(|expect| match expect {
@@ -106,8 +108,8 @@ impl IOMock {
             self.inner.set_user_inputs(inputs)?;
         }
 
-        self.expectations = Some(expectations);
-        self.strict = strict;
+        self.expectations.set(Some(expectations));
+        self.strict.set(strict);
 
         Ok(())
     }
@@ -120,7 +122,7 @@ impl IOMock {
         }
 
         // Not configured to expect anything, so there is nothing to verify.
-        let Some(expectations) = &self.expectations else {
+        let Some(expectations) = &self.expectations.cloned() else {
             return;
         };
 
@@ -133,7 +135,7 @@ impl IOMock {
                 bstr::BString,
                 bstr::BString,
                 Option<bstr::BString>,
-            )> = self.auth_log.clone().into();
+            )> = self.auth_log.cloned().into();
 
             'expects: for expect in expectations {
                 if let Expectation::Auth {
@@ -148,7 +150,7 @@ impl IOMock {
                             continue 'expects;
                         }
 
-                        if self.strict {
+                        if self.strict.cloned() {
                             panic!(
                                 "IO authentication mismatch. Expected:\n{expected:?}\nGot:\n{auth:?}"
                             );
@@ -176,7 +178,7 @@ impl IOMock {
                         continue 'expects;
                     }
 
-                    if self.strict {
+                    if self.strict.cloned() {
                         panic!(
                             "IO output mismatch. Expected:\n{}\nGot:\n{}",
                             label.display_lossy(),
@@ -191,7 +193,7 @@ impl IOMock {
                     output.display_lossy()
                 );
             }
-        } else if !output.is_empty() && self.strict {
+        } else if !output.is_empty() && self.strict.cloned() {
             panic!(
                 "There was strictly no output expected but some output occurred: {}",
                 output.display_lossy()
@@ -200,7 +202,7 @@ impl IOMock {
     }
 }
 
-impl IOInterfaceImmutable for IOMock {
+impl IOInterface for IOMock {
     fn is_interactive(&self) -> bool {
         self.inner.is_interactive()
     }
@@ -321,30 +323,27 @@ impl IOInterfaceImmutable for IOMock {
     fn debug_bytes(&self, message: &bstr::BStr, context: &[(&bstr::BStr, &bstr::BStr)]) {
         self.inner.debug_bytes(message, context)
     }
-}
 
-impl IOInterfaceMutable for IOMock {
     fn set_authentication(
-        &mut self,
+        &self,
         repository_name: bstr::BString,
         username: bstr::BString,
         password: Option<bstr::BString>,
     ) {
-        self.auth_log
-            .push((repository_name.clone(), username.clone(), password.clone()));
+        self.auth_log.update(|auth_log| {
+            auth_log.push((repository_name.clone(), username.clone(), password.clone()))
+        });
         self.inner
             .set_authentication(repository_name, username, password)
     }
-    fn load_configuration(&mut self, config: &mut Config) -> anyhow::Result<()> {
+    fn load_configuration(&self, config: &Config) -> anyhow::Result<()> {
         self.inner.load_configuration(config)
     }
-}
 
-impl IOInterface for IOMock {
     fn as_any(&self) -> &dyn std::any::Any {
         self
     }
-    fn as_base_io_mut(&mut self) -> Option<&mut dyn shirabe::io::BaseIO> {
+    fn as_base_io(&self) -> Option<&dyn shirabe::io::BaseIO> {
         Some(self)
     }
 }
@@ -352,17 +351,15 @@ impl IOInterface for IOMock {
 impl shirabe::io::BaseIO for IOMock {
     fn authentications(
         &self,
-    ) -> &indexmap::IndexMap<bstr::BString, indexmap::IndexMap<bstr::BString, Option<bstr::BString>>>
-    {
-        self.inner.authentications()
-    }
-    fn authentications_mut(
-        &mut self,
-    ) -> &mut indexmap::IndexMap<
-        bstr::BString,
-        indexmap::IndexMap<bstr::BString, Option<bstr::BString>>,
+    ) -> &PhpProp<
+        std::rc::Rc<
+            indexmap::IndexMap<
+                bstr::BString,
+                indexmap::IndexMap<bstr::BString, Option<bstr::BString>>,
+            >,
+        >,
     > {
-        self.inner.authentications_mut()
+        self.inner.authentications()
     }
 }
 
@@ -373,7 +370,7 @@ fn with_eol(question: &bstr::BStr) -> bstr::BString {
     )
 }
 
-pub struct IOMockGuard(std::rc::Rc<std::cell::RefCell<IOMock>>);
+pub struct IOMockGuard(std::rc::Rc<IOMock>);
 
 impl Drop for IOMockGuard {
     fn drop(&mut self) {
@@ -381,15 +378,13 @@ impl Drop for IOMockGuard {
         if std::thread::panicking() {
             return;
         }
-        self.0.borrow().assert_complete();
+        self.0.assert_complete();
     }
 }
 
 // For testing only. Mirrors TestCase::getIOMock: returns a shared IOMock handle
 // plus a guard that runs assert_complete when it drops at the end of the test scope.
-pub fn get_io_mock(
-    verbosity: i64,
-) -> anyhow::Result<(std::rc::Rc<std::cell::RefCell<IOMock>>, IOMockGuard)> {
-    let mock = std::rc::Rc::new(std::cell::RefCell::new(IOMock::new(verbosity)?));
+pub fn get_io_mock(verbosity: i64) -> anyhow::Result<(std::rc::Rc<IOMock>, IOMockGuard)> {
+    let mock = std::rc::Rc::new(IOMock::new(verbosity)?);
     Ok((mock.clone(), IOMockGuard(mock)))
 }

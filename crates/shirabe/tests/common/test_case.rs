@@ -241,26 +241,22 @@ impl Drop for RestoreEnv {
     }
 }
 
-fn null_io() -> std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
-    std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()))
+fn null_io() -> std::rc::Rc<dyn IOInterface> {
+    std::rc::Rc::new(NullIO::new())
 }
 
 /// ref: FactoryMock::createInstallationManager (the real installers are never created in tests, so a
 /// bare InstallationManager over a mock HttpDownloader suffices).
 pub(crate) fn installation_manager(
-    io: &std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-) -> std::rc::Rc<std::cell::RefCell<InstallationManager>> {
-    let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(false, None)));
+    io: &std::rc::Rc<dyn IOInterface>,
+) -> std::rc::Rc<InstallationManager> {
+    let config = std::rc::Rc::new(Config::new(false, None));
     let http_downloader = std::rc::Rc::new(std::cell::RefCell::new(HttpDownloader::__new_mock(
         io.clone(),
         config,
     )));
     let r#loop = std::rc::Rc::new(std::cell::RefCell::new(Loop::new(http_downloader, None)));
-    std::rc::Rc::new(std::cell::RefCell::new(InstallationManager::__new_mock(
-        r#loop,
-        io.clone(),
-        None,
-    )))
+    std::rc::Rc::new(InstallationManager::__new_mock(r#loop, io.clone(), None))
 }
 
 /// ref: TestCase::createInstalledJson
@@ -288,7 +284,7 @@ pub fn create_installed_json(
 
     let io = null_io();
     let im = installation_manager(&io);
-    repo.write(dev_mode, &im.borrow()).unwrap();
+    repo.write(dev_mode, &im).unwrap();
 }
 
 /// ref: TestCase::createComposerLock
@@ -305,7 +301,7 @@ pub fn create_composer_lock(
     let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
         io.clone(),
     ))));
-    let mut locker = Locker::new(
+    let locker = Locker::new(
         io.clone(),
         json_file,
         installation_manager(&io),

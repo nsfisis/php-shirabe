@@ -81,7 +81,7 @@ impl Command for DumpAutoloadCommand {
             output,
         );
         let command_event_name = command_event.get_name().to_owned();
-        composer.get_event_dispatcher().borrow_mut().dispatch(
+        composer.get_event_dispatcher().dispatch(
             Some(command_event_name.as_ref()),
             Some(std::rc::Rc::new(std::cell::RefCell::new(command_event))),
         )?;
@@ -90,14 +90,10 @@ impl Command for DumpAutoloadCommand {
 
         let mut missing_dependencies = false;
         {
-            let local_repo = composer
-                .get_repository_manager()
-                .borrow()
-                .get_local_repository();
+            let local_repo = composer.get_repository_manager().get_local_repository();
             for local_pkg in local_repo.get_canonical_packages()? {
                 let install_path = composer
                     .get_installation_manager()
-                    .borrow_mut()
                     .get_install_path(local_pkg)?;
                 if install_path.as_deref().is_some_and(|p| !file_exists(p)) {
                     missing_dependencies = true;
@@ -112,13 +108,13 @@ impl Command for DumpAutoloadCommand {
             .get_option("optimize")?
             .as_bool()
             .unwrap_or(false)
-            || config.borrow().get_truthy("optimize-autoloader")?;
+            || config.get_truthy("optimize-autoloader")?;
         let authoritative = input
             .borrow()
             .get_option("classmap-authoritative")?
             .as_bool()
             .unwrap_or(false)
-            || config.borrow().get_truthy("classmap-authoritative")?;
+            || config.get_truthy("classmap-authoritative")?;
         let apcu_prefix = input
             .borrow()
             .get_option("apcu-prefix")?
@@ -130,7 +126,7 @@ impl Command for DumpAutoloadCommand {
                 .get_option("apcu")?
                 .as_bool()
                 .unwrap_or(false)
-            || config.borrow().get_truthy("apcu-autoloader")?;
+            || config.get_truthy("apcu-autoloader")?;
 
         if input
             .borrow()
@@ -225,18 +221,14 @@ impl Command for DumpAutoloadCommand {
             .as_bool()
             .unwrap_or(false);
 
-        let local_repo_handle = composer
-            .get_repository_manager()
-            .borrow()
-            .get_local_repository();
+        let local_repo_handle = composer.get_repository_manager().get_local_repository();
         let package = composer.get_package().clone();
         let installation_manager = composer.get_installation_manager();
         let locker = composer.get_locker();
         let autoload_generator = composer.get_autoload_generator();
 
-        let config_ref = config.borrow();
         let class_map = autoload_generator.borrow().dump(
-            &config_ref,
+            &config,
             local_repo_handle,
             package,
             installation_manager,

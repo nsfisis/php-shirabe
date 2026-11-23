@@ -20,9 +20,7 @@ use crate::event_dispatcher::ScriptExecutionException;
 use crate::exception::NoSslException;
 use crate::factory::{DisablePlugins, Factory};
 use crate::installer::Installer;
-use crate::io::{
-    ConsoleIO, IOInterface, IOInterfaceImmutable, IOInterfaceWrite, NullIO, io_interface,
-};
+use crate::io::{ConsoleIO, IOInterface, IOInterfaceWrite, NullIO, io_interface};
 use crate::json::JsonValidationException;
 use crate::php_worker::console::{
     RustCommandMetadata, extend_console_application_commands,
@@ -101,7 +99,7 @@ pub struct Application {
     single_command: bool,
     // $initialized is omitted. See ApplicationHandle::init().
     composer: Option<PartialComposerHandle>,
-    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    io: std::rc::Rc<dyn IOInterface>,
     has_plugin_commands: bool,
     /// Whether this application published the worker-side console application handoff. The
     /// handoff is process-wide, so a second application in the same process must replace it
@@ -138,8 +136,7 @@ impl Application {
         // is loaded. Xdebug can only be loaded into the PHP worker, which is spawned with both
         // settings instead (see `php_worker::xdebug::add_worker_settings`).
 
-        let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
-            std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
+        let io: std::rc::Rc<dyn IOInterface> = std::rc::Rc::new(NullIO::new());
 
         // TODO(php-runtime): Composer registers shutdown function that reports special message for
         // OOM. In Shirabe, limit of memory allocation has effect only on PHP side so that the
@@ -220,18 +217,15 @@ impl Application {
         let disk_hint_msg: Option<BString> = (|| -> anyhow::Result<Option<BString>> {
             let composer = self.get_composer(false, Some(true), None)?;
             if let Some(composer) = composer {
-                let composer = composer.borrow_partial();
                 let config = composer.get_config();
 
                 let min_space_free: f64 = 100.0 * 1024.0 * 1024.0;
                 let mut dir = path_from_bytes(config
-                    .borrow()
                     .get_home()?.as_bstr()).to_path_buf();
                 let df = disk_free_space(&dir);
                 let mut hit = df.map(|d| d < min_space_free).unwrap_or(false);
                 if !hit {
                     dir = path_from_bytes(config
-                        .borrow()
                         .get_path("vendor-dir")?.as_bstr()).to_path_buf();
                     let df = disk_free_space(&dir);
                     hit = df.map(|d| d < min_space_free).unwrap_or(false);
@@ -335,9 +329,9 @@ impl Application {
         let disable_scripts = disable_scripts.unwrap_or(self.disable_scripts_by_default);
 
         if self.composer.is_none() {
-            let io_for_factory: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+            let io_for_factory: std::rc::Rc<dyn IOInterface> =
                 if Platform::is_input_completion_process() {
-                    std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()))
+                    std::rc::Rc::new(NullIO::new())
                 } else {
                     self.io.clone()
                 };
@@ -382,12 +376,12 @@ impl Application {
     pub fn reset_composer(&mut self) {
         self.composer = None;
         let io = self.get_io();
-        if let Some(base_io) = io.borrow_mut().as_base_io_mut() {
+        if let Some(base_io) = io.as_base_io() {
             base_io.reset_authentications();
         }
     }
 
-    pub fn get_io(&self) -> std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
+    pub fn get_io(&self) -> std::rc::Rc<dyn IOInterface> {
         self.io.clone()
     }
 
@@ -539,7 +533,7 @@ impl Application {
             let composer = composer
                 .as_full()
                 .expect("Factory::create and Factory::create_global build a full Composer");
-            let pm = composer.borrow().get_plugin_manager();
+            let pm = composer.get_plugin_manager();
             let mut ctor_args: IndexMap<BString, shirabe_php_rpc::RpcValue> = IndexMap::new();
             ctor_args.insert(
                 BString::from("composer"),
@@ -1871,11 +1865,11 @@ impl ApplicationHandle {
             input.borrow_mut().set_interactive(false);
         }
 
-        application.borrow_mut().io = std::rc::Rc::new(std::cell::RefCell::new(ConsoleIO::new(
+        application.borrow_mut().io = std::rc::Rc::new(ConsoleIO::new(
             input.clone(),
             output.clone(),
             QuestionHelper::default(),
-        )));
+        ));
         let io = application.borrow().io.clone();
 
         // Register error handler again to pass it the IO instance
@@ -2285,11 +2279,7 @@ impl ApplicationHandle {
 
                                     let loader = generator.create_loader(
                                         &map,
-                                        composer
-                                            .get_config()
-                                            .borrow()
-                                            .get_path("vendor-dir")
-                                            .map(Some)?,
+                                        composer.get_config().get_path("vendor-dir").map(Some)?,
                                     )?;
                                     ClassLoader::register(&loader, false);
                                 }
@@ -2315,7 +2305,6 @@ impl ApplicationHandle {
                                                 Some(ref composer_handle) => {
                                                     composer_full(composer_handle)
                                                         .get_config()
-                                                        .borrow()
                                                         .get_path("cache-dir")?
                                                 }
                                                 None => {
@@ -2411,7 +2400,7 @@ impl ApplicationHandle {
         let result_outcome: anyhow::Result<i32> = async {
             if input.borrow().has_parameter_option(&["--profile"], false) {
                 start_time = Some(microtime());
-                io.borrow_mut().enable_debugging(start_time.unwrap());
+                io.enable_debugging(start_time.unwrap());
             }
 
             let result = self.base_do_run(input.clone(), output.clone()).await?;

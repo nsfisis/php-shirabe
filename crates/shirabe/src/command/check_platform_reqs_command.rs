@@ -227,22 +227,13 @@ impl Command for CheckPlatformReqsCommand {
                 "<info>Checking {}platform requirements using the lock file</info>",
                 if no_dev { "non-dev " } else { "" }
             ));
-            composer
-                .get_locker()
-                .borrow_mut()
-                .get_locked_repository(!no_dev)?
-                .into()
+            composer.get_locker().get_locked_repository(!no_dev)?.into()
         } else {
             let repository_manager = composer.get_repository_manager().clone();
-            let repository_manager = repository_manager.borrow();
             let local_repo = repository_manager.get_local_repository();
             if local_repo.get_packages()?.is_empty() {
                 io.write_error(bformat!("<warning>No vendor dir present, checking {}platform requirements from the lock file</warning>", if no_dev { "non-dev " } else { "" }));
-                composer
-                    .get_locker()
-                    .borrow_mut()
-                    .get_locked_repository(!no_dev)?
-                    .into()
+                composer.get_locker().get_locked_repository(!no_dev)?.into()
             } else {
                 if no_dev {
                     remove_packages = local_repo.get_dev_package_names();
@@ -265,7 +256,7 @@ impl Command for CheckPlatformReqsCommand {
         }
 
         let root_pkg_repo =
-            RootPackageRepository::new(RootPackageInterfaceHandle::dup(composer.get_package()));
+            RootPackageRepository::new(RootPackageInterfaceHandle::dup(&composer.get_package()));
         let mut installed_repo = InstalledRepository::new(vec![
             installed_repo_base,
             RepositoryInterfaceHandle::new(root_pkg_repo),

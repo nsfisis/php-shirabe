@@ -21,7 +21,6 @@ use shirabe_symfony_console::output::VERBOSITY_NORMAL;
 fn test_capture_authentication_params_from_url() {
     let (io_mock, _io_guard) = get_io_mock(io_interface::NORMAL).unwrap();
     io_mock
-        .borrow_mut()
         .expects(
             vec![Expectation::auth(
                 "github.com",
@@ -33,12 +32,12 @@ fn test_capture_authentication_params_from_url() {
         .unwrap();
 
     // The PHP Config mock returns [] for github-domains/gitlab-domains.
-    let config: std::rc::Rc<std::cell::RefCell<Config>> = ConfigStubBuilder::new()
+    let config: std::rc::Rc<Config> = ConfigStubBuilder::new()
         .with("github-domains", PhpMixed::Array(IndexMap::new()))
         .with("gitlab-domains", PhpMixed::Array(IndexMap::new()))
         .build_shared();
 
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io_mock;
+    let io: std::rc::Rc<dyn IOInterface> = io_mock;
 
     Platform::put_env("COMPOSER_DISABLE_NETWORK", "1").unwrap();
     let fs = HttpDownloader::new(
@@ -61,13 +60,12 @@ fn test_capture_authentication_params_from_url() {
 
 #[test]
 fn test_output_warnings() {
-    let io: std::rc::Rc<std::cell::RefCell<BufferIO>> = std::rc::Rc::new(std::cell::RefCell::new(
-        BufferIO::new(BString::default(), VERBOSITY_NORMAL, None).unwrap(),
-    ));
-    let io_dyn: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io.clone();
+    let io: std::rc::Rc<BufferIO> =
+        std::rc::Rc::new(BufferIO::new(BString::default(), VERBOSITY_NORMAL, None).unwrap());
+    let io_dyn: std::rc::Rc<dyn IOInterface> = io.clone();
 
     HttpDownloader::output_warnings(io_dyn.clone(), "$URL", &IndexMap::new()).unwrap();
-    assert_eq!("", io.borrow().get_output());
+    assert_eq!("", io.get_output());
 
     let mut data: IndexMap<BString, PhpMixed> = IndexMap::new();
     data.insert(
@@ -140,7 +138,7 @@ fn test_output_warnings() {
         bformat!(
             "<warning>Warning from $URL: old warning msg</warning>{PHP_EOL}Info from $URL: old info msg{PHP_EOL}<warning>Warning from $URL: visible warning</warning>{PHP_EOL}Info from $URL: visible info{PHP_EOL}"
         ),
-        io.borrow().get_output()
+        io.get_output()
     );
 }
 
@@ -148,10 +146,9 @@ fn test_output_warnings() {
 // StreamContextFactory::getTlsDefaults(), which Factory::createHttpDownloader() catches.
 #[test]
 fn test_constructor_rejects_an_unreadable_cafile() {
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = std::rc::Rc::new(
-        std::cell::RefCell::new(BufferIO::new("", VERBOSITY_NORMAL, None).unwrap()),
-    );
-    let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(false, None)));
+    let io: std::rc::Rc<dyn IOInterface> =
+        std::rc::Rc::new(BufferIO::new("", VERBOSITY_NORMAL, None).unwrap());
+    let config = std::rc::Rc::new(Config::new(false, None));
     let mut ssl = IndexMap::new();
     ssl.insert(
         BString::from("cafile"),

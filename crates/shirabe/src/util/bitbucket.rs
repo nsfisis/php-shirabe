@@ -13,8 +13,8 @@ use shirabe_php_shim::{
 
 #[derive(Debug)]
 pub struct Bitbucket {
-    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-    config: std::rc::Rc<std::cell::RefCell<Config>>,
+    io: std::rc::Rc<dyn IOInterface>,
+    config: std::rc::Rc<Config>,
     process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
     token: Option<IndexMap<BString, PhpMixed>>,
@@ -26,8 +26,8 @@ impl Bitbucket {
         php_str(b"https://bitbucket.org/site/oauth2/access_token");
 
     pub fn new(
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        io: std::rc::Rc<dyn IOInterface>,
+        config: std::rc::Rc<Config>,
         process: Option<std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,
         http_downloader: Option<std::rc::Rc<std::cell::RefCell<HttpDownloader>>>,
         time: Option<i64>,
@@ -79,7 +79,7 @@ impl Bitbucket {
         )? == 0
         {
             let output_str = trim(output.as_string().unwrap_or_default());
-            self.io.borrow_mut().set_authentication(
+            self.io.set_authentication(
                 origin_url.into(),
                 BString::from("x-token-auth"),
                 Some(output_str),
@@ -164,11 +164,10 @@ impl Bitbucket {
 
         let local_auth_config_name: Option<BString> = self
             .config
-            .borrow()
             .get_local_auth_config_source()
             .map(|c| c.get_name());
         let has_local_auth_config = local_auth_config_name.is_some();
-        let auth_config_source_name = self.config.borrow().get_auth_config_source().get_name();
+        let auth_config_source_name = self.config.get_auth_config_source().get_name();
         let url =
             "https://support.atlassian.com/bitbucket-cloud/docs/use-oauth-on-bitbucket-cloud/";
         self.io.write_error("Follow the instructions here:");
@@ -214,7 +213,7 @@ impl Bitbucket {
             return Ok(false);
         }
 
-        self.io.borrow_mut().set_authentication(
+        self.io.set_authentication(
             origin_url.into(),
             consumer_key.clone(),
             Some(consumer_secret.clone()),
@@ -230,8 +229,7 @@ impl Bitbucket {
         self.store_in_auth_config(origin_url, consumer_key.as_ref(), consumer_secret.as_ref())?;
 
         self.config
-            .borrow_mut()
-            .get_auth_config_source_mut()
+            .get_auth_config_source()
             .remove_config_setting(bstr::BStr::new(&bformat!("http-basic.{origin_url}")))?;
 
         self.io
@@ -257,7 +255,7 @@ impl Bitbucket {
                 .unwrap_or_default());
         }
 
-        self.io.borrow_mut().set_authentication(
+        self.io.set_authentication(
             origin_url.into(),
             consumer_key.into(),
             Some(consumer_secret.into()),
@@ -293,8 +291,7 @@ impl Bitbucket {
         consumer_secret: &BStr,
     ) -> anyhow::Result<()> {
         self.config
-            .borrow_mut()
-            .get_config_source_mut()
+            .get_config_source()
             .remove_config_setting(bstr::BStr::new(&bformat!("bitbucket-oauth.{origin_url}")))?;
 
         let token = self.token.as_ref().ok_or_else(|| {
@@ -330,19 +327,16 @@ impl Bitbucket {
             PhpMixed::Int(t + expires_in),
         );
 
-        self.config
-            .borrow_mut()
-            .get_auth_config_source_mut()
-            .add_config_setting(
-                bstr::BStr::new(&bformat!("bitbucket-oauth.{origin_url}")),
-                PhpMixed::Array(consumer),
-            )?;
+        self.config.get_auth_config_source().add_config_setting(
+            bstr::BStr::new(&bformat!("bitbucket-oauth.{origin_url}")),
+            PhpMixed::Array(consumer),
+        )?;
 
         Ok(())
     }
 
     fn get_token_from_config(&mut self, origin_url: &BStr) -> anyhow::Result<bool> {
-        let auth_config = self.config.borrow().get("bitbucket-oauth")?;
+        let auth_config = self.config.get("bitbucket-oauth")?;
 
         let auth_map = match auth_config.as_array() {
             Some(m) => m.clone(),

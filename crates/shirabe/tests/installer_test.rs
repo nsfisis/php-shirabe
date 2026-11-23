@@ -161,14 +161,14 @@ struct StubEventDispatcher;
 
 impl EventDispatcherInterface for StubEventDispatcher {
     fn dispatch(
-        &mut self,
+        &self,
         _event_name: Option<&bstr::BStr>,
         _event: Option<std::rc::Rc<std::cell::RefCell<dyn EventInterface>>>,
     ) -> anyhow::Result<i64> {
         Ok(0)
     }
     fn dispatch_script(
-        &mut self,
+        &self,
         _event_name: &bstr::BStr,
         _dev_mode: bool,
         _additional_args: Vec<bstr::BString>,
@@ -177,7 +177,7 @@ impl EventDispatcherInterface for StubEventDispatcher {
         Ok(0)
     }
     fn dispatch_installer_event(
-        &mut self,
+        &self,
         _event_name: &bstr::BStr,
         _dev_mode: bool,
         _execute_operations: bool,
@@ -185,15 +185,15 @@ impl EventDispatcherInterface for StubEventDispatcher {
     ) -> anyhow::Result<i64> {
         Ok(0)
     }
-    fn add_listener(&mut self, _event_name: &bstr::BStr, _listener: Callable, _priority: i64) {}
+    fn add_listener(&self, _event_name: &bstr::BStr, _listener: Callable, _priority: i64) {}
     fn add_subscriber(
-        &mut self,
+        &self,
         _subscriber: &dyn shirabe::event_dispatcher::EventSubscriberInterface,
     ) -> anyhow::Result<()> {
         Ok(())
     }
-    fn remove_listener(&mut self, _listener: &shirabe_php_rpc::PhpEntityHandle) {}
-    fn has_event_listeners(&mut self, _event: &dyn EventInterface) -> bool {
+    fn remove_listener(&self, _listener: &shirabe_php_rpc::PhpEntityHandle) {}
+    fn has_event_listeners(&self, _event: &dyn EventInterface) -> bool {
         false
     }
 }
@@ -220,22 +220,18 @@ impl AutoloadGeneratorInterface for StubAutoloadGenerator {
         _config: &Config,
         _local_repo: shirabe::repository::RepositoryInterfaceHandle,
         _root_package: RootPackageInterfaceHandle,
-        _installation_manager: std::rc::Rc<
-            std::cell::RefCell<dyn shirabe::installer::InstallationManagerInterface>,
-        >,
+        _installation_manager: std::rc::Rc<dyn shirabe::installer::InstallationManagerInterface>,
         _target_dir: &bstr::BStr,
         _scan_psr_packages: bool,
         _suffix: Option<bstr::BString>,
-        _locker: Option<std::rc::Rc<std::cell::RefCell<dyn LockerInterface>>>,
+        _locker: Option<std::rc::Rc<dyn LockerInterface>>,
         _strict_ambiguous: bool,
     ) -> anyhow::Result<ClassMap> {
         Ok(ClassMap::new())
     }
     fn build_package_map(
         &self,
-        _installation_manager: std::rc::Rc<
-            std::cell::RefCell<dyn shirabe::installer::InstallationManagerInterface>,
-        >,
+        _installation_manager: std::rc::Rc<dyn shirabe::installer::InstallationManagerInterface>,
         _root_package: RootPackageInterfaceHandle,
         _packages: Vec<PackageInterfaceHandle>,
     ) -> anyhow::Result<Vec<(PackageInterfaceHandle, Option<std::path::PathBuf>)>> {
@@ -395,10 +391,9 @@ fn test_installer() {
     let _tear_down = TearDown::new();
 
     for case in provide_installer() {
-        let io_buffer = std::rc::Rc::new(std::cell::RefCell::new(
-            BufferIO::new(BString::default(), VERBOSITY_NORMAL, None).unwrap(),
-        ));
-        let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io_buffer.clone();
+        let io_buffer =
+            std::rc::Rc::new(BufferIO::new(BString::default(), VERBOSITY_NORMAL, None).unwrap());
+        let io: std::rc::Rc<dyn IOInterface> = io_buffer.clone();
 
         let config = ConfigStubBuilder::new()
             .with("vendor-dir", PhpMixed::string(BString::from("foo")))
@@ -406,14 +401,14 @@ fn test_installer() {
             .with("notify-on-install", PhpMixed::Bool(true))
             .build_shared();
 
-        let download_manager: std::rc::Rc<std::cell::RefCell<dyn DownloadManagerInterface>> =
-            std::rc::Rc::new(std::cell::RefCell::new(StubDownloadManager));
+        let download_manager: std::rc::Rc<dyn DownloadManagerInterface> =
+            std::rc::Rc::new(StubDownloadManager);
 
         let http_downloader = std::rc::Rc::new(std::cell::RefCell::new(
             HttpDownloader::__new_mock(io.clone(), config.clone()),
         ));
 
-        let mut repository_manager = RepositoryManager::new(
+        let repository_manager = RepositoryManager::new(
             io.clone(),
             config.clone(),
             http_downloader.clone(),
@@ -426,19 +421,15 @@ fn test_installer() {
         for repository in &case.repositories {
             repository_manager.add_repository(repository.clone());
         }
-        let repository_manager: std::rc::Rc<std::cell::RefCell<dyn RepositoryManagerInterface>> =
-            std::rc::Rc::new(std::cell::RefCell::new(repository_manager));
+        let repository_manager: std::rc::Rc<dyn RepositoryManagerInterface> =
+            std::rc::Rc::new(repository_manager);
 
         let r#loop = std::rc::Rc::new(std::cell::RefCell::new(Loop::new(
             http_downloader.clone(),
             None,
         )));
-        let installation_manager: std::rc::Rc<std::cell::RefCell<InstallationManager>> =
-            std::rc::Rc::new(std::cell::RefCell::new(InstallationManager::__new_mock(
-                r#loop,
-                io.clone(),
-                None,
-            )));
+        let installation_manager: std::rc::Rc<InstallationManager> =
+            std::rc::Rc::new(InstallationManager::__new_mock(r#loop, io.clone(), None));
 
         // emulate a writable lock file: a real JsonFile over a fresh temp path (initially absent, so
         // the installer falls back to an update; PHP uses an in-memory JsonFile mock instead).
@@ -448,14 +439,13 @@ fn test_installer() {
         let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
             io.clone(),
         ))));
-        let locker: std::rc::Rc<std::cell::RefCell<dyn LockerInterface>> =
-            std::rc::Rc::new(std::cell::RefCell::new(Locker::new(
-                io.clone(),
-                lock_json,
-                installation_manager.clone(),
-                "{}",
-                process,
-            )));
+        let locker: std::rc::Rc<dyn LockerInterface> = std::rc::Rc::new(Locker::new(
+            io.clone(),
+            lock_json,
+            installation_manager.clone(),
+            "{}",
+            process,
+        ));
 
         let autoload_generator: std::rc::Rc<std::cell::RefCell<dyn AutoloadGeneratorInterface>> =
             std::rc::Rc::new(std::cell::RefCell::new(StubAutoloadGenerator));
@@ -470,19 +460,18 @@ fn test_installer() {
             repository_manager,
             locker,
             installation_manager.clone(),
-            std::rc::Rc::new(std::cell::RefCell::new(StubEventDispatcher)),
+            std::rc::Rc::new(StubEventDispatcher),
             autoload_generator,
         );
         installer.set_audit_config(
-            AuditConfig::from_config(&mut config.borrow_mut(), false, Auditor::FORMAT_SUMMARY)
-                .unwrap(),
+            AuditConfig::from_config(&config, false, Auditor::FORMAT_SUMMARY).unwrap(),
         );
         let result = shirabe::util::sync_executor::block_on(installer.run()).unwrap();
 
-        let output = str_replace("\r", "", io_buffer.borrow().get_output());
+        let output = str_replace("\r", "", io_buffer.get_output());
         assert_eq!(0, result, "{}", output.display_lossy());
 
-        let installed = installation_manager.borrow().__get_installed_packages();
+        let installed = installation_manager.__get_installed_packages();
         assert_eq!(
             make_packages_comparable(&case.expected_install),
             make_packages_comparable(&installed),
@@ -490,10 +479,10 @@ fn test_installer() {
             output.display_lossy()
         );
 
-        let updated = installation_manager.borrow().__get_updated_packages();
+        let updated = installation_manager.__get_updated_packages();
         assert_eq!(case.expected_update, updated);
 
-        let uninstalled = installation_manager.borrow().__get_uninstalled_packages();
+        let uninstalled = installation_manager.__get_uninstalled_packages();
         assert_eq!(case.expected_uninstall, uninstalled);
     }
 }
@@ -889,10 +878,9 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&BString>) 
         return; // markTestSkipped
     }
 
-    let io_buffer = std::rc::Rc::new(std::cell::RefCell::new(
-        BufferIO::new(BString::default(), VERBOSITY_NORMAL, None).unwrap(),
-    ));
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io_buffer.clone();
+    let io_buffer =
+        std::rc::Rc::new(BufferIO::new(BString::default(), VERBOSITY_NORMAL, None).unwrap());
+    let io: std::rc::Rc<dyn IOInterface> = io_buffer.clone();
 
     let is_exception = matches!(case.expect_result, ExpectResult::Exception(_));
 
@@ -942,10 +930,8 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&BString>) 
         None,
     )
     .unwrap();
-    let repository_manager = composer.borrow().get_repository_manager();
-    repository_manager
-        .borrow_mut()
-        .set_local_repository(RepositoryInterfaceHandle::new(local_repo));
+    let repository_manager = composer.get_repository_manager();
+    repository_manager.set_local_repository(RepositoryInterfaceHandle::new(local_repo));
 
     // emulate a writable lock file: a real composer.lock over a temp path.
     let lock_dir = tempfile::TempDir::new().unwrap();
@@ -961,12 +947,12 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&BString>) 
     let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
         io.clone(),
     ))));
-    let locker_loop = composer.borrow().get_loop();
-    let locker_im = std::rc::Rc::new(std::cell::RefCell::new(InstallationManager::__new_mock(
+    let locker_loop = composer.get_loop();
+    let locker_im = std::rc::Rc::new(InstallationManager::__new_mock(
         locker_loop,
         io.clone(),
         None,
-    )));
+    ));
     // Must match the encoding used for the lock's auto-computed "hash" field in
     // load_integration_tests (PHP: `json_encode($composerConfig)`, i.e. options=0 with slashes
     // escaped), or the freshness check spuriously fails on any composer.json containing "/"
@@ -975,20 +961,12 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&BString>) 
         JsonFile::encode_with_options(&case.composer, shirabe::json::JsonEncodeOptions::none())
             .unwrap();
     let locker = Locker::new(io.clone(), lock_json, locker_im, &contents, process);
-    composer
-        .borrow_mut()
-        .set_locker(std::rc::Rc::new(std::cell::RefCell::new(locker)));
+    composer.set_locker(std::rc::Rc::new(locker));
 
-    composer
-        .borrow_mut()
-        .set_autoload_generator(std::rc::Rc::new(std::cell::RefCell::new(
-            StubAutoloadGenerator,
-        )));
-    composer
-        .borrow_mut()
-        .set_event_dispatcher(std::rc::Rc::new(std::cell::RefCell::new(
-            StubEventDispatcher,
-        )));
+    composer.set_autoload_generator(std::rc::Rc::new(std::cell::RefCell::new(
+        StubAutoloadGenerator,
+    )));
+    composer.set_event_dispatcher(std::rc::Rc::new(StubEventDispatcher));
 
     let installer = std::rc::Rc::new(std::cell::RefCell::new(Installer::create(
         io.clone(),
@@ -1056,7 +1034,7 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&BString>) 
                 )
                 .set_audit_config(
                     AuditConfig::from_config(
-                        &mut composer_cl.borrow().get_config().borrow_mut(),
+                        &composer_cl.get_config(),
                         false,
                         Auditor::FORMAT_SUMMARY,
                     )
@@ -1156,7 +1134,7 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&BString>) 
                 )
                 .set_audit_config(
                     AuditConfig::from_config(
-                        &mut composer_cl.borrow().get_config().borrow_mut(),
+                        &composer_cl.get_config(),
                         false,
                         Auditor::FORMAT_SUMMARY,
                     )
@@ -1195,7 +1173,7 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&BString>) 
     let app_run =
         shirabe::util::sync_executor::block_on(application.run(Some(input), Some(output)));
 
-    let output_string: BString = io_buffer.borrow().get_output().replace("\r", "").into();
+    let output_string: BString = io_buffer.get_output().replace("\r", "").into();
 
     // Shouldn't check output and results if an exception was expected by this point.
     if is_exception {
@@ -1270,7 +1248,7 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&BString>) 
 
     if let Some(expect_installed) = &case.expect_installed {
         let dumper = ArrayDumper::new();
-        let local_repo = repository_manager.borrow().get_local_repository();
+        let local_repo = repository_manager.get_local_repository();
         let mut actual_installed: Vec<IndexMap<BString, PhpMixed>> = local_repo
             .get_canonical_packages()
             .unwrap()
@@ -1309,8 +1287,8 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&BString>) 
     }
 
     // trace from the composer's recording InstallationManager.
-    let im_handle = composer.borrow().get_installation_manager();
-    let im_ref = im_handle.borrow();
+    let im_handle = composer.get_installation_manager();
+    let im_ref = &im_handle;
     let trace = im_ref
         .as_any()
         .downcast_ref::<InstallationManager>()

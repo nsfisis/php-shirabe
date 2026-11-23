@@ -84,7 +84,7 @@ impl Auditor {
     #[allow(clippy::too_many_arguments, reason = "to keep PHP signature")]
     pub fn audit(
         &self,
-        io: &std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: &std::rc::Rc<dyn IOInterface>,
         repo_set: &RepositorySet,
         packages: Vec<PackageInterfaceHandle>,
         format: &BStr,
@@ -388,18 +388,16 @@ impl Auditor {
 
     fn output_advisories(
         &self,
-        io: &std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: &std::rc::Rc<dyn IOInterface>,
         advisories: &IndexMap<BString, Vec<std::rc::Rc<AnySecurityAdvisory>>>,
         format: &BStr,
     ) -> anyhow::Result<()> {
         match format {
             _ if format == Self::FORMAT_TABLE => {
-                let io_ref = io.borrow();
                 // PHP: `$io instanceof ConsoleIO`. BufferIO extends ConsoleIO in PHP but is
                 // modeled as composition here, so also unwrap it to its inner ConsoleIO.
-                let io_as_console = io_ref.as_any().downcast_ref::<ConsoleIO>().or_else(|| {
-                    io_ref
-                        .as_any()
+                let io_as_console = io.as_any().downcast_ref::<ConsoleIO>().or_else(|| {
+                    io.as_any()
                         .downcast_ref::<BufferIO>()
                         .map(|buffer_io| &buffer_io.inner)
                 });
@@ -487,7 +485,7 @@ impl Auditor {
 
     fn output_advisories_plain(
         &self,
-        io: &std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: &std::rc::Rc<dyn IOInterface>,
         advisories: &IndexMap<BString, Vec<std::rc::Rc<AnySecurityAdvisory>>>,
     ) -> anyhow::Result<()> {
         let mut error: Vec<BString> = vec![];
@@ -535,7 +533,7 @@ impl Auditor {
 
     fn output_abandoned_packages(
         &self,
-        io: &std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: &std::rc::Rc<dyn IOInterface>,
         packages: &[CompletePackageInterfaceHandle],
         format: &BStr,
     ) -> anyhow::Result<()> {
@@ -561,12 +559,10 @@ impl Auditor {
             return Ok(());
         }
 
-        let io_ref = io.borrow();
         // PHP: `$io instanceof ConsoleIO`. BufferIO extends ConsoleIO in PHP but is modeled as
         // composition here, so also unwrap it to its inner ConsoleIO.
-        let io_as_console = io_ref.as_any().downcast_ref::<ConsoleIO>().or_else(|| {
-            io_ref
-                .as_any()
+        let io_as_console = io.as_any().downcast_ref::<ConsoleIO>().or_else(|| {
+            io.as_any()
                 .downcast_ref::<BufferIO>()
                 .map(|buffer_io| &buffer_io.inner)
         });

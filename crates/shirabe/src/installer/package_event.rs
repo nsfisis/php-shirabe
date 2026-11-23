@@ -14,7 +14,7 @@ use shirabe_php_binding_macros::php_binding;
 pub struct PackageEvent {
     inner: Event,
     composer: ComposerWeakHandle,
-    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    io: std::rc::Rc<dyn IOInterface>,
     dev_mode: bool,
     local_repo: InstalledRepositoryInterfaceHandle,
     operations: Vec<std::rc::Rc<AnyOperation>>,
@@ -26,7 +26,7 @@ impl PackageEvent {
     pub fn new(
         event_name: impl Into<BString>,
         composer: ComposerWeakHandle,
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: std::rc::Rc<dyn IOInterface>,
         dev_mode: bool,
         local_repo: InstalledRepositoryInterfaceHandle,
         operations: Vec<std::rc::Rc<AnyOperation>>,
@@ -51,7 +51,7 @@ impl PackageEvent {
         &self.composer
     }
 
-    pub fn get_io(&self) -> std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
+    pub fn get_io(&self) -> std::rc::Rc<dyn IOInterface> {
         self.io.clone()
     }
 

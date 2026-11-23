@@ -1,12 +1,12 @@
 //! ref: composer/src/Composer/IO/ConsoleIO.php sha1:7a0e5150d632d483425cc5cce27201aafc52ce77
 
 use crate::config::Config;
-use crate::io::{BaseIO, IOInterface, IOInterfaceImmutable, IOInterfaceMutable, io_interface};
+use crate::io::{BaseIO, IOInterface, io_interface};
 use crate::question::StrictConfirmationQuestion;
 use bstr::{BStr, BString, ByteSlice as _};
-use indexmap::{IndexMap, indexmap};
+use indexmap::IndexMap;
 use shirabe_php_shim::{
-    bformat, canonical_int_key, display_to_bytes, error_message, mb_check_encoding,
+    PhpProp, bformat, canonical_int_key, display_to_bytes, error_message, mb_check_encoding,
     mb_convert_encoding, microtime, preg_replace, str_repeat, strip_tags, strlen,
 };
 use shirabe_symfony_console::helper::{
@@ -21,8 +21,14 @@ use shirabe_symfony_console::question::{ChoiceQuestion, Question, QuestionInterf
 /// The Input/Output helper.
 #[derive(Debug)]
 pub struct ConsoleIO {
-    authentications:
-        indexmap::IndexMap<bstr::BString, indexmap::IndexMap<bstr::BString, Option<bstr::BString>>>,
+    authentications: PhpProp<
+        std::rc::Rc<
+            indexmap::IndexMap<
+                bstr::BString,
+                indexmap::IndexMap<bstr::BString, Option<bstr::BString>>,
+            >,
+        >,
+    >,
 
     pub(crate) input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
     pub(crate) output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
@@ -31,12 +37,12 @@ pub struct ConsoleIO {
     /// `$this->helperSet->get('question')` on every ask. The Application class, which constructs
     /// this class, registers a single `QuestionHelper`. So this port holds the `QuestionHelper`
     /// directly instead of a `HelperSet`.
-    question_helper: std::cell::RefCell<QuestionHelper>,
+    question_helper: std::rc::Rc<std::cell::RefCell<QuestionHelper>>,
 
-    last_message: std::cell::RefCell<BString>,
-    last_message_err: std::cell::RefCell<BString>,
+    last_message: PhpProp<BString>,
+    last_message_err: PhpProp<BString>,
 
-    start_time: Option<f64>,
+    start_time: PhpProp<Option<f64>>,
     verbosity_map: IndexMap<i64, i64>,
 }
 
@@ -56,19 +62,19 @@ impl ConsoleIO {
         );
         verbosity_map.insert(io_interface::DEBUG, output_interface::VERBOSITY_DEBUG);
         Self {
-            authentications: indexmap![],
+            authentications: PhpProp::default(),
             input,
             output,
-            question_helper: std::cell::RefCell::new(question_helper),
-            last_message: std::cell::RefCell::new(BString::default()),
-            last_message_err: std::cell::RefCell::new(BString::default()),
-            start_time: None,
+            question_helper: std::rc::Rc::new(std::cell::RefCell::new(question_helper)),
+            last_message: PhpProp::default(),
+            last_message_err: PhpProp::default(),
+            start_time: PhpProp::new(None),
             verbosity_map,
         }
     }
 
-    pub fn enable_debugging(&mut self, start_time: f64) {
-        self.start_time = Some(start_time);
+    pub fn enable_debugging(&self, start_time: f64) {
+        self.start_time.set(Some(start_time));
     }
 
     fn do_write(&self, messages: &BStr, newline: bool, stderr: bool, verbosity: i64, raw: bool) {
@@ -81,7 +87,7 @@ impl ConsoleIO {
             sf_verbosity |= output_interface::OUTPUT_RAW;
         }
 
-        let messages = if let Some(start_time) = self.start_time {
+        let messages = if let Some(start_time) = self.start_time.cloned() {
             let memory_usage = match shirabe_php_rpc::memory_get_usage(false) {
                 Ok(memory_usage) => display_to_bytes(format_args!(
                     "{:.1}MiB",
@@ -111,7 +117,7 @@ impl ConsoleIO {
             error_output
                 .borrow()
                 .write(std::slice::from_ref(&messages), newline, sf_verbosity);
-            *self.last_message_err.borrow_mut() = messages;
+            self.last_message_err.set(messages);
 
             return;
         }
@@ -119,7 +125,7 @@ impl ConsoleIO {
         self.output
             .borrow()
             .write(std::slice::from_ref(&messages), newline, sf_verbosity);
-        *self.last_message.borrow_mut() = messages;
+        self.last_message.set(messages);
     }
 
     fn do_overwrite(
@@ -134,9 +140,9 @@ impl ConsoleIO {
         let size = size.unwrap_or_else(|| {
             // removing possible formatting of lastMessage with strip_tags
             let last = if stderr {
-                self.last_message_err.borrow().clone()
+                self.last_message_err.cloned()
             } else {
-                self.last_message.borrow().clone()
+                self.last_message.cloned()
             };
             strlen(strip_tags(&last))
         });
@@ -180,9 +186,9 @@ impl ConsoleIO {
         }
 
         if stderr {
-            *self.last_message_err.borrow_mut() = BString::from(messages);
+            self.last_message_err.set(BString::from(messages));
         } else {
-            *self.last_message.borrow_mut() = BString::from(messages);
+            self.last_message.set(BString::from(messages));
         }
     }
 
@@ -276,7 +282,7 @@ impl ConsoleIO {
     }
 }
 
-impl IOInterfaceImmutable for ConsoleIO {
+impl IOInterface for ConsoleIO {
     fn is_interactive(&self) -> bool {
         self.input.borrow().is_interactive()
     }
@@ -486,11 +492,9 @@ impl IOInterfaceImmutable for ConsoleIO {
     fn debug_bytes(&self, message: &bstr::BStr, context: &[(&bstr::BStr, &bstr::BStr)]) {
         <Self as BaseIO>::debug(self, message, context);
     }
-}
 
-impl IOInterfaceMutable for ConsoleIO {
     fn set_authentication(
-        &mut self,
+        &self,
         repository_name: bstr::BString,
         username: bstr::BString,
         password: Option<bstr::BString>,
@@ -498,12 +502,10 @@ impl IOInterfaceMutable for ConsoleIO {
         <Self as BaseIO>::set_authentication(self, repository_name, username, password)
     }
 
-    fn load_configuration(&mut self, config: &mut Config) -> anyhow::Result<()> {
+    fn load_configuration(&self, config: &Config) -> anyhow::Result<()> {
         <Self as BaseIO>::load_configuration(self, config)
     }
-}
 
-impl IOInterface for ConsoleIO {
     fn as_any(&self) -> &dyn std::any::Any {
         self
     }
@@ -512,11 +514,11 @@ impl IOInterface for ConsoleIO {
         Some(BStr::new("Composer\\IO\\ConsoleIO"))
     }
 
-    fn as_base_io_mut(&mut self) -> Option<&mut dyn BaseIO> {
+    fn as_base_io(&self) -> Option<&dyn BaseIO> {
         Some(self)
     }
 
-    fn enable_debugging(&mut self, start_time: f64) {
+    fn enable_debugging(&self, start_time: f64) {
         self.enable_debugging(start_time)
     }
 }
@@ -524,17 +526,14 @@ impl IOInterface for ConsoleIO {
 impl BaseIO for ConsoleIO {
     fn authentications(
         &self,
-    ) -> &indexmap::IndexMap<bstr::BString, indexmap::IndexMap<bstr::BString, Option<bstr::BString>>>
-    {
-        &self.authentications
-    }
-
-    fn authentications_mut(
-        &mut self,
-    ) -> &mut indexmap::IndexMap<
-        bstr::BString,
-        indexmap::IndexMap<bstr::BString, Option<bstr::BString>>,
+    ) -> &PhpProp<
+        std::rc::Rc<
+            indexmap::IndexMap<
+                bstr::BString,
+                indexmap::IndexMap<bstr::BString, Option<bstr::BString>>,
+            >,
+        >,
     > {
-        &mut self.authentications
+        &self.authentications
     }
 }

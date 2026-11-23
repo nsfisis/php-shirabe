@@ -122,15 +122,14 @@ fn as_dyn(downloader: MockDownloader) -> std::rc::Rc<std::cell::RefCell<dyn Down
 }
 
 fn create_manager() -> DownloadManager {
-    let io = std::rc::Rc::new(std::cell::RefCell::new(IOStub::new()))
-        as std::rc::Rc<std::cell::RefCell<dyn IOInterface>>;
+    let io = std::rc::Rc::new(IOStub::new()) as std::rc::Rc<dyn IOInterface>;
     DownloadManager::new(io, false, None)
 }
 
 #[test]
 fn test_set_get_downloader() {
     let downloader = create_downloader_mock();
-    let mut manager = create_manager();
+    let manager = create_manager();
 
     manager.set_downloader("test", downloader.clone());
     assert!(std::rc::Rc::ptr_eq(
@@ -176,7 +175,7 @@ fn test_get_downloader_for_correctly_installed_dist_package() {
 
     let downloader = as_dyn(downloader_mock(BStr::new("dist")));
 
-    let mut manager = create_manager();
+    let manager = create_manager();
     manager.set_downloader("pear", downloader.clone());
 
     let result = manager
@@ -194,7 +193,7 @@ fn test_get_downloader_for_incorrectly_installed_dist_package() {
 
     let downloader = as_dyn(downloader_mock(BStr::new("source")));
 
-    let mut manager = create_manager();
+    let manager = create_manager();
     manager.set_downloader("git", downloader);
 
     // LogicException: the resolved downloader is a source downloader.
@@ -209,7 +208,7 @@ fn test_get_downloader_for_correctly_installed_source_package() {
 
     let downloader = as_dyn(downloader_mock(BStr::new("source")));
 
-    let mut manager = create_manager();
+    let manager = create_manager();
     manager.set_downloader("git", downloader.clone());
 
     let result = manager
@@ -227,7 +226,7 @@ fn test_get_downloader_for_incorrectly_installed_source_package() {
 
     let downloader = as_dyn(downloader_mock(BStr::new("dist")));
 
-    let mut manager = create_manager();
+    let manager = create_manager();
     manager.set_downloader("pear", downloader);
 
     assert!(manager.get_downloader_for_package(package).is_err());
@@ -246,7 +245,7 @@ fn test_full_package_download() {
         .withf(|_pkg, path, _prev, _output| path == "target_dir")
         .returning(|_, _, _, _| Ok(None));
 
-    let mut manager = create_manager();
+    let manager = create_manager();
     manager.set_downloader("pear", as_dyn(downloader));
 
     run(manager.download(package.clone(), std::path::Path::new("target_dir"), None)).unwrap();
@@ -278,7 +277,7 @@ fn test_full_package_download_failover() {
         .withf(|_pkg, path, _prev, _output| path == "target_dir")
         .returning(|_, _, _, _| Ok(None));
 
-    let mut manager = create_manager();
+    let manager = create_manager();
     manager.set_downloader("pear", as_dyn(downloader_fail));
     manager.set_downloader("git", as_dyn(downloader_success));
 
@@ -318,7 +317,7 @@ fn test_dist_only_package_download() {
         .withf(|_pkg, path, _prev, _output| path == "target_dir")
         .returning(|_, _, _, _| Ok(None));
 
-    let mut manager = create_manager();
+    let manager = create_manager();
     manager.set_downloader("pear", as_dyn(downloader));
 
     run(manager.download(package.clone(), std::path::Path::new("target_dir"), None)).unwrap();
@@ -341,7 +340,7 @@ fn test_source_only_package_download() {
         .withf(|_pkg, path, _prev, _output| path == "target_dir")
         .returning(|_, _, _, _| Ok(None));
 
-    let mut manager = create_manager();
+    let manager = create_manager();
     manager.set_downloader("git", as_dyn(downloader));
 
     run(manager.download(package.clone(), std::path::Path::new("target_dir"), None)).unwrap();
@@ -382,7 +381,7 @@ fn test_full_package_download_with_source_preferred() {
         .withf(|_pkg, path, _prev, _output| path == "target_dir")
         .returning(|_, _, _, _| Ok(None));
 
-    let mut manager = create_manager();
+    let manager = create_manager();
     manager.set_downloader("git", as_dyn(downloader));
 
     manager.set_prefer_source(true);
@@ -406,7 +405,7 @@ fn test_dist_only_package_download_with_source_preferred() {
         .withf(|_pkg, path, _prev, _output| path == "target_dir")
         .returning(|_, _, _, _| Ok(None));
 
-    let mut manager = create_manager();
+    let manager = create_manager();
     manager.set_downloader("pear", as_dyn(downloader));
 
     manager.set_prefer_source(true);
@@ -430,7 +429,7 @@ fn test_source_only_package_download_with_source_preferred() {
         .withf(|_pkg, path, _prev, _output| path == "target_dir")
         .returning(|_, _, _, _| Ok(None));
 
-    let mut manager = create_manager();
+    let manager = create_manager();
     manager.set_downloader("git", as_dyn(downloader));
 
     manager.set_prefer_source(true);
@@ -470,7 +469,7 @@ fn test_update_dist_with_equal_types() {
         .withf(|_initial, _target, path| path == "vendor/bundles/FOS/UserBundle")
         .returning(|_, _, _| Ok(None));
 
-    let mut manager = create_manager();
+    let manager = create_manager();
     manager.set_downloader("zip", as_dyn(zip_downloader));
 
     run(manager.update(
@@ -505,7 +504,7 @@ fn test_update_dist_with_not_equal_types() {
         .withf(|_pkg, path, _output| path == "vendor/bundles/FOS/UserBundle")
         .returning(|_, _, _| Ok(None));
 
-    let mut manager = create_manager();
+    let manager = create_manager();
     manager.set_downloader("xz", as_dyn(xz_downloader));
     manager.set_downloader("zip", as_dyn(zip_downloader));
 
@@ -675,7 +674,7 @@ fn test_remove() {
         .withf(|_pkg, path, _output| path == "vendor/bundles/FOS/UserBundle")
         .returning(|_, _, _| Ok(None));
 
-    let mut manager = create_manager();
+    let manager = create_manager();
     manager.set_downloader("pear", as_dyn(pear_downloader));
 
     run(manager.remove(
@@ -716,7 +715,7 @@ fn test_install_preference_without_preference_dev() {
         .withf(|_pkg, path, _prev, _output| path == "target_dir")
         .returning(|_, _, _, _| Ok(None));
 
-    let mut manager = create_manager();
+    let manager = create_manager();
     manager.set_downloader("git", as_dyn(downloader));
 
     run(manager.download(package.clone(), std::path::Path::new("target_dir"), None)).unwrap();
@@ -740,7 +739,7 @@ fn test_install_preference_without_preference_no_dev() {
         .withf(|_pkg, path, _prev, _output| path == "target_dir")
         .returning(|_, _, _, _| Ok(None));
 
-    let mut manager = create_manager();
+    let manager = create_manager();
     manager.set_downloader("pear", as_dyn(downloader));
 
     run(manager.download(package.clone(), std::path::Path::new("target_dir"), None)).unwrap();
@@ -764,7 +763,7 @@ fn test_install_preference_without_match_dev() {
         .withf(|_pkg, path, _prev, _output| path == "target_dir")
         .returning(|_, _, _, _| Ok(None));
 
-    let mut manager = create_manager();
+    let manager = create_manager();
     manager.set_downloader("git", as_dyn(downloader));
     manager.set_preferences(IndexMap::from([("foo/*".into(), "source".into())]));
 
@@ -789,7 +788,7 @@ fn test_install_preference_without_match_no_dev() {
         .withf(|_pkg, path, _prev, _output| path == "target_dir")
         .returning(|_, _, _, _| Ok(None));
 
-    let mut manager = create_manager();
+    let manager = create_manager();
     manager.set_downloader("pear", as_dyn(downloader));
     manager.set_preferences(IndexMap::from([("foo/*".into(), "source".into())]));
 
@@ -814,7 +813,7 @@ fn test_install_preference_with_match_auto_dev() {
         .withf(|_pkg, path, _prev, _output| path == "target_dir")
         .returning(|_, _, _, _| Ok(None));
 
-    let mut manager = create_manager();
+    let manager = create_manager();
     manager.set_downloader("git", as_dyn(downloader));
     manager.set_preferences(IndexMap::from([("foo/*".into(), "auto".into())]));
 
@@ -839,7 +838,7 @@ fn test_install_preference_with_match_auto_no_dev() {
         .withf(|_pkg, path, _prev, _output| path == "target_dir")
         .returning(|_, _, _, _| Ok(None));
 
-    let mut manager = create_manager();
+    let manager = create_manager();
     manager.set_downloader("pear", as_dyn(downloader));
     manager.set_preferences(IndexMap::from([("foo/*".into(), "auto".into())]));
 
@@ -864,7 +863,7 @@ fn test_install_preference_with_match_source() {
         .withf(|_pkg, path, _prev, _output| path == "target_dir")
         .returning(|_, _, _, _| Ok(None));
 
-    let mut manager = create_manager();
+    let manager = create_manager();
     manager.set_downloader("git", as_dyn(downloader));
     manager.set_preferences(IndexMap::from([("foo/*".into(), "source".into())]));
 
@@ -889,7 +888,7 @@ fn test_install_preference_with_match_dist() {
         .withf(|_pkg, path, _prev, _output| path == "target_dir")
         .returning(|_, _, _, _| Ok(None));
 
-    let mut manager = create_manager();
+    let manager = create_manager();
     manager.set_downloader("pear", as_dyn(downloader));
     manager.set_preferences(IndexMap::from([("foo/*".into(), "dist".into())]));
 

@@ -11,8 +11,7 @@ fn fixture(name: impl AsRef<std::path::Path>) -> std::path::PathBuf {
 }
 
 fn validate(file: &std::path::Path) -> Vec<bstr::BString> {
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
-        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
+    let io: std::rc::Rc<dyn IOInterface> = std::rc::Rc::new(NullIO::new());
     let config_validator = ConfigValidator::new(io);
     let (_, _, warnings) = config_validator.validate(
         file,

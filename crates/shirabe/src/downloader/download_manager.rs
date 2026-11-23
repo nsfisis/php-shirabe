@@ -2,34 +2,36 @@
 
 use crate::downloader::DownloaderInterface;
 use crate::exception::IrrecoverableDownloadException;
-use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite};
+use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::package::PackageInterfaceHandle;
 use crate::util::Filesystem;
 use bstr::{BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_binding_macros::php_binding;
 use shirabe_php_shim::{
-    Catch as _, InvalidArgumentException, LogicException, PhpMixed, RuntimeException, ToPhpString,
-    array_keys, array_reverse, array_shift, bformat, dirname, implode, in_array_strict,
-    path_from_bytes, path_to_bytes, preg_is_match, preg_quote, rtrim_chars, str_replace,
-    strtolower, usort,
+    Catch as _, InvalidArgumentException, LogicException, PhpMixed, PhpProp, RuntimeException,
+    ToPhpString, array_keys, array_reverse, array_shift, bformat, dirname, implode,
+    in_array_strict, path_from_bytes, path_to_bytes, preg_is_match, preg_quote, rtrim_chars,
+    str_replace, strtolower, usort,
 };
 
 /// Downloaders manager.
 #[derive(Debug)]
 pub struct DownloadManager {
-    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-    prefer_dist: std::cell::Cell<bool>,
-    prefer_source: std::cell::Cell<bool>,
-    package_preferences: IndexMap<BString, BString>,
+    io: std::rc::Rc<dyn IOInterface>,
+    prefer_dist: PhpProp<bool>,
+    prefer_source: PhpProp<bool>,
+    package_preferences: PhpProp<std::rc::Rc<IndexMap<BString, BString>>>,
     filesystem: std::rc::Rc<std::cell::RefCell<Filesystem>>,
-    downloaders: IndexMap<BString, std::rc::Rc<std::cell::RefCell<dyn DownloaderInterface>>>,
+    downloaders: PhpProp<
+        std::rc::Rc<IndexMap<BString, std::rc::Rc<std::cell::RefCell<dyn DownloaderInterface>>>>,
+    >,
 }
 
 impl DownloadManager {
     /// Initializes download manager.
     pub fn new(
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: std::rc::Rc<dyn IOInterface>,
         prefer_source: bool,
         filesystem: Option<std::rc::Rc<std::cell::RefCell<Filesystem>>>,
     ) -> Self {
@@ -37,11 +39,11 @@ impl DownloadManager {
             .unwrap_or_else(|| std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(None))));
         Self {
             io,
-            prefer_source: std::cell::Cell::new(prefer_source),
-            prefer_dist: std::cell::Cell::new(false),
-            package_preferences: IndexMap::new(),
+            prefer_source: PhpProp::new(prefer_source),
+            prefer_dist: PhpProp::new(false),
+            package_preferences: PhpProp::default(),
             filesystem,
-            downloaders: IndexMap::new(),
+            downloaders: PhpProp::default(),
         }
     }
 
@@ -56,18 +58,19 @@ impl DownloadManager {
     }
 
     /// Sets fine tuned preference settings for package level source/dist selection.
-    pub fn set_preferences(&mut self, preferences: IndexMap<BString, BString>) {
-        self.package_preferences = preferences;
+    pub fn set_preferences(&self, preferences: IndexMap<BString, BString>) {
+        self.package_preferences.set(std::rc::Rc::new(preferences));
     }
 
     /// Sets installer downloader for a specific installation type.
     pub fn set_downloader(
-        &mut self,
+        &self,
         r#type: impl AsRef<[u8]>,
         downloader: std::rc::Rc<std::cell::RefCell<dyn DownloaderInterface>>,
     ) {
         let r#type = strtolower(r#type);
-        self.downloaders.insert(r#type, downloader);
+        self.downloaders
+            .update(|downloaders| std::rc::Rc::make_mut(downloaders).insert(r#type, downloader));
     }
 
     /// Returns downloader for a specific installation type.
@@ -76,16 +79,17 @@ impl DownloadManager {
         r#type: impl AsRef<[u8]>,
     ) -> anyhow::Result<std::rc::Rc<std::cell::RefCell<dyn DownloaderInterface>>> {
         let r#type = strtolower(r#type);
-        if !self.downloaders.contains_key(r#type.as_bstr()) {
+        let downloaders = self.downloaders.cloned();
+        if !downloaders.contains_key(r#type.as_bstr()) {
             return Err(InvalidArgumentException::new(bformat!(
                 "Unknown downloader type: {}. Available types: {}.",
                 r#type,
-                implode(", ", &array_keys(&self.downloaders))
+                implode(", ", &array_keys(&downloaders))
             ))
             .into());
         }
 
-        Ok(self.downloaders.get(r#type.as_bstr()).unwrap().clone())
+        Ok(downloaders.get(r#type.as_bstr()).unwrap().clone())
     }
 
     /// Returns downloader for already installed package.
@@ -128,7 +132,7 @@ impl DownloadManager {
         downloader: &std::rc::Rc<std::cell::RefCell<dyn DownloaderInterface>>,
     ) -> BString {
         // PHP: array_search($downloader, $this->downloaders)
-        for (r#type, candidate) in &self.downloaders {
+        for (r#type, candidate) in self.downloaders.cloned().iter() {
             if std::rc::Rc::ptr_eq(candidate, downloader) {
                 return r#type.clone();
             }
@@ -347,7 +351,7 @@ impl DownloadManager {
 
     /// Determines the install preference of a package
     fn resolve_package_install_preference(&self, package: PackageInterfaceHandle) -> &'static BStr {
-        for (pattern, preference) in &self.package_preferences {
+        for (pattern, preference) in self.package_preferences.cloned().iter() {
             let pattern_regex = bformat!(
                 "{{^{}$}}i",
                 str_replace("\\*", ".*", preg_quote(pattern, None))
@@ -418,8 +422,8 @@ impl DownloadManager {
         }
 
         // reverse sources in case dist is the preferred source for this package
-        if !self.prefer_source.get()
-            && (self.prefer_dist.get()
+        if !self.prefer_source.cloned()
+            && (self.prefer_dist.cloned()
                 || "dist" == self.resolve_package_install_preference(package))
         {
             sources = array_reverse(&sources, false);

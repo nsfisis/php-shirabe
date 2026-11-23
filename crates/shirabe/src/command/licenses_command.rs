@@ -135,8 +135,8 @@ impl Command for LicensesCommand {
             output.clone(),
         );
         let command_event_name = command_event.get_name().to_owned();
-        let event_dispatcher = composer_handle.borrow_partial().get_event_dispatcher();
-        event_dispatcher.borrow_mut().dispatch(
+        let event_dispatcher = composer_handle.get_event_dispatcher();
+        event_dispatcher.dispatch(
             Some(command_event_name.as_ref()),
             Some(std::rc::Rc::new(std::cell::RefCell::new(command_event))),
         )?;
@@ -151,7 +151,6 @@ impl Command for LicensesCommand {
             .unwrap_or(false)
         {
             let locker = composer.get_locker().clone();
-            let mut locker = locker.borrow_mut();
             if !locker.is_locked() {
                 return Err(UnexpectedValueException::new(BString::from("Valid composer.json and composer.lock files are required to run this command with --locked")).into());
             }
@@ -164,7 +163,6 @@ impl Command for LicensesCommand {
             repo.borrow_mut().get_packages()?
         } else {
             let repository_manager = composer.get_repository_manager().clone();
-            let repository_manager = repository_manager.borrow();
             let repo = repository_manager.get_local_repository();
 
             if input

@@ -121,14 +121,11 @@ impl Command for SuggestsCommand {
 
         let mut installed_repos: Vec<RepositoryInterfaceHandle> =
             vec![RepositoryInterfaceHandle::new(RootPackageRepository::new(
-                RootPackageInterfaceHandle::dup(composer.get_package()),
+                RootPackageInterfaceHandle::dup(&composer.get_package()),
             ))];
 
-        if composer.get_locker().borrow_mut().is_locked() {
-            let platform_overrides = composer
-                .get_locker()
-                .borrow_mut()
-                .get_platform_overrides()?;
+        if composer.get_locker().is_locked() {
+            let platform_overrides = composer.get_locker().get_platform_overrides()?;
             let platform_overrides: IndexMap<BString, PhpMixed> = platform_overrides
                 .into_iter()
                 .map(|(k, v)| (k, PhpMixed::string(v)))
@@ -139,7 +136,7 @@ impl Command for SuggestsCommand {
                 None,
                 None,
             )?));
-            let locked_repo = composer.get_locker().borrow_mut().get_locked_repository(
+            let locked_repo = composer.get_locker().get_locked_repository(
                 !input
                     .borrow()
                     .get_option("no-dev")?
@@ -148,19 +145,14 @@ impl Command for SuggestsCommand {
             )?;
             installed_repos.push(locked_repo.into());
         } else {
-            let platform_overrides = composer.get_config().borrow().get_map("platform")?;
+            let platform_overrides = composer.get_config().get_map("platform")?;
             installed_repos.push(RepositoryInterfaceHandle::new(PlatformRepository::new(
                 vec![],
                 platform_overrides,
                 None,
                 None,
             )?));
-            installed_repos.push(
-                composer
-                    .get_repository_manager()
-                    .borrow()
-                    .get_local_repository(),
-            );
+            installed_repos.push(composer.get_repository_manager().get_local_repository());
         }
 
         let mut installed_repo = InstalledRepository::new(installed_repos);

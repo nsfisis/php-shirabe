@@ -31,7 +31,7 @@ fn ignore_list(pairs: Vec<(&BStr, Option<&BStr>)>) -> IndexMap<BString, Option<B
 }
 
 fn audit_config_from(audit_section: PhpMixed) -> anyhow::Result<AuditConfig> {
-    let mut config = Config::new(true, None);
+    let config = Config::new(true, None);
     let mut top: IndexMap<BString, PhpMixed> = IndexMap::new();
     top.insert(
         "config".into(),
@@ -39,7 +39,7 @@ fn audit_config_from(audit_section: PhpMixed) -> anyhow::Result<AuditConfig> {
     );
     config.merge(&top, "test");
 
-    AuditConfig::from_config(&mut config, true, Auditor::FORMAT_SUMMARY)
+    AuditConfig::from_config(&config, true, Auditor::FORMAT_SUMMARY)
 }
 
 #[test]

@@ -29,7 +29,7 @@ pub struct Perforce {
     unique_perforce_client_name: BString,
     windows_flag: bool,
     command_result: BString,
-    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    io: std::rc::Rc<dyn IOInterface>,
     filesystem: Option<std::rc::Rc<std::cell::RefCell<Filesystem>>>,
 }
 
@@ -40,7 +40,7 @@ impl Perforce {
         path: std::path::PathBuf,
         process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
         is_windows: bool,
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: std::rc::Rc<dyn IOInterface>,
     ) -> Self {
         let mut this = Self {
             path: std::path::PathBuf::new(),
@@ -70,7 +70,7 @@ impl Perforce {
         port: BString,
         path: std::path::PathBuf,
         process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: std::rc::Rc<dyn IOInterface>,
     ) -> Self {
         Self::new(repo_config, port, path, process, Platform::is_windows(), io)
     }

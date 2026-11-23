@@ -31,39 +31,34 @@ mod mock_auth_json {
         #[derive(Debug)]
         pub AuthJson {}
         impl ConfigSourceInterface for AuthJson {
-            fn add_repository(&mut self, name: &bstr::BStr, config: PhpMixed, append: bool) -> anyhow::Result<()>;
-            fn insert_repository(&mut self, name: &bstr::BStr, config: PhpMixed, reference_name: &bstr::BStr, offset: i64) -> anyhow::Result<()>;
-            fn set_repository_url(&mut self, name: &bstr::BStr, url: &bstr::BStr) -> anyhow::Result<()>;
-            fn remove_repository(&mut self, name: &bstr::BStr) -> anyhow::Result<()>;
-            fn add_config_setting(&mut self, name: &bstr::BStr, value: PhpMixed) -> anyhow::Result<()>;
-            fn remove_config_setting(&mut self, name: &bstr::BStr) -> anyhow::Result<()>;
-            fn add_property(&mut self, name: &bstr::BStr, value: PhpMixed) -> anyhow::Result<()>;
-            fn remove_property(&mut self, name: &bstr::BStr) -> anyhow::Result<()>;
-            fn add_link(&mut self, r#type: &bstr::BStr, name: &bstr::BStr, value: &bstr::BStr) -> anyhow::Result<()>;
-            fn remove_link(&mut self, r#type: &bstr::BStr, name: &bstr::BStr) -> anyhow::Result<()>;
+            fn add_repository(&self, name: &bstr::BStr, config: PhpMixed, append: bool) -> anyhow::Result<()>;
+            fn insert_repository(&self, name: &bstr::BStr, config: PhpMixed, reference_name: &bstr::BStr, offset: i64) -> anyhow::Result<()>;
+            fn set_repository_url(&self, name: &bstr::BStr, url: &bstr::BStr) -> anyhow::Result<()>;
+            fn remove_repository(&self, name: &bstr::BStr) -> anyhow::Result<()>;
+            fn add_config_setting(&self, name: &bstr::BStr, value: PhpMixed) -> anyhow::Result<()>;
+            fn remove_config_setting(&self, name: &bstr::BStr) -> anyhow::Result<()>;
+            fn add_property(&self, name: &bstr::BStr, value: PhpMixed) -> anyhow::Result<()>;
+            fn remove_property(&self, name: &bstr::BStr) -> anyhow::Result<()>;
+            fn add_link(&self, r#type: &bstr::BStr, name: &bstr::BStr, value: &bstr::BStr) -> anyhow::Result<()>;
+            fn remove_link(&self, r#type: &bstr::BStr, name: &bstr::BStr) -> anyhow::Result<()>;
             fn get_name(&self) -> bstr::BString;
         }
     }
 }
 use mock_auth_json::MockAuthJson;
 
-fn get_auth_json_mock() -> Box<MockAuthJson> {
+fn get_auth_json_mock() -> std::rc::Rc<MockAuthJson> {
     let mut mock = MockAuthJson::new();
     mock.expect_get_name()
         .times(1..)
         .returning(|| "auth.json".into());
     mock.expect_add_config_setting().returning(|_, _| Ok(()));
     mock.expect_remove_config_setting().returning(|_| Ok(()));
-    Box::new(mock)
+    std::rc::Rc::new(mock)
 }
 
-fn set_up(
-    io_mock: &std::rc::Rc<std::cell::RefCell<IOMock>>,
-    config: &std::rc::Rc<std::cell::RefCell<Config>>,
-) {
-    config
-        .borrow_mut()
-        .set_auth_config_source(get_auth_json_mock());
+fn set_up(io_mock: &std::rc::Rc<IOMock>, config: &std::rc::Rc<Config>) {
+    config.set_auth_config_source(get_auth_json_mock());
     let _ = io_mock;
 }
 
@@ -71,7 +66,6 @@ fn set_up(
 fn test_username_password_authentication_flow() {
     let (io_mock, _io_guard) = get_io_mock(io_interface::NORMAL).unwrap();
     io_mock
-        .borrow_mut()
         .expects(
             vec![
                 Expectation::text(MESSAGE),
@@ -100,7 +94,7 @@ fn test_username_password_authentication_flow() {
     let config = ConfigStubBuilder::new().build_shared();
     set_up(&io_mock, &config);
 
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io_mock;
+    let io: std::rc::Rc<dyn IOInterface> = io_mock;
     let mut gitlab = GitLab::new(io, config, None, Some(http_downloader)).unwrap();
 
     assert!(
@@ -118,7 +112,6 @@ fn test_username_password_authentication_flow() {
 fn test_username_password_failure() {
     let (io_mock, _io_guard) = get_io_mock(io_interface::NORMAL).unwrap();
     io_mock
-        .borrow_mut()
         .expects(
             vec![
                 Expectation::ask("Username: ", USERNAME),
@@ -151,7 +144,7 @@ fn test_username_password_failure() {
     let config = ConfigStubBuilder::new().build_shared();
     set_up(&io_mock, &config);
 
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io_mock;
+    let io: std::rc::Rc<dyn IOInterface> = io_mock;
     let mut gitlab = GitLab::new(io, config, None, Some(http_downloader)).unwrap();
 
     let err = gitlab

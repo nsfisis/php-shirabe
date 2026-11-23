@@ -894,7 +894,7 @@ fn expand_input(input: Input) -> syn::Result<proc_macro2::TokenStream> {
             let body = deref.apply(quote::quote! { &self.0 });
             routes.push(quote::quote! {
                 impl crate::php_worker::rpc::binding::Receiver<#target> for #route {
-                    type Guard<'a> = &'a #target where Self: 'a;
+                    type Guard<'a> = &'a (#target) where Self: 'a;
 
                     fn get(&self) -> Self::Guard<'_> #body
                 }

@@ -400,8 +400,8 @@ impl RepositorySet {
     pub fn create_pool(
         &mut self,
         request: &mut Request,
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<dyn EventDispatcherInterface>>>,
+        io: std::rc::Rc<dyn IOInterface>,
+        event_dispatcher: Option<std::rc::Rc<dyn EventDispatcherInterface>>,
         pool_optimizer: Option<PoolOptimizer>,
         ignored_types: Vec<BString>,
         allowed_types: Option<Vec<BString>>,
@@ -557,7 +557,7 @@ impl RepositorySet {
 
         self.create_pool(
             &mut request,
-            std::rc::Rc::new(std::cell::RefCell::new(NullIO::new())),
+            std::rc::Rc::new(NullIO::new()),
             None,
             None,
             vec![],

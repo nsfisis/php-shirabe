@@ -8,7 +8,7 @@ use shirabe_php_shim::PhpMixed;
 
 pub enum DownloaderOrManager<'a> {
     Interface(&'a std::rc::Rc<std::cell::RefCell<dyn DownloaderInterface>>),
-    Manager(&'a std::rc::Rc<std::cell::RefCell<dyn DownloadManagerInterface>>),
+    Manager(&'a std::rc::Rc<dyn DownloadManagerInterface>),
 }
 
 impl<'a> DownloaderOrManager<'a> {
@@ -20,7 +20,7 @@ impl<'a> DownloaderOrManager<'a> {
     ) -> anyhow::Result<Option<PhpMixed>> {
         match self {
             Self::Interface(d) => d.borrow_mut().download(package, path, prev_package).await,
-            Self::Manager(d) => d.borrow().download(package, path, prev_package).await,
+            Self::Manager(d) => d.download(package, path, prev_package).await,
         }
     }
 
@@ -37,11 +37,7 @@ impl<'a> DownloaderOrManager<'a> {
                     .prepare(r#type, package, path, prev_package)
                     .await
             }
-            Self::Manager(d) => {
-                d.borrow()
-                    .prepare(r#type, package, path, prev_package)
-                    .await
-            }
+            Self::Manager(d) => d.prepare(r#type, package, path, prev_package).await,
         }
     }
 
@@ -52,7 +48,7 @@ impl<'a> DownloaderOrManager<'a> {
     ) -> anyhow::Result<Option<PhpMixed>> {
         match self {
             Self::Interface(d) => d.borrow_mut().install(package, path).await,
-            Self::Manager(d) => d.borrow().install(package, path).await,
+            Self::Manager(d) => d.install(package, path).await,
         }
     }
 
@@ -64,7 +60,7 @@ impl<'a> DownloaderOrManager<'a> {
     ) -> anyhow::Result<Option<PhpMixed>> {
         match self {
             Self::Interface(d) => d.borrow_mut().update(package, prev_package, path).await,
-            Self::Manager(d) => d.borrow().update(package, prev_package, path).await,
+            Self::Manager(d) => d.update(package, prev_package, path).await,
         }
     }
 
@@ -81,11 +77,7 @@ impl<'a> DownloaderOrManager<'a> {
                     .cleanup(r#type, package, path, prev_package)
                     .await
             }
-            Self::Manager(d) => {
-                d.borrow()
-                    .cleanup(r#type, package, path, prev_package)
-                    .await
-            }
+            Self::Manager(d) => d.cleanup(r#type, package, path, prev_package).await,
         }
     }
 }

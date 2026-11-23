@@ -114,10 +114,9 @@ impl HomeCommand {
             let composer = composer_full(&composer);
             let mut repos: Vec<RepositoryInterfaceHandle> = vec![];
             repos.push(RepositoryInterfaceHandle::new(RootPackageRepository::new(
-                RootPackageInterfaceHandle::dup(composer.get_package()),
+                RootPackageInterfaceHandle::dup(&composer.get_package()),
             )));
             let repository_manager = composer.get_repository_manager();
-            let repository_manager = repository_manager.borrow();
             repos.push(repository_manager.get_local_repository());
             for repo in repository_manager.get_repositories() {
                 repos.push(repo.clone());

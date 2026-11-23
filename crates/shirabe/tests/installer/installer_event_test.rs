@@ -9,10 +9,9 @@ use shirabe::io::{IOInterface, NullIO};
 
 #[test]
 fn test_getter() {
-    let composer_rc = std::rc::Rc::new(std::cell::RefCell::new(PartialOrFullComposer::new_full()));
+    let composer_rc = std::rc::Rc::new(PartialOrFullComposer::new_full());
     let composer = ComposerHandle::from_rc_unchecked(composer_rc);
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
-        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
+    let io: std::rc::Rc<dyn IOInterface> = std::rc::Rc::new(NullIO::new());
     let transaction = std::rc::Rc::new(AnyTransaction::Transaction(Transaction::new(
         vec![],
         vec![],

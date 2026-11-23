@@ -63,15 +63,15 @@ mod mock_repository_manager {
         pub RepositoryManager {}
         impl RepositoryManagerInterface for RepositoryManager {
             fn get_local_repository(&self) -> RepositoryInterfaceHandle;
-            fn get_repositories(&self) -> &Vec<RepositoryInterfaceHandle>;
+            fn get_repositories(&self) -> Vec<RepositoryInterfaceHandle>;
             fn create_repository<'a>(
                 &self,
                 r#type: &BStr,
                 config: IndexMap<BString, PhpMixed>,
                 name: Option<&'a bstr::BStr>,
             ) -> anyhow::Result<RepositoryInterfaceHandle>;
-            fn add_repository(&mut self, repository: RepositoryInterfaceHandle);
-            fn set_local_repository(&mut self, repository: RepositoryInterfaceHandle);
+            fn add_repository(&self, repository: RepositoryInterfaceHandle);
+            fn set_local_repository(&self, repository: RepositoryInterfaceHandle);
         }
     }
 }
@@ -92,31 +92,31 @@ mod mock_event_dispatcher {
         pub EventDispatcher {}
         impl EventDispatcherInterface for EventDispatcher {
             fn dispatch<'a>(
-                &mut self,
+                &self,
                 event_name: Option<&'a bstr::BStr>,
                 event: Option<std::rc::Rc<std::cell::RefCell<dyn EventInterface>>>,
             ) -> anyhow::Result<i64>;
             fn dispatch_script(
-                &mut self,
+                &self,
                 event_name: &bstr::BStr,
                 dev_mode: bool,
                 additional_args: Vec<bstr::BString>,
                 flags: shirabe::event_dispatcher::EventFlags,
             ) -> anyhow::Result<i64>;
             fn dispatch_installer_event(
-                &mut self,
+                &self,
                 event_name: &bstr::BStr,
                 dev_mode: bool,
                 execute_operations: bool,
                 transaction: std::rc::Rc<AnyTransaction>,
             ) -> anyhow::Result<i64>;
-            fn add_listener(&mut self, event_name: &bstr::BStr, listener: Callable, priority: i64);
+            fn add_listener(&self, event_name: &bstr::BStr, listener: Callable, priority: i64);
             fn add_subscriber<'a>(
-                &mut self,
+                &self,
                 subscriber: &'a dyn shirabe::event_dispatcher::EventSubscriberInterface,
             ) -> anyhow::Result<()>;
-            fn remove_listener<'a>(&mut self, listener: &'a shirabe_php_rpc::PhpEntityHandle);
-            fn has_event_listeners(&mut self, event: &dyn EventInterface) -> bool;
+            fn remove_listener<'a>(&self, listener: &'a shirabe_php_rpc::PhpEntityHandle);
+            fn has_event_listeners(&self, event: &dyn EventInterface) -> bool;
         }
     }
 }
@@ -139,9 +139,7 @@ fn root_package(name: &BStr, version: &BStr) -> RootPackageHandle {
 }
 
 fn full_composer(composer: Composer) -> PartialComposerHandle {
-    PartialComposerHandle::from_rc(std::rc::Rc::new(std::cell::RefCell::new(
-        PartialOrFullComposer::Full(composer),
-    )))
+    PartialComposerHandle::from_rc(std::rc::Rc::new(PartialOrFullComposer::Full(composer)))
 }
 
 #[test]
@@ -153,7 +151,7 @@ fn test_uses_config_from_composer_object() {
         std::cell::RefCell::new(BufferedOutput::new(None, false, None)),
     );
 
-    let config: std::rc::Rc<std::cell::RefCell<Config>> = ConfigStubBuilder::new()
+    let config: std::rc::Rc<Config> = ConfigStubBuilder::new()
         .with("archive-format", PhpMixed::from("zip"))
         .build_shared();
 
@@ -177,12 +175,10 @@ fn test_uses_config_from_composer_object() {
 
     let package = root_package(BStr::new("archive/test"), BStr::new("1.0.0"));
 
-    let mut composer = Composer::new();
+    let composer = Composer::new();
     composer.set_config(config);
     composer.set_archive_manager(std::rc::Rc::new(std::cell::RefCell::new(manager)));
-    composer.set_event_dispatcher(std::rc::Rc::new(std::cell::RefCell::new(
-        noop_event_dispatcher(),
-    )));
+    composer.set_event_dispatcher(std::rc::Rc::new(noop_event_dispatcher()));
     composer.set_package(package.into());
     let composer = full_composer(composer);
 
@@ -242,7 +238,7 @@ fn test_uses_config_from_composer_object_with_package_name() {
         std::cell::RefCell::new(BufferedOutput::new(None, false, None)),
     );
 
-    let config: std::rc::Rc<std::cell::RefCell<Config>> = ConfigStubBuilder::new()
+    let config: std::rc::Rc<Config> = ConfigStubBuilder::new()
         .with("archive-format", PhpMixed::from("zip"))
         .build_shared();
 
@@ -281,18 +277,14 @@ fn test_uses_config_from_composer_object_with_package_name() {
     repository_manager
         .expect_get_repositories()
         .times(1)
-        .return_const(Vec::new());
+        .returning(Vec::new);
 
-    let mut composer = Composer::new();
+    let composer = Composer::new();
     composer.set_config(config);
     composer.set_archive_manager(std::rc::Rc::new(std::cell::RefCell::new(manager)));
-    composer.set_event_dispatcher(std::rc::Rc::new(std::cell::RefCell::new(
-        noop_event_dispatcher(),
-    )));
+    composer.set_event_dispatcher(std::rc::Rc::new(noop_event_dispatcher()));
     composer.set_package(package.into());
-    composer.set_repository_manager(std::rc::Rc::new(std::cell::RefCell::new(
-        repository_manager,
-    )));
+    composer.set_repository_manager(std::rc::Rc::new(repository_manager));
     let composer = full_composer(composer);
 
     let command = ArchiveCommand::new();

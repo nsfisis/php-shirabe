@@ -40,8 +40,8 @@ use shirabe_php_shim::{
 
 #[derive(Debug)]
 pub struct NativeHttpDownloader {
-    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-    config: std::rc::Rc<std::cell::RefCell<Config>>,
+    io: std::rc::Rc<dyn IOInterface>,
+    config: std::rc::Rc<Config>,
     auth_helper: std::cell::RefCell<AuthHelper>,
     max_redirects: i64,
     max_retries: i64,
@@ -261,8 +261,8 @@ fn error_chain(error: &dyn std::error::Error) -> BString {
 
 impl NativeHttpDownloader {
     pub fn new(
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        io: std::rc::Rc<dyn IOInterface>,
+        config: std::rc::Rc<Config>,
         _options: StreamContextOptions,
         _disable_tls: bool,
     ) -> Self {
@@ -331,11 +331,8 @@ impl NativeHttpDownloader {
         if !preg_is_match(php_regex!(r"{^http://(repo\.)?packagist\.org/p/}"), url)
             || (strpos(url, "$").is_none() && strpos(url, "%24").is_none())
         {
-            self.config.borrow_mut().prohibit_url_by_config(
-                url,
-                Some(self.io.clone()),
-                &options.to_array(),
-            )?;
+            self.config
+                .prohibit_url_by_config(url, Some(self.io.clone()), &options.to_array())?;
         }
 
         // PHP added the auth options and ran StreamContextFactory::initOptions here, and would fail
@@ -416,7 +413,7 @@ impl NativeHttpDownloader {
                         tokio::time::sleep(std::time::Duration::from_millis(ms)).await;
                     }
                     current_url = new_url;
-                    current_origin = Url::get_origin(&self.config.borrow(), &current_url)?;
+                    current_origin = Url::get_origin(&self.config, &current_url)?;
                     continue;
                 }
                 Decision::Done(response) => return Ok(Ok(response)),
@@ -959,7 +956,7 @@ impl NativeHttpDownloader {
         if response.inner.get_status_code() == 404
             && in_array_strict(
                 PhpMixed::string(origin),
-                &self.config.borrow().get_list("gitlab-domains")?,
+                &self.config.get_list("gitlab-domains")?,
             )
             && strpos(url, "archive.zip").is_some()
         {

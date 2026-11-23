@@ -13,13 +13,13 @@ use shirabe_php_shim::{PhpMixed, ToPhpString, path_to_bytes};
 
 struct SetUp {
     home: tempfile::TempDir,
-    config: std::rc::Rc<std::cell::RefCell<Config>>,
-    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    config: std::rc::Rc<Config>,
+    io: std::rc::Rc<dyn IOInterface>,
 }
 
 fn set_up() -> SetUp {
     let home = get_unique_tmp_directory();
-    let mut config = Config::new(true, None);
+    let config = Config::new(true, None);
     let mut top: IndexMap<BString, PhpMixed> = IndexMap::new();
     let mut config_section: IndexMap<BString, PhpMixed> = IndexMap::new();
     config_section.insert("home".into(), PhpMixed::string(path_to_bytes(&home.path())));
@@ -32,12 +32,11 @@ fn set_up() -> SetUp {
 
     // PHP mocks IOInterface with isInteractive() => true; on the passing (200) paths
     // exercised here the interactivity flag is never consulted, so a bare NullIO matches.
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
-        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
+    let io: std::rc::Rc<dyn IOInterface> = std::rc::Rc::new(NullIO::new());
 
     SetUp {
         home,
-        config: std::rc::Rc::new(std::cell::RefCell::new(config)),
+        config: std::rc::Rc::new(config),
         io,
     }
 }

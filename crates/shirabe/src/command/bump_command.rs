@@ -51,7 +51,7 @@ impl BumpCommand {
 
     pub fn do_bump(
         &self,
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: std::rc::Rc<dyn IOInterface>,
         dev_only: bool,
         no_dev_only: bool,
         dry_run: bool,
@@ -89,29 +89,18 @@ impl BumpCommand {
 
         let composer = self.require_composer(None, None)?;
         let composer = composer_full(&composer);
-        let has_lock_file_disabled = !composer.get_config().borrow().has("lock")
-            || composer.get_config().borrow().get_bool("lock");
+        let has_lock_file_disabled =
+            !composer.get_config().has("lock") || composer.get_config().get_bool("lock");
         let repo: RepositoryInterfaceHandle = if !has_lock_file_disabled {
-            composer
-                .get_locker()
-                .borrow_mut()
-                .get_locked_repository(true)?
-                .into()
-        } else if composer.get_locker().borrow_mut().is_locked() {
-            if !composer.get_locker().borrow_mut().is_fresh()? {
+            composer.get_locker().get_locked_repository(true)?.into()
+        } else if composer.get_locker().is_locked() {
+            if !composer.get_locker().is_fresh()? {
                 io.write_error("<error>The lock file is not up to date with the latest changes in composer.json. Run the appropriate `update` to fix that before you use the `bump` command.</error>");
                 return Ok(Self::ERROR_LOCK_OUTDATED);
             }
-            composer
-                .get_locker()
-                .borrow_mut()
-                .get_locked_repository(true)?
-                .into()
+            composer.get_locker().get_locked_repository(true)?.into()
         } else {
-            composer
-                .get_repository_manager()
-                .borrow()
-                .get_local_repository()
+            composer.get_repository_manager().get_local_repository()
         };
 
         if composer.get_package().get_type() != "project" && !dev_only {
@@ -238,14 +227,11 @@ impl BumpCommand {
         }
 
         if !dry_run
-            && composer.get_locker().borrow_mut().is_locked()
-            && composer.get_config().borrow().get_bool("lock")
+            && composer.get_locker().is_locked()
+            && composer.get_config().get_bool("lock")
             && change_count > 0
         {
-            composer
-                .get_locker()
-                .borrow_mut()
-                .update_hash(&composer_json, None)?;
+            composer.get_locker().update_hash(&composer_json, None)?;
         }
 
         if dry_run && change_count > 0 {

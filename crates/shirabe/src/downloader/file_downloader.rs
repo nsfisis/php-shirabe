@@ -10,9 +10,7 @@ use crate::downloader::{
 };
 use crate::event_dispatcher::EventDispatcher;
 use crate::exception::IrrecoverableDownloadException;
-use crate::io::{
-    IOInterface, IOInterfaceImmutable, IOInterfaceWrite, NullIO, VERY_VERBOSE, io_interface,
-};
+use crate::io::{IOInterface, IOInterfaceWrite, NullIO, VERY_VERBOSE, io_interface};
 use crate::package::comparer::Comparer;
 use crate::package::{DisplayMode, PackageInterfaceHandle};
 use crate::plugin::{
@@ -42,12 +40,12 @@ pub static RESPONSE_HEADERS: std::sync::LazyLock<
 /// Base downloader for files
 #[derive(Debug)]
 pub struct FileDownloader {
-    pub(crate) io: std::cell::RefCell<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
-    pub(crate) config: std::rc::Rc<std::cell::RefCell<Config>>,
+    pub(crate) io: std::cell::RefCell<std::rc::Rc<dyn IOInterface>>,
+    pub(crate) config: std::rc::Rc<Config>,
     http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
     pub(crate) filesystem: std::rc::Rc<std::cell::RefCell<Filesystem>>,
     cache: Option<std::rc::Rc<std::cell::RefCell<Cache>>>,
-    event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
+    event_dispatcher: Option<std::rc::Rc<EventDispatcher>>,
     pub(crate) process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     last_cache_writes: std::sync::Mutex<IndexMap<BString, BString>>,
     additional_cleanup_paths: std::cell::RefCell<IndexMap<BString, Vec<std::path::PathBuf>>>,
@@ -66,10 +64,10 @@ impl FileDownloader {
 
     /// Constructor.
     pub fn new(
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        io: std::rc::Rc<dyn IOInterface>,
+        config: std::rc::Rc<Config>,
         http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
-        event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
+        event_dispatcher: Option<std::rc::Rc<EventDispatcher>>,
         cache: Option<std::rc::Rc<std::cell::RefCell<Cache>>>,
         filesystem: Option<std::rc::Rc<std::cell::RefCell<Filesystem>>>,
         process: Option<std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,
@@ -103,8 +101,8 @@ impl FileDownloader {
             this.io
                 .borrow()
                 .write_error_with_verbosity("Running cache garbage collection", VERY_VERBOSE);
-            let ttl = this.config.borrow().get_cache_files_ttl();
-            let max_size = this.config.borrow().get_cache_files_maxsize()?;
+            let ttl = this.config.get_cache_files_ttl();
+            let max_size = this.config.get_cache_files_maxsize()?;
             cache.borrow_mut().gc(ttl, max_size);
         }
 
@@ -123,14 +121,9 @@ impl FileDownloader {
         package: PackageInterfaceHandle,
         path: &std::path::Path,
     ) -> anyhow::Result<Option<bstr::BString>> {
-        let prev_io = std::mem::replace(
-            &mut *self.io.borrow_mut(),
-            std::rc::Rc::new(std::cell::RefCell::new(NullIO::new())),
-        );
-        self.io
-            .borrow()
-            .borrow_mut()
-            .load_configuration(&mut self.config.borrow_mut())?;
+        let prev_io =
+            std::mem::replace(&mut *self.io.borrow_mut(), std::rc::Rc::new(NullIO::new()));
+        self.io.borrow().load_configuration(&self.config)?;
 
         let target_dir = Filesystem::trim_trailing_slash(path);
         // PHP attaches an onRejected handler to capture the error and drives the promise via
@@ -276,7 +269,7 @@ impl FileDownloader {
         Ok(std::path::PathBuf::from(path_from_bytes(&rtrim_chars(
             bformat!(
                 "{}/composer/tmp-{}.{extension}",
-                self.config.borrow().get_path("vendor-dir")?,
+                self.config.get_path("vendor-dir")?,
                 hash(
                     "md5",
                     bformat!(
@@ -333,7 +326,7 @@ impl FileDownloader {
 
         let mut url = BString::from(url);
         if let Some(dist_reference) = package.get_dist_reference() {
-            url = UrlUtil::update_dist_reference(&self.config.borrow(), &url, &dist_reference)?;
+            url = UrlUtil::update_dist_reference(&self.config, &url, &dist_reference)?;
         }
 
         Ok(url)
@@ -418,7 +411,7 @@ impl DownloaderInterface for FileDownloader {
                     )));
                 let pre_file_download_event_name =
                     pre_file_download_event.borrow().get_name().to_owned();
-                event_dispatcher.borrow_mut().dispatch(
+                event_dispatcher.dispatch(
                     Some(pre_file_download_event_name.as_ref()),
                     Some(pre_file_download_event.clone()),
                 )?;
@@ -632,7 +625,7 @@ impl DownloaderInterface for FileDownloader {
                     Some(FileDownloadContext::Package(package.clone())),
                 );
                 let post_file_download_event_name = post_file_download_event.get_name().to_owned();
-                event_dispatcher.borrow_mut().dispatch(
+                event_dispatcher.dispatch(
                     Some(post_file_download_event_name.as_ref()),
                     Some(std::rc::Rc::new(std::cell::RefCell::new(
                         post_file_download_event,
@@ -666,7 +659,7 @@ impl DownloaderInterface for FileDownloader {
             self.filesystem.borrow_mut().unlink(&file_name)?;
         }
 
-        let vendor_dir = self.config.borrow().get_path("vendor-dir")?;
+        let vendor_dir = self.config.get_path("vendor-dir")?;
         let first_segment = explode("/", package.get_pretty_name())
             .first()
             .cloned()
@@ -715,7 +708,7 @@ impl DownloaderInterface for FileDownloader {
             ));
         }
 
-        let vendor_dir = self.config.borrow().get_path("vendor-dir")?;
+        let vendor_dir = self.config.get_path("vendor-dir")?;
 
         // clean up the target directory, unless it contains the vendor dir, as the vendor dir contains
         // the file to be installed. This is the case when installing with create-project in the current directory

@@ -23,18 +23,18 @@ impl Drop for TearDown {
 }
 
 // `$config = new Config; $config->merge(['repositories' => ['packagist' => false]]);`
-fn make_config() -> std::rc::Rc<std::cell::RefCell<Config>> {
-    let mut config = Config::new(true, None);
+fn make_config() -> std::rc::Rc<Config> {
+    let config = Config::new(true, None);
     let mut repositories: IndexMap<BString, PhpMixed> = IndexMap::new();
     repositories.insert("packagist".into(), PhpMixed::Bool(false));
     let mut merge: IndexMap<BString, PhpMixed> = IndexMap::new();
     merge.insert("repositories".into(), PhpMixed::Array(repositories));
     config.merge(&merge, Config::SOURCE_UNKNOWN);
-    std::rc::Rc::new(std::cell::RefCell::new(config))
+    std::rc::Rc::new(config)
 }
 
 fn make_guesser(
-    config: std::rc::Rc<std::cell::RefCell<Config>>,
+    config: std::rc::Rc<Config>,
     process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
 ) -> VersionGuesser {
     VersionGuesser::new(config, process, VersionParser::new(), None)
@@ -623,7 +623,7 @@ fn test_get_root_version_from_env() {
 
     for (env, expected_version) in root_env_versions {
         Platform::put_env("COMPOSER_ROOT_VERSION", env).unwrap();
-        let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(true, None)));
+        let config = std::rc::Rc::new(Config::new(true, None));
         let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(None)));
         let guesser = VersionGuesser::new(config, process, VersionParser::new(), None);
         assert_eq!(

@@ -68,7 +68,7 @@ pub trait ArchiveDownloader {
             ));
         }
 
-        let vendor_dir = self.inner().config.borrow().get_path("vendor-dir")?;
+        let vendor_dir = self.inner().config.get_path("vendor-dir")?;
 
         // clean up the target directory, unless it contains the vendor dir, as the vendor dir contains
         // the archive to be extracted. This is the case when installing with create-project in the current directory

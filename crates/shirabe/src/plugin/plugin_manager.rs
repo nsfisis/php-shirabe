@@ -5,7 +5,7 @@ use crate::composer::{ComposerHandle, ComposerWeakHandle, PartialComposerHandle}
 use crate::config::{AllowPlugins, Config};
 use crate::factory::DisablePlugins;
 use crate::installer::InstallerInterface;
-use crate::io::{DEBUG, IOInterface, IOInterfaceImmutable, IOInterfaceWrite};
+use crate::io::{DEBUG, IOInterface, IOInterfaceWrite};
 use crate::package::version::VersionParser;
 use crate::package::{
     BasePackageHandle, LockerInterface, PackageInterfaceHandle, RootPackageInterfaceHandle,
@@ -40,7 +40,7 @@ use shirabe_symfony_console::input::InputValue;
 #[derive(Debug)]
 pub struct PluginManager {
     composer: ComposerWeakHandle,
-    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    io: std::rc::Rc<dyn IOInterface>,
     global_composer: Option<PartialComposerHandle>,
     version_parser: VersionParser,
     disable_plugins: DisablePlugins,
@@ -63,7 +63,7 @@ static CLASS_COUNTER: std::sync::atomic::AtomicI64 = std::sync::atomic::AtomicI6
 
 impl PluginManager {
     pub fn new(
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: std::rc::Rc<dyn IOInterface>,
         composer: ComposerWeakHandle,
         global_composer: Option<PartialComposerHandle>,
         disable_plugins: DisablePlugins,
@@ -71,23 +71,12 @@ impl PluginManager {
         let composer_rc = composer
             .upgrade()
             .expect("PluginManager must not outlive Composer");
-        let allow_plugins_config = composer_rc
-            .borrow()
-            .get_config()
-            .borrow()
-            .get_allow_plugins()?;
-        let locker = composer_rc.borrow().get_locker().clone();
-        let mut locker = locker.borrow_mut();
-        let allow_plugin_rules =
-            Self::parse_allowed_plugins(allow_plugins_config, Some(&mut *locker));
-        drop(locker);
+        let allow_plugins_config = composer_rc.get_config().get_allow_plugins()?;
+        let locker = composer_rc.get_locker();
+        let allow_plugin_rules = Self::parse_allowed_plugins(allow_plugins_config, Some(&*locker));
         let allow_global_plugin_rules = Self::parse_allowed_plugins(
             match &global_composer {
-                Some(gc) => gc
-                    .borrow_partial()
-                    .get_config()
-                    .borrow()
-                    .get_allow_plugins()?,
+                Some(gc) => gc.get_config().get_allow_plugins()?,
                 None => AllowPlugins::Bool(false),
             },
             None,
@@ -132,14 +121,12 @@ impl PluginManager {
         if !self.are_plugins_disabled(BStr::new("local")) {
             let repo = self
                 .composer_full()
-                .borrow()
                 .get_repository_manager()
-                .borrow()
                 .get_local_repository();
             self.load_repository(
                 &repo,
                 false,
-                Some(self.composer_full().borrow().get_package().clone()),
+                Some(self.composer_full().get_package().clone()),
             )?;
         }
 
@@ -148,9 +135,7 @@ impl PluginManager {
                 .global_composer
                 .as_ref()
                 .unwrap()
-                .borrow_partial()
                 .get_repository_manager()
-                .borrow()
                 .get_local_repository();
             self.load_repository(&repo, true, None)?;
         }
@@ -163,9 +148,7 @@ impl PluginManager {
         if !self.are_plugins_disabled(BStr::new("local")) {
             let repo = self
                 .composer_full()
-                .borrow()
                 .get_repository_manager()
-                .borrow()
                 .get_local_repository();
             self.deactivate_repository(&repo, false)?;
         }
@@ -175,9 +158,7 @@ impl PluginManager {
                 .global_composer
                 .as_ref()
                 .unwrap()
-                .borrow_partial()
                 .get_repository_manager()
-                .borrow()
                 .get_local_repository();
             self.deactivate_repository(&repo, true)?;
         }
@@ -307,19 +288,13 @@ impl PluginManager {
         };
 
         let composer = self.composer_full();
-        let local_repo = composer
-            .borrow()
-            .get_repository_manager()
-            .borrow()
-            .get_local_repository();
-        let global_repo = self.global_composer.as_ref().map(|gc| {
-            gc.borrow_partial()
-                .get_repository_manager()
-                .borrow()
-                .get_local_repository()
-        });
+        let local_repo = composer.get_repository_manager().get_local_repository();
+        let global_repo = self
+            .global_composer
+            .as_ref()
+            .map(|gc| gc.get_repository_manager().get_local_repository());
 
-        let root_package = RootPackageInterfaceHandle::dup(composer.borrow().get_package());
+        let root_package = RootPackageInterfaceHandle::dup(&composer.get_package());
 
         // clear files autoload rules from the root package as the root dependencies are not
         // necessarily all present yet when booting this runtime autoloader
@@ -343,7 +318,7 @@ impl PluginManager {
         let autoload_packages =
             self.collect_dependencies(&installed_repo, autoload_packages, package.clone())?;
 
-        let generator = composer.borrow().get_autoload_generator();
+        let generator = composer.get_autoload_generator();
         let root_package_as_package: PackageInterfaceHandle = root_package.clone().into();
         let mut autoloads: Vec<(PackageInterfaceHandle, Option<std::path::PathBuf>)> = vec![(
             root_package_as_package.clone(),
@@ -371,22 +346,14 @@ impl PluginManager {
             generator
                 .borrow()
                 .parse_autoloads(autoloads, root_package, PhpMixed::Bool(false));
-        let vendor_dir = composer
-            .borrow()
-            .get_config()
-            .borrow()
-            .get_path("vendor-dir")?;
+        let vendor_dir = composer.get_config().get_path("vendor-dir")?;
         let class_loader = generator.borrow().create_loader(&map, Some(vendor_dir))?;
         ClassLoader::register(&class_loader, false);
 
         // The plugin code runs in the PHP worker: load the Composer PHP runtime (contracts like
         // PluginInterface) and the reverse-RPC autoloader before touching plugin classes there.
         runtime::ensure_composer_php_runtime(|| {
-            let cache_dir = composer
-                .borrow()
-                .get_config()
-                .borrow()
-                .get_path("cache-dir")?;
+            let cache_dir = composer.get_config().get_path("cache-dir")?;
             Ok(path_from_bytes(&cache_dir).to_path_buf())
         })?;
         runtime::ensure_script_autoloader()?;
@@ -504,9 +471,7 @@ impl PluginManager {
                 )?;
                 let installer = php_installer_proxy(handle);
                 composer
-                    .borrow()
                     .get_installation_manager()
-                    .borrow()
                     .add_installer(installer.clone());
                 self.registered_plugins
                     .entry(package.get_name())
@@ -562,11 +527,11 @@ impl PluginManager {
                 Some(p) => self.remove_plugin(&p)?,
                 None => {
                     let composer = self.composer_full();
-                    let installation_manager = composer.borrow().get_installation_manager();
+                    let installation_manager = composer.get_installation_manager();
                     if let PluginOrInstaller::Installer(inst) =
                         &self.registered_plugins.get(&name).unwrap()[index]
                     {
-                        installation_manager.borrow().remove_installer(&**inst);
+                        installation_manager.remove_installer(&**inst);
                     }
                 }
             }
@@ -600,11 +565,11 @@ impl PluginManager {
                 }
                 None => {
                     let composer = self.composer_full();
-                    let installation_manager = composer.borrow().get_installation_manager();
+                    let installation_manager = composer.get_installation_manager();
                     if let PluginOrInstaller::Installer(inst) =
                         &self.registered_plugins.get(&name).unwrap()[index]
                     {
-                        installation_manager.borrow().remove_installer(&**inst);
+                        installation_manager.remove_installer(&**inst);
                     }
                 }
             }
@@ -694,8 +659,8 @@ impl PluginManager {
 
         let plugin_ref = plugin.borrow();
         if let Some(subscriber) = plugin_ref.as_event_subscriber() {
-            let event_dispatcher = self.composer_full().borrow().get_event_dispatcher();
-            let result = event_dispatcher.borrow_mut().add_subscriber(subscriber);
+            let event_dispatcher = self.composer_full().get_event_dispatcher();
+            let result = event_dispatcher.add_subscriber(subscriber);
             result?;
         }
         Ok(())
@@ -735,8 +700,8 @@ impl PluginManager {
             .as_event_subscriber()
             .map(|s| s.subscriber_handle());
         if let Some(handle) = subscriber_handle {
-            let event_dispatcher = self.composer_full().borrow().get_event_dispatcher();
-            event_dispatcher.borrow_mut().remove_listener(&handle);
+            let event_dispatcher = self.composer_full().get_event_dispatcher();
+            event_dispatcher.remove_listener(&handle);
         }
         Ok(())
     }
@@ -890,9 +855,7 @@ impl PluginManager {
         if !global {
             return self
                 .composer_full()
-                .borrow()
                 .get_installation_manager()
-                .borrow()
                 .get_install_path(package);
         }
 
@@ -900,9 +863,7 @@ impl PluginManager {
         self.global_composer
             .as_ref()
             .unwrap()
-            .borrow_partial()
             .get_installation_manager()
-            .borrow()
             .get_install_path(package)
     }
 
@@ -1012,13 +973,13 @@ impl PluginManager {
 
     fn parse_allowed_plugins(
         allow_plugins_config: AllowPlugins,
-        mut locker: Option<&mut dyn LockerInterface>,
+        locker: Option<&dyn LockerInterface>,
     ) -> Option<IndexMap<BString, bool>> {
         // PHP: [] === $allowPluginsConfig && $locker !== null && $locker->isLocked() && version_compare($locker->getPluginApi(), '2.2.0', '<')
         let is_empty_array =
             matches!(&allow_plugins_config, AllowPlugins::Rules(rules) if rules.is_empty());
         let plugin_api_under_2_2_0 = if is_empty_array {
-            match locker.as_deref_mut() {
+            match locker {
                 Some(l) => {
                     if l.is_locked() {
                         let api = l.get_plugin_api().unwrap_or_default();
@@ -1132,7 +1093,6 @@ impl PluginManager {
                 .composer
                 .upgrade()
                 .expect("PluginManager must not outlive Composer")
-                .borrow()
                 .get_config();
 
             self.io.write_error(bformat!("<warning>{package}{} contains a Composer plugin which is currently not in your allow-plugins config. See https://getcomposer.org/allow-plugins</warning>", if is_global_plugin || self.running_in_global_dir { " (installed globally)" } else { "" }));
@@ -1163,28 +1123,23 @@ impl PluginManager {
 
                         // persist answer in composer.json if it wasn't simply discarded
                         if answer_str == b"y" || answer_str == b"n" {
-                            let allow_plugins_value = config.borrow().get("allow-plugins")?;
+                            let allow_plugins_value = config.get("allow-plugins")?;
                             if let Some(arr) = allow_plugins_value.as_array() {
                                 let mut allow_plugins = arr.clone();
                                 allow_plugins.insert(BString::from(package), PhpMixed::Bool(allow));
-                                if config.borrow().get_truthy("sort-packages")? {
+                                if config.get_truthy("sort-packages")? {
                                     ksort(&mut allow_plugins);
                                 }
-                                config
-                                    .borrow_mut()
-                                    .get_config_source_mut()
-                                    .add_config_setting(
-                                        bstr::BStr::new("allow-plugins"),
-                                        PhpMixed::Array(allow_plugins.clone()),
-                                    )?;
+                                config.get_config_source().add_config_setting(
+                                    bstr::BStr::new("allow-plugins"),
+                                    PhpMixed::Array(allow_plugins.clone()),
+                                )?;
                                 let mut inner = IndexMap::new();
                                 inner
                                     .insert("allow-plugins".into(), PhpMixed::Array(allow_plugins));
                                 let mut config_section = IndexMap::new();
                                 config_section.insert("config".into(), PhpMixed::Array(inner));
-                                config
-                                    .borrow_mut()
-                                    .merge(&config_section, Config::SOURCE_UNKNOWN);
+                                config.merge(&config_section, Config::SOURCE_UNKNOWN);
                             }
                         }
 

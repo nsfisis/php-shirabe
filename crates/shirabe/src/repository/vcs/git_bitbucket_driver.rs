@@ -3,7 +3,7 @@
 use crate::cache::Cache;
 use crate::config::Config;
 use crate::downloader::TransportException;
-use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface};
+use crate::io::{IOInterface, IOInterfaceWrite, io_interface};
 use crate::json::{JsonEncodeOptions, JsonFile};
 use crate::repository::vcs::{GitDriver, VcsDriverBase, VcsDriverInterface};
 use crate::util::http::Response;
@@ -39,8 +39,8 @@ pub struct GitBitbucketDriver {
 impl GitBitbucketDriver {
     pub fn new(
         repo_config: IndexMap<BString, PhpMixed>,
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        io: std::rc::Rc<dyn IOInterface>,
+        config: std::rc::Rc<Config>,
         http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
         process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     ) -> Self {
@@ -80,13 +80,7 @@ impl GitBitbucketDriver {
             path_from_bytes(&implode(
                 "/",
                 &[
-                    BString::from(
-                        self.inner
-                            .config
-                            .borrow()
-                            .get_path("cache-repo-dir")?
-                            .as_bstr(),
-                    ),
+                    BString::from(self.inner.config.get_path("cache-repo-dir")?.as_bstr()),
                     self.inner.origin_url.clone(),
                     self.owner.clone(),
                     self.repository.clone(),
@@ -100,7 +94,7 @@ impl GitBitbucketDriver {
             .cache
             .as_mut()
             .unwrap()
-            .set_read_only(self.inner.config.borrow().get_bool("cache-read-only"));
+            .set_read_only(self.inner.config.get_bool("cache-read-only"));
 
         Ok(())
     }
@@ -753,8 +747,8 @@ impl GitBitbucketDriver {
     }
 
     pub fn supports(
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        _config: std::rc::Rc<std::cell::RefCell<Config>>,
+        io: std::rc::Rc<dyn IOInterface>,
+        _config: std::rc::Rc<Config>,
         url: &BStr,
         _deep: bool,
     ) -> anyhow::Result<bool> {
@@ -847,8 +841,8 @@ impl VcsDriverInterface for GitBitbucketDriver {
     }
 
     fn supports(
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        io: std::rc::Rc<dyn IOInterface>,
+        config: std::rc::Rc<Config>,
         url: &BStr,
         deep: bool,
     ) -> anyhow::Result<bool> {

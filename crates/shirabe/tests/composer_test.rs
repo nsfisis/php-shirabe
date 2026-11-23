@@ -12,14 +12,14 @@ use shirabe::repository::{RepositoryManager, RepositoryManagerInterface};
 use shirabe::util::r#loop::Loop;
 use shirabe::util::{HttpDownloader, ProcessExecutor};
 
-fn null_io() -> std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
-    std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()))
+fn null_io() -> std::rc::Rc<dyn IOInterface> {
+    std::rc::Rc::new(NullIO::new())
 }
 
 fn http_downloader(
-    io: &std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    io: &std::rc::Rc<dyn IOInterface>,
 ) -> std::rc::Rc<std::cell::RefCell<HttpDownloader>> {
-    let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(false, None)));
+    let config = std::rc::Rc::new(Config::new(false, None));
     std::rc::Rc::new(std::cell::RefCell::new(
         HttpDownloader::new(
             io.clone(),
@@ -31,23 +31,17 @@ fn http_downloader(
     ))
 }
 
-fn installation_manager(
-    io: &std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-) -> std::rc::Rc<std::cell::RefCell<InstallationManager>> {
+fn installation_manager(io: &std::rc::Rc<dyn IOInterface>) -> std::rc::Rc<InstallationManager> {
     let r#loop = std::rc::Rc::new(std::cell::RefCell::new(Loop::new(
         http_downloader(io),
         None,
     )));
-    std::rc::Rc::new(std::cell::RefCell::new(InstallationManager::new(
-        r#loop,
-        io.clone(),
-        None,
-    )))
+    std::rc::Rc::new(InstallationManager::new(r#loop, io.clone(), None))
 }
 
 #[test]
 fn test_set_get_package() {
-    let mut composer = Composer::new();
+    let composer = Composer::new();
     let package: RootPackageInterfaceHandle = RootPackageHandle::new(
         BString::from("foo"),
         BString::from("1.0.0.0"),
@@ -61,20 +55,19 @@ fn test_set_get_package() {
 
 #[test]
 fn test_set_get_locker() {
-    let mut composer = Composer::new();
+    let composer = Composer::new();
     let io = null_io();
     let json_file = JsonFile::new("composer.lock", None, None).unwrap();
     let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
         io.clone(),
     ))));
-    let locker: std::rc::Rc<std::cell::RefCell<dyn LockerInterface>> =
-        std::rc::Rc::new(std::cell::RefCell::new(Locker::new(
-            io.clone(),
-            json_file,
-            installation_manager(&io),
-            "{}",
-            process,
-        )));
+    let locker: std::rc::Rc<dyn LockerInterface> = std::rc::Rc::new(Locker::new(
+        io.clone(),
+        json_file,
+        installation_manager(&io),
+        "{}",
+        process,
+    ));
     composer.set_locker(locker.clone());
 
     assert!(std::rc::Rc::ptr_eq(&composer.get_locker(), &locker));
@@ -82,17 +75,12 @@ fn test_set_get_locker() {
 
 #[test]
 fn test_set_get_repository_manager() {
-    let mut composer = Composer::new();
+    let composer = Composer::new();
     let io = null_io();
-    let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(false, None)));
-    let manager: std::rc::Rc<std::cell::RefCell<dyn RepositoryManagerInterface>> =
-        std::rc::Rc::new(std::cell::RefCell::new(RepositoryManager::new(
-            io.clone(),
-            config,
-            http_downloader(&io),
-            None,
-            None,
-        )));
+    let config = std::rc::Rc::new(Config::new(false, None));
+    let manager: std::rc::Rc<dyn RepositoryManagerInterface> = std::rc::Rc::new(
+        RepositoryManager::new(io.clone(), config, http_downloader(&io), None, None),
+    );
     composer.set_repository_manager(manager.clone());
 
     assert!(std::rc::Rc::ptr_eq(
@@ -103,10 +91,9 @@ fn test_set_get_repository_manager() {
 
 #[test]
 fn test_set_get_download_manager() {
-    let mut composer = Composer::new();
-    let manager: std::rc::Rc<std::cell::RefCell<dyn DownloadManagerInterface>> = std::rc::Rc::new(
-        std::cell::RefCell::new(DownloadManager::new(null_io(), false, None)),
-    );
+    let composer = Composer::new();
+    let manager: std::rc::Rc<dyn DownloadManagerInterface> =
+        std::rc::Rc::new(DownloadManager::new(null_io(), false, None));
     composer.set_download_manager(manager.clone());
 
     assert!(std::rc::Rc::ptr_eq(
@@ -117,10 +104,9 @@ fn test_set_get_download_manager() {
 
 #[test]
 fn test_set_get_installation_manager() {
-    let mut composer = Composer::new();
+    let composer = Composer::new();
     let io = null_io();
-    let manager: std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>> =
-        installation_manager(&io);
+    let manager: std::rc::Rc<dyn InstallationManagerInterface> = installation_manager(&io);
     composer.set_installation_manager(manager.clone());
 
     assert!(std::rc::Rc::ptr_eq(

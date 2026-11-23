@@ -16,7 +16,7 @@ struct SetUp {
 
 fn set_up() -> SetUp {
     let home = get_unique_tmp_directory();
-    let mut config = Config::new(true, None);
+    let config = Config::new(true, None);
     let mut top: IndexMap<BString, PhpMixed> = IndexMap::new();
     let mut config_section: IndexMap<BString, PhpMixed> = IndexMap::new();
     config_section.insert("home".into(), PhpMixed::string(path_to_bytes(&home.path())));
@@ -61,9 +61,8 @@ fn support_provider() -> Vec<(&'static BStr, bool)> {
 #[test]
 fn test_support() {
     for (url, assertion) in support_provider() {
-        let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
-            std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
-        let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(true, None)));
+        let io: std::rc::Rc<dyn IOInterface> = std::rc::Rc::new(NullIO::new());
+        let config = std::rc::Rc::new(Config::new(true, None));
         let result = FossilDriver::supports(io, config, bstr::BStr::new(url), false).unwrap();
         assert_eq!(assertion, result);
     }

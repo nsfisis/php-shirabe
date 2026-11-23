@@ -35,8 +35,8 @@ use shirabe_symfony_console::formatter::OutputFormatter;
 
 #[derive(Debug)]
 pub struct AutoloadGenerator {
-    event_dispatcher: std::rc::Rc<std::cell::RefCell<EventDispatcher>>,
-    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    event_dispatcher: std::rc::Rc<EventDispatcher>,
+    io: std::rc::Rc<dyn IOInterface>,
     // `dump()` dispatches script events whose listeners reach back here through
     // `Composer::getAutoloadGenerator()` and mutate this instance mid-dump.
     dev_mode: std::cell::Cell<Option<bool>>,
@@ -51,11 +51,11 @@ pub struct AutoloadGenerator {
 
 impl AutoloadGenerator {
     pub fn new(
-        event_dispatcher: std::rc::Rc<std::cell::RefCell<EventDispatcher>>,
-        io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
+        event_dispatcher: std::rc::Rc<EventDispatcher>,
+        io: Option<std::rc::Rc<dyn IOInterface>>,
     ) -> Self {
-        let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
-            io.unwrap_or_else(|| std::rc::Rc::new(std::cell::RefCell::new(NullIO::new())));
+        let io: std::rc::Rc<dyn IOInterface> =
+            io.unwrap_or_else(|| std::rc::Rc::new(NullIO::new()));
 
         Self {
             event_dispatcher,
@@ -111,11 +111,11 @@ impl AutoloadGenerator {
         config: &Config,
         local_repo: RepositoryInterfaceHandle,
         root_package: RootPackageInterfaceHandle,
-        installation_manager: std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>,
+        installation_manager: std::rc::Rc<dyn InstallationManagerInterface>,
         target_dir: &BStr,
         scan_psr_packages: bool,
         suffix: Option<BString>,
-        locker: Option<std::rc::Rc<std::cell::RefCell<dyn LockerInterface>>>,
+        locker: Option<std::rc::Rc<dyn LockerInterface>>,
         strict_ambiguous: bool,
     ) -> anyhow::Result<ClassMap> {
         let mut scan_psr_packages = scan_psr_packages;
@@ -165,7 +165,7 @@ impl AutoloadGenerator {
                 )?;
             }
 
-            self.event_dispatcher.borrow_mut().dispatch_script(
+            self.event_dispatcher.dispatch_script(
                 ScriptEvents::PRE_AUTOLOAD_DUMP,
                 self.dev_mode.get().unwrap_or(false),
                 vec![],
@@ -539,10 +539,9 @@ impl AutoloadGenerator {
 
             if suffix.is_none() {
                 suffix = Some(if let Some(l) = locker {
-                    let is_locked = l.borrow_mut().is_locked();
+                    let is_locked = l.is_locked();
                     if is_locked {
-                        l.borrow_mut()
-                            .get_lock_data()?
+                        l.get_lock_data()?
                             .get(B("content-hash"))
                             .and_then(|v| v.as_string())
                             .unwrap_or_default()
@@ -700,7 +699,7 @@ impl AutoloadGenerator {
         )?;
 
         if self.run_scripts.get() {
-            self.event_dispatcher.borrow_mut().dispatch_script(
+            self.event_dispatcher.dispatch_script(
                 ScriptEvents::POST_AUTOLOAD_DUMP,
                 self.dev_mode.get().unwrap_or(false),
                 vec![],
@@ -787,7 +786,7 @@ impl AutoloadGenerator {
 
     pub fn build_package_map(
         &self,
-        installation_manager: std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>,
+        installation_manager: std::rc::Rc<dyn InstallationManagerInterface>,
         root_package: RootPackageInterfaceHandle,
         packages: Vec<PackageInterfaceHandle>,
     ) -> anyhow::Result<Vec<(PackageInterfaceHandle, Option<std::path::PathBuf>)>> {
@@ -801,9 +800,7 @@ impl AutoloadGenerator {
                 continue;
             }
             self.validate_package(package.clone())?;
-            let install_path = installation_manager
-                .borrow()
-                .get_install_path(package.clone())?;
+            let install_path = installation_manager.get_install_path(package.clone())?;
             package_map.push((package, install_path));
         }
 
@@ -1933,17 +1930,17 @@ pub trait AutoloadGeneratorInterface: std::fmt::Debug {
         config: &Config,
         local_repo: RepositoryInterfaceHandle,
         root_package: RootPackageInterfaceHandle,
-        installation_manager: std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>,
+        installation_manager: std::rc::Rc<dyn InstallationManagerInterface>,
         target_dir: &BStr,
         scan_psr_packages: bool,
         suffix: Option<BString>,
-        locker: Option<std::rc::Rc<std::cell::RefCell<dyn LockerInterface>>>,
+        locker: Option<std::rc::Rc<dyn LockerInterface>>,
         strict_ambiguous: bool,
     ) -> anyhow::Result<ClassMap>;
     #[php(skip)]
     fn build_package_map(
         &self,
-        installation_manager: std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>,
+        installation_manager: std::rc::Rc<dyn InstallationManagerInterface>,
         root_package: RootPackageInterfaceHandle,
         packages: Vec<PackageInterfaceHandle>,
     ) -> anyhow::Result<Vec<(PackageInterfaceHandle, Option<std::path::PathBuf>)>>;
@@ -1996,11 +1993,11 @@ impl AutoloadGeneratorInterface for AutoloadGenerator {
         config: &Config,
         local_repo: RepositoryInterfaceHandle,
         root_package: RootPackageInterfaceHandle,
-        installation_manager: std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>,
+        installation_manager: std::rc::Rc<dyn InstallationManagerInterface>,
         target_dir: &BStr,
         scan_psr_packages: bool,
         suffix: Option<BString>,
-        locker: Option<std::rc::Rc<std::cell::RefCell<dyn LockerInterface>>>,
+        locker: Option<std::rc::Rc<dyn LockerInterface>>,
         strict_ambiguous: bool,
     ) -> anyhow::Result<ClassMap> {
         self.dump(
@@ -2018,7 +2015,7 @@ impl AutoloadGeneratorInterface for AutoloadGenerator {
 
     fn build_package_map(
         &self,
-        installation_manager: std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>,
+        installation_manager: std::rc::Rc<dyn InstallationManagerInterface>,
         root_package: RootPackageInterfaceHandle,
         packages: Vec<PackageInterfaceHandle>,
     ) -> anyhow::Result<Vec<(PackageInterfaceHandle, Option<std::path::PathBuf>)>> {

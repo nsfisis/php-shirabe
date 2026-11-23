@@ -9,7 +9,7 @@ use crate::delegate_base_command_trait_impls_to_inner;
 use crate::dependency_resolver::{DefaultPolicy, PolicyInterface};
 use crate::event_dispatcher::EventFlags;
 use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
-use crate::io::{IOInterfaceImmutable, IOInterfaceWrite};
+use crate::io::IOInterfaceWrite;
 use crate::json::JsonFile;
 use crate::package::version::{ShowWarnings, VersionParser, VersionSelector};
 use crate::package::{
@@ -449,11 +449,8 @@ impl ShowCommand {
         if is_installed_package {
             let installation_manager = self
                 .require_composer(None, None)?
-                .borrow_partial()
                 .get_installation_manager();
-            let path = installation_manager
-                .borrow_mut()
-                .get_install_path(package.clone().into())?;
+            let path = installation_manager.get_install_path(package.clone().into())?;
             if let Some(p) = path {
                 self.get_io().write(bformat!(
                     "<info>path</info>     : {}",
@@ -685,10 +682,8 @@ impl ShowCommand {
             && installed_repo.has_package(package.clone().into())?
         {
             let composer = self.require_composer(None, None)?;
-            let installation_manager = composer.borrow_partial().get_installation_manager();
-            let path = installation_manager
-                .borrow_mut()
-                .get_install_path(package.clone().into())?;
+            let installation_manager = composer.get_installation_manager();
+            let path = installation_manager.get_install_path(package.clone().into())?;
             match path {
                 Some(p) => {
                     if let Some(r) = realpath(&p) {
@@ -1267,7 +1262,6 @@ impl ShowCommand {
             rs.add_repository(RepositoryInterfaceHandle::new(CompositeRepository::new(
                 composer
                     .get_repository_manager()
-                    .borrow()
                     .get_repositories()
                     .to_vec(),
             )))?;
@@ -1568,7 +1562,7 @@ impl Command for ShowCommand {
         let mut platform_overrides: IndexMap<BString, PhpMixed> = IndexMap::new();
         if let Some(ref composer) = composer {
             let composer = composer_full(composer);
-            platform_overrides = composer.get_config().borrow().get_map("platform")?;
+            platform_overrides = composer.get_config().get_map("platform")?;
         }
         let platform_repo = PlatformRepositoryHandle::new(PlatformRepository::new(
             vec![],
@@ -1589,7 +1583,7 @@ impl Command for ShowCommand {
             && input.borrow().get_option("locked")?.as_bool() != Some(true)
         {
             let composer = self.require_composer(None, None)?;
-            let package = RootPackageInterfaceHandle::dup(composer.borrow_partial().get_package());
+            let package = RootPackageInterfaceHandle::dup(&composer.get_package());
             if input.borrow().get_option("name-only")?.as_bool() == Some(true) {
                 self.get_io().write(package.get_name());
 
@@ -1627,16 +1621,10 @@ impl Command for ShowCommand {
                 repos = RepositoryInterfaceHandle::new(CompositeRepository::new(
                     composer
                         .get_repository_manager()
-                        .borrow()
                         .get_repositories()
                         .to_vec(),
                 ));
-                ir.add_repository(
-                    composer
-                        .get_repository_manager()
-                        .borrow()
-                        .get_local_repository(),
-                );
+                ir.add_repository(composer.get_repository_manager().get_local_repository());
                 installed_repo = RepositoryInterfaceHandle::new(ir);
             } else {
                 let default_repos =
@@ -1650,12 +1638,8 @@ impl Command for ShowCommand {
             }
         } else if input.borrow().get_option("all")?.as_bool() == Some(true) && composer.is_some() {
             let composer_ref = composer_full(composer.as_ref().unwrap());
-            let local_repo = composer_ref
-                .get_repository_manager()
-                .borrow()
-                .get_local_repository();
-            let locker_rc = composer_ref.get_locker().clone();
-            let mut locker = locker_rc.borrow_mut();
+            let local_repo = composer_ref.get_repository_manager().get_local_repository();
+            let locker = composer_ref.get_locker();
             if locker.is_locked() {
                 let lr_handle: RepositoryInterfaceHandle =
                     locker.get_locked_repository(true)?.into();
@@ -1680,11 +1664,7 @@ impl Command for ShowCommand {
                         m
                     },
                 )?)];
-            for r in composer_ref
-                .get_repository_manager()
-                .borrow()
-                .get_repositories()
-            {
+            for r in composer_ref.get_repository_manager().get_repositories() {
                 composite_input.push(r.clone());
             }
             repos = RepositoryInterfaceHandle::new(CompositeRepository::new(composite_input));
@@ -1705,20 +1685,20 @@ impl Command for ShowCommand {
             if composer.is_none()
                 || !composer_full(composer.as_ref().unwrap())
                     .get_locker()
-                    .borrow_mut()
                     .is_locked()
             {
                 return Err(UnexpectedValueException::new(BString::from("A valid composer.json and composer.lock files is required to run this command with --locked"))
                 .into());
             }
             let composer_ref = composer_full(composer.as_ref().unwrap());
-            let locker_rc = composer_ref.get_locker().clone();
-            let mut locker = locker_rc.borrow_mut();
+            let locker = composer_ref.get_locker();
             let lr = locker.get_locked_repository(
                 input.borrow().get_option("no-dev")?.as_bool() != Some(true),
             )?;
             if input.borrow().get_option("self")?.as_bool() == Some(true) {
-                lr.add_package(RootPackageInterfaceHandle::dup(composer_ref.get_package()).into())?;
+                lr.add_package(
+                    RootPackageInterfaceHandle::dup(&composer_ref.get_package()).into(),
+                )?;
             }
             let lr_handle: RepositoryInterfaceHandle = lr.into();
             locked_repo = Some(lr_handle.clone());
@@ -1729,16 +1709,11 @@ impl Command for ShowCommand {
         } else {
             // --installed / default case
             let composer_local_owned;
-            let _guard_from_existing;
             let composer_local = match composer.as_ref() {
-                Some(c) => {
-                    _guard_from_existing = composer_full(c);
-                    &*_guard_from_existing
-                }
+                Some(c) => composer_full(c),
                 None => {
                     composer_local_owned = self.require_composer(None, None)?;
-                    _guard_from_existing = composer_full(&composer_local_owned);
-                    &*_guard_from_existing
+                    composer_full(&composer_local_owned)
                 }
             };
             let root_pkg = composer_local.get_package();
@@ -1746,7 +1721,7 @@ impl Command for ShowCommand {
             let root_repo: RepositoryInterfaceHandle =
                 if input.borrow().get_option("self")?.as_bool() == Some(true) {
                     RepositoryInterfaceHandle::new(RootPackageRepository::new(
-                        RootPackageInterfaceHandle::dup(composer_local.get_package()),
+                        RootPackageInterfaceHandle::dup(&composer_local.get_package()),
                     ))
                 } else {
                     RepositoryInterfaceHandle::new(InstalledArrayRepository::new()?)
@@ -1754,7 +1729,6 @@ impl Command for ShowCommand {
             if input.borrow().get_option("no-dev")?.as_bool() == Some(true) {
                 let local_packages = composer_local
                     .get_repository_manager()
-                    .borrow()
                     .get_local_repository()
                     .get_packages()?;
                 let packages = RepositoryUtils::filter_required_packages(
@@ -1775,7 +1749,6 @@ impl Command for ShowCommand {
                 repos = new_repo;
             } else {
                 let repository_manager = composer_local.get_repository_manager().clone();
-                let repository_manager = repository_manager.borrow();
                 let lr = repository_manager.get_local_repository();
                 installed_repo = RepositoryInterfaceHandle::new(InstalledRepository::new(vec![
                     root_repo.clone(),
@@ -1811,7 +1784,7 @@ impl Command for ShowCommand {
                 EventFlags::default(),
             );
             let command_event_name = command_event.get_name().to_owned();
-            composer.get_event_dispatcher().borrow_mut().dispatch(
+            composer.get_event_dispatcher().dispatch(
                 Some(command_event_name.as_ref()),
                 Some(std::rc::Rc::new(std::cell::RefCell::new(command_event))),
             )?;
@@ -1962,9 +1935,7 @@ impl Command for ShowCommand {
                 let path = {
                     let composer_ref = composer.as_ref().unwrap();
                     composer_ref
-                        .borrow_partial()
                         .get_installation_manager()
-                        .borrow_mut()
                         .get_install_path(package.clone().into())?
                 };
                 if let Some(path) = path {
@@ -2337,14 +2308,9 @@ impl Command for ShowCommand {
                             package_view_data.description = Some(c.get_description());
                         }
                         if write_path {
-                            let installation_manager = composer
-                                .as_ref()
-                                .unwrap()
-                                .borrow_partial()
-                                .get_installation_manager();
-                            let path = installation_manager
-                                .borrow_mut()
-                                .get_install_path(package.clone())?;
+                            let installation_manager =
+                                composer.as_ref().unwrap().get_installation_manager();
+                            let path = installation_manager.get_install_path(package.clone())?;
                             if let Some(p) = path {
                                 let r = realpath(&p).unwrap_or_default();
                                 package_view_data.path = Some(Some(BString::from(

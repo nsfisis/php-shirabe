@@ -1,6 +1,6 @@
 //! ref: composer/src/Composer/Cache.php sha1:184c5863c06dfba0950c0d70a167269306a42aa2
 
-use crate::io::{DEBUG, IOInterface, IOInterfaceImmutable, IOInterfaceWrite};
+use crate::io::{DEBUG, IOInterface, IOInterfaceWrite};
 use crate::util::{Filesystem, Platform};
 use bstr::{BStr, BString};
 use shirabe_php_shim::{
@@ -14,7 +14,7 @@ use shirabe_symfony_finder::Finder;
 /// Reads/writes to a filesystem cache
 #[derive(Debug)]
 pub struct Cache {
-    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    io: std::rc::Rc<dyn IOInterface>,
     root: std::path::PathBuf,
     enabled: Option<bool>,
     allowlist: BString,
@@ -49,7 +49,7 @@ static CACHE_COLLECTED: std::sync::Mutex<Option<bool>> = std::sync::Mutex::new(N
 
 impl Cache {
     pub fn new(
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: std::rc::Rc<dyn IOInterface>,
         cache_dir: impl AsRef<std::path::Path>,
         allowlist: Option<&BStr>,
         filesystem: Option<std::rc::Rc<std::cell::RefCell<Filesystem>>>,

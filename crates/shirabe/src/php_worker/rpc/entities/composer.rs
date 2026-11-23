@@ -23,7 +23,7 @@ php_entity! {
             instance: {
                 adapters: __php_binding_partial_composer,
                 target: PartialComposer,
-                borrow: |composer| std::cell::Ref::map(composer.borrow(), Composer::as_partial),
+                deref: |composer| composer.as_partial(),
             },
             unimplemented: [
                 isGlobal,
@@ -40,7 +40,7 @@ php_entity! {
             instance: {
                 adapters: __php_binding_composer,
                 target: Composer,
-                borrow: |composer| composer.borrow(),
+                deref: |composer| &**composer,
             },
             unimplemented: [
                 getArchiveManager,
@@ -65,7 +65,7 @@ fn loop_services(
     if call.method() != "__shirabe_loop_services" {
         return None;
     }
-    let r#loop = composer.borrow().get_loop();
+    let r#loop = composer.get_loop();
     let downloader = r#loop.borrow().get_http_downloader().clone();
     let process = r#loop.borrow().get_process_executor().cloned();
     Some((|| {

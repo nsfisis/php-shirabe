@@ -21,7 +21,7 @@ pub struct PluginInstaller {
 
 impl PluginInstaller {
     pub fn new(
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: std::rc::Rc<dyn IOInterface>,
         composer: PartialComposerWeakHandle,
         fs: Option<std::rc::Rc<std::cell::RefCell<Filesystem>>>,
         binary_installer: Option<std::rc::Rc<std::cell::RefCell<dyn BinaryInstallerInterface>>>,
@@ -65,7 +65,6 @@ impl PluginInstaller {
             .expect("Composer handle dropped")
             .as_full()
             .expect("PluginInstaller should be initialized with a fully loaded Composer instance.")
-            .borrow()
             .get_plugin_manager()
     }
 }

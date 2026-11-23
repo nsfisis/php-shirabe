@@ -21,8 +21,8 @@ pub struct RepositoryFactory;
 
 impl RepositoryFactory {
     pub fn config_from_string(
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        config: &std::rc::Rc<std::cell::RefCell<Config>>,
+        io: std::rc::Rc<dyn IOInterface>,
+        config: &std::rc::Rc<Config>,
         repository: impl AsRef<[u8]>,
         allow_filesystem: bool,
     ) -> anyhow::Result<IndexMap<BString, PhpMixed>> {
@@ -85,11 +85,11 @@ impl RepositoryFactory {
     }
 
     pub fn from_string(
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        config: &std::rc::Rc<std::cell::RefCell<Config>>,
+        io: std::rc::Rc<dyn IOInterface>,
+        config: &std::rc::Rc<Config>,
         repository: impl AsRef<[u8]>,
         allow_filesystem: bool,
-        rm: Option<&mut dyn RepositoryManagerInterface>,
+        rm: Option<&dyn RepositoryManagerInterface>,
     ) -> anyhow::Result<RepositoryInterfaceHandle> {
         let repo_config =
             Self::config_from_string(io.clone(), config, repository, allow_filesystem)?;
@@ -97,10 +97,10 @@ impl RepositoryFactory {
     }
 
     pub fn create_repo(
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        config: &std::rc::Rc<std::cell::RefCell<Config>>,
+        io: std::rc::Rc<dyn IOInterface>,
+        config: &std::rc::Rc<Config>,
         repo_config: IndexMap<BString, PhpMixed>,
-        rm: Option<&mut dyn RepositoryManagerInterface>,
+        rm: Option<&dyn RepositoryManagerInterface>,
     ) -> anyhow::Result<RepositoryInterfaceHandle> {
         let mut owned_rm;
         let rm = if let Some(rm) = rm {
@@ -125,9 +125,9 @@ impl RepositoryFactory {
     }
 
     pub fn default_repos(
-        io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
-        config: Option<std::rc::Rc<std::cell::RefCell<Config>>>,
-        rm: Option<&mut dyn RepositoryManagerInterface>,
+        io: Option<std::rc::Rc<dyn IOInterface>>,
+        config: Option<std::rc::Rc<Config>>,
+        rm: Option<&dyn RepositoryManagerInterface>,
     ) -> anyhow::Result<IndexMap<BString, RepositoryInterfaceHandle>> {
         if rm.is_none() {
             // TODO(php-runtime): upstream raises this with the @ operator, which lowers
@@ -140,14 +140,10 @@ impl RepositoryFactory {
 
         let config = match config {
             Some(c) => c,
-            None => std::rc::Rc::new(std::cell::RefCell::new(Factory::create_config(
-                io.clone(),
-                None,
-            )?)),
+            None => std::rc::Rc::new(Factory::create_config(io.clone(), None)?),
         };
         if let Some(io) = &io {
-            io.borrow_mut()
-                .load_configuration(&mut config.borrow_mut())?;
+            io.load_configuration(&config)?;
         }
 
         let mut owned_rm;
@@ -171,16 +167,16 @@ impl RepositoryFactory {
             &mut owned_rm
         };
 
-        let repo_configs = config.borrow().get_repositories();
+        let repo_configs = config.get_repositories();
         // PHP: array_values($repoConfigs) — keep ordering, discard keys
         Self::create_repos(rm, repo_configs.into_iter().map(|(_, v)| v).collect())
     }
 
     pub fn manager(
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        config: &std::rc::Rc<std::cell::RefCell<Config>>,
+        io: std::rc::Rc<dyn IOInterface>,
+        config: &std::rc::Rc<Config>,
         http_downloader: Option<std::rc::Rc<std::cell::RefCell<HttpDownloader>>>,
-        event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
+        event_dispatcher: Option<std::rc::Rc<EventDispatcher>>,
         process: Option<std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,
     ) -> anyhow::Result<RepositoryManager> {
         let http_downloader = match http_downloader {
@@ -200,7 +196,7 @@ impl RepositoryFactory {
             }
         };
 
-        let mut rm = RepositoryManager::new(
+        let rm = RepositoryManager::new(
             io,
             config.clone(),
             http_downloader,
@@ -272,20 +268,16 @@ impl RepositoryFactory {
     }
 
     pub fn default_repos_with_default_manager(
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: std::rc::Rc<dyn IOInterface>,
     ) -> anyhow::Result<IndexMap<BString, RepositoryInterfaceHandle>> {
-        let config = std::rc::Rc::new(std::cell::RefCell::new(Factory::create_config(
-            Some(io.clone()),
-            None,
-        )?));
-        let mut manager = Self::manager(io.clone(), &config, None, None, None)?;
-        io.borrow_mut()
-            .load_configuration(&mut config.borrow_mut())?;
-        Self::default_repos(Some(io), Some(config), Some(&mut manager))
+        let config = std::rc::Rc::new(Factory::create_config(Some(io.clone()), None)?);
+        let manager = Self::manager(io.clone(), &config, None, None, None)?;
+        io.load_configuration(&config)?;
+        Self::default_repos(Some(io), Some(config), Some(&manager))
     }
 
     fn create_repos(
-        rm: &mut dyn RepositoryManagerInterface,
+        rm: &dyn RepositoryManagerInterface,
         repo_configs: Vec<PhpMixed>,
     ) -> anyhow::Result<IndexMap<BString, RepositoryInterfaceHandle>> {
         let mut repo_map: IndexMap<BString, RepositoryInterfaceHandle> = IndexMap::new();

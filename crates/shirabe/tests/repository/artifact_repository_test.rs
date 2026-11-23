@@ -26,8 +26,7 @@ fn create_repo(url: impl AsRef<[u8]>) -> ArtifactRepository {
     coordinates.insert("type".into(), PhpMixed::string(BString::from("artifact")));
     coordinates.insert("url".into(), PhpMixed::string(url.as_ref()));
 
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
-        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
+    let io: std::rc::Rc<dyn IOInterface> = std::rc::Rc::new(NullIO::new());
     ArtifactRepository::new(coordinates, io).unwrap()
 }
 

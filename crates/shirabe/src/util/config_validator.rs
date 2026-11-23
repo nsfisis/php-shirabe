@@ -16,13 +16,13 @@ use shirabe_spdx_licenses::SpdxLicenses;
 
 #[derive(Debug)]
 pub struct ConfigValidator {
-    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    io: std::rc::Rc<dyn IOInterface>,
 }
 
 impl ConfigValidator {
     pub const CHECK_VERSION: i64 = 1;
 
-    pub fn new(io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>) -> Self {
+    pub fn new(io: std::rc::Rc<dyn IOInterface>) -> Self {
         Self { io }
     }
 

@@ -56,7 +56,6 @@ impl AuditCommand {
             .unwrap_or(false)
         {
             let locker = composer.get_locker().clone();
-            let mut locker = locker.borrow_mut();
             if !locker.is_locked() {
                 return Err(UnexpectedValueException::new(BString::from("Valid composer.json and composer.lock files are required to run this command with --locked")).into());
             }
@@ -71,10 +70,7 @@ impl AuditCommand {
         }
 
         let root_pkg = composer.get_package();
-        let local_repo = composer
-            .get_repository_manager()
-            .borrow()
-            .get_local_repository();
+        let local_repo = composer.get_repository_manager().get_local_repository();
         let mut installed_repo = InstalledRepository::new(vec![local_repo]);
 
         if input
@@ -203,19 +199,12 @@ impl Command for AuditCommand {
             indexmap::IndexMap::new(),
             indexmap::IndexMap::new(),
         );
-        for repo in composer
-            .get_repository_manager()
-            .borrow()
-            .get_repositories()
-        {
+        for repo in composer.get_repository_manager().get_repositories() {
             repo_set.add_repository(repo.clone())?;
         }
 
-        let audit_config = AuditConfig::from_config(
-            &mut composer.get_config().borrow_mut(),
-            true,
-            Auditor::FORMAT_SUMMARY,
-        )?;
+        let audit_config =
+            AuditConfig::from_config(&composer.get_config(), true, Auditor::FORMAT_SUMMARY)?;
 
         let abandoned = input
             .borrow()

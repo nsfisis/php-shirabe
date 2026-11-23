@@ -130,10 +130,10 @@ struct SetUp {
     repository: shirabe::repository::RepositoryInterfaceHandle,
     /// ref: `$this->configValueMap['use-include-path']`, which testUseGlobalIncludePath mutates.
     use_include_path: bool,
-    im: std::rc::Rc<std::cell::RefCell<dyn shirabe::installer::InstallationManagerInterface>>,
-    io: std::rc::Rc<std::cell::RefCell<BufferIO>>,
+    im: std::rc::Rc<dyn shirabe::installer::InstallationManagerInterface>,
+    io: std::rc::Rc<BufferIO>,
     generator: AutoloadGenerator,
-    event_dispatcher: std::rc::Rc<std::cell::RefCell<EventDispatcher>>,
+    event_dispatcher: std::rc::Rc<EventDispatcher>,
 }
 
 impl Drop for SetUp {
@@ -151,9 +151,9 @@ fn null_path(s: &BStr) -> BString {
 /// exercised here, so a mock HttpDownloader (no real curl backend) stands in for the loop.
 fn make_installation_manager(
     vendor_dir: &std::path::Path,
-    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    io: std::rc::Rc<dyn IOInterface>,
 ) -> InstallationManager {
-    let config_for_downloader = std::rc::Rc::new(std::cell::RefCell::new(Config::new(false, None)));
+    let config_for_downloader = std::rc::Rc::new(Config::new(false, None));
     let http_downloader = std::rc::Rc::new(std::cell::RefCell::new(HttpDownloader::__new_mock(
         io.clone(),
         config_for_downloader,
@@ -177,16 +177,14 @@ fn set_up() -> SetUp {
     let prev_cwd = std::env::current_dir().unwrap();
     std::env::set_current_dir(&working_dir).unwrap();
 
-    let io = std::rc::Rc::new(std::cell::RefCell::new(
+    let io = std::rc::Rc::new(
         BufferIO::new(BString::default(), output_interface::VERBOSITY_NORMAL, None).unwrap(),
-    ));
+    );
 
-    let dispatcher_io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io.clone();
-    let im: std::rc::Rc<std::cell::RefCell<dyn shirabe::installer::InstallationManagerInterface>> =
-        std::rc::Rc::new(std::cell::RefCell::new(make_installation_manager(
-            &vendor_dir,
-            dispatcher_io.clone(),
-        )));
+    let dispatcher_io: std::rc::Rc<dyn IOInterface> = io.clone();
+    let im: std::rc::Rc<dyn shirabe::installer::InstallationManagerInterface> = std::rc::Rc::new(
+        make_installation_manager(&vendor_dir, dispatcher_io.clone()),
+    );
 
     let repository = shirabe::repository::RepositoryInterfaceHandle::new(
         InstalledArrayRepository::new().unwrap(),
@@ -194,14 +192,13 @@ fn set_up() -> SetUp {
 
     // EventDispatcher constructor is disabled in PHP and dispatch is never called when run-scripts
     // is off (the default), so a real dispatcher over an empty Composer is a faithful no-op stand-in.
-    let composer = ComposerHandle::from_rc_unchecked(std::rc::Rc::new(std::cell::RefCell::new(
-        PartialOrFullComposer::new_full(),
-    )));
-    let event_dispatcher = std::rc::Rc::new(std::cell::RefCell::new(EventDispatcher::new(
+    let composer =
+        ComposerHandle::from_rc_unchecked(std::rc::Rc::new(PartialOrFullComposer::new_full()));
+    let event_dispatcher = std::rc::Rc::new(EventDispatcher::new(
         composer.upcast().downgrade(),
         dispatcher_io.clone(),
         None,
-    )));
+    ));
 
     let generator = AutoloadGenerator::new(event_dispatcher.clone(), Some(dispatcher_io));
 
@@ -564,10 +561,9 @@ fn test_vendor_dir_same_as_working_dir() {
     let mut s = set_up();
     s.vendor_dir = s.working_dir.clone();
     // Re-register the install-path stub so getInstallPath uses the new vendor dir.
-    s.im.borrow()
-        .add_installer(std::rc::Rc::new(InstallPathStubInstaller {
-            vendor_dir: s.vendor_dir.clone(),
-        }));
+    s.im.add_installer(std::rc::Rc::new(InstallPathStubInstaller {
+        vendor_dir: s.vendor_dir.clone(),
+    }));
 
     let package = new_root_pkg(BStr::new("root/a"));
     package.set_autoload(autoload(vec![
@@ -643,10 +639,9 @@ fn test_root_package_autoloading_alternative_vendor_dir() {
     ]));
 
     s.vendor_dir = s.vendor_dir.join("subdir");
-    s.im.borrow()
-        .add_installer(std::rc::Rc::new(InstallPathStubInstaller {
-            vendor_dir: s.vendor_dir.clone(),
-        }));
+    s.im.add_installer(std::rc::Rc::new(InstallPathStubInstaller {
+        vendor_dir: s.vendor_dir.clone(),
+    }));
 
     s.ensure_dir(s.vendor_dir.join("composer"));
     s.ensure_dir(s.working_dir.join("src"));
@@ -767,7 +762,7 @@ fn test_duplicate_files_warning() {
         composer_out.join("autoload_files.php"),
     );
     let expected = "<warning>The following \"files\" autoload rules are included multiple times, this may cause issues and should be resolved:</warning>\n<warning> - $baseDir . '/foo.php'</warning>\n";
-    assert_eq!(expected, s.io.borrow().get_output());
+    assert_eq!(expected, s.io.get_output());
 }
 
 #[test]
@@ -2400,15 +2395,15 @@ fn test_pre_and_post_events_are_dispatched_during_autoload_dump() {
     let dispatched = std::rc::Rc::new(std::cell::Cell::new(0));
     let series_for_cb = series.clone();
     let dispatched_for_cb = dispatched.clone();
-    s.event_dispatcher
-        .borrow_mut()
-        .__set_dispatch_script_override(Box::new(move |r#type, dev, _args, _flags| {
+    s.event_dispatcher.__set_dispatch_script_override(Box::new(
+        move |r#type, dev, _args, _flags| {
             dispatched_for_cb.set(dispatched_for_cb.get() + 1);
             let expected = series_for_cb.borrow_mut().remove(0);
             assert_eq!(expected, (r#type, dev));
 
             Ok(0)
-        }));
+        },
+    ));
 
     let package = new_root_pkg(BStr::new("root/a"));
     package.set_autoload(autoload(vec![(
@@ -2506,11 +2501,8 @@ fn test_vendor_dir_excluded_from_working_dir() {
 
     s.set_canonical_packages(vec![vendor_package.into()]);
 
-    let im: std::rc::Rc<std::cell::RefCell<dyn shirabe::installer::InstallationManagerInterface>> =
-        std::rc::Rc::new(std::cell::RefCell::new(make_installation_manager(
-            &vendor_dir,
-            s.io.clone(),
-        )));
+    let im: std::rc::Rc<dyn shirabe::installer::InstallationManagerInterface> =
+        std::rc::Rc::new(make_installation_manager(&vendor_dir, s.io.clone()));
 
     s.ensure_dir(working_dir.join("src/Foo"));
     s.ensure_dir(working_dir.join("classmap"));
@@ -3154,7 +3146,7 @@ fn test_absolute_symlink_with_psr4_does_not_generate_warnings() {
 
     dump(&mut s, package.into(), true, BStr::new("_9")).unwrap();
 
-    let output = s.io.borrow().get_output();
+    let output = s.io.get_output();
 
     // Should not contain PSR-4 violation warnings
     assert!(!output.contains_str("does not comply with psr-4 autoloading standard"));

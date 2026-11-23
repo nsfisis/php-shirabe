@@ -20,19 +20,19 @@ use shirabe_php_shim::{
 #[derive(Debug)]
 pub struct RootPackageLoader {
     inner: ArrayLoader,
-    manager: std::rc::Rc<std::cell::RefCell<RepositoryManager>>,
-    config: std::rc::Rc<std::cell::RefCell<Config>>,
+    manager: std::rc::Rc<RepositoryManager>,
+    config: std::rc::Rc<Config>,
     version_guesser: Box<dyn VersionGuesserInterface>,
-    io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
+    io: Option<std::rc::Rc<dyn IOInterface>>,
 }
 
 impl RootPackageLoader {
     pub fn new(
-        manager: std::rc::Rc<std::cell::RefCell<RepositoryManager>>,
-        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        manager: std::rc::Rc<RepositoryManager>,
+        config: std::rc::Rc<Config>,
         parser: Option<VersionParser>,
         version_guesser: Option<Box<dyn VersionGuesserInterface>>,
-        io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
+        io: Option<std::rc::Rc<dyn IOInterface>>,
     ) -> Self {
         let inner = ArrayLoader::new(parser, true);
         let version_guesser = version_guesser.unwrap_or_else(|| {
@@ -230,12 +230,12 @@ impl RootPackageLoader {
         let repos = RepositoryFactory::default_repos(
             None,
             Some(self.config.clone()),
-            Some(&mut *self.manager.borrow_mut()),
+            Some(&*self.manager),
         )?;
         for (_, repo) in repos {
-            self.manager.borrow_mut().add_repository(repo);
+            self.manager.add_repository(repo);
         }
-        real_package.set_repositories(self.config.borrow().get_repositories());
+        real_package.set_repositories(self.config.get_repositories());
 
         Ok(package)
     }

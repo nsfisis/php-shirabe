@@ -32,8 +32,8 @@ use shirabe::util::r#loop::Loop;
 use shirabe::util::{HttpDownloader, Platform, ProcessExecutor};
 use shirabe_php_rpc::RpcValue;
 use shirabe_php_shim::{
-    Catch as _, PhpMixed, RuntimeException, ToPhpString, UnexpectedValueException, bformat,
-    path_from_bytes, path_to_bytes,
+    Catch as _, PhpMixed, PhpProp, RuntimeException, ToPhpString, UnexpectedValueException,
+    bformat, path_from_bytes, path_to_bytes,
 };
 use shirabe_semver::VersionParser;
 use shirabe_symfony_console::output::VERBOSITY_NORMAL;
@@ -119,17 +119,17 @@ use mock_download_manager::MockDownloadManager;
 /// test repository; the other methods are never reached.
 #[derive(Debug)]
 struct MockRepositoryManager {
-    local: RepositoryInterfaceHandle,
+    local: PhpProp<RepositoryInterfaceHandle>,
     repositories: Vec<RepositoryInterfaceHandle>,
 }
 
 impl RepositoryManagerInterface for MockRepositoryManager {
     fn get_local_repository(&self) -> RepositoryInterfaceHandle {
-        self.local.clone()
+        self.local.cloned()
     }
 
-    fn get_repositories(&self) -> &Vec<RepositoryInterfaceHandle> {
-        &self.repositories
+    fn get_repositories(&self) -> Vec<RepositoryInterfaceHandle> {
+        self.repositories.clone()
     }
 
     fn create_repository(
@@ -141,12 +141,12 @@ impl RepositoryManagerInterface for MockRepositoryManager {
         unimplemented!("not exercised by PluginInstallerTest")
     }
 
-    fn add_repository(&mut self, _repository: RepositoryInterfaceHandle) {
+    fn add_repository(&self, _repository: RepositoryInterfaceHandle) {
         unimplemented!("not exercised by PluginInstallerTest")
     }
 
-    fn set_local_repository(&mut self, repository: RepositoryInterfaceHandle) {
-        self.local = repository;
+    fn set_local_repository(&self, repository: RepositoryInterfaceHandle) {
+        self.local.set(repository);
     }
 }
 
@@ -162,17 +162,17 @@ impl InstallationManagerInterface for MockInstallationManager {
 
     fn remove_installer(&self, _installer: &dyn InstallerInterface) {}
 
-    fn disable_plugins(&mut self) {}
+    fn disable_plugins(&self) {}
 
     fn is_package_installed(
-        &mut self,
+        &self,
         _repo: &InstalledRepositoryInterfaceHandle,
         _package: PackageInterfaceHandle,
     ) -> anyhow::Result<bool> {
         Ok(false)
     }
 
-    fn ensure_binaries_presence(&mut self, _package: PackageInterfaceHandle) -> anyhow::Result<()> {
+    fn ensure_binaries_presence(&self, _package: PackageInterfaceHandle) -> anyhow::Result<()> {
         Ok(())
     }
 
@@ -201,18 +201,18 @@ impl InstallationManagerInterface for MockInstallationManager {
         ))
     }
 
-    fn set_output_progress(&mut self, _output_progress: bool) {}
+    fn set_output_progress(&self, _output_progress: bool) {}
 
-    async fn notify_installs(&mut self, _io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>) {}
+    async fn notify_installs(&self, _io: std::rc::Rc<dyn IOInterface>) {}
 }
 
 /// Equivalent to PHP setUp()'s `new InstallationManager(...)`, used only to satisfy
 /// `Locker::new`'s concrete constructor argument (PHP hands the same InstallationManager mock to
 /// the Locker, which never touches it in these tests).
 fn locker_installation_manager(
-    io: &std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-) -> std::rc::Rc<std::cell::RefCell<InstallationManager>> {
-    let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(false, None)));
+    io: &std::rc::Rc<dyn IOInterface>,
+) -> std::rc::Rc<InstallationManager> {
+    let config = std::rc::Rc::new(Config::new(false, None));
     let http_downloader = std::rc::Rc::new(std::cell::RefCell::new(
         HttpDownloader::new(
             io.clone(),
@@ -223,17 +223,13 @@ fn locker_installation_manager(
         .unwrap(),
     ));
     let r#loop = std::rc::Rc::new(std::cell::RefCell::new(Loop::new(http_downloader, None)));
-    std::rc::Rc::new(std::cell::RefCell::new(InstallationManager::new(
-        r#loop,
-        io.clone(),
-        None,
-    )))
+    std::rc::Rc::new(InstallationManager::new(r#loop, io.clone(), None))
 }
 
 #[derive(Debug)]
 pub(crate) struct SetUp {
-    pub(crate) io: std::rc::Rc<std::cell::RefCell<BufferIO>>,
-    io_dyn: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    pub(crate) io: std::rc::Rc<BufferIO>,
+    io_dyn: std::rc::Rc<dyn IOInterface>,
     pub(crate) pm: std::rc::Rc<std::cell::RefCell<PluginManager>>,
     autoload_generator: std::rc::Rc<std::cell::RefCell<AutoloadGenerator>>,
     packages: Vec<PackageInterfaceHandle>,
@@ -276,35 +272,31 @@ pub(crate) fn set_up() -> SetUp {
         InstalledRepositoryInterfaceHandle::new(InstalledArrayRepository::new().unwrap());
 
     let repository_manager = MockRepositoryManager {
-        local: repository.as_repository_handle(),
+        local: PhpProp::new(repository.as_repository_handle()),
         repositories: vec![],
     };
 
     let installation_manager = MockInstallationManager;
 
-    let io = std::rc::Rc::new(std::cell::RefCell::new(
-        BufferIO::new(BString::default(), VERBOSITY_NORMAL, None).unwrap(),
-    ));
-    let io_dyn: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io.clone();
+    let io = std::rc::Rc::new(BufferIO::new(BString::default(), VERBOSITY_NORMAL, None).unwrap());
+    let io_dyn: std::rc::Rc<dyn IOInterface> = io.clone();
 
-    let composer_rc = std::rc::Rc::new(std::cell::RefCell::new(PartialOrFullComposer::Full(
-        Composer::new(),
-    )));
+    let composer_rc = std::rc::Rc::new(PartialOrFullComposer::Full(Composer::new()));
     let composer = ComposerHandle::from_rc_unchecked(composer_rc.clone());
 
     // PHP hands the AutoloadGenerator a mocked EventDispatcher (disabled constructor); the Rust
     // AutoloadGenerator requires a concrete EventDispatcher, and none of these tests reach it.
-    let dispatcher = std::rc::Rc::new(std::cell::RefCell::new(EventDispatcher::new(
+    let dispatcher = std::rc::Rc::new(EventDispatcher::new(
         composer.upcast().downgrade(),
         io_dyn.clone(),
         None,
-    )));
+    ));
     let autoload_generator = std::rc::Rc::new(std::cell::RefCell::new(AutoloadGenerator::new(
         dispatcher,
         Some(io_dyn.clone()),
     )));
 
-    let mut config = Config::new(false, None);
+    let config = Config::new(false, None);
     let mut config_section: IndexMap<BString, PhpMixed> = IndexMap::new();
     config_section.insert(
         "vendor-dir".into(),
@@ -330,24 +322,20 @@ pub(crate) fn set_up() -> SetUp {
     config.merge(&merged, Config::SOURCE_UNKNOWN);
 
     {
-        let mut c = composer.borrow_mut();
-        c.set_config(std::rc::Rc::new(std::cell::RefCell::new(config)));
-        c.set_download_manager(std::rc::Rc::new(std::cell::RefCell::new(dm)));
-        c.set_repository_manager(std::rc::Rc::new(std::cell::RefCell::new(
-            repository_manager,
-        )));
-        c.set_installation_manager(std::rc::Rc::new(std::cell::RefCell::new(
-            installation_manager,
-        )));
+        let c = &composer;
+        c.set_config(std::rc::Rc::new(config));
+        c.set_download_manager(std::rc::Rc::new(dm));
+        c.set_repository_manager(std::rc::Rc::new(repository_manager));
+        c.set_installation_manager(std::rc::Rc::new(installation_manager));
         c.set_autoload_generator(autoload_generator.clone());
     }
-    let real_dispatcher = std::rc::Rc::new(std::cell::RefCell::new(EventDispatcher::new(
+    let real_dispatcher = std::rc::Rc::new(EventDispatcher::new(
         composer.upcast().downgrade(),
         io_dyn.clone(),
         None,
-    )));
-    composer.borrow_mut().set_event_dispatcher(real_dispatcher);
-    composer.borrow_mut().set_package(
+    ));
+    composer.set_event_dispatcher(real_dispatcher);
+    composer.set_package(
         RootPackageHandle::new(
             BString::from("dummy/root"),
             BString::from("1.0.0.0"),
@@ -365,15 +353,14 @@ pub(crate) fn set_up() -> SetUp {
         let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
             io_dyn.clone(),
         ))));
-        let locker: std::rc::Rc<std::cell::RefCell<dyn LockerInterface>> =
-            std::rc::Rc::new(std::cell::RefCell::new(Locker::new(
-                io_dyn.clone(),
-                json_file,
-                locker_installation_manager(&io_dyn),
-                "{}",
-                process,
-            )));
-        composer.borrow_mut().set_locker(locker);
+        let locker: std::rc::Rc<dyn LockerInterface> = std::rc::Rc::new(Locker::new(
+            io_dyn.clone(),
+            json_file,
+            locker_installation_manager(&io_dyn),
+            "{}",
+            process,
+        ));
+        composer.set_locker(locker);
     }
 
     let pm = std::rc::Rc::new(std::cell::RefCell::new(
@@ -385,7 +372,7 @@ pub(crate) fn set_up() -> SetUp {
         )
         .unwrap(),
     ));
-    composer.borrow_mut().set_plugin_manager(pm.clone());
+    composer.set_plugin_manager(pm.clone());
 
     SetUp {
         io,
@@ -444,7 +431,7 @@ fn test_install_new_plugin() {
         "installer-v1",
         plugin_property(&plugins[0], BStr::new("version"))
     );
-    assert_eq!("activate v1\n", set_up.io.borrow().get_output());
+    assert_eq!("activate v1\n", set_up.io.get_output());
 }
 
 #[test]
@@ -464,7 +451,7 @@ fn test_install_plugin_with_root_package_having_files_autoload() {
         "files".into(),
         PhpMixed::List(vec![PhpMixed::string(path_to_bytes(&files_autoload))]),
     );
-    let root = set_up.composer.borrow().get_package().clone();
+    let root = set_up.composer.get_package().clone();
     root.set_autoload(autoload.clone());
     root.set_dev_autoload(autoload);
 
@@ -472,7 +459,7 @@ fn test_install_plugin_with_root_package_having_files_autoload() {
 
     let pm = set_up.pm.borrow();
     let plugins = pm.get_plugins();
-    assert_eq!("activate v1\n", set_up.io.borrow().get_output());
+    assert_eq!("activate v1\n", set_up.io.get_output());
     assert_eq!(
         "installer-v1",
         plugin_property(&plugins[0], BStr::new("version"))
@@ -508,7 +495,7 @@ fn test_install_multiple_plugins() {
     );
     assert_eq!(
         "activate v4-plugin1\nactivate v4-plugin2\n",
-        set_up.io.borrow().get_output()
+        set_up.io.get_output()
     );
 }
 
@@ -544,7 +531,7 @@ fn test_upgrade_with_new_class_name() {
     );
     assert_eq!(
         "activate v1\ndeactivate v1\nactivate v2\n",
-        set_up.io.borrow().get_output()
+        set_up.io.get_output()
     );
 }
 
@@ -567,7 +554,7 @@ fn test_uninstall() {
     assert_eq!(0, plugins.len());
     assert_eq!(
         "activate v1\ndeactivate v1\nuninstall v1\n",
-        set_up.io.borrow().get_output()
+        set_up.io.get_output()
     );
 }
 
@@ -599,7 +586,7 @@ fn test_upgrade_with_same_class_name() {
     );
     assert_eq!(
         "activate v2\ndeactivate v2\nactivate v3\n",
-        set_up.io.borrow().get_output()
+        set_up.io.get_output()
     );
 }
 
@@ -625,7 +612,7 @@ fn test_register_plugin_only_one_time() {
         "installer-v1",
         plugin_property(&plugins[0], BStr::new("version"))
     );
-    assert_eq!("activate v1\n", set_up.io.borrow().get_output());
+    assert_eq!("activate v1\n", set_up.io.get_output());
 }
 
 /// PHP `setPluginApiVersionWithPlugins`: swaps in a plugin manager reporting
@@ -648,7 +635,7 @@ fn set_plugin_api_version_with_plugins(
     ));
     pm.borrow_mut()
         .__set_plugin_api_version(BStr::new(new_plugin_api_version));
-    set_up.composer.borrow_mut().set_plugin_manager(pm.clone());
+    set_up.composer.set_plugin_manager(pm.clone());
 
     let plug_api_internal_package: PackageInterfaceHandle = CompletePackageHandle::new(
         BString::from("composer-plugin-api"),
@@ -669,9 +656,7 @@ fn set_plugin_api_version_with_plugins(
     }
     set_up
         .composer
-        .borrow()
         .get_repository_manager()
-        .borrow_mut()
         .set_local_repository(repository.as_repository_handle());
 
     pm.borrow_mut().load_installed_plugins().unwrap();
@@ -818,7 +803,7 @@ impl PluginInterface for NoopPlugin {
     fn activate(
         &mut self,
         _composer: ComposerHandle,
-        _io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        _io: std::rc::Rc<dyn IOInterface>,
     ) -> anyhow::Result<()> {
         Ok(())
     }
@@ -826,7 +811,7 @@ impl PluginInterface for NoopPlugin {
     fn deactivate(
         &mut self,
         _composer: ComposerHandle,
-        _io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        _io: std::rc::Rc<dyn IOInterface>,
     ) -> anyhow::Result<()> {
         Ok(())
     }
@@ -834,7 +819,7 @@ impl PluginInterface for NoopPlugin {
     fn uninstall(
         &mut self,
         _composer: ComposerHandle,
-        _io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        _io: std::rc::Rc<dyn IOInterface>,
     ) -> anyhow::Result<()> {
         Ok(())
     }
@@ -1011,7 +996,7 @@ impl PluginInterface for CapablePlugin {
     fn activate(
         &mut self,
         _composer: ComposerHandle,
-        _io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        _io: std::rc::Rc<dyn IOInterface>,
     ) -> anyhow::Result<()> {
         Ok(())
     }
@@ -1019,7 +1004,7 @@ impl PluginInterface for CapablePlugin {
     fn deactivate(
         &mut self,
         _composer: ComposerHandle,
-        _io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        _io: std::rc::Rc<dyn IOInterface>,
     ) -> anyhow::Result<()> {
         Ok(())
     }
@@ -1027,7 +1012,7 @@ impl PluginInterface for CapablePlugin {
     fn uninstall(
         &mut self,
         _composer: ComposerHandle,
-        _io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        _io: std::rc::Rc<dyn IOInterface>,
     ) -> anyhow::Result<()> {
         Ok(())
     }

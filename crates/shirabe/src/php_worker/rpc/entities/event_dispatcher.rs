@@ -37,7 +37,7 @@ pub(crate) fn call_php_callable(
 }
 
 php_entity! {
-    handle: std::rc::Rc<std::cell::RefCell<dyn EventDispatcherInterface>>,
+    handle: std::rc::Rc<dyn EventDispatcherInterface>,
     type_error: "an EventDispatcher",
     classes: {
         r"Composer\EventDispatcher\EventDispatcher": { constructor: unimplemented },
@@ -60,12 +60,12 @@ php_entity! {
 }
 
 fn dispatch(
-    dispatcher: &std::rc::Rc<std::cell::RefCell<dyn EventDispatcherInterface>>,
+    dispatcher: &std::rc::Rc<dyn EventDispatcherInterface>,
     call: &mut Call<'_>,
 ) -> Result<RpcValue, PhpThrow> {
     let name = call.arg::<BString>(0)?;
     let probe = Event::from_name(name.clone());
-    if dispatcher.borrow_mut().has_event_listeners(&probe) {
+    if dispatcher.has_event_listeners(&probe) {
         // TODO(plugin): dispatching a worker-constructed event through the Rust-side
         // dispatcher needs the event object (and the console input it carries) proxied back
         // into this process, so only the no-listener case is answered here.

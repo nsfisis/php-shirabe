@@ -15,16 +15,16 @@ use shirabe_symfony_console::input::InputValue;
 
 #[derive(Debug)]
 pub struct GitLab {
-    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-    config: std::rc::Rc<std::cell::RefCell<Config>>,
+    io: std::rc::Rc<dyn IOInterface>,
+    config: std::rc::Rc<Config>,
     process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
 }
 
 impl GitLab {
     pub fn new(
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        io: std::rc::Rc<dyn IOInterface>,
+        config: std::rc::Rc<Config>,
         process: Option<std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,
         http_downloader: Option<std::rc::Rc<std::cell::RefCell<HttpDownloader>>>,
     ) -> anyhow::Result<Self> {
@@ -53,7 +53,7 @@ impl GitLab {
         // before composer 1.9, origin URLs had no port number in them
         let bc_origin_url = preg_replace(php_regex!("{:\\d+}"), "", origin_url);
 
-        let gitlab_domains = self.config.borrow().get_list("gitlab-domains")?;
+        let gitlab_domains = self.config.get_list("gitlab-domains")?;
         if !in_array_strict(PhpMixed::string(origin_url), &gitlab_domains)
             && !in_array_strict(PhpMixed::string(bc_origin_url.clone()), &gitlab_domains)
         {
@@ -72,7 +72,7 @@ impl GitLab {
             None,
         )? == 0
         {
-            self.io.borrow_mut().set_authentication(
+            self.io.set_authentication(
                 origin_url.into(),
                 trim(&output),
                 Some(BString::from("oauth2")),
@@ -102,7 +102,7 @@ impl GitLab {
                 None,
             )? == 0
         {
-            self.io.borrow_mut().set_authentication(
+            self.io.set_authentication(
                 origin_url.into(),
                 trim(&token_user),
                 Some(trim(&token_password)),
@@ -111,7 +111,7 @@ impl GitLab {
         }
 
         // if available use token from composer config
-        let auth_tokens = self.config.borrow().get("gitlab-token")?;
+        let auth_tokens = self.config.get("gitlab-token")?;
 
         let mut token: Option<PhpMixed> = None;
 
@@ -152,17 +152,11 @@ impl GitLab {
             if [B("private-token"), B("gitlab-ci-token"), B("oauth2")]
                 .contains(&username.as_slice())
             {
-                self.io.borrow_mut().set_authentication(
-                    origin_url.into(),
-                    password,
-                    Some(username),
-                );
+                self.io
+                    .set_authentication(origin_url.into(), password, Some(username));
             } else {
-                self.io.borrow_mut().set_authentication(
-                    origin_url.into(),
-                    username,
-                    Some(password),
-                );
+                self.io
+                    .set_authentication(origin_url.into(), username, Some(password));
             }
 
             return Ok(true);
@@ -183,7 +177,6 @@ impl GitLab {
 
         let local_auth_config_name: Option<BString> = self
             .config
-            .borrow()
             .get_local_auth_config_source()
             .map(|c| c.get_name());
         let has_local_auth_config = local_auth_config_name.is_some();
@@ -196,7 +189,7 @@ impl GitLab {
                 .as_ref()
                 .map(|name| bformat!("{name} OR "))
                 .unwrap_or_default(),
-            self.config.borrow().get_auth_config_source().get_name()
+            self.config.get_auth_config_source().get_name()
         ));
         self.io
             .write_error("To revoke access to this token you can visit:");
@@ -264,7 +257,7 @@ impl GitLab {
                     .unwrap_or_default(),
             );
 
-            self.io.borrow_mut().set_authentication(
+            self.io.set_authentication(
                 origin_url.into(),
                 access_token.clone(),
                 Some(BString::from("oauth2")),
@@ -278,8 +271,8 @@ impl GitLab {
                 .unwrap_or(false);
 
             if use_local {
-                let mut config = self.config.borrow_mut();
-                let auth_config_source = config.get_local_auth_config_source_mut().unwrap();
+                let config = &self.config;
+                let auth_config_source = config.get_local_auth_config_source().unwrap();
                 if has_expires_in {
                     auth_config_source.add_config_setting(
                         bstr::BStr::new(&bformat!("gitlab-oauth.{origin_url}")),
@@ -292,8 +285,8 @@ impl GitLab {
                     )?;
                 }
             } else {
-                let mut config = self.config.borrow_mut();
-                let auth_config_source = config.get_auth_config_source_mut();
+                let config = &self.config;
+                let auth_config_source = config.get_auth_config_source();
                 if has_expires_in {
                     auth_config_source.add_config_setting(
                         bstr::BStr::new(&bformat!("gitlab-oauth.{origin_url}")),
@@ -342,20 +335,17 @@ impl GitLab {
                 .unwrap_or_default(),
         );
 
-        self.io.borrow_mut().set_authentication(
+        self.io.set_authentication(
             origin_url.into(),
             access_token.clone(),
             Some(BString::from("oauth2")),
         );
 
         // store value in user config in auth file
-        self.config
-            .borrow_mut()
-            .get_auth_config_source_mut()
-            .add_config_setting(
-                bstr::BStr::new(&bformat!("gitlab-oauth.{origin_url}")),
-                Self::build_oauth_config(&response, access_token.as_ref()),
-            )?;
+        self.config.get_auth_config_source().add_config_setting(
+            bstr::BStr::new(&bformat!("gitlab-oauth.{origin_url}")),
+            Self::build_oauth_config(&response, access_token.as_ref()),
+        )?;
 
         Ok(true)
     }
@@ -400,7 +390,7 @@ impl GitLab {
     }
 
     pub fn is_oauth_expired(&self, origin_url: &BStr) -> anyhow::Result<bool> {
-        let auth_tokens = self.config.borrow().get("gitlab-oauth")?;
+        let auth_tokens = self.config.get("gitlab-oauth")?;
         if let Some(map) = auth_tokens.as_array()
             && let Some(token_info) = map.get(origin_url)
             && let Some(token_map) = token_info.as_array()
@@ -415,7 +405,7 @@ impl GitLab {
     }
 
     fn refresh_token(&mut self, scheme: &BStr, origin_url: &BStr) -> anyhow::Result<PhpMixed> {
-        let auth_tokens = self.config.borrow().get("gitlab-oauth")?;
+        let auth_tokens = self.config.get("gitlab-oauth")?;
         let refresh_token = auth_tokens
             .as_array()
             .and_then(|map| map.get(origin_url))

@@ -53,34 +53,28 @@ pub trait CompletionTrait: BaseCommand {
 
             if include_root_package {
                 installed_repos.push(RepositoryInterfaceHandle::new(RootPackageRepository::new(
-                    RootPackageInterfaceHandle::dup(composer.get_package()),
+                    RootPackageInterfaceHandle::dup(&composer.get_package()),
                 )));
             }
 
             let locker = composer.get_locker();
-            if locker.borrow_mut().is_locked() {
-                installed_repos.push(locker.borrow_mut().get_locked_repository(true)?.into());
+            if locker.is_locked() {
+                installed_repos.push(locker.get_locked_repository(true)?.into());
             } else {
-                installed_repos.push(
-                    composer
-                        .get_repository_manager()
-                        .borrow()
-                        .get_local_repository(),
-                );
+                installed_repos.push(composer.get_repository_manager().get_local_repository());
             }
 
             let mut platform_hint: Vec<BString> = vec![];
             if include_platform_packages {
-                let mut platform_repo = if locker.borrow_mut().is_locked() {
+                let mut platform_repo = if locker.is_locked() {
                     let overrides: IndexMap<BString, PhpMixed> = locker
-                        .borrow_mut()
                         .get_platform_overrides()?
                         .into_iter()
                         .map(|(k, v)| (k, PhpMixed::string(v)))
                         .collect();
                     PlatformRepository::new(vec![], overrides, None, None)?
                 } else {
-                    let overrides = composer.get_config().borrow().get_map("platform")?;
+                    let overrides = composer.get_config().get_map("platform")?;
                     PlatformRepository::new(vec![], overrides, None, None)?
                 };
                 if input.get_completion_value().is_empty() {
@@ -140,20 +134,15 @@ pub trait CompletionTrait: BaseCommand {
 
             if include_root_package {
                 installed_repos.push(RepositoryInterfaceHandle::new(RootPackageRepository::new(
-                    RootPackageInterfaceHandle::dup(composer.get_package()),
+                    RootPackageInterfaceHandle::dup(&composer.get_package()),
                 )));
             }
 
             let locker = composer.get_locker();
-            if locker.borrow_mut().is_locked() {
-                installed_repos.push(locker.borrow_mut().get_locked_repository(true)?.into());
+            if locker.is_locked() {
+                installed_repos.push(locker.get_locked_repository(true)?.into());
             } else {
-                installed_repos.push(
-                    composer
-                        .get_repository_manager()
-                        .borrow()
-                        .get_local_repository(),
-                );
+                installed_repos.push(composer.get_repository_manager().get_local_repository());
             }
 
             let mut installed_repo = InstalledRepository::new(installed_repos);
@@ -183,7 +172,6 @@ pub trait CompletionTrait: BaseCommand {
             let composer = this.require_composer(None, None)?;
             let composer = composer_full(&composer);
             let repository_manager = composer.get_repository_manager();
-            let repository_manager = repository_manager.borrow();
             let mut repos = CompositeRepository::new(repository_manager.get_repositories().clone());
 
             let mut results: Vec<SearchResult> = vec![];
@@ -273,7 +261,7 @@ pub trait CompletionTrait: BaseCommand {
         SuggestedValues::Closure(Box::new(|this, input, _suggestions| {
             let composer = this.require_composer(None, None)?;
             let composer = composer_full(&composer);
-            let overrides = composer.get_config().borrow().get_map("platform")?;
+            let overrides = composer.get_config().get_map("platform")?;
             let mut repos = PlatformRepository::new(vec![], overrides, None, None)?;
 
             let pattern =

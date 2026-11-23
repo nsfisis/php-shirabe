@@ -128,11 +128,7 @@ impl AuditConfig {
         Ok((for_audit, for_block))
     }
 
-    pub fn from_config(
-        config: &mut Config,
-        audit: bool,
-        audit_format: &BStr,
-    ) -> anyhow::Result<Self> {
+    pub fn from_config(config: &Config, audit: bool, audit_format: &BStr) -> anyhow::Result<Self> {
         let audit_config = config.get_audit()?;
 
         let empty_array = PhpMixed::Array(IndexMap::new());

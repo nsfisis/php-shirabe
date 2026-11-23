@@ -60,7 +60,7 @@ impl UpdateCommand {
 
     fn get_packages_interactively(
         &self,
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: std::rc::Rc<dyn IOInterface>,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         composer: &PartialComposerHandle,
@@ -93,16 +93,12 @@ impl UpdateCommand {
         io.write_error("<info>Loading packages that can be updated...</info>");
         let mut autocompleter_values: IndexMap<BString, BString> = IndexMap::new();
         let installed_packages: Vec<PackageInterfaceHandle> =
-            if composer_ref.get_locker().borrow_mut().is_locked() {
-                let locked_repo = composer_ref
-                    .get_locker()
-                    .borrow_mut()
-                    .get_locked_repository(true)?;
+            if composer_ref.get_locker().is_locked() {
+                let locked_repo = composer_ref.get_locker().get_locked_repository(true)?;
                 locked_repo.borrow_mut().get_canonical_packages()?
             } else {
                 composer_ref
                     .get_repository_manager()
-                    .borrow()
                     .get_local_repository()
                     .get_packages()?
             };
@@ -222,7 +218,6 @@ impl UpdateCommand {
         );
         let repositories: Vec<RepositoryInterfaceHandle> = composer
             .get_repository_manager()
-            .borrow()
             .get_repositories()
             .iter()
             .filter(|repository| !repository.is::<PlatformRepository>())
@@ -397,7 +392,7 @@ impl Command for UpdateCommand {
             .as_bool()
             .unwrap_or(false)
         {
-            if !composer.get_locker().borrow_mut().is_locked() {
+            if !composer.get_locker().is_locked() {
                 return Err(InvalidArgumentException::new(BString::from(
                     "patch-only can only be used with a lock file present",
                 ))
@@ -405,7 +400,6 @@ impl Command for UpdateCommand {
             }
             for package in composer
                 .get_locker()
-                .borrow_mut()
                 .get_locked_repository(true)?
                 .borrow_mut()
                 .get_canonical_packages()?
@@ -492,40 +486,37 @@ impl Command for UpdateCommand {
         let command_event =
             CommandEvent::new(PluginEvents::COMMAND, "update", input.clone(), output);
         let command_event_name = command_event.get_name().to_owned();
-        composer.get_event_dispatcher().borrow_mut().dispatch(
+        composer.get_event_dispatcher().dispatch(
             Some(command_event_name.as_ref()),
             Some(std::rc::Rc::new(std::cell::RefCell::new(command_event))),
         )?;
 
-        composer
-            .get_installation_manager()
-            .borrow_mut()
-            .set_output_progress(
-                !input
-                    .borrow()
-                    .get_option("no-progress")?
-                    .as_bool()
-                    .unwrap_or(false),
-            );
+        composer.get_installation_manager().set_output_progress(
+            !input
+                .borrow()
+                .get_option("no-progress")?
+                .as_bool()
+                .unwrap_or(false),
+        );
 
         let mut install = Installer::create(io.clone(), &composer_handle);
 
         let config = composer.get_config();
         let (prefer_source, prefer_dist) =
-            self.get_preferred_install_options(&config.borrow(), input.clone(), false)?;
+            self.get_preferred_install_options(&config, input.clone(), false)?;
 
         let optimize = input
             .borrow()
             .get_option("optimize-autoloader")?
             .as_bool()
             .unwrap_or(false)
-            || config.borrow().get_truthy("optimize-autoloader")?;
+            || config.get_truthy("optimize-autoloader")?;
         let authoritative = input
             .borrow()
             .get_option("classmap-authoritative")?
             .as_bool()
             .unwrap_or(false)
-            || config.borrow().get_truthy("classmap-authoritative")?;
+            || config.get_truthy("classmap-authoritative")?;
         let apcu_prefix: Option<BString> = input
             .borrow()
             .get_option("apcu-autoloader-prefix")?
@@ -537,13 +528,13 @@ impl Command for UpdateCommand {
                 .get_option("apcu-autoloader")?
                 .as_bool()
                 .unwrap_or(false)
-            || config.borrow().get_truthy("apcu-autoloader")?;
+            || config.get_truthy("apcu-autoloader")?;
         let minimal_changes = input
             .borrow()
             .get_option("minimal-changes")?
             .as_bool()
             .unwrap_or(false)
-            || config.borrow().get_truthy("update-with-minimal-changes")?;
+            || config.get_truthy("update-with-minimal-changes")?;
 
         let mut update_allow_transitive_dependencies = UpdateAllowTransitiveDeps::UpdateOnlyListed;
         if input
@@ -625,9 +616,7 @@ impl Command for UpdateCommand {
                     .unwrap_or(false),
             )
             .set_temporary_constraints(temporary_constraints)
-            .set_audit_config(
-                self.create_audit_config(&mut composer.get_config().borrow_mut(), input.clone())?,
-            )
+            .set_audit_config(self.create_audit_config(&composer.get_config(), input.clone())?)
             .set_minimal_update(minimal_changes);
 
         if input
@@ -652,7 +641,7 @@ impl Command for UpdateCommand {
                 input.borrow().get_option("bump-after-update")?.into();
             // PHP: false === $bumpAfterUpdate (strict)
             let bump_after_update = if matches!(bump_after_update_option, PhpMixed::Bool(false)) {
-                composer.get_config().borrow().get_bump_after_update()?
+                composer.get_config().get_bump_after_update()?
             } else {
                 BumpAfterUpdate::from_value(&bump_after_update_option)
             };

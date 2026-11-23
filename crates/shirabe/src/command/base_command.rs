@@ -38,7 +38,7 @@ pub const INVALID: i64 = 2;
 pub struct BaseCommandData {
     inner: CommandData,
     composer: std::cell::RefCell<Option<PartialComposerHandle>>,
-    io: std::cell::RefCell<Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>>,
+    io: std::cell::RefCell<Option<std::rc::Rc<dyn IOInterface>>>,
     /// The definition entries that were registered through the Composer-typed
     /// InputArgument/InputOption (which carry the suggested-values backport). PHP checks
     /// `$definition->getArgument($name) instanceof Composer\Console\Input\InputArgument`; in
@@ -176,15 +176,15 @@ pub trait BaseCommand: Command {
     /// Removes the cached composer instance
     fn reset_composer(&self) -> anyhow::Result<()>;
 
-    fn get_io(&self) -> std::rc::Rc<std::cell::RefCell<dyn IOInterface>>;
+    fn get_io(&self) -> std::rc::Rc<dyn IOInterface>;
 
-    fn set_io(&self, io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>);
+    fn set_io(&self, io: std::rc::Rc<dyn IOInterface>);
 
     /// Calls {@see Factory::create()} with the given arguments, taking into account flags and default states for disabling scripts and plugins
     fn create_composer_instance(
         &self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: std::rc::Rc<dyn IOInterface>,
         config: Option<IndexMap<BString, PhpMixed>>,
         disable_plugins: bool,
         disable_scripts: Option<bool>,
@@ -230,7 +230,7 @@ pub trait BaseCommand: Command {
     /// Creates an AuditConfig from the Config object, optionally overriding security blocking based on input options
     fn create_audit_config(
         &self,
-        config: &mut Config,
+        config: &Config,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
     ) -> anyhow::Result<AuditConfig>;
 }
@@ -246,9 +246,9 @@ macro_rules! delegate_base_command_trait_impls_to_inner {
         shirabe_symfony_console::delegate_to_inner!($field, fn try_composer(&self, disable_plugins: Option<bool>, disable_scripts: Option<bool>) -> Option<$crate::composer::PartialComposerHandle>);
         shirabe_symfony_console::delegate_to_inner!($field, fn set_composer(&self, composer: $crate::composer::PartialComposerHandle));
         shirabe_symfony_console::delegate_to_inner!($field, fn reset_composer(&self) -> anyhow::Result<()>);
-        shirabe_symfony_console::delegate_to_inner!($field, fn get_io(&self) -> std::rc::Rc<std::cell::RefCell<dyn $crate::io::IOInterface>>);
-        shirabe_symfony_console::delegate_to_inner!($field, fn set_io(&self, io: std::rc::Rc<std::cell::RefCell<dyn $crate::io::IOInterface>>));
-        shirabe_symfony_console::delegate_to_inner!($field, fn create_composer_instance(&self, input: std::rc::Rc<std::cell::RefCell<dyn shirabe_symfony_console::input::InputInterface>>, io: std::rc::Rc<std::cell::RefCell<dyn $crate::io::IOInterface>>, config: Option<indexmap::IndexMap<bstr::BString, shirabe_php_shim::PhpMixed>>, disable_plugins: bool, disable_scripts: Option<bool>) -> anyhow::Result<$crate::composer::PartialComposerHandle>);
+        shirabe_symfony_console::delegate_to_inner!($field, fn get_io(&self) -> std::rc::Rc<dyn $crate::io::IOInterface>);
+        shirabe_symfony_console::delegate_to_inner!($field, fn set_io(&self, io: std::rc::Rc<dyn $crate::io::IOInterface>));
+        shirabe_symfony_console::delegate_to_inner!($field, fn create_composer_instance(&self, input: std::rc::Rc<std::cell::RefCell<dyn shirabe_symfony_console::input::InputInterface>>, io: std::rc::Rc<dyn $crate::io::IOInterface>, config: Option<indexmap::IndexMap<bstr::BString, shirabe_php_shim::PhpMixed>>, disable_plugins: bool, disable_scripts: Option<bool>) -> anyhow::Result<$crate::composer::PartialComposerHandle>);
         shirabe_symfony_console::delegate_to_inner!($field, fn get_preferred_install_options(&self, config: &$crate::config::Config, input: std::rc::Rc<std::cell::RefCell<dyn shirabe_symfony_console::input::InputInterface>>, keep_vcs_requires_prefer_source: bool) -> anyhow::Result<(bool, bool)>);
         shirabe_symfony_console::delegate_to_inner!($field, fn get_platform_requirement_filter(&self, input: std::rc::Rc<std::cell::RefCell<dyn shirabe_symfony_console::input::InputInterface>>) -> anyhow::Result<std::rc::Rc<dyn $crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface>>);
         shirabe_symfony_console::delegate_to_inner!($field, fn format_requirements(&self, requirements: Vec<bstr::BString>) -> anyhow::Result<indexmap::IndexMap<bstr::BString, bstr::BString>>);
@@ -256,7 +256,7 @@ macro_rules! delegate_base_command_trait_impls_to_inner {
         shirabe_symfony_console::delegate_to_inner!($field, fn render_table(&self, table: Vec<Vec<bstr::BString>>, output: std::rc::Rc<std::cell::RefCell<dyn shirabe_symfony_console::output::OutputInterface>>) -> anyhow::Result<()>);
         shirabe_symfony_console::delegate_to_inner!($field, fn get_terminal_width(&self) -> i64);
         shirabe_symfony_console::delegate_to_inner!($field, fn get_audit_format(&self, input: std::rc::Rc<std::cell::RefCell<dyn shirabe_symfony_console::input::InputInterface>>, opt_name: &bstr::BStr) -> anyhow::Result<bstr::BString>);
-        shirabe_symfony_console::delegate_to_inner!($field, fn create_audit_config(&self, config: &mut $crate::config::Config, input: std::rc::Rc<std::cell::RefCell<dyn shirabe_symfony_console::input::InputInterface>>) -> anyhow::Result<$crate::advisory::AuditConfig>);
+        shirabe_symfony_console::delegate_to_inner!($field, fn create_audit_config(&self, config: &$crate::config::Config, input: std::rc::Rc<std::cell::RefCell<dyn shirabe_symfony_console::input::InputInterface>>) -> anyhow::Result<$crate::advisory::AuditConfig>);
     };
 }
 
@@ -353,7 +353,7 @@ impl BaseCommand for BaseCommandData {
         Ok(())
     }
 
-    fn get_io(&self) -> std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
+    fn get_io(&self) -> std::rc::Rc<dyn IOInterface> {
         if self.io.borrow().is_none() {
             match self.get_application() {
                 Some(application) => {
@@ -370,8 +370,7 @@ impl BaseCommand for BaseCommandData {
                     *self.io.borrow_mut() = Some(io);
                 }
                 None => {
-                    *self.io.borrow_mut() =
-                        Some(std::rc::Rc::new(std::cell::RefCell::new(NullIO::new())));
+                    *self.io.borrow_mut() = Some(std::rc::Rc::new(NullIO::new()));
                 }
             }
         }
@@ -379,14 +378,14 @@ impl BaseCommand for BaseCommandData {
         self.io.borrow().clone().unwrap()
     }
 
-    fn set_io(&self, io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>) {
+    fn set_io(&self, io: std::rc::Rc<dyn IOInterface>) {
         *self.io.borrow_mut() = Some(io);
     }
 
     fn create_composer_instance(
         &self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: std::rc::Rc<dyn IOInterface>,
         config: Option<IndexMap<BString, PhpMixed>>,
         disable_plugins: bool,
         disable_scripts: Option<bool>,
@@ -656,7 +655,7 @@ impl BaseCommand for BaseCommandData {
 
     fn create_audit_config(
         &self,
-        config: &mut Config,
+        config: &Config,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
     ) -> anyhow::Result<AuditConfig> {
         // Handle both --audit and --no-audit flags
@@ -823,8 +822,8 @@ pub fn base_command_initialize(
             command_name,
         );
         let pre_command_run_event_name = pre_command_run_event.get_name().to_owned();
-        let dispatcher = composer.borrow_partial().get_event_dispatcher();
-        dispatcher.borrow_mut().dispatch(
+        let dispatcher = composer.get_event_dispatcher();
+        dispatcher.dispatch(
             Some(pre_command_run_event_name.as_ref()),
             Some(std::rc::Rc::new(std::cell::RefCell::new(
                 pre_command_run_event,

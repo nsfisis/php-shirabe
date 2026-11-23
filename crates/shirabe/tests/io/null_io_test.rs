@@ -2,7 +2,7 @@
 
 use bstr::BString;
 use indexmap::{IndexMap, indexmap};
-use shirabe::io::{IOInterfaceImmutable, IOInterfaceWrite, NullIO};
+use shirabe::io::{IOInterface, IOInterfaceWrite, NullIO};
 use shirabe_symfony_console::input::InputValue;
 
 #[test]

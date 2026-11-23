@@ -1,15 +1,22 @@
 //! ref: composer/src/Composer/IO/NullIO.php sha1:f36480c2ba0704f5d52fb278b24cfffd70429440
 
 use crate::config::Config;
-use crate::io::{BaseIO, IOInterface, IOInterfaceImmutable, IOInterfaceMutable};
+use crate::io::{BaseIO, IOInterface};
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
+use shirabe_php_shim::PhpProp;
 use shirabe_symfony_console::input::InputValue;
 
 #[derive(Debug)]
 pub struct NullIO {
-    authentications:
-        indexmap::IndexMap<bstr::BString, indexmap::IndexMap<bstr::BString, Option<bstr::BString>>>,
+    authentications: PhpProp<
+        std::rc::Rc<
+            indexmap::IndexMap<
+                bstr::BString,
+                indexmap::IndexMap<bstr::BString, Option<bstr::BString>>,
+            >,
+        >,
+    >,
 }
 
 impl Default for NullIO {
@@ -21,12 +28,12 @@ impl Default for NullIO {
 impl NullIO {
     pub fn new() -> Self {
         Self {
-            authentications: indexmap::IndexMap::new(),
+            authentications: PhpProp::default(),
         }
     }
 }
 
-impl IOInterfaceImmutable for NullIO {
+impl IOInterface for NullIO {
     fn is_interactive(&self) -> bool {
         false
     }
@@ -143,11 +150,9 @@ impl IOInterfaceImmutable for NullIO {
     fn debug_bytes(&self, message: &bstr::BStr, context: &[(&bstr::BStr, &bstr::BStr)]) {
         <Self as BaseIO>::debug(self, message, context);
     }
-}
 
-impl IOInterfaceMutable for NullIO {
     fn set_authentication(
-        &mut self,
+        &self,
         repository_name: bstr::BString,
         username: bstr::BString,
         password: Option<bstr::BString>,
@@ -155,12 +160,10 @@ impl IOInterfaceMutable for NullIO {
         <Self as BaseIO>::set_authentication(self, repository_name, username, password)
     }
 
-    fn load_configuration(&mut self, config: &mut Config) -> anyhow::Result<()> {
+    fn load_configuration(&self, config: &Config) -> anyhow::Result<()> {
         <Self as BaseIO>::load_configuration(self, config)
     }
-}
 
-impl IOInterface for NullIO {
     fn as_any(&self) -> &dyn std::any::Any {
         self
     }
@@ -169,7 +172,7 @@ impl IOInterface for NullIO {
         Some(BStr::new("Composer\\IO\\NullIO"))
     }
 
-    fn as_base_io_mut(&mut self) -> Option<&mut dyn BaseIO> {
+    fn as_base_io(&self) -> Option<&dyn BaseIO> {
         Some(self)
     }
 }
@@ -177,17 +180,14 @@ impl IOInterface for NullIO {
 impl BaseIO for NullIO {
     fn authentications(
         &self,
-    ) -> &indexmap::IndexMap<bstr::BString, indexmap::IndexMap<bstr::BString, Option<bstr::BString>>>
-    {
-        &self.authentications
-    }
-
-    fn authentications_mut(
-        &mut self,
-    ) -> &mut indexmap::IndexMap<
-        bstr::BString,
-        indexmap::IndexMap<bstr::BString, Option<bstr::BString>>,
+    ) -> &PhpProp<
+        std::rc::Rc<
+            indexmap::IndexMap<
+                bstr::BString,
+                indexmap::IndexMap<bstr::BString, Option<bstr::BString>>,
+            >,
+        >,
     > {
-        &mut self.authentications
+        &self.authentications
     }
 }

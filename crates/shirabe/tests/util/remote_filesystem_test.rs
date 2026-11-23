@@ -14,7 +14,7 @@ use shirabe_php_shim::{
 // Mirrors RemoteFilesystemTest::getConfigMock: get('github-domains') and
 // get('gitlab-domains') return [], everything else returns null. add_authentication_options
 // reads gitlab-domains, so seed it as an empty list.
-fn config_mock() -> std::rc::Rc<std::cell::RefCell<shirabe::config::Config>> {
+fn config_mock() -> std::rc::Rc<shirabe::config::Config> {
     ConfigStubBuilder::new()
         .with("github-domains", PhpMixed::List(vec![]))
         .with("gitlab-domains", PhpMixed::List(vec![]))
@@ -24,7 +24,7 @@ fn config_mock() -> std::rc::Rc<std::cell::RefCell<shirabe::config::Config>> {
 // Mirrors RemoteFilesystemTest::callGetOptionsForUrl: build a RemoteFilesystem, set the
 // private file_url, then invoke the private get_options_for_url with the given args.
 fn call_get_options_for_url(
-    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    io: std::rc::Rc<dyn IOInterface>,
     origin_url: &BStr,
     additional_options: IndexMap<BString, PhpMixed>,
     options: IndexMap<BString, PhpMixed>,
@@ -54,9 +54,8 @@ fn test_get_options_for_url() {
     // TODO(plugin): the PHP RemoteFilesystem instance cannot be built in the worker yet: the
     // IOStub mock has no proxy stub, IOInterface::debug is not served over RPC, and the
     // AuthHelper the constructor builds is guarded there.
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = std::rc::Rc::new(
-        std::cell::RefCell::new(IOStub::new().with_has_authentication(false)),
-    );
+    let io: std::rc::Rc<dyn IOInterface> =
+        std::rc::Rc::new(IOStub::new().with_has_authentication(false));
 
     let res = call_get_options_for_url(
         io,
@@ -87,12 +86,11 @@ fn test_get_options_for_url_with_authorization() {
         BString::from("password"),
         Some(bstr::BString::from("password")),
     );
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
-        std::rc::Rc::new(std::cell::RefCell::new(
-            IOStub::new()
-                .with_has_authentication(true)
-                .with_get_authentication(auth),
-        ));
+    let io: std::rc::Rc<dyn IOInterface> = std::rc::Rc::new(
+        IOStub::new()
+            .with_has_authentication(true)
+            .with_get_authentication(auth),
+    );
 
     let options = call_get_options_for_url(
         io,
@@ -120,12 +118,11 @@ fn test_get_options_for_url_with_stream_options() {
     let mut auth: IndexMap<bstr::BString, Option<bstr::BString>> = IndexMap::new();
     auth.insert(BString::from("username"), None);
     auth.insert(BString::from("password"), None);
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
-        std::rc::Rc::new(std::cell::RefCell::new(
-            IOStub::new()
-                .with_has_authentication(true)
-                .with_get_authentication(auth),
-        ));
+    let io: std::rc::Rc<dyn IOInterface> = std::rc::Rc::new(
+        IOStub::new()
+            .with_has_authentication(true)
+            .with_get_authentication(auth),
+    );
 
     let mut ssl: IndexMap<BString, PhpMixed> = IndexMap::new();
     ssl.insert("allow_self_signed".into(), PhpMixed::Bool(true));
@@ -161,12 +158,11 @@ fn test_get_options_for_url_with_call_options_keeps_header() {
     let mut auth: IndexMap<bstr::BString, Option<bstr::BString>> = IndexMap::new();
     auth.insert(BString::from("username"), None);
     auth.insert(BString::from("password"), None);
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
-        std::rc::Rc::new(std::cell::RefCell::new(
-            IOStub::new()
-                .with_has_authentication(true)
-                .with_get_authentication(auth),
-        ));
+    let io: std::rc::Rc<dyn IOInterface> = std::rc::Rc::new(
+        IOStub::new()
+            .with_has_authentication(true)
+            .with_get_authentication(auth),
+    );
 
     let mut http: IndexMap<BString, PhpMixed> = IndexMap::new();
     http.insert("header".into(), PhpMixed::string(BString::from("Foo: bar")));
@@ -199,8 +195,7 @@ fn test_callback_get_file_size() {
     // TODO(plugin): the PHP RemoteFilesystem instance cannot be built in the worker yet: the
     // IOStub mock has no proxy stub, IOInterface::debug is not served over RPC, and the
     // AuthHelper the constructor builds is guarded there.
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
-        std::rc::Rc::new(std::cell::RefCell::new(IOStub::new()));
+    let io: std::rc::Rc<dyn IOInterface> = std::rc::Rc::new(IOStub::new());
     let fs = RemoteFilesystem::new(
         io,
         config_mock(),
@@ -225,8 +220,7 @@ fn test_callback_get_notify_progress() {
     // TODO(plugin): the PHP RemoteFilesystem instance cannot be built in the worker yet: the
     // IOStub mock has no proxy stub, IOInterface::debug is not served over RPC, and the
     // AuthHelper the constructor builds is guarded there.
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
-        std::rc::Rc::new(std::cell::RefCell::new(IOStub::new()));
+    let io: std::rc::Rc<dyn IOInterface> = std::rc::Rc::new(IOStub::new());
     let fs = RemoteFilesystem::new(
         io,
         config_mock(),
@@ -254,8 +248,7 @@ fn test_callback_get_passes_through404() {
     // TODO(plugin): the PHP RemoteFilesystem instance cannot be built in the worker yet: the
     // IOStub mock has no proxy stub, IOInterface::debug is not served over RPC, and the
     // AuthHelper the constructor builds is guarded there.
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
-        std::rc::Rc::new(std::cell::RefCell::new(IOStub::new()));
+    let io: std::rc::Rc<dyn IOInterface> = std::rc::Rc::new(IOStub::new());
     let fs = RemoteFilesystem::new(
         io,
         config_mock(),
@@ -306,8 +299,7 @@ fn test_get_options_for_url_creates_secure_tls_defaults() {
     // TODO(plugin): the PHP RemoteFilesystem instance cannot be built in the worker yet: the
     // IOStub mock has no proxy stub, IOInterface::debug is not served over RPC, and the
     // AuthHelper the constructor builds is guarded there.
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
-        std::rc::Rc::new(std::cell::RefCell::new(IOStub::new()));
+    let io: std::rc::Rc<dyn IOInterface> = std::rc::Rc::new(IOStub::new());
 
     let mut ssl: IndexMap<BString, PhpMixed> = IndexMap::new();
     ssl.insert(
@@ -374,8 +366,7 @@ fn test_bit_bucket_public_download() {
     // IOStub mock has no proxy stub, IOInterface::debug is not served over RPC, and the
     // AuthHelper the constructor builds is guarded there.
     for (url, contents) in provide_bitbucket_public_download_urls() {
-        let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
-            std::rc::Rc::new(std::cell::RefCell::new(IOStub::new()));
+        let io: std::rc::Rc<dyn IOInterface> = std::rc::Rc::new(IOStub::new());
         let rfs = RemoteFilesystem::new(
             io,
             config_mock(),

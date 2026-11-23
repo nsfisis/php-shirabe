@@ -55,7 +55,7 @@ impl ConfigStubBuilder {
     }
 
     pub fn build(self) -> Config {
-        let mut config = Config::new(self.use_environment, self.base_dir);
+        let config = Config::new(self.use_environment, self.base_dir);
         if !self.values.is_empty() {
             let mut merge: IndexMap<BString, PhpMixed> = IndexMap::new();
             merge.insert("config".into(), PhpMixed::Array(self.values));
@@ -64,8 +64,8 @@ impl ConfigStubBuilder {
         config
     }
 
-    pub fn build_shared(self) -> std::rc::Rc<std::cell::RefCell<Config>> {
-        std::rc::Rc::new(std::cell::RefCell::new(self.build()))
+    pub fn build_shared(self) -> std::rc::Rc<Config> {
+        std::rc::Rc::new(self.build())
     }
 }
 

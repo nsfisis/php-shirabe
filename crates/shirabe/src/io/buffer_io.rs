@@ -1,13 +1,13 @@
 //! ref: composer/src/Composer/IO/BufferIO.php sha1:92cbd3ce7909bd23e07b2d280a5f49ad5ea099bb
 
 use crate::config::Config;
-use crate::io::{BaseIO, ConsoleIO, IOInterface, IOInterfaceImmutable, IOInterfaceMutable};
+use crate::io::{BaseIO, ConsoleIO, IOInterface};
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_binding_macros::php_binding;
 use shirabe_php_shim::{
-    PHP_EOL, PhpResource, PregMatches, RuntimeException, SEEK_SET, bformat, fopen, fseek, fwrite,
-    php_regex, preg_replace_callback, rewind, rtrim, stream_get_contents, strip_tags,
+    PHP_EOL, PhpProp, PhpResource, PregMatches, RuntimeException, SEEK_SET, bformat, fopen, fseek,
+    fwrite, php_regex, preg_replace_callback, rewind, rtrim, stream_get_contents, strip_tags,
 };
 use shirabe_symfony_console::formatter::OutputFormatterInterface;
 use shirabe_symfony_console::helper::QuestionHelper;
@@ -141,7 +141,7 @@ impl BufferIO {
     }
 }
 
-impl IOInterfaceImmutable for BufferIO {
+impl IOInterface for BufferIO {
     fn is_interactive(&self) -> bool {
         self.inner.is_interactive()
     }
@@ -234,16 +234,16 @@ impl IOInterfaceImmutable for BufferIO {
         &self,
     ) -> indexmap::IndexMap<bstr::BString, indexmap::IndexMap<bstr::BString, Option<bstr::BString>>>
     {
-        IOInterfaceImmutable::get_authentications(&self.inner)
+        IOInterface::get_authentications(&self.inner)
     }
     fn has_authentication(&self, repository_name: &bstr::BStr) -> bool {
-        IOInterfaceImmutable::has_authentication(&self.inner, repository_name)
+        IOInterface::has_authentication(&self.inner, repository_name)
     }
     fn get_authentication(
         &self,
         repository_name: &bstr::BStr,
     ) -> indexmap::IndexMap<bstr::BString, Option<bstr::BString>> {
-        IOInterfaceImmutable::get_authentication(&self.inner, repository_name)
+        IOInterface::get_authentication(&self.inner, repository_name)
     }
     fn error_bytes(&self, message: &bstr::BStr, context: &[(&bstr::BStr, &bstr::BStr)]) {
         self.inner.error_bytes(message, context)
@@ -256,23 +256,19 @@ impl IOInterfaceImmutable for BufferIO {
     fn debug_bytes(&self, message: &bstr::BStr, context: &[(&bstr::BStr, &bstr::BStr)]) {
         self.inner.debug_bytes(message, context)
     }
-}
 
-impl IOInterfaceMutable for BufferIO {
     fn set_authentication(
-        &mut self,
+        &self,
         repository_name: bstr::BString,
         username: bstr::BString,
         password: Option<bstr::BString>,
     ) {
-        IOInterfaceMutable::set_authentication(&mut self.inner, repository_name, username, password)
+        IOInterface::set_authentication(&self.inner, repository_name, username, password)
     }
-    fn load_configuration(&mut self, config: &mut Config) -> anyhow::Result<()> {
-        IOInterfaceMutable::load_configuration(&mut self.inner, config)
+    fn load_configuration(&self, config: &Config) -> anyhow::Result<()> {
+        IOInterface::load_configuration(&self.inner, config)
     }
-}
 
-impl IOInterface for BufferIO {
     fn as_any(&self) -> &dyn std::any::Any {
         self
     }
@@ -281,11 +277,11 @@ impl IOInterface for BufferIO {
         Some(BStr::new("Composer\\IO\\BufferIO"))
     }
 
-    fn as_base_io_mut(&mut self) -> Option<&mut dyn BaseIO> {
+    fn as_base_io(&self) -> Option<&dyn BaseIO> {
         Some(self)
     }
 
-    fn enable_debugging(&mut self, start_time: f64) {
+    fn enable_debugging(&self, start_time: f64) {
         self.inner.enable_debugging(start_time)
     }
 }
@@ -293,16 +289,14 @@ impl IOInterface for BufferIO {
 impl BaseIO for BufferIO {
     fn authentications(
         &self,
-    ) -> &indexmap::IndexMap<bstr::BString, indexmap::IndexMap<bstr::BString, Option<bstr::BString>>>
-    {
-        self.inner.authentications()
-    }
-    fn authentications_mut(
-        &mut self,
-    ) -> &mut indexmap::IndexMap<
-        bstr::BString,
-        indexmap::IndexMap<bstr::BString, Option<bstr::BString>>,
+    ) -> &PhpProp<
+        std::rc::Rc<
+            indexmap::IndexMap<
+                bstr::BString,
+                indexmap::IndexMap<bstr::BString, Option<bstr::BString>>,
+            >,
+        >,
     > {
-        self.inner.authentications_mut()
+        self.inner.authentications()
     }
 }

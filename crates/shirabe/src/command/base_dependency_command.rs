@@ -2,7 +2,7 @@
 
 use crate::command::BaseCommand;
 use crate::composer::composer_full;
-use crate::io::{IOInterfaceImmutable, IOInterfaceWrite};
+use crate::io::IOInterfaceWrite;
 use crate::package::version::VersionParser;
 use crate::package::{
     Package, PackageHandle, PackageInterfaceHandle, RootPackage, RootPackageInterfaceHandle,
@@ -54,15 +54,15 @@ pub trait BaseDependencyCommand: BaseCommand {
             output.clone(),
         );
         let command_event_name = command_event.get_name().to_owned();
-        let event_dispatcher = composer.borrow_partial().get_event_dispatcher();
-        event_dispatcher.borrow_mut().dispatch(
+        let event_dispatcher = composer.get_event_dispatcher();
+        event_dispatcher.dispatch(
             Some(command_event_name.as_ref()),
             Some(std::rc::Rc::new(std::cell::RefCell::new(command_event))),
         )?;
         let composer = composer_full(&composer);
 
         let mut repos: Vec<RepositoryInterfaceHandle> = vec![RepositoryInterfaceHandle::new(
-            RootPackageRepository::new(RootPackageInterfaceHandle::dup(composer.get_package())),
+            RootPackageRepository::new(RootPackageInterfaceHandle::dup(&composer.get_package())),
         )];
 
         if input
@@ -72,7 +72,6 @@ pub trait BaseDependencyCommand: BaseCommand {
             .unwrap_or(false)
         {
             let locker = composer.get_locker().clone();
-            let mut locker = locker.borrow_mut();
 
             if !locker.is_locked() {
                 return Err(UnexpectedValueException::new(BString::from(
@@ -95,7 +94,6 @@ pub trait BaseDependencyCommand: BaseCommand {
             )?));
         } else {
             let repository_manager = composer.get_repository_manager().clone();
-            let repository_manager = repository_manager.borrow();
             let local_repo = repository_manager.get_local_repository();
             let root_pkg = composer.get_package();
 
@@ -114,7 +112,6 @@ pub trait BaseDependencyCommand: BaseCommand {
 
             let platform_overrides: IndexMap<BString, PhpMixed> = composer
                 .get_config()
-                .borrow()
                 .get_map_or_empty("platform")?
                 .into_iter()
                 .collect();
@@ -167,7 +164,7 @@ pub trait BaseDependencyCommand: BaseCommand {
                     RepositoryFactory::default_repos(
                         Some(self.get_io()),
                         Some(composer.get_config()),
-                        Some(&mut *rm.borrow_mut()),
+                        Some(&*rm),
                     )?
                     .into_values()
                     .collect(),

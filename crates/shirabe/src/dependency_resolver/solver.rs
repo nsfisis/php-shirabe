@@ -38,7 +38,7 @@ pub struct Solver {
 
     pub test_flag_learned_positive_literal: bool,
 
-    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    io: std::rc::Rc<dyn IOInterface>,
 }
 
 impl Solver {
@@ -48,7 +48,7 @@ impl Solver {
     pub fn new(
         policy: std::rc::Rc<dyn PolicyInterface>,
         pool: std::rc::Rc<std::cell::RefCell<Pool>>,
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: std::rc::Rc<dyn IOInterface>,
     ) -> Self {
         let decisions = Decisions::new(pool.clone());
         Self {

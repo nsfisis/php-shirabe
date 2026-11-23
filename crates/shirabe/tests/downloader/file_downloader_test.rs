@@ -26,16 +26,14 @@ fn get_package(name: &BStr, version: &BStr) -> PackageInterfaceHandle {
 }
 
 /// ref: TestCase::getConfig
-fn get_config(
-    config_options: IndexMap<BString, PhpMixed>,
-) -> std::rc::Rc<std::cell::RefCell<Config>> {
-    let mut config = Config::new(false, None);
+fn get_config(config_options: IndexMap<BString, PhpMixed>) -> std::rc::Rc<Config> {
+    let config = Config::new(false, None);
     if !config_options.is_empty() {
         let mut merged: IndexMap<BString, PhpMixed> = IndexMap::new();
         merged.insert("config".into(), PhpMixed::Array(config_options));
         config.merge(&merged, "test");
     }
-    std::rc::Rc::new(std::cell::RefCell::new(config))
+    std::rc::Rc::new(config)
 }
 
 /// The PHP `getDownloader` builds a HttpDownloader mock whose `addCopy` resolves to a 200 Response
@@ -43,16 +41,15 @@ fn get_config(
 /// handler returning a 200/`file~` response for any URL. The mock never writes the destination file,
 /// so the verification step throws "could not be saved to" exactly as in PHP.
 fn get_downloader(
-    io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
-    config: Option<std::rc::Rc<std::cell::RefCell<Config>>>,
+    io: Option<std::rc::Rc<dyn IOInterface>>,
+    config: Option<std::rc::Rc<Config>>,
 ) -> (
     FileDownloader,
     std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
     HttpDownloaderMockGuard,
 ) {
-    let io = io.unwrap_or_else(|| std::rc::Rc::new(std::cell::RefCell::new(NullIO::new())));
-    let config = config
-        .unwrap_or_else(|| std::rc::Rc::new(std::cell::RefCell::new(Config::new(false, None))));
+    let io = io.unwrap_or_else(|| std::rc::Rc::new(NullIO::new()));
+    let config = config.unwrap_or_else(|| std::rc::Rc::new(Config::new(false, None)));
 
     let (http_downloader, guard) = get_http_downloader_mock(
         Vec::new(),
@@ -221,8 +218,7 @@ fn test_cache_garbage_collection_is_called() {
     // The PHP Cache mock forces gcIsNecessary() true and records the single gc() call; the CacheMock
     // seam plays both roles here.
     let tmp_dir = get_unique_tmp_directory();
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
-        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
+    let io: std::rc::Rc<dyn IOInterface> = std::rc::Rc::new(NullIO::new());
     let mut cache = Cache::new(io, tmp_dir.path(), None, None, false);
     cache.__set_mock(CacheMock {
         gc_is_necessary: Some(true),
@@ -241,8 +237,7 @@ fn test_cache_garbage_collection_is_called() {
         },
     );
 
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
-        std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
+    let io: std::rc::Rc<dyn IOInterface> = std::rc::Rc::new(NullIO::new());
     let _downloader = FileDownloader::new(
         io,
         config,
@@ -319,7 +314,6 @@ fn test_downgrade_shows_appropriate_message() {
 
     let (io_mock, _io_guard) = get_io_mock(io_interface::DEBUG).unwrap();
     io_mock
-        .borrow_mut()
         .expects(
             vec![
                 Expectation::text_regex("{Downloading .*}"),
@@ -359,7 +353,7 @@ fn test_downgrade_shows_appropriate_message() {
         },
     );
 
-    let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io_mock;
+    let io: std::rc::Rc<dyn IOInterface> = io_mock;
     let downloader = FileDownloader::new(
         io,
         config,

@@ -13,28 +13,29 @@ use bstr::{B, BStr, BString, ByteSlice as _};
 use indexmap::IndexMap;
 use shirabe_php_binding_macros::php_binding;
 use shirabe_php_shim::{
-    InvalidArgumentException, PhpMixed, RuntimeException, ToPhpString, bformat, json_encode,
+    InvalidArgumentException, PhpMixed, PhpProp, RuntimeException, ToPhpString, bformat,
+    json_encode,
 };
 use shirabe_semver::constraint::AnyConstraint;
 
 #[derive(Debug)]
 pub struct RepositoryManager {
-    local_repository: Option<RepositoryInterfaceHandle>,
-    repositories: Vec<RepositoryInterfaceHandle>,
-    repository_classes: IndexMap<BString, BString>,
-    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-    config: std::rc::Rc<std::cell::RefCell<Config>>,
+    local_repository: PhpProp<Option<RepositoryInterfaceHandle>>,
+    repositories: PhpProp<std::rc::Rc<Vec<RepositoryInterfaceHandle>>>,
+    repository_classes: PhpProp<std::rc::Rc<IndexMap<BString, BString>>>,
+    io: std::rc::Rc<dyn IOInterface>,
+    config: std::rc::Rc<Config>,
     http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
-    event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
+    event_dispatcher: Option<std::rc::Rc<EventDispatcher>>,
     process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
 }
 
 impl RepositoryManager {
     pub fn new(
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        io: std::rc::Rc<dyn IOInterface>,
+        config: std::rc::Rc<Config>,
         http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
-        event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
+        event_dispatcher: Option<std::rc::Rc<EventDispatcher>>,
         process: Option<std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,
     ) -> Self {
         let process = process.unwrap_or_else(|| {
@@ -43,9 +44,9 @@ impl RepositoryManager {
             ))))
         });
         Self {
-            local_repository: None,
-            repositories: vec![],
-            repository_classes: IndexMap::new(),
+            local_repository: PhpProp::new(None),
+            repositories: PhpProp::default(),
+            repository_classes: PhpProp::default(),
             io,
             config,
             http_downloader,
@@ -59,7 +60,7 @@ impl RepositoryManager {
         name: &BStr,
         constraint: &AnyConstraint,
     ) -> anyhow::Result<Option<PackageInterfaceHandle>> {
-        for repository in &self.repositories {
+        for repository in self.repositories.cloned().iter() {
             if let Some(package) = repository
                 .find_package(name, FindPackageConstraint::Constraint(constraint.clone()))?
             {
@@ -86,12 +87,14 @@ impl RepositoryManager {
         Ok(packages)
     }
 
-    pub fn add_repository(&mut self, repository: RepositoryInterfaceHandle) {
-        self.repositories.push(repository);
+    pub fn add_repository(&self, repository: RepositoryInterfaceHandle) {
+        self.repositories
+            .update(|repositories| std::rc::Rc::make_mut(repositories).push(repository));
     }
 
-    pub fn prepend_repository(&mut self, repository: RepositoryInterfaceHandle) {
-        self.repositories.insert(0, repository);
+    pub fn prepend_repository(&self, repository: RepositoryInterfaceHandle) {
+        self.repositories
+            .update(|repositories| std::rc::Rc::make_mut(repositories).insert(0, repository));
     }
 
     pub fn create_repository(
@@ -100,7 +103,8 @@ impl RepositoryManager {
         config: IndexMap<BString, PhpMixed>,
         name: Option<&BStr>,
     ) -> anyhow::Result<RepositoryInterfaceHandle> {
-        if !self.repository_classes.contains_key(r#type) {
+        let repository_classes = self.repository_classes.cloned();
+        if !repository_classes.contains_key(r#type) {
             return Err(InvalidArgumentException::new(bformat!(
                 "Repository type is not registered: {}",
                 r#type
@@ -116,7 +120,7 @@ impl RepositoryManager {
             self.io.write_error(bformat!("<warning>Repository \"{}\" ({config_json}) has a packagist key which should be in its own repository definition</warning>", name.unwrap_or_default()));
         }
 
-        let class = self.repository_classes[r#type].clone();
+        let class = repository_classes[r#type].clone();
 
         let has_filter = config.contains_key(B("only"))
             || config.contains_key(B("exclude"))
@@ -159,7 +163,7 @@ impl RepositoryManager {
                 Ok(RepositoryInterfaceHandle::new(ComposerRepository::new(
                     config,
                     self.io.clone(),
-                    &self.config.borrow(),
+                    &self.config,
                     self.http_downloader.clone(),
                     self.event_dispatcher.clone(),
                 )?))
@@ -201,45 +205,47 @@ impl RepositoryManager {
         }
     }
 
-    pub fn set_repository_class(&mut self, r#type: &BStr, class: &BStr) {
-        self.repository_classes
-            .insert(bstr::BString::from(r#type), class.to_php_string());
+    pub fn set_repository_class(&self, r#type: &BStr, class: &BStr) {
+        self.repository_classes.update(|repository_classes| {
+            std::rc::Rc::make_mut(repository_classes)
+                .insert(bstr::BString::from(r#type), class.to_php_string())
+        });
     }
 
-    pub fn get_repositories(&self) -> &Vec<RepositoryInterfaceHandle> {
-        &self.repositories
+    pub fn get_repositories(&self) -> Vec<RepositoryInterfaceHandle> {
+        std::rc::Rc::unwrap_or_clone(self.repositories.cloned())
     }
 
     /// For testing only: exposes the private `repository_classes` map so tests
     /// can assert on its registered type keys (PHP reads it via ReflectionProperty).
-    pub fn __repository_classes(&self) -> &IndexMap<BString, BString> {
-        &self.repository_classes
+    pub fn __repository_classes(&self) -> IndexMap<BString, BString> {
+        std::rc::Rc::unwrap_or_clone(self.repository_classes.cloned())
     }
 
-    pub fn set_local_repository(&mut self, repository: RepositoryInterfaceHandle) {
-        self.local_repository = Some(repository);
+    pub fn set_local_repository(&self, repository: RepositoryInterfaceHandle) {
+        self.local_repository.set(Some(repository));
     }
 
     pub fn get_local_repository(&self) -> RepositoryInterfaceHandle {
-        self.local_repository.clone().unwrap()
+        self.local_repository.cloned().unwrap()
     }
 }
 
 // Composer's PartialComposer::setRepositoryManager() accepts any RepositoryManager subclass, so
 // plugins may swap in a replacement. The interface captures the methods reached through Composer's
-// accessor and through the `&mut RepositoryManager` parameters fed from it.
+// accessor.
 #[php_binding(r"Composer\Repository\RepositoryManager")]
 pub trait RepositoryManagerInterface: std::fmt::Debug {
     fn get_local_repository(&self) -> RepositoryInterfaceHandle;
-    fn get_repositories(&self) -> &Vec<RepositoryInterfaceHandle>;
+    fn get_repositories(&self) -> Vec<RepositoryInterfaceHandle>;
     fn create_repository(
         &self,
         r#type: &BStr,
         config: IndexMap<BString, PhpMixed>,
         name: Option<&BStr>,
     ) -> anyhow::Result<RepositoryInterfaceHandle>;
-    fn add_repository(&mut self, repository: RepositoryInterfaceHandle);
-    fn set_local_repository(&mut self, repository: RepositoryInterfaceHandle);
+    fn add_repository(&self, repository: RepositoryInterfaceHandle);
+    fn set_local_repository(&self, repository: RepositoryInterfaceHandle);
 }
 
 impl RepositoryManagerInterface for RepositoryManager {
@@ -247,7 +253,7 @@ impl RepositoryManagerInterface for RepositoryManager {
         self.get_local_repository()
     }
 
-    fn get_repositories(&self) -> &Vec<RepositoryInterfaceHandle> {
+    fn get_repositories(&self) -> Vec<RepositoryInterfaceHandle> {
         self.get_repositories()
     }
 
@@ -260,11 +266,11 @@ impl RepositoryManagerInterface for RepositoryManager {
         self.create_repository(r#type, config, name)
     }
 
-    fn add_repository(&mut self, repository: RepositoryInterfaceHandle) {
+    fn add_repository(&self, repository: RepositoryInterfaceHandle) {
         self.add_repository(repository);
     }
 
-    fn set_local_repository(&mut self, repository: RepositoryInterfaceHandle) {
+    fn set_local_repository(&self, repository: RepositoryInterfaceHandle) {
         self.set_local_repository(repository);
     }
 }

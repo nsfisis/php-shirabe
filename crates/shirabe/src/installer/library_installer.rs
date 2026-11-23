@@ -21,8 +21,8 @@ use shirabe_php_shim::{
 pub struct LibraryInstaller {
     pub(crate) composer: PartialComposerWeakHandle,
     vendor_dir: std::cell::RefCell<std::path::PathBuf>,
-    download_manager: Option<std::rc::Rc<std::cell::RefCell<dyn DownloadManagerInterface>>>,
-    pub(crate) io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    download_manager: Option<std::rc::Rc<dyn DownloadManagerInterface>>,
+    pub(crate) io: std::rc::Rc<dyn IOInterface>,
     r#type: Option<BString>,
     filesystem: std::rc::Rc<std::cell::RefCell<Filesystem>>,
     binary_installer: std::rc::Rc<std::cell::RefCell<dyn BinaryInstallerInterface>>,
@@ -31,7 +31,7 @@ pub struct LibraryInstaller {
 impl LibraryInstaller {
     /// Initializes library installer.
     pub fn new(
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: std::rc::Rc<dyn IOInterface>,
         composer: PartialComposerWeakHandle,
         r#type: Option<BString>,
         filesystem: Option<std::rc::Rc<std::cell::RefCell<Filesystem>>>,
@@ -43,14 +43,14 @@ impl LibraryInstaller {
 
         let download_manager = composer_rc
             .as_full()
-            .map(|full| full.borrow().get_download_manager());
+            .map(|full| full.get_download_manager());
 
-        let composer_ref = composer_rc.borrow_partial();
+        let composer_ref = &composer_rc;
 
         let filesystem = filesystem
             .unwrap_or_else(|| std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(None))));
         let vendor_dir = std::path::PathBuf::from(path_from_bytes(&rtrim_chars(
-            composer_ref.get_config().borrow().get_path("vendor-dir")?,
+            composer_ref.get_config().get_path("vendor-dir")?,
             "/",
         )));
         let binary_installer: std::rc::Rc<std::cell::RefCell<dyn BinaryInstallerInterface>> =
@@ -58,10 +58,10 @@ impl LibraryInstaller {
                 Some(binary_installer) => binary_installer,
                 None => {
                     let bin_dir = std::path::PathBuf::from(path_from_bytes(&rtrim_chars(
-                        composer_ref.get_config().borrow().get_path("bin-dir")?,
+                        composer_ref.get_config().get_path("bin-dir")?,
                         "/",
                     )));
-                    let bin_compat = composer_ref.get_config().borrow().get_bin_compat()?;
+                    let bin_compat = composer_ref.get_config().get_bin_compat()?;
                     std::rc::Rc::new(std::cell::RefCell::new(BinaryInstaller::new(
                         io.clone(),
                         bin_dir,
@@ -134,7 +134,6 @@ impl LibraryInstaller {
         let download_path = self.get_install_path(package.clone())?.unwrap();
 
         self.get_download_manager()
-            .borrow()
             .install(package, &download_path)
             .await
     }
@@ -165,7 +164,6 @@ impl LibraryInstaller {
         }
 
         self.get_download_manager()
-            .borrow()
             .update(initial, target, &target_download_path)
             .await
     }
@@ -177,7 +175,6 @@ impl LibraryInstaller {
         let download_path = self.get_package_base_path(package.clone())?;
 
         self.get_download_manager()
-            .borrow()
             .remove(package, &download_path)
             .await
     }
@@ -190,9 +187,7 @@ impl LibraryInstaller {
         *self.vendor_dir.borrow_mut() = realpath;
     }
 
-    fn get_download_manager(
-        &self,
-    ) -> &std::rc::Rc<std::cell::RefCell<dyn DownloadManagerInterface>> {
+    fn get_download_manager(&self) -> &std::rc::Rc<dyn DownloadManagerInterface> {
         // PHP: assert($this->downloadManager instanceof DownloadManager, new \LogicException(...))
         assert!(
             self.download_manager.is_some(),
@@ -253,7 +248,6 @@ impl InstallerInterface for LibraryInstaller {
         let download_path = self.get_install_path(package.clone())?.unwrap();
 
         self.get_download_manager()
-            .borrow()
             .download(package, &download_path, prev_package)
             .await
     }
@@ -268,7 +262,6 @@ impl InstallerInterface for LibraryInstaller {
         let download_path = self.get_install_path(package.clone())?.unwrap();
 
         self.get_download_manager()
-            .borrow()
             .prepare(r#type, package, &download_path, prev_package)
             .await
     }
@@ -283,7 +276,6 @@ impl InstallerInterface for LibraryInstaller {
         let download_path = self.get_install_path(package.clone())?.unwrap();
 
         self.get_download_manager()
-            .borrow()
             .cleanup(r#type, package, &download_path, prev_package)
             .await
     }

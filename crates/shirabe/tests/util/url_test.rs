@@ -25,7 +25,7 @@ fn conf(entries: &[(&BStr, &[&BStr])]) -> IndexMap<BString, PhpMixed> {
 #[test]
 fn test_update_dist_reference() {
     for (url, expected_url, c, r#ref) in dist_refs_provider() {
-        let mut config = Config::new(true, None);
+        let config = Config::new(true, None);
         let mut merged: IndexMap<BString, PhpMixed> = IndexMap::new();
         merged.insert("config".into(), PhpMixed::Array(c));
         config.merge(&merged, Config::SOURCE_UNKNOWN);

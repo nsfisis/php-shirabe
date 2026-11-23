@@ -11,7 +11,7 @@ use crate::delegate_base_command_trait_impls_to_inner;
 use crate::dependency_resolver::UpdateAllowTransitiveDeps;
 use crate::factory::Factory;
 use crate::installer::Installer;
-use crate::io::{IOInterfaceImmutable, IOInterfaceWrite};
+use crate::io::IOInterfaceWrite;
 use crate::json::JsonFile;
 use crate::package::base_package;
 use crate::plugin::{CommandEvent, PluginEvents};
@@ -221,7 +221,6 @@ impl Command for RemoveCommand {
             let composer = composer_full(&composer);
             {
                 let locker = composer.get_locker().clone();
-                let mut locker = locker.borrow_mut();
                 if !locker.is_locked() {
                     return Err(UnexpectedValueException::new(BString::from(
                         "A valid composer.lock file is required to run this command with --unused",
@@ -230,10 +229,7 @@ impl Command for RemoveCommand {
                 }
             }
 
-            let locked_repo = composer
-                .get_locker()
-                .borrow_mut()
-                .get_locked_repository(true)?;
+            let locked_repo = composer.get_locker().get_locked_repository(true)?;
             let locked_packages = locked_repo.borrow_mut().get_packages()?;
 
             let mut required: IndexMap<BString, bool> = IndexMap::new();
@@ -287,7 +283,7 @@ impl Command for RemoveCommand {
         let composer_backup = std::fs::read(json_file.get_path())?;
 
         let json_file_for_source = JsonFile::new(file.clone(), None, None)?;
-        let mut json = JsonConfigSource::new(
+        let json = JsonConfigSource::new(
             std::rc::Rc::new(std::cell::RefCell::new(json_file_for_source)),
             false,
         );
@@ -502,12 +498,12 @@ impl Command for RemoveCommand {
         let command_event =
             CommandEvent::new(PluginEvents::COMMAND, "remove", input.clone(), output);
         let command_event_name = command_event.get_name().to_owned();
-        composer.get_event_dispatcher().borrow_mut().dispatch(
+        composer.get_event_dispatcher().dispatch(
             Some(command_event_name.as_ref()),
             Some(std::rc::Rc::new(std::cell::RefCell::new(command_event))),
         )?;
 
-        let allow_plugins = composer.get_config().borrow().get("allow-plugins")?;
+        let allow_plugins = composer.get_config().get("allow-plugins")?;
         let removed_plugins: Vec<BString> =
             if let Some(allow_map) = allow_plugins.as_opt().and_then(|v| v.as_array()) {
                 packages
@@ -539,16 +535,13 @@ impl Command for RemoveCommand {
             }
         }
 
-        composer
-            .get_installation_manager()
-            .borrow_mut()
-            .set_output_progress(
-                !input
-                    .borrow()
-                    .get_option("no-progress")?
-                    .as_bool()
-                    .unwrap_or(false),
-            );
+        composer.get_installation_manager().set_output_progress(
+            !input
+                .borrow()
+                .get_option("no-progress")?
+                .as_bool()
+                .unwrap_or(false),
+        );
 
         let mut install = Installer::create(self.get_io().clone(), &composer_handle);
 
@@ -562,19 +555,13 @@ impl Command for RemoveCommand {
             .get_option("optimize-autoloader")?
             .as_bool()
             .unwrap_or(false)
-            || composer
-                .get_config()
-                .borrow()
-                .get_truthy("optimize-autoloader")?;
+            || composer.get_config().get_truthy("optimize-autoloader")?;
         let authoritative = input
             .borrow()
             .get_option("classmap-authoritative")?
             .as_bool()
             .unwrap_or(false)
-            || composer
-                .get_config()
-                .borrow()
-                .get_truthy("classmap-authoritative")?;
+            || composer.get_config().get_truthy("classmap-authoritative")?;
         let apcu_prefix = input
             .borrow()
             .get_option("apcu-autoloader-prefix")?
@@ -586,10 +573,7 @@ impl Command for RemoveCommand {
                 .get_option("apcu-autoloader")?
                 .as_bool()
                 .unwrap_or(false)
-            || composer
-                .get_config()
-                .borrow()
-                .get_truthy("apcu-autoloader")?;
+            || composer.get_config().get_truthy("apcu-autoloader")?;
         let minimal_changes = input
             .borrow()
             .get_option("minimal-changes")?
@@ -597,7 +581,6 @@ impl Command for RemoveCommand {
             .unwrap_or(false)
             || composer
                 .get_config()
-                .borrow()
                 .get_truthy("update-with-minimal-changes")?;
 
         let mut update_allow_transitive_dependencies =
@@ -655,14 +638,12 @@ impl Command for RemoveCommand {
         install
             .set_platform_requirement_filter(self.get_platform_requirement_filter(input.clone())?);
         install.set_dry_run(dry_run);
-        install.set_audit_config(
-            self.create_audit_config(&mut composer.get_config().borrow_mut(), input)?,
-        );
+        install.set_audit_config(self.create_audit_config(&composer.get_config(), input)?);
         install.set_minimal_update(minimal_changes);
 
         // if no lock is present, we do not do a partial update as
         // this is not supported by the Installer
-        if composer.get_locker().borrow_mut().is_locked() {
+        if composer.get_locker().is_locked() {
             install.set_update_allow_list(packages.clone());
         }
 
@@ -678,7 +659,6 @@ impl Command for RemoveCommand {
             for package in &packages {
                 if !composer
                     .get_repository_manager()
-                    .borrow()
                     .get_local_repository()
                     .find_packages(bstr::BStr::new(package), None)?
                     .is_empty()

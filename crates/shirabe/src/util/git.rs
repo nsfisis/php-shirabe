@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/Util/Git.php sha1:122bf88edc1ff375541af8c8ccf697c0f330408a
 
 use crate::config::Config;
-use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface};
+use crate::io::{IOInterface, IOInterfaceWrite, io_interface};
 use crate::util::{
     AuthHelper, Bitbucket, CommandLine, Filesystem, GitHub, GitLab, HttpDownloader, Platform,
     ProcessExecutor, StoreAuth, Url,
@@ -19,8 +19,8 @@ use shirabe_symfony_console::input::InputValue;
 
 #[derive(Debug)]
 pub struct Git {
-    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-    config: std::rc::Rc<std::cell::RefCell<Config>>,
+    io: std::rc::Rc<dyn IOInterface>,
+    config: std::rc::Rc<Config>,
     process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     filesystem: std::rc::Rc<std::cell::RefCell<Filesystem>>,
     http_downloader: Option<std::rc::Rc<std::cell::RefCell<HttpDownloader>>>,
@@ -30,8 +30,8 @@ static VERSION: std::sync::Mutex<Option<Option<BString>>> = std::sync::Mutex::ne
 
 impl Git {
     pub fn new(
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        io: std::rc::Rc<dyn IOInterface>,
+        config: std::rc::Rc<Config>,
         process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
         fs: std::rc::Rc<std::cell::RefCell<Filesystem>>,
     ) -> Self {
@@ -47,7 +47,7 @@ impl Git {
     pub fn check_for_repo_ownership_error(
         output: &BStr,
         path: &std::path::Path,
-        io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
+        io: Option<std::rc::Rc<dyn IOInterface>>,
     ) -> anyhow::Result<()> {
         if output.contains_str("fatal: detected dubious ownership") {
             let msg = bformat!(
@@ -131,11 +131,8 @@ impl Git {
         let mut last_command = CommandLine::Shell(BString::default());
 
         // Ensure we are allowed to use this URL by config
-        self.config.borrow_mut().prohibit_url_by_config(
-            url,
-            Some(self.io.clone()),
-            &IndexMap::new(),
-        )?;
+        self.config
+            .prohibit_url_by_config(url, Some(self.io.clone()), &IndexMap::new())?;
 
         let orig_cwd: Option<std::path::PathBuf> = if initial_clone {
             cwd.map(std::path::Path::to_path_buf)
@@ -203,7 +200,7 @@ impl Git {
             ) {
                 let m3 = m.get(3).unwrap_or_default();
                 if !self.io.has_authentication(m3) {
-                    self.io.borrow_mut().set_authentication(
+                    self.io.set_authentication(
                         m3.to_owned(),
                         rawurldecode(m.get(1).unwrap_or_default()),
                         Some(rawurldecode(m.get(2).unwrap_or_default())),
@@ -212,12 +209,12 @@ impl Git {
             }
         }
 
-        let protocols = self.config.borrow().get_github_protocols()?;
+        let protocols = self.config.get_github_protocols()?;
         // public github, autoswitch protocols
         if let Some(m) = preg_match(
             bformat!(
                 "{{^(?:https?|git)://{}/(.*)}}",
-                Self::get_github_domains_regex(&self.config.borrow())?
+                Self::get_github_domains_regex(&self.config)?
             ),
             url,
         ) {
@@ -267,11 +264,11 @@ impl Git {
         }
 
         // if we have a private github url and the ssh protocol is disabled then we skip it and directly fallback to https
-        let protocols = self.config.borrow().get_github_protocols()?;
+        let protocols = self.config.get_github_protocols()?;
         let bypass_ssh_for_github = preg_is_match(
             bformat!(
                 "{{^git@{}:(.+?)\\.git$}}i",
-                Self::get_github_domains_regex(&self.config.borrow())?
+                Self::get_github_domains_regex(&self.config)?
             ),
             url,
         ) && !protocols.iter().any(|protocol| protocol == "ssh");
@@ -291,7 +288,7 @@ impl Git {
             let github_matched = match preg_match(
                 bformat!(
                     "{{^git@{}:(.+?)\\.git$}}i",
-                    Self::get_github_domains_regex(&self.config.borrow())?
+                    Self::get_github_domains_regex(&self.config)?
                 ),
                 url,
             ) {
@@ -299,7 +296,7 @@ impl Git {
                 None => preg_match(
                     bformat!(
                         "{{^https?://{}/(.*?)(?:\\.git)?$}}i",
-                        Self::get_github_domains_regex(&self.config.borrow())?
+                        Self::get_github_domains_regex(&self.config)?
                     ),
                     url,
                 ),
@@ -382,7 +379,7 @@ impl Git {
                         bitbucket_util
                             .authorize_oauth_interactively(domain, Some(BStr::new(message)))?;
                         let access_token = bitbucket_util.get_token();
-                        self.io.borrow_mut().set_authentication(
+                        self.io.set_authentication(
                             domain.to_owned(),
                             BString::from("x-token-auth"),
                             Some(access_token),
@@ -437,7 +434,7 @@ impl Git {
                             password.as_bstr(),
                         )?;
                         if !access_token.is_empty() {
-                            self.io.borrow_mut().set_authentication(
+                            self.io.set_authentication(
                                 domain.to_owned(),
                                 BString::from("x-token-auth"),
                                 Some(access_token),
@@ -498,7 +495,7 @@ impl Git {
             } else if let Some(m) = match preg_match(
                 bformat!(
                     "{{^(git)@{}:(.+?\\.git)$}}i",
-                    Self::get_gitlab_domains_regex(&self.config.borrow())?
+                    Self::get_gitlab_domains_regex(&self.config)?
                 ),
                 url,
             ) {
@@ -506,7 +503,7 @@ impl Git {
                 None => preg_match(
                     bformat!(
                         "{{^(https?)://{}/(.*)}}i",
-                        Self::get_gitlab_domains_regex(&self.config.borrow())?
+                        Self::get_gitlab_domains_regex(&self.config)?
                     ),
                     url,
                 ),
@@ -631,7 +628,7 @@ impl Git {
                         self.io.ask_and_hide_answer("      Password: ")?,
                     );
                     auth = Some(auth_map);
-                    store_auth = self.config.borrow().get_store_auths()?;
+                    store_auth = self.config.get_store_auths()?;
                 }
 
                 if let Some(auth_inner) = auth.as_ref() {
@@ -658,11 +655,8 @@ impl Git {
                         &mut command_output,
                     ) == 0
                     {
-                        self.io.borrow_mut().set_authentication(
-                            origin.clone(),
-                            username,
-                            Some(password),
-                        );
+                        self.io
+                            .set_authentication(origin.clone(), username, Some(password));
                         let auth_helper = AuthHelper::new(self.io.clone(), self.config.clone());
                         auth_helper.store_auth(origin.as_bstr(), store_auth.clone())?;
 

@@ -4,7 +4,7 @@ use crate::composer;
 use crate::config::Config;
 use crate::downloader::TransportException;
 use crate::exception::IrrecoverableDownloadException;
-use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite};
+use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::package::version::VersionParser;
 use crate::php_worker::job::{JobOwner, record_internal_job};
 use crate::util::http::{NativeHttpDownloader, Response};
@@ -25,8 +25,8 @@ use shirabe_semver::constraint::SimpleConstraint;
 
 #[derive(Debug)]
 pub struct HttpDownloader {
-    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-    config: std::rc::Rc<std::cell::RefCell<Config>>,
+    io: std::rc::Rc<dyn IOInterface>,
+    config: std::rc::Rc<Config>,
     options: StreamContextOptions,
     /// Replaces PHP's `$runningJobs`/`$maxJobs` counters: a permit is held for the duration of
     /// each in-flight request and released when it settles.
@@ -98,8 +98,8 @@ impl Default for HttpDownloaderMockHandler {
 impl HttpDownloader {
     #[php(name = "__construct")]
     pub fn new(
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        io: std::rc::Rc<dyn IOInterface>,
+        config: std::rc::Rc<Config>,
         options: StreamContextOptions,
         disable_tls: bool,
     ) -> anyhow::Result<Self> {
@@ -273,11 +273,11 @@ impl HttpDownloader {
         options: StreamContextOptions,
     ) -> anyhow::Result<(StreamContextOptions, BString)> {
         let options = self.options.clone().replace_recursive(options);
-        let origin = Url::get_origin(&self.config.borrow(), url)?;
+        let origin = Url::get_origin(&self.config, url)?;
 
         // capture username/password from URL if there is one
         if let Some(m) = preg_match(php_regex!(r"{^https?://([^:/]+):([^@/]+)@([^/]+)}i"), url) {
-            self.io.borrow_mut().set_authentication(
+            self.io.set_authentication(
                 origin.clone(),
                 rawurldecode(m.get(1).unwrap_or_default()),
                 Some(rawurldecode(m.get(2).unwrap_or_default())),
@@ -463,7 +463,7 @@ impl HttpDownloader {
     }
 
     pub fn output_warnings(
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        io: std::rc::Rc<dyn IOInterface>,
         url: impl AsRef<[u8]>,
         data: &IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<()> {
@@ -619,10 +619,7 @@ impl HttpDownloader {
     /// short-circuited by the mock (see [`HttpDownloader::__expects`]), without
     /// constructing the native downloader. Mirrors HttpDownloaderMock, which
     /// extends HttpDownloader but never performs curl I/O.
-    pub fn __new_mock(
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        config: std::rc::Rc<std::cell::RefCell<Config>>,
-    ) -> Self {
+    pub fn __new_mock(io: std::rc::Rc<dyn IOInterface>, config: std::rc::Rc<Config>) -> Self {
         Self {
             local: LocalFilesystem::new(io.clone(), config.clone()),
             rfs: RemoteFilesystem::new(

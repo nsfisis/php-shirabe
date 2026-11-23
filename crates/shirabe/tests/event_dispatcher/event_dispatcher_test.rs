@@ -49,44 +49,33 @@ impl Drop for TearDown {
 /// The RepositoryManager / AutoloadGenerator / InstallationManager are what the autoloader-rebuild
 /// path reaches for, which happens for PHP-script and array callables.
 fn create_composer_instance() -> ComposerHandle {
-    let composer = ComposerHandle::from_rc_unchecked(std::rc::Rc::new(std::cell::RefCell::new(
-        PartialOrFullComposer::new_full(),
-    )));
-    let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(true, None)));
-    composer.borrow_mut().set_config(config);
+    let composer =
+        ComposerHandle::from_rc_unchecked(std::rc::Rc::new(PartialOrFullComposer::new_full()));
+    let config = std::rc::Rc::new(Config::new(true, None));
+    composer.set_config(config);
     let package: RootPackageInterfaceHandle = RootPackageHandle::new(
         BString::from("foo"),
         BString::from("1.0.0.0"),
         BString::from("1.0.0"),
     )
     .into();
-    composer.borrow_mut().set_package(package);
+    composer.set_package(package);
 
     let mut repository_manager = MockRepositoryManager::new();
     repository_manager
         .expect_get_local_repository()
         .returning(|| RepositoryInterfaceHandle::new(InstalledArrayRepository::new().unwrap()));
-    composer
-        .borrow_mut()
-        .set_repository_manager(std::rc::Rc::new(std::cell::RefCell::new(
-            repository_manager,
-        )));
-    composer
-        .borrow_mut()
-        .set_installation_manager(std::rc::Rc::new(std::cell::RefCell::new(
-            MockInstallationManager::new(),
-        )));
+    composer.set_repository_manager(std::rc::Rc::new(repository_manager));
+    composer.set_installation_manager(std::rc::Rc::new(MockInstallationManager::new()));
     let generator = AutoloadGenerator::new(
-        std::rc::Rc::new(std::cell::RefCell::new(EventDispatcher::new(
+        std::rc::Rc::new(EventDispatcher::new(
             composer.upcast().downgrade(),
             null_io(),
             None,
-        ))),
+        )),
         None,
     );
-    composer
-        .borrow_mut()
-        .set_autoload_generator(std::rc::Rc::new(std::cell::RefCell::new(generator)));
+    composer.set_autoload_generator(std::rc::Rc::new(std::cell::RefCell::new(generator)));
 
     composer
 }
@@ -120,8 +109,8 @@ fn load_php_listener_class() {
     });
 }
 
-fn null_io() -> std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
-    std::rc::Rc::new(std::cell::RefCell::new(shirabe::io::null_io::NullIO::new()))
+fn null_io() -> std::rc::Rc<dyn IOInterface> {
+    std::rc::Rc::new(shirabe::io::null_io::NullIO::new())
 }
 
 /// Locates a `php` executable on PATH and points `PHP_BINARY` at it.
@@ -146,26 +135,26 @@ fn ensure_php_binary() {
     Platform::put_env("PHP_BINARY", path_to_bytes(&candidate)).unwrap();
 }
 
-fn buffer_io_verbose() -> std::rc::Rc<std::cell::RefCell<BufferIO>> {
-    std::rc::Rc::new(std::cell::RefCell::new(
+fn buffer_io_verbose() -> std::rc::Rc<BufferIO> {
+    std::rc::Rc::new(
         BufferIO::new(
             BString::default(),
             output_interface::VERBOSITY_VERBOSE,
             None,
         )
         .unwrap(),
-    ))
+    )
 }
 
 /// Builds the EventDispatcher used by the script tests with a mocked `getListeners`, mirroring
 /// `getMockBuilder(EventDispatcher)->onlyMethods(['getListeners'])`.
 fn dispatcher_with_listeners(
     composer: &ComposerHandle,
-    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    io: std::rc::Rc<dyn IOInterface>,
     process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     callback: Box<dyn Fn(&dyn EventInterface) -> Vec<Callable>>,
 ) -> EventDispatcher {
-    let mut dispatcher = EventDispatcher::new(composer.upcast().downgrade(), io, Some(process));
+    let dispatcher = EventDispatcher::new(composer.upcast().downgrade(), io, Some(process));
     dispatcher.__set_get_listeners_override(callback);
     dispatcher
 }
@@ -174,10 +163,10 @@ fn dispatcher_with_listeners(
 /// constructed without a ProcessExecutor.
 fn dispatcher_stub_for_listeners_test(
     composer: &ComposerHandle,
-    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+    io: std::rc::Rc<dyn IOInterface>,
     listeners: Vec<&BStr>,
 ) -> EventDispatcher {
-    let mut dispatcher = EventDispatcher::new(composer.upcast().downgrade(), io, None);
+    let dispatcher = EventDispatcher::new(composer.upcast().downgrade(), io, None);
     dispatcher.__set_get_listeners_override(listeners_const(listeners));
     dispatcher
 }
@@ -197,7 +186,7 @@ fn test_dispatcher_can_execute_single_command_line_script() {
             get_process_executor_mock(vec![cmd(command)], true, MockHandler::default());
 
         let composer = create_composer_instance();
-        let mut dispatcher = dispatcher_with_listeners(
+        let dispatcher = dispatcher_with_listeners(
             &composer,
             null_io(),
             process,
@@ -228,7 +217,7 @@ fn test_dispatcher_can_execute_composer_script_groups() {
 
     let composer = create_composer_instance();
     let io = buffer_io_verbose();
-    let io_dyn: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io.clone();
+    let io_dyn: std::rc::Rc<dyn IOInterface> = io.clone();
 
     let callback: Box<dyn Fn(&dyn EventInterface) -> Vec<Callable>> =
         Box::new(|event| match &**event.get_name() {
@@ -241,7 +230,7 @@ fn test_dispatcher_can_execute_composer_script_groups() {
             b"subgroup" => vec![Callable::String("echo -n baz".into())],
             _ => vec![],
         });
-    let mut dispatcher = dispatcher_with_listeners(&composer, io_dyn.clone(), process, callback);
+    let dispatcher = dispatcher_with_listeners(&composer, io_dyn.clone(), process, callback);
 
     let event = ScriptEvent::new(
         BString::from("root"),
@@ -261,7 +250,7 @@ fn test_dispatcher_can_execute_composer_script_groups() {
     let expected = bformat!(
         "> root: @group{PHP_EOL}> group: echo -n foo{PHP_EOL}> group: @subgroup{PHP_EOL}> subgroup: echo -n baz{PHP_EOL}> group: echo -n bar{PHP_EOL}"
     );
-    assert_eq!(expected, io.borrow().get_output());
+    assert_eq!(expected, io.get_output());
 }
 
 #[test]
@@ -280,7 +269,7 @@ fn test_recursion_in_scripts_names() {
 
     let composer = create_composer_instance();
     let io = buffer_io_verbose();
-    let io_dyn: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io.clone();
+    let io_dyn: std::rc::Rc<dyn IOInterface> = io.clone();
 
     let callback: Box<dyn Fn(&dyn EventInterface) -> Vec<Callable>> =
         Box::new(|event| match &**event.get_name() {
@@ -288,7 +277,7 @@ fn test_recursion_in_scripts_names() {
             b"helloWorld" => vec![Callable::String("@hello World".into())],
             _ => vec![],
         });
-    let mut dispatcher = dispatcher_with_listeners(&composer, io_dyn.clone(), process, callback);
+    let dispatcher = dispatcher_with_listeners(&composer, io_dyn.clone(), process, callback);
 
     let event = ScriptEvent::new(
         BString::from("helloWorld"),
@@ -309,7 +298,7 @@ fn test_recursion_in_scripts_names() {
         "> helloWorld: @hello World{PHP_EOL}> hello: echo Hello {}{PHP_EOL}",
         ProcessExecutor::escape("World")
     );
-    assert_eq!(expected, io.borrow().get_output());
+    assert_eq!(expected, io.get_output());
 }
 
 #[test]
@@ -328,7 +317,7 @@ fn test_dispatcher_detect_infinite_recursion() {
             b"recurse" => vec![Callable::String("@root".into())],
             _ => vec![],
         });
-    let mut dispatcher = dispatcher_with_listeners(&composer, io.clone(), process, callback);
+    let dispatcher = dispatcher_with_listeners(&composer, io.clone(), process, callback);
 
     let event = ScriptEvent::new(
         BString::from("root"),
@@ -357,7 +346,7 @@ fn test_dispatcher_installer_events() {
         get_process_executor_mock(vec![], false, MockHandler::default());
 
     let composer = create_composer_instance();
-    let mut dispatcher =
+    let dispatcher =
         dispatcher_with_listeners(&composer, null_io(), process, listeners_const(vec![]));
 
     let transaction = std::rc::Rc::new(AnyTransaction::Transaction(Transaction::new(
@@ -387,7 +376,7 @@ fn test_dispatcher_doesnt_return_skipped_scripts() {
         BString::from("scriptName"),
         vec![BString::from("scriptName")],
     );
-    composer.borrow().get_package().set_scripts(
+    composer.get_package().set_scripts(
         scripts
             .into_iter()
             .map(|(k, v)| (k, v.into_iter().collect::<Vec<_>>()))
@@ -396,8 +385,7 @@ fn test_dispatcher_doesnt_return_skipped_scripts() {
 
     let (process, _process_guard) =
         get_process_executor_mock(vec![], false, MockHandler::default());
-    let mut dispatcher =
-        EventDispatcher::new(composer.upcast().downgrade(), null_io(), Some(process));
+    let dispatcher = EventDispatcher::new(composer.upcast().downgrade(), null_io(), Some(process));
 
     let mut event = ScriptEvent::new(
         BString::from("scriptName"),
@@ -420,10 +408,10 @@ fn test_listener_exceptions_are_caught() {
     load_php_listener_class();
 
     let (io_mock, _io_guard) = get_io_mock(io_interface::NORMAL).unwrap();
-    let io_dyn: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io_mock.clone();
+    let io_dyn: std::rc::Rc<dyn IOInterface> = io_mock.clone();
 
     let composer = create_composer_instance();
-    let mut dispatcher = dispatcher_stub_for_listeners_test(
+    let dispatcher = dispatcher_stub_for_listeners_test(
         &composer,
         io_dyn,
         vec![BStr::new(
@@ -432,7 +420,6 @@ fn test_listener_exceptions_are_caught() {
     );
 
     io_mock
-        .borrow_mut()
         .expects(
             vec![
                 Expectation::text("> Composer\\Test\\EventDispatcher\\EventDispatcherTest::call"),
@@ -483,16 +470,16 @@ mod mock_autoload_generator {
                 config: &Config,
                 local_repo: shirabe::repository::RepositoryInterfaceHandle,
                 root_package: RootPackageInterfaceHandle,
-                installation_manager: std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>,
+                installation_manager: std::rc::Rc<dyn InstallationManagerInterface>,
                 target_dir: &bstr::BStr,
                 scan_psr_packages: bool,
                 suffix: Option<bstr::BString>,
-                locker: Option<std::rc::Rc<std::cell::RefCell<dyn LockerInterface>>>,
+                locker: Option<std::rc::Rc<dyn LockerInterface>>,
                 strict_ambiguous: bool,
             ) -> anyhow::Result<ClassMap>;
             fn build_package_map(
                 &self,
-                installation_manager: std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>,
+                installation_manager: std::rc::Rc<dyn InstallationManagerInterface>,
                 root_package: RootPackageInterfaceHandle,
                 packages: Vec<PackageInterfaceHandle>,
             ) -> anyhow::Result<Vec<(PackageInterfaceHandle, Option<std::path::PathBuf>)>>;
@@ -526,15 +513,15 @@ mod mock_repository_manager {
         pub RepositoryManager {}
         impl RepositoryManagerInterface for RepositoryManager {
             fn get_local_repository(&self) -> RepositoryInterfaceHandle;
-            fn get_repositories(&self) -> &Vec<RepositoryInterfaceHandle>;
+            fn get_repositories(&self) -> Vec<RepositoryInterfaceHandle>;
             fn create_repository<'a>(
                 &self,
                 r#type: &BStr,
                 config: IndexMap<BString, PhpMixed>,
                 name: Option<&'a bstr::BStr>,
             ) -> anyhow::Result<RepositoryInterfaceHandle>;
-            fn add_repository(&mut self, repository: RepositoryInterfaceHandle);
-            fn set_local_repository(&mut self, repository: RepositoryInterfaceHandle);
+            fn add_repository(&self, repository: RepositoryInterfaceHandle);
+            fn set_local_repository(&self, repository: RepositoryInterfaceHandle);
         }
     }
 }
@@ -556,13 +543,13 @@ mod mock_installation_manager {
         impl InstallationManagerInterface for InstallationManager {
             fn add_installer(&self, installer: std::rc::Rc<dyn InstallerInterface>);
             fn remove_installer(&self, installer: &dyn InstallerInterface);
-            fn disable_plugins(&mut self);
+            fn disable_plugins(&self);
             fn is_package_installed(
-                &mut self,
+                &self,
                 repo: &shirabe::repository::InstalledRepositoryInterfaceHandle,
                 package: PackageInterfaceHandle,
             ) -> anyhow::Result<bool>;
-            fn ensure_binaries_presence(&mut self, package: PackageInterfaceHandle) -> anyhow::Result<()>;
+            fn ensure_binaries_presence(&self, package: PackageInterfaceHandle) -> anyhow::Result<()>;
             async fn execute(
                 &self,
                 repo: &shirabe::repository::InstalledRepositoryInterfaceHandle,
@@ -572,8 +559,8 @@ mod mock_installation_manager {
                 download_only: bool,
             ) -> anyhow::Result<()>;
             fn get_install_path(&self, package: PackageInterfaceHandle) -> anyhow::Result<Option<std::path::PathBuf>>;
-            fn set_output_progress(&mut self, output_progress: bool);
-            async fn notify_installs(&mut self, io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>);
+            fn set_output_progress(&self, output_progress: bool);
+            async fn notify_installs(&self, io: std::rc::Rc<dyn IOInterface>);
         }
     }
 }
@@ -615,9 +602,7 @@ fn test_dispatcher_pass_dev_mode_to_autoload_generator_for_script_events() {
                 None,
             ))))
         });
-        composer
-            .borrow_mut()
-            .set_autoload_generator(std::rc::Rc::new(std::cell::RefCell::new(generator)));
+        composer.set_autoload_generator(std::rc::Rc::new(std::cell::RefCell::new(generator)));
 
         let package: RootPackageInterfaceHandle = RootPackageHandle::new(
             BString::from("foo"),
@@ -636,26 +621,18 @@ fn test_dispatcher_pass_dev_mode_to_autoload_generator_for_script_events() {
                 .map(|(k, v)| (k, v.into_iter().collect::<Vec<_>>()))
                 .collect::<indexmap::IndexMap<_, _>>(),
         );
-        composer.borrow_mut().set_package(package);
+        composer.set_package(package);
 
         let mut repository_manager = MockRepositoryManager::new();
         repository_manager
             .expect_get_local_repository()
             .returning(|| RepositoryInterfaceHandle::new(InstalledArrayRepository::new().unwrap()));
-        composer
-            .borrow_mut()
-            .set_repository_manager(std::rc::Rc::new(std::cell::RefCell::new(
-                repository_manager,
-            )));
-        composer
-            .borrow_mut()
-            .set_installation_manager(std::rc::Rc::new(std::cell::RefCell::new(
-                MockInstallationManager::new(),
-            )));
+        composer.set_repository_manager(std::rc::Rc::new(repository_manager));
+        composer.set_installation_manager(std::rc::Rc::new(MockInstallationManager::new()));
 
         let (process, _process_guard) =
             get_process_executor_mock(vec![], false, MockHandler::default());
-        let mut dispatcher =
+        let dispatcher =
             EventDispatcher::new(composer.upcast().downgrade(), null_io(), Some(process));
 
         let event = ScriptEvent::new(
@@ -687,8 +664,8 @@ fn test_dispatcher_remove_listener() {
     let (process, _process_guard) =
         get_process_executor_mock(vec![], false, MockHandler::default());
     let io = buffer_io_verbose();
-    let io_dyn: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io.clone();
-    let mut dispatcher = EventDispatcher::new(composer.upcast().downgrade(), io_dyn, Some(process));
+    let io_dyn: std::rc::Rc<dyn IOInterface> = io.clone();
+    let dispatcher = EventDispatcher::new(composer.upcast().downgrade(), io_dyn, Some(process));
 
     // PHP's `[$this, 'someMethod']` is an array callable whose object half is the test instance.
     // `Callable::PhpMethod` is the port's shape for an object-half callable: it carries the
@@ -716,7 +693,7 @@ fn test_dispatcher_remove_listener() {
     let mut expected = bformat!(
         "> ev1: Composer\\Test\\EventDispatcher\\EventDispatcherTest->someMethod{PHP_EOL}> ev1: Composer\\Test\\EventDispatcher\\EventDispatcherTest->someMethod2{PHP_EOL}> ev1: Composer\\Test\\EventDispatcher\\EventDispatcherTest->someMethod{PHP_EOL}> ev1: Composer\\Test\\EventDispatcher\\EventDispatcherTest::someMethod{PHP_EOL}> ev2: Composer\\Test\\EventDispatcher\\EventDispatcherTest::someMethod{PHP_EOL}> ev2: Composer\\Test\\EventDispatcher\\EventDispatcherTest->someMethod{PHP_EOL}"
     );
-    assert_eq!(expected, io.borrow().get_output());
+    assert_eq!(expected, io.get_output());
 
     dispatcher.remove_listener(&this);
     dispatcher.dispatch(Some("ev1".into()), None).unwrap();
@@ -725,7 +702,7 @@ fn test_dispatcher_remove_listener() {
     expected = bformat!(
         "{expected}> ev1: Composer\\Test\\EventDispatcher\\EventDispatcherTest::someMethod{PHP_EOL}> ev2: Composer\\Test\\EventDispatcher\\EventDispatcherTest::someMethod{PHP_EOL}"
     );
-    assert_eq!(expected, io.borrow().get_output());
+    assert_eq!(expected, io.get_output());
 }
 
 #[test]
@@ -743,9 +720,9 @@ fn test_dispatcher_can_execute_cli_and_php_in_same_event_script_stack() {
 
     let composer = create_composer_instance();
     let io = buffer_io_verbose();
-    let io_dyn: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io.clone();
+    let io_dyn: std::rc::Rc<dyn IOInterface> = io.clone();
 
-    let mut dispatcher = dispatcher_with_listeners(
+    let dispatcher = dispatcher_with_listeners(
         &composer,
         io_dyn,
         process,
@@ -768,7 +745,7 @@ fn test_dispatcher_can_execute_cli_and_php_in_same_event_script_stack() {
     let expected = bformat!(
         "> post-install-cmd: echo -n foo{PHP_EOL}> post-install-cmd: Composer\\Test\\EventDispatcher\\EventDispatcherTest::someMethod{PHP_EOL}> post-install-cmd: echo -n bar{PHP_EOL}"
     );
-    assert_eq!(expected, io.borrow().get_output());
+    assert_eq!(expected, io.get_output());
 }
 
 #[test]
@@ -782,9 +759,9 @@ fn test_dispatcher_can_put_env() {
 
     let composer = create_composer_instance();
     let io = buffer_io_verbose();
-    let io_dyn: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io.clone();
+    let io_dyn: std::rc::Rc<dyn IOInterface> = io.clone();
 
-    let mut dispatcher = dispatcher_with_listeners(
+    let dispatcher = dispatcher_with_listeners(
         &composer,
         io_dyn,
         process,
@@ -806,7 +783,7 @@ fn test_dispatcher_can_put_env() {
     let expected = bformat!(
         "> post-install-cmd: @putenv ABC=123{PHP_EOL}> post-install-cmd: Composer\\Test\\EventDispatcher\\EventDispatcherTest::getTestEnv{PHP_EOL}"
     );
-    assert_eq!(expected, io.borrow().get_output());
+    assert_eq!(expected, io.get_output());
 }
 
 #[test]
@@ -831,9 +808,9 @@ fn test_dispatcher_appends_dir_bin_on_path_for_every_listener() {
 
     let composer = create_composer_instance();
     let io = buffer_io_verbose();
-    let io_dyn: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io.clone();
+    let io_dyn: std::rc::Rc<dyn IOInterface> = io.clone();
 
-    let mut dispatcher = dispatcher_with_listeners(
+    let dispatcher = dispatcher_with_listeners(
         &composer,
         io_dyn,
         process,
@@ -873,7 +850,7 @@ fn test_dispatcher_support_for_additional_args() {
 
     let composer = create_composer_instance();
     let io = buffer_io_verbose();
-    let io_dyn: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io.clone();
+    let io_dyn: std::rc::Rc<dyn IOInterface> = io.clone();
 
     // PHP obtains phpCmd via `new \ReflectionMethod($dispatcher, 'getPhpExecCommand')`;
     // __get_php_exec_command is that reflection seam. It only inspects the environment, so a
@@ -899,7 +876,7 @@ fn test_dispatcher_support_for_additional_args() {
         MockHandler::default(),
     );
 
-    let mut dispatcher = dispatcher_with_listeners(
+    let dispatcher = dispatcher_with_listeners(
         &composer,
         io_dyn,
         process,
@@ -922,7 +899,7 @@ fn test_dispatcher_support_for_additional_args() {
     let expected = bformat!(
         "> post-install-cmd: echo -n foo{PHP_EOL}> post-install-cmd: @php foo.php {args} then the rest{PHP_EOL}> post-install-cmd: echo -n bar {args}{PHP_EOL}"
     );
-    assert_eq!(expected, io.borrow().get_output());
+    assert_eq!(expected, io.get_output());
 }
 
 #[test]
@@ -931,13 +908,13 @@ fn test_dispatcher_outputs_command() {
     let _tear_down = TearDown;
 
     let composer = create_composer_instance();
-    let io = std::rc::Rc::new(std::cell::RefCell::new(IOStub::new()));
-    let io_dyn: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io.clone();
+    let io = std::rc::Rc::new(IOStub::new());
+    let io_dyn: std::rc::Rc<dyn IOInterface> = io.clone();
     let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
         io_dyn.clone(),
     ))));
 
-    let mut dispatcher = dispatcher_with_listeners(
+    let dispatcher = dispatcher_with_listeners(
         &composer,
         io_dyn,
         process,
@@ -955,7 +932,6 @@ fn test_dispatcher_outputs_command() {
 
     // ref: $io->expects($this->once())->method('writeError')->with('> echo foo')
     let write_error_messages: Vec<bstr::BString> = io
-        .borrow()
         .write_error_calls()
         .into_iter()
         .map(|(message, _newline)| message)
@@ -964,7 +940,7 @@ fn test_dispatcher_outputs_command() {
 
     // ref: $io->expects($this->once())->method('writeRaw')->with('foo'.PHP_EOL, false)
     assert_eq!(
-        io.borrow().write_raw_calls(),
+        io.write_raw_calls(),
         vec![(bformat!("foo{PHP_EOL}"), false)]
     );
 }
@@ -976,13 +952,13 @@ fn test_dispatcher_outputs_error_on_failed_command() {
 
     let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(None)));
     let composer = create_composer_instance();
-    let io = std::rc::Rc::new(std::cell::RefCell::new(
+    let io = std::rc::Rc::new(
         BufferIO::new(BString::default(), output_interface::VERBOSITY_NORMAL, None).unwrap(),
-    ));
-    let io_dyn: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io.clone();
+    );
+    let io_dyn: std::rc::Rc<dyn IOInterface> = io.clone();
 
     let code = BStr::new("exit 1");
-    let mut dispatcher =
+    let dispatcher =
         dispatcher_with_listeners(&composer, io_dyn, process, listeners_const(vec![code]));
 
     let result = dispatcher.dispatch_script(
@@ -998,7 +974,7 @@ fn test_dispatcher_outputs_error_on_failed_command() {
     let expected = bformat!(
         "> exit 1{PHP_EOL}Script exit 1 handling the post-install-cmd event returned with error code 1{PHP_EOL}"
     );
-    assert_eq!(expected, io.borrow().get_output());
+    assert_eq!(expected, io.get_output());
 }
 
 /// Both `@composer <args>` and a bare `composer <args>` script re-enter the binary that is running
@@ -1023,9 +999,9 @@ fn test_dispatcher_runs_composer_scripts_through_the_running_binary() {
 
     let composer = create_composer_instance();
     let io = buffer_io_verbose();
-    let io_dyn: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io.clone();
+    let io_dyn: std::rc::Rc<dyn IOInterface> = io.clone();
 
-    let mut dispatcher = dispatcher_with_listeners(
+    let dispatcher = dispatcher_with_listeners(
         &composer,
         io_dyn,
         process,
@@ -1047,7 +1023,7 @@ fn test_dispatcher_runs_composer_scripts_through_the_running_binary() {
     let expected = bformat!(
         "> post-install-cmd: @composer install --no-dev{PHP_EOL}> post-install-cmd: composer update{PHP_EOL}"
     );
-    assert_eq!(expected, io.borrow().get_output());
+    assert_eq!(expected, io.get_output());
 }
 
 #[test]
@@ -1056,8 +1032,8 @@ fn test_listeners_are_keyed_by_the_bytes_of_the_event_name() {
     let _tear_down = TearDown;
     let composer = create_composer_instance();
     let io = buffer_io_verbose();
-    let io_dyn: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io.clone();
-    let mut dispatcher = EventDispatcher::new(composer.upcast().downgrade(), io_dyn, None);
+    let io_dyn: std::rc::Rc<dyn IOInterface> = io.clone();
+    let dispatcher = EventDispatcher::new(composer.upcast().downgrade(), io_dyn, None);
     let called = std::rc::Rc::new(std::cell::Cell::new(0));
     let called_by_listener = called.clone();
     dispatcher.add_listener(

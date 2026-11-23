@@ -14,8 +14,8 @@ use shirabe_symfony_console::input::{InputInterface, InputInterfaceByName};
 use shirabe_symfony_console::output::OutputInterface;
 
 pub trait BaseConfigCommand: BaseCommand {
-    fn config(&self) -> Option<std::rc::Rc<std::cell::RefCell<Config>>>;
-    fn set_config(&self, config: Option<std::rc::Rc<std::cell::RefCell<Config>>>);
+    fn config(&self) -> Option<std::rc::Rc<Config>>;
+    fn set_config(&self, config: Option<std::rc::Rc<Config>>);
     fn config_file(&self) -> Option<std::rc::Rc<std::cell::RefCell<JsonFile>>>;
     fn set_config_file(&self, file: Option<std::rc::Rc<std::cell::RefCell<JsonFile>>>);
     fn set_config_source(&self, source: Option<JsonConfigSource>);
@@ -44,9 +44,10 @@ pub trait BaseConfigCommand: BaseCommand {
         }
 
         let io = self.get_io();
-        self.set_config(Some(std::rc::Rc::new(std::cell::RefCell::new(
-            Factory::create_config(Some(io.clone()), None)?,
-        ))));
+        self.set_config(Some(std::rc::Rc::new(Factory::create_config(
+            Some(io.clone()),
+            None,
+        )?)));
         let config_rc = self.config().unwrap();
 
         // When using --global flag, set baseDir to home directory for correct absolute path resolution
@@ -56,18 +57,18 @@ pub trait BaseConfigCommand: BaseCommand {
             .as_bool()
             .unwrap_or(false)
         {
-            let home = config_rc.borrow().get_home()?;
-            config_rc.borrow_mut().set_base_dir(Some(home));
+            let home = config_rc.get_home()?;
+            config_rc.set_base_dir(Some(home));
         }
 
-        let config_file = self.get_composer_config_file(input.clone(), &config_rc.borrow())?;
+        let config_file = self.get_composer_config_file(input.clone(), &config_rc)?;
 
         // Create global composer.json if invoked using `composer global [config-cmd]`
         if (config_file.as_os_str() == "composer.json"
             || config_file.as_os_str() == "./composer.json")
             && !std::path::Path::new(&config_file).exists()
             && std::fs::canonicalize(Platform::get_cwd(false)?).ok()
-                == std::fs::canonicalize(path_from_bytes(&config_rc.borrow().get_home()?)).ok()
+                == std::fs::canonicalize(path_from_bytes(&config_rc.get_home()?)).ok()
         {
             std::fs::write(&config_file, "{\n}\n")?;
         }

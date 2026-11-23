@@ -35,8 +35,8 @@ pub struct SvnDriver {
 impl SvnDriver {
     pub fn new(
         repo_config: IndexMap<BString, PhpMixed>,
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        io: std::rc::Rc<dyn IOInterface>,
+        config: std::rc::Rc<Config>,
         http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
         process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     ) -> Self {
@@ -91,11 +91,7 @@ impl SvnDriver {
             self.inner.io.clone(),
             path_from_bytes(&bformat!(
                 "{}/{}",
-                self.inner
-                    .config
-                    .borrow()
-                    .get_path("cache-repo-dir")?
-                    .as_bstr(),
+                self.inner.config.get_path("cache-repo-dir")?.as_bstr(),
                 preg_replace(r"{[^a-z0-9.]}i", "-", Url::sanitize(&self.base_url))
             )),
             None,
@@ -106,7 +102,7 @@ impl SvnDriver {
             .cache
             .as_mut()
             .unwrap()
-            .set_read_only(self.inner.config.borrow().get_bool("cache-read-only"));
+            .set_read_only(self.inner.config.get_bool("cache-read-only"));
 
         self.get_branches()?;
         self.get_tags()?;
@@ -431,8 +427,8 @@ impl SvnDriver {
     }
 
     pub fn supports(
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        _config: std::rc::Rc<std::cell::RefCell<Config>>,
+        io: std::rc::Rc<dyn IOInterface>,
+        _config: std::rc::Rc<Config>,
         url: &BStr,
         deep: bool,
     ) -> anyhow::Result<bool> {
@@ -610,8 +606,8 @@ impl VcsDriverInterface for SvnDriver {
     }
 
     fn supports(
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        io: std::rc::Rc<dyn IOInterface>,
+        config: std::rc::Rc<Config>,
         url: &BStr,
         deep: bool,
     ) -> anyhow::Result<bool> {

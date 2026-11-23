@@ -89,13 +89,13 @@ mod mock_installation_manager {
         impl InstallationManagerInterface for InstallationManager {
             fn add_installer(&self, installer: std::rc::Rc<dyn InstallerInterface>);
             fn remove_installer(&self, installer: &dyn InstallerInterface);
-            fn disable_plugins(&mut self);
+            fn disable_plugins(&self);
             fn is_package_installed(
-                &mut self,
+                &self,
                 repo: &shirabe::repository::InstalledRepositoryInterfaceHandle,
                 package: PackageInterfaceHandle,
             ) -> anyhow::Result<bool>;
-            fn ensure_binaries_presence(&mut self, package: PackageInterfaceHandle) -> anyhow::Result<()>;
+            fn ensure_binaries_presence(&self, package: PackageInterfaceHandle) -> anyhow::Result<()>;
             async fn execute(
                 &self,
                 repo: &shirabe::repository::InstalledRepositoryInterfaceHandle,
@@ -105,8 +105,8 @@ mod mock_installation_manager {
                 download_only: bool,
             ) -> anyhow::Result<()>;
             fn get_install_path(&self, package: PackageInterfaceHandle) -> anyhow::Result<Option<std::path::PathBuf>>;
-            fn set_output_progress(&mut self, output_progress: bool);
-            async fn notify_installs(&mut self, io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>);
+            fn set_output_progress(&self, output_progress: bool);
+            async fn notify_installs(&self, io: std::rc::Rc<dyn IOInterface>);
         }
     }
 }
