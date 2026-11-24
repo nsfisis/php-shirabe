@@ -17,8 +17,10 @@ final class SortedDependencies implements Linter
 
     public function failureIntro(): string
     {
-        return "Found unsorted `[dependencies]` / `[dev-dependencies]` in Cargo.toml.\n"
-            . 'Entries must be alphabetical, with `shirabe-*` crates listed before others:';
+        return (
+            "Found unsorted `[dependencies]` / `[dev-dependencies]` in Cargo.toml.\n"
+            . 'Entries must be alphabetical, with `shirabe-*` crates listed before others:'
+        );
     }
 
     public function check(string $rootDir, array $excludes): array
@@ -44,9 +46,13 @@ final class SortedDependencies implements Linter
                     continue;
                 }
 
-                $errors[] = "{$relative} [{$section}]\n"
-                    . '    actual:   ' . implode(', ', $deps) . "\n"
-                    . '    expected: ' . implode(', ', $expected);
+                $errors[] =
+                    "{$relative} [{$section}]\n"
+                    . '    actual:   '
+                    . implode(', ', $deps)
+                    . "\n"
+                    . '    expected: '
+                    . implode(', ', $expected);
             }
         }
 

@@ -39,74 +39,104 @@ $runner = new Runner($rootDir, [
     [new CargoWorkspaceDependencies(), []],
     [new ContiguousUseBlock(), []],
     [new NoBannedUse(), []],
-    [new NoDecorativeSectionComment(), [
-        'crates/shirabe-semver/src/version_parser.rs',
-    ]],
-    [new NoDirectEnvAccess(), [
-        // Defines the shim the rule points at.
-        'crates/shirabe-php-shim/src/env.rs',
-        // Build scripts read Cargo's own variables, and run before the shim exists.
-        'crates/shirabe-php-rpc/build.rs',
-        'crates/shirabe/build.rs',
-        // Reads the calling crate's directory, which Cargo gives the macro at compile time.
-        'crates/shirabe-php-binding-macros/src/decls.rs',
-    ]],
-    [new NoExceptionDowncast(), [
-        // Defines the box and the walk the rule points at.
-        'crates/shirabe-php-shim/src/exception.rs',
-        // Downcast a panic payload, not an error: PHP's error handler throws an \ErrorException
-        // where these call sites `catch` it.
-        'crates/shirabe/src/cache.rs',
-        'crates/shirabe/src/util/filesystem.rs',
-    ]],
-    [new NoFormatTrailingComma(), [
-        'crates/shirabe/src/package/loader/root_package_loader.rs',
-        'crates/shirabe-spdx-licenses/src/spdx_licenses.rs',
-    ]],
-    [new NoHaltCompilerLiteral(), [
-        'crates/shirabe/build.rs',
-    ]],
+    [
+        new NoDecorativeSectionComment(),
+        [
+            'crates/shirabe-semver/src/version_parser.rs',
+        ],
+    ],
+    [
+        new NoDirectEnvAccess(),
+        [
+            // Defines the shim the rule points at.
+            'crates/shirabe-php-shim/src/env.rs',
+            // Build scripts read Cargo's own variables, and run before the shim exists.
+            'crates/shirabe-php-rpc/build.rs',
+            'crates/shirabe/build.rs',
+            // Reads the calling crate's directory, which Cargo gives the macro at compile time.
+            'crates/shirabe-php-binding-macros/src/decls.rs',
+        ],
+    ],
+    [
+        new NoExceptionDowncast(),
+        [
+            // Defines the box and the walk the rule points at.
+            'crates/shirabe-php-shim/src/exception.rs',
+            // Downcast a panic payload, not an error: PHP's error handler throws an \ErrorException
+            // where these call sites `catch` it.
+            'crates/shirabe/src/cache.rs',
+            'crates/shirabe/src/util/filesystem.rs',
+        ],
+    ],
+    [
+        new NoFormatTrailingComma(),
+        [
+            'crates/shirabe/src/package/loader/root_package_loader.rs',
+            'crates/shirabe-spdx-licenses/src/spdx_licenses.rs',
+        ],
+    ],
+    [
+        new NoHaltCompilerLiteral(),
+        [
+            'crates/shirabe/build.rs',
+        ],
+    ],
     [new NoModRs(), []],
     [new NoPhpDocTag(), []],
-    [new NoQualifiedCratePath(), [
-        // Generate code that expands in the caller's scope, as a `macro_rules!` body does.
-        'crates/shirabe-php-binding-macros/src/binding.rs',
-        'crates/shirabe-php-binding-macros/src/entity.rs',
-    ]],
-    [new NoQualifiedPhpShimPath(), [
-        // Generates code that expands in the caller's scope, as a `macro_rules!` body does.
-        'crates/shirabe-php-shim-macros/src/lib.rs',
-        // Newtypes named after the shim exception they wrap; the shim type cannot be imported
-        // under its own name.
-        'crates/shirabe-symfony-console/src/exception/invalid_argument_exception.rs',
-        'crates/shirabe-symfony-console/src/exception/logic_exception.rs',
-        'crates/shirabe-symfony-console/src/exception/runtime_exception.rs',
-        'crates/shirabe-symfony-process/src/exception/invalid_argument_exception.rs',
-        'crates/shirabe-symfony-process/src/exception/logic_exception.rs',
-        'crates/shirabe-symfony-process/src/exception/runtime_exception.rs',
-        'crates/shirabe-symfony-string/src/exception/invalid_argument_exception.rs',
-    ]],
+    [
+        new NoQualifiedCratePath(),
+        [
+            // Generate code that expands in the caller's scope, as a `macro_rules!` body does.
+            'crates/shirabe-php-binding-macros/src/binding.rs',
+            'crates/shirabe-php-binding-macros/src/entity.rs',
+        ],
+    ],
+    [
+        new NoQualifiedPhpShimPath(),
+        [
+            // Generates code that expands in the caller's scope, as a `macro_rules!` body does.
+            'crates/shirabe-php-shim-macros/src/lib.rs',
+            // Newtypes named after the shim exception they wrap; the shim type cannot be imported
+            // under its own name.
+            'crates/shirabe-symfony-console/src/exception/invalid_argument_exception.rs',
+            'crates/shirabe-symfony-console/src/exception/logic_exception.rs',
+            'crates/shirabe-symfony-console/src/exception/runtime_exception.rs',
+            'crates/shirabe-symfony-process/src/exception/invalid_argument_exception.rs',
+            'crates/shirabe-symfony-process/src/exception/logic_exception.rs',
+            'crates/shirabe-symfony-process/src/exception/runtime_exception.rs',
+            'crates/shirabe-symfony-string/src/exception/invalid_argument_exception.rs',
+        ],
+    ],
     [new NoRedundantModulePath(), []],
     [new NoStdCollectionsMaps(), []],
-    [new NoSuperPath(), [
-        // Generates the child module holding a trait's or an impl's adapters, which sees the
-        // scope of the item it stands next to.
-        'crates/shirabe-php-binding-macros/src/binding.rs',
-    ]],
+    [
+        new NoSuperPath(),
+        [
+            // Generates the child module holding a trait's or an impl's adapters, which sees the
+            // scope of the item it stands next to.
+            'crates/shirabe-php-binding-macros/src/binding.rs',
+        ],
+    ],
     [new NoUseAsAlias(), []],
     [new OneUsePerModule(), []],
     [new PhpObjectModel(), []],
     [new PhpSrcDerivationBoundary(), []],
-    [new PhpThrowConversion(), [
-        // Defines `error_throw`, the one place an error without an exception is described.
-        'crates/shirabe/src/php_worker/rpc/dispatch.rs',
-    ]],
+    [
+        new PhpThrowConversion(),
+        [
+            // Defines `error_throw`, the one place an error without an exception is described.
+            'crates/shirabe/src/php_worker/rpc/dispatch.rs',
+        ],
+    ],
     [new PluginClassification(), []],
     [new PluginGeneratedStubs(), []],
-    [new RustEntityHandleConstruction(), [
-        // Defines `entity_value`, the one place the handle is built.
-        'crates/shirabe/src/php_worker/rpc/entity.rs',
-    ]],
+    [
+        new RustEntityHandleConstruction(),
+        [
+            // Defines `entity_value`, the one place the handle is built.
+            'crates/shirabe/src/php_worker/rpc/entity.rs',
+        ],
+    ],
     [new SortedDependencies(), []],
     [new UpstreamFileHash(), []],
     [new UpstreamIncludeRef(), []],

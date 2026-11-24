@@ -29,8 +29,7 @@ final class ByValueObject
             // crosses rebased on UTC. Going through the offset rather than the zone keeps the
             // instant exact across an ambiguous wall clock, and drops any subclass a plugin
             // brought along.
-            return (new \DateTimeImmutable($value->format('Y-m-d H:i:s.uP')))
-                ->setTimezone(new \DateTimeZone('UTC'));
+            return (new \DateTimeImmutable($value->format('Y-m-d H:i:s.uP')))->setTimezone(new \DateTimeZone('UTC'));
         }
 
         // Not instanceof: a subclass has state and behaviour of its own that no Rust value

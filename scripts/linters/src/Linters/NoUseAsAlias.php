@@ -20,10 +20,12 @@ final class NoUseAsAlias implements Linter
 
     public function failureIntro(): string
     {
-        return "Found `use ... as name` aliases.\n"
+        return (
+            "Found `use ... as name` aliases.\n"
             . "Aliasing imports merely to shorten a namespace is forbidden.\n"
             . "Only `as _` (e.g. `use std::io::Write as _;`) and PascalCase renames\n"
-            . '(for collision avoidance, e.g. `use foo::Error as FooError;`) are allowed:';
+            . '(for collision avoidance, e.g. `use foo::Error as FooError;`) are allowed:'
+        );
     }
 
     public function check(string $rootDir, array $excludes): array

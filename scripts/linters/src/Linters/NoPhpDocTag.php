@@ -23,8 +23,10 @@ final class NoPhpDocTag implements Linter
 
     public function failureIntro(): string
     {
-        return "Found PHPDoc tags in doc comments.\n"
-            . 'Types and visibility are expressed in Rust, and the PHP source documents the rest — remove them:';
+        return (
+            "Found PHPDoc tags in doc comments.\n"
+            . 'Types and visibility are expressed in Rust, and the PHP source documents the rest — remove them:'
+        );
     }
 
     public function check(string $rootDir, array $excludes): array

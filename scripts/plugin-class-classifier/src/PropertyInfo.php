@@ -16,7 +16,6 @@ final class PropertyInfo
         /** Native type is array/iterable/mixed/object or absent. */
         public readonly bool $expandable,
         /** Class-like FQCNs from the `@var` docblock. @var list<string> */
-        public readonly array $docblockTypes,
-    ) {
-    }
+        public readonly array $docblockTypes
+    ) {}
 }

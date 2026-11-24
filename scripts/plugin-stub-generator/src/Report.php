@@ -14,9 +14,9 @@ final class Report
     /**
      * @param array<string, array<string, mixed>> $classes fqcn => row
      */
-    private function __construct(private readonly array $classes)
-    {
-    }
+    private function __construct(
+        private readonly array $classes
+    ) {}
 
     public static function load(string $path): self
     {

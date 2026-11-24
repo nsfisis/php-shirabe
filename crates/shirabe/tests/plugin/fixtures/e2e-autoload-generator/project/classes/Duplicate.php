@@ -1,5 +1,3 @@
 <?php
 
-class Duplicate
-{
-}
+class Duplicate {}

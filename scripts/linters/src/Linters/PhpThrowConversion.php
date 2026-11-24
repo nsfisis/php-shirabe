@@ -41,8 +41,10 @@ final class PhpThrowConversion implements Linter
 
     public function failureIntro(): string
     {
-        return "Found a conversion between `PhpThrow` and `anyhow::Error` outside the canonical ones.\n"
-            . 'Use `error_throw` (Rust to PHP) or `throw_into_error` / `PhpThrow::into_error` (PHP to Rust):';
+        return (
+            "Found a conversion between `PhpThrow` and `anyhow::Error` outside the canonical ones.\n"
+            . 'Use `error_throw` (Rust to PHP) or `throw_into_error` / `PhpThrow::into_error` (PHP to Rust):'
+        );
     }
 
     public function check(string $rootDir, array $excludes): array

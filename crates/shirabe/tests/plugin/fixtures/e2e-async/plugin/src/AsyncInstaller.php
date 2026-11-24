@@ -40,8 +40,11 @@ class AsyncInstaller implements InstallerInterface
         return null;
     }
 
-    public function prepare(string $type, PackageInterface $package, ?PackageInterface $prevPackage = null): ?PromiseInterface
-    {
+    public function prepare(
+        string $type,
+        PackageInterface $package,
+        ?PackageInterface $prevPackage = null
+    ): ?PromiseInterface {
         // A promise that settled before it was returned takes the same route.
         $this->trace('prepare returned');
 
@@ -59,8 +62,11 @@ class AsyncInstaller implements InstallerInterface
         });
     }
 
-    public function update(InstalledRepositoryInterface $repo, PackageInterface $initial, PackageInterface $target): ?PromiseInterface
-    {
+    public function update(
+        InstalledRepositoryInterface $repo,
+        PackageInterface $initial,
+        PackageInterface $target
+    ): ?PromiseInterface {
         return $this->install($repo, $target);
     }
 
@@ -69,8 +75,11 @@ class AsyncInstaller implements InstallerInterface
         return null;
     }
 
-    public function cleanup(string $type, PackageInterface $package, ?PackageInterface $prevPackage = null): ?PromiseInterface
-    {
+    public function cleanup(
+        string $type,
+        PackageInterface $package,
+        ?PackageInterface $prevPackage = null
+    ): ?PromiseInterface {
         $this->trace('cleanup');
 
         return null;
@@ -84,7 +93,10 @@ class AsyncInstaller implements InstallerInterface
     private function step(string $name, string $command): PromiseInterface
     {
         $settled = false;
-        $promise = $this->composer->getLoop()->getProcessExecutor()->executeAsync($command)
+        $promise = $this->composer
+            ->getLoop()
+            ->getProcessExecutor()
+            ->executeAsync($command)
             ->then(function ($process) use ($name, &$settled): void {
                 $settled = true;
                 $this->trace($name . ' settled output=' . json_encode($process->getOutput()));

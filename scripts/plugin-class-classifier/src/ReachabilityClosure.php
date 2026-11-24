@@ -33,7 +33,7 @@ final class ReachabilityClosure
 
     public function __construct(
         private readonly SourceParser $sources,
-        private readonly Inputs $lists,
+        private readonly Inputs $lists
     ) {
         $this->buildDescendants();
     }
@@ -148,7 +148,10 @@ final class ReachabilityClosure
         // PHP->Rust (consumed), results flow Rust->PHP (provided). On a
         // consumed type, Composer calls the plugin's implementation: the
         // directions invert.
-        foreach ([self::PROVIDED => [self::CONSUMED, self::PROVIDED], self::CONSUMED => [self::PROVIDED, self::CONSUMED]] as $ownerDir => [$paramDir, $returnDir]) {
+        foreach ([
+            self::PROVIDED => [self::CONSUMED, self::PROVIDED],
+            self::CONSUMED => [self::PROVIDED, self::CONSUMED],
+        ] as $ownerDir => [$paramDir, $returnDir]) {
             if (($ownerBits & $ownerDir) === 0) {
                 continue;
             }

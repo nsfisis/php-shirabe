@@ -26,9 +26,11 @@ final class NoSuperPath implements Linter
 
     public function failureIntro(): string
     {
-        return "Found `super` paths.\n"
+        return (
+            "Found `super` paths.\n"
             . 'The only allowed form is `use super::*;` in test code (a `#[cfg(test)]` module or an '
-            . 'integration test file). Name the item with a `crate::` path instead:';
+            . 'integration test file). Name the item with a `crate::` path instead:'
+        );
     }
 
     public function check(string $rootDir, array $excludes): array

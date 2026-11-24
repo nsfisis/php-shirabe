@@ -19,60 +19,60 @@ use PhpParser\NodeFinder;
 final class Generator
 {
     private const BOILERPLATE = <<<'PHP'
-        /** @var int */
-        protected $__entityId;
+            /** @var int */
+            protected $__entityId;
 
-        /**
-         * Binds a stub the registry built for an existing entity. Proxy instantiation bypasses
-         * the constructor, which belongs to plugin code building a new entity instead.
-         */
-        public function __shirabeBind(int $entityId): void
-        {
-            $this->__entityId = $entityId;
-        }
+            /**
+             * Binds a stub the registry built for an existing entity. Proxy instantiation bypasses
+             * the constructor, which belongs to plugin code building a new entity instead.
+             */
+            public function __shirabeBind(int $entityId): void
+            {
+                $this->__entityId = $entityId;
+            }
 
-        public function __destruct()
-        {
-            \Shirabe\RustStubRegistry::release($this->__entityId);
-        }
+            public function __destruct()
+            {
+                \Shirabe\RustStubRegistry::release($this->__entityId);
+            }
 
-        public function __shirabeRustEntityHandle(): \Shirabe\Rpc\RustEntityHandle
-        {
-            return new \Shirabe\Rpc\RustEntityHandle($this->__entityId, static::class);
-        }
+            public function __shirabeRustEntityHandle(): \Shirabe\Rpc\RustEntityHandle
+            {
+                return new \Shirabe\Rpc\RustEntityHandle($this->__entityId, static::class);
+            }
 
-        public function __clone()
-        {
-            // PHP has already shallow-copied this stub, so both copies would point at one
-            // entity and release it twice. The Rust side clones the entity instead, applying
-            // whatever __clone semantics the real class defines, and this copy rebinds to the
-            // fresh handle. Entities without clone semantics answer with an explicit error.
-            $this->__entityId = \Shirabe\RpcRuntime::callRust($this->__entityId, '__shirabe_clone', []);
-            \Shirabe\RustStubRegistry::adopt($this->__entityId, $this);
-        }
-    PHP;
+            public function __clone()
+            {
+                // PHP has already shallow-copied this stub, so both copies would point at one
+                // entity and release it twice. The Rust side clones the entity instead, applying
+                // whatever __clone semantics the real class defines, and this copy rebinds to the
+                // fresh handle. Entities without clone semantics answer with an explicit error.
+                $this->__entityId = \Shirabe\RpcRuntime::callRust($this->__entityId, '__shirabe_clone', []);
+                \Shirabe\RustStubRegistry::adopt($this->__entityId, $this);
+            }
+        PHP;
 
     private const PROPERTY_FORWARDERS = <<<'PHP'
-        public function __get($name)
-        {
-            return \Shirabe\RpcRuntime::callRust($this->__entityId, '__get', [$name]);
-        }
+            public function __get($name)
+            {
+                return \Shirabe\RpcRuntime::callRust($this->__entityId, '__get', [$name]);
+            }
 
-        public function __set($name, $value): void
-        {
-            \Shirabe\RpcRuntime::callRust($this->__entityId, '__set', [$name, $value]);
-        }
+            public function __set($name, $value): void
+            {
+                \Shirabe\RpcRuntime::callRust($this->__entityId, '__set', [$name, $value]);
+            }
 
-        public function __isset($name): bool
-        {
-            return \Shirabe\RpcRuntime::callRust($this->__entityId, '__isset', [$name]);
-        }
+            public function __isset($name): bool
+            {
+                return \Shirabe\RpcRuntime::callRust($this->__entityId, '__isset', [$name]);
+            }
 
-        public function __unset($name): void
-        {
-            \Shirabe\RpcRuntime::callRust($this->__entityId, '__unset', [$name]);
-        }
-    PHP;
+            public function __unset($name): void
+            {
+                \Shirabe\RpcRuntime::callRust($this->__entityId, '__unset', [$name]);
+            }
+        PHP;
 
     private Project $project;
 
@@ -110,8 +110,10 @@ final class Generator
      */
     private array $runtimeProvided;
 
-    public function __construct(string $composerRoot, private readonly Report $report)
-    {
+    public function __construct(
+        string $composerRoot,
+        private readonly Report $report
+    ) {
         $this->project = new Project($composerRoot);
         $this->printer = new NamePrinter();
         $this->nodeFinder = new NodeFinder();
@@ -319,7 +321,7 @@ final class Generator
         if ($class->extends !== null) {
             $decl .= ' extends ' . $this->printer->renderName($class->extends, $file);
         }
-        $interfaces = array_map(fn (Name $n): string => $this->printer->renderName($n, $file), $class->implements);
+        $interfaces = array_map(fn(Name $n): string => $this->printer->renderName($n, $file), $class->implements);
         if ($isRoot) {
             $interfaces[] = '\Shirabe\RustStub';
         }
@@ -344,7 +346,8 @@ final class Generator
         $members = array_merge($members, $staticMethods, $methodTexts);
         $body = implode("\n\n", $members);
 
-        $header = "// Generated by scripts/plugin-stub-generator; do not edit by hand.\n"
+        $header =
+            "// Generated by scripts/plugin-stub-generator; do not edit by hand.\n"
             . "// Proxy stub for $fqcn: the public surface forwards to the Rust-side entity over RPC.";
         $text = "<?php\n\n$header\n\nnamespace {$file->namespace};\n\n";
         $uses = $file->importsUsedBy($decl . "\n" . $body);
@@ -378,8 +381,12 @@ final class Generator
             $have = $actual[$kind];
             sort($have);
             if ($members !== $have) {
-                $this->errors[] = "$fqcn: the stub forwards the {$kind}s [" . implode(', ', $have)
-                    . '], the classifier report [' . implode(', ', $members) . ']';
+                $this->errors[] =
+                    "$fqcn: the stub forwards the {$kind}s ["
+                    . implode(', ', $have)
+                    . '], the classifier report ['
+                    . implode(', ', $members)
+                    . ']';
             }
         }
     }
@@ -413,13 +420,16 @@ final class Generator
             $params[] = $rendered;
             $args[] = '$' . $paramName;
         }
-        $call = "\\Shirabe\\RpcRuntime::newRust(static::class, ["
-            . implode(', ', $args) . '])';
-        return "    public function __construct(" . implode(', ', $params) . ")\n"
+        $call = "\\Shirabe\\RpcRuntime::newRust(static::class, [" . implode(', ', $args) . '])';
+        return (
+            '    public function __construct('
+            . implode(', ', $params)
+            . ")\n"
             . "    {\n"
             . "        \$this->__entityId = $call;\n"
             . "        \\Shirabe\\RustStubRegistry::adopt(\$this->__entityId, \$this);\n"
-            . "    }";
+            . '    }'
+        );
     }
 
     /**
@@ -510,7 +520,7 @@ final class Generator
             $references = array_merge(
                 $this->nodeFinder->findInstanceOf($node, Node\Expr\StaticCall::class),
                 $this->nodeFinder->findInstanceOf($node, Node\Expr\ClassConstFetch::class),
-                $this->nodeFinder->findInstanceOf($node, Node\Expr\New_::class),
+                $this->nodeFinder->findInstanceOf($node, Node\Expr\New_::class)
             );
             foreach ($references as $reference) {
                 if (!$reference->class instanceof Name) {
@@ -581,8 +591,8 @@ final class Generator
     {
         [$params, $args, $outPositions] = $this->renderParams($fqcn, $name, $method, $target);
         $returnType = $this->printer->renderType($method->returnType, $target);
-        $signature = "public function $name(" . implode(', ', $params) . ')'
-            . ($returnType === '' ? '' : ": $returnType");
+        $signature =
+            "public function $name(" . implode(', ', $params) . ')' . ($returnType === '' ? '' : ": $returnType");
         if (isset(self::LOCAL_BODIES["$fqcn::$name"])) {
             $this->usedLocalBodies["$fqcn::$name"] = true;
             return "    $signature\n    {\n" . self::LOCAL_BODIES["$fqcn::$name"] . "\n    }";
@@ -592,7 +602,7 @@ final class Generator
             $args,
             $outPositions,
             $this->inspectsArgCount($fqcn, $name, $method),
-            $returnType,
+            $returnType
         );
         return "    $signature\n    {\n$body\n    }";
     }
@@ -607,14 +617,17 @@ final class Generator
         string $name,
         ClassMethod $method,
         SourceFile $target,
-        string $reason,
+        string $reason
     ): string {
         [$params, $args, $outPositions] = $this->renderParams($fqcn, $name, $method, $target);
         if ($outPositions !== []) {
             $this->errors[] = "$fqcn::$name: a forwarded static method cannot take by-ref parameters yet";
         }
         $returnType = $this->printer->renderType($method->returnType, $target);
-        $signature = "public static function $name(" . implode(', ', $params) . ')'
+        $signature =
+            "public static function $name("
+            . implode(', ', $params)
+            . ')'
             . ($returnType === '' ? '' : ": $returnType");
         // self::class, not static::class: the forwarded statics stand for this class's own state,
         // and a plugin subclass redeclaring it is not modelled on the Rust side.
@@ -623,10 +636,9 @@ final class Generator
             $args,
             $outPositions,
             $this->inspectsArgCount($fqcn, $name, $method),
-            $returnType,
+            $returnType
         );
-        return "    // Forwarded rather than materialized: it $reason.\n"
-            . "    $signature\n    {\n$body\n    }";
+        return "    // Forwarded rather than materialized: it $reason.\n" . "    $signature\n    {\n$body\n    }";
     }
 
     /**
@@ -700,7 +712,7 @@ final class Generator
         array $args,
         array $outPositions,
         bool $arityAware,
-        string $returnType,
+        string $returnType
     ): string {
         $lines = [];
         $argsExpr = '[' . implode(', ', $args) . ']';
@@ -751,10 +763,11 @@ final class Generator
         string $name,
         ClassMethod $method,
         SourceFile $file,
-        array $inherited,
+        array $inherited
     ): void {
         if ($this->fingerprint($method, $file) !== $inherited) {
-            $this->errors[] = "$fqcn::$name: override diverges from the inherited stub signature"
+            $this->errors[] =
+                "$fqcn::$name: override diverges from the inherited stub signature"
                 . ' (names, arity, defaults or passing modes); it can no longer be omitted';
         }
     }

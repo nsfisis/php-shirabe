@@ -5,7 +5,13 @@
 // Shirabe maps PHP's int to a 64-bit integer, and the frame codec below relies on pack('P').
 // Exiting ends the Shirabe process with the same status on its first call to the worker.
 if (PHP_INT_SIZE !== 8) {
-    fwrite(STDERR, 'Shirabe requires a 64-bit build of PHP and you are running a 32-bit build of PHP '.PHP_VERSION.'. Aborting.'.PHP_EOL);
+    fwrite(
+        STDERR,
+        'Shirabe requires a 64-bit build of PHP and you are running a 32-bit build of PHP '
+        . PHP_VERSION
+        . '. Aborting.'
+        . PHP_EOL
+    );
     exit(1);
 }
 

@@ -8,9 +8,9 @@ use Composer\DependencyResolver\Operation\OperationInterface;
 use Composer\DependencyResolver\Operation\UninstallOperation;
 use Composer\DependencyResolver\Operation\UpdateOperation;
 use Composer\EventDispatcher\EventSubscriberInterface;
-use Composer\IO\IOInterface;
 use Composer\Installer\PackageEvent;
 use Composer\Installer\PackageEvents;
+use Composer\IO\IOInterface;
 use Composer\Plugin\PluginInterface;
 
 /**
@@ -30,13 +30,9 @@ class Plugin implements PluginInterface, EventSubscriberInterface
         $this->io = $io;
     }
 
-    public function deactivate(Composer $composer, IOInterface $io): void
-    {
-    }
+    public function deactivate(Composer $composer, IOInterface $io): void {}
 
-    public function uninstall(Composer $composer, IOInterface $io): void
-    {
-    }
+    public function uninstall(Composer $composer, IOInterface $io): void {}
 
     public static function getSubscribedEvents()
     {
@@ -76,7 +72,8 @@ class Plugin implements PluginInterface, EventSubscriberInterface
     {
         if ($operation instanceof UpdateOperation) {
             return $operation->getInitialPackage()->getPrettyName()
-                . '->' . $operation->getTargetPackage()->getPrettyName();
+            . '->'
+            . $operation->getTargetPackage()->getPrettyName();
         }
         if ($operation instanceof InstallOperation || $operation instanceof UninstallOperation) {
             return $operation->getPackage()->getPrettyName();

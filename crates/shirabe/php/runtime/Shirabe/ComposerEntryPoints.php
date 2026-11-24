@@ -78,8 +78,12 @@ final class ComposerEntryPoints
                     'curl_version' => extension_loaded('curl') ? curl_version()['version'] : null,
                     'inet_pton_ipv6' => $inet_pton_ipv6 === false ? null : $inet_pton_ipv6,
                     'resource_bundle_version' => $resource_bundle_version,
-                    'intl_char_unicode_version' => class_exists('IntlChar', false) ? \IntlChar::getUnicodeVersion() : null,
-                    'imagick_version_string' => extension_loaded('imagick') ? (new \Imagick())->getVersion()['versionString'] : null,
+                    'intl_char_unicode_version' => class_exists('IntlChar', false)
+                        ? \IntlChar::getUnicodeVersion()
+                        : null,
+                    'imagick_version_string' => extension_loaded('imagick')
+                        ? (new \Imagick())->getVersion()['versionString']
+                        : null,
                 ];
             },
             // The extensions, functions and ini settings reported on arrive with the query.
@@ -192,16 +196,17 @@ final class ComposerEntryPoints
                 \Composer\InstalledVersions::reload($versions);
                 try {
                     $reflProp = new \ReflectionProperty(\Composer\InstalledVersions::class, 'selfDir');
-                    (\PHP_VERSION_ID < 80100) and $reflProp->setAccessible(true);
+                    \PHP_VERSION_ID < 80100 and $reflProp->setAccessible(true);
                     $reflProp->setValue(null, strtr($repoDir, '\\', '/'));
 
                     $reflProp = new \ReflectionProperty(\Composer\InstalledVersions::class, 'installedIsLocalDir');
-                    (\PHP_VERSION_ID < 80100) and $reflProp->setAccessible(true);
+                    \PHP_VERSION_ID < 80100 and $reflProp->setAccessible(true);
                     $reflProp->setValue(null, true);
                 } catch (\ReflectionException $e) {
                     if (preg_match('{Property .*? does not exist}i', $e->getMessage()) !== 1) {
                         throw $e;
                     }
+
                     // noop, an outdated InstalledVersions class simply lacks the properties
                 }
                 return true;

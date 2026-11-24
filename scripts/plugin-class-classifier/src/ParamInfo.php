@@ -18,7 +18,6 @@ final class ParamInfo
         public readonly array $docblockTypes,
         /** Native type mentions callable or \Closure: the value is a
          *  callback that needs a handle across the boundary. */
-        public readonly bool $callable = false,
-    ) {
-    }
+        public readonly bool $callable = false
+    ) {}
 }

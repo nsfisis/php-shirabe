@@ -41,13 +41,9 @@ class Plugin implements PluginInterface
         $io->write('built: ' . self::describe($built));
     }
 
-    public function deactivate(Composer $composer, IOInterface $io)
-    {
-    }
+    public function deactivate(Composer $composer, IOInterface $io) {}
 
-    public function uninstall(Composer $composer, IOInterface $io)
-    {
-    }
+    public function uninstall(Composer $composer, IOInterface $io) {}
 
     private static function describe(AliasPackage $package): string
     {

@@ -41,9 +41,11 @@ final class NoBannedUse implements Linter
 
     public function failureIntro(): string
     {
-        return "Found banned `use` imports.\n"
+        return (
+            "Found banned `use` imports.\n"
             . "These items must always be referenced by their fully-qualified path.\n"
-            . 'For imports to use trait methods, use `as _` (e.g., `use std::io::Write as _;`).';
+            . 'For imports to use trait methods, use `as _` (e.g., `use std::io::Write as _;`).'
+        );
     }
 
     public function check(string $rootDir, array $excludes): array
@@ -95,7 +97,8 @@ final class NoBannedUse implements Linter
                 if (!$this->isBanned($full, $localModules)) {
                     continue;
                 }
-                $errors[] = "{$relative}:" . ($startIdx + 1) . ": `use {$full}` is banned (fully qualify as `{$full}` instead)";
+                $errors[] =
+                    "{$relative}:" . ($startIdx + 1) . ": `use {$full}` is banned (fully qualify as `{$full}` instead)";
             }
 
             $buffer = null;

@@ -2,6 +2,4 @@
 
 namespace Acme\A;
 
-class Widget
-{
-}
+class Widget {}

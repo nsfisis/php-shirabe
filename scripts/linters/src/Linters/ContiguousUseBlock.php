@@ -19,8 +19,10 @@ final class ContiguousUseBlock implements Linter
 
     public function failureIntro(): string
     {
-        return "Found blank lines splitting the leading `use` block into sections.\n"
-            . 'All `use` statements at the top of the file must be contiguous (no blank lines between them):';
+        return (
+            "Found blank lines splitting the leading `use` block into sections.\n"
+            . 'All `use` statements at the top of the file must be contiguous (no blank lines between them):'
+        );
     }
 
     public function check(string $rootDir, array $excludes): array
@@ -92,7 +94,12 @@ final class ContiguousUseBlock implements Linter
             if (preg_match(self::USE_START_RE, $stripped)) {
                 return $idx;
             }
-            if ($stripped === '' || str_starts_with($stripped, '//') || str_starts_with($stripped, '#![') || str_starts_with($stripped, '#[')) {
+            if (
+                $stripped === ''
+                || str_starts_with($stripped, '//')
+                || str_starts_with($stripped, '#![')
+                || str_starts_with($stripped, '#[')
+            ) {
                 continue;
             }
 

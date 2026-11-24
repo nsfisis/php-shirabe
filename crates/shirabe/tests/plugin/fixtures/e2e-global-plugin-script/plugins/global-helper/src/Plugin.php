@@ -16,11 +16,7 @@ class Plugin implements PluginInterface
         Helper::trace('activate handler-loaded=' . json_encode(class_exists(ScriptHandler::class, false)));
     }
 
-    public function deactivate(Composer $composer, IOInterface $io): void
-    {
-    }
+    public function deactivate(Composer $composer, IOInterface $io): void {}
 
-    public function uninstall(Composer $composer, IOInterface $io): void
-    {
-    }
+    public function uninstall(Composer $composer, IOInterface $io): void {}
 }

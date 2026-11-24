@@ -49,8 +49,11 @@ class AssetInstaller implements InstallerInterface
         return null;
     }
 
-    public function prepare(string $type, PackageInterface $package, ?PackageInterface $prevPackage = null): ?PromiseInterface
-    {
+    public function prepare(
+        string $type,
+        PackageInterface $package,
+        ?PackageInterface $prevPackage = null
+    ): ?PromiseInterface {
         $this->trace('prepare ' . $type . ' ' . $package->getPrettyName() . ' prev=' . $this->name($prevPackage));
 
         return null;
@@ -66,14 +69,18 @@ class AssetInstaller implements InstallerInterface
             'version=' . $package->getPrettyVersion(),
             'type=' . $package->getType(),
             'root=' . $this->composer->getPackage()->getName(),
-        ]) . "\n");
+        ])
+            . "\n");
         $this->io->write('asset-installer: installed ' . $package->getPrettyName());
 
         return null;
     }
 
-    public function update(InstalledRepositoryInterface $repo, PackageInterface $initial, PackageInterface $target): ?PromiseInterface
-    {
+    public function update(
+        InstalledRepositoryInterface $repo,
+        PackageInterface $initial,
+        PackageInterface $target
+    ): ?PromiseInterface {
         $this->trace('update ' . $initial->getPrettyName() . ' -> ' . $target->getPrettyName());
 
         return $this->install($repo, $target);
@@ -89,8 +96,11 @@ class AssetInstaller implements InstallerInterface
         return null;
     }
 
-    public function cleanup(string $type, PackageInterface $package, ?PackageInterface $prevPackage = null): ?PromiseInterface
-    {
+    public function cleanup(
+        string $type,
+        PackageInterface $package,
+        ?PackageInterface $prevPackage = null
+    ): ?PromiseInterface {
         $this->trace('cleanup ' . $type . ' ' . $package->getPrettyName());
 
         return null;

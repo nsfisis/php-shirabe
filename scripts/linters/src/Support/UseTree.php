@@ -71,6 +71,6 @@ final class UseTree
         }
         $parts[] = $current;
 
-        return array_values(array_filter(array_map('trim', $parts), static fn (string $p): bool => $p !== ''));
+        return array_values(array_filter(array_map('trim', $parts), static fn(string $p): bool => $p !== ''));
     }
 }

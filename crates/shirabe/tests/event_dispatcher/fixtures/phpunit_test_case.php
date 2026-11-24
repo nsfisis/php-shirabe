@@ -1,4 +1,6 @@
-<?php declare(strict_types=1);
+<?php
+
+declare(strict_types=1);
 
 namespace PHPUnit\Framework;
 
@@ -15,22 +17,30 @@ class TestCase
     public static function assertStringContainsString(string $needle, string $haystack, string $message = ''): void
     {
         if (!str_contains($haystack, $needle)) {
-            throw new \RuntimeException($message !== '' ? $message : sprintf(
-                'Failed asserting that %s contains %s.',
-                var_export($haystack, true),
-                var_export($needle, true)
-            ));
+            throw new \RuntimeException(
+                $message !== ''
+                    ? $message
+                    : sprintf(
+                        'Failed asserting that %s contains %s.',
+                        var_export($haystack, true),
+                        var_export($needle, true)
+                    )
+            );
         }
     }
 
     public static function assertStringNotContainsString(string $needle, string $haystack, string $message = ''): void
     {
         if (str_contains($haystack, $needle)) {
-            throw new \RuntimeException($message !== '' ? $message : sprintf(
-                'Failed asserting that %s does not contain %s.',
-                var_export($haystack, true),
-                var_export($needle, true)
-            ));
+            throw new \RuntimeException(
+                $message !== ''
+                    ? $message
+                    : sprintf(
+                        'Failed asserting that %s does not contain %s.',
+                        var_export($haystack, true),
+                        var_export($needle, true)
+                    )
+            );
         }
     }
 }

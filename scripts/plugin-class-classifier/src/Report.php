@@ -14,9 +14,9 @@ final class Report
         5 => 'shared static properties no mechanism keeps in sync',
     ];
 
-    public function __construct(private readonly Classifier $classifier)
-    {
-    }
+    public function __construct(
+        private readonly Classifier $classifier
+    ) {}
 
     public function render(): string
     {
@@ -30,7 +30,7 @@ final class Report
                 'direction' => $bits === 3 ? 'both' : ($bits === 1 ? 'provided' : 'consumed'),
             ];
         }
-        usort($vendor, static fn (array $a, array $b) => strcmp($a['fqcn'], $b['fqcn']));
+        usort($vendor, static fn(array $a, array $b) => strcmp($a['fqcn'], $b['fqcn']));
 
         $builtins = array_keys($this->classifier->closure->builtinReachable);
         sort($builtins);
@@ -68,7 +68,7 @@ final class Report
         }
         echo "\n";
 
-        $overridden = array_filter($this->classifier->rows, static fn (array $r) => isset($r['ruleValue']));
+        $overridden = array_filter($this->classifier->rows, static fn(array $r) => isset($r['ruleValue']));
         if ($overridden !== []) {
             echo "## Overridden\n\n";
             foreach ($overridden as $row) {

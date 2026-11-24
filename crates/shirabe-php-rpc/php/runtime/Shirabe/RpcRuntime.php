@@ -125,6 +125,7 @@ final class RpcRuntime
             if ($handle !== null) {
                 return $handle;
             }
+
             // A natively-constructed dual-mode instance falls through to the PHP entity table
             // below.
         }
@@ -201,17 +202,9 @@ final class RpcRuntime
      *
      * @param array<int, mixed>|null $outParams
      */
-    public static function callRust(
-        int $entityId,
-        string $method,
-        array $args,
-        ?array &$outParams = null
-    ) {
-        return self::request(
-            self::TAG_CALL_METHOD,
-            [$entityId, $method, self::toRpcValue($args)],
-            $outParams
-        );
+    public static function callRust(int $entityId, string $method, array $args, ?array &$outParams = null)
+    {
+        return self::request(self::TAG_CALL_METHOD, [$entityId, $method, self::toRpcValue($args)], $outParams);
     }
 
     /**
@@ -289,7 +282,7 @@ final class RpcRuntime
                 self::replyWith($corrId, static function () use ($name, $args) {
                     $args = RpcRuntime::fromRpcValue($args);
                     if (isset(RpcRuntime::$dispatch[$name])) {
-                        return (RpcRuntime::$dispatch[$name])($args);
+                        return RpcRuntime::$dispatch[$name]($args);
                     }
                     if (function_exists($name)) {
                         return $name(...$args);
@@ -303,9 +296,7 @@ final class RpcRuntime
                     $obj = PhpEntityTable::get((int) $entityId);
                     $args = RpcRuntime::fromRpcValue($args);
                     if (!is_callable([$obj, $method])) {
-                        throw new \RuntimeException(
-                            get_class($obj) . "::{$method} is not callable"
-                        );
+                        throw new \RuntimeException(get_class($obj) . "::{$method} is not callable");
                     }
                     return $obj->$method(...$args);
                 });
@@ -344,17 +335,9 @@ final class RpcRuntime
     {
         try {
             $result = $handler();
-            self::writeFrame(
-                self::TAG_RETURN,
-                $corrId,
-                serialize([self::toRpcValue($result), []])
-            );
+            self::writeFrame(self::TAG_RETURN, $corrId, serialize([self::toRpcValue($result), []]));
         } catch (\Throwable $e) {
-            self::writeFrame(
-                self::TAG_THROW,
-                $corrId,
-                serialize(self::toRpcValue(ThrowableRecord::fromThrowable($e)))
-            );
+            self::writeFrame(self::TAG_THROW, $corrId, serialize(self::toRpcValue(ThrowableRecord::fromThrowable($e))));
         }
     }
 

@@ -80,9 +80,8 @@ final class Classifier
 
     public function __construct(
         private readonly string $composerSrc,
-        private readonly Inputs $inputs,
-    ) {
-    }
+        private readonly Inputs $inputs
+    ) {}
 
     public function run(): void
     {
@@ -158,13 +157,21 @@ final class Classifier
             return ['worker', ['not plugin-reachable: no instance the Rust side owns ever reaches plugin code']];
         }
         if ($this->isThrowable($fqcn)) {
-            return ['worker', ['exception class: thrown and caught where it is raised, crossing as a throwable record']];
+            return [
+                'worker',
+                ['exception class: thrown and caught where it is raised, crossing as a throwable record'],
+            ];
         }
         if ($this->isConstantsOnly($info)) {
             return ['worker', ['constants-only class: pure definitions, no state to share']];
         }
         if ($this->statelessPureCandidates[$fqcn] ?? false) {
-            return ['worker', ['stateless pure class: no instance state, all methods pure, real code answers identically on both sides']];
+            return [
+                'worker',
+                [
+                    'stateless pure class: no instance state, all methods pure, real code answers identically on both sides',
+                ],
+            ];
         }
         if ($this->valueObjectCandidates[$fqcn] ?? false) {
             return ['rust-value', ['value object: no state referencing living services, all methods pure']];
@@ -233,7 +240,9 @@ final class Classifier
             }
 
             return [
-                'kind' => $reflection->isInterface() ? 'interface' : ($reflection->isTrait() ? 'trait' : ($reflection->isEnum() ? 'enum' : 'class')),
+                'kind' => $reflection->isInterface()
+                    ? 'interface'
+                    : ($reflection->isTrait() ? 'trait' : ($reflection->isEnum() ? 'enum' : 'class')),
                 'abstract' => $reflection->isAbstract() && !$reflection->isInterface(),
                 'origin' => 'builtin',
             ];
@@ -246,7 +255,15 @@ final class Classifier
             return null;
         }
         $short = substr($fqcn, strrpos($fqcn, '\\') + 1);
-        if (preg_match('/^\s*((?:(?:abstract|final|readonly)\s+)*)(class|interface|trait|enum)\s+' . preg_quote($short, '/') . '\b/m', (string) file_get_contents($file), $m) !== 1) {
+        if (
+            preg_match(
+                '/^\s*((?:(?:abstract|final|readonly)\s+)*)(class|interface|trait|enum)\s+'
+                . preg_quote($short, '/')
+                . '\b/m',
+                (string) file_get_contents($file),
+                $m
+            ) !== 1
+        ) {
             return null;
         }
 
@@ -342,8 +359,12 @@ final class Classifier
         do {
             $changed = false;
             foreach ($this->sources->classes as $fqcn => $info) {
-                if ($info->kind !== 'class' || $sources[$fqcn] !== 'default' || $this->values[$fqcn] !== 'worker'
-                    || $this->inputs->isTwoWorld($fqcn)) {
+                if (
+                    $info->kind !== 'class'
+                    || $sources[$fqcn] !== 'default'
+                    || $this->values[$fqcn] !== 'worker'
+                    || $this->inputs->isTwoWorld($fqcn)
+                ) {
                     continue;
                 }
                 $origins = [];
@@ -435,7 +456,7 @@ final class Classifier
                 $rows[] = $this->forwardedRow($fqcn, $name, 'static');
             }
         }
-        usort($rows, static fn (array $a, array $b) => strcmp($a['member'], $b['member']));
+        usort($rows, static fn(array $a, array $b) => strcmp($a['member'], $b['member']));
 
         return $rows;
     }
@@ -565,7 +586,10 @@ final class Classifier
         $parent = $info->parent;
         $parentForwards = $parent !== null && in_array($this->treatments[$parent] ?? null, ['stub', 'runtime'], true);
         $ctor = $info->methods['__construct'] ?? null;
-        if (!$parentForwards || ($ctor !== null && !isset($info->traitMethods['__construct']) && $ctor->visibility === 'public')) {
+        if (
+            !$parentForwards
+            || $ctor !== null && !isset($info->traitMethods['__construct']) && $ctor->visibility === 'public'
+        ) {
             return $this->constructsEntity[$fqcn] = true;
         }
 
@@ -590,8 +614,12 @@ final class Classifier
         }
         $forwarded = [];
         foreach ($info->methods as $lname => $method) {
-            if (!$method->static || $method->visibility !== 'public' || isset($info->traitMethods[$lname])
-                || str_starts_with($method->name, '__')) {
+            if (
+                !$method->static
+                || $method->visibility !== 'public'
+                || isset($info->traitMethods[$lname])
+                || str_starts_with($method->name, '__')
+            ) {
                 continue;
             }
             $queue = [$method];
@@ -619,7 +647,6 @@ final class Classifier
 
         return $forwarded;
     }
-
 
     /** @return array<string, mixed> */
     private function row(string $fqcn, ClassInfo $info): array
@@ -710,8 +737,8 @@ final class Classifier
     private function foreignRow(string $fqcn, array $declaration): array
     {
         $bits = $declaration['origin'] === 'vendor'
-            ? ($this->closure->vendorReachable[$fqcn] ?? 0)
-            : ($this->closure->builtinReachable[$fqcn] ?? 0);
+            ? $this->closure->vendorReachable[$fqcn] ?? 0
+            : $this->closure->builtinReachable[$fqcn] ?? 0;
 
         return [
             'fqcn' => $fqcn,
@@ -815,7 +842,10 @@ final class Classifier
         }
         foreach ($this->rows as $fqcn => $row) {
             foreach ($row['staticProperties'] ?? [] as $property) {
-                if ($property['sync'] !== 'unsynced' || isset($this->inputs->forced[$fqcn]['staticProperties'][$property['name']])) {
+                if (
+                    $property['sync'] !== 'unsynced'
+                    || isset($this->inputs->forced[$fqcn]['staticProperties'][$property['name']])
+                ) {
                     continue;
                 }
                 $this->violations[] = "$fqcn::\${$property['name']} is shared state with no way to sync it; record it in forced.json as unsynced";
@@ -958,7 +988,7 @@ final class Classifier
                 'callableParams' => $callableParams,
             ];
         }
-        usort($rows, static fn (array $a, array $b) => strcmp($a['name'], $b['name']));
+        usort($rows, static fn(array $a, array $b) => strcmp($a['name'], $b['name']));
 
         return $rows;
     }
@@ -984,11 +1014,13 @@ final class Classifier
         $info = $this->sources->classes[$fqcn] ?? null;
         if ($info === null) {
             $isGlobal = !str_contains($fqcn, '\\');
-            $result = $isGlobal && (
-                in_array($fqcn, self::THROWABLE_ROOTS, true)
-                || str_ends_with($fqcn, 'Exception')
-                || str_ends_with($fqcn, 'Error')
-            );
+            $result =
+                $isGlobal
+                && (
+                    in_array($fqcn, self::THROWABLE_ROOTS, true)
+                    || str_ends_with($fqcn, 'Exception')
+                    || str_ends_with($fqcn, 'Error')
+                );
 
             return $this->throwableCache[$fqcn] = $result;
         }
@@ -1188,8 +1220,7 @@ final class Classifier
 
     private function isConstantsOnly(ClassInfo $info): bool
     {
-        return $info->methods === [] && $info->properties === []
-            && $info->parent === null && $info->interfaces === [];
+        return $info->methods === [] && $info->properties === [] && $info->parent === null && $info->interfaces === [];
     }
 
     private function checkTwoWorld(): void
@@ -1208,7 +1239,14 @@ final class Classifier
                     break;
                 }
             }
-            if (!$matches && !in_array($prefix, array_map(static fn (string $p) => rtrim($p, '\\'), array_keys(VendorPackages::PREFIXES)), true)) {
+            if (
+                !$matches
+                && !in_array(
+                    $prefix,
+                    array_map(static fn(string $p) => rtrim($p, '\\'), array_keys(VendorPackages::PREFIXES)),
+                    true
+                )
+            ) {
                 $this->violations[] = "two-world.json: $prefix names no Composer class or vendor package";
             }
         }

@@ -71,9 +71,8 @@ final class MethodInfo
         /** Class-like FQCNs from the `@return` docblock. @var list<string> */
         public readonly array $docblockReturnTypes,
         /** Class-like FQCNs from `@throws` docblocks. @var list<string> */
-        public readonly array $docblockThrowsTypes,
-    ) {
-    }
+        public readonly array $docblockThrowsTypes
+    ) {}
 
     /** @return list<int> positions of by-ref parameters */
     public function byRefParamPositions(): array

@@ -12,7 +12,8 @@ class BytesCommand extends Command
 {
     protected function configure(): void
     {
-        $this->setDescription("description-\xE9")
+        $this
+            ->setDescription("description-\xE9")
             ->setAliases(["alias\xE9", "namespace\xE9:sub"])
             ->setHelp("help-\xE9")
             ->addUsage("usage-\xE9")

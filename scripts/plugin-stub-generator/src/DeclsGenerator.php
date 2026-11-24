@@ -62,7 +62,7 @@ final class DeclsGenerator
         private readonly string $composerRoot,
         private readonly Report $report,
         private readonly array $runtimeSources = [],
-        private readonly array $runtimeForwarded = [],
+        private readonly array $runtimeForwarded = []
     ) {
         $this->finder = new NodeFinder();
     }
@@ -96,10 +96,11 @@ final class DeclsGenerator
         $files = [];
         foreach ($fqcns as $fqcn) {
             $decl = $this->describe($fqcn);
-            $files[str_replace('\\', '/', $fqcn) . '.json'] = json_encode(
-                $decl,
-                JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR,
-            ) . "\n";
+            $files[str_replace('\\', '/', $fqcn) . '.json'] =
+                json_encode(
+                    $decl,
+                    JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
+                ) . "\n";
         }
         if ($this->errors !== []) {
             throw new GenerationError($this->errors);
@@ -327,7 +328,10 @@ final class DeclsGenerator
         if ($param->type === null) {
             return true;
         }
-        if ($param->default instanceof Node\Expr\ConstFetch && strtolower($param->default->name->toString()) === 'null') {
+        if (
+            $param->default instanceof Node\Expr\ConstFetch
+            && strtolower($param->default->name->toString()) === 'null'
+        ) {
             return true;
         }
 
@@ -477,7 +481,7 @@ final class DeclsGenerator
                 // `A | B` and `A, B` inside a shape are joined by the bracket depth; at the top
                 // level, a `|` next to the whitespace continues the type.
                 $next = ltrim(substr($text, $i));
-                if (str_starts_with($next, '|') || ($i > 0 && $text[$i - 1] === '|')) {
+                if (str_starts_with($next, '|') || $i > 0 && $text[$i - 1] === '|') {
                     continue;
                 }
                 break;
@@ -563,7 +567,9 @@ final class DeclsGenerator
             }
             if (count($topmost) > 1) {
                 sort($topmost, SORT_STRING);
-                $this->errors[] = "$fqcn::$name is declared by unrelated interfaces " . implode(', ', $topmost)
+                $this->errors[] =
+                    "$fqcn::$name is declared by unrelated interfaces "
+                    . implode(', ', $topmost)
                     . '; its topmost declaration is ambiguous';
             }
             return $topmost[0];
@@ -644,10 +650,10 @@ final class DeclsGenerator
     private function forwardedMembers(string $fqcn): array
     {
         if (isset($this->runtimeForwarded[$fqcn])) {
-            return array_map(
-                static fn (string $method): array => ['member' => $method, 'kind' => 'method'],
-                $this->runtimeForwarded[$fqcn],
-            );
+            return array_map(static fn(string $method): array => [
+                'member' => $method,
+                'kind' => 'method',
+            ], $this->runtimeForwarded[$fqcn]);
         }
 
         return $this->report->forwarded($fqcn);
@@ -758,10 +764,11 @@ final class DeclsGenerator
             return $this->composerSources[$fqcn] = new SourceFile(
                 $this->runtimeSources[$fqcn],
                 $fqcn,
-                (new \PhpParser\ParserFactory())->createForNewestSupportedVersion(),
+                (new \PhpParser\ParserFactory())->createForNewestSupportedVersion()
             );
         }
-        $builtin = (class_exists($fqcn, false) || interface_exists($fqcn, false))
+        $builtin =
+            (class_exists($fqcn, false) || interface_exists($fqcn, false))
             && (new \ReflectionClass($fqcn))->isInternal();
         $source = null;
         // The worker runtime's other classes (`Shirabe\RustStub` and the like) forward nothing.

@@ -22,9 +22,11 @@ final class PhpSrcDerivationBoundary implements Linter
 
     public function failureIntro(): string
     {
-        return "Found `php-src` mentioned outside the `shirabe-php-src` crate.\n"
+        return (
+            "Found `php-src` mentioned outside the `shirabe-php-src` crate.\n"
             . "Code written by reading php-src is licensed under php-src's terms, not Shirabe's MIT,\n"
-            . 'so it must live in `crates/shirabe-php-src/` and be reached through that crate:';
+            . 'so it must live in `crates/shirabe-php-src/` and be reached through that crate:'
+        );
     }
 
     public function check(string $rootDir, array $excludes): array

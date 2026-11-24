@@ -46,10 +46,6 @@ final class PhpEntityTable
 
     public static function handle(object $obj): Rpc\PhpEntityHandle
     {
-        return new Rpc\PhpEntityHandle(
-            self::register($obj),
-            get_class($obj),
-            array_values(class_implements($obj))
-        );
+        return new Rpc\PhpEntityHandle(self::register($obj), get_class($obj), array_values(class_implements($obj)));
     }
 }

@@ -348,9 +348,7 @@ class RustProcessStub extends Process implements \Shirabe\RustStub
         throw $this->__shirabeUnsupported(__FUNCTION__);
     }
 
-    public function checkTimeout()
-    {
-    }
+    public function checkTimeout() {}
 
     public function getStartTime(): float
     {

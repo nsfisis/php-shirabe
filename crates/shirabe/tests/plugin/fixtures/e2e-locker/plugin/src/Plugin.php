@@ -3,10 +3,10 @@
 namespace ShirabeTest\Locker;
 
 use Composer\Composer;
+use Composer\DependencyResolver\Operation\InstallOperation;
 use Composer\EventDispatcher\EventSubscriberInterface;
 use Composer\Installer\PackageEvent;
 use Composer\Installer\PackageEvents;
-use Composer\DependencyResolver\Operation\InstallOperation;
 use Composer\IO\IOInterface;
 use Composer\Package\Locker;
 use Composer\Plugin\PluginInterface;
@@ -30,13 +30,9 @@ class Plugin implements PluginInterface, EventSubscriberInterface
         $this->composer = $composer;
     }
 
-    public function deactivate(Composer $composer, IOInterface $io): void
-    {
-    }
+    public function deactivate(Composer $composer, IOInterface $io): void {}
 
-    public function uninstall(Composer $composer, IOInterface $io): void
-    {
-    }
+    public function uninstall(Composer $composer, IOInterface $io): void {}
 
     public static function getSubscribedEvents()
     {
@@ -50,7 +46,10 @@ class Plugin implements PluginInterface, EventSubscriberInterface
     public function onPostPackageInstall(PackageEvent $event): void
     {
         $operation = $event->getOperation();
-        if ($operation instanceof InstallOperation && $operation->getPackage()->getName() === 'shirabe-test/locker-probe') {
+        if (
+            $operation instanceof InstallOperation
+            && $operation->getPackage()->getName() === 'shirabe-test/locker-probe'
+        ) {
             $this->write(['installed isLocked=' . json_encode($event->getComposer()->getLocker()->isLocked())]);
         }
     }
@@ -70,7 +69,13 @@ class Plugin implements PluginInterface, EventSubscriberInterface
             foreach ($repository->getPackages() as $package) {
                 $names[] = get_class($package) . ':' . $package->getName() . '@' . $package->getPrettyVersion();
             }
-            $lines[] = 'lockedRepository dev=' . json_encode($withDev) . ' class=' . get_class($repository) . ' ' . json_encode($names);
+            $lines[] =
+                'lockedRepository dev='
+                . json_encode($withDev)
+                . ' class='
+                . get_class($repository)
+                . ' '
+                . json_encode($names);
 
             $requirements = [];
             foreach ($locker->getPlatformRequirements($withDev) as $name => $link) {
@@ -90,10 +95,13 @@ class Plugin implements PluginInterface, EventSubscriberInterface
 
         $lockData = $locker->getLockData();
         $lines[] = 'lockData keys ' . json_encode(array_keys($lockData));
-        $lines[] = 'lockData contentHash matches=' . json_encode(
-            $lockData['content-hash'] === Locker::getContentHash((string) file_get_contents('composer.json'))
-        );
-        $lines[] = 'missingRequirementInfo ' . json_encode($locker->getMissingRequirementInfo($composer->getPackage(), true));
+        $lines[] =
+            'lockData contentHash matches='
+            . json_encode(
+                $lockData['content-hash'] === Locker::getContentHash((string) file_get_contents('composer.json'))
+            );
+        $lines[] =
+            'missingRequirementInfo ' . json_encode($locker->getMissingRequirementInfo($composer->getPackage(), true));
 
         $generator = $composer->getAutoloadGenerator();
         $generator->setDryRun(true);
@@ -133,11 +141,17 @@ class Plugin implements PluginInterface, EventSubscriberInterface
                 ['php' => '8.1.0'],
                 false
             );
-            $lines[] = 'setLockData changed=' . json_encode($changed)
-                . ' minimumStability=' . json_encode($locker->getMinimumStability())
-                . ' preferStable=' . json_encode($locker->getPreferStable())
-                . ' preferLowest=' . json_encode($locker->getPreferLowest())
-                . ' isFresh=' . json_encode($locker->isFresh());
+            $lines[] =
+                'setLockData changed='
+                . json_encode($changed)
+                . ' minimumStability='
+                . json_encode($locker->getMinimumStability())
+                . ' preferStable='
+                . json_encode($locker->getPreferStable())
+                . ' preferLowest='
+                . json_encode($locker->getPreferLowest())
+                . ' isFresh='
+                . json_encode($locker->isFresh());
         }
 
         $this->write($lines);

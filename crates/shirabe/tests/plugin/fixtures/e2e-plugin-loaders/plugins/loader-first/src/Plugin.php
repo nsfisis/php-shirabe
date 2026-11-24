@@ -18,13 +18,9 @@ class Plugin implements PluginInterface
         self::trace('activate first lazy-loaded=' . json_encode(class_exists(Lazy::class, false)));
     }
 
-    public function deactivate(Composer $composer, IOInterface $io): void
-    {
-    }
+    public function deactivate(Composer $composer, IOInterface $io): void {}
 
-    public function uninstall(Composer $composer, IOInterface $io): void
-    {
-    }
+    public function uninstall(Composer $composer, IOInterface $io): void {}
 
     public static function loadLazyClass(): void
     {

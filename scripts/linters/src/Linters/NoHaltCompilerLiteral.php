@@ -20,12 +20,16 @@ final class NoHaltCompilerLiteral implements Linter
 
     public function failureIntro(): string
     {
-        return "Found a literal `" . self::TOKEN . "` (case-insensitive).\n"
+        return (
+            'Found a literal `'
+            . self::TOKEN
+            . "` (case-insensitive).\n"
             . "The executable carries the Composer runtime bundle as a phar that PHP finds by\n"
             . "scanning for the first occurrence of that token, and every literal here ends up in\n"
             . "the same binary, so an earlier one shadows the bundle. Build the token at run time\n"
-            . "instead — see "
-            . '`halt_compiler_token` in `crates/shirabe-php-shim/src/phar.rs`:';
+            . 'instead — see '
+            . '`halt_compiler_token` in `crates/shirabe-php-shim/src/phar.rs`:'
+        );
     }
 
     public function check(string $rootDir, array $excludes): array
@@ -61,9 +65,10 @@ final class NoHaltCompilerLiteral implements Linter
         $paths = FileFinder::rustFiles($rootDir);
 
         foreach (glob("{$rootDir}/crates/*/php", GLOB_ONLYDIR) ?: [] as $phpDir) {
-            $iterator = new \RecursiveIteratorIterator(
-                new \RecursiveDirectoryIterator($phpDir, \FilesystemIterator::SKIP_DOTS),
-            );
+            $iterator = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator(
+                $phpDir,
+                \FilesystemIterator::SKIP_DOTS
+            ));
             foreach ($iterator as $file) {
                 /** @var \SplFileInfo $file */
                 if ($file->isFile()) {

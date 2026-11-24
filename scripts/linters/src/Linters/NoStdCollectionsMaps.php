@@ -19,8 +19,10 @@ final class NoStdCollectionsMaps implements Linter
 
     public function failureIntro(): string
     {
-        return "Found uses of `std::collections::{HashMap, HashSet, BTreeMap, BTreeSet}`.\n"
-            . 'Use `indexmap::IndexMap` / `indexmap::IndexSet` instead:';
+        return (
+            "Found uses of `std::collections::{HashMap, HashSet, BTreeMap, BTreeSet}`.\n"
+            . 'Use `indexmap::IndexMap` / `indexmap::IndexSet` instead:'
+        );
     }
 
     public function check(string $rootDir, array $excludes): array
@@ -49,7 +51,12 @@ final class NoStdCollectionsMaps implements Linter
 
             if (preg_match_all('/\bstd::collections::(HashMap|HashSet|BTreeMap|BTreeSet)\b/', $code, $m)) {
                 foreach ($m[1] as $name) {
-                    $errors[] = "{$relative}:" . ($idx + 1) . ": use of `std::collections::{$name}` (use `indexmap::" . self::indexmapReplacement($name) . '` instead)';
+                    $errors[] =
+                        "{$relative}:"
+                        . ($idx + 1)
+                        . ": use of `std::collections::{$name}` (use `indexmap::"
+                        . self::indexmapReplacement($name)
+                        . '` instead)';
                 }
             }
 
@@ -60,7 +67,12 @@ final class NoStdCollectionsMaps implements Linter
                         if (!in_array($name, self::BANNED_MAP_NAMES, true)) {
                             continue;
                         }
-                        $errors[] = "{$relative}:" . ($idx + 1) . ": import of `std::collections::{$name}` (use `indexmap::" . self::indexmapReplacement($name) . '` instead)';
+                        $errors[] =
+                            "{$relative}:"
+                            . ($idx + 1)
+                            . ": import of `std::collections::{$name}` (use `indexmap::"
+                            . self::indexmapReplacement($name)
+                            . '` instead)';
                     }
                 }
             }

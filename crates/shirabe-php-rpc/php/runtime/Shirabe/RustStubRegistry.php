@@ -19,9 +19,7 @@ final class RustStubRegistry
         // A guard class exists for every proxied FQCN without a stub, so class_exists() alone no
         // longer tells the two apart; only a stub can be bound to a Rust entity id.
         if (!class_exists($class) || !is_a($class, RustStub::class, true)) {
-            throw new \RuntimeException(
-                "no proxy stub class is available for {$class}"
-            );
+            throw new \RuntimeException("no proxy stub class is available for {$class}");
         }
         // The stub's constructor belongs to plugin code building a *new* entity; an entity that
         // already exists is bound directly, so proxying never runs it.

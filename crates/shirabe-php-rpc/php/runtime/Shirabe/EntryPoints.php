@@ -42,9 +42,7 @@ final class EntryPoints
                         'react/promise is not loaded in the plugin process, so a PromiseInterface cannot be built'
                     );
                 }
-                return PromiseRegistry::park(\React\Promise\reject(
-                    ThrowableRecord::revive($args[0])
-                ));
+                return PromiseRegistry::park(\React\Promise\reject(ThrowableRecord::revive($args[0])));
             },
             // The settle pushes of a Rust-owned promise, sent from inside the tick that saw it
             // finish. The callbacks plugin code chained on the promise run before these return.
@@ -93,9 +91,7 @@ final class EntryPoints
             },
             // For testing: round-trips raw serialize() bytes through the PHP core codec, for the codec
             // oracle tests.
-            '__shirabe_oracle_roundtrip' => static fn($args) => serialize(
-                RpcRuntime::unserializePayload($args[0])
-            ),
+            '__shirabe_oracle_roundtrip' => static fn($args) => serialize(RpcRuntime::unserializePayload($args[0])),
             // For testing: reads a public property of a PHP entity (PHPUnit asserts like
             // `$plugins[0]->version` have no method to call).
             '__shirabe_get_property' => static function ($args) {
@@ -109,21 +105,21 @@ final class EntryPoints
             '__shirabe_reflection_invoke' => static function ($args) {
                 [$obj, $method, $methodArgs] = $args;
                 $reflMethod = new \ReflectionMethod($obj, $method);
-                (\PHP_VERSION_ID < 80100) and $reflMethod->setAccessible(true);
+                \PHP_VERSION_ID < 80100 and $reflMethod->setAccessible(true);
                 return $reflMethod->invokeArgs($obj, $methodArgs);
             },
             // For testing: reads a non-public property of a PHP entity through ReflectionProperty.
             '__shirabe_reflection_get_property' => static function ($args) {
                 [$obj, $name] = $args;
                 $reflProp = new \ReflectionProperty($obj, $name);
-                (\PHP_VERSION_ID < 80100) and $reflProp->setAccessible(true);
+                \PHP_VERSION_ID < 80100 and $reflProp->setAccessible(true);
                 return $reflProp->getValue($obj);
             },
             // For testing: writes a non-public property of a PHP entity through ReflectionProperty.
             '__shirabe_reflection_set_property' => static function ($args) {
                 [$obj, $name, $value] = $args;
                 $reflProp = new \ReflectionProperty($obj, $name);
-                (\PHP_VERSION_ID < 80100) and $reflProp->setAccessible(true);
+                \PHP_VERSION_ID < 80100 and $reflProp->setAccessible(true);
                 $reflProp->setValue($obj, $value);
                 return null;
             },

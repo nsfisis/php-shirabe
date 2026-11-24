@@ -93,7 +93,7 @@ final class ThrowableRecord
         if ($constructor !== null && self::acceptsMessageAndCode($constructor)) {
             return new $class($message, $code);
         }
-        if ($reflection->isAbstract() || ($reflection->isInternal() && $reflection->isFinal())) {
+        if ($reflection->isAbstract() || $reflection->isInternal() && $reflection->isFinal()) {
             return new \RuntimeException($message, $code);
         }
 
@@ -113,7 +113,10 @@ final class ThrowableRecord
      */
     private static function setBaseProperty(\Throwable $exception, string $name, $value): void
     {
-        $property = new \ReflectionProperty($exception instanceof \Exception ? \Exception::class : \Error::class, $name);
+        $property = new \ReflectionProperty(
+            $exception instanceof \Exception ? \Exception::class : \Error::class,
+            $name
+        );
         $property->setAccessible(true);
         $property->setValue($exception, $value);
     }

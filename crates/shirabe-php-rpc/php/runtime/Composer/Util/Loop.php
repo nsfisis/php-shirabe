@@ -1,4 +1,6 @@
-<?php declare(strict_types=1);
+<?php
+
+declare(strict_types=1);
 
 // ref: composer/src/Composer/Util/Loop.php sha1:54f0907047c3f5d67ef41b69d9696ed6a88804e2
 //
@@ -10,8 +12,8 @@
 
 namespace Composer\Util;
 
-use Symfony\Component\Console\Helper\ProgressBar;
 use React\Promise\PromiseInterface;
+use Symfony\Component\Console\Helper\ProgressBar;
 
 /**
  * @author Jordi Boggiano <j.boggiano@seld.be>
@@ -66,13 +68,11 @@ class Loop
     {
         $uncaught = null;
 
-        \React\Promise\all($promises)->then(
-            static function (): void {
-            },
-            static function (\Throwable $e) use (&$uncaught): void {
-                $uncaught = $e;
-            }
-        );
+        \React\Promise\all($promises)->then(static function (): void {}, static function (\Throwable $e) use (
+            &$uncaught
+        ): void {
+            $uncaught = $e;
+        });
 
         // keep track of every group of promises that is waited on, so abortJobs can
         // cancel them all, even if wait() was called within a wait()
@@ -97,7 +97,7 @@ class Loop
                 $activeJobs += $this->processExecutor->countActiveJobs();
             }
 
-            if ($progress && microtime(true) - $lastUpdate > 0.1) {
+            if ($progress && (microtime(true) - $lastUpdate) > 0.1) {
                 $lastUpdate = microtime(true);
                 $progress->setProgress($progress->getMaxSteps() - $activeJobs);
             }

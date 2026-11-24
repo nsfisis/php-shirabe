@@ -2,6 +2,4 @@
 
 namespace Acme\Hello;
 
-class Greeter
-{
-}
+class Greeter {}

@@ -27,13 +27,9 @@ class Plugin implements PluginInterface, EventSubscriberInterface
         $this->io = $io;
     }
 
-    public function deactivate(Composer $composer, IOInterface $io): void
-    {
-    }
+    public function deactivate(Composer $composer, IOInterface $io): void {}
 
-    public function uninstall(Composer $composer, IOInterface $io): void
-    {
-    }
+    public function uninstall(Composer $composer, IOInterface $io): void {}
 
     public static function getSubscribedEvents()
     {
@@ -50,8 +46,11 @@ class Plugin implements PluginInterface, EventSubscriberInterface
         $downloader = new HttpDownloader($this->io, $event->getComposer()->getConfig());
         $lines = ['event=' . $event->getName()];
 
-        $lines[] = 'class=' . json_encode(\get_class($downloader))
-            . ' instanceof=' . json_encode($downloader instanceof HttpDownloader);
+        $lines[] =
+            'class='
+            . json_encode(\get_class($downloader))
+            . ' instanceof='
+            . json_encode($downloader instanceof HttpDownloader);
 
         // Only the key the plugin set is compared: the rest of the map is the TLS defaults, whose
         // CA paths depend on the machine rather than on the implementation.
@@ -65,18 +64,22 @@ class Plugin implements PluginInterface, EventSubscriberInterface
 
         // getExceptionHints() only inspects the exception it is handed; both arguments below stay
         // clear of the branch that probes connectivity.
-        $lines[] = 'hints other=' . json_encode(HttpDownloader::getExceptionHints(new \RuntimeException('x')))
-            . ' transport=' . json_encode(HttpDownloader::getExceptionHints(new TransportException('plain', 400)));
+        $lines[] =
+            'hints other='
+            . json_encode(HttpDownloader::getExceptionHints(new \RuntimeException('x')))
+            . ' transport='
+            . json_encode(HttpDownloader::getExceptionHints(new TransportException('plain', 400)));
 
         // The version constraint cannot match, so this reaches Composer::getVersion() and the
         // version parser without writing anything to the terminal.
-        $lines[] = 'outputWarnings=' . $this->describe(static function () use ($event): void {
-            HttpDownloader::outputWarnings(
-                $event->getIO(),
-                'https://example.org/packages.json',
-                ['warning' => 'unreachable', 'warning-versions' => '^0.0.1']
-            );
-        });
+        $lines[] =
+            'outputWarnings='
+            . $this->describe(static function () use ($event): void {
+                HttpDownloader::outputWarnings($event->getIO(), 'https://example.org/packages.json', [
+                    'warning' => 'unreachable',
+                    'warning-versions' => '^0.0.1',
+                ]);
+            });
 
         // A file:// url keeps the probe offline and off the curl path, so the trace is the same
         // on a machine with no network. Paths stay out of the trace: the two runs work in
@@ -85,80 +88,123 @@ class Plugin implements PluginInterface, EventSubscriberInterface
         file_put_contents($payload, '{"probe":true,"n":42}');
 
         $response = null;
-        $lines[] = 'get=' . $this->describe(static function () use ($downloader, $payload, &$response): void {
-            $response = $downloader->get('file://' . $payload);
-        });
-        $lines[] = 'response class=' . json_encode($response === null ? null : \get_class($response))
-            . ' body=' . json_encode($response === null ? null : $response->getBody())
-            . ' headers=' . json_encode($response === null ? null : $response->getHeaders());
+        $lines[] =
+            'get='
+            . $this->describe(static function () use ($downloader, $payload, &$response): void {
+                $response = $downloader->get('file://' . $payload);
+            });
+        $lines[] =
+            'response class='
+            . json_encode($response === null ? null : \get_class($response))
+            . ' body='
+            . json_encode($response === null ? null : $response->getBody())
+            . ' headers='
+            . json_encode($response === null ? null : $response->getHeaders());
         $lines[] = 'getHeader=' . json_encode($response === null ? null : $response->getHeader('Content-Type'));
 
         $target = getcwd() . '/probe-copy.json';
-        $lines[] = 'copy=' . $this->describe(static function () use ($downloader, $payload, $target): void {
-            $downloader->copy('file://' . $payload, $target);
-        }) . ' file=' . json_encode(@file_get_contents($target));
+        $lines[] =
+            'copy='
+            . $this->describe(static function () use ($downloader, $payload, $target): void {
+                $downloader->copy('file://' . $payload, $target);
+            })
+            . ' file='
+            . json_encode(@file_get_contents($target));
 
         // A downloader that is not part of a Loop refuses async requests, so the probe records
         // both sides of the gate.
-        $lines[] = 'add-before-enable=' . $this->describe(static function () use ($downloader, $payload): void {
-            $downloader->add('file://' . $payload);
-        });
+        $lines[] =
+            'add-before-enable='
+            . $this->describe(static function () use ($downloader, $payload): void {
+                $downloader->add('file://' . $payload);
+            });
         $downloader->enableAsync();
 
         $added = null;
-        $lines[] = 'add=' . $this->describe(static function () use ($downloader, $payload, &$added): void {
-            $downloader->add('file://' . $payload)->then(static function ($result) use (&$added): void {
-                $added = $result;
-            });
-        }) . ' body=' . json_encode($added === null ? null : $added->getBody());
+        $lines[] =
+            'add='
+            . $this->describe(static function () use ($downloader, $payload, &$added): void {
+                $downloader->add('file://' . $payload)->then(static function ($result) use (&$added): void {
+                    $added = $result;
+                });
+            })
+            . ' body='
+            . json_encode($added === null ? null : $added->getBody());
 
         // A path that cannot exist keeps the rejection reason free of the temporary directory.
         $rejection = null;
-        $lines[] = 'add-missing=' . $this->describe(static function () use ($downloader, &$rejection): void {
-            $downloader->add('file:///shirabe-probe-missing.json')->then(null, static function ($error) use (&$rejection): void {
-                $rejection = $error;
-            });
-        }) . ' rejected=' . json_encode($rejection === null ? null : \get_class($rejection));
+        $lines[] =
+            'add-missing='
+            . $this->describe(static function () use ($downloader, &$rejection): void {
+                $downloader->add('file:///shirabe-probe-missing.json')->then(null, static function ($error) use (
+                    &$rejection
+                ): void {
+                    $rejection = $error;
+                });
+            })
+            . ' rejected='
+            . json_encode($rejection === null ? null : \get_class($rejection));
 
-        $lines[] = 'addCopy=' . $this->describe(static function () use ($downloader, $payload): void {
-            $downloader->addCopy('file://' . $payload, getcwd() . '/probe-async-copy.json')->then(null, static function ($error): void {
-                throw $error;
-            });
-        }) . ' file=' . json_encode(@file_get_contents(getcwd() . '/probe-async-copy.json'));
+        $lines[] =
+            'addCopy='
+            . $this->describe(static function () use ($downloader, $payload): void {
+                $downloader->addCopy(
+                    'file://' . $payload,
+                    getcwd() . '/probe-async-copy.json'
+                )->then(null, static function ($error): void {
+                    throw $error;
+                });
+            })
+            . ' file='
+            . json_encode(@file_get_contents(getcwd() . '/probe-async-copy.json'));
 
-        $lines[] = 'countActiveJobs=' . json_encode($downloader->countActiveJobs())
-            . ' wait=' . $this->describe(static function () use ($downloader): void {
+        $lines[] =
+            'countActiveJobs='
+            . json_encode($downloader->countActiveJobs())
+            . ' wait='
+            . $this->describe(static function () use ($downloader): void {
                 $downloader->wait();
             });
 
         // collect() unsets the response's own properties, so the object is spent afterwards and
         // nothing may read it again.
-        $lines[] = 'collect=' . $this->describe(static function () use ($response): void {
-            $response->collect();
-        });
+        $lines[] =
+            'collect='
+            . $this->describe(static function () use ($response): void {
+                $response->collect();
+            });
 
         // The route Composer's own docblocks point plugin authors at: the loop the run built
         // hands out the downloader and the executor the rest of the run uses.
         $loop = $event->getComposer()->getLoop();
         $shared = $loop->getHttpDownloader();
-        $lines[] = 'loop class=' . json_encode(\get_class($loop))
-            . ' downloader=' . json_encode(\get_class($shared))
-            . ' same=' . json_encode($shared === $loop->getHttpDownloader())
-            . ' executor=' . json_encode($loop->getProcessExecutor() === null ? null : \get_class($loop->getProcessExecutor()));
+        $lines[] =
+            'loop class='
+            . json_encode(\get_class($loop))
+            . ' downloader='
+            . json_encode(\get_class($shared))
+            . ' same='
+            . json_encode($shared === $loop->getHttpDownloader())
+            . ' executor='
+            . json_encode($loop->getProcessExecutor() === null ? null : \get_class($loop->getProcessExecutor()));
 
         // The shared downloader is the one the run enabled async on, so it takes a request group
         // without the plugin having to enable anything.
         $waited = [];
-        $lines[] = 'loop wait=' . $this->describe(static function () use ($loop, $shared, $payload, &$waited): void {
-            $loop->wait([
-                $shared->add('file://' . $payload)->then(static function ($result) use (&$waited): void {
-                    $waited[] = $result->getBody();
-                }),
-                $shared->add('file://' . $payload)->then(static function ($result) use (&$waited): void {
-                    $waited[] = $result->getBody();
-                }),
-            ]);
-        }) . ' bodies=' . json_encode($waited);
+        $lines[] =
+            'loop wait='
+            . $this->describe(static function () use ($loop, $shared, $payload, &$waited): void {
+                $loop->wait([
+                    $shared->add('file://' . $payload)->then(static function ($result) use (&$waited): void {
+                        $waited[] = $result->getBody();
+                    }),
+                    $shared->add('file://' . $payload)->then(static function ($result) use (&$waited): void {
+                        $waited[] = $result->getBody();
+                    }),
+                ]);
+            })
+            . ' bodies='
+            . json_encode($waited);
 
         // Only the class: the reason a stream failed to open comes from the PHP warning the
         // reader raised, which this port does not have.
@@ -170,14 +216,18 @@ class Plugin implements PluginInterface, EventSubscriberInterface
         }
         $lines[] = 'loop wait-rejected=' . json_encode($rejected === null ? null : \get_class($rejected));
 
-        $lines[] = 'abortJobs=' . $this->describe(static function () use ($loop): void {
-            $loop->abortJobs();
-        });
+        $lines[] =
+            'abortJobs='
+            . $this->describe(static function () use ($loop): void {
+                $loop->abortJobs();
+            });
 
         // A plugin may drive its own loop over the services it already holds.
-        $lines[] = 'own loop=' . $this->describe(static function () use ($downloader): void {
-            (new \Composer\Util\Loop($downloader))->wait([]);
-        });
+        $lines[] =
+            'own loop='
+            . $this->describe(static function () use ($downloader): void {
+                (new \Composer\Util\Loop($downloader))->wait([]);
+            });
 
         file_put_contents('http-downloader-trace.txt', implode("\n", $lines) . "\n");
     }

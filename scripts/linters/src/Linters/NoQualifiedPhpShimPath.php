@@ -23,9 +23,11 @@ final class NoQualifiedPhpShimPath implements Linter
 
     public function failureIntro(): string
     {
-        return "Found `shirabe_php_shim::` paths outside `use` statements.\n"
+        return (
+            "Found `shirabe_php_shim::` paths outside `use` statements.\n"
             . 'Import the item with `use shirabe_php_shim::...;` instead '
-            . '(`macro_rules!` bodies are exempt):';
+            . '(`macro_rules!` bodies are exempt):'
+        );
     }
 
     public function check(string $rootDir, array $excludes): array

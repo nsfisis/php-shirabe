@@ -34,26 +34,40 @@ class Plugin implements PluginInterface
         }
 
         $package->setRequires([
-            'bar/plain' => new Link('dummy/root', 'bar/plain', self::pretty(new Constraint('==', '2.0.0.0'), '2.0'), Link::TYPE_REQUIRE, '2.0'),
-            'bar/multi' => new Link('dummy/root', 'bar/multi', new MultiConstraint([
-                new Constraint('<', '1.0.0.0'),
-                new Constraint('>=', '3.0.0.0'),
-            ], false), Link::TYPE_DEV_REQUIRE, '<1.0 || >=3.0'),
+            'bar/plain' => new Link(
+                'dummy/root',
+                'bar/plain',
+                self::pretty(new Constraint('==', '2.0.0.0'), '2.0'),
+                Link::TYPE_REQUIRE,
+                '2.0'
+            ),
+            'bar/multi' => new Link(
+                'dummy/root',
+                'bar/multi',
+                new MultiConstraint([
+                    new Constraint('<', '1.0.0.0'),
+                    new Constraint('>=', '3.0.0.0'),
+                ], false),
+                Link::TYPE_DEV_REQUIRE,
+                '<1.0 || >=3.0'
+            ),
             'bar/all' => new Link('dummy/root', 'bar/all', new MatchAllConstraint(), Link::TYPE_REQUIRE, '*'),
-            'bar/none' => new Link('dummy/root', 'bar/none', self::pretty(new MatchNoneConstraint(), 'nothing'), Link::TYPE_REQUIRE, ''),
+            'bar/none' => new Link(
+                'dummy/root',
+                'bar/none',
+                self::pretty(new MatchNoneConstraint(), 'nothing'),
+                Link::TYPE_REQUIRE,
+                ''
+            ),
         ]);
 
         $package->setReleaseDate(new \DateTimeImmutable('2024-03-04 05:06:07.123456', new \DateTimeZone('Asia/Tokyo')));
         $io->write('release date: ' . $package->getReleaseDate()->format('Y-m-d\TH:i:s.uP'));
     }
 
-    public function deactivate(Composer $composer, IOInterface $io)
-    {
-    }
+    public function deactivate(Composer $composer, IOInterface $io) {}
 
-    public function uninstall(Composer $composer, IOInterface $io)
-    {
-    }
+    public function uninstall(Composer $composer, IOInterface $io) {}
 
     private static function pretty(ConstraintInterface $constraint, string $prettyString): ConstraintInterface
     {

@@ -19,17 +19,59 @@ namespace Shirabe\PluginClassifier;
 final class DocblockTypeExtractor
 {
     private const KEYWORDS = [
-        'int', 'integer', 'float', 'double', 'string', 'bool', 'boolean',
-        'true', 'false', 'null', 'void', 'never', 'mixed', 'scalar', 'array',
-        'iterable', 'object', 'callable', 'resource', 'self', 'static',
-        'parent', 'this', 'list', 'non-empty-list', 'non-empty-array',
-        'non-empty-string', 'class-string', 'callable-string',
-        'numeric-string', 'lowercase-string', 'literal-string', 'key-of',
-        'value-of', 'array-key', 'positive-int', 'negative-int',
-        'non-negative-int', 'non-positive-int', 'int-mask-of', 'Closure',
-        'Generator', 'Traversable', 'Iterator', 'IteratorAggregate',
-        'ArrayAccess', 'Countable', 'Stringable', 'JsonSerializable',
-        'Throwable', 'Exception', 'SplFileInfo', 'ArrayObject',
+        'int',
+        'integer',
+        'float',
+        'double',
+        'string',
+        'bool',
+        'boolean',
+        'true',
+        'false',
+        'null',
+        'void',
+        'never',
+        'mixed',
+        'scalar',
+        'array',
+        'iterable',
+        'object',
+        'callable',
+        'resource',
+        'self',
+        'static',
+        'parent',
+        'this',
+        'list',
+        'non-empty-list',
+        'non-empty-array',
+        'non-empty-string',
+        'class-string',
+        'callable-string',
+        'numeric-string',
+        'lowercase-string',
+        'literal-string',
+        'key-of',
+        'value-of',
+        'array-key',
+        'positive-int',
+        'negative-int',
+        'non-negative-int',
+        'non-positive-int',
+        'int-mask-of',
+        'Closure',
+        'Generator',
+        'Traversable',
+        'Iterator',
+        'IteratorAggregate',
+        'ArrayAccess',
+        'Countable',
+        'Stringable',
+        'JsonSerializable',
+        'Throwable',
+        'Exception',
+        'SplFileInfo',
+        'ArrayObject',
     ];
 
     /**
@@ -43,11 +85,13 @@ final class DocblockTypeExtractor
 
     public function collectAliases(string $code): void
     {
-        if (preg_match_all(
-            '/@(?:phpstan-|psalm-)?(?:template(?:-covariant|-contravariant)?|type|import-type)\s+([A-Za-z_][A-Za-z0-9_]*)/',
-            $code,
-            $m,
-        ) > 0) {
+        if (
+            preg_match_all(
+                '/@(?:phpstan-|psalm-)?(?:template(?:-covariant|-contravariant)?|type|import-type)\s+([A-Za-z_][A-Za-z0-9_]*)/',
+                $code,
+                $m
+            ) > 0
+        ) {
             foreach ($m[1] as $name) {
                 $this->aliasNames[$name] = true;
             }
@@ -94,7 +138,7 @@ final class DocblockTypeExtractor
                     if ($paramName !== null) {
                         $result['params'][$paramName] = array_values(array_unique(array_merge(
                             $result['params'][$paramName] ?? [],
-                            $types,
+                            $types
                         )));
                     }
                     break;

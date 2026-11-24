@@ -27,13 +27,9 @@ class Plugin implements PluginInterface, EventSubscriberInterface
         $this->composer = $composer;
     }
 
-    public function deactivate(Composer $composer, IOInterface $io): void
-    {
-    }
+    public function deactivate(Composer $composer, IOInterface $io): void {}
 
-    public function uninstall(Composer $composer, IOInterface $io): void
-    {
-    }
+    public function uninstall(Composer $composer, IOInterface $io): void {}
 
     public static function getSubscribedEvents()
     {
@@ -55,8 +51,8 @@ class Plugin implements PluginInterface, EventSubscriberInterface
         $config = $composer->getConfig();
 
         $lines = ['event=' . $event->getName()];
-        $lines[] = 'class=' . get_class($generator)
-            . ' same=' . json_encode($generator === $composer->getAutoloadGenerator());
+        $lines[] =
+            'class=' . get_class($generator) . ' same=' . json_encode($generator === $composer->getAutoloadGenerator());
 
         $packageMap = $generator->buildPackageMap(
             $installationManager,
@@ -65,7 +61,8 @@ class Plugin implements PluginInterface, EventSubscriberInterface
         );
         $entries = [];
         foreach ($packageMap as [$package, $installPath]) {
-            $entries[] = $package->getName() . '=' . json_encode($installPath === null ? null : $this->relative($installPath));
+            $entries[] =
+                $package->getName() . '=' . json_encode($installPath === null ? null : $this->relative($installPath));
         }
         $lines[] = 'packageMap ' . implode(' ', $entries);
         $lines[] = 'packageMap rootIdentity=' . json_encode($packageMap[0][0] === $rootPackage);
@@ -81,18 +78,23 @@ class Plugin implements PluginInterface, EventSubscriberInterface
 
         $autoloads = $generator->parseAutoloads($packageMap, $rootPackage);
         $lines[] = 'autoloads ' . $this->relative(json_encode($autoloads));
-        $lines[] = 'autoloads no-dev ' . $this->relative(json_encode(
-            $generator->parseAutoloads($packageMap, $rootPackage, true)
-        ));
-        $lines[] = 'autoloads filtered ' . $this->relative(json_encode(
-            $generator->parseAutoloads($packageMap, $rootPackage, ['acme/lib-b'])
-        ));
+        $lines[] =
+            'autoloads no-dev '
+            . $this->relative(json_encode($generator->parseAutoloads($packageMap, $rootPackage, true)));
+        $lines[] =
+            'autoloads filtered '
+            . $this->relative(json_encode($generator->parseAutoloads($packageMap, $rootPackage, ['acme/lib-b'])));
 
         $vendorDir = $config->get('vendor-dir');
         $loader = $generator->createLoader($autoloads, $vendorDir);
-        $lines[] = 'loader class=' . get_class($loader)
-            . ' registered=' . json_encode(isset(\Composer\Autoload\ClassLoader::getRegisteredLoaders()[$vendorDir])
-                && \Composer\Autoload\ClassLoader::getRegisteredLoaders()[$vendorDir] === $loader);
+        $lines[] =
+            'loader class='
+            . get_class($loader)
+            . ' registered='
+            . json_encode(
+                isset(\Composer\Autoload\ClassLoader::getRegisteredLoaders()[$vendorDir])
+                && \Composer\Autoload\ClassLoader::getRegisteredLoaders()[$vendorDir] === $loader
+            );
         $lines[] = 'loader psr-0 ' . $this->relative(json_encode($loader->getPrefixes()));
         $lines[] = 'loader psr-4 ' . $this->relative(json_encode($loader->getPrefixesPsr4()));
         $lines[] = 'loader classmap ' . $this->relative(json_encode($loader->getClassMap()));
@@ -105,32 +107,66 @@ class Plugin implements PluginInterface, EventSubscriberInterface
             $lines[] = 'invalid loader caught=' . get_class($e) . ' message=' . json_encode($e->getMessage());
         }
 
-        $lines[] = 'setters ' . json_encode([
-            $generator->setDevMode(true),
-            $generator->setApcu(false),
-            $generator->setRunScripts(false),
-            $generator->setIgnorePlatformRequirements(false),
-            $generator->setClassMapAuthoritative(false),
-        ]);
+        $lines[] =
+            'setters '
+            . json_encode([
+                $generator->setDevMode(true),
+                $generator->setApcu(false),
+                $generator->setRunScripts(false),
+                $generator->setIgnorePlatformRequirements(false),
+                $generator->setClassMapAuthoritative(false),
+            ]);
         $generator->setDryRun(true);
 
-        $classMap = $generator->dump($config, $localRepo, $rootPackage, $installationManager, 'composer', false, 'Probe');
+        $classMap = $generator->dump(
+            $config,
+            $localRepo,
+            $rootPackage,
+            $installationManager,
+            'composer',
+            false,
+            'Probe'
+        );
         $lines[] = 'dump class=' . get_class($classMap) . ' count=' . count($classMap);
         $lines[] = 'dump map ' . $this->relative(json_encode($classMap->getMap()));
         $lines[] = 'dump ambiguous ' . $this->relative(json_encode($classMap->getAmbiguousClasses(false)));
         $lines[] = 'dump psrViolations ' . $this->relative(json_encode($classMap->getPsrViolations()));
 
-        $classMap = $generator->dump($config, $localRepo, $rootPackage, $installationManager, 'composer', true, 'Probe');
+        $classMap = $generator->dump(
+            $config,
+            $localRepo,
+            $rootPackage,
+            $installationManager,
+            'composer',
+            true,
+            'Probe'
+        );
         $lines[] = 'dump scanPsr map ' . $this->relative(json_encode($classMap->getMap()));
         $lines[] = 'dump scanPsr psrViolations ' . $this->relative(json_encode($classMap->getPsrViolations()));
 
         // An authoritative class map forces the PSR scan on, so the dump has to see the setter.
         $generator->setClassMapAuthoritative(true);
-        $classMap = $generator->dump($config, $localRepo, $rootPackage, $installationManager, 'composer', false, 'Probe');
+        $classMap = $generator->dump(
+            $config,
+            $localRepo,
+            $rootPackage,
+            $installationManager,
+            'composer',
+            false,
+            'Probe'
+        );
         $lines[] = 'dump authoritative count=' . count($classMap);
 
         $generator->setDevMode(false);
-        $classMap = $generator->dump($config, $localRepo, $rootPackage, $installationManager, 'composer', true, 'Probe');
+        $classMap = $generator->dump(
+            $config,
+            $localRepo,
+            $rootPackage,
+            $installationManager,
+            'composer',
+            true,
+            'Probe'
+        );
         $lines[] = 'dump no-dev map ' . $this->relative(json_encode(array_keys($classMap->getMap())));
 
         $generator->setClassMapAuthoritative(false);

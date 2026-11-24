@@ -25,9 +25,11 @@ final class NoQualifiedCratePath implements Linter
 
     public function failureIntro(): string
     {
-        return "Found `crate::` paths outside `use` statements.\n"
+        return (
+            "Found `crate::` paths outside `use` statements.\n"
             . 'Import the item with `use crate::...;` instead, renaming it with `as` on a collision '
-            . '(`macro_rules!` bodies are exempt):';
+            . '(`macro_rules!` bodies are exempt):'
+        );
     }
 
     public function check(string $rootDir, array $excludes): array

@@ -86,7 +86,8 @@ function resolveTarget(string $target, array $classes): array
         $path = str_replace('\\', '/', $target);
         $pos = strpos($path, 'src/Composer/');
         if ($pos !== false) {
-            $fqcn = 'Composer\\' . str_replace('/', '\\', substr($path, $pos + strlen('src/Composer/'), -strlen('.php')));
+            $fqcn =
+                'Composer\\' . str_replace('/', '\\', substr($path, $pos + strlen('src/Composer/'), -strlen('.php')));
             if (isset($classes[$fqcn])) {
                 return [$fqcn];
             }
@@ -139,7 +140,7 @@ function printRow(array $row): void
         if (is_array($value)) {
             $value = array_is_list($value)
                 ? implode(', ', $value)
-                : implode(', ', array_map(static fn ($k, $v) => "$k: $v", array_keys($value), $value));
+                : implode(', ', array_map(static fn($k, $v) => "$k: $v", array_keys($value), $value));
         } else {
             $value = var_export($value, true);
         }
@@ -147,16 +148,28 @@ function printRow(array $row): void
     }
     foreach ($row['forwarded'] ?? [] as $member) {
         if ($member['status'] !== 'implemented') {
-            echo '  ', $member['kind'], ' ', $member['member'], ': ', $member['status'],
-                isset($member['reason']) ? ' (' . $member['reason'] . ')' : '', "\n";
+            echo
+                '  ',
+                $member['kind'],
+                ' ',
+                $member['member'],
+                ': ',
+                $member['status'],
+                isset($member['reason']) ? ' (' . $member['reason'] . ')' : '',
+                "\n";
         }
     }
     foreach ($row['staticProperties'] ?? [] as $property) {
-        echo '  static $', $property['name'], ': ', $property['disposition'],
-            $property['sync'] !== null ? ', sync ' . $property['sync'] : '', "\n";
+        echo
+            '  static $',
+            $property['name'],
+            ': ',
+            $property['disposition'],
+            $property['sync'] !== null ? ', sync ' . $property['sync'] : '',
+            "\n";
     }
     if ($row['methods'] !== []) {
-        $mutators = array_values(array_filter($row['methods'], static fn (array $m) => $m['purity'] === 'mutator'));
+        $mutators = array_values(array_filter($row['methods'], static fn(array $m) => $m['purity'] === 'mutator'));
         echo '  methods:   ', count($row['methods']), ' public/protected, ', count($mutators), " mutator\n";
         foreach ($mutators as $m) {
             echo '    mutator: ', $m['name'], "\n";

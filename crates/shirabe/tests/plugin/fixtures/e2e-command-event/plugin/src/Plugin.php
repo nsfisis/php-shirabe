@@ -17,17 +17,11 @@ use Composer\Plugin\PreCommandRunEvent;
  */
 class Plugin implements PluginInterface, EventSubscriberInterface
 {
-    public function activate(Composer $composer, IOInterface $io): void
-    {
-    }
+    public function activate(Composer $composer, IOInterface $io): void {}
 
-    public function deactivate(Composer $composer, IOInterface $io): void
-    {
-    }
+    public function deactivate(Composer $composer, IOInterface $io): void {}
 
-    public function uninstall(Composer $composer, IOInterface $io): void
-    {
-    }
+    public function uninstall(Composer $composer, IOInterface $io): void {}
 
     public static function getSubscribedEvents()
     {
@@ -39,19 +33,35 @@ class Plugin implements PluginInterface, EventSubscriberInterface
 
     public function onPreCommandRun(PreCommandRunEvent $event): void
     {
-        $this->trace('command-event-trace.txt', $event->getName() . ' class=' . get_class($event) . ' command=' . $event->getCommand());
-        $this->trace('command-event-console-trace.txt', $event->getName() . ' ' . $this->console(static function () use ($event): string {
-            return 'input=' . $event->getInput()->getFirstArgument();
-        }));
+        $this->trace(
+            'command-event-trace.txt',
+            $event->getName() . ' class=' . get_class($event) . ' command=' . $event->getCommand()
+        );
+        $this->trace(
+            'command-event-console-trace.txt',
+            $event->getName() . ' '
+                . $this->console(static function () use ($event): string {
+                    return 'input=' . $event->getInput()->getFirstArgument();
+                })
+        );
     }
 
     public function onCommand(CommandEvent $event): void
     {
-        $this->trace('command-event-trace.txt', $event->getName() . ' class=' . get_class($event) . ' commandName=' . $event->getCommandName());
-        $this->trace('command-event-console-trace.txt', $event->getName() . ' ' . $this->console(static function () use ($event): string {
-            return 'input=' . $event->getInput()->getFirstArgument()
-                . ' verbosity=' . $event->getOutput()->getVerbosity();
-        }));
+        $this->trace(
+            'command-event-trace.txt',
+            $event->getName() . ' class=' . get_class($event) . ' commandName=' . $event->getCommandName()
+        );
+        $this->trace(
+            'command-event-console-trace.txt',
+            $event->getName() . ' '
+                . $this->console(static function () use ($event): string {
+                    return 'input='
+                    . $event->getInput()->getFirstArgument()
+                    . ' verbosity='
+                    . $event->getOutput()->getVerbosity();
+                })
+        );
     }
 
     private function console(callable $read): string

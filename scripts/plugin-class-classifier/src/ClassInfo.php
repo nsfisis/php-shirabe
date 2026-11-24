@@ -67,12 +67,11 @@ final class ClassInfo
         public readonly ?string $parent,
         /** @var list<string> */
         public readonly array $interfaces,
-        public readonly string $file,
-    ) {
-    }
+        public readonly string $file
+    ) {}
 
     public function isContractLike(): bool
     {
-        return $this->kind === 'interface' || ($this->kind === 'class' && $this->abstract);
+        return $this->kind === 'interface' || $this->kind === 'class' && $this->abstract;
     }
 }

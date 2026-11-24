@@ -15,6 +15,9 @@ class Script
     public static function keep(Event $event): void
     {
         self::$kept = $event;
-        Plugin::trace('script keep ' . $event->getName() . ' identical to the plugin-kept one=' . json_encode($event === Plugin::$scriptEvent));
+        Plugin::trace(
+            'script keep ' . $event->getName() . ' identical to the plugin-kept one='
+                . json_encode($event === Plugin::$scriptEvent)
+        );
     }
 }

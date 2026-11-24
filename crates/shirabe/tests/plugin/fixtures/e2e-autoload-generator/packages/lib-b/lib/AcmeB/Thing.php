@@ -1,5 +1,3 @@
 <?php
 
-class AcmeB_Thing
-{
-}
+class AcmeB_Thing {}

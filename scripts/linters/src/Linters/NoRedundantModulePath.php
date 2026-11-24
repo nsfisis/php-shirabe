@@ -46,9 +46,11 @@ final class NoRedundantModulePath implements Linter
 
     public function failureIntro(): string
     {
-        return "Found `use` paths that spell out a submodule its parent re-exports with `pub use <child>::*;`,\n"
+        return (
+            "Found `use` paths that spell out a submodule its parent re-exports with `pub use <child>::*;`,\n"
             . 'or glob re-exports of a namespace module (one with its own directory).'
-            . ' Import the item through the parent module, and keep namespace segments in paths:';
+            . ' Import the item through the parent module, and keep namespace segments in paths:'
+        );
     }
 
     public function check(string $rootDir, array $excludes): array
@@ -69,8 +71,12 @@ final class NoRedundantModulePath implements Linter
             }
 
             foreach ($this->useStatements($path) as [$line, , $statement, $isTopLevel, $attr]) {
-                if ($isTopLevel && !str_contains($attr, '#[cfg') && preg_match(self::GLOB_REEXPORT_RE, $statement, $gm)
-                    && is_dir($this->childDir($path, $gm[1]))) {
+                if (
+                    $isTopLevel
+                    && !str_contains($attr, '#[cfg')
+                    && preg_match(self::GLOB_REEXPORT_RE, $statement, $gm)
+                    && is_dir($this->childDir($path, $gm[1]))
+                ) {
                     $errors[] = "{$relative}:{$line}: `{$statement}` re-exports the namespace module `{$gm[1]}`";
                 }
             }
@@ -201,7 +207,8 @@ final class NoRedundantModulePath implements Linter
     private function childDir(string $moduleFile, string $child): string
     {
         $base = basename($moduleFile);
-        $dir = $base === 'lib.rs' || $base === 'main.rs' ? dirname($moduleFile) : substr($moduleFile, 0, -strlen('.rs'));
+        $dir =
+            $base === 'lib.rs' || $base === 'main.rs' ? dirname($moduleFile) : substr($moduleFile, 0, -strlen('.rs'));
 
         return "{$dir}/{$child}";
     }

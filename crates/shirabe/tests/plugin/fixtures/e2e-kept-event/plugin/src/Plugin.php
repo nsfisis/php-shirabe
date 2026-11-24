@@ -26,17 +26,11 @@ class Plugin implements PluginInterface, EventSubscriberInterface
     /** @var PackageEvent[] */
     private $packageEvents = [];
 
-    public function activate(Composer $composer, IOInterface $io): void
-    {
-    }
+    public function activate(Composer $composer, IOInterface $io): void {}
 
-    public function deactivate(Composer $composer, IOInterface $io): void
-    {
-    }
+    public function deactivate(Composer $composer, IOInterface $io): void {}
 
-    public function uninstall(Composer $composer, IOInterface $io): void
-    {
-    }
+    public function uninstall(Composer $composer, IOInterface $io): void {}
 
     public static function getSubscribedEvents()
     {
@@ -44,9 +38,9 @@ class Plugin implements PluginInterface, EventSubscriberInterface
         // events fires, so both are subscribed.
         return [
             PackageEvents::POST_PACKAGE_INSTALL => [
-                ['keepPackageEvent', 10],
+                ['keepPackageEvent',     10],
                 ['stopThroughKeptEvent', 5],
-                ['afterStop', 0],
+                ['afterStop',            0],
             ],
             ScriptEvents::POST_AUTOLOAD_DUMP => 'keepScriptEvent',
             ScriptEvents::POST_INSTALL_CMD => 'useKeptEvents',

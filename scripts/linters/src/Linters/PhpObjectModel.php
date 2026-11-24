@@ -60,8 +60,10 @@ final class PhpObjectModel implements Linter
 
     public function failureIntro(): string
     {
-        return "Found a type following PHP's object model used with a raw `Cell` / `RefCell`.\n"
-            . 'Share it as `Rc<T>` / `Rc<dyn T>` and keep its mutable properties in `PhpProp`:';
+        return (
+            "Found a type following PHP's object model used with a raw `Cell` / `RefCell`.\n"
+            . 'Share it as `Rc<T>` / `Rc<dyn T>` and keep its mutable properties in `PhpProp`:'
+        );
     }
 
     public function check(string $rootDir, array $excludes): array
@@ -82,7 +84,7 @@ final class PhpObjectModel implements Linter
             }
         }
 
-        $handles = implode('|', array_map(static fn (string $t): string => preg_quote($t, '/'), self::HANDLE_TYPES));
+        $handles = implode('|', array_map(static fn(string $t): string => preg_quote($t, '/'), self::HANDLE_TYPES));
         $pattern = '/\bRefCell<\s*(?:dyn\s+)?(?:[A-Za-z_][A-Za-z0-9_]*::)*(' . $handles . ')\s*>/';
 
         foreach (FileFinder::rustFiles($rootDir) as $path) {
@@ -109,7 +111,10 @@ final class PhpObjectModel implements Linter
         $lines = file($path);
         $start = null;
         foreach ($lines as $idx => $raw) {
-            if (preg_match('/^\s*(?:pub(?:\([^)]*\))?\s+)?struct\s+' . preg_quote($struct, '/') . '\b.*\{\s*$/', $raw)) {
+            if (preg_match(
+                '/^\s*(?:pub(?:\([^)]*\))?\s+)?struct\s+' . preg_quote($struct, '/') . '\b.*\{\s*$/',
+                $raw
+            )) {
                 $start = $idx;
                 break;
             }
@@ -124,8 +129,17 @@ final class PhpObjectModel implements Linter
             if (preg_match('/^\s*\}/', $code)) {
                 break;
             }
-            if (preg_match('/^\s*(?:pub(?:\([^)]*\))?\s+)?([a-z_][a-z0-9_]*)\s*:\s*(?:std::cell::)?(Ref)?Cell</', $code, $m)) {
-                $errors[] = "{$relative}:" . ($idx + 1) . ": property `{$struct}::{$m[1]}` held in a raw `" . ($m[2] ?? '') . 'Cell` (use `PhpProp`)';
+            if (preg_match(
+                '/^\s*(?:pub(?:\([^)]*\))?\s+)?([a-z_][a-z0-9_]*)\s*:\s*(?:std::cell::)?(Ref)?Cell</',
+                $code,
+                $m
+            )) {
+                $errors[] =
+                    "{$relative}:"
+                    . ($idx + 1)
+                    . ": property `{$struct}::{$m[1]}` held in a raw `"
+                    . ($m[2] ?? '')
+                    . 'Cell` (use `PhpProp`)';
             }
         }
 

@@ -27,8 +27,10 @@ final class OneUsePerModule implements Linter
 
     public function failureIntro(): string
     {
-        return "Found several `use` statements importing from the same module.\n"
-            . 'Merge them into one, e.g. `use foo::bar::{baz, qux};`:';
+        return (
+            "Found several `use` statements importing from the same module.\n"
+            . 'Merge them into one, e.g. `use foo::bar::{baz, qux};`:'
+        );
     }
 
     public function check(string $rootDir, array $excludes): array
@@ -71,7 +73,7 @@ final class OneUsePerModule implements Linter
 
             $start = $i;
             $text = $lines[$i];
-            while (!str_ends_with(rtrim($text), ';') && $i + 1 < $count) {
+            while (!str_ends_with(rtrim($text), ';') && ($i + 1) < $count) {
                 $i++;
                 $text .= $lines[$i];
             }
@@ -98,7 +100,8 @@ final class OneUsePerModule implements Linter
             $module = array_key_first($modules);
             $key = "{$block}\0{$m[1]}\0" . trim($m[2]) . "\0{$module}";
             if (isset($seen[$key])) {
-                $errors[] = "{$relative}:" . ($start + 1) . ": `{$module}` is already imported from on line {$seen[$key]}";
+                $errors[] =
+                    "{$relative}:" . ($start + 1) . ": `{$module}` is already imported from on line {$seen[$key]}";
             } else {
                 $seen[$key] = $start + 1;
             }

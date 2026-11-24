@@ -27,13 +27,9 @@ class Plugin implements PluginInterface, EventSubscriberInterface
         $this->io = $io;
     }
 
-    public function deactivate(Composer $composer, IOInterface $io): void
-    {
-    }
+    public function deactivate(Composer $composer, IOInterface $io): void {}
 
-    public function uninstall(Composer $composer, IOInterface $io): void
-    {
-    }
+    public function uninstall(Composer $composer, IOInterface $io): void {}
 
     public static function getSubscribedEvents()
     {
@@ -59,22 +55,32 @@ class Plugin implements PluginInterface, EventSubscriberInterface
         ProcessExecutor::setTimeout($original);
 
         $code = $process->execute('echo captured', $captured);
-        $lines[] = 'capture code=' . $code . ' output=' . json_encode($captured)
-            . ' error=' . json_encode($process->getErrorOutput());
+        $lines[] =
+            'capture code='
+            . $code
+            . ' output='
+            . json_encode($captured)
+            . ' error='
+            . json_encode($process->getErrorOutput());
 
         $code = $process->execute(['echo', 'from', 'a', 'list'], $listed);
         $lines[] = 'list code=' . $code . ' output=' . json_encode($listed);
 
         $code = $process->execute('echo out; echo err 1>&2; exit 3', $failed);
-        $lines[] = 'failing code=' . $code . ' output=' . json_encode($failed)
-            . ' error=' . json_encode($process->getErrorOutput());
+        $lines[] =
+            'failing code='
+            . $code
+            . ' output='
+            . json_encode($failed)
+            . ' error='
+            . json_encode($process->getErrorOutput());
 
         // Without a second argument the child's output is forwarded rather than captured, which
         // is a different branch of the same method; the redirection keeps it out of the terminal
         // so the trace stays the only thing under comparison.
         $code = $process->execute('echo forwarded > forwarded.txt');
-        $lines[] = 'forwarded code=' . $code
-            . ' file=' . json_encode(trim((string) @file_get_contents('forwarded.txt')));
+        $lines[] =
+            'forwarded code=' . $code . ' file=' . json_encode(trim((string) @file_get_contents('forwarded.txt')));
 
         // A callable second argument drives the child's output itself and is never assigned to.
         $seen = [];
@@ -82,22 +88,38 @@ class Plugin implements PluginInterface, EventSubscriberInterface
             $seen[] = $type . ':' . trim($buffer);
         };
         $code = $process->execute('echo through-a-callback', $callback);
-        $lines[] = 'callback code=' . $code . ' seen=' . json_encode($seen)
-            . ' argument=' . json_encode(\is_callable($callback));
+        $lines[] =
+            'callback code='
+            . $code
+            . ' seen='
+            . json_encode($seen)
+            . ' argument='
+            . json_encode(\is_callable($callback));
 
         // The callback may call back into the executor that is running it. The nested command
         // overwrites the error output, and the outer command overwrites it again once it ends.
         $nested = [];
         $reentrant = static function (string $type, string $buffer) use ($process, &$nested): void {
             $code = $process->execute('echo inner; echo inner-err 1>&2', $inner);
-            $nested[] = trim($buffer) . ' code=' . $code . ' output=' . json_encode($inner)
-                . ' error=' . json_encode($process->getErrorOutput());
+            $nested[] =
+                trim($buffer)
+                . ' code='
+                . $code
+                . ' output='
+                . json_encode($inner)
+                . ' error='
+                . json_encode($process->getErrorOutput());
             $process->setMaxJobs(4);
             $process->resetMaxJobs();
         };
         $code = $process->execute('echo outer', $reentrant);
-        $lines[] = 'reentrant code=' . $code . ' nested=' . json_encode($nested)
-            . ' error=' . json_encode($process->getErrorOutput());
+        $lines[] =
+            'reentrant code='
+            . $code
+            . ' nested='
+            . json_encode($nested)
+            . ' error='
+            . json_encode($process->getErrorOutput());
 
         // A throw from the callback unwinds out of execute() before the rest of the output.
         $calls = 0;
@@ -109,25 +131,35 @@ class Plugin implements PluginInterface, EventSubscriberInterface
             $process->execute('echo first; sleep 0.2; echo second', $throwing);
             $lines[] = 'throwing returned';
         } catch (\Exception $e) {
-            $lines[] = 'throwing caught=' . get_class($e) . ' message=' . json_encode($e->getMessage())
-                . ' code=' . $e->getCode() . ' calls=' . $calls;
+            $lines[] =
+                'throwing caught='
+                . get_class($e)
+                . ' message='
+                . json_encode($e->getMessage())
+                . ' code='
+                . $e->getCode()
+                . ' calls='
+                . $calls;
         }
 
         $code = $process->execute('pwd', $cwdOutput, 'vendor');
         $lines[] = 'cwd code=' . $code . ' basename=' . json_encode(basename(trim((string) $cwdOutput)));
 
         $code = $process->execute('echo x; echo y', $multiline);
-        $lines[] = 'splitLines code=' . $code
-            . ' lines=' . json_encode($process->splitLines($multiline))
-            . ' empty=' . json_encode($process->splitLines(null));
+        $lines[] =
+            'splitLines code='
+            . $code
+            . ' lines='
+            . json_encode($process->splitLines($multiline))
+            . ' empty='
+            . json_encode($process->splitLines(null));
 
         $lines[] = 'escape=' . json_encode(ProcessExecutor::escape("a b'c"));
         // TODO(php-semantics): a command matching GIT_CMDS_NEED_GIT_DIR has no agreed value to
         // compare. array_intersect() keeps its first argument's keys and `===` compares an
         // array's keys too, so Composer answers false for those patterns as well; the shim's
         // array_intersect drops the keys and Shirabe answers true.
-        $lines[] = 'requiresGitDirEnv status='
-            . json_encode($process->requiresGitDirEnv('git status'));
+        $lines[] = 'requiresGitDirEnv status=' . json_encode($process->requiresGitDirEnv('git status'));
 
         $process->setMaxJobs(4);
         $process->resetMaxJobs();
@@ -136,9 +168,13 @@ class Plugin implements PluginInterface, EventSubscriberInterface
         // The executor is a constructor argument of other Composer utilities, so a plugin-built
         // one has to be accepted wherever the real class is.
         $filesystem = new Filesystem($process);
-        $lines[] = 'filesystem normalizePath=' . json_encode($filesystem->normalizePath('/a/b/../c'))
-            . ' isLocalPath=' . json_encode(Filesystem::isLocalPath('/a/b'))
-            . ' getPlatformPath=' . json_encode(Filesystem::getPlatformPath('file:///a/b'));
+        $lines[] =
+            'filesystem normalizePath='
+            . json_encode($filesystem->normalizePath('/a/b/../c'))
+            . ' isLocalPath='
+            . json_encode(Filesystem::isLocalPath('/a/b'))
+            . ' getPlatformPath='
+            . json_encode(Filesystem::getPlatformPath('file:///a/b'));
 
         file_put_contents('process-executor-trace.txt', implode("\n", $lines) . "\n");
     }

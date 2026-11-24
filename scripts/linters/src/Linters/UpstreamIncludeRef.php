@@ -29,11 +29,13 @@ final class UpstreamIncludeRef implements Linter
 
     public function failureIntro(): string
     {
-        return "Found an `include_str!` / `include_bytes!` of a file under composer/ without a\n"
+        return (
+            "Found an `include_str!` / `include_bytes!` of a file under composer/ without a\n"
             . "`// ref: <file> sha1:<hash>` comment in the statement or item that embeds it, or a\n"
             . "`// ref:` comment that no such embedding follows. Write the comment above the\n"
             . "embedding with the path of the file, then run\n"
-            . "`scripts/linters/upstream-file-hash update <file>...`:";
+            . '`scripts/linters/upstream-file-hash update <file>...`:'
+        );
     }
 
     public function check(string $rootDir, array $excludes): array

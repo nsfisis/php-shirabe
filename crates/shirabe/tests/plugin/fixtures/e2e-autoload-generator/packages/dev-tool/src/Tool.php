@@ -2,6 +2,4 @@
 
 namespace Acme\Dev;
 
-class Tool
-{
-}
+class Tool {}

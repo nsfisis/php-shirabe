@@ -2,6 +2,4 @@
 
 namespace App;
 
-class Kernel
-{
-}
+class Kernel {}

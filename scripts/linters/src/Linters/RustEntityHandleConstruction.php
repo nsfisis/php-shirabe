@@ -22,8 +22,10 @@ final class RustEntityHandleConstruction implements Linter
 
     public function failureIntro(): string
     {
-        return "Found a `RustEntityHandle` built outside `entity_value`.\n"
-            . 'Hand the entity to `crates/shirabe/src/php_worker/rpc/entity.rs` `entity_value` instead:';
+        return (
+            "Found a `RustEntityHandle` built outside `entity_value`.\n"
+            . 'Hand the entity to `crates/shirabe/src/php_worker/rpc/entity.rs` `entity_value` instead:'
+        );
     }
 
     public function check(string $rootDir, array $excludes): array

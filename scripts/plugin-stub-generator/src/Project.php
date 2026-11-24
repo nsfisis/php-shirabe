@@ -31,7 +31,7 @@ final class Project
         }
         $map = require $mapFile;
         $map['Composer\\'] ??= [$composerRoot . '/src/Composer'];
-        uksort($map, static fn (string $a, string $b): int => strlen($b) <=> strlen($a));
+        uksort($map, static fn(string $a, string $b): int => strlen($b) <=> strlen($a));
         $this->psr4 = $map;
     }
 

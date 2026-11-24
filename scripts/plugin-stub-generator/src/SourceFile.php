@@ -33,7 +33,7 @@ final class SourceFile
     public function __construct(
         public readonly string $path,
         public readonly string $expectedFqcn,
-        Parser $parser,
+        Parser $parser
     ) {
         $code = file_get_contents($path);
         if ($code === false) {
@@ -91,8 +91,11 @@ final class SourceFile
         $kept = [];
         foreach ($this->aliases as $alias => $fqcn) {
             if (preg_match('/(?<![\\\\$\w])' . preg_quote($alias, '/') . '\b/', $emittedText) === 1) {
-                $kept[] = 'use ' . $fqcn
-                    . (str_ends_with($fqcn, '\\' . $alias) || $fqcn === $alias ? '' : " as $alias") . ';';
+                $kept[] =
+                    'use '
+                    . $fqcn
+                    . (str_ends_with($fqcn, '\\' . $alias) || $fqcn === $alias ? '' : " as $alias")
+                    . ';';
             }
         }
         return implode("\n", $kept);

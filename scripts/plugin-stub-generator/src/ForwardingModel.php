@@ -99,7 +99,10 @@ final class ForwardingModel
         $parser = (new ParserFactory())->createForNewestSupportedVersion();
         $finder = new NodeFinder();
         $paths = [];
-        $iterator = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($dir, \FilesystemIterator::SKIP_DOTS));
+        $iterator = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator(
+            $dir,
+            \FilesystemIterator::SKIP_DOTS
+        ));
         foreach ($iterator as $entry) {
             if ($entry->isFile() && str_ends_with($entry->getFilename(), '.php')) {
                 $paths[] = $entry->getPathname();
@@ -123,7 +126,9 @@ final class ForwardingModel
                         $name = $call->name->toString();
                         if ($name !== 'callRust') {
                             if ($name === 'newRust' || $name === 'callRustStatic') {
-                                throw new GenerationError(["$where: a runtime class may forward only instance methods"]);
+                                throw new GenerationError([
+                                    "$where: a runtime class may forward only instance methods",
+                                ]);
                             }
                             continue;
                         }
@@ -132,9 +137,15 @@ final class ForwardingModel
                         if (!$member instanceof String_) {
                             throw new GenerationError(["$where calls callRust without a literal method name"]);
                         }
-                        if (!($handle instanceof PropertyFetch
-                            && $handle->var instanceof Variable && $handle->var->name === 'this'
-                            && $handle->name instanceof Node\Identifier && $handle->name->toString() === '__entityId')) {
+                        if (
+                            !(
+                                $handle instanceof PropertyFetch
+                                && $handle->var instanceof Variable
+                                && $handle->var->name === 'this'
+                                && $handle->name instanceof Node\Identifier
+                                && $handle->name->toString() === '__entityId'
+                            )
+                        ) {
                             throw new GenerationError(["$where calls callRust on a handle other than its own"]);
                         }
                         if (!in_array($member->value, self::GENERIC_METHODS, true)) {
@@ -162,9 +173,11 @@ final class ForwardingModel
 
     private static function isRpcRuntimeCall(Node $node): bool
     {
-        return $node instanceof StaticCall
+        return (
+            $node instanceof StaticCall
             && $node->class instanceof Name
             && $node->class->toString() === 'Shirabe\RpcRuntime'
-            && $node->name instanceof Node\Identifier;
+            && $node->name instanceof Node\Identifier
+        );
     }
 }

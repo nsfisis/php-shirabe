@@ -2,6 +2,4 @@
 
 namespace Acme\Client;
 
-class Client
-{
-}
+class Client {}

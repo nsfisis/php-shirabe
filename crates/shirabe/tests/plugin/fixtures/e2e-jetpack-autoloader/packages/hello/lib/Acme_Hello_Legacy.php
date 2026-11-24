@@ -1,5 +1,3 @@
 <?php
 
-class Acme_Hello_Legacy
-{
-}
+class Acme_Hello_Legacy {}

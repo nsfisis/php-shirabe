@@ -9,9 +9,8 @@ final class Runner
     /** @param list<array{0: Linter, 1: list<string>}> $linters */
     public function __construct(
         private readonly string $rootDir,
-        private readonly array $linters,
-    ) {
-    }
+        private readonly array $linters
+    ) {}
 
     public function run(): bool
     {

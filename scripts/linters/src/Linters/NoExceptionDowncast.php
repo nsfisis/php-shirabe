@@ -26,9 +26,11 @@ final class NoExceptionDowncast implements Linter
 
     public function failureIntro(): string
     {
-        return "Found `downcast` against a ported PHP exception type.\n"
+        return (
+            "Found `downcast` against a ported PHP exception type.\n"
             . 'An exception is carried by an `AnyThrowable`, so this never matches; '
-            . 'use `Catch::catch` / `Catch::catch_mut`, which match subclasses too:';
+            . 'use `Catch::catch` / `Catch::catch_mut`, which match subclasses too:'
+        );
     }
 
     public function check(string $rootDir, array $excludes): array

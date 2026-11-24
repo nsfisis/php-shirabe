@@ -85,15 +85,16 @@ class Application extends BaseApplication
         return $this->shirabeIo;
     }
 
-    public function getComposer(bool $required = true, ?bool $disablePlugins = null, ?bool $disableScripts = null): ?Composer
-    {
+    public function getComposer(
+        bool $required = true,
+        ?bool $disablePlugins = null,
+        ?bool $disableScripts = null
+    ): ?Composer {
         if (null === $this->shirabeComposer && $required) {
             // TODO(plugin): creating a Composer instance from scratch here would need
             // Factory::create over RPC; the handoff currently always carries the instance the
             // Rust side already built, so this only fires after resetComposer-style flows.
-            throw new \RuntimeException(
-                'Shirabe cannot create a new Composer instance inside the plugin process yet'
-            );
+            throw new \RuntimeException('Shirabe cannot create a new Composer instance inside the plugin process yet');
         }
 
         return $this->shirabeComposer;
@@ -104,9 +105,7 @@ class Application extends BaseApplication
         // TODO(plugin): the Composer instance is owned by the Rust process; dropping only the
         // worker-side reference would desynchronize the two sides, so this needs a
         // reset-and-refetch round trip that does not exist yet.
-        throw new \RuntimeException(
-            'Shirabe does not support resetComposer() inside the plugin process yet'
-        );
+        throw new \RuntimeException('Shirabe does not support resetComposer() inside the plugin process yet');
     }
 
     /**
@@ -133,11 +132,31 @@ class Application extends BaseApplication
     protected function getDefaultInputDefinition(): InputDefinition
     {
         $definition = parent::getDefaultInputDefinition();
-        $definition->addOption(new InputOption('--profile', null, InputOption::VALUE_NONE, 'Display timing and memory usage information'));
-        $definition->addOption(new InputOption('--no-plugins', null, InputOption::VALUE_NONE, 'Whether to disable plugins.'));
-        $definition->addOption(new InputOption('--no-scripts', null, InputOption::VALUE_NONE, 'Skips the execution of all scripts defined in composer.json file.'));
-        $definition->addOption(new InputOption('--working-dir', '-d', InputOption::VALUE_REQUIRED, 'If specified, use the given directory as working directory.'));
-        $definition->addOption(new InputOption('--no-cache', null, InputOption::VALUE_NONE, 'Prevent use of the cache'));
+        $definition->addOption(
+            new InputOption('--profile', null, InputOption::VALUE_NONE, 'Display timing and memory usage information')
+        );
+        $definition->addOption(
+            new InputOption('--no-plugins', null, InputOption::VALUE_NONE, 'Whether to disable plugins.')
+        );
+        $definition->addOption(
+            new InputOption(
+                '--no-scripts',
+                null,
+                InputOption::VALUE_NONE,
+                'Skips the execution of all scripts defined in composer.json file.'
+            )
+        );
+        $definition->addOption(
+            new InputOption(
+                '--working-dir',
+                '-d',
+                InputOption::VALUE_REQUIRED,
+                'If specified, use the given directory as working directory.'
+            )
+        );
+        $definition->addOption(
+            new InputOption('--no-cache', null, InputOption::VALUE_NONE, 'Prevent use of the cache')
+        );
 
         return $definition;
     }

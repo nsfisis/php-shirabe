@@ -180,7 +180,7 @@ final class SourceParser
             $node instanceof Stmt\Class_ && $node->isFinal(),
             $parent,
             $interfaces,
-            $file,
+            $file
         );
 
         foreach ($node->getTraitUses() as $traitUse) {
@@ -199,7 +199,7 @@ final class SourceParser
                     $propNode->isStatic(),
                     $classTypes,
                     $expandable,
-                    $doc['var'],
+                    $doc['var']
                 );
             }
         }
@@ -230,19 +230,20 @@ final class SourceParser
                 $classTypes,
                 $expandable,
                 $doc['params'][$name] ?? [],
-                $this->typeIsCallable($paramNode->type),
+                $this->typeIsCallable($paramNode->type)
             );
 
             // Constructor property promotion.
             if ($paramNode->flags !== 0) {
                 $info->properties[] = new PropertyInfo(
                     $name,
-                    ($paramNode->flags & \PhpParser\Modifiers::PRIVATE) !== 0 ? 'private'
+                    ($paramNode->flags & \PhpParser\Modifiers::PRIVATE) !== 0
+                        ? 'private'
                         : (($paramNode->flags & \PhpParser\Modifiers::PROTECTED) !== 0 ? 'protected' : 'public'),
                     false,
                     $classTypes,
                     $expandable,
-                    $doc['params'][$name] ?? [],
+                    $doc['params'][$name] ?? []
                 );
             }
         }
@@ -258,7 +259,7 @@ final class SourceParser
             $returnClassTypes,
             $returnExpandable,
             $doc['return'],
-            $doc['throws'],
+            $doc['throws']
         );
 
         $propertyTypes = [];
@@ -301,7 +302,10 @@ final class SourceParser
             ];
         }
         $method->touchesStaticProps = $analyzer->touchesStaticProps;
-        $method->classRefs = array_values(array_unique(array_map(static fn (string $ref) => ltrim($ref, '\\'), $analyzer->classRefs)));
+        $method->classRefs = array_values(array_unique(array_map(static fn(string $ref) => ltrim(
+            $ref,
+            '\\'
+        ), $analyzer->classRefs)));
         $method->ownStaticCalls = array_values(array_unique($analyzer->ownStaticCalls));
 
         $info->methods[strtolower($method->name)] = $method;

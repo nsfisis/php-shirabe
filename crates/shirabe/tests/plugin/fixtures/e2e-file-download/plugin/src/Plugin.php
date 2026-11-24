@@ -21,17 +21,11 @@ use Composer\Util\HttpDownloader;
  */
 class Plugin implements PluginInterface, EventSubscriberInterface
 {
-    public function activate(Composer $composer, IOInterface $io): void
-    {
-    }
+    public function activate(Composer $composer, IOInterface $io): void {}
 
-    public function deactivate(Composer $composer, IOInterface $io): void
-    {
-    }
+    public function deactivate(Composer $composer, IOInterface $io): void {}
 
-    public function uninstall(Composer $composer, IOInterface $io): void
-    {
-    }
+    public function uninstall(Composer $composer, IOInterface $io): void {}
 
     public static function getSubscribedEvents()
     {
@@ -70,7 +64,14 @@ class Plugin implements PluginInterface, EventSubscriberInterface
             $event->getName(),
             'type=' . $event->getType(),
             'url=' . $event->getUrl(),
-            'fileName=' . json_encode($event->getFileName() === null ? null : basename(dirname($event->getFileName())) . '/' . pathinfo($event->getFileName(), PATHINFO_EXTENSION)),
+            'fileName='
+                . json_encode(
+                    $event->getFileName() === null
+                        ? null
+                        : basename(dirname($event->getFileName()))
+                        . '/'
+                        . pathinfo($event->getFileName(), PATHINFO_EXTENSION)
+                ),
             'checksum=' . json_encode($event->getChecksum()),
         ];
         if ($event->getType() === 'package') {

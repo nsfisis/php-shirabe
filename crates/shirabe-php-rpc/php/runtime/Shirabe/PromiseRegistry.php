@@ -48,7 +48,7 @@ final class PromiseRegistry
     /** The promise standing for a promise id that arrived in a frame. */
     public static function promiseFor(int $id): \React\Promise\PromiseInterface
     {
-        if ($id % 2 === 0) {
+        if (($id % 2) === 0) {
             if (isset(self::$parked[$id])) {
                 $promise = self::$parked[$id];
                 unset(self::$parked[$id], self::$parkedIdsByObjectId[spl_object_id($promise)]);
@@ -131,22 +131,16 @@ final class PromiseRegistry
         $forget = static function () use ($id, $objectId): void {
             unset(self::$promises[$id], self::$idsByObjectId[$objectId]);
         };
-        $promise->then(
-            static function ($value) use ($id, $forget): void {
-                $forget();
-                RpcRuntime::callRustFunction('__shirabe_resolve_promise', [$id, $value]);
-            },
-            static function ($reason) use ($id, $forget): void {
-                $forget();
-                if (!$reason instanceof \Throwable) {
-                    $reason = new \RuntimeException('the promise was rejected with ' . gettype($reason));
-                }
-                RpcRuntime::callRustFunction(
-                    '__shirabe_reject_promise',
-                    [$id, ThrowableRecord::fromThrowable($reason)]
-                );
+        $promise->then(static function ($value) use ($id, $forget): void {
+            $forget();
+            RpcRuntime::callRustFunction('__shirabe_resolve_promise', [$id, $value]);
+        }, static function ($reason) use ($id, $forget): void {
+            $forget();
+            if (!$reason instanceof \Throwable) {
+                $reason = new \RuntimeException('the promise was rejected with ' . gettype($reason));
             }
-        );
+            RpcRuntime::callRustFunction('__shirabe_reject_promise', [$id, ThrowableRecord::fromThrowable($reason)]);
+        });
         return new Rpc\PromiseHandle($id);
     }
 }

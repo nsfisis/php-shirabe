@@ -17,9 +17,9 @@ final class PurityAnalyzer
     /** @var array<string, string> "Fqcn::lowername" => 'pure' | 'mutator' | 'n/a' */
     public array $verdicts = [];
 
-    public function __construct(private readonly SourceParser $sources)
-    {
-    }
+    public function __construct(
+        private readonly SourceParser $sources
+    ) {}
 
     public function run(): void
     {
@@ -53,7 +53,8 @@ final class PurityAnalyzer
                             break;
                         }
                         [$calleeClass, $calleeMethod] = $callee;
-                        $calleeVerdict = $this->verdicts["$calleeClass::" . strtolower($calleeMethod->name)] ?? 'mutator';
+                        $calleeVerdict =
+                            $this->verdicts["$calleeClass::" . strtolower($calleeMethod->name)] ?? 'mutator';
                         if ($calleeVerdict === 'mutator') {
                             $this->verdicts[$key] = 'mutator';
                             $changed = true;

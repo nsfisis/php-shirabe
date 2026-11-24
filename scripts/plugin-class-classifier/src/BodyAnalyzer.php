@@ -62,12 +62,17 @@ final class BodyAnalyzer extends NodeVisitorAbstract
         private readonly array $propertyTypes,
         /** @var array<string, string> param name => single class type FQCN */
         private readonly array $paramTypes,
-        private readonly BuiltinSignatures $builtins,
-    ) {
-    }
+        private readonly BuiltinSignatures $builtins
+    ) {}
 
-    public static function analyze(ClassMethod $node, MethodInfo $method, string $currentClass, array $propertyTypes, array $paramTypes, BuiltinSignatures $builtins): self
-    {
+    public static function analyze(
+        ClassMethod $node,
+        MethodInfo $method,
+        string $currentClass,
+        array $propertyTypes,
+        array $paramTypes,
+        BuiltinSignatures $builtins
+    ): self {
         $analyzer = new self($method, $currentClass, $propertyTypes, $paramTypes, $builtins);
         if ($node->stmts !== null) {
             $traverser = new NodeTraverser();
@@ -88,8 +93,12 @@ final class BodyAnalyzer extends NodeVisitorAbstract
                     $this->method->mutatesThisDirectly = true;
                 }
             }
-        } elseif ($node instanceof Expr\PreInc || $node instanceof Expr\PostInc
-            || $node instanceof Expr\PreDec || $node instanceof Expr\PostDec) {
+        } elseif (
+            $node instanceof Expr\PreInc
+            || $node instanceof Expr\PostInc
+            || $node instanceof Expr\PreDec
+            || $node instanceof Expr\PostDec
+        ) {
             if ($this->isThisRooted($node->var)) {
                 $this->method->mutatesThisDirectly = true;
             }
@@ -152,7 +161,11 @@ final class BodyAnalyzer extends NodeVisitorAbstract
                 $this->ownStaticWrites[] = $property;
             } else {
                 $this->staticRefs[] = $root->class->toString();
-                $this->hardRefs[] = ['kind' => 'static', 'class' => $root->class->toString(), 'member' => '$' . $property];
+                $this->hardRefs[] = [
+                    'kind' => 'static',
+                    'class' => $root->class->toString(),
+                    'member' => '$' . $property,
+                ];
             }
         }
     }
@@ -178,7 +191,19 @@ final class BodyAnalyzer extends NodeVisitorAbstract
         // Callback-forwarding builtins re-dispatch their arguments to an
         // unknown callee, so the stub signature (no by-ref) is not the
         // whole truth: [$this, 'method'] can reach a mutator.
-        if (in_array($name, ['call_user_func', 'call_user_func_array', 'array_walk', 'array_walk_recursive', 'usort', 'uasort', 'uksort'], true)) {
+        if (in_array(
+            $name,
+            [
+                'call_user_func',
+                'call_user_func_array',
+                'array_walk',
+                'array_walk_recursive',
+                'usort',
+                'uasort',
+                'uksort',
+            ],
+            true
+        )) {
             $this->method->thisEscapesUnresolved = true;
 
             return;
@@ -194,8 +219,10 @@ final class BodyAnalyzer extends NodeVisitorAbstract
         }
 
         foreach ($thisArgs as $pos) {
-            if (in_array($pos, $info['fixed'], true)
-                || ($info['variadicFrom'] !== null && $pos >= $info['variadicFrom'])) {
+            if (
+                in_array($pos, $info['fixed'], true)
+                || $info['variadicFrom'] !== null && $pos >= $info['variadicFrom']
+            ) {
                 $this->method->mutatesThisDirectly = true;
 
                 return;
@@ -242,8 +269,11 @@ final class BodyAnalyzer extends NodeVisitorAbstract
         $thisArgs = $this->thisArgPositions($call->args);
         $literalName = $call->name instanceof Node\Identifier ? strtolower($call->name->toString()) : null;
 
-        if ($call->class instanceof Name && $literalName !== null
-            && ($this->isSelfLike($call->class) || $call->class->toString() === $this->currentClass)) {
+        if (
+            $call->class instanceof Name
+            && $literalName !== null
+            && ($this->isSelfLike($call->class) || $call->class->toString() === $this->currentClass)
+        ) {
             $this->ownStaticCalls[] = $literalName;
         }
 
@@ -271,7 +301,11 @@ final class BodyAnalyzer extends NodeVisitorAbstract
                 if ($literalName === null) {
                     $this->method->thisEscapesUnresolved = true;
                 } else {
-                    $this->method->externalCalls[] = ['class' => $className, 'method' => $literalName, 'thisArgs' => $thisArgs];
+                    $this->method->externalCalls[] = [
+                        'class' => $className,
+                        'method' => $literalName,
+                        'thisArgs' => $thisArgs,
+                    ];
                 }
             }
 
@@ -304,7 +338,11 @@ final class BodyAnalyzer extends NodeVisitorAbstract
         $this->classRefs[] = $className;
         $this->hardRefs[] = ['kind' => 'new', 'class' => $className, 'member' => '__construct'];
         if ($thisArgs !== []) {
-            $this->method->externalCalls[] = ['class' => $className, 'method' => '__construct', 'thisArgs' => $thisArgs];
+            $this->method->externalCalls[] = [
+                'class' => $className,
+                'method' => '__construct',
+                'thisArgs' => $thisArgs,
+            ];
         }
     }
 
@@ -363,9 +401,12 @@ final class BodyAnalyzer extends NodeVisitorAbstract
     /** Resolve the receiver's class when it is a typed property or param. */
     private function resolveReceiverClass(Expr $receiver): ?string
     {
-        if (($receiver instanceof Expr\PropertyFetch || $receiver instanceof Expr\NullsafePropertyFetch)
-            && $receiver->var instanceof Expr\Variable && $receiver->var->name === 'this'
-            && $receiver->name instanceof Node\Identifier) {
+        if (
+            ($receiver instanceof Expr\PropertyFetch || $receiver instanceof Expr\NullsafePropertyFetch)
+            && $receiver->var instanceof Expr\Variable
+            && $receiver->var->name === 'this'
+            && $receiver->name instanceof Node\Identifier
+        ) {
             return $this->propertyTypes[$receiver->name->toString()] ?? null;
         }
 

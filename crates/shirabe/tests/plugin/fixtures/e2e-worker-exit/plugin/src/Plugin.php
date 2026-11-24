@@ -15,17 +15,11 @@ use Composer\Script\ScriptEvents;
  */
 class Plugin implements PluginInterface, EventSubscriberInterface
 {
-    public function activate(Composer $composer, IOInterface $io): void
-    {
-    }
+    public function activate(Composer $composer, IOInterface $io): void {}
 
-    public function deactivate(Composer $composer, IOInterface $io): void
-    {
-    }
+    public function deactivate(Composer $composer, IOInterface $io): void {}
 
-    public function uninstall(Composer $composer, IOInterface $io): void
-    {
-    }
+    public function uninstall(Composer $composer, IOInterface $io): void {}
 
     public static function getSubscribedEvents()
     {
@@ -41,7 +35,7 @@ class Plugin implements PluginInterface, EventSubscriberInterface
             case 'exit':
                 exit(3);
             case 'fatal':
-                ini_set('memory_limit', (string) (memory_get_usage() + 32 * 1024 * 1024));
+                ini_set('memory_limit', (string) (memory_get_usage() + (32 * 1024 * 1024)));
                 $chunks = [];
                 while (true) {
                     $chunks[] = str_repeat('x', 1024 * 1024);

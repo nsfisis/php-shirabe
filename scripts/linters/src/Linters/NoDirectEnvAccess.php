@@ -19,11 +19,13 @@ final class NoDirectEnvAccess implements Linter
 
     public function failureIntro(): string
     {
-        return "Found direct access to the process environment.\n"
+        return (
+            "Found direct access to the process environment.\n"
             . "PHP reads and writes environment variables through three storages that are not kept in\n"
             . "sync with each other, and each has its own counterpart in `shirabe_php_shim`:\n"
             . "`getenv`/`getenv_all`/`putenv`/`putenv_clear`, `PHP_ENV`, and `PHP_SERVER`.\n"
-            . 'Port whichever one the PHP source uses; see `docs/dev/env-vars-porting.md`:';
+            . 'Port whichever one the PHP source uses; see `docs/dev/env-vars-porting.md`:'
+        );
     }
 
     public function check(string $rootDir, array $excludes): array

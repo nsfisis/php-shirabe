@@ -81,9 +81,9 @@ final class BuiltinSignatures
         $byRef = &$this->byRef;
         $collector = new class($byRef) extends NodeVisitorAbstract {
             /** @param array<string, array{fixed: list<int>, variadicFrom: int|null}> $byRef */
-            public function __construct(private array &$byRef)
-            {
-            }
+            public function __construct(
+                private array &$byRef
+            ) {}
 
             public function enterNode(Node $node): null
             {
@@ -111,7 +111,9 @@ final class BuiltinSignatures
                     $fixed = array_values(array_unique(array_merge($this->byRef[$name]['fixed'], $fixed)));
                     sort($fixed);
                     $prev = $this->byRef[$name]['variadicFrom'];
-                    $variadicFrom = $prev === null ? $variadicFrom : ($variadicFrom === null ? $prev : min($prev, $variadicFrom));
+                    $variadicFrom = $prev === null
+                        ? $variadicFrom
+                        : ($variadicFrom === null ? $prev : min($prev, $variadicFrom));
                 }
                 $this->byRef[$name] = ['fixed' => $fixed, 'variadicFrom' => $variadicFrom];
 

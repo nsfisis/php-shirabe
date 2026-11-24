@@ -22,17 +22,11 @@ use Symfony\Component\Console\Output\OutputInterface;
  */
 class Plugin implements PluginInterface, EventSubscriberInterface
 {
-    public function activate(Composer $composer, IOInterface $io): void
-    {
-    }
+    public function activate(Composer $composer, IOInterface $io): void {}
 
-    public function deactivate(Composer $composer, IOInterface $io): void
-    {
-    }
+    public function deactivate(Composer $composer, IOInterface $io): void {}
 
-    public function uninstall(Composer $composer, IOInterface $io): void
-    {
-    }
+    public function uninstall(Composer $composer, IOInterface $io): void {}
 
     public static function getSubscribedEvents()
     {
@@ -55,14 +49,12 @@ class Plugin implements PluginInterface, EventSubscriberInterface
         $io->writeError(' <info>tagged</info>');
         $io->write('verbose only', true, IOInterface::VERBOSE);
         $io->write("10%\x08\x08\x0820%");
-        $lines[] = 'default output=' . json_encode($io->getOutput())
-            . ' ' . self::flags($io);
+        $lines[] = 'default output=' . json_encode($io->getOutput()) . ' ' . self::flags($io);
 
         $verbose = new BufferIO('', OutputInterface::VERBOSITY_VERY_VERBOSE);
         $verbose->write('very verbose', true, IOInterface::VERY_VERBOSE);
         $verbose->write('debug only', true, IOInterface::DEBUG);
-        $lines[] = 'very-verbose output=' . json_encode($verbose->getOutput())
-            . ' ' . self::flags($verbose);
+        $lines[] = 'very-verbose output=' . json_encode($verbose->getOutput()) . ' ' . self::flags($verbose);
 
         $verbose->setUserInputs(['yes', 'no']);
         $lines[] = 'user-inputs ' . self::flags($verbose);
@@ -72,8 +64,15 @@ class Plugin implements PluginInterface, EventSubscriberInterface
         $debug = new BufferIO('input', OutputInterface::VERBOSITY_DEBUG);
         $process = new ProcessExecutor($debug);
         $code = $process->execute('echo captured', $captured);
-        $lines[] = 'process code=' . $code . ' output=' . json_encode($captured)
-            . ' io=' . json_encode($debug->getOutput()) . ' ' . self::flags($debug);
+        $lines[] =
+            'process code='
+            . $code
+            . ' output='
+            . json_encode($captured)
+            . ' io='
+            . json_encode($debug->getOutput())
+            . ' '
+            . self::flags($debug);
 
         file_put_contents('buffer-io-trace.txt', implode("\n", $lines) . "\n");
 
@@ -88,10 +87,17 @@ class Plugin implements PluginInterface, EventSubscriberInterface
 
     private static function flags(IOInterface $io): string
     {
-        return 'verbose=' . json_encode($io->isVerbose())
-            . ' veryVerbose=' . json_encode($io->isVeryVerbose())
-            . ' debug=' . json_encode($io->isDebug())
-            . ' interactive=' . json_encode($io->isInteractive())
-            . ' decorated=' . json_encode($io->isDecorated());
+        return (
+            'verbose='
+            . json_encode($io->isVerbose())
+            . ' veryVerbose='
+            . json_encode($io->isVeryVerbose())
+            . ' debug='
+            . json_encode($io->isDebug())
+            . ' interactive='
+            . json_encode($io->isInteractive())
+            . ' decorated='
+            . json_encode($io->isDecorated())
+        );
     }
 }

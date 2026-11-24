@@ -18,7 +18,7 @@ final class FileFinder
     /** @return list<string> absolute paths to *.rs files under crates/, sorted */
     public static function rustFiles(string $rootDir): array
     {
-        return self::walk("{$rootDir}/crates", static fn (string $path): bool => str_ends_with($path, '.rs'));
+        return self::walk("{$rootDir}/crates", static fn(string $path): bool => str_ends_with($path, '.rs'));
     }
 
     // Returns absolute paths to the PHP files the worker runs (crates/*/php/runtime/**/*.php),
@@ -27,7 +27,7 @@ final class FileFinder
     {
         $found = [];
         foreach (glob("{$rootDir}/crates/*/php/runtime", GLOB_ONLYDIR) ?: [] as $dir) {
-            $found = [...$found, ...self::walk($dir, static fn (string $path): bool => str_ends_with($path, '.php'))];
+            $found = [...$found, ...self::walk($dir, static fn(string $path): bool => str_ends_with($path, '.php'))];
         }
         sort($found);
 
@@ -46,7 +46,7 @@ final class FileFinder
                 continue;
             }
 
-            foreach (self::walk($srcDir, static fn (string $path): bool => basename($path) === 'mod.rs') as $path) {
+            foreach (self::walk($srcDir, static fn(string $path): bool => basename($path) === 'mod.rs') as $path) {
                 $found[] = $path;
             }
         }
@@ -64,9 +64,10 @@ final class FileFinder
         }
 
         $found = [];
-        $iterator = new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($baseDir, \FilesystemIterator::SKIP_DOTS),
-        );
+        $iterator = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator(
+            $baseDir,
+            \FilesystemIterator::SKIP_DOTS
+        ));
         foreach ($iterator as $file) {
             /** @var \SplFileInfo $file */
             if ($file->isFile() && $predicate($file->getPathname())) {

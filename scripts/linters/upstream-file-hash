@@ -9,13 +9,13 @@ use Shirabe\Lint\Support\Paths;
 use Shirabe\Lint\Support\RefHeader;
 
 const USAGE = <<<'TXT'
-Usage:
-  upstream-file-hash update <file>...
-      Write the current hash of the upstream file into every `//! ref:` header and `// ref:`
-      comment of the Rust or PHP files, adding it where it is missing. Run it only after checking
-      that the port follows the upstream file.
+    Usage:
+      upstream-file-hash update <file>...
+          Write the current hash of the upstream file into every `//! ref:` header and `// ref:`
+          comment of the Rust or PHP files, adding it where it is missing. Run it only after checking
+          that the port follows the upstream file.
 
-TXT;
+    TXT;
 
 $rootDir = dirname(__DIR__, 2);
 

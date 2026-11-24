@@ -20,8 +20,10 @@ final class NoDecorativeSectionComment implements Linter
 
     public function failureIntro(): string
     {
-        return "Found decorative section comments (4+ consecutive `=`, `-`, or Unicode box-drawing characters).\n"
-            . 'These section dividers are unnecessarily noisy — remove them:';
+        return (
+            "Found decorative section comments (4+ consecutive `=`, `-`, or Unicode box-drawing characters).\n"
+            . 'These section dividers are unnecessarily noisy — remove them:'
+        );
     }
 
     public function check(string $rootDir, array $excludes): array

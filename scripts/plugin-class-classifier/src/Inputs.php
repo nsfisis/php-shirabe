@@ -19,7 +19,6 @@ final class Inputs
 {
     public const DISPOSITIONS = ['memo-cache', 'seed-once', 'needs-sync'];
 
-
     public const PROPERTY_HANDLINGS = ['handoff', 'rust-local', 'static-config'];
 
     /** @var array<string, string> prefix => reason */
@@ -57,7 +56,9 @@ final class Inputs
             }
             foreach ($properties as $property => $disposition) {
                 if (!in_array($disposition, self::DISPOSITIONS, true)) {
-                    throw new \RuntimeException("static-state.json: $fqcn::\$$property: unknown disposition " . json_encode($disposition));
+                    throw new \RuntimeException(
+                        "static-state.json: $fqcn::\$$property: unknown disposition " . json_encode($disposition)
+                    );
                 }
             }
             $inputs->staticState[$fqcn] = $properties;
@@ -77,23 +78,35 @@ final class Inputs
                 $fqcn,
                 $entry,
                 ['treatment', 'reason', 'statics', 'properties', 'staticProperties'],
-                [],
+                []
             );
             if (isset($entry['treatment']) && !in_array($entry['treatment'], Classifier::TREATMENTS, true)) {
-                throw new \RuntimeException("forced.json: $fqcn: unknown treatment " . json_encode($entry['treatment']));
+                throw new \RuntimeException(
+                    "forced.json: $fqcn: unknown treatment " . json_encode($entry['treatment'])
+                );
             }
             if (isset($entry['reason']) && !isset($entry['treatment'])) {
                 throw new \RuntimeException("forced.json: $fqcn: a reason belongs to a treatment");
             }
             foreach ($entry['statics'] ?? [] as $member => $override) {
-                self::expectKeys('forced.json', "$fqcn::$member", $override, ['status', 'reason'], ['status', 'reason']);
+                self::expectKeys(
+                    'forced.json',
+                    "$fqcn::$member",
+                    $override,
+                    ['status', 'reason'],
+                    ['status', 'reason']
+                );
                 if ($override['status'] !== 'forward') {
-                    throw new \RuntimeException("forced.json: $fqcn::$member: unknown status " . json_encode($override['status']));
+                    throw new \RuntimeException(
+                        "forced.json: $fqcn::$member: unknown status " . json_encode($override['status'])
+                    );
                 }
             }
             foreach ($entry['properties'] ?? [] as $property => $handling) {
                 if (!in_array($handling, self::PROPERTY_HANDLINGS, true)) {
-                    throw new \RuntimeException("forced.json: $fqcn::\$$property: unknown handling " . json_encode($handling));
+                    throw new \RuntimeException(
+                        "forced.json: $fqcn::\$$property: unknown handling " . json_encode($handling)
+                    );
                 }
             }
             foreach ($entry['staticProperties'] ?? [] as $property => $sync) {
@@ -130,7 +143,7 @@ final class Inputs
             throw new \RuntimeException("missing input file: $path");
         }
         $data = json_decode((string) file_get_contents($path), true, 512, JSON_THROW_ON_ERROR);
-        if (!is_array($data) || ($data !== [] && array_is_list($data))) {
+        if (!is_array($data) || $data !== [] && array_is_list($data)) {
             throw new \RuntimeException("$path: expected a JSON object");
         }
 
@@ -143,7 +156,7 @@ final class Inputs
      */
     private static function expectKeys(string $file, string $where, mixed $entry, array $allowed, array $required): void
     {
-        if (!is_array($entry) || ($entry !== [] && array_is_list($entry))) {
+        if (!is_array($entry) || $entry !== [] && array_is_list($entry)) {
             throw new \RuntimeException("$file: $where: expected an object");
         }
         foreach (array_keys($entry) as $key) {

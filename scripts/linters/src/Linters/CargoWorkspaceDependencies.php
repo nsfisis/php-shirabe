@@ -19,8 +19,10 @@ final class CargoWorkspaceDependencies implements Linter
 
     public function failureIntro(): string
     {
-        return "Found `[dependencies]` / `[dev-dependencies]` entries that do not use `workspace = true`.\n"
-            . 'In a crate `Cargo.toml`, only `name.workspace = true` or `name = { workspace = true, ... }` is allowed:';
+        return (
+            "Found `[dependencies]` / `[dev-dependencies]` entries that do not use `workspace = true`.\n"
+            . 'In a crate `Cargo.toml`, only `name.workspace = true` or `name = { workspace = true, ... }` is allowed:'
+        );
     }
 
     public function check(string $rootDir, array $excludes): array

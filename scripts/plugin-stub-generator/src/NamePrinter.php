@@ -39,10 +39,10 @@ final class NamePrinter extends Standard
             return '?' . $this->renderType($type->type, $context);
         }
         if ($type instanceof UnionType) {
-            return implode('|', array_map(fn (Node $t): string => $this->renderType($t, $context), $type->types));
+            return implode('|', array_map(fn(Node $t): string => $this->renderType($t, $context), $type->types));
         }
         if ($type instanceof IntersectionType) {
-            return implode('&', array_map(fn (Node $t): string => $this->renderType($t, $context), $type->types));
+            return implode('&', array_map(fn(Node $t): string => $this->renderType($t, $context), $type->types));
         }
         if ($type instanceof Name) {
             return $this->renderName($type, $context);

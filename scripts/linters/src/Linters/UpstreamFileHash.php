@@ -18,9 +18,11 @@ final class UpstreamFileHash implements Linter
 
     public function failureIntro(): string
     {
-        return "Found `ref: <file> sha1:<hash>` lines that do not match the sources under\n"
+        return (
+            "Found `ref: <file> sha1:<hash>` lines that do not match the sources under\n"
             . "composer/. On a hash mismatch, the file changed upstream: check that the Rust port\n"
-            . "or the PHP code follows it, then run `scripts/linters/upstream-file-hash update <file>...`:";
+            . 'or the PHP code follows it, then run `scripts/linters/upstream-file-hash update <file>...`:'
+        );
     }
 
     public function check(string $rootDir, array $excludes): array
