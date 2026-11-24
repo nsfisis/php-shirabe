@@ -17,11 +17,6 @@
       url = "github:oxalica/rust-overlay";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-
-    treefmt-nix = {
-      url = "github:numtide/treefmt-nix";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
   };
 
   outputs =
@@ -30,7 +25,6 @@
       nixpkgs,
       flake-utils,
       rust-overlay,
-      treefmt-nix,
       ...
     }:
     flake-utils.lib.eachDefaultSystem (
@@ -41,10 +35,6 @@
           overlays = [ rust-overlay.overlays.default ];
         };
         rustToolchain = pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
-        treefmt = treefmt-nix.lib.evalModule pkgs {
-          imports = [ ./treefmt.nix ];
-          programs.rustfmt.package = rustToolchain;
-        };
 
         php = pkgs.php85;
 
@@ -140,8 +130,6 @@
         };
       in
       {
-        formatter = treefmt.config.build.wrapper;
-
         packages = {
           inherit shirabe;
           default = shirabe;
@@ -153,6 +141,9 @@
             php
             php.packages.composer
             pkgs.just
+            pkgs.treefmt
+            pkgs.mago
+            pkgs.nixfmt
             pkgs.hyperfine
             pkgs.cargo-about
 

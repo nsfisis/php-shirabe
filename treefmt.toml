@@ -1,0 +1,20 @@
+[formatter.rustfmt]
+command = "rustfmt"
+options = ["--config", "skip_children=true"]
+includes = ["*.rs"]
+
+[formatter.mago]
+command = "mago"
+options = ["format"]
+includes = [
+    "*.php",
+    "scripts/linters/lint",
+    "scripts/linters/upstream-file-hash",
+    "scripts/plugin-class-classifier/classify",
+    "scripts/plugin-class-classifier/query",
+    "scripts/plugin-stub-generator/generate-stubs",
+]
+
+[formatter.nixfmt]
+command = "nixfmt"
+includes = ["*.nix"]

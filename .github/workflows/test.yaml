@@ -19,7 +19,7 @@ jobs:
         with:
           nix_path: nixpkgs=channel:nixos-unstable
 
-      - run: nix fmt -- --ci
+      - run: nix develop --command treefmt --ci
 
   tests:
     strategy:

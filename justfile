@@ -13,7 +13,7 @@ test: setup
     cargo test
 
 fmt:
-    nix fmt
+    treefmt
 
 setup: fetch-fixtures
     #!/usr/bin/env bash
